@@ -1,12 +1,14 @@
 ---
 status: Accepted
-date: 2026-05-02
+date: 2026-05-11
 deciders: shane
 supersedes:
 superseded-by:
 ---
 
 # ADR-015: Radar / map tiles strategy
+
+> **Amended 2026-05-11** during Phase 2 task 3b-15 brief-draft research. `mapbox_jma` dropped from the day-1 provider set — Mapbox's JMA tilesets are `raster-array` shape (multi-band, GL-JS-only) and the Mapbox Raster Tiles API doesn't expose band selection for raster-array tilesets, so they cannot be consumed by Leaflet with the 5-min nowcast animation that justified picking them. Japan radar at v0.1 falls back to RainViewer; re-adding Japan as a first-class provider requires either an alternative JMA-sourced XYZ-tile feed (e.g. jma.go.jp/bosai/nowc) or a separate ADR allowing Mapbox GL JS for the JMA case alongside Leaflet. Both deferred.
 
 ## Context
 
@@ -31,8 +33,9 @@ In `weewx_clearskies_api/providers/radar/`, conforming to [ADR-038](ADR-038-data
 - **`noaa_mrms`** — US AK / HI / PR / Guam via NOAA MapServer. Free, no key.
 - **`msc_geomet`** — Canada national mosaic via Environment Canada WMS-T. Free, attribution required.
 - **`dwd_radolan`** — Germany RADOLAN via DWD GeoWebService WMS. Free, 10-min cadence.
-- **`mapbox_jma`** — Japan via Mapbox-hosted JMA layers (5-min present + 60-min nowcast). Mapbox key required (free tier OK).
 - **`iframe`** — operator-supplied URL for regions without a tile-API path (BoM Australia, MetService NZ, regional met-service viewers). Loses theming/composition; documented tradeoff.
+
+Japan at v0.1 uses the RainViewer global mosaic (RainViewer's composite includes JMA returns; the 5-min nowcast feature is unavailable). See the 2026-05-11 amendment note above.
 
 Full per-region matrix and per-provider terms live in cat 8 of [CLEAR-SKIES-CONTENT-DECISIONS.md](../reference/CLEAR-SKIES-CONTENT-DECISIONS.md). Each module's capability declaration ([ADR-038](ADR-038-data-provider-module-organization.md) rule 4) carries its geographic coverage so the setup wizard can recommend per operator lat/lon.
 
@@ -41,7 +44,7 @@ Full per-region matrix and per-provider terms live in cat 8 of [CLEAR-SKIES-CONT
 1. Configuration UI reads operator lat/lon.
 2. Suggests a radar module based on region (e.g., Canada → `msc_geomet`).
 3. Operator confirms or picks a different module.
-4. For keyed modules (Aeris, OpenWeatherMap, Mapbox JMA): operator enters their API key. Keys stored per [ADR-027](ADR-027-config-and-setup-wizard.md).
+4. For keyed modules (Aeris, OpenWeatherMap): operator enters their API key. Keys stored per [ADR-027](ADR-027-config-and-setup-wizard.md).
 5. For `iframe`: operator pastes the URL.
 
 ### Key handling
@@ -63,7 +66,7 @@ Tile sources with time-stepped frames drive a frame-replay control on the radar 
 
 ## Consequences
 
-- Phase 2 builds 8 provider modules + the iframe config slot. Capability declarations populate the setup wizard's recommendation engine.
+- Phase 2 builds 7 provider modules + the iframe config slot. Capability declarations populate the setup wizard's recommendation engine.
 - Earthquakes page reuses Leaflet — same dependency, two consumers.
 - OpenWeatherMap radar UI label is "Model precipitation," not "Radar."
 - Keyed providers add proxy endpoints in clearskies-api (one route per keyed module).
@@ -73,6 +76,7 @@ Tile sources with time-stepped frames drive a frame-replay control on the radar 
 
 - Per-provider tile URL templates and WMS layer names — Phase 2.
 - Phase 6+ providers (Météo-France, KNMI, MeteoSwiss, EUMETNET OPERA, UK Met Office DataHub) — added as new modules when demand surfaces.
+- Japan as a first-class radar provider — deferred 2026-05-11. Either a Leaflet-compatible JMA-sourced feed (e.g. jma.go.jp/bosai/nowc) or an ADR allowing Mapbox GL JS for the JMA case is needed first.
 - Marine wave / sea-state overlays — out of v0.1 per cat 7.
 
 ## References

@@ -591,7 +591,7 @@ paths:
         Server-side proxy per ADR-015 + ADR-037 — keys never reach the
         browser. Free keyless providers can be fetched directly by the
         browser; this proxy is for keyed paths (`aeris`,
-        `openweathermap`, `mapbox_jma`).
+        `openweathermap`).
 
         Tile content type and per-provider URL templates are declared
         by the radar capability registry; see `/capabilities`.

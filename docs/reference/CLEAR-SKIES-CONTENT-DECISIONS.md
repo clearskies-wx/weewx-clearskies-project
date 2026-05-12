@@ -387,7 +387,7 @@ For each region, the question is: **what's the best free native-tile (XYZ/WMS) p
 | **Eastern Europe** | EUMETNET OPERA (when tile API ships) | Local met-service iframes | RainViewer mosaic |
 | **Russia** | None free that we found | n/a | RainViewer mosaic (very gappy across Russian interior); accept "no radar" outcome for many lat/lons |
 | **China** | None public/free; CMA radar is state-controlled | n/a | RainViewer mosaic (very gappy); accept "no radar" |
-| **Japan** | Mapbox Japan Weather Layers (Mapbox free tier; JMA data) — 5-min, present + 60-min forecast | jma.go.jp/bosai/en_nowc | **Mapbox JMA layers** (operator brings Mapbox key) — best-in-class for that region |
+| **Japan** | ~~Mapbox Japan Weather Layers (Mapbox free tier; JMA data) — 5-min, present + 60-min forecast~~ — deferred per ADR-015 2026-05-11 amendment (raster-array tilesets are GL-JS-only, not Leaflet-compatible) | jma.go.jp/bosai/en_nowc | **RainViewer global mosaic** at v0.1 (includes JMA returns but no 5-min nowcast). Future Japan-first-class path needs either a Leaflet-compatible JMA tile feed or an ADR allowing Mapbox GL JS for the JMA case. |
 | **India** | None public/free for tiles | mausam.imd.gov.in iframe | RainViewer mosaic + iframe fallback |
 | **Southeast Asia (TH, VN, ID, MY, PH, SG)** | None pan-regional free | National met-service iframes | RainViewer mosaic |
 | **Australia** | None native (BoM is FTP non-commercial) | bom.gov.au radar pages | **iframe to bom.gov.au** (RainViewer is gappy across the Australian interior) |
@@ -408,7 +408,7 @@ For each region, the question is: **what's the best free native-tile (XYZ/WMS) p
    - Canada → MSC GeoMet WMS
    - Germany → DWD GeoWebService WMS
    - Netherlands → KNMI Data Platform WMS
-   - Japan → Mapbox JMA layers (operator must add Mapbox key)
+   - Japan → RainViewer fallback at v0.1 (mapbox_jma deferred per ADR-015 2026-05-11 amendment — raster-array tilesets need Mapbox GL JS; ADR-015 locks Leaflet)
    - Australia / NZ → iframe to BoM / MetService (with explicit "iframe mode" warning in UI)
    - Everywhere else → **RainViewer global mosaic** (XYZ tiles, free personal use, attribution required, but downgraded vs. its 2024-era capability — past 2hr only, no nowcast, zoom ≤7, fixed palette)
 
