@@ -300,6 +300,52 @@ OWM also publishes regional variants (UK / Europe / USA / Mainland China) at htt
 - **No location label in the response.** Canonical `aqiLocation` stays null for this provider.
 - **NH₃ and NO are extras.** Present on the wire, not in EPA AQI, not on canonical AQIReading — dropped during translation.
 
+### Weather Maps 1.0 (free)
+
+**Provenance:** Written 2026-05-11 from upstream documentation (https://openweathermap.org/api/weathermaps). **NOT live-verified at brief-draft time.** Test-author should capture a live tile response during fixture work and surface any divergence per `rules/clearskies-process.md` "api-docs file provenance is part of the cross-check."
+
+OpenWeatherMap exposes weather model layers as XYZ slippy-map raster tiles. Day-1 layer per [ADR-015](../../decisions/ADR-015-radar-map-tiles-strategy.md) is `precipitation_new` — labeled **"Model precipitation"** in the dashboard, NOT "Radar," because OWM serves NWP-model output, not radar reflectivity.
+
+#### Tile URL template
+
+```
+https://tile.openweathermap.org/map/{layer}/{z}/{x}/{y}.png?appid={appid}
+```
+
+- `{layer}` — one of `precipitation_new`, `clouds_new`, `pressure_new`, `wind_new`, `temp_new`. Clear Skies day-1 uses `precipitation_new`.
+- `{z}` / `{x}` / `{y}` — slippy-map zoom + tile coordinates.
+- `{appid}` — OWM API key, query parameter.
+
+#### Tile content type
+
+`image/png`. Transparent background; meant to overlay on a basemap.
+
+#### Time-stepping
+
+**None — current-only.** Weather Maps 1.0 has no `?t=...` parameter; every request returns the latest available tile. Weather Maps 2.0 (paid) adds hourly historical + forecast layers, but that's out of v0.1 scope.
+
+For the canonical `/radar/providers/openweathermap/frames` response, this means: at most one frame, kind=`current`. Acceptable per the canonical model (RadarFrameList allows an empty or single-entry list); the dashboard renders the static tile without a frame slider when `frames=[]` or `frames=[current]`.
+
+#### Authentication / tier gating
+
+- A basic OWM `appid` (free tier) is sufficient — no Weather Maps subscription required for the 1.0 layers.
+- `precipitation_new` and the other four day-1 layers are documented as free.
+- 401/403 from this endpoint indicates `appid` invalid or revoked → canonical `KeyInvalid`.
+
+#### Rate limits
+
+Free tier: 60 calls/min, 1,000,000 calls/month (shared bucket with other free-tier OWM endpoints per https://openweathermap.org/price). Tile requests count individually; a single map view typically loads 4–20 tiles. The api caches tile bytes per ADR-017, so polling cost is bounded.
+
+#### Cache-Control on tile responses
+
+Per ADR-017, the tile proxy honors upstream `Cache-Control: max-age=...` if present; defaults to 300s otherwise. Upstream behavior **not live-verified** — test-author should capture and document.
+
+#### Known gotchas
+
+- **Tile coverage is global.** No partial-domain restrictions like the WMS providers; works for any (z, x, y) the operator's viewport requests.
+- **Layer is model precipitation, not radar reflectivity.** Operators expecting radar-style returns (e.g., NEXRAD echo intensity) will see something different. Dashboard labels this as "Model precipitation" per ADR-015 line 28.
+- **No `t` parameter despite OpenAPI spec exposing `?t=` on the proxy.** Per LC-7 in the round brief, the api accepts `?t` but ignores it for OWM (always returns current). Documented behavior; not a bug.
+
 ### Other free / paid endpoints (overview only)
 
 | Product | Path | Tier |

@@ -338,6 +338,54 @@ All endpoints use a path of the form `/<endpoint>/<action>` where `<action>` is 
   - HTTP error codes specific to this endpoint not enumerated separately — falls back to the common Aeris status codes documented above.
   - Plan/tier requirements for endpoint access not stated.
 
+### Raster Maps (radar)
+
+**Provenance:** Written 2026-05-11 from upstream documentation (https://www.xweather.com/docs/maps/getting-started/map-tiles; AerisWeather rebranded to Xweather mid-2025). **NOT live-verified at brief-draft time.** Test-author should capture a live tile response during fixture work and surface any divergence per `rules/clearskies-process.md` "api-docs file provenance is part of the cross-check."
+
+Aeris exposes radar mosaic + many other weather layers as XYZ slippy-map raster tiles via the Maps API (formerly "AerisWeather Maps," now "Xweather Raster Maps"). Day-1 layer per [ADR-015](../../decisions/ADR-015-radar-map-tiles-strategy.md) is `radar` — global radar mosaic.
+
+#### Tile URL template
+
+```
+https://maps.api.xweather.com/{client_id}_{client_secret}/{layers}/{z}/{x}/{y}/{offset}.png
+```
+
+- `{client_id}_{client_secret}` — credentials embedded in the URL **path**, joined by an underscore. This is structurally different from every other Aeris endpoint (which use query-string auth) and creates a logging-leak risk — see §3 lead-call LC-E in the round brief.
+- `{layers}` — one or comma-separated; Clear Skies day-1 uses `radar`. Other useful layers: `flat` (basemap), `admin` (boundaries), `radar-global` (alias) — but day-1 sticks to plain `radar`.
+- `{z}` / `{x}` / `{y}` — slippy-map zoom + tile coordinates. Normal range 1-21.
+- `{offset}` — time offset. `current` for latest; documented relative-offset syntax (`-5min`, `-10min`, `-15min`, etc.) for past frames. Verbatim list of supported offsets not on the getting-started page; check the Time Offsets reference page during fixture capture.
+
+#### Tile content type
+
+`image/png`. Transparent background; meant to overlay on a basemap.
+
+#### Time-stepping
+
+**Supported** via the `{offset}` URL segment. Past frames at 5-min increments are typical for the radar mosaic. For Clear Skies v0.1 the tile proxy always passes `current` (time-step animation is a Phase-2 feature beyond this round — see brief LC-7). The `?t` query parameter on the proxy is accepted but ignored at v0.1; future round can wire it to `{offset}`.
+
+For `/radar/providers/aeris/frames`, the api returns a single-entry list with `kind=current` (parity with OWM). The frame index can be extended in a later round to call Aeris's `/info` or `/maps/img` endpoints if Aeris exposes past-frame timestamps.
+
+#### Authentication / tier gating
+
+- Credentials live in the URL **path**, not the query string — `{client_id}_{client_secret}` joined by underscore.
+- The **AerisWeather Contributor Plan** (free tier, granted via PWSWeather membership at https://pwsweather.com/contribute) bundles Maps API access. Operators who contribute their PWS data to PWSWeather get a client_id + client_secret pair usable across all Aeris endpoints, including the radar tiles documented here.
+- **NOT live-verified during brief-draft** — confirm Contributor-Plan Maps access still includes the radar mosaic during fixture capture. If access is gated to a paid plan, brief assumptions need to flip and the round closes with a documented "free-path unavailable" finding.
+- 401/403 → canonical `KeyInvalid`; 429 → `QuotaExhausted` with `Retry-After`.
+
+#### Rate limits
+
+Aeris Maps API plan-tier-conditional. Contributor Plan limits not documented on the page captured; operator pays via the Aeris portal for higher tiers if needed. Polling cost is bounded by ADR-017 tile cache (300s default).
+
+#### Logging-leak risk (security baseline)
+
+The path-embedded credential pattern is the only Aeris endpoint that puts secrets in the URL itself (other endpoints use query-string auth, which the `logging.Filter` redaction layer per ADR-029 already strips). The radar provider module **must** redact the path credential before any URL is logged. See brief LC-E.
+
+#### Known gotchas
+
+- **Layer name conventions can shift.** The page captured today uses `radar`; older Aeris docs reference `radar:global`. Brief assumption locks `radar`; cross-check at fixture time.
+- **`{offset}` syntax not enumerated in full** on the captured page; check Time Offsets reference page during fixture capture.
+- **The base URL is `maps.api.xweather.com`** (rebrand from `maps.api.aerisapi.com`). Confirm during live capture that the rebrand is server-side complete; some old docs still cite the aerisapi.com domain.
+
 ## Common query parameters (all endpoints)
 
 - `p=<location>` — place; alternative to passing the location in the path
