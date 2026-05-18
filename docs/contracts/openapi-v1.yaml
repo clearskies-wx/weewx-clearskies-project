@@ -1445,6 +1445,26 @@ components:
           description: '"global" or operator-meaningful region descriptor.'
         defaultPollIntervalSeconds: { type: integer, minimum: 0 }
         operatorNotes: { type: string, nullable: true }
+        tileUrlTemplate:
+          type: string
+          nullable: true
+          description: 'XYZ slippy tile URL template ({z}/{x}/{y} placeholders). Radar XYZ providers only.'
+        wmsEndpointUrl:
+          type: string
+          nullable: true
+          description: 'WMS GetMap base URL. Radar WMS-T providers only.'
+        wmsLayerName:
+          type: string
+          nullable: true
+          description: 'WMS layer name. Radar WMS-T providers only.'
+        tileContentType:
+          type: string
+          nullable: true
+          description: 'MIME type for tile content (e.g. image/png). All radar providers.'
+        iframeUrl:
+          type: string
+          nullable: true
+          description: 'Operator-supplied iframe URL. iframe radar provider only.'
       required: [providerId, domain, suppliedCanonicalFields, geographicCoverage]
 
     CapabilityRegistry:
