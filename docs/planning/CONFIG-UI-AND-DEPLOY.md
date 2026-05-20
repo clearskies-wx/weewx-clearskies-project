@@ -1,8 +1,39 @@
 # Plan: Build Config UI + Deploy Clear Skies for Live Testing
 
-**Status:** Approved 2026-05-19. Phase 0 not yet started.
+**Status:** Phases 0–D complete. Phase E (live testing) surfaced 30 UX issues → **UX fix plan inserted before resuming Phase E.**
 **Approved by:** shane
 **Predecessor:** Phase 4 (clearskies-realtime + integration) completed 2026-05-19.
+
+### Execution progress (2026-05-20)
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| Phase 0 | **Complete** | ADR-027 updated, plan amended with 18 compliance gaps |
+| Phase A | **Complete** | Config UI built: 8 rounds (A1–A8), 14 commits, ~8000 lines, 200 tests |
+| Phase B | **Complete** | Container moved to VLAN 7 (192.168.7.7), hostname `clearskies`, DB user created |
+| Phase C | **Complete** | API on weewx, Apache + realtime + dashboard + config tool on test container |
+| Phase D | **Complete** | Services running, Apache vhost, NPM proxy at `weather-test.shaneburkhardt.com` |
+| Phase E | **Paused** | Live browser testing surfaced 30 UX issues. Fix plan inserted. |
+| **UX Fix Plan** | **Next** | See [CONFIG-UI-UX-FIXES.md](CONFIG-UI-UX-FIXES.md) — 6 rounds, then resume Phase E |
+
+### Resume point after UX fixes
+
+When the UX fix plan completes, resume this plan at **Phase E step E3** (browser testing). Steps E1–E2 (service verification) were already done. The test URL is `https://weather-test.shaneburkhardt.com/`. Services may need restarting — check before testing.
+
+### Hotfixes applied during Phase E testing
+
+- `8932d71` — bootstrap token not consumed on validation failure
+- `69a238d` — ConfigObj BytesIO fix, station.py altitude list handling
+- Apache vhost updated with all config tool proxy paths
+- NPM proxy host uses FQDN `clearskies.shaneburkhardt.com`, not hardcoded IP
+- DNS: `weather-test.shaneburkhardt.com` CNAME → `npm.shaneburkhardt.com`
+
+### Known issues from Phase E (not in UX fix plan)
+
+- SSE realtime service has a ContextVar bug (`sse_starlette` crashes on connect)
+- Archive endpoint returns empty (API query/config issue)
+- Forecast returns empty (no provider configured — expected, wizard not complete)
+- `weewx-clearskies-api` `bind_host = ::` not honored (using `0.0.0.0` workaround)
 
 ---
 
