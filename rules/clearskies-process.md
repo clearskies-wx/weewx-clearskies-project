@@ -83,6 +83,8 @@ Use the Nygard format. Template at `docs/decisions/_TEMPLATE.md`. Required: Stat
 
 **Dev/test runs in `weather-dev` LXD container, not Windows.** Shell into container: `ssh weather-dev "<command>"`. File sync: push to GitHub from DILBERT, then run `scripts/sync-to-weather-dev.sh`. Browser testing: `http://192.168.2.113:<port>`. DILBERT = editing + git + planning only.
 
+**Single test host.** All services (API, realtime, config UI), the dashboard, and the web server run on `weather-dev`. Do not split services across containers for testing — one host, everything local.
+
 **PowerShell multi-line commits: use `git commit -F`.** Write message to `c:\tmp\<task>-msg.txt`, then `git commit -s -F c:\tmp\<task>-msg.txt`. PowerShell heredocs break on parens/quotes.
 
 ## Plan and documentation discipline

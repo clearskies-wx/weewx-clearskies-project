@@ -20,6 +20,8 @@
 
 UX fixes are complete. Resume this plan at **Phase E step E3** (browser testing). Steps E1–E2 (service verification) were already done. The test URL is `https://weather-test.shaneburkhardt.com/`. Services may need restarting — check before testing.
 
+**Test host:** All services, dashboard, and testing on `weather-dev` (192.168.2.113) only. Do not split across containers.
+
 ### Hotfixes applied during Phase E testing
 
 - `8932d71` — bootstrap token not consumed on validation failure
