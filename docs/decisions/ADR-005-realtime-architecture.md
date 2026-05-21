@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Proposed
 date: 2026-04-30
 deciders: shane
 ---
@@ -50,20 +50,19 @@ Both modes feed the same internal SSE emitter, so the dashboard sees an identica
 [input]
 mode = direct  # direct | mqtt
 
-[input.direct]
-# (no config needed — bound to the weewx engine process)
+    # (no config needed for direct mode — bound to the weewx engine process)
 
-[input.mqtt]
-broker_host = mqtt.example.local
-broker_port = 8883
-topic = weewx/loop
-client_id = weewx-clearskies-realtime
-username = weewx-web
-password_env = WEEWX_CLEARSKIES_MQTT_PASSWORD  # from env, not the config file
-tls = true
-ca_file =                                       # optional
-qos = 0
-keepalive = 60
+    [[mqtt]]
+    broker_host = 127.0.0.1
+    broker_port = 1883
+    topic = weewx/loop
+    client_id = weewx-clearskies-realtime
+    username =
+    password_env = WEEWX_CLEARSKIES_MQTT_PASSWORD
+    tls = false
+    ca_file =
+    qos = 0
+    keepalive = 60
 ```
 
 ### Direct mode

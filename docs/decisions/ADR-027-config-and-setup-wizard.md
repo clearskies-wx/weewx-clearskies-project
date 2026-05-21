@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Proposed
 date: 2026-05-04
 updated: 2026-05-20
 deciders: shane
@@ -207,9 +207,9 @@ weewx-clearskies-config --show-secrets        # re-prints current secrets for cr
 weewx-clearskies-config --headless            # non-interactive flags-only mode
 ```
 
-### Wizard flow (5 steps)
+### Wizard flow (6 steps)
 
-Reduced from the original 9-step design during live testing (2026-05-20). Removed steps: topology (auto-detected from DB host — localhost = same-host, remote = cross-host) and bind addresses (auto-configured from topology; still accessible in master config for power users). API Keys merged into Providers (step 4).
+Reduced from the original 9-step design during live testing (2026-05-20). Removed steps: topology (auto-detected from DB host — localhost = same-host, remote = cross-host) and bind addresses (auto-configured from topology; still accessible in master config for power users). API Keys merged into Providers (step 5).
 
 **Step 1 — Database connection.** DB type + connection string. Unchanged from prior design.
 
@@ -217,9 +217,11 @@ Reduced from the original 9-step design during live testing (2026-05-20). Remove
 
 **Step 3 — Station identity.** Auto-populated from the API's `/station` endpoint, not from local `weewx.conf`. Fields: station name, latitude/longitude, altitude (displayed in operator's preferred unit system). An explicit "Detect from weewx.conf" button appears only when the config tool is running on the weewx host. "Use my location" browser geolocation is also available.
 
-**Step 4 — Provider selection + API keys (merged).** Forecast and alert provider dropdowns. When a key-required provider is selected, an inline key entry field appears immediately — no separate step. Inline connectivity test runs after key entry. Single-provider keyless domains (earthquakes, radar) are shown as informational panels with no dropdown. Alert provider selection considers forecast provider overlap (NWS is default for US users where forecast + alert come from the same provider).
+**Step 4 — Data pipeline.** Choose input mode: **Direct** (bound to the weewx engine process; no broker needed) or **MQTT** (subscriber mode for users with an existing broker). When MQTT is selected, inline fields appear for broker host, port, topic, client ID, username, password (stored as env var reference), TLS toggle, CA file path, QoS, and keepalive. Inline connectivity test runs after MQTT credentials are entered.
 
-**Step 5 — Review + apply.** Summary of all choices; operator confirms; config written to disk.
+**Step 5 — Provider selection + API keys (merged).** Forecast and alert provider dropdowns. When a key-required provider is selected, an inline key entry field appears immediately — no separate step. Inline connectivity test runs after key entry. Single-provider keyless domains (earthquakes, radar) are shown as informational panels with no dropdown. Alert provider selection considers forecast provider overlap (NWS is default for US users where forecast + alert come from the same provider).
+
+**Step 6 — Review + apply.** Summary of all choices; operator confirms; config written to disk.
 
 **Auth flow refinements (from live testing):**
 - Bootstrap auto-logs in after credentials are set — no redirect to a separate login page.
@@ -231,7 +233,7 @@ Reduced from the original 9-step design during live testing (2026-05-20). Remove
 
 ### Configuration UI collected fields
 
-DB type + connection; forecast provider + credentials per [ADR-007](ADR-007-forecast-providers.md); alert provider; station identity (populated from `/station` endpoint); public hostname for the docker-compose Caddy path; logging destination; UI's own bind/port + TLS cert paths + `[ui] enabled` flag (latter not flippable from the UI — would lock the operator out). Topology and bind addresses for api/realtime are auto-configured from the DB connection and available in the master config for power users.
+DB type + connection; input mode (`direct` / `mqtt`); MQTT fields when mqtt is selected: `mqtt_broker_host`, `mqtt_broker_port`, `mqtt_topic`, `mqtt_client_id`, `mqtt_username`, `mqtt_password` (env var reference only — stored in `secrets.env`), `mqtt_tls`, `mqtt_qos`, `mqtt_keepalive`; forecast provider + credentials per [ADR-007](ADR-007-forecast-providers.md); alert provider; station identity (populated from `/station` endpoint); public hostname for the docker-compose Caddy path; logging destination; UI's own bind/port + TLS cert paths + `[ui] enabled` flag (latter not flippable from the UI — would lock the operator out). Topology and bind addresses for api/realtime are auto-configured from the DB connection and available in the master config for power users.
 
 NOT collected: theme/branding ([ADR-022](ADR-022-theming-branding-mechanism.md)), i18n locale ([ADR-021](ADR-021-i18n-strategy.md)), end-user accounts (none — see [ADR-008](ADR-008-auth-model.md)).
 
