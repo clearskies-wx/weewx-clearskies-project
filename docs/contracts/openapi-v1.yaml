@@ -1220,6 +1220,13 @@ components:
         firstRecord: { type: string, format: date-time, nullable: true }
         lastRecord: { type: string, format: date-time, nullable: true }
         hardware: { type: string, nullable: true }
+        defaultLocale:
+          type: string
+          description: |
+            Default locale for the dashboard (ADR-021). One of the 13 supported
+            locale codes. The dashboard uses this as the initial language, with
+            browser preference as a fallback.
+          example: "en"
       required: [stationId, name, latitude, longitude, altitude, timezone, unitSystem]
 
     # ---------- Almanac entities ----------
