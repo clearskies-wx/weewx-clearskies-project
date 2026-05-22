@@ -363,11 +363,14 @@ Full entries in [decision-log-phase1-scaffold.md](decision-log-phase1-scaffold.m
 
 A phase-boundary ADR compliance sweep on 2026-05-19 identified 18 gaps; a deeper sweep on 2026-05-22 found additional issues and confirmed prior findings. These must be resolved before v0.1 public release.
 
+**Tier 1 (release-blocking):** Gaps #4, #16, #17 resolved 2026-05-22 (docker-compose stack).
+**Tier 2 (complete misses):** Gaps #1, #2, #3, #26 resolved 2026-05-22 (i18n, metrics, perf infra).
+
 | # | Gap | ADR(s) | Severity | Status | Notes |
 |---|-----|--------|----------|--------|-------|
-| 1 | Internationalization — no i18n library, no locale files, inline English throughout | [ADR-021](../decisions/ADR-021-i18n-strategy.md) | **Complete miss** | ⬜ | 13 locales required. No `src/i18n/` directory. Static `lang="en"` in index.html. |
-| 2 | Prometheus metrics endpoint | [ADR-031](../decisions/ADR-031-observability-metrics.md) | **Complete miss** | ⬜ | No `/metrics`, no `prometheus-client` dep, no `CLEARSKIES_METRICS_ENABLED` config. |
-| 3 | Performance measurement infrastructure | [ADR-033](../decisions/ADR-033-performance-budget.md) | **Complete miss** | ⬜ | No Lighthouse CI, no pytest-benchmark, no bundle-size CI. |
+| 1 | Internationalization — no i18n library, no locale files, inline English throughout | [ADR-021](../decisions/ADR-021-i18n-strategy.md) | **Complete miss** | ✅ | Shipped 2026-05-22: react-i18next infra, ~255 keys extracted from 16 files, 13 locale JSONs, dynamic `<html lang>`, API `default_locale` setting, wizard locale picker. |
+| 2 | Prometheus metrics endpoint | [ADR-031](../decisions/ADR-031-observability-metrics.md) | **Complete miss** | ✅ | Shipped 2026-05-22: `/metrics` on health port (8081) behind `CLEARSKIES_METRICS_ENABLED`. 7 ADR-031 metrics, 46 tests. Known partial: `provider_calls_total{outcome="cache_hit"}` deferred. |
+| 3 | Performance measurement infrastructure | [ADR-033](../decisions/ADR-033-performance-budget.md) | **Complete miss** | ✅ | Shipped 2026-05-22: Lighthouse CI + bundle size workflow in dashboard, pytest-benchmark in API. Targets not gates per ADR-033. |
 | 4 | Production docker-compose.yml | [ADR-034](../decisions/ADR-034-deployment-topology-default.md) | **Release blocker** | ✅ | Shipped 2026-05-22: docker-compose.yml + Caddyfile + .env.example in stack repo. Caddy + api + realtime + dashboard init container. All 3 images build on weather-dev. |
 | 5 | Realtime direct mode | [ADR-005](../decisions/ADR-005-realtime-architecture.md) | **Major** | ⬜ | MQTT-only. `__main__.py` says "not yet implemented." Default should be `direct`, is `mqtt`. |
 | 6 | Leaflet maps (earthquake + radar) | [ADR-015](../decisions/ADR-015-radar-tile-providers.md), [ADR-024](../decisions/ADR-024-page-taxonomy.md) | **Major** | ⬜ | Leaflet not installed. Map components are placeholders. |
@@ -390,7 +393,7 @@ A phase-boundary ADR compliance sweep on 2026-05-19 identified 18 gaps; a deeper
 | 23 | Screen-reader data-table fallbacks for charts | [ADR-026](../decisions/ADR-026-accessibility-commitments.md) | **Medium** | ⬜ | Charts have no sr-only data table alongside. |
 | 24 | API DEVELOPMENT.md "how to add a provider" | [ADR-038](../decisions/ADR-038-data-provider-module-organization.md) | **Minor** | ⬜ | No DEVELOPMENT.md in api repo. |
 | 25 | TypeScript codegen from OpenAPI | [ADR-018](../decisions/ADR-018-api-versioning-policy.md) | **Minor** | ⬜ | Dashboard types are manually maintained, not generated from spec. |
-| 26 | API benchmark suite | [ADR-033](../decisions/ADR-033-performance-budget.md) | **Minor** | ⬜ | No pytest-benchmark for endpoint performance measurement. |
+| 26 | API benchmark suite | [ADR-033](../decisions/ADR-033-performance-budget.md) | **Minor** | ✅ | Shipped 2026-05-22: pytest-benchmark in `tests/benchmarks/` with 4 ADR-033 endpoint classes. Covered by Gap #3. |
 
 ---
 
