@@ -1,6 +1,6 @@
 # Plan: Build Config UI + Deploy Clear Skies for Live Testing
 
-**Status:** Phases 0–D complete. Phase E (live testing) surfaced 30 UX issues → **UX fix plan inserted before resuming Phase E.**
+**Status:** Phases 0–E complete. Config UI wizard fully tested, including re-run flow and automated service restarts.
 **Approved by:** shane
 **Predecessor:** Phase 4 (clearskies-realtime + integration) completed 2026-05-19.
 
@@ -13,7 +13,7 @@
 | Phase B | **Complete** | Container moved to VLAN 7 (192.168.7.7), hostname `clearskies`, DB user created |
 | Phase C | **Complete** | API on weewx, Apache + realtime + dashboard + config tool on test container |
 | Phase D | **Complete** | Services running, Apache vhost, NPM proxy at `weather-test.shaneburkhardt.com` |
-| Phase E | **Ready to resume — UX fixes complete** | Live browser testing surfaced 30 UX issues. Fix plan inserted. |
+| Phase E | **Complete** | Wizard tested end-to-end across 6 rounds. Re-run flow, secret pre-population, altitude unit display, automated service restarts all verified. |
 | **UX Fix Plan** | **Complete** | See [CONFIG-UI-UX-FIXES.md](CONFIG-UI-UX-FIXES.md) — 6 rounds, then resume Phase E |
 
 ### Resume point
@@ -36,6 +36,32 @@ UX fixes are complete. Resume this plan at **Phase E step E3** (browser testing)
 - Archive endpoint returns empty (API query/config issue)
 - Forecast returns empty (no provider configured — expected, wizard not complete)
 - `weewx-clearskies-api` `bind_host = ::` not honored (using `0.0.0.0` workaround)
+
+### Phase E closeout (2026-05-21)
+
+**Wizard testing: 6 rounds, 12 commits across 2 repos.**
+
+weewx-clearskies-stack (9 commits):
+- Bootstrap prompt false positive — secrets.env two-writer conflict (read-merge fix)
+- Secret fields pre-populated on re-run (DB, MQTT, provider API keys)
+- Aeris credentials field name mismatch in remap + apply payload
+- Review page "Not connected" in re-run mode (template checked wrong auth field)
+- Altitude unit display + grid alignment on Step 4
+- Altitude unit not detected on re-run with stale progress file
+- Automated service restart with live HTMX status polling on Apply success
+
+weewx-clearskies-api (2 commits):
+- POST /setup/restart endpoint (proxy-auth required, deferred SIGTERM)
+- GET /health on main port for cross-container restart detection
+
+Infrastructure changes:
+- Both services changed to Restart=always in systemd units
+- API reinstalled as editable package (stale wheel was silently running old code)
+
+**Remaining known issues (carry forward to Phase 5):**
+- SSE realtime service ContextVar bug (sse_starlette crashes on connect)
+- Archive endpoint returns empty (API query/config issue)
+- weewx-clearskies-api bind_host = :: not honored (using 0.0.0.0 workaround)
 
 ---
 
