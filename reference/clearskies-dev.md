@@ -2,6 +2,82 @@
 
 Load alongside [rules/clearskies-process.md](../rules/clearskies-process.md) when doing Clear Skies implementation work.
 
+## Deployment architecture (ADR-034, ADR-027, ADR-038)
+
+### Two topologies
+
+| Topology | API runs… | Config UI + realtime + dashboard run… | Wizard detects via… |
+|---|---|---|---|
+| **Same-host** (default) | On the weewx host | On the weewx host | DB host is loopback |
+| **Cross-host** | On the weewx host (where the DB is) | On a separate host | DB host is non-loopback |
+
+**The API ALWAYS co-locates with weewx.** The API reads the weewx archive DB and `weewx.conf` locally. It does not belong on any other host. If the operator's dashboard is on a different machine, the API still stays with weewx.
+
+### Wizard → API communication (ADR-038)
+
+The wizard talks to the **API**, not the database. Flow:
+
+1. Operator installs API on weewx host. API generates TLS cert + trust token on first start.
+2. Operator opens wizard on the dashboard host. Step 1: enters API address + trust token + fingerprint.
+3. Wizard connects to API over TLS. All DB operations go through the API.
+4. On Apply: wizard POSTs config payload to `POST /setup/apply` → **API writes its own `api.conf` and `secrets.env`** (DB creds, provider keys). Wizard writes LOCAL files only (`realtime.conf`, `stack.conf`, local `secrets.env` with proxy secret + MQTT password).
+5. Wizard triggers restarts: API via `POST /setup/restart`, realtime locally.
+
+**The wizard does NOT write `api.conf`.** The API writes its own config after receiving the Apply payload. This is by design (ADR-038).
+
+### What goes where
+
+| File | Written by | Lives on | Contains |
+|---|---|---|---|
+| `api.conf` | API (via `/setup/apply`) | weewx host | DB connection, station metadata, providers, bind address |
+| `realtime.conf` | Wizard config_writer | Dashboard host | SSE bind address, MQTT settings (password as env var ref) |
+| `stack.conf` | Wizard config_writer | Dashboard host | UI settings, station display info, topology |
+| `secrets.env` (API side) | API (via `/setup/apply`) | weewx host | DB password, provider API keys, proxy secret |
+| `secrets.env` (local side) | Wizard config_writer | Dashboard host | Proxy secret, MQTT password |
+
+### Topology auto-detection (routes.py lines 823–836)
+
+```
+DB host is loopback → same-host → api_bind_host = 127.0.0.1, realtime_bind_host = 127.0.0.1
+DB host is remote   → cross-host → api_bind_host = ::, realtime_bind_host = ::, generate proxy_secret
+```
+
+### Pipeline auto-detection (routes.py lines 951–988)
+
+```
+API address is loopback → direct mode (no MQTT needed, same machine)
+API address is remote   → MQTT mode (broker bridges loop packets between hosts)
+```
+
+### Our test infrastructure = cross-host topology
+
+| Host | IP | Role | Services |
+|---|---|---|---|
+| **weewx** (LXD container) | 192.168.7.20 | weewx + API | weewx, weewx-clearskies-api (port 8765 TLS) |
+| **weather-dev** (LXD container) | 192.168.2.113 | Dashboard host | weewx-clearskies-config (9876), weewx-clearskies-realtime (8766), dashboard static files, Apache |
+| **nextcloud** (LXD container) | 192.168.7.2 | MQTT broker | EMQX (port 1883) |
+
+### One-door reverse proxy (ADR-037)
+
+All public traffic goes through ONE web server. Browser uses relative URLs (`/api/v1/...`, `/sse`). Inner services bind to loopback, never publicly exposed. The proxy routes:
+
+| Browser path | Proxied to |
+|---|---|
+| `/` (SPA) | Static dashboard files |
+| `/api/v1/*` | clearskies-api (127.0.0.1:8765) |
+| `/sse` | clearskies-realtime (127.0.0.1:8766) |
+
+For docker-compose: Caddy is the proxy (bundled, automatic, zero-config).
+For native install: operator's existing web server (Apache/nginx/Caddy). Project ships example configs.
+
+CORS is a non-issue by design — everything is same-origin through the proxy.
+
+### Production docker-compose (ADR-034)
+
+The production `docker-compose.yml` (Caddy + api + realtime + dashboard) is in the stack repo root. `docker compose up` yields a working stack with auto-LE TLS. Built and tested on weather-dev 2026-05-22 — all 3 images build, dashboard init container populates shared volume, Caddy serves SPA. The dev/test compose (MariaDB + seed data) remains at `dev/docker-compose.yml`.
+
+**There should be NO clearskies-api running on weather-dev.** The API belongs on the weewx host (where the DB and weewx.conf live).
+
 ## Two-machine split
 
 | Machine | Role | What runs here |
@@ -40,18 +116,6 @@ Meta repo (`c:\CODE\weather-belchertown\`) default branch: **master**.
 ```
 
 Owner: `ubuntu`. Container IP: `192.168.2.113` (DHCP/SLAAC on `br-vlan2`).
-
-### weather-deploy-rehearsal (deploy rehearsal)
-
-```
-/root/   # runs as root (pristine container, no ubuntu user)
-```
-
-Container IP: `192.168.2.120` (DHCP on `br-vlan2`). Ephemeral — tear down and rebuild per rehearsal pass. `security.nesting=true`, `limits.memory=4GB`.
-
-Access: `ssh ratbert "lxc exec weather-deploy-rehearsal -- <command>"`
-
-Toolchain: Python 3.12.3, Node 22.22.2, Docker 29.5.1 + Compose v5.1.3, uv 0.11.15, git 2.43.0.
 
 ## SSH access
 
