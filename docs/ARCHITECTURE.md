@@ -1,0 +1,375 @@
+# Clear Skies — System Architecture
+
+Single source of truth for what each service is, where it runs, what it exposes, and how traffic flows. **Read this before any architecture work. Update it after any architecture change.**
+
+Authoritative for current system state. ADRs are authoritative for *why* decisions were made. If this document conflicts with an ADR, investigate — one of them is stale.
+
+Last verified: 2026-05-23 (all 40 ADRs read, all 5 repos code-audited).
+
+---
+
+## Services
+
+| Service | Repo | What it does | Technology | Main port | Health port |
+|---------|------|-------------|------------|-----------|-------------|
+| **API** | weewx-clearskies-api | REST API for weewx archive data, provider aggregation, setup endpoints | FastAPI (Python 3.12+), sync handlers, SQLAlchemy 2.x sync, uvicorn | 8765 | 8081 |
+| **Realtime** | weewx-clearskies-realtime | Bridges weewx loop packets to Server-Sent Events | FastAPI (Python), sse-starlette, uvicorn | 8766 | 8082 |
+| **Dashboard** | weewx-clearskies-dashboard | Weather UI (static SPA, 9 pages + custom pages) | React 19, Vite 8, Tailwind CSS v4, shadcn/ui, Recharts, Leaflet, Lucide + Weather Icons, i18next | None (init container) | — |
+| **Config UI** | weewx-clearskies-stack | Setup wizard (7 steps) + ongoing config admin | FastAPI, Jinja2, HTMX, Pico CSS (Python-only, no Node build step) | 9876 | — |
+| **Caddy** | upstream (caddy:2-alpine) | Reverse proxy, TLS termination (auto Let's Encrypt), static file server | Caddy | 80, 443 | — |
+| **Redis** | upstream (redis:7-alpine) | Optional cache for provider API responses | Redis | 6379 | — |
+| **Design Tokens** | weewx-clearskies-design-tokens | Tailwind config + design variables npm package | Phase 6+ placeholder — no code yet. Tokens currently live in dashboard repo. | — | — |
+
+## Container inventory
+
+Each repo builds its own container image independently (ADR-034). A dashboard CSS tweak does not rebuild the API.
+
+| Container | Image source | Lifecycle | Runs on (two-host default) |
+|-----------|-------------|-----------|---------------------------|
+| `api` | `weewx-clearskies-api/Dockerfile` | Long-running. TLS always enabled (Ed25519 self-signed by default). | weewx host |
+| `realtime` | `weewx-clearskies-realtime/Dockerfile` | Long-running | front-end host |
+| `dashboard` | `weewx-clearskies-dashboard/Dockerfile` | **Init container** — multi-stage Node 22 build, copies `dist/` to `/dist` volume, exits | front-end host |
+| `caddy` | `caddy:2-alpine` | Long-running | front-end host |
+| `redis` | `redis:7-alpine` | Long-running (optional) | weewx host |
+
+> **Config UI is NOT containerized.** It has no Dockerfile and is not in any compose file. It is distributed as a pip package (`weewx-clearskies-config`) and run manually by the operator. ADR-027 says "bundled compose adds a `config` service" — this is an unimplemented requirement. See Known gaps.
+
+## Default topology: two-host split (ADR-034)
+
+```
+weewx host                          front-end host
++-----------------------+           +----------------------------------+
+| api :8765 (TLS)       |           | caddy :80/:443                   |
+|   health :8081 (lo)   |  network  |   serves dashboard static files  |
+|   reads weewx.conf    |<--------->|   proxies /api/v1/* to API       |
+|   reads weewx archive |           |   proxies /sse to realtime       |
+|   serves /api/v1/*    |           |                                  |
+|   serves /setup/*     |           | realtime :8766                   |
+|                       |           |   health :8082 (lo)              |
+| redis :6379 (optional)|           |   MQTT mode (subscribes to       |
+|   loopback only       |           |   broker on weewx host)          |
++-----------------------+           |                                  |
+                                    | dashboard (init)                 |
+                                    |   builds SPA, copies to volume   |
+                                    +----------------------------------+
+```
+
+**Single-host alternative:** All services on one machine. Caddy proxies to local Docker network names (`api:8765`, `realtime:8766`). Realtime uses direct mode (Unix socket to weewx engine, no MQTT broker needed).
+
+## Caddy routing (as currently implemented)
+
+| Path pattern | Destination | What it serves |
+|-------------|-------------|----------------|
+| `/api/v1/*` | API container (remote `{$CLEARSKIES_API_URL}` or local `api:8765`) | Weather data JSON endpoints |
+| `/sse` | `realtime:8766` (local Docker network) | Server-Sent Events stream |
+| `/*` (fallback) | `/srv/dashboard` static files (shared volume from init container) | React SPA with `try_files` fallback to `index.html` |
+
+**NOT proxied (gap):** `/wizard`, `/bootstrap`, `/login`, `/admin` — config UI is not reachable through Caddy.
+
+Security headers on all responses: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Server` header removed.
+
+## API endpoints (30+ total, verified from code)
+
+### Data endpoints (under `/api/v1`, 15 routers)
+
+| Path | Method | Purpose |
+|------|--------|---------|
+| `/api/v1/station` | GET | Station metadata (singleton) |
+| `/api/v1/current` | GET | Most recent observation |
+| `/api/v1/archive` | GET | Historical archive records with pagination/filtering |
+| `/api/v1/records` | GET | Section-grouped highs and lows |
+| `/api/v1/forecast` | GET | Forecast bundle (hourly + daily + discussion) |
+| `/api/v1/alerts` | GET | Active severe-weather alerts |
+| `/api/v1/aqi/current` | GET | Current air quality index |
+| `/api/v1/aqi/history` | GET | Historical AQI from archive |
+| `/api/v1/earthquakes` | GET | Recent earthquakes within configured radius |
+| `/api/v1/almanac` | GET | Sun + moon snapshot for one date |
+| `/api/v1/almanac/sun-times` | GET | Year-long sunrise/sunset/daylight series |
+| `/api/v1/almanac/moon-phases` | GET | Per-day moon-phase grid (month or year) |
+| `/api/v1/charts/groups` | GET | Chart-group structure |
+| `/api/v1/reports` | GET | Available NOAA report files |
+| `/api/v1/reports/{year}/{month}` | GET | Monthly NOAA report (raw text) |
+| `/api/v1/reports/{year}` | GET | Yearly NOAA report (raw text) |
+| `/api/v1/pages` | GET | Dashboard navigation list |
+| `/api/v1/pages/{slug}/content` | GET | Page markdown content |
+| `/api/v1/content/about` | GET | About page markdown content |
+| `/api/v1/content/legal` | GET | Legal/privacy page markdown content |
+| `/api/v1/capabilities` | GET | Runtime capability registry |
+| `/api/v1/branding` | GET | Operator branding (accent, logos, theme defaults) |
+| `/api/v1/radar/providers/{id}/frames` | GET | Radar frame index |
+| `/api/v1/radar/providers/{id}/tiles/{z}/{x}/{y}` | GET | Binary tile proxy (keyed providers) |
+
+OpenAPI docs: `/api/v1/docs` (Swagger), `/api/v1/redoc`, `/api/v1/openapi.json`.
+
+### Setup endpoints (under `/setup`, NO `/api/v1` prefix)
+
+Used by the config UI wizard per ADR-038. Not proxied through Caddy — config UI connects directly to API.
+
+| Path | Method | Purpose | Auth |
+|------|--------|---------|------|
+| `/setup/handshake` | POST | Exchange trust token for session | Trust token |
+| `/setup/db-defaults` | GET | DB connection from `weewx.conf` | Session |
+| `/setup/db-test` | POST | Test DB connection | Session |
+| `/setup/schema` | GET | Column schema from DB | Session |
+| `/setup/station` | GET | Station identity from `weewx.conf` | Session |
+| `/setup/apply` | POST | Write final config, API restarts | Session |
+| `/setup/current-config` | GET | Full config for re-run | Proxy secret |
+| `/setup/restart` | POST | Trigger graceful service restart | Proxy secret |
+
+### Health & metrics (separate loopback port 8081)
+
+| Path | Method | Purpose |
+|------|--------|---------|
+| `/health/live` | GET | Liveness probe (always 200 if process alive) |
+| `/health/ready` | GET | Readiness probe (200 ok/degraded, 503 unhealthy) |
+| `/metrics` | GET | Prometheus metrics (opt-in via `CLEARSKIES_METRICS_ENABLED=true`) |
+
+Additionally, `GET /health` exists on the main port (8765) returning `{"status": "ok"}`.
+
+### API middleware stack (outermost → innermost)
+
+1. MetricsMiddleware — request timing
+2. RequestIdMiddleware — establishes `request_id` for structured logging
+3. BodySizeLimitMiddleware — rejects bodies > 1 MiB
+4. ProxyAuthMiddleware — validates `X-Clearskies-Proxy-Auth` shared secret
+5. RateLimitMiddleware — per-IP rate limiting (bypassed if proxy-trusted)
+6. CORSMiddleware — configurable origins (default same-origin)
+7. SecurityHeadersMiddleware — injects security headers
+
+All errors returned as RFC 9457 `application/problem+json`.
+
+## Realtime endpoints
+
+| Port | Path | Purpose |
+|------|------|---------|
+| 8766 | `/sse` | SSE stream — events with `type: "loop"`, data = JSON loop-packet. 15-second keepalive comments. |
+| 8082 (lo) | `/health/live` | Liveness probe |
+| 8082 (lo) | `/health/ready` | Readiness probe (checks adapter connection status) |
+
+OpenAPI disabled on realtime (no docs/redoc endpoints).
+
+## Realtime modes (ADR-005)
+
+| Mode | Config | When | Transport | Broker needed |
+|------|--------|------|-----------|--------------|
+| **Direct** | `[input] mode = direct` (default) | weewx on same host | Unix socket at `[input.direct] socket_path` (default `/var/run/weewx-clearskies/loop.sock`) | No |
+| **MQTT** | `[input] mode = mqtt` | weewx on different host | paho-mqtt subscriber (optional install extra) | Yes |
+
+MQTT settings: `broker_host`, `broker_port` (1883), `topic` (weewx/loop), `client_id`, `username`, `password_env` (env var reference), `tls`, `qos` (0), `keepalive` (60).
+
+Neither mode reads the database. The API is the only component that touches the database.
+
+## Config UI routes (verified from code)
+
+Config UI is a standalone FastAPI app, run via `weewx-clearskies-config` CLI on port 9876.
+
+### Auth & bootstrap
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/` | GET | Redirect: no credentials → `/bootstrap`; no api.conf → `/wizard`; else → `/login` |
+| `/bootstrap` | GET/POST | First-run: set admin credentials (one-time token) |
+| `/login` | GET/POST | Admin login form |
+| `/logout` | POST | End session |
+| `/health` | GET | Returns `{"status": "ok"}` |
+
+### Wizard (7-step setup flow)
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/wizard` | GET | Full wizard page (starts at step 1) |
+| `/wizard/step/1` | POST | API connection verification |
+| `/wizard/step/2` | POST | Database configuration |
+| `/wizard/step/2/test` | POST | Test DB connection |
+| `/wizard/step/3` | POST | Column mapping |
+| `/wizard/step/4` | GET/POST | Station identity |
+| `/wizard/step/4/timezone` | POST | Timezone lookup |
+| `/wizard/step/5` | GET | MQTT / input mode |
+| `/wizard/step/5/test` | POST | Test MQTT connection |
+| `/wizard/step/6` | POST | Provider selection + API keys |
+| `/wizard/step/6/key-fields/{domain}/{id}` | GET | Inline key entry fields |
+| `/wizard/step/6/test-key/{id}` | POST | Test provider connectivity |
+| `/wizard/step/7` | GET | Review summary |
+| `/wizard/apply` | POST | Finalize config + write files |
+| `/wizard/restart-status` | GET | Service restart status |
+
+### Admin (ongoing config)
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/admin/config` | GET | Config dashboard (all sections) |
+| `/admin/config/{component}/{section}` | GET/POST | Section edit form (component = api/realtime/stack) |
+| `/admin/config/column-mapping` | GET/POST | Column mapping editor |
+| `/admin/config/test-provider` | POST | Test provider connectivity |
+
+## Dashboard pages (React Router v7)
+
+| Route | Page | Lazy-loaded |
+|-------|------|-------------|
+| `/` | Now (home) | Yes |
+| `/forecast` | Forecast | Yes |
+| `/charts` | Charts | Yes |
+| `/almanac` | Almanac | Yes |
+| `/earthquakes` | Earthquakes | Yes |
+| `/records` | Records | Yes |
+| `/reports` | Reports | Yes |
+| `/about` | About | Yes |
+| `/legal` | Legal/Privacy | Yes |
+| `/:slug` | Custom pages | Yes |
+| `/*` | 404 Not Found | Yes |
+
+API client defaults to `/api/v1` (relative, works with Caddy proxy). Override: `VITE_API_BASE_URL` env var. SSE URL: `VITE_SSE_URL` env var (or `/sse` via proxy). Mock mode: `VITE_USE_MOCK=true`.
+
+No global error boundary. Each component independently shows `TileError` with retry button on API failure. **No first-run/unconfigured detection.**
+
+## Configuration files
+
+All config in `/etc/weewx-clearskies/` (search order: `CLEARSKIES_CONFIG` env var → `/etc/weewx-clearskies/` → `~/.config/weewx-clearskies/`).
+
+| File | Used by | Contains | Exists in examples? |
+|------|---------|----------|-------------------|
+| `api.conf` | API | Server bind, DB connection, providers, logging, TLS, branding | Yes (`config/api.conf.example`) |
+| `realtime.conf` | Realtime | Input mode, MQTT settings, socket path, SSE bind, health bind | Yes (`config/realtime.conf.example`) |
+| `stack.conf` | Config UI | UI bind/port, TLS, `[ui] enabled` flag | **No — does not exist** |
+| `secrets.env` | All (mode 0600) | DB password, API keys, admin credentials, proxy secret | No (generated by wizard) |
+| `ui-cert.pem` | Config UI | Self-signed TLS cert (mode 0644) | No (auto-generated with `--tls`) |
+| `ui-key.pem` | Config UI | TLS private key (mode 0600) | No (auto-generated with `--tls`) |
+
+**Secret naming:** `WEEWX_CLEARSKIES_<DOMAIN>_<FIELD>` (e.g., `WEEWX_CLEARSKIES_DB_PASSWORD`, `WEEWX_CLEARSKIES_AERIS_CLIENT_ID`).
+
+**Secret-leak guard:** API and realtime scan `.conf` at startup; any key matching `(?i)_(KEY|SECRET|TOKEN|PASSWORD)$` is a fatal startup error. Secrets belong in `secrets.env` only.
+
+**Startup behavior when config missing:** Both API and realtime raise `FileNotFoundError` and exit non-zero. Neither starts in an "unconfigured" mode.
+
+## API TLS
+
+The API always serves TLS (ADR-038 amendment to ADR-008):
+- **Default:** Auto-generates Ed25519 keypair + self-signed X.509 cert on first start. Stored in config directory. Fingerprint (SHA-256) printed to terminal.
+- **Override:** Operator supplies cert/key via `[tls] cert_path` / `key_path` in `api.conf` or `--tls-cert` / `--tls-key` CLI flags.
+- **Trust handshake:** First-time setup: API prints address + trust token + fingerprint → operator enters in wizard step 1 → config UI verifies fingerprint + sends token → API validates, issues session → token consumed (single-use) → fingerprint pinned (SSH-style).
+
+## Database access (ADR-012)
+
+| Engine | Config | Connection string | Pool |
+|--------|--------|------------------|------|
+| **SQLite** (default) | `[database] kind = sqlite`, `path = /var/lib/weewx/weewx.sdb` | `sqlite:///{path}?mode=ro&uri=true` | NullPool |
+| **MySQL/MariaDB** | `[database] kind = mysql`, `host`, `port`, `name` | `mysql+pymysql://{user}:{pass}@{host}:{port}/{name}?charset=utf8mb4` | QueuePool (pool_size=5, max_overflow=10) |
+
+Credentials via env vars only: `WEEWX_CLEARSKIES_DB_USER`, `WEEWX_CLEARSKIES_DB_PASSWORD`.
+
+Read-only enforcement (defense-in-depth): DB user with `SELECT`-only grants + startup write-probe (fails if writes succeed) + SQLite `?mode=ro`.
+
+## Provider module layout (ADR-038)
+
+```
+weewx_clearskies_api/providers/
+├── _common/          # HTTP client, retry/backoff, error taxonomy, capability registry
+├── forecast/         # aeris, nws, openmeteo, openweathermap, wunderground
+├── aqi/              # aeris, openmeteo, openweathermap, iqair
+├── alerts/           # nws, aeris, openweathermap
+├── earthquakes/      # usgs, geonet, emsc, renass
+└── radar/            # rainviewer, openweathermap, aeris, iem_nexrad, noaa_mrms, msc_geomet, dwd_radolan, iframe
+```
+
+Each module: outbound API call → response parsing → canonical field translation → capability declaration → error handling. Keyed providers proxied server-side (keys never reach browser).
+
+## Caching (ADR-017)
+
+| Backend | Config | When to use |
+|---------|--------|------------|
+| `memory` (default) | No config needed | Single worker (v0.1 default) |
+| `redis` (optional) | `CLEARSKIES_CACHE_URL=redis://localhost:6379/0` | Multi-worker deploys |
+
+Per-provider TTLs: forecast 30 min, alerts 5 min, AQI 15 min, radar metadata 5 min.
+
+## Repo layout
+
+| Repo | Local path | Branch | Language | Has Dockerfile |
+|------|-----------|--------|----------|----------------|
+| weewx-clearskies-api | `repos/weewx-clearskies-api` | main | Python 3.12+ | Yes |
+| weewx-clearskies-realtime | `repos/weewx-clearskies-realtime` | main | Python | Yes |
+| weewx-clearskies-dashboard | `repos/weewx-clearskies-dashboard` | main | TypeScript/React | Yes (init container) |
+| weewx-clearskies-stack | `repos/weewx-clearskies-stack` | main | Python (config UI) + YAML/Caddyfile (orchestration) | **No** |
+| weewx-clearskies-design-tokens | `repos/weewx-clearskies-design-tokens` | main | — | No (Phase 6+ placeholder) |
+| weather-belchertown (meta) | `.` (root) | master | — (ADRs, plans, rules, contracts) | — |
+
+## Stack repo structure (verified)
+
+```
+weewx-clearskies-stack/
+├── weewx-host/
+│   ├── docker-compose.yml      # api + redis
+│   └── .env.example
+├── frontend-host/
+│   ├── docker-compose.yml      # caddy + dashboard (init) + realtime
+│   ├── Caddyfile
+│   └── .env.example
+├── single-host/
+│   ├── docker-compose.yml      # all services combined
+│   ├── Caddyfile
+│   └── .env.example
+├── config/
+│   ├── api.conf.example
+│   └── realtime.conf.example
+├── examples/
+│   └── reverse-proxy/Caddyfile # bare-metal Caddy example
+├── archive/                    # pre-split monolithic files (historical)
+├── dev/
+│   ├── docker-compose.yml      # MariaDB + seed + Redis for local dev
+│   └── .env.example
+├── weewx_clearskies_config/    # Config UI Python package (pip-installable)
+│   ├── app.py                  # FastAPI app factory
+│   ├── cli.py                  # CLI entry point (port 9876 default)
+│   ├── auth.py                 # Admin auth, sessions, rate limiting
+│   ├── tls.py                  # Self-signed cert generation
+│   ├── wizard/                 # Wizard routes, state, config writer
+│   ├── config/                 # Config reader/updater, admin routes
+│   ├── templates/              # Jinja2 templates (wizard steps, admin, login, bootstrap)
+│   └── static/                 # CSS, JS
+└── tests/                      # Wizard tests
+```
+
+## Authoritative ADRs by component
+
+| Component | Primary ADRs |
+|-----------|-------------|
+| Component breakdown | ADR-001 |
+| Tech stack | ADR-002 |
+| Deployment topology | ADR-034 |
+| API | ADR-010 (data model), ADR-012 (DB access), ADR-018 (versioning) |
+| Realtime | ADR-005 |
+| Dashboard | ADR-002, ADR-009 (design), ADR-024 (page taxonomy) |
+| Config UI / Wizard | ADR-027 (wizard), ADR-038a-wizard-api-channel (wizard-to-API channel) |
+| Auth | ADR-008, ADR-037 (inbound traffic) |
+| Providers | ADR-006 (compliance), ADR-007 (forecast), ADR-038-data-provider-module-organization |
+| Caching | ADR-017 |
+| Theming / Branding | ADR-022, ADR-023 (light/dark mode) |
+| i18n | ADR-021 |
+| Health / Readiness | ADR-030 |
+| Observability / Metrics | ADR-031 |
+| Logging | ADR-029 |
+| Security | contracts/security-baseline.md |
+
+> **Note:** ADR-038a (`ADR-038a-wizard-api-channel.md`) was originally numbered ADR-038, sharing the number with the data-provider module organization ADR. Renumbered to 038a on 2026-05-23.
+
+## Known gaps (current state vs. intended architecture)
+
+> Update this section as gaps are closed. Remove entries when resolved.
+
+| # | Gap | Intended | Current state | Decision (2026-05-23) | Blocking |
+|---|-----|----------|---------------|----------------------|----------|
+| 1 | Config UI not in compose/Caddy | ADR-027: "bundled compose adds a `config` service", "accessible at `/admin` through the reverse proxy" | No Dockerfile, not in any compose file, not proxied by Caddy | **Fix required.** Config UI is part of the site UI (like WordPress `/wp-admin`), not a standalone service. Add to compose, add Caddy proxy rules for `/wizard`, `/bootstrap`, `/login`, `/admin`. Operator should never think about it as separate. | First-run UX |
+| 2 | API crashes without api.conf | API must be running for wizard (ADR-038a: wizard calls `/setup/*`) | `FileNotFoundError` at startup | **Fix required.** API needs a "life-support mode" — start without config, serve health port with `{"configured": false}` status, serve `/setup/*` endpoints. Dashboard and wizard use health port to detect unconfigured state. | Wizard flow |
+| 3 | Dashboard shows error wall when unconfigured | Should detect unconfigured state and redirect to `/wizard` | Shows "Unable to load" on every tile, no global error boundary | **Fix required.** Dashboard checks API health port on load. If `configured: false`, redirect to `/wizard`. | First-run UX |
+| 4 | Realtime crashes without realtime.conf | Same pattern as API | `FileNotFoundError` at startup | Lower priority — wizard configures API first; realtime config written during wizard apply step. Consider same life-support pattern. | Wizard flow |
+| 5 | No stack.conf example | ADR-027 references `stack.conf` | Does not exist | Deferred — CLI flags sufficient for v0.1. | Low |
+| 6 | ADR-034 container table incomplete | ADR-027 adds config service | ADR-034 lists only 4 containers | Amend ADR-034 to add config UI row after gap #1 is implemented. | ADR consistency |
+| 7 | Config UI imports API code directly | ADR-038a: wizard talks to API via HTTP | `wizard/schema.py` and `wizard/routes.py` import `STOCK_COLUMN_MAP` from `weewx_clearskies_api.db.reflection` — forces API source into config UI Docker build | Eliminate after first-run UX ships. Get stock column map from `/setup/schema` endpoint instead. | Code coupling |
+
+### Resolved gaps (2026-05-23)
+
+| # | Was | Resolution |
+|---|-----|-----------|
+| 7 | ADR-038 index entry incomplete | Renumbered to ADR-038a; added to INDEX.md |
+| 8 | Security baseline port numbers stale (8000/8001) | Fixed to 8765/8766 |
+| 9 | ADR-030 port reference (8080) | Fixed to 8765 |

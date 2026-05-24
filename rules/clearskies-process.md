@@ -5,6 +5,14 @@ Incident history and rationale at [reference/process-rule-history.md](../referen
 
 ---
 
+## Architecture document discipline
+
+**Read `docs/ARCHITECTURE.md` before any architecture work.** Before proposing, discussing, or implementing any infrastructure change, deployment fix, proxy configuration, service placement, container change, endpoint change, or config-file change: read `docs/ARCHITECTURE.md` first. This is the single source of truth for what each service is, where it runs, what it exposes, and how traffic flows. Do not re-derive the architecture from ADRs, observation, or memory.
+
+**Update `docs/ARCHITECTURE.md` after any architecture change.** Every change to services, containers, endpoints, routing, config files, or topology must be reflected in the architecture document before the task is considered complete. If the change reveals a gap between intended and current state, update the "Known gaps" section.
+
+**Why (2026-05-23):** Without this document, the lead spent an entire session re-deriving architecture that was already decided in ADRs — going in circles proposing the wizard as a standalone Flask app, then suggesting it be split across containers, then suggesting it be rebuilt in React in the dashboard, then suggesting it be bundled into the API container. All four proposals contradicted existing ADRs. The root cause: 40 ADRs cannot serve as a quick-reference for "how does the system work right now." A single architecture document eliminates the re-derivation loop.
+
 ## ADR discipline
 
 **Write decisions to disk immediately.** Decision discussed → ADR drafted as `Proposed` → user reviews full content → user explicitly approves → status becomes `Accepted`. Never create ADRs as Accepted. "It was in the plan" is not sign-off. Directional chat ("yes use the prefix") is input to a Proposed ADR, not approval.
@@ -13,7 +21,7 @@ Incident history and rationale at [reference/process-rule-history.md](../referen
 
 **Read the ADR before the plan.** Plan body summaries drift. ADR wins on conflict — fix the plan to match.
 
-**Read the ADRs before touching architecture.** Before proposing any infrastructure change, deployment fix, proxy configuration, service placement, or config-file change: read the relevant ADRs (especially ADR-034 deployment topology, ADR-027 config wizard, ADR-038 wizard-to-API channel). Do NOT guess the architecture from observation alone — the live state may be broken or interim. The ADRs define what the system SHOULD look like; divergence means a bug to fix, not a new architecture to invent. Session context or resume prompts may be stale or wrong; ADRs are authoritative.
+**Read the ADRs before touching architecture.** Before proposing any infrastructure change, deployment fix, proxy configuration, service placement, or config-file change: read `docs/ARCHITECTURE.md` first (see above), then the relevant ADRs if deeper decision context is needed (especially ADR-034 deployment topology, ADR-027 config wizard, ADR-038 wizard-to-API channel). Do NOT guess the architecture from observation alone — the live state may be broken or interim. The ADRs define what the system SHOULD look like; divergence means a bug to fix, not a new architecture to invent. Session context or resume prompts may be stale or wrong; ADRs are authoritative.
 
 **Why (2026-05-22):** Phase 5 session wasted significant time patching a wrong architecture: running the API on weather-dev (not the weewx host), adding Apache ProxyPass rules between the dashboard and API, manually writing `api.conf` on the wrong host, and proposing the wizard write `api.conf` locally. All of these contradicted ADR-034 (API co-locates with weewx), ADR-038 (API writes its own config via `/setup/apply`), and ADR-027 (wizard auto-detects topology). None of the ADRs were read until the user intervened. The ADRs had all the answers; the session burned tokens and user patience reinventing them badly.
 

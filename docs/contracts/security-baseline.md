@@ -168,7 +168,7 @@ Meta repo with `docker-compose.yml`, `Caddyfile`, INSTALL guide, example HA conf
 | Compose pins image digests | [`coding.md`](../../rules/coding.md) §1 | Every `image:` reference is `@sha256:...` (or a versioned tag in dev-only profiles, clearly marked) | Reviewer scans `docker-compose.yml` |
 | Caddy auto-LE TLS | [ADR-034](../decisions/ADR-034-deployment-topology-default.md) | Caddyfile uses `tls user@example.com` directive; auto-renewal is Caddy's default | Smoke test in deploy-rehearsal env confirms cert issued |
 | Caddy enforces security headers | This doc | Caddyfile sets HSTS (`Strict-Transport-Security: max-age=31536000; includeSubDomains`), CSP (per dashboard §5), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: <minimal>` | curl response inspection in deploy-rehearsal env |
-| Caddy proxies to inner services on loopback | [ADR-037](../decisions/ADR-037-inbound-traffic-architecture.md) | `reverse_proxy 127.0.0.1:8000` for api; `reverse_proxy 127.0.0.1:8001` for realtime; dashboard served as static file root | Reviewer confirms Caddyfile |
+| Caddy proxies to inner services on loopback | [ADR-037](../decisions/ADR-037-inbound-traffic-architecture.md) | `reverse_proxy 127.0.0.1:8765` for api; `reverse_proxy 127.0.0.1:8766` for realtime; dashboard served as static file root | Reviewer confirms Caddyfile |
 | Bind-mount config dir | [ADR-027](../decisions/ADR-027-config-and-setup-wizard.md) + [ADR-028](../decisions/ADR-028-update-mechanism.md) | `/etc/weewx-clearskies/` mounted into containers; `secrets.env` permission preserved by setup script | INSTALL doc; smoke test in deploy-rehearsal env |
 
 ---

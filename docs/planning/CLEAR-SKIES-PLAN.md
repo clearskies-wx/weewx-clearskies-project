@@ -27,37 +27,49 @@
 
 ## Architecture overview
 
+> **Full architecture reference:** [docs/ARCHITECTURE.md](../ARCHITECTURE.md) — single source of truth for services, containers, endpoints, routing, config files, and deployment topology. The diagram below is a simplified summary; ARCHITECTURE.md is authoritative.
+
 ```
 External provider APIs              weewx (existing)
 (forecast, AQI, alerts,                 │
- earthquakes, radar)                    │ writes archive records to MariaDB
+ earthquakes, radar)                    │ writes archive records to DB
         │                               │ also publishes to weewx-mqtt → EMQX
         │ HTTPS                         │   (existing, for HA & power users)
         │                               │
         ▼                               ▼
 ┌────────────────────────────┐    ┌──────────────────────────┐
 │  weewx-clearskies-api      │    │  weewx-clearskies-       │
-│  (FastAPI/Py, sync)        │    │  realtime                │
+│  (FastAPI/Py, sync, :8765) │    │  realtime (:8766)        │
 │                            │    │  (Py, SSE bridge)        │
-│  - reads MariaDB           │    │  weewx loop → SSE        │
-│  - calls external APIs     │    │                          │
+│  - reads weewx DB          │    │  weewx loop → SSE        │
+│  - calls external APIs     │    │  (direct or MQTT mode)   │
 │    via PROVIDER PLUGIN     │    │                          │
-│    MODULES internal        │    │                          │
-│    to this repo (ADR-038)  │    │                          │
+│    MODULES (ADR-038)       │    │                          │
+│  - serves /setup/* for     │    │                          │
+│    wizard (ADR-038a)       │    │                          │
 └──────────┬─────────────────┘    └──────────┬───────────────┘
            │  JSON over HTTPS                │  SSE over HTTPS
            ▼                                 ▼
         ┌──────────────────────────────────────────┐
+        │   Caddy (reverse proxy, auto-LE TLS)     │
+        │   /api/v1/* → API  |  /sse → realtime    │
+        │   /wizard,/admin → config UI              │
+        │   /* → dashboard static files             │
+        ├──────────────────────────────────────────┤
         │   weewx-clearskies-dashboard             │
         │   (React 19 + Vite SPA — "Clear Skies")  │
         │   Tailwind v4 + shadcn/ui + Recharts +   │
         │   Lucide + Weather Icons                 │
+        │                                          │
+        │   Config UI / Wizard / Admin             │
+        │   (Jinja2 + HTMX — part of the UI,      │
+        │    accessible at /wizard and /admin)      │
         └──────────────────────────────────────────┘
 
       weewx-clearskies-stack (meta repo)
       ──────────────────────────────────
-      docker-compose for the easy-button install,
-      deploy guide, architecture diagrams,
+      docker-compose orchestration, Caddyfile,
+      config UI Python package, deploy guide,
       example HA configs (REST sensors + MQTT YAML)
 ```
 
@@ -74,7 +86,7 @@ Repo names per [ADR-004](../decisions/ADR-004-repo-naming.md). 5-component break
 | 1 | **weewx-clearskies-api** | HTTP/JSON API serving (a) read-only access to weewx's archive DB, and (b) external provider data via per-provider **plugin modules internal to this repo** (per [ADR-038](../decisions/ADR-038-data-provider-module-organization.md)). Python / FastAPI (sync) / SQLAlchemy 2.x. Versioned (`/api/v1/...`). | `pip install` + systemd unit, optional Docker image | Yes |
 | 2 | **weewx-clearskies-realtime** | Small Python service that bridges weewx loop packets to Server-Sent Events. paho-mqtt is an optional install extra for the MQTT-subscriber mode per [ADR-005](../decisions/ADR-005-realtime-architecture.md). | `pip install` + systemd unit, optional Docker image | Yes |
 | 3 | **weewx-clearskies-dashboard** | The SPA. React 19 + Vite + Tailwind v4 + shadcn/ui + Recharts + Lucide + Weather Icons. Config-driven (station name, units, palette, API URL). Built artifact is static HTML/CSS/JS. | Pre-built static bundle, git source, optional containerized `caddy + dist` | Yes |
-| 4 | **weewx-clearskies-stack** | Meta repo: docker-compose for the easy-button install, deployment guide, architecture diagrams, example HA configs (`examples/home-assistant/sensors-rest.yaml` and `examples/home-assistant/sensors-mqtt.yaml`). | Just docs + compose file. The "front door" for new users. | Optional but recommended |
+| 4 | **weewx-clearskies-stack** | Meta repo: docker-compose orchestration, Caddyfile, **config UI Python package** (setup wizard + ongoing admin at `/wizard` and `/admin`, Jinja2 + HTMX per [ADR-027](../decisions/ADR-027-config-and-setup-wizard.md)), deployment guide, example HA configs (`examples/home-assistant/sensors-rest.yaml` and `examples/home-assistant/sensors-mqtt.yaml`). | Compose files + config UI package + docs. The "front door" for new users. | Optional but recommended |
 | 5 | **weewx-clearskies-design-tokens** | Tailwind config + named design variables (palette, spacing, typography), published as a standalone npm package so others can build their own dashboards using the same visual language. | npm package | **Deferred — Phase 6+.** Tokens still exist *inside* `weewx-clearskies-dashboard` from day 1; they just aren't extracted to a separate package until there's demand. |
 
 ### Coexistence with existing infrastructure
@@ -266,7 +278,7 @@ Multi-agent for the SSE bridge work; deploy rehearsal is single-track (lead-driv
 | **Build Caddyfile for docker-compose** | ✅ | [ADR-037](../decisions/ADR-037-inbound-traffic-architecture.md) | Shipped 2026-05-22. SPA at `/`, proxies `/api/v1/*` and `/sse`. Domain via `$CLEARSKIES_DOMAIN` env var. Auto-LE TLS. Security headers. |
 | **Ship example reverse-proxy configs** | ✅ | [ADR-037](../decisions/ADR-037-inbound-traffic-architecture.md) | Shipped 2026-05-22. `examples/reverse-proxy/` — Apache, nginx, Caddy for native install path. |
 | **Build Dockerfiles for api + realtime + dashboard** | ✅ | [ADR-039](../decisions/ADR-039-distribution-installation-mechanism.md) | Shipped 2026-05-22. Multi-stage builds, non-root clearskies user, health checks. All 3 build on weather-dev. |
-| **Clean-slate wizard test (docker-compose path)** | ⬜ | [ADR-027](../decisions/ADR-027-config-and-setup-wizard.md), [ADR-038](../decisions/ADR-038-wizard-api-channel.md) | Wipe all config, `docker compose up`, run wizard, verify all services configure correctly end-to-end. |
+| **Clean-slate wizard test (docker-compose path)** | ⬜ | [ADR-027](../decisions/ADR-027-config-and-setup-wizard.md), [ADR-038](../decisions/ADR-038a-wizard-api-channel.md) | Wipe all config, `docker compose up`, run wizard, verify all services configure correctly end-to-end. |
 | **Clean-slate wizard test (native install path)** | ⬜ | [ADR-027](../decisions/ADR-027-config-and-setup-wizard.md), [ADR-034](../decisions/ADR-034-deployment-topology-default.md) | pip install + systemd + operator web server. Verify wizard configures everything. |
 | **Verify all dashboard pages with real data** | ⬜ | [ADR-024](../decisions/ADR-024-page-taxonomy.md) | Current conditions, charts, forecast, alerts, AQI, radar, earthquakes, records, NOAA reports |
 | **Verify SSE live updates end-to-end** | ⬜ | [ADR-005](../decisions/ADR-005-realtime-architecture.md) | Real weewx loop packets → SSE → dashboard live update |

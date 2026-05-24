@@ -19,6 +19,7 @@ At the start of a task, identify which domain(s) apply and read the matching fil
 | Home Assistant, automations | [rules/homeassistant.md](../Windows%20Server/rules/homeassistant.md) + [reference/homeassistant.md](../Windows%20Server/reference/homeassistant.md) |
 | GitHub operations (branches, PRs, releases) | [rules/github.md](rules/github.md) |
 | Clear Skies project (planning, ADRs, contracts, research) | [rules/clearskies-process.md](rules/clearskies-process.md) — facts live in ADRs at [docs/decisions/](docs/decisions/) and contracts at [docs/contracts/](docs/contracts/) |
+| Clear Skies architecture (services, containers, endpoints, routing, deployment) | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — **read first, before any ADRs** + [rules/clearskies-process.md](rules/clearskies-process.md) |
 | Writing or modifying code in any language (Python, PHP, JS/TS, shell, Cheetah, SQL) | [rules/coding.md](rules/coding.md) |
 
 ## Always-applicable rules

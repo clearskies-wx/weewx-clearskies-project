@@ -44,7 +44,7 @@ Body is for human / dashboard diagnostics; the orchestrator decision keys on the
 
 ### Port
 
-Health endpoints bind to a **separate port** from the main service (default `8081` for api when api is on `8080`; realtime defaults TBD per [ADR-005](ADR-005-realtime-architecture.md)). Health port binds to loopback by default — operators expose remotely via reverse proxy only when external monitoring requires it.
+Health endpoints bind to a **separate port** from the main service (default `8081` for api when api is on `8765`; `8082` for realtime when realtime is on `8766`). Health port binds to loopback by default — operators expose remotely via reverse proxy only when external monitoring requires it.
 
 This satisfies "not internet-exposed" and prevents probe traffic from polluting access logs.
 

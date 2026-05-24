@@ -44,6 +44,7 @@ Every locked architecture or process decision for the Clear Skies project lives 
 | [ADR-036](ADR-036-workspace-layout.md) | Workspace & meta-repo layout (nested `repos/` under meta; multi-root VS Code workspace) | Accepted | 2026-05-04 |
 | [ADR-037](ADR-037-inbound-traffic-architecture.md) | Inbound traffic flow / one-door reverse-proxy architecture | Accepted | 2026-05-04 |
 | [ADR-038](ADR-038-data-provider-module-organization.md) | Data-provider module organization (one file/dir per provider, internal contract; not a third-party plugin ecosystem) | Accepted | 2026-05-04 |
+| [ADR-038a](ADR-038a-wizard-api-channel.md) | Wizard-to-API secure channel & API-mediated configuration (amends ADR-027, ADR-008) | Accepted | 2026-05-20 |
 | [ADR-039](ADR-039-distribution-installation-mechanism.md) | Distribution / installation — PyPI + container registry + GitHub Releases; Linux native or Docker; macOS native or Docker; Windows = Docker Desktop; no bespoke OS installers | Accepted | 2026-05-04 |
 | [ADR-040](ADR-040-earthquake-providers.md) | Earthquake providers — day-1 set: usgs/geonet/emsc/renass; single source per deploy; setup wizard suggests by region; USGS provides global fallback | Accepted | 2026-05-05 |
 
