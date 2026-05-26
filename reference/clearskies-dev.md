@@ -39,8 +39,10 @@ The wizard talks to the **API**, not the database. Flow:
 
 ```
 DB host is loopback → same-host → api_bind_host = 127.0.0.1, realtime_bind_host = 127.0.0.1
-DB host is remote   → cross-host → api_bind_host = ::, realtime_bind_host = ::, generate proxy_secret
+DB host is remote   → cross-host → api_bind_host = 0.0.0.0, realtime_bind_host = 0.0.0.0, generate proxy_secret
 ```
+
+**Bind-address note:** `::` is IPv6-only in both modern MariaDB (`my.cnf` `bind-address`) and uvicorn (sets `IPV6_V6ONLY=1`). Use `*` for MariaDB `bind-address` and `0.0.0.0` for service `bind_host` when you need all interfaces. The wizard was previously emitting `::` for cross-host topology; this was corrected in `87f8467`.
 
 ### Pipeline auto-detection (routes.py lines 951–988)
 

@@ -99,7 +99,7 @@ For network/infrastructure context:
 
 These are refinements to ADR-027 approved by the user. **ADR-027 must be updated in Phase 0a before coding begins.**
 
-1. **Default bind: all interfaces (`[::]`), not loopback.** Target audience is weather hobbyists running headless servers (Raspberry Pi, NAS, containers). They access the wizard from a laptop/phone on the LAN. Localhost-only would require SSH tunneling — too much friction.
+1. **Default bind: all interfaces, not loopback.** Target audience is weather hobbyists running headless servers (Raspberry Pi, NAS, containers). They access the wizard from a laptop/phone on the LAN. Localhost-only would require SSH tunneling — too much friction. *Note (2026-05-25): Originally specified as `[::]`; corrected to `0.0.0.0` in implementation — uvicorn sets `IPV6_V6ONLY=1` so `::` is IPv6-only. Same applies to MariaDB `my.cnf`: use `bind-address = *` not `::` for all interfaces.*
 
 2. **HTTP by default for standalone mode.** Self-signed certs cause browser warnings that confuse operators and train them to ignore security warnings. The first-run wizard is a one-time setup on a private network. `--tls` flag available for opt-in self-signed HTTPS. `--localhost` flag restricts to loopback if desired.
 
@@ -107,7 +107,7 @@ These are refinements to ADR-027 approved by the user. **ADR-027 must be updated
 
 4. **Config tool is host-agnostic.** Does NOT assume it runs on the same machine as weewx or the database. Connects to the database over the network. Auto-detect from a local weewx.conf is a convenience shortcut, not the primary path. Natural install location is wherever the website will run.
 
-5. **API installed on the weewx container.** The whole point of the API is that the database doesn't have to cross a firewall. MariaDB stays localhost-only for weather data. The API binds dual-stack `[::]` on port 8765, protected by a shared secret header.
+5. **API installed on the weewx container.** The whole point of the API is that the database doesn't have to cross a firewall. MariaDB stays localhost-only for weather data. The API binds `0.0.0.0` (all IPv4 interfaces) on port 8765, protected by a shared secret header.
 
 6. **Frontend: Jinja2 + HTMX + lightweight CSS framework (e.g., Pico CSS).** The config tool is a Python package distributed via PyPI — adding a Node build step for React adds two-toolchain friction that isn't worth it for forms and tables. HTMX handles interactive wizard flow via HTML attributes (server renders fragments, browser swaps them in) — no complex JavaScript needed. Jinja2 produces semantic HTML that's inherently accessible. No build step; static files ship directly in the Python package.
 
@@ -118,7 +118,7 @@ Internet → CCR2004 router (192.168.2.254)
   → VLAN 7 (cloudDMZ, 192.168.7.0/24):
       NPM (192.168.7.5)         — Nginx Proxy Manager, wildcard *.shaneburkhardt.com cert
       nextcloud (192.168.7.2)    — Nextcloud + EMQX MQTT broker (ports 1883 TCP, 8083 WS)
-      weewx (192.168.7.20)      — weewx + MariaDB 10.11, port 3306 bound to [::]
+      weewx (192.168.7.20)      — weewx + MariaDB 10.11, port 3306 bound to * (all interfaces; use bind-address = * in my.cnf, not ::, which is IPv6-only in modern MariaDB)
       test container (TBD IP)    — repurposed weather-deploy-rehearsal, moved from VLAN 2
 
 DOGBERT (192.168.2.1) — Windows Server DC, Microsoft DNS

@@ -1,7 +1,7 @@
 ---
 status: Accepted
 date: 2026-05-04
-updated: 2026-05-20
+updated: 2026-05-25
 deciders: shane
 supersedes:
 superseded-by:
@@ -12,6 +12,8 @@ superseded-by:
 > Updated 2026-05-20 with refinements from CONFIG-UI-AND-DEPLOY planning session.
 
 > Updated 2026-05-20 with wizard flow refinements from live testing session.
+
+> **Amendment 2026-05-25:** Default bind corrected from `[::]` to `0.0.0.0`. Uvicorn sets `IPV6_V6ONLY=1` on IPv6 sockets, so `::` is IPv6-only in practice regardless of kernel `net.ipv6.bindv6only`. Implementation in `cli.py` uses `0.0.0.0` (all IPv4 interfaces). The same principle applies to MariaDB `my.cnf`: use `bind-address = *` (not `::`) to bind all interfaces.
 
 ## Context
 
