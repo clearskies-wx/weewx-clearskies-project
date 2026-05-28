@@ -17,7 +17,7 @@ The existing implementation (`local_conditions.py` in the API repo) uses naive s
 
 ## Decision
 
-> **Amendment (2026-05-28):** Sections 5–8 added. §5 comfort/humidity descriptor replaced with 2D temperature-comfort matrix (§5–7). §8 input stability specification added. §4 Beaufort 1 renamed "Very Light Breeze". Original §6–7 renumbered to §9–10.
+> **Amendment (2026-05-28):** Sections 5–8 added. §5 comfort/humidity descriptor replaced with 2D temperature-comfort matrix (§5–7). §8 input stability specification added. §4 Beaufort 1 renamed "Very Light Breeze". §9 composition order reversed (temperature-comfort leads, "with" connector). Original §6–7 renumbered to §9–10.
 
 ### 1. Sky condition
 
@@ -270,19 +270,22 @@ Three stability mechanisms are applied in sequence before any threshold comparis
 
 ### 9. Composition rules
 
-Components are assembled in priority order: **[sky, precipitation, wind, temperature-comfort]**. Null/omitted components are dropped.
+> **Amendment (2026-05-28):** Composition order reversed — temperature-comfort leads, weather phenomena follow with "with" connector. Prevents double-"and" when the temperature-comfort label is compound (e.g., "Warm and Humid").
+
+Components are assembled in priority order: **[temperature-comfort, sky, wind, precipitation]**. Null/omitted components are dropped.
 
 | Parts | Format |
 |---|---|
 | 1 | "{part}" |
-| 2 | "{a} and {b}" |
-| 3+ | "{a}, {b}, ... and {last}" (Oxford comma style) |
+| 2 | "{a}, with {b}" |
+| 3+ | "{a}, {b}, with {last}" |
 
 Examples:
-- "Partly Cloudy and Moderate Breeze"
-- "Overcast, Light Rain, and Humid"
-- "Mostly Cloudy, Heavy Rain, Fresh Breeze and Gusty, and Oppressive"
-- "Moderate Breeze" (night, no provider cloud cover, no precipitation)
+- "Warm and Humid, Overcast, with Light Rain"
+- "Pleasant, Partly Cloudy, with Moderate Breeze"
+- "Hot and Oppressive, Mostly Cloudy, Fresh Breeze and Gusty, with Heavy Rain"
+- "Moderate Breeze" (night, no provider cloud cover, no precipitation, no temperature data)
+- "Chilly, with Light Rain" (night, no sky data, no wind)
 
 ### 10. Data source priority
 
