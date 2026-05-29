@@ -1700,7 +1700,7 @@ components:
         logo:
           type: object
           nullable: true
-          description: Logo URLs for light and dark display modes.
+          description: Logo URLs for light and dark display modes, plus WCAG alt text.
           properties:
             light:
               type: string
@@ -1712,6 +1712,13 @@ components:
               format: uri
               nullable: true
               description: Logo URL for use on dark-mode backgrounds.
+            alt:
+              type: string
+              description: >
+                Alt text for the logo image (WCAG 2.1 AA, ADR-022 §5.5).
+                Always non-empty when a logo is configured: if the operator has
+                not set explicit alt text the API falls back to
+                "<site_title> logo" or "Weather station logo".
         faviconUrl:
           type: string
           format: uri
