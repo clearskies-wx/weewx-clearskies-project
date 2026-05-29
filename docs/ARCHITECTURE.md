@@ -4,7 +4,7 @@ Single source of truth for what each service is, where it runs, what it exposes,
 
 Authoritative for current system state. ADRs are authoritative for *why* decisions were made. If this document conflicts with an ADR, investigate — one of them is stale.
 
-Last verified: 2026-05-24 (native API install on weewx container confirmed running; Redis 7.0.15 installed and active on weewx host, CLEARSKIES_CACHE_URL set in secrets.env).
+Last verified: 2026-05-29 (B-1 fix: all three Caddyfiles now route /api/v1/* to realtime:8766 BFF instead of directly to the API; stack config/realtime.conf.example updated with [api] upstream_url section).
 
 ---
 
@@ -13,7 +13,7 @@ Last verified: 2026-05-24 (native API install on weewx container confirmed runni
 | Service | Repo | What it does | Technology | Main port | Health port |
 |---------|------|-------------|------------|-----------|-------------|
 | **API** | weewx-clearskies-api | REST API for weewx archive data, provider aggregation, setup endpoints | FastAPI (Python 3.12+), sync handlers, SQLAlchemy 2.x sync, uvicorn | 8765 | 8081 |
-| **Realtime** | weewx-clearskies-realtime | Bridges weewx loop packets to Server-Sent Events | FastAPI (Python), sse-starlette, uvicorn | 8766 | 8082 |
+| **Realtime (BFF)** | weewx-clearskies-realtime | BFF gateway — proxies API requests, serves SSE, applies unit conversion (ADR-041, ADR-042) | FastAPI (Python), sse-starlette, httpx, uvicorn | 8766 | 8082 |
 | **Dashboard** | weewx-clearskies-dashboard | Weather UI (static SPA, 9 pages + custom pages) | React 19, Vite 8, Tailwind CSS v4, shadcn/ui, Recharts, Leaflet, Lucide + Weather Icons, i18next | None (init container) | — |
 | **Config UI** | weewx-clearskies-stack | Setup wizard (8 steps) + ongoing config admin | FastAPI, Jinja2, HTMX, Pico CSS (Python-only, no Node build step) | 9876 | — |
 | **Caddy** | upstream (caddy:2-alpine) | Reverse proxy, TLS termination (auto Let's Encrypt), static file server | Caddy | 80, 443 | — |
@@ -28,9 +28,9 @@ Last verified: 2026-05-24 (native API install on weewx container confirmed runni
 |------|----------|---------|------|---------|-------|
 | **80** | TCP | Caddy | front-end host | `0.0.0.0` | HTTP → public. Docker publishes as `80:80`. |
 | **443** | TCP+UDP | Caddy | front-end host | `0.0.0.0` | HTTPS + HTTP/3 → public. Docker publishes as `443:443` and `443:443/udp`. |
-| **8765** | TCP | API | weewx host | `0.0.0.0` | TLS always. Caddy proxies `/api/v1/*` here. |
+| **8765** | TCP | API | weewx host | `0.0.0.0` | TLS always. BFF proxies here; not directly browser-accessible (ADR-041). |
 | **8081** | TCP | API health | weewx host | `127.0.0.1` | `/health/live`, `/health/ready`, `/metrics`. Loopback only. |
-| **8766** | TCP | Realtime | front-end host | Docker network | SSE stream. Caddy proxies `/sse` here. Not exposed to host. |
+| **8766** | TCP | Realtime (BFF) | front-end host | Docker network | BFF gateway. Caddy proxies `/api/v1/*` and `/sse` here (ADR-041). Not exposed to host. |
 | **8082** | TCP | Realtime health | front-end host | `127.0.0.1` | Loopback only. |
 | **9876** | TCP | Config UI | front-end host | Docker network | Wizard + admin. Caddy proxies `/wizard`, `/bootstrap`, `/login`, `/admin`, `/static` here. Not exposed to host. |
 | **6379** | TCP | Redis | weewx host | `127.0.0.1` | Cache (active). Loopback only. CLEARSKIES_CACHE_URL=redis://localhost:6379/0 in secrets.env. |
@@ -59,27 +59,30 @@ weewx host                          front-end host
 +-----------------------+           +----------------------------------+
 | api :8765 (TLS)       |           | caddy :80/:443                   |
 |   health :8081 (lo)   |  network  |   serves dashboard static files  |
-|   reads weewx.conf    |<--------->|   proxies /api/v1/* to API       |
-|   reads weewx archive |           |   proxies /sse to realtime       |
+|   reads weewx.conf    |<--------->|   proxies /api/v1/* to BFF       |
+|   reads weewx archive |           |   proxies /sse to BFF            |
 |   serves /api/v1/*    |           |                                  |
-|   serves /setup/*     |           | realtime :8766                   |
-|                       |           |   health :8082 (lo)              |
-| redis :6379 (optional)|           |   MQTT mode (subscribes to       |
-|   loopback only       |           |   broker on weewx host)          |
+|   serves /setup/*     |           | realtime (BFF) :8766             |
+|   NOT browser-facing  |           |   proxies /api/v1/* to API       |
+|                       |           |   serves /sse (MQTT→SSE)         |
+| redis :6379 (optional)|           |   applies unit conversion        |
+|   loopback only       |           |   health :8082 (lo)              |
 +-----------------------+           |                                  |
                                     | dashboard (init)                 |
                                     |   builds SPA, copies to volume   |
                                     +----------------------------------+
 ```
 
-**Single-host alternative:** All services on one machine. Caddy proxies to local Docker network names (`api:8765`, `realtime:8766`). Realtime uses direct mode (Unix socket to weewx engine, no MQTT broker needed).
+**Single-host alternative:** All services on one machine. Caddy proxies to local Docker network names (`realtime:8766` for both `/api/v1/*` and `/sse`). Realtime BFF proxies to `api:8765`. Realtime uses direct mode (Unix socket to weewx engine, no MQTT broker needed).
 
-## Caddy routing (as currently implemented)
+## Caddy routing
+
+All three Caddyfile variants (frontend-host, single-host, examples/reverse-proxy) route both `/api/v1/*` and `/sse` to the realtime BFF. The BFF proxies `/api/v1/*` onward to the upstream API and applies unit conversion before returning responses. `realtime.conf [api] upstream_url` must be set to the upstream API address — see topology notes below the table.
 
 | Path pattern | Destination | What it serves |
 |-------------|-------------|----------------|
-| `/api/v1/*` | API container (remote `{$CLEARSKIES_API_URL}` or local `api:8765`) | Weather data JSON endpoints |
-| `/sse` | `realtime:8766` (local Docker network) | Server-Sent Events stream |
+| `/api/v1/*` | `realtime:8766` BFF — BFF proxies to upstream API and applies unit conversion | Weather data JSON endpoints (unit-converted by BFF) |
+| `/sse` | `realtime:8766` BFF | Server-Sent Events stream (unit-converted by BFF) |
 | `/wizard*` | `config:9876` (local Docker network) | Setup wizard (7-step flow) |
 | `/bootstrap*` | `config:9876` | First-run admin credential setup |
 | `/login*`, `/logout*` | `config:9876` | Admin auth |
@@ -89,6 +92,16 @@ weewx host                          front-end host
 | `/*` (fallback) | `/srv/dashboard` static files (shared volume from init container) | React SPA with `try_files` fallback to `index.html` |
 
 Security headers on all responses: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Server` header removed.
+
+**`[api] upstream_url` per topology** (set in `realtime.conf` — REQUIRED; omitting it makes every `/api/v1/*` request return 503):
+
+| Topology | `upstream_url` value | Notes |
+|----------|---------------------|-------|
+| frontend-host (compose) | `https://<weewx-host-address>:8765` | API is on the remote weewx host; `$CLEARSKIES_API_URL` from the old Caddyfile belongs here instead |
+| single-host (compose) | `https://api:8765` | Both services are compose services; use the Docker network service name |
+| native / reverse-proxy | `https://localhost:8765` | Both services are systemd units on the same host |
+
+`tls_verify = false` applies in all three cases when the API uses its default self-signed certificate.
 
 ## Webcam
 
@@ -201,13 +214,14 @@ Additionally, `GET /health` exists on the main port (8765) returning `{"status":
 
 All errors returned as RFC 9457 `application/problem+json`.
 
-## Realtime endpoints
+## Realtime (BFF) endpoints
 
 | Port | Path | Purpose |
 |------|------|---------|
-| 8766 | `/sse` | SSE stream — events with `type: "loop"`, data = JSON loop-packet. 15-second keepalive comments. |
+| 8766 | `/api/v1/*` | Catch-all proxy to upstream API. Applies unit conversion to JSON responses (ADR-041, ADR-042). |
+| 8766 | `/sse` | SSE stream — events with `type: "loop"`, data = unit-converted JSON. 15-second keepalive comments. |
 | 8082 (lo) | `/health/live` | Liveness probe |
-| 8082 (lo) | `/health/ready` | Readiness probe (checks adapter connection status) |
+| 8082 (lo) | `/health/ready` | Readiness probe (checks adapter connection + upstream API connectivity) |
 
 OpenAPI disabled on realtime (no docs/redoc endpoints).
 
@@ -221,6 +235,18 @@ OpenAPI disabled on realtime (no docs/redoc endpoints).
 MQTT settings: `broker_host`, `broker_port` (1883), `topic` (weewx/loop), `client_id`, `username`, `password_env` (env var reference), `tls`, `qos` (0), `keepalive` (60).
 
 Neither mode reads the database. The API is the only component that touches the database.
+
+## Unit conversion (ADR-042)
+
+The BFF converts all outbound data (both proxied REST responses and SSE events) from the source unit system to the operator's configured display units. The dashboard receives `{value, label, formatted}` objects and has zero unit knowledge.
+
+**REST path:** API returns raw archive values with `usUnits` declaring the unit system → BFF looks up each field's group → converts to operator display unit → attaches label and formatted string.
+
+**SSE path:** MQTT field names carry unit suffixes (e.g., `outTemp_F`) → BFF strips suffix using known-suffix map from weewx's `UNIT_REDUCTIONS` → identifies source unit → converts to display unit → attaches label.
+
+**Derived values:** Beaufort scale and comfort index (wind chill vs heat index) computed by BFF. Dashboard does not carry thresholds.
+
+**Config:** `realtime.conf` `[units]` section — `[[groups]]` (display unit per group), `[[string_formats]]` (decimal places), `[[labels]]` (display symbols), `[[ordinates]]` (compass directions), `[[time_formats]]`, `[[degree_days]]`, `[[trend]]`. Mirrors weewx skin.conf `[Units]` subsection names. Supports all 14 weewx unit groups.
 
 ## Config UI routes (verified from code)
 
@@ -293,7 +319,7 @@ All config in `/etc/weewx-clearskies/` (search order: `CLEARSKIES_CONFIG` env va
 | File | Used by | Contains | Exists in examples? |
 |------|---------|----------|-------------------|
 | `api.conf` | API | Server bind, DB connection, providers, logging, TLS, branding | Yes (`config/api.conf.example`) |
-| `realtime.conf` | Realtime | Input mode, MQTT settings, socket path, SSE bind, health bind | Yes (`config/realtime.conf.example`) |
+| `realtime.conf` | Realtime (BFF) | Input mode, MQTT settings, socket path, SSE bind, health bind, upstream API URL, unit conversion config | Yes (`config/realtime.conf.example`) |
 | `stack.conf` | Config UI | UI bind/port, TLS, `[ui] enabled` flag | **No — does not exist** |
 | `secrets.env` | All (mode 0600) | DB password, API keys, admin credentials, proxy secret | No (generated by wizard) |
 | `ui-cert.pem` | Config UI | Self-signed TLS cert (mode 0644) | No (auto-generated with `--tls`) |
@@ -401,7 +427,7 @@ weewx-clearskies-stack/
 | Tech stack | ADR-002 |
 | Deployment topology | ADR-034 |
 | API | ADR-010 (data model), ADR-012 (DB access), ADR-018 (versioning) |
-| Realtime | ADR-005 |
+| Realtime (BFF) | ADR-005, ADR-041 (BFF), ADR-042 (units) |
 | Dashboard | ADR-002, ADR-009 (design), ADR-024 (page taxonomy) |
 | Config UI / Wizard | ADR-027 (wizard), ADR-038a-wizard-api-channel (wizard-to-API channel) |
 | Auth | ADR-008, ADR-037 (inbound traffic) |
