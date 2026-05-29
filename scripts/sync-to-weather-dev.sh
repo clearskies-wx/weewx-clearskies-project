@@ -14,6 +14,11 @@
 # Usage:
 #   ./sync-to-weather-dev.sh                              # pulls all five
 #   ./sync-to-weather-dev.sh weewx-clearskies-api         # pulls one repo
+#
+# NOTE: This script ONLY pulls source. It does NOT rebuild the dashboard,
+# restart services, or refresh the web root. For a full redeploy (pull +
+# restart services + dashboard build + publish dist/), use the companion
+# script `redeploy-weather-dev.sh`. See docs/procedures/deploy-clearskies.md.
 
 set -eu
 
