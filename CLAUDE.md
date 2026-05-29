@@ -33,6 +33,20 @@ These apply regardless of domain.
 - **NO LOOPS.** Do not repeatedly attempt the same fix or command hoping for a different result.
 - **When you don't know, search the web.** Don't guess at procedures from training data. Search official docs and reputable community sources before running anything destructive or unfamiliar.
 
+### Git safety — agents and coordinator
+
+These rules apply to ALL repos, ALL domains. No exceptions.
+
+**Agents must NOT run any of these git commands:** `git pull`, `git push`, `git fetch`, `git rebase`, `git merge`, `git remote`, `git checkout` of remote branches, or any command that introduces remote changes or sends local changes to a remote. Agents may only: `git add`, `git commit` (to the local branch), `git status`, `git log`, `git diff`. If an agent encounters a situation where it thinks it needs to pull or push, it MUST stop and report to the coordinator.
+
+**No worktree isolation for implementation agents.** Git worktrees create a parallel checkout that bypasses the local repo. Work done in a worktree gets pushed to GitHub without ever appearing in the primary checkout — the user never sees or approves it. All implementation work happens in the primary local checkout at the known repo path. Worktrees may only be used for read-only exploration.
+
+**Coordinator never pushes without explicit user instruction.** The word "push" must come from the user in chat. Not inferred, not assumed, not triggered by a task being "done." Committing locally is fine after review; pushing is a separate user-authorized step.
+
+**If an agent reports unexpected repo state, STOP.** Diverged remote, unknown commits, merge conflicts, branches that shouldn't exist — any of these mean the coordinator halts all work on that repo and reports to the user immediately. No autonomous resolution. The user decides what to do.
+
+**Why (2026-05-28):** A previous session's agent used worktree isolation, committed 14 commits, and pushed them to GitHub — all without the user's knowledge. The primary checkout never moved. A later session's agent pulled and merged those unknown commits without asking. The user discovered code they never approved in their repo. Agents operating outside the local checkout and pushing without approval is the root cause of half-done, unreviewed work landing in the codebase.
+
 ### Collaboration style
 
 - **NEVER use AskUserQuestion.** Do not pop up interactive question/choice prompts. If you need user input, ask in plain text. The user will reply in chat.
@@ -53,9 +67,15 @@ For non-trivial outputs (architecture recommendations, multi-step plans, ADR dra
 
 You have explicit permission to think critically about your own work and refine it. Goal: correct and durable, not fast and sloppy. Surfacing the audit lets the user push back on points you may have under-weighted.
 
+**Evidence over assertion.** When the self-audit involves verifiable claims (tests pass, file exists, endpoint returns expected shape), include the verification command and its output in the reply. "I verified the tests pass" is not evidence. `pytest result: 73 passed, 0 failed at commit abc1234` is evidence. This applies to claims about test results, accessibility scans, build success, deployment state, and any other machine-verifiable assertion. For non-machine-verifiable claims (design judgment, trade-off analysis), the existing audit-and-surface pattern is sufficient.
+
 **Scope:** non-trivial outputs only. For simple sync / match-state / one-line-fix tasks, the "Simple means simple" rule still wins — don't perform an audit just to look thorough.
 
 **Anti-pattern:** announce a perfect-sounding plan, then scramble when the user surfaces an obvious risk. Better to surface the risk yourself first, with the proposed mitigation.
+
+### Prompt faithfulness
+
+Before reporting a task complete, walk the user's original request and confirm every distinct ask has a corresponding deliverable or an explicit deferral communicated to the user. The user should never have to say "but I also asked you to do X." When the task involves multiple items, enumerate them at the start and check them off at the end.
 
 ### Capture lessons in the right place
 

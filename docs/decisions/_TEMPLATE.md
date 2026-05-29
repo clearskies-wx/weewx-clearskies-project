@@ -35,6 +35,15 @@ What changes as a result of this decision? Both positive and negative.
 - Future flexibility lost or gained
 - Trade-offs accepted
 
+## Acceptance criteria
+
+Minimum verifiable conditions before this ADR's implementation is considered complete. Each criterion must be independently testable — "it works" is not a criterion.
+
+- [ ] {Criterion 1 — specific, observable, testable}
+- [ ] {Criterion 2}
+
+Checked at: (a) round close by the auditor, (b) phase-boundary ADR compliance sweep, (c) pre-release QA. Criteria that depend on a later phase say so explicitly with the blocking dependency.
+
 ## Implementation guidance
 
 Concrete-enough notes that a future Sonnet session can act on this without re-deriving. Include:

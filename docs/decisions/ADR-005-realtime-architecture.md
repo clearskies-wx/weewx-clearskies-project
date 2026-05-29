@@ -2,6 +2,7 @@
 status: Accepted
 date: 2026-04-30
 deciders: shane
+amended-by: ADR-041
 ---
 
 # ADR-005: Realtime supports both direct-read and MQTT subscriber modes
@@ -96,3 +97,9 @@ mode = direct  # direct | mqtt
 - Related ADRs: [ADR-001](ADR-001-component-breakdown.md) (component breakdown), [ADR-002](ADR-002-tech-stack.md) (tech stack), [ADR-006](ADR-006-compliance-model.md) (compliance), ADR-008 (auth — pinned)
 - Server reference: [reference/weather-skin.md](../../reference/weather-skin.md) — existing MQTT chain (EMQX + weewx-mqtt + Apache WS-upgrade)
 - Plan: [Coexistence section in CLEAR-SKIES-PLAN.md](../planning/CLEAR-SKIES-PLAN.md)
+
+---
+
+## Amendment: BFF responsibility (ADR-041, 2026-05-26)
+
+[ADR-041](ADR-041-realtime-bff.md) adds Backend-for-Frontend (BFF) responsibility to the realtime service: it proxies REST requests to the upstream API and applies unit conversion to all outbound data (both proxied REST responses and SSE events). The input mode decision in this ADR (direct vs MQTT, operator-selectable) is unchanged. The BFF role is additive — the service still does everything described above, plus proxying and unit conversion.

@@ -1,9 +1,9 @@
 ---
-status: Accepted
+status: Superseded by ADR-041, ADR-042
 date: 2026-05-02
 deciders: shane
 supersedes:
-superseded-by:
+superseded-by: ADR-041, ADR-042
 ---
 
 # ADR-019: Units handling

@@ -1,0 +1,140 @@
+---
+status: Accepted
+date: 2026-05-26
+deciders: shane
+---
+
+# ADR-042: Unit system — full weewx compatibility
+
+## Context
+
+Clear Skies is a weewx skin but has no unit system. Traditional weewx skins get unit conversion and labeling for free from the Cheetah template engine via skin.conf `[Units]`. We chose React (ADR-002) for interactivity but never accounted for the unit handling we walked away from.
+
+weewx defines 14 unit groups with specific valid units for each. Operators expect per-group unit selection. The current dashboard has 45+ hardcoded unit strings (`"°F"`, `"mph"`, `"inHg"`) and Beaufort/comfort-index thresholds in US units.
+
+MQTT field names arrive with unit suffixes (`outTemp_F`, `windSpeed_mph`) that encode the source unit. The BFF (ADR-041) needs to identify the source unit, convert to the operator's display unit, and attach the correct label.
+
+## Options considered
+
+| Option | Verdict |
+|---|---|
+| A. Full weewx compatibility in BFF (14 groups, all valid units) | **Selected.** One conversion layer, compatible with skin.conf migration. |
+| B. Partial compatibility (top 5 groups only) | Violates "weewx skin" positioning. Non-US operators hit gaps immediately. |
+| C. Client-side conversion in dashboard | Duplicates logic for REST and SSE paths. Every component needs unit knowledge. |
+| D. Force operators to set weewx `target_unit` to desired display | Breaks mixed-unit preferences (e.g., metric temp + imperial rain). Per-field overrides are the norm in skin.conf. |
+
+## Decision
+
+Clear Skies implements full weewx unit system compatibility. The BFF (ADR-041) is the single conversion authority.
+
+### Unit groups (complete, from weewx 5.x docs)
+
+| Group | Valid units | Default (US) |
+|---|---|---|
+| group_temperature | degree_F, degree_C, degree_K, degree_E | degree_F |
+| group_speed | mile_per_hour, km_per_hour, knot, meter_per_second, beaufort | mile_per_hour |
+| group_speed2 | mile_per_hour2, km_per_hour2, knot2, meter_per_second2 | mile_per_hour2 |
+| group_pressure | inHg, mbar, hPa, kPa | inHg |
+| group_pressurerate | inHg_per_hour, mbar_per_hour, hPa_per_hour, kPa_per_hour | inHg_per_hour |
+| group_rain | inch, cm, mm | inch |
+| group_rainrate | inch_per_hour, cm_per_hour, mm_per_hour | inch_per_hour |
+| group_altitude | foot, meter | foot |
+| group_distance | mile, km | mile |
+| group_direction | degree_compass | degree_compass |
+| group_radiation | watt_per_meter_squared | watt_per_meter_squared |
+| group_percent | percent | percent |
+| group_moisture | centibar | centibar |
+| group_volt | volt | volt |
+
+### How conversion works
+
+**REST path:** API returns raw archive values with `usUnits` declaring the unit system. BFF reads `usUnits`, looks up each field's group, converts from archive unit to operator display unit, attaches label and formatted string.
+
+**SSE path:** MQTT field names carry unit suffixes (e.g., `outTemp_F`). BFF strips the suffix using a mapping derived from weewx's `UNIT_REDUCTIONS` dict, identifies the source unit, converts to display unit, attaches label.
+
+**Output format:** `{ "value": 22.5, "label": "°C", "formatted": "22.5" }` — the dashboard renders this directly with zero unit math.
+
+### Additional unit config (beyond group selection)
+
+| Config subsection | What it controls | weewx equivalent |
+|---|---|---|
+| `[[string_formats]]` | Decimal places per unit (`degree_F = %.1f`) | `[Units][[StringFormats]]` |
+| `[[labels]]` | Display symbols per unit (`degree_F = " °F"`) | `[Units][[Labels]]` |
+| `[[ordinates]]` | Compass direction labels (N, NNE, NE, ...) | `[Units][[Ordinates]]` |
+| `[[time_formats]]` | strftime patterns for different contexts | `[Units][[TimeFormats]]` |
+| `[[degree_days]]` | Base temps for HDD/CDD/GDD calculations | `[Units][[DegreeDays]]` |
+| `[[trend]]` | Barometer trend window and grace period | `[Units][[Trend]]` |
+
+### Derived values
+
+- **Beaufort scale:** BFF computes from wind speed (any source unit) and emits the Beaufort number + label. Dashboard does not carry Beaufort thresholds.
+- **Comfort index:** BFF determines wind chill vs heat index from temperature and emits the appropriate value + label. Dashboard does not carry temperature thresholds.
+
+## Consequences
+
+- Dashboard stripped of ALL unit awareness — simpler components, no hardcoded strings.
+- Conversion factors must exactly match weewx's own values. Source: weewx Python source code (`weewx/units.py`), not approximations or Wikipedia.
+- Floating-point precision handled by `StringFormats` rounding at format time — no accumulated error in display.
+- Config format mirrors skin.conf `[Units]` subsection names for operator familiarity.
+- Wizard can pre-fill unit config from imported skin.conf (ADR-043) or detected archive `usUnits`.
+- MQTT suffix stripping uses a known-suffix map (not "split on last underscore") because some field names contain underscores and some suffixes are ambiguous (e.g., `_count` for dimensionless values).
+
+## Implementation guidance
+
+### File layout in realtime repo
+
+```
+weewx_clearskies_realtime/
+├── units/
+│   ├── __init__.py
+│   ├── groups.py        # Group definitions, valid units, field→group mapping
+│   ├── conversion.py    # Conversion factors (from weewx source)
+│   ├── labels.py        # Display symbols per unit
+│   └── transformer.py   # Applies conversion + formatting to data dicts
+├── mqtt_fields.py       # Suffix→unit mapping, field name normalization
+```
+
+### Config in `realtime.conf`
+
+```ini
+[units]
+    [[groups]]
+    group_temperature = degree_F
+    group_speed = mile_per_hour
+    group_pressure = inHg
+    # ... defaults to US system if omitted
+
+    [[string_formats]]
+    degree_F = %.1f
+    inch = %.2f
+
+    [[labels]]
+    degree_F = " °F"
+    mile_per_hour = " mph"
+
+    [[ordinates]]
+    directions = N, NNE, NE, ENE, E, ESE, SE, SSE, S, SSW, SW, WSW, W, WNW, NW, NNW
+
+    [[time_formats]]
+    # strftime patterns
+
+    [[degree_days]]
+    heating_base = 65, degree_F
+    cooling_base = 65, degree_F
+
+    [[trend]]
+    time_delta = 10800
+    time_grace = 300
+```
+
+### Out of scope
+
+- Custom unit definitions beyond weewx's documented set.
+- Mixed units within a single group (weewx doesn't support this either).
+
+## References
+
+- weewx unit system docs: https://weewx.com/docs/5.1/reference/units/
+- weewx source: `weewx/units.py` (conversion factors, UNIT_REDUCTIONS)
+- Related: [ADR-041](ADR-041-realtime-bff.md) (BFF), [ADR-010](ADR-010-canonical-data-model.md) (data model), [ADR-043](ADR-043-skinconf-compliance.md) (skin.conf)
+- Research: [brief-weewx-units.md](../planning/briefs/brief-weewx-units.md), [brief-mqtt-field-names.md](../planning/briefs/brief-mqtt-field-names.md), [brief-dashboard-unit-audit.md](../planning/briefs/brief-dashboard-unit-audit.md)

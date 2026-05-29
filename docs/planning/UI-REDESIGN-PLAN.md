@@ -1,0 +1,180 @@
+# UI-REDESIGN-PLAN — Clear Skies dashboard UI redesign (the "plan for the plan")
+
+**Status:** DRAFT for user review (2026-05-28). Not binding until approved. This is a roadmap/index,
+not a decision record — decisions live in ADRs.
+
+**Purpose:** Sequence the UI redesign as a series of **decision points**, each resolved into an
+ADR, each ADR operationalized into a **granular, prescriptive execution plan** that drives coding
+under tight agent control. Guides decision-making and order of operations; holds no decisions itself.
+
+**Inputs:**
+- Inspiration analysis: [docs/design/inspiration/NOTES.md](../design/inspiration/NOTES.md) — 28-pin walk + synthesis.
+- Architecture source of truth: [docs/ARCHITECTURE.md](../ARCHITECTURE.md) — React 19 + Vite + Tailwind v4 +
+  shadcn/ui + **Recharts** + **Lucide** + **Weather Icons**.
+- Process discipline: [rules/clearskies-process.md](../../rules/clearskies-process.md).
+
+---
+
+## ⛔ BLOCKERS — fix before ANY further UI work
+
+The A0 audit (2026-05-29) found build work that was reported done but is **half-finished**. These are
+**hard blockers**: no Track A/B/C component work proceeds until they are fixed and verified. Evidence is
+file:line so these can't be hand-waved as "probably fine."
+
+| # | Blocker | Reality (verified) | Fix | Repos |
+|---|---|---|---|---|
+| **B-1** ✅ **DONE — verified live 2026-05-29** | **Traffic does not go through the BFF.** All `/api/v1/*` requests bypassed the realtime BFF and hit the API directly, so no server-side unit conversion happened. | `frontend-host/Caddyfile`, `single-host/Caddyfile`, `examples/reverse-proxy/Caddyfile` all routed `/api/v1/*` direct to API. | **Fixed:** all 3 Caddyfiles now route `/api/v1/*` → `realtime:8766` (commits stack `4334475`, realtime `5f52eac`, meta `02f4ada`). **Verified end-to-end on weather-dev:** BFF `:8766` returns `outTemp 68.2 °F` vs raw upstream `68.22576…°F` — BFF actively transforms (also fixes UAT #10 significant-figures). Lead re-ran realtime suite: 366 passed/10 skipped/0 failed. | stack, realtime, meta docs |
+| ~~**B-1b**~~ ✅ **NOT A GAP (verified)** | ~~Wizard must write `[api] upstream_url`.~~ The B-1 agent claimed the wizard doesn't write `realtime.conf`; **that was wrong.** `config_writer.py:466` (`write_all`) calls `write_realtime_conf()` which writes `[api] upstream_url = state.api_address` in a MANAGED REGION. Confirmed by the live weather-dev `realtime.conf` matching that writer's exact format. No action needed. | — | — |
+| **B-2** ✅ **DONE — verified 2026-05-29** | **"and Gusty" conditions qualifier never implemented** (ADR-044 §4 mandates it). | `conditions_text.py` had no `wind_gust` param and no gusty logic; `windGust` sat in a ring-buffer, never consumed. | **Fixed** (commit realtime `eafb706`): `wind_gust`/`wind_gust_unit` added to `build_weather_text()` + wired through `compose_weather_text()`; fires when `gust_mph ≥ speed_mph+12` AND `gust_mph ≥ 18` (both converted to mph from declared units); Calm-suppressed. **Verified:** lead re-ran suite (375 passed/10 skipped/0) + exercised the function directly (fires at 20/5 & exact 18/6; not at 15/5; knots path correct; calm+gust → empty). 8 new tests. | realtime |
+| **B-3** | **Client-side unit math that belongs in the BFF** (violates ADR-042 "dashboard stripped of all unit awareness"). | (a) `barometerTrend` emitted as raw float; dashboard hardcodes ±0.01 inHg threshold (`barometer_trend.py:162`, `barometer.ts:11-18`). (b) `windDirLabel()` recomputes compass client-side, disagrees with BFF `windDir.label` at sector boundaries (`now.tsx:49-52`, `forecast.tsx:16-19` vs `transformer.py:302-307`). | (a) BFF emits a ConvertedValue or a pre-classified `rising/falling/steady` direction; dashboard drops the hardcoded threshold. (b) Dashboard uses `windDir.label` from BFF; delete `windDirLabel()`. | realtime, dashboard |
+| **B-4** | **Timezone display bugs** (violate ADR-020 "always station TZ"). | seismic map popup `toLocaleString()` no TZ (`seismic.tsx:317`); records "Date Observed" hardcodes `'UTC'` (`records.tsx:48-56`); radar frame time no TZ (`radar-map.tsx:205-215`). | Records date → station TZ; seismic popup → existing `formatTime(...)` helper; radar frame time → carve-out OK per A0 decision (document) or station TZ. | dashboard |
+| **B-5** | **a11y + i18n gaps** (violate ADR-026 / ADR-021). | Homepage sr-only chart table omits temp unit (`charts.tsx:1090`); `weather` i18n namespace unregistered + missing in 12 locales; 5 hardcoded English aria-labels in footer (`footer.tsx:82-117`). | Add unit to sr-only cell; register `weather` ns + seed locale; extract footer aria strings to i18n. | dashboard |
+| **B-6** | **Logo alt text not enforced** (ADR-022 + coding §5.5 mandate required alt). | `LogoBranding.alt` defaults to `''`; no `logo_alt` field in wizard payload (`responses.py:950`, `setup.py:239-251`). | Add `logo_alt` to `BrandingApplyConfig`/`BrandingSettings` + plumb to `LogoBranding.alt`. | api |
+
+> **Dashboard gate:** the dashboard repo currently has an **uncommitted** `src/api/openapi-v1.yaml` edit +
+> untracked `test-results/`. Resolve that before dispatching any dashboard fix (B-3b, B-4, B-5).
+
+**Fix order:** B-1 first (it's the root cause — wiring the BFF makes B-3a/b the correct fix rather than
+patching client hacks), then B-2 / B-3 / B-4 / B-5 / B-6 in parallel where repos don't collide.
+
+---
+
+## How this works — the four-layer flow
+
+| Layer | Answers | Controls | Lives in |
+| --- | --- | --- | --- |
+| **1. Roadmap plan** (this doc) | what decisions, in what order | sequencing & dependencies | `docs/planning/` |
+| **2. ADR** (per decision point) | what we decided & why + **acceptance criteria** | the decision record | `docs/decisions/` |
+| **3. Execution plan** (per decision point) | exact files, QC gates, definition-of-done, scope fences | the **agent leash** | `docs/planning/briefs/` |
+| **4. Code** | the implementation | — | the repos |
+
+**Discipline (carried from `rules/clearskies-process.md`):**
+- ADRs start **Proposed**, user reviews full content, user explicitly approves → **Accepted**. Directional
+  chat is *input* to a Proposed ADR, not approval.
+- Every ADR must carry **acceptance criteria** (an ADR without them can't be verified).
+- The execution plan **references** the ADR; it never **restates** its decisions. **ADR wins on conflict.**
+- The execution plan is **prescriptive, low-latitude**: scope in/out (exhaustive file list), per-deliverable
+  spec, QC gates, definition-of-done, verification command, agent git restrictions. Agents *execute*, not interpret.
+- **Honor prior decisions — don't throw the baby out with the bathwater.** Many UI/behavior decisions already
+  exist (Accepted ADRs, the current Belchertown site, Phase-2 dashboard work). For each surface, FIRST surface
+  any prior decision, then **explicitly re-affirm it or consciously depart** — edit-in-place for a correction,
+  supersede only if fundamentally distinct. Never silently redo or discard what was already decided.
+
+### Why the execution-plan layer exists (the problem it solves)
+ADRs capture *what/why* but don't tell an agent its exact scope, QC gates, what "done" means, or where its
+latitude ends. That gap is where this project has been burned: scope overrun, false completion claims,
+re-invented architecture. The execution plan closes it by making completion and scope **machine-checkable
+and explicit** before any agent is dispatched.
+
+---
+
+## Directional decisions made (to be formalized as Proposed ADRs)
+These were decided in conversation (2026-05-28) and are **directional input** — each becomes a Proposed ADR
+the user reviews before it's binding.
+- **Theme:** support **light + dark**; backgrounds keyed by **condition × theme** (dark = Milky Way / night
+  imagery, not blue-sky cumulus).
+- **Backgrounds:** **photographic** (not illustrated); layered (soft base + crisp foreground effect);
+  **operator-replaceable** over a generic default set (sense of place).
+- **Per-metric treatment:** **mixed** — text vs. dial/gauge vs. curve decided per metric, not one answer.
+- **Card sizing:** fixed cards for now, but **sized to be compatible with the future grid** (no grid engine yet).
+- **Icons:** likely keep stack default — **Weather Icons** (hero) + **Lucide** (utility) — pending a bold-enough check.
+
+---
+
+## Decision-point roadmap (sequenced)
+
+> Ordering rule: **Foundations** and **Research gates** both precede **Signature components** — you can't design
+> a data-display component before you know the data exists and the design tokens are set.
+
+### Track A — Foundations (design system; no provider-data dependency)
+- **A0. ADR reconciliation gate (UI-impacting ADRs).** Before any component design, make every
+  UI-impacting ADR **complete and accurate against the current code**. This is NOT a new ADR — it edits
+  existing ADRs **in place** (status → Proposed → user re-approves, per `rules/clearskies-process.md`).
+  Known divergences to fix (see [C0-PAGE-INVENTORY.md](../design/C0-PAGE-INVENTORY.md) reconciliation
+  table): **ADR-002** (charts = Recharts, not ECharts/Tremor), **ADR-046** (fault overlay Proposed-but-
+  built, incl. out-of-scope fault popups), **ADR-024** (Records column model; Webcam/Radar tabbed-vs-
+  split; inside-temp/custom-records), plus the `/seismic` route fix in `ARCHITECTURE.md`. ADR-009's
+  hero-Now-only-vs-global-background tension is reconciled inside **A2**. Audit-for-accuracy scope
+  (verify complete & accurate vs code, fix if drifted): ADR-013/014/015/016/020/021/022/023/026/040/
+  041/042/044. → edits to existing ADRs (no new ADR). **This gate precedes A1.**
+- **A1. Theme & color system** (light + dark, tokens) → ADR. 
+- **A2. Background system** (condition × theme, layered, photographic, operator-replaceable) → ADR.
+  Has a **config/asset feature** dimension (upload/override + storage/serving) — may split into a design ADR
+  + a config ADR.
+- **A3. Icon system** — confirm Weather Icons (hero) + Lucide (utility) satisfy the two-family preference → ADR (likely short).
+- **A4. Card model & grid-compatible sizing** (1/2/3/4-col footprints, spacing/row tokens; NOT the grid engine) → ADR.
+
+### Track B — Research gates
+**B1 is decomposed into per-component data inventories** (folded into the Track C workflow below) — NOT one
+monolithic audit. Each component opens with "here's exactly what the providers supply for this card." B2 + B3
+remain global gates run once.
+- **B1 (per-component, just-in-time). Provider-data inventory** — at the start of each Track C component,
+  enumerate everything the providers can supply for that card's metric(s), so composition/design is grounded in
+  real available data. This replaces the monolithic audit and makes the research bite-sized.
+- **B2. Recharts background-image support** (global) — can Recharts render a scenic image behind the plot area? Gates C1 temp-curve styling.
+- **B3. Accessibility-contrast + image-performance budget** (global) — text-contrast floors over photos; image
+  weight/loading budget. Gates A2 and all photo-backed components. → research note / ADR.
+
+### Track C — Components, ALL pages (depend on A + B)
+**Scope = every page, not just the "now"/home page** — forecast page, almanac, radar, earthquakes, alerts,
+records, etc. each have cards. Track C opens with a page inventory, then walks components page by page.
+
+**Per-component workflow (each component is a self-contained mini-cycle):**
+0. **Prior-decision check** — surface any existing decision for this surface (ADRs, current site, Phase-2 work);
+   re-affirm or consciously depart (don't silently redo).
+1. **Data inventory (B1 slice)** — "here is everything the providers / weewx give us for this card."
+2. **Composition** — what's grouped on one card vs. split into separate cards.
+3. **Mockup** — quick artifact mockup(s) to react to (see Mockups below).
+4. **ADR** — lock composition + what's shown + treatment → Proposed → Accepted.
+5. **Execution plan → code.**
+
+- **C0. Page inventory** — enumerate every page/screen and the cards each holds (now/home, forecast, almanac,
+  radar, earthquakes, alerts, records, …). Establishes the full Track C work list. → research note.
+- **C1. Current-conditions card** + **today's temperature curve** along the bottom (model: img-23). → ADR + exec plan.
+- **C2. ⭐ Wind compass** (loved; signature; info-inside-the-dial). → ADR + exec plan.
+- **C3. Forecast screen** — icon-rich columns + time-range tabs + (B1-permitting) expandable columns. → ADR + exec plan.
+- **C4. Per-metric stat treatment + detail grid** — the text/dial/gauge/curve table; uniform tiles; per-stat icons;
+  plain-language context line. → ADR + exec plan.
+- **C5. Sun & Moon arcs** (moon gets its own arch) + moon phase → almanac/front page. → ADR + exec plan.
+- **C6. AQI card** (B1-permitting; per-pollutant breakdown) + **radar legend/key**. → ADR + exec plan.
+
+### Out of scope here — separate future plan
+- **Customizable card GRID** (fixed-column grid, operator move/resize, layout persistence, responsive collapse).
+  Its own plan + ADR(s). **Compatibility constraint:** everything in Track A/C must use grid-compatible card
+  footprints so nothing needs redesign when the grid lands. Do **not** build the grid engine here.
+
+---
+
+## Execution-plan template (Layer 3 — per decision point)
+Each Accepted ADR gets one of these in `docs/planning/briefs/` before any agent is dispatched. Required sections
+(per `rules/clearskies-process.md` "Agent prompt requirements" + "Scope binding"):
+1. **ADR reference** — which ADR(s) this implements. (Reference, do not restate decisions.)
+2. **Scope in / out** — exhaustive file list to create/modify; explicit "do NOT touch" exclusions.
+3. **Per-deliverable spec** — each component/endpoint's behavior, states, responsive behavior, edge cases.
+4. **QC gates** — the ADR's acceptance criteria turned into pass/fail checks (tests, axe-core a11y, visual states).
+5. **Definition of done** — what the lead will see in git log; pass thresholds; verification command.
+6. **Agent constraints** — git restrictions block (no pull/push/fetch/rebase/merge); scope-ack required before code.
+
+---
+
+## Mockups (artifact format)
+Quick, self-contained **HTML mockups** saved to `docs/design/mockups/`, openable in a browser, durable on disk
+(same principle as the inspiration board — not floating in chat). Fidelity rises in step with Track A:
+- **Low-fidelity first** — grayscale layout/composition wireframe (boxes + labels) to settle "what's on the card."
+  Foundation-independent, so it can start before Track A is done.
+- **Higher-fidelity later** — real Tailwind styling, colors, icons, background — once theme/background/icon
+  foundations (Track A) are decided to style against.
+Mockups are throwaway exploration artifacts, NOT the React implementation.
+
+## Next action
+**C0 (page inventory) is DONE** → [docs/design/C0-PAGE-INVENTORY.md](../design/C0-PAGE-INVENTORY.md)
+(the full Track C work list + the as-built reconciliation surface). Next, in this order/parallelism:
+- **A0 (ADR reconciliation gate)** — make UI-impacting ADRs complete & accurate vs current code
+  **before** component design. Foundational; precedes A1.
+- **A1 (theme & color system)** as the first Proposed ADR — root dependency for dark-mode backgrounds
+  & all visuals. Starts once A0's theming-relevant ADRs (022/023/009) are confirmed accurate.
+- **B2 + B3 global research gates** — Recharts background support + a11y-contrast/perf budget (can run
+  in parallel with A0/A1).
+
+Then walk Track C component by component using the per-component workflow (prior-decision check → data inventory
+→ composition → mockup → ADR → exec plan). Per-component data inventory (B1) happens just-in-time inside each.
