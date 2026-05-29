@@ -300,7 +300,7 @@ Config UI is a standalone FastAPI app, run via `weewx-clearskies-config` CLI on 
 | `/forecast` | Forecast | Yes |
 | `/charts` | Charts | Yes |
 | `/almanac` | Almanac | Yes |
-| `/earthquakes` | Earthquakes | Yes |
+| `/seismic` | Seismic | Yes |
 | `/records` | Records | Yes |
 | `/reports` | Reports | Yes |
 | `/about` | About | Yes |

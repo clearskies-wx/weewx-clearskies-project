@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Proposed
 date: 2026-05-26
 deciders: shane
 ---
@@ -32,7 +32,7 @@ Clear Skies implements full weewx unit system compatibility. The BFF (ADR-041) i
 | Group | Valid units | Default (US) |
 |---|---|---|
 | group_temperature | degree_F, degree_C, degree_K, degree_E | degree_F |
-| group_speed | mile_per_hour, km_per_hour, knot, meter_per_second, beaufort | mile_per_hour |
+| group_speed | mile_per_hour, km_per_hour, knot, meter_per_second | mile_per_hour |
 | group_speed2 | mile_per_hour2, km_per_hour2, knot2, meter_per_second2 | mile_per_hour2 |
 | group_pressure | inHg, mbar, hPa, kPa | inHg |
 | group_pressurerate | inHg_per_hour, mbar_per_hour, hPa_per_hour, kPa_per_hour | inHg_per_hour |
@@ -42,6 +42,7 @@ Clear Skies implements full weewx unit system compatibility. The BFF (ADR-041) i
 | group_distance | mile, km | mile |
 | group_direction | degree_compass | degree_compass |
 | group_radiation | watt_per_meter_squared | watt_per_meter_squared |
+| group_uv | uv_index | uv_index |
 | group_percent | percent | percent |
 | group_moisture | centibar | centibar |
 | group_volt | volt | volt |
@@ -56,23 +57,35 @@ Clear Skies implements full weewx unit system compatibility. The BFF (ADR-041) i
 
 ### Additional unit config (beyond group selection)
 
-| Config subsection | What it controls | weewx equivalent |
-|---|---|---|
-| `[[string_formats]]` | Decimal places per unit (`degree_F = %.1f`) | `[Units][[StringFormats]]` |
-| `[[labels]]` | Display symbols per unit (`degree_F = " °F"`) | `[Units][[Labels]]` |
-| `[[ordinates]]` | Compass direction labels (N, NNE, NE, ...) | `[Units][[Ordinates]]` |
-| `[[time_formats]]` | strftime patterns for different contexts | `[Units][[TimeFormats]]` |
-| `[[degree_days]]` | Base temps for HDD/CDD/GDD calculations | `[Units][[DegreeDays]]` |
-| `[[trend]]` | Barometer trend window and grace period | `[Units][[Trend]]` |
+| Config subsection | What it controls | weewx equivalent | v0.1 status |
+|---|---|---|---|
+| `[[string_formats]]` | Decimal places per unit (`degree_F = %.1f`) | `[Units][[StringFormats]]` | supported |
+| `[[labels]]` | Display symbols per unit (`degree_F = " °F"`) | `[Units][[Labels]]` | supported |
+| `[[ordinates]]` | Compass direction labels (N, NNE, NE, ...) | `[Units][[Ordinates]]` | supported |
+| `[[time_formats]]` | strftime patterns for different contexts | `[Units][[TimeFormats]]` | _out of scope — v0.1_ |
+| `[[degree_days]]` | Base temps for HDD/CDD/GDD calculations | `[Units][[DegreeDays]]` | _out of scope — v0.1_ |
+| `[[trend]]` | Barometer trend window and grace period | `[Units][[Trend]]` | supported |
 
 ### Derived values
 
 - **Beaufort scale:** BFF computes from wind speed (any source unit) and emits the Beaufort number + label. Dashboard does not carry Beaufort thresholds.
-- **Comfort index:** BFF determines wind chill vs heat index from temperature and emits the appropriate value + label. Dashboard does not carry temperature thresholds.
+- **Comfort index selector:** `comfortIndex` is a plain string field the BFF adds to every
+  converted record. It selects which comfort metric applies at the current temperature:
+  `"windChill"` (outTemp ≤ 50 °F), `"heatIndex"` (outTemp ≥ 80 °F), or `"none"` (moderate
+  range). The dashboard uses this value to choose which of `windChill` or `heatIndex` to
+  display — it does not re-derive the selection. The actual windChill and heatIndex values
+  are separate fields converted by the normal unit pipeline.
 
 ## Consequences
 
 - Dashboard stripped of ALL unit awareness — simpler components, no hardcoded strings.
+- **As-built (confirmed):** `barometerTrendDirection` is classified by the BFF's
+  `enrichment/barometer_trend.py` and emitted as a direction string
+  (commits realtime cafb6b2, dashboard 6161f2f). `windDirCardinal` and
+  `windGustDirCardinal` are BFF-computed 16-point codes emitted by `proxy.py`
+  alongside every converted current-conditions record
+  (commits realtime 3500659, dashboard 7340408). The dashboard performs zero
+  client-side unit or direction math for these fields.
 - Conversion factors must exactly match weewx's own values. Source: weewx Python source code (`weewx/units.py`), not approximations or Wikipedia.
 - Floating-point precision handled by `StringFormats` rounding at format time — no accumulated error in display.
 - Config format mirrors skin.conf `[Units]` subsection names for operator familiarity.
@@ -90,7 +103,8 @@ weewx_clearskies_realtime/
 │   ├── groups.py        # Group definitions, valid units, field→group mapping
 │   ├── conversion.py    # Conversion factors (from weewx source)
 │   ├── labels.py        # Display symbols per unit
-│   └── transformer.py   # Applies conversion + formatting to data dicts
+│   ├── transformer.py   # Applies conversion + formatting to data dicts
+│   └── derived.py       # BFF-computed derived fields: beaufort(), comfort_index()
 ├── mqtt_fields.py       # Suffix→unit mapping, field name normalization
 ```
 
@@ -131,6 +145,7 @@ weewx_clearskies_realtime/
 
 - Custom unit definitions beyond weewx's documented set.
 - Mixed units within a single group (weewx doesn't support this either).
+- `[[time_formats]]` and `[[degree_days]]` config blocks: acknowledged as weewx config surface for operator familiarity, but BFF behavior is not wired in v0.1 — there is no dashboard consumer (degree-days reach the UI via the NOAA monthly-report text, already computed upstream; timestamps are formatted client-side per locale and station timezone per ADR-020/021).
 
 ## References
 

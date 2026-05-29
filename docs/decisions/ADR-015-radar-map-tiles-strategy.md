@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Proposed
 date: 2026-05-11
 deciders: shane
 supersedes:
@@ -12,7 +12,7 @@ superseded-by:
 
 ## Context
 
-The Now-page webcam/timelapse/radar 3-tab panel ([ADR-024](ADR-024-page-taxonomy.md) cat 8) and the Earthquakes-page embedded map (cat 6) both need an interactive map with tile overlays. The cat 8 walk research established the per-region radar provider matrix and the PWS-contributor track as the default lens for "free" Aeris.
+The Now-page radar card and webcam card ([ADR-024](ADR-024-page-taxonomy.md) cat 8) and the Earthquakes-page embedded map (cat 6) both need an interactive map with tile overlays. **As built:** radar and webcam ship as two separate side-by-side cards in Row 7 of the Now page (not a single 3-tab panel). The webcam card is conditionally rendered only when `webcamEnabled && webcamAvailable`; the radar card expands to full width when the webcam card is absent. The cat 8 walk research established the per-region radar provider matrix and the PWS-contributor track as the default lens for "free" Aeris.
 
 This ADR locks the map library and the day-1 radar provider set. Per-provider modules conform to [ADR-038](ADR-038-data-provider-module-organization.md).
 
@@ -69,8 +69,8 @@ Tile sources with time-stepped frames drive a frame-replay control on the radar 
 - Phase 2 builds 7 provider modules + the iframe config slot. Capability declarations populate the setup wizard's recommendation engine.
 - Earthquakes page reuses Leaflet — same dependency, two consumers.
 - OpenWeatherMap radar UI label is "Model precipitation," not "Radar."
-- Keyed providers add proxy endpoints in clearskies-api (one route per keyed module).
-- Attribution rendered per source's terms (OSM, RainViewer, NOAA, IEM, MSC, DWD, JMA, Mapbox, Aeris) on the radar tab.
+- Keyed providers are proxied through a single parameterized tile-proxy endpoint: `GET /radar/providers/{provider_id}/tiles/{z}/{x}/{y}`. Provider identity is the `{provider_id}` path parameter. Only keyed providers (`aeris`, `openweathermap`) are served through this proxy; keyless providers are fetched directly by the browser per ADR-037.
+- Attribution rendered per source's terms (OSM, RainViewer, NOAA, IEM, MSC, DWD, Aeris, OpenWeatherMap) on the radar tab. JMA and Mapbox are excluded — `mapbox_jma` was dropped from the day-1 provider set per the 2026-05-11 amendment (Mapbox JMA tilesets are raster-array shape, GL-JS-only, incompatible with Leaflet). No `mapbox_jma.py` provider module exists.
 
 ## Out of scope
 

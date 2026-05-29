@@ -197,7 +197,7 @@ Not to be solved during this walk, but it reframes how every card is designed:
 2. **Condition-keyed background images** — source stock backgrounds per condition
    (clear / cloudy / rainy / stormy / etc.); check whether the current site's clear-sky
    image can be reused. Present for comparison.
-3b. **Verify chart-background support** — confirm ECharts (+ Tremor) in clearskies-dashboard can
+3b. **Verify chart-background support** — confirm Recharts in clearskies-dashboard can
    render a scenic image behind plotted chart data (img-27). Likely yes; verify before relying on it.
 5. **Per-metric treatment audit** — for each stat (humidity, UV, pressure, wind, dew point,
    visibility, precip%, temp, etc.) decide its best representation: **plain text vs. radial
@@ -432,5 +432,5 @@ _What it is:_ Low-res AI-mockup dark dashboard (placeholder text): scenic mounta
 trend charts, stat cards w/ photo thumbnails, circular gauge, sidebar nav. Read as vibe reference.
 _What you like:_ The possibility of **adding backgrounds (scenic images) behind charts**.
 Questioned whether our chart app supports it.
-_Steal / skip:_ Steal (pending verify): image backgrounds behind charts. Charts = ECharts/Tremor;
-likely supported — verify (deferred #6).
+_Steal / skip:_ Steal (pending verify): image backgrounds behind charts. Charts = Recharts;
+likely supported — verify (deferred #3b).

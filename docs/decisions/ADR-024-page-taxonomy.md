@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Proposed
 date: 2026-05-04
 deciders: shane
 supersedes:
@@ -31,7 +31,7 @@ The 12-category content walk ([CLEAR-SKIES-CONTENT-DECISIONS.md](../reference/CL
 | 2 | Forecast | `/forecast` | `cloud-sun-rain` |
 | 3 | Charts | `/charts` | `chart-line` |
 | 4 | Almanac | `/almanac` | `moon` |
-| 5 | Earthquakes | `/earthquakes` | `activity` |
+| 5 | Seismic | `/seismic` | `activity` |
 | 6 | Records | `/records` | `trophy` |
 | 7 | Reports | `/reports` | `file-text` |
 | 8 | About | `/about` | `info` |
@@ -47,7 +47,7 @@ The 12-category content walk ([CLEAR-SKIES-CONTENT-DECISIONS.md](../reference/CL
 
 Sensor-availability self-hide applies to every card (cat 10): cards self-hide when their backing data has no non-null aggregate over the visible period. When all cards on a page hide, the page itself self-hides from nav.
 
-**1. Now (`/`)** — current-conditions hero (operator-uploadable photo, current outTemp primary, condition + feels-like secondary), active alert banner (when present), Today's Highlights (today's hi/lo + peak gust + rain so far + peak AQI + records-broken-today), Wind tile (animated compass + speed/gust + Beaufort), Station observations tile (locked default 8: barometer + 3-hr trend, dewpoint, outHumidity, rain combined, heatindex, windchill, radiation, UV; indoor temp/humidity off by default), Sun & Moon mini-tile, AQI tile (half-gauge + main pollutant), Lightning tile (1h/24h count + nearest distance + storm-phase badge + yellow accent if strike <5 min), Earthquake tile (most recent within radius), Today's forecast card (provider-adaptive narrative + hi/lo + precip% + condition icons through the day), Webcam/Timelapse/Radar tabs (only configured tabs render), homepage chart panel (default `homepage` group with 1d/3d/7d/30d/90d range selector + "View all charts →" link).
+**1. Now (`/`)** — current-conditions hero (operator-uploadable photo, current outTemp primary, condition + feels-like secondary), active alert banner (when present), Today's Highlights (today's hi/lo + peak gust + rain so far + peak AQI + records-broken-today), Wind tile (animated compass + speed/gust + Beaufort), Station observations tile (locked default 8: barometer + 3-hr trend, dewpoint, outHumidity, rain combined, heatindex, windchill, radiation, UV; indoor temp/humidity off by default), Sun & Moon mini-tile, AQI tile (half-gauge + main pollutant), Lightning tile (1h/24h count + nearest distance + storm-phase badge + yellow accent if strike <5 min), Earthquake tile (most recent within radius), Today's forecast card (provider-adaptive narrative + hi/lo + precip% + condition icons through the day), Radar card (separate — expands to full width when webcam is disabled); Webcam card (separate — shown only when `webcam.json` `enabled: true` and image loads successfully; has Live / Timelapse tab toggle within the card), homepage chart panel (default `homepage` group with 1d/3d/7d/30d/90d range selector + "View all charts →" link).
 
 **2. Forecast (`/forecast`)** — active alert banner header strip, hourly forecast (scrollable strip; provider-adaptive 1h or 3h), daily forecast (7-day default, extending if provider supplies more; per-day icon + day-of-week + condition + hi/lo + precip% + wind), forecast discussion / narrative tile (operator-toggled, off by default; renders NWS AFD or equivalent prose when provider supplies it), forecast freshness indicator.
 
@@ -55,9 +55,9 @@ Sensor-availability self-hide applies to every card (cat 10): cards self-hide wh
 
 **4. Almanac (`/almanac`)** — Sun details (civil twilight, rise/transit/set, azimuth/altitude/RA/declination, total daylight + delta vs yesterday, next equinox, next solstice — Skyfield-computed per [ADR-014](ADR-014-almanac-data-source.md)), Moon details (rise/transit/set, azimuth/altitude/RA/declination, phase name + % full, next full moon, next new moon), year-long sunrise/sunset chart, year-long daylight chart, moon-phase calendar (month grid). Phase 6+: planets visible tonight, eclipses, meteor showers, conjunctions, twilight times table.
 
-**5. Earthquakes (`/earthquakes`)** — recent earthquakes list (last 7 days within configured radius, sortable by time/magnitude/distance), embedded map (Leaflet + OSM per [ADR-015](ADR-015-radar-map-tiles-strategy.md), markers sized by magnitude), provider-specific extras when supplied (e.g., GeoNet Mercalli intensity, ReNaSS regional detail), settings summary.
+**5. Seismic (`/seismic`)** — two-card layout: a Leaflet/OSM map card (left on desktop, stacked on mobile) and a scrollable earthquake list card (right on desktop). Map shows earthquake markers sized by magnitude and colour-coded by age (oldest = blue, newest = red); station location marker; GEM Global Active Faults overlay (show/hide toggle, default on). Fault lines drawn in uniform amber (no per-slip-type colour differentiation). Clicking a list row flies the map to that earthquake; clicking a map marker scrolls the list. Settings summary bar (provider, radius, minimum magnitude, days). API endpoint remains `/api/v1/earthquakes` for backwards compatibility.
 
-**6. Records (`/records`)** — sortable HTML data table grouped by section (Temperature 8 rows, Wind 2, Rain 6, Humidity 4, Barometer 2, Sun 2 gated on radiation/UV, AQI gated on AQI columns, Inside Temp gated on operator config default-off, Custom records via cat 10 mechanism). Default columns YTD | All-Time + year selector. "Broken in last 30 days" badge on freshly set records. Operator markdown narrative slot above the table.
+**6. Records (`/records`)** — per-section cards, one card per section returned by the API (Temperature, Wind, Rain, Humidity, Barometer, Sun gated on radiation/UV, AQI gated on AQI columns). Each card renders a non-sortable table with four columns: **Record | Today | Value | Date**. A single period toggle (YTD / All-Time) switches the data set for all cards simultaneously; there is no year selector. "Broken in last 30 days" badge on freshly set records. Inside Temp and Custom records sections are not present (both dropped per user decision; sensor-availability self-hide applies to remaining sections). Operator markdown narrative slot above the cards is reserved for a future enhancement.
 
 **7. Reports (`/reports`)** — year/month dropdowns populated from `NOAA-*.txt` files actually present (no empty options), HTML-parsed table as default rendered view (parses fixed-width text → sortable responsive table; high/low rows highlighted), "Download .txt" link for canonical file. **Setup-time precondition:** dashboard checks for `/NOAA/*.txt` at startup; if absent, page self-hides + configuration UI prompts operator to enable the weewx NOAA generator. Enhanced template ships in stack repo with annotation "Generated locally; not an official NOAA / NWS / NCEI product"; 9 added fields beyond weewx default; auto-omits sensor-absent columns.
 
@@ -77,7 +77,7 @@ Sensor-availability self-hide applies to every card (cat 10): cards self-hide wh
 
 Per [ADR-009](ADR-009-design-direction.md) — icon-rail on desktop (left), bottom-nav on mobile. Active page = background shift + accent line. Skip-to-main-content at top.
 
-**Default desktop rail order:** `Now` · `Forecast` · `Charts` · `Almanac` · `Earthquakes` · `Records` · `Reports` · *custom pages* · `About`.
+**Default desktop rail order:** `Now` · `Forecast` · `Charts` · `Almanac` · `Seismic` · `Records` · `Reports` · *custom pages* · `About`.
 
 **Footer:** `Legal/Privacy` (always), `© year station-name`, `Powered by Clear Skies` (hideable).
 
@@ -103,7 +103,7 @@ Per [ADR-009](ADR-009-design-direction.md) — icon-rail on desktop (left), bott
 
 ### Routes (`weewx-clearskies-dashboard/src/routes/`)
 
-`now.tsx` (`/`), `forecast.tsx` (`/forecast`), `charts.tsx` (`/charts` tabbed), `almanac.tsx`, `earthquakes.tsx`, `records.tsx`, `reports.tsx`, `about.tsx`, `legal.tsx`, `custom-page.tsx` (`/:slug` — handles operator-defined pages dynamically), `not-found.tsx` (404 for hidden/nonexistent routes).
+`now.tsx` (`/`), `forecast.tsx` (`/forecast`), `charts.tsx` (`/charts` tabbed), `almanac.tsx`, `seismic.tsx` (`/seismic`), `records.tsx`, `reports.tsx`, `about.tsx`, `legal.tsx`, `custom-page.tsx` (`/:slug` — handles operator-defined pages dynamically), `not-found.tsx` (404 for hidden/nonexistent routes).
 
 Routes registered at runtime from operator config so hidden pages return 404, not just "not in nav but still reachable."
 

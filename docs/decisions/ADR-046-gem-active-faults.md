@@ -1,5 +1,5 @@
 ---
-status: Proposed
+status: Accepted
 date: 2026-05-27
 deciders: shane
 supersedes:
@@ -37,7 +37,10 @@ Use GEM GAF-DB. CC-BY-SA 4.0 license — attribution required, displayed in the 
 - `data/gem_active_faults.geojson` bundled in the API package.
 - `services/faults.py` — loads GeoJSON, clips by haversine radius from station coordinates.
 - `endpoints/earthquakes.py` — adds `/earthquakes/faults` route.
-- Out of scope: fault metadata popups, fault-type styling differentiation, automatic GEM updates.
+- **Fault show/hide toggle** — checkbox in the map card header; default on (`showFaults` state initialised `true`). When unchecked, the GeoJSON layer and the below-map attribution caption are both hidden.
+- **Fault metadata popups** — `onEachFeature` calls `layer.bindPopup()` with the fault name (`feature.properties.name`) and slip type (`feature.properties.slip_type`). Both values fall back to localised "unknown" strings when absent.
+- **Dual attribution** — both the in-map Leaflet attribution control and the below-map caption render the same API-provided canonical GEM string — `"Active faults: GEM Global Active Faults Database, CC-BY-SA 4.0"` — single-source and consistent. The below-map caption is shown only while the fault layer is visible.
+- Out of scope: fault-type styling differentiation (all fault traces rendered in uniform amber — `FAULT_STYLE` applies one colour regardless of slip type), automatic GEM updates.
 
 ## References
 

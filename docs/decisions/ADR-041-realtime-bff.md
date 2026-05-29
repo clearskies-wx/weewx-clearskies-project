@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Proposed
 date: 2026-05-26
 deciders: shane
 amends: ADR-005
@@ -39,11 +39,22 @@ The realtime service (`weewx-clearskies-realtime`) becomes the dashboard's singl
 
 ## Consequences
 
-- **Caddy routing changes:** `/api/v1/*` routes to the BFF (`realtime:8766`) instead of directly to the API. `/sse` routing unchanged.
-- **Dashboard has one connection point:** The front-end host where the BFF runs. No direct browser→API traffic.
-- **API stays internal:** weewx host, not directly browser-accessible. Strengthens ADR-034 topology.
-- **Service growth:** Realtime grows from ~1,200 LOC to ~2,500–3,000 LOC. Still a single-purpose service (dashboard gateway), not a monolith.
+- **Caddy routing changes:** `/api/v1/*` routes to the BFF (`realtime:8766`) instead of directly
+  to the API. `/sse` routing unchanged. **As-built (stack commit 4334475):** all three Caddyfiles
+  (`frontend-host/Caddyfile`, `single-host/Caddyfile`, `examples/reverse-proxy/Caddyfile`) route
+  `/api/v1/*` to `realtime:8766` (or `localhost:8766` in the native/pip example). The dashboard
+  has one connection point; no direct browser→API traffic. ADR-034 topology satisfied.
+- **Service growth:** Realtime has grown from ~1,200 LOC (pre-BFF) to **~5,000 LOC** of
+  production code (src only, excluding tests). As-built includes: proxy, units module
+  (groups/conversion/labels/transformer/derived), MQTT fields, sky condition, conditions text,
+  temperature comfort, enrichment pipeline (input smoother, ring buffer, barometer trend,
+  weather text, sky tap), and direct/MQTT adapters. Still a single-purpose service
+  (dashboard gateway), not a monolith.
 - **New dependency:** `httpx` for upstream API communication.
+- **Proxy is optional:** When `[api] upstream_url` is absent (or left empty), the BFF starts
+  without a proxy client. Requests to `/api/v1/*` return **HTTP 503** `{"error": "API proxy not
+  configured"}`. SSE and health endpoints are unaffected. Set `upstream_url` only when the
+  upstream API is deployed.
 - **Health probes:** Must include upstream API connectivity check alongside existing MQTT/adapter status.
 - **Latency:** One extra network hop for REST (BFF → API over LAN). Negligible for weather data.
 - **Availability:** BFF down = both REST and SSE unavailable. Same risk profile as any reverse proxy; health checks monitor it.
@@ -71,20 +82,24 @@ tls_verify = false
 - `config/settings.py` — add `[api]` and `[units]` config sections.
 - `health.py` — add upstream API connectivity probe to readiness check.
 
-### Caddy routing change
+### Caddy routing — as-built
+
+All three shipped Caddyfiles route `/api/v1/*` to the BFF:
 
 ```
-# Before (current)
-reverse_proxy /api/v1/* {$CLEARSKIES_API_URL}
-
-# After (BFF)
-reverse_proxy /api/v1/* realtime:8766
+handle /api/v1/* {
+    reverse_proxy realtime:8766   # frontend-host and single-host (Docker)
+}
+reverse_proxy /api/v1/* localhost:8766   # examples/reverse-proxy (native/pip)
 ```
+
+The "Before (current)" stanza showing a direct API route no longer applies; it is
+retained only as historical context in git history (pre-stack-4334475).
 
 ### Out of scope
 
-- Direct mode implementation (ADR-005, separate work item).
-- Wizard changes (Phase 5 of the plan).
+- Wizard changes (Phase 5 of the plan). _(unchanged — the wizard does not yet surface
+  `[api] upstream_url` in its config-writer flow.)_
 
 ## References
 

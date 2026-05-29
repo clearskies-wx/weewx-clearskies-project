@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Proposed
 date: 2026-05-02
 deciders: shane
 supersedes:
@@ -32,7 +32,7 @@ Operator picks **one** alerts module at setup; configuration UI suggests by regi
 
 ### Operators outside covered regions
 
-If the operator's region isn't covered by any of the three modules, the alert banner doesn't render — render-time sensor-availability detection (cat 10) handles the empty case. No error, no nag.
+If the operator's region isn't covered by any of the three modules, the API returns an empty `alerts` list. The `AlertBanner` component returns `null` directly when `alerts.length === 0` — this is a **direct early-return inside the component**, not the category-10 sensor-availability self-hide system. No error, no nag.
 
 ### Canonical fields
 

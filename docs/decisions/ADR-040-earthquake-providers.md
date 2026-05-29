@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Proposed
 date: 2026-05-05
 deciders: shane
 supersedes:
@@ -50,7 +50,19 @@ USGS provides global coverage at M2.5+, so every operator can fall back to it. U
 
 ### Canonical fields
 
-Each module translates upstream payloads into `EarthquakeRecord` per [ADR-010](ADR-010-canonical-data-model.md). Provider-specific fields not in the canonical (GeoNet `MMI` calculated for NZ, EMSC `flynn_region`, USGS `cdi`/`sig`/`gap`, etc.) flow through the `extras` dict.
+Each module translates upstream payloads into `EarthquakeRecord` per [ADR-010](ADR-010-canonical-data-model.md). Provider-specific fields not in the canonical model flow through the `extras` dict. Exceptions where the code maps to a canonical field instead of extras:
+
+- GeoNet `mmi` (the wire field is lowercase `mmi`) maps to the canonical `EarthquakeRecord.mmi` field directly; it is **not** in `extras`.
+- EMSC `flynn_region` maps to the canonical `EarthquakeRecord.place` field directly; it is **not** in `extras`.
+
+**Per-provider `extras` keys as built:**
+
+| Provider | `extras` keys | Notes |
+|---|---|---|
+| `usgs` | `cdi`, `sig`, `net`, `code`, `ids`, `sources`, `types`, `nst`, `dmin`, `rms`, `gap`, `type`, `title` | All optional; only present when non-null in the USGS response. `cdi` = Community Decimal Intensity. `sig` = significance score. `gap` = azimuthal gap. |
+| `geonet` | `quality` | GeoNet `quality` string ("best"/"preliminary"/"automatic"/"deleted"). Only present when non-null. `mmi` and `locality` map to canonical fields, not extras. |
+| `emsc` | `evtype`, `auth`, `source_id`, `source_catalog`, `lastupdate` | Only present when non-null. `evtype` = EMSC event type code. `auth` = publishing agency. `flynn_region` maps to canonical `place`, not extras. |
+| `renass` | `type`, `description_fr`, `url_fr` | `type` always present (may be null). `description_fr` and `url_fr` present only when the bilingual dict supplies a `fr` key. |
 
 ### Polling / caching cadence
 

@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Proposed
 date: 2026-05-02
 deciders: shane
 supersedes:
@@ -50,10 +50,10 @@ This ADR locks the **language list**. Framework / file format / string-extractio
 ## Consequences
 
 - All user-facing strings in `clearskies-dashboard` and `clearskies-stack` (configuration UI) are extractable for translation from day 1 — no inline English in JSX/HTML.
-- Phase 3 dashboard scaffold includes a `src/i18n/locales/` directory with 13 locale files.
+- Locale files live at `public/locales/<lang>/<ns>.json` and are served as static assets via **i18next-http-backend** (loadPath: `/locales/{{lng}}/{{ns}}.json`). All 13 locale directories are present. The `src/i18n/` directory contains only the i18next configuration (`index.ts`) and the locale-sync hook — no locale JSON files live under `src/`.
 - Default fallback locale is `en`. Missing keys fall back to `en` silently; logged for translator follow-up.
 - Numbers, dates, units format per locale via `Intl.NumberFormat` / `Intl.DateTimeFormat`.
-- Initial translations (beyond `en`) come from machine translation reviewed by the user; community contributions welcomed via PR after launch.
+- **As built:** All 13 locales carry a file for every registered namespace (locale structure is complete). The `en` locale is the authoritative source; non-English translation **content** for newer keys (the `weather` namespace, plus `footer.*` and `directions.*` in `common`) is English-seeded today and served via the `en` fallback. A non-English translation pass is deliberately deferred per this ADR's design (machine-translation reviewed by the operator + community PRs after launch) — the file structure is done; the content translation is the deferred part.
 
 ## Out of scope
 

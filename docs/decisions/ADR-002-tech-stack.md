@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Proposed
 date: 2026-04-30
 deciders: shane
 ---
@@ -79,7 +79,7 @@ Need to lock the major library/framework choices for the three primary component
 
 - Package manager: pnpm (chosen in Phase 1 spike if it works; otherwise npm). Stick with whichever across all subsequent JS work.
 - **Tailwind v4 specifics:** CSS-first config (`@theme` in `globals.css`, no `tailwind.config.js`). HSL → OKLCH color migration. `tailwindcss-animate` plugin replaced with `tw-animate-css`. Targets modern browsers (per [ADR-025](INDEX.md), pinned).
-- **Recharts + React 19 footgun:** Recharts (current major) requires a `react-is` dependency override when used with React 19. Capture in `package.json` `overrides` field at scaffold time. Search keyword for future maintainers: "react-is override Recharts React 19."
+- **Recharts + React 19:** Recharts v3 declares `react-is` as a peer dependency. As of the scaffolded project, this is satisfied by adding `react-is` as a direct `dependencies` entry (version matching the React 19 release in use — currently `^19.2.0`). No `overrides` block is required. If a future Recharts major introduces an incompatible `react-is` constraint, revisit at that upgrade. Search keyword for future maintainers: "react-is Recharts React 19 peer dependency."
 - **shadcn discipline policy (locked):**
   - Components installed via `npx shadcn add <name>`. Never edit the copied source files directly.
   - All customizations happen in **wrapper components** in `src/components/` (one level above the shadcn-copied `src/components/ui/`).

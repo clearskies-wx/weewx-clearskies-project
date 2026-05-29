@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Proposed
 date: 2026-05-02
 deciders: shane
 supersedes:
@@ -26,7 +26,8 @@ The station TZ is delivered via `StationMetadata` ([ADR-010](ADR-010-canonical-d
 
 1. Explicit operator setting in clearskies-api config (configuration UI / setup wizard, [ADR-027](ADR-027-config-and-setup-wizard.md)).
 2. weewx config (`Station.timezone` if set).
-3. Derived from operator lat/lon at first-run (one-time lookup; result persisted in operator config).
+3. OS timezone (`time.tzname[0]` resolved via `zoneinfo`).
+4. UTC + WARN (logged at startup; operator must set an explicit timezone).
 
 ### Browser-side rendering
 
@@ -47,7 +48,7 @@ Same precedent as units ([ADR-019](ADR-019-units-handling.md)). No per-user iden
 ## Consequences
 
 - StationMetadata response includes `timezone` (IANA string) and `timezoneOffsetMinutes` (current offset, useful for clients that don't ship full IANA TZ data).
-- Phase 2 work: TZ derivation at first-run setup if operator and weewx config don't supply one (e.g., `timezonefinder` or a small lookup table).
+- Phase 4 work: lat/lon-based TZ derivation at first-run setup wizard if operator and weewx config don't supply one (e.g., `timezonefinder` or a small lookup table). Until Phase 4, the fallback is OS timezone then UTC+WARN.
 - Daylight saving transitions handled by browser IANA TZ data; no server-side DST logic.
 - NOAA-report rendering, Records-page year boundaries, Charts-page x-axes all use station TZ.
 - Dashboard never calls `toLocaleString()` without an explicit `timeZone` option — always station TZ.
@@ -55,7 +56,7 @@ Same precedent as units ([ADR-019](ADR-019-units-handling.md)). No per-user iden
 ## Out of scope
 
 - Per-user TZ override — Phase 6+.
-- TZ lookup library choice — Phase 2.
+- TZ lookup library choice (e.g., `timezonefinder`) — Phase 4 / setup-wizard scope.
 - Stations that moved across zones (historical TZ change in the archive) — out of scope; v0.1 assumes a stable station TZ.
 
 ## References

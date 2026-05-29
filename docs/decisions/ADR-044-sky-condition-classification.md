@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Proposed
 date: 2026-05-26
 amended: 2026-05-28
 deciders: shane
@@ -41,7 +41,12 @@ During daytime, the station's pyranometer is the authoritative source. Provider 
 
 σ(kc) threshold of 0.10 separates stable skies from intermittent clouds (Dürr & Philipona 2001). The 30-minute window provides ~360 samples at 5-second intervals — sufficient statistical power for variance estimation.
 
-**Startup:** Until 30 minutes of data accumulates, fall back to provider cloud cover. If no provider either, report no sky condition (wind/comfort only).
+**Startup:** Until **~3 minutes** of data accumulates (**36 samples** at ~5-second intervals),
+fall back to provider cloud cover. If no provider either, report no sky condition
+(wind/comfort only). The minimum-samples guard (`_MIN_SAMPLES = 36`) provides enough
+statistical power for a first classification without requiring the full 30-minute window.
+The full 30-minute window is the steady-state buffer size for variance estimation, not the
+startup threshold.
 
 #### 1b. Secondary source: provider conditions (night / twilight / no pyranometer)
 
@@ -80,7 +85,12 @@ Provider data is used only when solar radiation analysis is unavailable: at nigh
 
 - **Night** (solar zenith > 90°): No solar classification possible. Use provider cloud cover or omit sky descriptor.
 - **Civil twilight** (zenith 80–90°): Solar classification unreliable. Fall back to provider cloud cover; if unavailable, omit sky descriptor.
-- **GHI < 10 W/m²**: Below pyranometer noise floor. Skip solar classification, use provider.
+- **GHI noise floor:** The code sets `_NOISE_FLOOR = 0.0` W/m² — readings at or above 0 are
+  accepted into the kc buffer. A separate guard (`maxSolarRad < 50 W/m²`) already excludes
+  night and deep-twilight periods before any GHI value is evaluated; in practice this makes
+  the 10 W/m² floor redundant. The effective operational threshold is the `maxSolarRad < 50`
+  guard: below it, no readings are added regardless of GHI. The `_NOISE_FLOOR = 0.0`
+  constant catches only physically invalid negative sensor readings.
 - **Cloud-edge enhancement** (kc > 1.0): Evidence of nearby clouds. Sustained enhancement within the window contributes to elevated σ(kc), naturally classifying as Partly Cloudy.
 - **Anomalous turbidity — smoke, dust, haze:** Climatological Linke turbidity underestimates actual atmospheric extinction during wildfire smoke, dust storms, or heavy haze. This produces artificially low kc (sky appears "cloudier" than it is). **Detection heuristic:** when kc is persistently low (mean < 0.70) AND σ(kc) is very low (< 0.03) AND provider reports clear or few clouds AND local temperature/humidity are inconsistent with thick cloud cover (e.g., high temp, low humidity), flag as "Hazy" or "Smoky" instead of "Mostly Cloudy." This heuristic is imperfect but catches the most common false classification. When AQI data is available and elevated (PM2.5 > 35 µg/m³ or AQI > 100), the confidence in a smoke/haze diagnosis increases.
 - **Snow on pyranometer:** Produces kc ≈ 0, indistinguishable from overcast. Cannot be detected from radiation data alone. If temperature is well below freezing and provider reports clear, consider adding a data-quality warning.
@@ -107,8 +117,8 @@ Rain rate thresholds (AMS Glossary of Meteorology; WMO classification):
 |---|---|
 | 0 or null | No precipitation |
 | > 0 and < 0.10 in/hr (2.5 mm/hr) | Light Rain |
-| 0.10–0.30 in/hr (2.5–7.6 mm/hr) | Moderate Rain |
-| > 0.30 in/hr (7.6 mm/hr) | Heavy Rain |
+| ≥ 0.10 and < 0.30 in/hr (2.5–7.6 mm/hr) | Moderate Rain |
+| ≥ 0.30 in/hr (7.6 mm/hr) | Heavy Rain |
 
 **Frozen precipitation:** Rain gauges cannot distinguish rain from snow. When `rainRate > 0` AND provider reports `precipType` of "snow", "freezing-rain", or "sleet", use the provider's type — but only if the Stull (2011) wet-bulb temperature is ≤ 35°F (1.7°C). Above this threshold, frozen precipitation is thermodynamically implausible regardless of provider forecast. Wet-bulb temperature is computed from `outTemp` and `outHumidity` using the Stull (2011) empirical formula.
 
@@ -122,21 +132,33 @@ Rain rate thresholds (AMS Glossary of Meteorology; WMO classification):
 |---|---|---|
 | 0 | < 0.5 | Calm |
 | 1 | 0.5–1.5 | Very Light Breeze |
-| 2 | 1.6–3.3 | Light Breeze |
-| 3 | 3.4–5.4 | Gentle Breeze |
-| 4 | 5.5–7.9 | Moderate Breeze |
-| 5 | 8.0–10.7 | Fresh Breeze |
-| 6 | 10.8–13.8 | Strong Breeze |
-| 7 | 13.9–17.1 | Near Gale |
+| 2 | 1.6–3.3 | Light breeze |
+| 3 | 3.4–5.4 | Gentle breeze |
+| 4 | 5.5–7.9 | Moderate breeze |
+| 5 | 8.0–10.7 | Fresh breeze |
+| 6 | 10.8–13.8 | Strong breeze |
+| 7 | 13.9–17.1 | Near gale |
 | 8 | 17.2–20.7 | Gale |
-| 9 | 20.8–24.4 | Strong Gale |
+| 9 | 20.8–24.4 | Strong gale |
 | 10 | 24.5–28.4 | Storm |
-| 11 | 28.5–32.6 | Violent Storm |
-| 12 | ≥ 32.7 | Hurricane Force |
+| 11 | 28.5–32.6 | Violent storm |
+| 12 | ≥ 32.7 | Hurricane |
 
 > **Amendment (2026-05-28):** Beaufort 1 renamed from "Light Air" to "Very Light Breeze". All other labels unchanged.
 
+> **Casing note:** All multi-word labels use sentence case (only the first word capitalised),
+> except "Calm" (single word) and "Very Light Breeze" (B1, initial-capitalised by convention).
+> B12 is "Hurricane" (not "Hurricane Force") — the "Force" suffix is omitted for display
+> brevity. The code in `units/derived.py` is authoritative; this table documents the as-built
+> strings.
+
 **Gusty qualifier:** Append "and Gusty" when `windGust ≥ windSpeed + 12 mph` AND `windGust ≥ 18 mph`. This follows NWS ASOS practice where "gusty" means sustained-to-gust spread exceeds a meaningful threshold.
+
+> **As-built (commit eafb706):** Implemented in `conditions_text.py:build_weather_text()`.
+> Both speeds are converted to mph before comparison regardless of station unit, so knot/m/s
+> stations evaluate the same thresholds. The qualifier only fires inside the `Beaufort > 0`
+> branch — when sustained wind is Calm, the entire wind component is omitted and "and Gusty"
+> does not appear floating alone (conscious design choice).
 
 **Calm suppression:** Beaufort 0 (Calm) is omitted from the composed text — "Overcast" reads better than "Overcast and Calm."
 
@@ -246,7 +268,7 @@ Three stability mechanisms are applied in sequence before any threshold comparis
 
 | Input | Buffer window | Samples (~5s interval) | Rationale |
 |---|---|---|---|
-| Solar radiation (kc) | 30 min | 400 | ADR-044 §1 spec — sky conditions change slowly |
+| Solar radiation (kc) | 30 min | ~360 | ADR-044 §1 spec — sky conditions change slowly |
 | UV | 10 min | 120 | Cloud-pass noise |
 | appTemp | 10 min | 120 | Temperature does not legitimately change 5°F in seconds |
 | dewpoint | 10 min | 120 | Same |

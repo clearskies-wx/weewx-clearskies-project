@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Proposed
 date: 2026-05-02
 deciders: shane
 supersedes:
@@ -10,7 +10,7 @@ superseded-by:
 
 ## Context
 
-The Almanac page and the Sun & Moon tile on the Now page ([ADR-024](ADR-024-page-taxonomy.md)) need ephemeris data: rise / transit / set, civil twilight, azimuth / altitude / RA / declination, moon phase + fullness, equinox / solstice / new-moon / full-moon dates. Phase 6+ candidates on the same page (planets, eclipses, meteor showers, conjunctions) need the same library.
+The Almanac page and the Sun & Moon tile on the Now page ([ADR-024](ADR-024-page-taxonomy.md)) need ephemeris data: rise / transit / set, civil twilight, azimuth / altitude / RA / declination, moon phase + fullness, equinox / solstice / new-moon / full-moon dates. Phase 6+ candidates on the same page (conjunctions) need the same library. Planet visibility, lunar eclipses, meteor showers, and special moon names shipped in v0.1 per the 2026-05-27 ADR-024 amendment.
 
 Belchertown computes this with `pyephem`, which is unmaintained.
 
@@ -36,7 +36,7 @@ Calculations run **server-side in clearskies-api**: stateless given (lat, lon, t
 ## Consequences
 
 - clearskies-api adds `skyfield` to its Python dependencies and bundles/downloads the DE421 ephemeris (~17 MB) on first run.
-- Almanac computations are stateless and local — no caching beyond the in-memory ephemeris.
+- Almanac computations are stateless and local. Core almanac endpoints (sun-times, moon-phases) and the four expanded astronomy endpoints (planets, eclipses, meteor showers) are additionally pre-computed by the ADR-045 background cache-warming tier on 6-hour and 24-hour intervals, keyed as `almanac:sun-times:{year}`, `almanac:moon-phases:{year}`, `almanac:planets:{date}`, `almanac:eclipses`, and `almanac:meteor-showers:{year}`. Cache misses fall through to a live Skyfield computation (graceful degradation, no user-visible error).
 - Phase 6+ Almanac additions don't require a library swap.
 
 ## Out of scope
