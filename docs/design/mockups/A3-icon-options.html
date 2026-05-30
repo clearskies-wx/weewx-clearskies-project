@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A3 — Icon set options (per session feedback)</title>
+<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+<style>
+  :root{ --bg:#eef0f3; --fg:#15171c; --card:#fff; --muted:#646b76; --border:#e2e5ea; --accent:oklch(0.48 0.22 260); }
+  [data-theme="dark"]{ --bg:#0e1014; --fg:#f1f3f6; --card:#1a1d24; --muted:#99a0ac; --border:#282c35; --accent:oklch(0.70 0.15 260); }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--fg);
+       padding:22px;line-height:1.4;transition:background .2s,color .2s}
+  h1{font-size:21px;margin:0 0 4px} h2{font-size:15px;margin:26px 0 2px}
+  .sub{color:var(--muted);font-size:13px;max-width:880px;margin:0 0 8px}
+  .bar{position:sticky;top:0;z-index:9;display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+       background:var(--bg);padding:8px 0 12px;border-bottom:1px solid var(--border);margin-bottom:14px}
+  .bar button{background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:7px 13px;font-size:13px;cursor:pointer}
+  .bar label{font-size:12px;color:var(--muted)}
+  .legend{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:3px 8px}
+  .set{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:14px 16px;margin-bottom:13px}
+  .set-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .set-h .n{font-weight:700;font-size:14px}
+  .set-h .opt{font-size:11px;font-weight:700;color:#fff;background:var(--accent);border-radius:6px;padding:2px 7px}
+  .set-h .desc{font-size:12px;color:var(--muted)}
+  .set-h .lic{font-size:10.5px;color:var(--muted);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
+  .head,.row{display:grid;gap:8px}
+  .head .c,.row .c{text-align:center;min-width:0}
+  .head .c{font-size:10px;color:var(--muted);letter-spacing:.02em}
+  .row .c iconify-icon{color:var(--fg)}            /* mono sets tint to text color */
+  .row.color .c iconify-icon{color:initial}        /* colorful set keeps own colors */
+  .row .c{display:flex;align-items:center;justify-content:center}
+  .row .c img,.cx img{object-fit:contain}
+  /* utility */
+  .urow{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:10px}
+  .u{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:10px;color:var(--muted);
+     border:1px solid var(--border);border-radius:9px;padding:11px 5px;background:var(--bg)}
+  .u iconify-icon{color:var(--fg)}
+  /* in-context hero strip */
+  .ctx{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:6px}
+  .cx{display:flex;align-items:center;gap:12px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px}
+  .cx .t{font-size:30px;font-weight:600}.cx .m{font-size:11px;color:var(--muted)}.cx .nm{font-size:10px;color:var(--accent);font-weight:700}
+  .cx iconify-icon{color:var(--fg)} .cx.color iconify-icon{color:initial}
+  .note{font-size:12px;color:var(--muted);max-width:880px;margin:2px 0 4px}
+
+  /* ── Section 2: inventory grid ── */
+  .catalog-links{background:var(--card);border:2px solid var(--accent);border-radius:13px;padding:14px 18px;margin-bottom:18px}
+  .catalog-links h3{margin:0 0 8px;font-size:14px;font-weight:700}
+  .catalog-links a{display:inline-block;margin:3px 6px 3px 0;font-size:12px;color:var(--accent);text-decoration:none;
+     border:1px solid var(--accent);border-radius:6px;padding:3px 10px;transition:background .15s}
+  .catalog-links a:hover{background:var(--accent);color:#fff}
+  .catalog-links .note2{font-size:11px;color:var(--muted);margin-top:8px}
+
+  .inv-section{margin-bottom:22px}
+  .inv-cat{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);
+           margin:18px 0 6px;padding:4px 10px;background:color-mix(in oklch, var(--accent) 10%, transparent);
+           border-radius:6px;display:inline-block}
+  .inv-table{width:100%;border-collapse:collapse;font-size:12px}
+  .inv-table th{font-size:10px;font-weight:700;text-align:center;color:var(--muted);letter-spacing:.04em;
+                padding:4px 6px;border-bottom:2px solid var(--border);background:var(--card)}
+  .inv-table th.label-col{text-align:left}
+  .inv-table td{padding:5px 6px;border-bottom:1px solid var(--border);vertical-align:middle;text-align:center;background:var(--card)}
+  .inv-table td.label-col{text-align:left;font-size:11px;color:var(--fg);font-weight:500;white-space:nowrap;min-width:130px}
+  .inv-table tr:hover td{background:color-mix(in oklch, var(--accent) 5%, var(--card))}
+  .inv-table iconify-icon{color:var(--fg);vertical-align:middle}
+  .gap{font-size:11px;color:var(--muted);opacity:.5}
+  .sz-bar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .sz-bar label{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+  <h1>A3 — Icon set options <span style="color:var(--muted);font-weight:400">· built to your session feedback</span></h1>
+  <p class="sub">Your feedback: <b>hero weather icons</b> (current conditions + forecast condition glyphs) =
+    <b>bold / filled / illustrative</b> (you liked the thicker filled icons in img-01/02/25, disliked thin
+    line-art in img-00/04). <b>Everything else</b> (stat + nav icons) = <b>demure, thin, simplified line</b>,
+    one per stat. Below: <b>4 app-grade hero</b> sets + 4 simplified line sets, real glyphs
+    (Iconify — needs internet). All licenses are permissive / GPL-compatible.</p>
+
+  <div class="bar">
+    <button id="themeBtn" onclick="toggleTheme()">◐ Dark</button>
+    <label>Hero size <span id="szlab">96px</span></label>
+    <input type="range" min="40" max="150" value="96" id="sz" oninput="setSize(this.value)">
+    <span class="legend">Colorful sets keep their own colors; mono sets tint to text color (so they'd take your accent/condition color in the app).</span>
+  </div>
+
+  <h2>1 · Hero weather icons — pick one (app-grade, none cartoony)</h2>
+  <p class="note">Same 8 conditions across each set. <b>H1/H2 = Meteocons</b> (multicolor, the set you liked) in two
+    styles. <b>H3/H4 = bold solid icons tinted per condition</b> (sun=amber, rain=blue, storm=purple) — colorful
+    and app-grade without being emoji; these can also be set to follow your theme/brand color instead.
+    <b>H1/H2 use the official <code>@meteocons/svg-static</code> npm package</b> (v0.1.0, MIT) via jsDelivr —
+    these are pure static SVGs with no SMIL animations. The Iconify <code>meteocons:</code> prefix serves the
+    <em>animated</em> set whose rain/snow drops start at <code>opacity:0</code> and animate in; when SMIL is
+    broken or blocked they stay invisible, leaving only a bare cloud. The static package has no animation
+    elements at all, so precipitation renders unconditionally. All four options here are static and reliable.</p>
+  <div class="head" id="heroHead"></div>
+  <div id="heroSets"></div>
+
+  <h2 style="margin-top:14px">Hero, in context (current-conditions anchor)</h2>
+  <div class="ctx" id="heroCtx"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <h2 style="margin-top:28px">2 · Everything-else icons — full site-wide candidate inventory</h2>
+  <p class="note" style="max-width:960px">
+    This is the <b>complete inventory</b> of every icon the site may use, rendered across
+    <b>4 candidate line-icon packs side by side</b>: Lucide · Phosphor (regular) · Tabler · Solar (linear).
+    <b>Blank cells ("—") mean that pack has no good match for that icon</b> — this is intentional and important.
+    You are expected to <b>mix packs</b> to cover gaps; coverage gaps are surfaced here so you can see where mixing is needed.
+    All 4 packs are MIT/ISC/CC-BY-4.0 licensed and GPL-compatible. The hero set (Material Symbols styled like
+    Meteocons) is documented separately and does not appear here.
+  </p>
+
+  <!-- Browse panel -->
+  <div class="catalog-links">
+    <h3>Browse the catalogs yourself</h3>
+    <a href="https://lucide.dev/icons/" target="_blank">Lucide icons</a>
+    <a href="https://phosphoricons.com/" target="_blank">Phosphor icons</a>
+    <a href="https://tabler.io/icons" target="_blank">Tabler icons</a>
+    <a href="https://icon-sets.iconify.design/solar/" target="_blank">Solar (Iconify)</a>
+    <a href="https://icon-sets.iconify.design/" target="_blank">Browse ALL packs on Iconify</a>
+    <div class="note2">
+      Hero set reference: <a href="https://fonts.google.com/icons" target="_blank" style="font-size:11px">Material Symbols</a>
+      styled like <a href="https://meteocons.com/" target="_blank" style="font-size:11px">Meteocons</a> — documented separately in the hero section above.
+      Icon names here are verified against the Iconify API; "—" cells confirm no good match exists in that pack.
+    </div>
+  </div>
+
+  <div class="sz-bar">
+    <label>Inventory icon size <span id="invSzLab">24px</span></label>
+    <input type="range" min="16" max="40" value="24" id="invSz" oninput="setInvSize(this.value)">
+  </div>
+
+  <div id="inventoryWrap"></div>
+
+<script>
+const CONDS = ['Clear day','Partly cloudy','Overcast','Fog','Rain','Snow','Thunderstorm','Clear night'];
+
+// Per-condition tint colors for the "tinted solid" options (sun=amber, rain=blue, storm=purple…)
+const COND_COLORS = ['#f3a712','#6f8db0','#8b94a1','#9aa3ad','#3a82c7','#74b6e6','#7d5cc6','#3e4a85'];
+
+// ---- HERO candidate sets (all verified). All app-grade, none emoji/cartoony. ----
+// mode: 'multicolor' = set's own colors · 'tint' = solid icon colored per-condition
+const HERO = [
+  { opt:'H1', name:'Meteocons — filled (static)', desc:'★ colorful, app-grade, full vocabulary — official @meteocons/svg-static package (no SMIL, precipitation renders fully)', lic:'MIT', mode:'img',
+    base:'https://cdn.jsdelivr.net/npm/@meteocons/svg-static@0.1.0/fill/',
+    icons:['clear-day','partly-cloudy-day','overcast','fog','rain','snow','thunderstorms','clear-night'] },
+  { opt:'H2', name:'Meteocons — line (static)', desc:'same set, lighter line style — official @meteocons/svg-static package', lic:'MIT', mode:'img',
+    base:'https://cdn.jsdelivr.net/npm/@meteocons/svg-static@0.1.0/line/',
+    icons:['clear-day','partly-cloudy-day','overcast','fog','rain','snow','thunderstorms','clear-night'] },
+  { opt:'H3', name:'Material Symbols — condition-tinted', desc:'STATIC clean bold solid, colored PER condition — always shows full precip; can also follow your theme', lic:'Apache-2.0', mode:'tint',
+    icons:['material-symbols:sunny','material-symbols:partly-cloudy-day','material-symbols:cloud','material-symbols:foggy','material-symbols:rainy','material-symbols:weather-snowy','material-symbols:thunderstorm','material-symbols:bedtime'] },
+  { opt:'H4', name:'Solar Bold — condition-tinted', desc:'STATIC chunkier rounded solid, same per-condition coloring (heavier alternative to H3)', lic:'CC-BY-4.0', mode:'tint',
+    icons:['solar:sun-bold','solar:cloud-sun-bold','solar:clouds-bold','solar:fog-bold','solar:cloud-rain-bold','solar:cloud-snowfall-bold','solar:cloud-storm-bold','solar:moon-stars-bold'] },
+];
+
+// ════════════════════════════════════════════════════════════════════════════
+// SECTION 2 — FULL SITE-WIDE ICON INVENTORY
+// Each item: [label, lucide-icon|null, ph-icon|null, tabler-icon|null, solar-icon|null]
+// null = no good match in that pack → renders "—"
+// All names verified against Iconify API.
+// ════════════════════════════════════════════════════════════════════════════
+const INVENTORY = [
+
+  // ── CURRENT CONDITIONS / STATS ──────────────────────────────────────────
+  { cat: 'Current Conditions / Stats' },
+  ['Temperature',         'lucide:thermometer',           'ph:thermometer',           'tabler:thermometer',           'solar:temperature-linear'],
+  ['Feels Like',          'lucide:thermometer-sun',       'ph:thermometer-hot',       'tabler:temperature-plus',      'solar:temperature-bold'],
+  ['Dew Point',           'lucide:thermometer-snowflake', 'ph:thermometer-cold',      'tabler:temperature-minus',     null],
+  ['Humidity',            'lucide:droplets',              'ph:drop-half',             'tabler:droplet-half-2',        'solar:waterdrop-linear'],
+  ['Barometric Pressure', 'lucide:gauge',                 'ph:gauge',                 'tabler:gauge',                 'solar:chart-linear'],
+  ['Pressure Trend Up',   'lucide:trending-up',           'ph:trend-up',              'tabler:trending-up',           'solar:graph-up-linear'],
+  ['Pressure Trend Down', 'lucide:trending-down',         'ph:trend-down',            'tabler:trending-down',         'solar:graph-down-linear'],
+  ['Pressure Trend Steady','lucide:minus',                'ph:minus',                 'tabler:minus',                 'solar:alt-arrow-right-linear'],
+  ['Wind Speed',          'lucide:wind',                  'ph:wind',                  'tabler:wind',                  'solar:wind-linear'],
+  ['Wind Direction',      'lucide:compass',               'ph:compass',               'tabler:compass',               'solar:compass-linear'],
+  ['Wind Gust',           'lucide:zap',                   'ph:lightning',             'tabler:bolt',                  'solar:bolt-linear'],
+  ['Visibility',          'lucide:eye',                   'ph:eye',                   'tabler:eye',                   'solar:eye-linear'],
+  ['UV Index',            'lucide:sun-medium',            'ph:sun-dim',               'tabler:uv-index',              null],
+  ['Solar Radiation',     'lucide:sun',                   'ph:sun',                   'tabler:solar-panel',           'solar:sun-linear'],
+  ['Cloud Cover',         'lucide:cloud',                 'ph:cloud',                 'tabler:cloud',                 'solar:cloud-linear'],
+  ['Rainfall',            'lucide:cloud-rain',            'ph:cloud-rain',            'tabler:cloud-rain',            'solar:cloud-rain-linear'],
+  ['Rain Rate',           'lucide:cloud-drizzle',         'ph:cloud-rain',            'tabler:cloud-rain',            'solar:cloud-rain-linear'],
+  ['Precip Chance',       'lucide:percent',               'ph:percent',               'tabler:percentage',            'solar:water-linear'],
+  ['Snowfall',            'lucide:cloud-snow',            'ph:cloud-snow',            'tabler:cloud-snow',            'solar:snowflake-linear'],
+
+  // ── ASTRO / ALMANAC ──────────────────────────────────────────────────────
+  { cat: 'Astro / Almanac' },
+  ['Sunrise',             'lucide:sunrise',               'ph:sun-horizon',           'tabler:sunrise',               'solar:sunrise-linear'],
+  ['Sunset',              'lucide:sunset',                'ph:sun-horizon',           'tabler:sunset',                'solar:sunset-linear'],
+  ['Moonrise',            'lucide:moon-star',             'ph:moon-stars',            'tabler:moon-stars',            'solar:moon-stars-linear'],
+  ['Moonset',             'lucide:moon',                  'ph:moon',                  'tabler:moon',                  'solar:moon-linear'],
+  ['Moon Phase',          'lucide:moon-star',             'ph:moon-stars',            'tabler:moon-2',                'solar:moon-stars-linear'],
+  ['Day Length',          'lucide:clock',                 'ph:clock',                 'tabler:clock',                 'solar:clock-circle-linear'],
+  ['Sun',                 'lucide:sun',                   'ph:sun',                   'tabler:sun',                   'solar:sun-linear'],
+  ['Moon',                'lucide:moon',                  'ph:moon',                  'tabler:moon',                  'solar:moon-linear'],
+
+  // ── AIR QUALITY ──────────────────────────────────────────────────────────
+  { cat: 'Air Quality' },
+  ['Air Quality (AQI)',   'lucide:activity',              'ph:activity',              'tabler:activity-heartbeat',    'solar:pulse-2-linear'],
+  ['Particulate / PM',    'lucide:circle-alert',          'ph:warning-circle',        'tabler:info-circle',           'solar:danger-triangle-linear'],
+  ['Ozone / Molecule',    'lucide:zap-off',               'ph:atom',                  'tabler:atom',                  'solar:atom-linear'],
+  ['Leaf / Pollen',       'lucide:leaf',                  'ph:leaf',                  'tabler:leaf',                  'solar:leaf-linear'],
+
+  // ── FORECAST ─────────────────────────────────────────────────────────────
+  { cat: 'Forecast' },
+  ['Calendar',            'lucide:calendar',              'ph:calendar',              'tabler:calendar',              'solar:calendar-linear'],
+  ['Single Day',          'lucide:calendar',              'ph:calendar',              'tabler:calendar-event',        'solar:calendar-linear'],
+  ['Week View',           'lucide:calendar',              'ph:calendar',              'tabler:calendar-week',         'solar:calendar-linear'],
+  ['Hourly / Clock',      'lucide:clock',                 'ph:clock',                 'tabler:clock',                 'solar:clock-circle-linear'],
+  ['Forecast Outlook',    'lucide:cloud-sun',             'ph:cloud-sun',             null,                           'solar:cloud-sun-linear'],
+
+  // ── RADAR / MAP ───────────────────────────────────────────────────────────
+  { cat: 'Radar / Map' },
+  ['Map',                 'lucide:map',                   'ph:map-trifold',           'tabler:map',                   'solar:map-linear'],
+  ['Layers',              'lucide:layers',                'ph:stack',                 'tabler:layers-difference',     'solar:layers-minimalistic-linear'],
+  ['Radar / Broadcast',   'lucide:radio',                 'ph:radio',                 'tabler:broadcast',             'solar:radar-linear'],
+  ['Location Pin',        'lucide:map-pin',               'ph:map-pin',               'tabler:map-pin',               'solar:map-point-linear'],
+  ['Zoom In',             'lucide:zoom-in',               'ph:magnifying-glass-plus', 'tabler:zoom-in',               'solar:magnifer-zoom-in-linear'],
+  ['Zoom Out',            'lucide:zoom-out',              'ph:magnifying-glass-minus','tabler:zoom-out',              'solar:magnifer-zoom-out-linear'],
+  ['Play',                'lucide:play',                  'ph:play',                  'tabler:player-play',           'solar:play-linear'],
+  ['Pause',               'lucide:pause',                 'ph:pause',                 'tabler:player-pause',          'solar:pause-linear'],
+  ['Crosshair / Target',  'lucide:crosshair',             'ph:crosshair',             'tabler:crosshair',             'solar:target-linear'],
+
+  // ── EARTHQUAKES ───────────────────────────────────────────────────────────
+  { cat: 'Earthquakes' },
+  ['Seismic / Waveform',  'lucide:activity',              'ph:waveform',              'tabler:wave-square',           'solar:soundwave-linear'],
+  ['Magnitude / Pulse',   'lucide:heart-pulse',           'ph:activity',              'tabler:heartbeat',             'solar:pulse-2-linear'],
+  ['Epicenter',           'lucide:crosshair',             'ph:crosshair',             'tabler:current-location',      'solar:target-linear'],
+
+  // ── ALERTS ────────────────────────────────────────────────────────────────
+  { cat: 'Alerts' },
+  ['Warning Triangle',    'lucide:triangle-alert',        'ph:warning',               'tabler:alert-triangle',        'solar:danger-triangle-linear'],
+  ['Bell / Notification', 'lucide:bell',                  'ph:bell',                  'tabler:bell',                  'solar:bell-linear'],
+  ['Info',                'lucide:info',                  'ph:info',                  'tabler:info-circle',           'solar:info-circle-linear'],
+  ['Shield',              'lucide:shield',                'ph:shield',                'tabler:shield',                'solar:shield-linear'],
+
+  // ── RECORDS ───────────────────────────────────────────────────────────────
+  { cat: 'Records' },
+  ['Trophy / Award',      'lucide:trophy',                'ph:trophy',                'tabler:trophy',                'solar:cup-star-linear'],
+  ['Medal',               'lucide:medal',                 'ph:medal',                 'tabler:medal',                 'solar:medal-ribbon-linear'],
+  ['Line Chart',          'lucide:line-chart',            'ph:chart-line',            'tabler:chart-line',            'solar:chart-2-linear'],
+  ['Bar Chart',           'lucide:chart-no-axes-column',  'ph:chart-bar',             'tabler:chart-bar',             'solar:chart-square-linear'],
+  ['Trending Up',         'lucide:trending-up',           'ph:trend-up',              'tabler:trending-up',           'solar:graph-up-linear'],
+  ['Trending Down',       'lucide:trending-down',         'ph:trend-down',            'tabler:trending-down',         'solar:graph-down-linear'],
+  ['Arrow Up (max)',       'lucide:arrow-up',              'ph:arrow-fat-up',          'tabler:arrow-up',              'solar:alt-arrow-up-linear'],
+  ['Arrow Down (min)',     'lucide:arrow-down',            'ph:arrow-fat-down',        'tabler:arrow-down',            'solar:alt-arrow-down-linear'],
+
+  // ── WEBCAM ────────────────────────────────────────────────────────────────
+  { cat: 'Webcam' },
+  ['Camera',              'lucide:camera',                'ph:camera',                'tabler:camera',                'solar:camera-linear'],
+  ['Image / Photo',       'lucide:image',                 'ph:image',                 'tabler:photo',                 'solar:gallery-linear'],
+  ['Video',               'lucide:video',                 'ph:video',                 'tabler:video',                 'solar:videocamera-record-linear'],
+
+  // ── NAV / UI CHROME ───────────────────────────────────────────────────────
+  { cat: 'Nav / UI Chrome' },
+  ['Menu / Hamburger',    'lucide:menu',                  'ph:list',                  'tabler:menu-2',                'solar:hamburger-menu-linear'],
+  ['Home',                'lucide:house',                 'ph:house',                 'tabler:home',                  'solar:home-linear'],
+  ['Settings / Gear',     'lucide:settings',              'ph:gear',                  'tabler:settings',              'solar:settings-linear'],
+  ['Search',              'lucide:search',                'ph:magnifying-glass',      'tabler:search',                'solar:magnifer-linear'],
+  ['Close / X',           'lucide:x',                     'ph:x',                     'tabler:x',                     'solar:close-circle-linear'],
+  ['Chevron Up',          'lucide:chevron-up',            'ph:caret-up',              'tabler:chevron-up',            'solar:alt-arrow-up-linear'],
+  ['Chevron Down',        'lucide:chevron-down',          'ph:caret-down',            'tabler:chevron-down',          'solar:alt-arrow-down-linear'],
+  ['Chevron Left',        'lucide:chevron-left',          'ph:caret-left',            'tabler:chevron-left',          'solar:alt-arrow-left-linear'],
+  ['Chevron Right',       'lucide:chevron-right',         'ph:caret-right',           'tabler:chevron-right',         'solar:alt-arrow-right-linear'],
+  ['Refresh / Reload',    'lucide:refresh-cw',            'ph:arrows-clockwise',      'tabler:refresh',               'solar:refresh-circle-linear'],
+  ['External Link',       'lucide:external-link',         'ph:arrow-square-out',      'tabler:external-link',         'solar:square-arrow-right-up-linear'],
+  ['Help / Question',     'lucide:circle-question-mark',  'ph:question',              'tabler:help-circle',           'solar:question-circle-linear'],
+  ['Share',               'lucide:share-2',               'ph:share-network',         'tabler:share',                 'solar:share-linear'],
+  ['Download',            'lucide:download',              'ph:download-simple',       'tabler:download',              'solar:download-minimalistic-linear'],
+  ['Filter',              'lucide:filter',                'ph:funnel',                'tabler:filter',                'solar:filter-linear'],
+  ['Fullscreen',          'lucide:maximize-2',            'ph:frame-corners',         'tabler:arrows-maximize',       'solar:full-screen-linear'],
+  ['Expand',              'lucide:expand',                'ph:arrows-out',            'tabler:arrows-maximize',       'solar:maximize-square-linear'],
+  ['Collapse',            'lucide:minimize',              'ph:arrows-in',             'tabler:minimize',              'solar:minimize-square-linear'],
+  ['Theme Light (sun)',   'lucide:sun',                   'ph:sun',                   'tabler:sun',                   'solar:sun-linear'],
+  ['Theme Dark (moon)',   'lucide:moon',                  'ph:moon',                  'tabler:moon',                  'solar:moon-linear'],
+  ['Language / Globe',    'lucide:globe',                 'ph:globe',                 'tabler:globe',                 'solar:earth-linear'],
+  ['Account / User',      'lucide:user',                  'ph:user-circle',           'tabler:user',                  'solar:user-linear'],
+];
+
+let size = 96;
+let invSize = 24;
+
+function gridCols(host,n){ host.style.gridTemplateColumns = `repeat(${n},1fr)`; }
+
+function buildHero(){
+  const head=document.getElementById('heroHead');
+  gridCols(head,CONDS.length);
+  head.innerHTML = CONDS.map(c=>`<div class="c">${c}</div>`).join('');
+
+  const wrap=document.getElementById('heroSets'); wrap.innerHTML='';
+  HERO.forEach(s=>{
+    const block=document.createElement('div'); block.className='set';
+    const isColor = s.mode==='multicolor' || s.mode==='img';
+    const cells = s.icons.map((i,idx)=>{
+      if (s.mode==='img')
+        return `<div class="c"><img src="${s.base}${i}.svg" width="${size}" height="${size}" alt="${i}" loading="lazy" style="object-fit:contain"></div>`;
+      const style = s.mode==='tint' ? ` style="color:${COND_COLORS[idx]}"` : '';
+      return `<div class="c"><iconify-icon icon="${i}" width="${size}" height="${size}"${style}></iconify-icon></div>`;
+    }).join('');
+    const anim = s.animated ? `<span class="lic" style="color:#fff;background:#c2410c;border:none">⚠ ANIMATED</span>` : '';
+    block.innerHTML = `<div class="set-h"><span class="opt">${s.opt}</span><span class="n">${s.name}</span>
+      <span class="desc">${s.desc}</span><span class="lic">${s.lic}</span>${anim}</div>
+      <div class="row ${isColor?'color':''}">${cells}</div>`;
+    block.querySelector('.row').style.gridTemplateColumns=`repeat(${CONDS.length},1fr)`;
+    wrap.appendChild(block);
+  });
+
+  const ctx=document.getElementById('heroCtx'); ctx.innerHTML='';
+  HERO.forEach(s=>{
+    const isColor = s.mode==='multicolor' || s.mode==='img';
+    const glyph = s.mode==='img'
+      ? `<img src="${s.base}${s.icons[0]}.svg" width="64" height="64" alt="">`
+      : `<iconify-icon icon="${s.icons[0]}" width="64" height="64"${s.mode==='tint'?` style="color:${COND_COLORS[0]}"`:''}></iconify-icon>`;
+    const cx=document.createElement('div'); cx.className='cx'+(isColor?' color':'');
+    cx.innerHTML=`${glyph}<div><div class="t">68°</div><div class="m">Sunny · feels 66°</div><div class="nm">${s.opt} ${s.name}</div></div>`;
+    ctx.appendChild(cx);
+  });
+}
+
+function buildInventory(){
+  const wrap = document.getElementById('inventoryWrap');
+  wrap.innerHTML = '';
+
+  // Column headers
+  const PACKS = [
+    {key:'lucide', label:'Lucide', lic:'ISC'},
+    {key:'ph', label:'Phosphor', lic:'MIT'},
+    {key:'tabler', label:'Tabler', lic:'MIT'},
+    {key:'solar', label:'Solar (linear)', lic:'CC-BY-4.0'},
+  ];
+
+  let currentTable = null;
+
+  INVENTORY.forEach(row => {
+    if (row.cat !== undefined) {
+      // Start new category section
+      const sec = document.createElement('div');
+      sec.className = 'inv-section';
+
+      const catLabel = document.createElement('div');
+      catLabel.className = 'inv-cat';
+      catLabel.textContent = row.cat;
+      sec.appendChild(catLabel);
+
+      const table = document.createElement('table');
+      table.className = 'inv-table';
+
+      // Header row
+      const thead = document.createElement('thead');
+      thead.innerHTML = `<tr>
+        <th class="label-col">Icon</th>
+        ${PACKS.map(p=>`<th>${p.label}<br><span style="font-weight:400;font-size:9px;opacity:.7">${p.lic}</span></th>`).join('')}
+      </tr>`;
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      table.appendChild(tbody);
+      sec.appendChild(table);
+      wrap.appendChild(sec);
+
+      currentTable = tbody;
+      return;
+    }
+
+    // Data row: [label, lucide, ph, tabler, solar]
+    const [label, lucide, ph, tabler, solar] = row;
+    const icons = [lucide, ph, tabler, solar];
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="label-col">${label}</td>` +
+      icons.map(icon => {
+        if (!icon) return `<td><span class="gap">—</span></td>`;
+        return `<td><iconify-icon icon="${icon}" width="${invSize}" height="${invSize}"></iconify-icon></td>`;
+      }).join('');
+
+    if (currentTable) currentTable.appendChild(tr);
+  });
+}
+
+function setSize(v){ size=+v; document.getElementById('szlab').textContent=v+'px'; buildHero(); }
+function setInvSize(v){ invSize=+v; document.getElementById('invSzLab').textContent=v+'px'; buildInventory(); }
+
+function toggleTheme(){
+  const d=document.documentElement.getAttribute('data-theme')==='dark';
+  document.documentElement.setAttribute('data-theme', d?'light':'dark');
+  document.getElementById('themeBtn').textContent=d?'◐ Dark':'◑ Light';
+}
+
+buildHero();
+buildInventory();
+</script>
+</body>
+</html>
