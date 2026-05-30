@@ -46,7 +46,8 @@ date-range overrides) folds into the operator-replaceable set as future config s
 
 1. **Two static layers.** Base = the scene photo, **blurred 3px** while a precipitation overlay is
    active (enough to sell "looking through glass" while the scene stays readable). Overlay = a real
-   on-glass photo composited with **`screen` blend**. Overlay opacity **75% day / 25% night**.
+   on-glass photo. **Blend mode is per-overlay: rain = `overlay`** (flat-field photo, keeps the field
+   neutral) **; snow = `screen`** (transparent frost cutout). Overlay opacity **75% day / 25% night**.
 
 2. **Background photo = sky bucket × day/night.** The conditions engine's 5 sky labels bucket as:
 
@@ -107,8 +108,8 @@ date-range overrides) folds into the operator-replaceable set as future config s
       to disagree with the time of day.
 - [ ] `/current` and the SSE stream carry the `scene` descriptor; the dashboard selects assets from
       it without parsing the conditions text.
-- [ ] Visual params match the locked values: 3px base blur under an active overlay, `screen` blend,
-      75% day / 25% night overlay opacity.
+- [ ] Visual params match the locked values: 3px base blur under an active overlay, per-overlay blend
+      (rain = `overlay`, snow = `screen`), 75% day / 25% night overlay opacity.
 - [ ] Body/card text meets WCAG AA contrast over **every** shipped background in both themes
       (B3 gate, [ADR-026](ADR-026-accessibility-commitments.md)); a darken-scrim is applied where needed.
 - [ ] Each shipped background + overlay is **≤ 300 KB** (~2560px longest edge, WebP) after downscale.

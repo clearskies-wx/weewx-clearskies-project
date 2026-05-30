@@ -154,8 +154,8 @@ const OVERLAYS = {
   rain: BG+'rain_on_glass.jpg',
   snow: BG+'snow_on_glass_transparent.png',   // hand-made frost cutout, real colours on transparent
 };
-// locked: screen blend reads best for both rain and snow
-const DEFAULT_BLEND = { rain: 'screen', snow: 'screen' };
+// locked: rain reads best with `overlay` (flat-field photo); snow with `screen` (transparent cutout)
+const DEFAULT_BLEND = { rain: 'overlay', snow: 'screen' };
 // locked: overlay opacity by time of day (day brighter/heavier, night subtle)
 const OP_BY_TOD = { day: 75, night: 25 };
 

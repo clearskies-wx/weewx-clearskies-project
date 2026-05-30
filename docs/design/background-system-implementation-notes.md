@@ -21,9 +21,11 @@ Three stacked, full-viewport layers behind the app content; **all static, no ani
 1. **Scene photo (base).** `background-size: cover; background-position: center`. When a precipitation
    overlay is active, apply `filter: blur(3px)` (≈`brightness(0.93)` optional) — enough to read as
    "through glass" while the scene stays recognizable. No blur when there's no overlay.
-2. **Precipitation overlay.** The real on-glass photo, `background-size: cover`, composited with
-   **`mix-blend-mode: screen`**. Opacity is **time-of-day driven: 0.75 day / 0.25 night**. Empty
-   (`opacity: 0` / not rendered) when `overlay === null`.
+2. **Precipitation overlay.** The real on-glass photo, `background-size: cover`. Blend is
+   **per-overlay: rain = `mix-blend-mode: overlay`** (flat-field photo — `overlay` keeps the mid-gray
+   field neutral and lets the drops read); **snow = `mix-blend-mode: screen`** (transparent frost
+   cutout). Opacity is **time-of-day driven: 0.75 day / 0.25 night**. Empty (`opacity: 0` / not
+   rendered) when `overlay === null`.
 3. **Bottom scrim** (legibility): `linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.32))`.
    A darken-scrim like this is the AA-contrast mechanism over busy photos (ADR-026 / B3 gate).
 
@@ -50,8 +52,8 @@ day/night per ADR-047 §Decision.
 
 | Overlay tag | File | Notes |
 |---|---|---|
-| rain | `rain_on_glass.jpg` | flat-ish field; `screen` blend drops the dark field, keeps drops |
-| snow | `snow_on_glass_transparent.png` | operator's hand-made transparent frost cutout (preferred) |
+| rain | `rain_on_glass.jpg` | flat-field photo; **`overlay` blend** keeps the field neutral, keeps drops |
+| snow | `snow_on_glass_transparent.png` | operator's hand-made transparent frost cutout; **`screen` blend** |
 
 The two on-glass overlays carry **no attribution** (confirmed 2026-05-30). The renderer shows a credit
 only for assets that have one — i.e. the 5 scene photos credit their photographers; the blue-sky
