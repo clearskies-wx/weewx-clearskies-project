@@ -107,7 +107,13 @@ the user reviews before it's binding.
   hero-Now-only-vs-global-background tension is reconciled inside **A2**. Audit-for-accuracy scope
   (verify complete & accurate vs code, fix if drifted): ADR-013/014/015/016/020/021/022/023/026/040/
   041/042/044. → edits to existing ADRs (no new ADR). **This gate precedes A1.**
-- **A1. Theme & color system** (light + dark, tokens) → ADR. 
+- **A1. Theme & color system** (light + dark, tokens) → **[ADR-048](../decisions/ADR-048-theme-color-tokens.md)
+  (Accepted 2026-05-30).** ✅ **DONE.** Encapsulation ADR: adopts the **as-built** token set (shadcn/ui
+  `neutral` base in OKLCH, light+dark, 6 curated AA-safe accents, default blue) — the value-definition
+  ADR-009 deferred. References ADR-022/023 for branding/switch mechanisms. Faithful swatch render:
+  [mockups/A1-theme-tokens.html](../design/mockups/A1-theme-tokens.html). Tracked gaps (not blockers):
+  chart palette is 5-step neutral (revisit at first multi-series chart), EPA AQI palette not tokenized
+  (add with C6). No code change. 
 - **A2. Background system** (condition × theme, layered, photographic, operator-replaceable) → ADR.
   🔵 **ADR drafted + prototype accepted (2026-05-30).** Approach validated in a browser prototype the
   operator accepted ([mockups/background-prototype.html](../design/mockups/background-prototype.html)):
@@ -188,11 +194,12 @@ Mockups are throwaway exploration artifacts, NOT the React implementation.
 ## Next action
 **C0 (page inventory) is DONE** → [docs/design/C0-PAGE-INVENTORY.md](../design/C0-PAGE-INVENTORY.md)
 (the full Track C work list + the as-built reconciliation surface). **A0 (ADR reconciliation gate) is DONE**
-— 2026-05-29 (reconciled, user re-approved, deployed). Next, in this order/parallelism:
-- **A1 (theme & color system)** as the first Proposed ADR — root dependency for dark-mode backgrounds
-  & all visuals. Now unblocked (A0's theming-relevant ADRs 022/023/009 confirmed accurate).
-- **A2 (background system)**, **A3 (icon system)**, **A4 (card model & grid-compatible sizing)** —
-  the remaining Track A foundations, sequenced after A1.
+— 2026-05-29 (reconciled, user re-approved, deployed). **A1 (theme & color system) is DONE** —
+[ADR-048](../decisions/ADR-048-theme-color-tokens.md) Accepted 2026-05-30. Next, in this order/parallelism:
+- **A2 (background system)** — ADR-047 Accepted; build brief ready at
+  [briefs/A2-background-system.md](briefs/A2-background-system.md) (3 deliverables, not yet executed).
+- **A3 (icon system)**, **A4 (card model & grid-compatible sizing)** — remaining Track A foundations,
+  via mockups.
 - **B2 + B3 global research gates** — Recharts background support + a11y-contrast/perf budget (can run
   in parallel with Track A).
 

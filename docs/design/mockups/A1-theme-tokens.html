@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A1 — Theme &amp; Color Tokens (as-built)</title>
+<style>
+  /* Values copied verbatim from dashboard src/index.css + src/lib/branding.ts. This is a faithful
+     render of what already exists — not a proposal. */
+  :root{
+    --bg:oklch(1 0 0); --fg:oklch(0.145 0 0);
+    --card:oklch(1 0 0); --card-fg:oklch(0.145 0 0);
+    --primary:oklch(0.48 0.22 260); --primary-fg:oklch(1 0 0);      /* default accent = blue (light) */
+    --secondary:oklch(0.97 0 0); --secondary-fg:oklch(0.205 0 0);
+    --muted:oklch(0.97 0 0); --muted-fg:oklch(0.556 0 0);
+    --accent:oklch(0.97 0 0); --accent-fg:oklch(0.205 0 0);
+    --destructive:oklch(0.577 0.245 27.325);
+    --border:oklch(0.922 0 0); --input:oklch(0.922 0 0); --ring:oklch(0.708 0 0);
+    --chart-1:oklch(0.87 0 0); --chart-2:oklch(0.556 0 0); --chart-3:oklch(0.439 0 0);
+    --chart-4:oklch(0.371 0 0); --chart-5:oklch(0.269 0 0);
+    --radius:0.625rem;
+  }
+  [data-theme="dark"]{
+    --bg:oklch(0.145 0 0); --fg:oklch(0.985 0 0);
+    --card:oklch(0.205 0 0); --card-fg:oklch(0.985 0 0);
+    --primary:oklch(0.70 0.15 260); --primary-fg:oklch(0.15 0 0);   /* default accent = blue (dark) */
+    --secondary:oklch(0.269 0 0); --secondary-fg:oklch(0.985 0 0);
+    --muted:oklch(0.269 0 0); --muted-fg:oklch(0.708 0 0);
+    --accent:oklch(0.269 0 0); --accent-fg:oklch(0.985 0 0);
+    --destructive:oklch(0.704 0.191 22.216);
+    --border:oklch(1 0 0 / 10%); --input:oklch(1 0 0 / 15%); --ring:oklch(0.556 0 0);
+    --chart-1:oklch(0.87 0 0); --chart-2:oklch(0.556 0 0); --chart-3:oklch(0.439 0 0);
+    --chart-4:oklch(0.371 0 0); --chart-5:oklch(0.269 0 0);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Inter',system-ui,sans-serif;background:#5b6473;
+       color:#fff;padding:24px;line-height:1.4}
+  h1{font-size:20px;margin:0 0 4px} .sub{opacity:.8;font-size:13px;margin:0 0 20px;max-width:780px}
+  .panels{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:760px){.panels{grid-template-columns:1fr}}
+  .panel{background:var(--bg);color:var(--fg);border-radius:14px;padding:20px;
+         box-shadow:0 8px 30px rgba(0,0,0,.35)}
+  .panel h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;opacity:.6;margin:0 0 14px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px}
+  .sw{border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:11px}
+  .chip{height:46px} .lbl{padding:5px 7px;background:var(--card);color:var(--card-fg)}
+  .lbl b{display:block;font-size:11px} .lbl span{opacity:.55;font-size:9.5px;word-break:break-all}
+  .section-title{font-size:11px;opacity:.6;margin:16px 0 8px;letter-spacing:.05em;text-transform:uppercase}
+  /* live UI sample */
+  .demo{margin-top:16px;background:var(--card);color:var(--card-fg);border:1px solid var(--border);
+        border-radius:var(--radius);padding:16px}
+  .demo .t{font-size:22px;font-weight:600} .demo .m{color:var(--muted-fg);font-size:13px;margin:2px 0 12px}
+  .btn{border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:default}
+  .btn.p{background:var(--primary);color:var(--primary-fg)}
+  .btn.s{background:var(--secondary);color:var(--secondary-fg);margin-left:8px}
+  .badge{background:var(--destructive);color:#fff;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:600;margin-left:8px}
+  .accents{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .acc{display:flex;flex-direction:column;align-items:center;font-size:10px;gap:4px}
+  .acc .dot{width:40px;height:40px;border-radius:10px;border:2px solid rgba(255,255,255,.25)}
+  .toolbar{margin-bottom:18px}
+  .toolbar button{background:#111;color:#fff;border:1px solid #444;border-radius:8px;
+                  padding:7px 12px;font-size:12px;cursor:pointer;margin-right:8px}
+  code{background:rgba(0,0,0,.25);padding:1px 5px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+  <h1>A1 — Theme &amp; Color Tokens <span style="opacity:.6;font-weight:400">(as-built render)</span></h1>
+  <p class="sub">Every swatch below is the <b>actual value</b> from the dashboard's
+    <code>src/index.css</code> and <code>src/lib/branding.ts</code> — rendered in your browser, not described.
+    Foundation: shadcn/ui <b>neutral</b> base in OKLCH, light + dark. Default accent shown = <b>blue</b>.
+    This is what ADR-048 records as the decision.</p>
+
+  <div class="toolbar">
+    <button onclick="document.querySelectorAll('.panel.dark-host').forEach(()=>{});">Both themes shown side by side ↓</button>
+  </div>
+
+  <div class="panels">
+    <!-- LIGHT -->
+    <div class="panel" data-theme="light">
+      <h2>Light theme</h2>
+      <div class="grid" id="g-light"></div>
+      <div class="section-title">Chart series (5-step neutral)</div>
+      <div class="grid" id="c-light"></div>
+      <div class="demo">
+        <div class="t">68.2°F <span class="badge">Alert</span></div>
+        <div class="m">Partly cloudy · feels like 66°</div>
+        <button class="btn p">Primary</button><button class="btn s">Secondary</button>
+      </div>
+    </div>
+    <!-- DARK -->
+    <div class="panel" data-theme="dark">
+      <h2>Dark theme</h2>
+      <div class="grid" id="g-dark"></div>
+      <div class="section-title">Chart series (5-step neutral)</div>
+      <div class="grid" id="c-dark"></div>
+      <div class="demo">
+        <div class="t">68.2°F <span class="badge">Alert</span></div>
+        <div class="m">Partly cloudy · feels like 66°</div>
+        <button class="btn p">Primary</button><button class="btn s">Secondary</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:20px" data-theme="light">
+    <h2>Operator accent palette — 6 curated, AA-verified (operator picks one; default = blue)</h2>
+    <div class="section-title">Light value (on white) / Dark value (on near-black)</div>
+    <div class="accents" id="accents-light"></div>
+    <div class="section-title" style="margin-top:18px">Same accents, dark-theme value</div>
+    <div class="accents" id="accents-dark"></div>
+    <p style="font-size:12px;opacity:.7;margin-top:14px">
+      Free-form color picking is intentionally <b>not</b> offered — only these six — so an operator
+      can't break WCAG AA contrast (per ADR-022). Each value already verified ≥4.5:1.</p>
+  </div>
+
+<script>
+const TOKENS = [
+  ['--background','background'],['--foreground','foreground'],
+  ['--card','card'],['--card-foreground','card-foreground'],
+  ['--primary','primary'],['--primary-foreground','primary-fg'],
+  ['--secondary','secondary'],['--secondary-foreground','secondary-fg'],
+  ['--muted','muted'],['--muted-foreground','muted-fg'],
+  ['--accent','accent'],['--accent-foreground','accent-fg'],
+  ['--destructive','destructive'],
+  ['--border','border'],['--input','input'],['--ring','ring'],
+];
+// map demo var names -> css var names actually defined above
+const VARMAP={'--background':'--bg','--foreground':'--fg','--primary-foreground':'--primary-fg',
+  '--secondary-foreground':'--secondary-fg','--muted-foreground':'--muted-fg',
+  '--accent-foreground':'--accent-fg','--card-foreground':'--card-fg'};
+function swatches(hostId, theme){
+  const host=document.getElementById(hostId);
+  TOKENS.forEach(([cssvar,label])=>{
+    const v=VARMAP[cssvar]||cssvar;
+    const el=document.createElement('div'); el.className='sw';
+    el.innerHTML=`<div class="chip" style="background:var(${v})"></div>
+      <div class="lbl"><b>${label}</b><span>${cssvar}</span></div>`;
+    host.appendChild(el);
+  });
+}
+function charts(hostId){
+  const host=document.getElementById(hostId);
+  for(let i=1;i<=5;i++){
+    const el=document.createElement('div'); el.className='sw';
+    el.innerHTML=`<div class="chip" style="background:var(--chart-${i})"></div>
+      <div class="lbl"><b>chart-${i}</b></div>`;
+    host.appendChild(el);
+  }
+}
+swatches('g-light'); swatches('g-dark'); charts('c-light'); charts('c-dark');
+
+const ACCENTS={
+  blue:['oklch(0.48 0.22 260)','oklch(0.70 0.15 260)'],
+  teal:['oklch(0.46 0.10 185)','oklch(0.72 0.09 185)'],
+  indigo:['oklch(0.42 0.22 280)','oklch(0.68 0.15 280)'],
+  purple:['oklch(0.45 0.20 305)','oklch(0.70 0.14 305)'],
+  green:['oklch(0.46 0.14 150)','oklch(0.72 0.12 150)'],
+  amber:['oklch(0.50 0.14 75)','oklch(0.78 0.12 75)'],
+};
+function accentRow(hostId,idx){
+  const host=document.getElementById(hostId);
+  Object.entries(ACCENTS).forEach(([name,vals])=>{
+    const el=document.createElement('div'); el.className='acc';
+    el.innerHTML=`<div class="dot" style="background:${vals[idx]}"></div>${name}${name==='blue'?' ★':''}`;
+    host.appendChild(el);
+  });
+}
+accentRow('accents-light',0); accentRow('accents-dark',1);
+</script>
+</body>
+</html>
