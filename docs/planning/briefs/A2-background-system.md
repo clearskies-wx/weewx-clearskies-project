@@ -1,7 +1,7 @@
 # Execution plan — A2 Background system
 
-**Implements:** [ADR-047](../../decisions/ADR-047-background-system.md) (Proposed). **Do NOT dispatch
-any agent until ADR-047 is Accepted.** This plan references the ADR; it does not restate decisions —
+**Implements:** [ADR-047](../../decisions/ADR-047-background-system.md) (**Accepted 2026-05-30** — gate
+cleared, ready to dispatch). This plan references the ADR; it does not restate decisions —
 **ADR wins on conflict.** Concrete CSS values, asset map, and asset-prep scripts are in
 [background-system-implementation-notes.md](../../design/background-system-implementation-notes.md).
 
