@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<!--
+  B2 Research Spike — Recharts background image behind plot area
+  Track B / B2 gate. Lead = Opus. Date 2026-05-31.
+
+  PURPOSE: Throwaway prototype. Demonstrates two techniques for rendering a
+  scene photo (or scene-gradient stand-in) behind the Recharts plot area,
+  gates C1 temp-curve styling.
+
+  SCENE STAND-IN: Uses a CSS linear-gradient ("sky at golden hour") instead
+  of loading an external image, so this works fully offline. The gradient
+  (deep blue → teal → amber → warm orange) approximates the color field seen
+  in img-23 inspiration. The technique is identical whether you swap in a real
+  <image href="..."> — the gradient just proves SVG rendering without a
+  network dependency.
+
+  TECHNIQUE 1: CSS layer behind a transparent chart.
+    A `position: relative` wrapper holds the scene as an absolutely-positioned
+    background layer. The ResponsiveContainer / LineChart sit on top with fully
+    transparent chart fills. The image bleeds into the axis margins — that is the
+    key limitation noted in the findings.
+
+  TECHNIQUE 2: usePlotArea() hook + SVG <image> clipped to the plot rect.
+    Recharts 3.x (since 3.1) provides a public `usePlotArea()` hook returning
+    {x, y, width, height} — the exact plot rectangle in SVG-space. A custom
+    component placed directly inside <LineChart> (no <Customized> wrapper needed
+    in 3.x — that API is deprecated) uses this hook to render an SVG <image>
+    (implemented here as a <rect> filled with a SVG linearGradient) that is
+    absolutely confined to the plot area via <clipPath>. Axes and chart surface
+    are transparent; only the plot rectangle gets the scene.
+
+  RECHARTS 3.x NOTES:
+    - <Customized> is DEPRECATED in 3.x (marked @deprecated in es6/component/Customized.js,
+      will be removed in 4.0). Modern pattern: place custom components directly inside
+      <LineChart> and use context hooks.
+    - usePlotArea() is public API since 3.1, exported from recharts/hooks. Returns
+      {x, y, width, height} or undefined when outside chart context.
+    - useAppSelector / RechartsReduxContext are the internal plumbing; do NOT import
+      those directly — use the public hook.
+
+  BROWSER REQS: Evergreen (ESM + importmap). No IE. Matches ADR-025.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>B2 — Recharts background-image spike</title>
+
+  <!--
+    importmap: pin React 19 + Recharts 3.8.1 via esm.sh.
+    htm is a template-literal JSX alternative — no build step needed.
+    react-dom/client is listed explicitly so esm.sh resolves the same React instance.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "react":            "https://esm.sh/react@19.2.0",
+      "react-dom":        "https://esm.sh/react-dom@19.2.0",
+      "react-dom/client": "https://esm.sh/react-dom@19.2.0/client",
+      "recharts":         "https://esm.sh/recharts@3.8.1?deps=react@19.2.0,react-dom@19.2.0",
+      "htm":              "https://esm.sh/htm@3.1.1"
+    }
+  }
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 1.5rem;
+      font-family: system-ui, sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      min-height: 100vh;
+    }
+
+    h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+    .subtitle { font-size: 0.8rem; color: #94a3b8; margin: 0 0 2rem; }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      max-width: 1100px;
+    }
+
+    @media (max-width: 700px) {
+      .row { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+    }
+
+    h2 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin: 0 0 0.5rem;
+      color: #e2e8f0;
+    }
+
+    .label-tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 0.25rem;
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    .tag-css { background: #1e3a5f; color: #7dd3fc; }
+    .tag-hook { background: #14532d; color: #86efac; }
+    .tag-limitation { background: #7f1d1d; color: #fca5a5; }
+    .tag-recommended { background: #14532d; color: #86efac; }
+
+    p.note {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin: 0.5rem 0 0;
+      line-height: 1.5;
+    }
+
+    /* ── Technique 1: CSS layer wrapper ─────────────────────────── */
+
+    /* The scene-gradient is defined as a background on the wrapper.
+       The chart surface is transparent — the gradient shows through
+       including into the axis margins (the key limitation). */
+    .t1-wrapper {
+      position: relative;
+      width: 100%;
+      height: 260px;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      /* Scene stand-in: deep-blue (night) → teal → amber → warm-orange (hot midday) */
+      background: linear-gradient(
+        to top,
+        #1e3a5f 0%,     /* cold/deep baseline */
+        #0e7490 20%,    /* teal water/cool morning */
+        #ca8a04 65%,    /* amber warm */
+        #ea580c 100%    /* hot orange peak */
+      );
+    }
+    /* Recharts container must be transparent to pass the background through */
+    .t1-wrapper .recharts-wrapper,
+    .t1-wrapper .recharts-surface {
+      background: transparent !important;
+    }
+    .t1-wrapper .recharts-cartesian-grid-horizontal line,
+    .t1-wrapper .recharts-cartesian-grid-vertical line {
+      stroke: rgba(255,255,255,0.15);
+    }
+
+    /* ── Shared chart label styling (applies to both techniques) ─── */
+    .recharts-text { fill: rgba(255, 255, 255, 0.85) !important; font-size: 11px; }
+    .recharts-cartesian-axis-tick-value { fill: rgba(255, 255, 255, 0.75) !important; }
+
+    /* ── Findings table ──────────────────────────────────────────── */
+    table.compare {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.75rem;
+      margin-top: 1.5rem;
+    }
+    table.compare th {
+      text-align: left;
+      padding: 0.4rem 0.6rem;
+      background: rgba(148,163,184,0.1);
+      color: #cbd5e1;
+      font-weight: 600;
+      font-size: 0.7rem;
+    }
+    table.compare td {
+      padding: 0.35rem 0.6rem;
+      border-bottom: 1px solid rgba(148,163,184,0.1);
+      vertical-align: top;
+    }
+    table.compare tr:last-child td { border-bottom: none; }
+    table.compare .yes { color: #86efac; }
+    table.compare .no  { color: #fca5a5; }
+    table.compare .partial { color: #fde68a; }
+
+    /* sr-only: data-table fallback for screen readers */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    #app { /* ensure root mounts cleanly */ }
+  </style>
+</head>
+<body>
+  <h1>B2 — Recharts scene background spike</h1>
+  <p class="subtitle">
+    Research gate — two techniques for putting a scene photo behind the temperature curve.
+    Scene stand-in: CSS linear-gradient (cold-blue → teal → amber → hot-orange) used in place of a
+    real photo so the spike works offline. Recharts 3.8.1 + React 19 via esm.sh importmap.
+  </p>
+
+  <div id="app" role="main"></div>
+
+  <script type="module">
+    import { createElement as h, useState, useId } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import {
+      ResponsiveContainer,
+      LineChart,
+      Line,
+      XAxis,
+      YAxis,
+      CartesianGrid,
+      Tooltip,
+      ReferenceLine,
+      usePlotArea,   // public API since Recharts 3.1
+    } from 'recharts';
+
+    // ── Sample data: 24 hourly temperature readings (°F), plausible summer day
+    const HOURLY_DATA = [
+      { hour: '00', temp: 67 },
+      { hour: '01', temp: 65 },
+      { hour: '02', temp: 63 },
+      { hour: '03', temp: 62 },
+      { hour: '04', temp: 61 },
+      { hour: '05', temp: 61 },
+      { hour: '06', temp: 63 },
+      { hour: '07', temp: 67 },
+      { hour: '08', temp: 72 },
+      { hour: '09', temp: 78 },
+      { hour: '10', temp: 83 },
+      { hour: '11', temp: 87 },
+      { hour: '12', temp: 90 },
+      { hour: '13', temp: 92 },
+      { hour: '14', temp: 93 },
+      { hour: '15', temp: 92 },
+      { hour: '16', temp: 90 },
+      { hour: '17', temp: 87 },
+      { hour: '18', temp: 84 },
+      { hour: '19', temp: 80 },
+      { hour: '20', temp: 76 },
+      { hour: '21', temp: 73 },
+      { hour: '22', temp: 71 },
+      { hour: '23', temp: 69 },
+    ];
+
+    const CHART_MARGIN = { top: 16, right: 24, bottom: 8, left: 8 };
+
+    // ════════════════════════════════════════════════════════════════════
+    // TECHNIQUE 1: CSS layer behind a transparent chart
+    //
+    // The .t1-wrapper div carries the gradient background. The chart
+    // surface and fills are transparent — the gradient shows through.
+    //
+    // LIMITATION: The gradient also appears in the axis margins (left gutter,
+    // bottom gutter), not just the plot rect. This is the structural
+    // constraint: CSS cannot know where Recharts puts the plot area.
+    // ════════════════════════════════════════════════════════════════════
+
+    function Technique1() {
+      // Screen-reader data table (WCAG 2.1 AA — chart must have a data-table fallback)
+      const tableId = 'sr-table-t1';
+
+      return h('div', { className: 'card' },
+        h('h2', null, 'Technique 1 — CSS layer'),
+        h('span', { className: 'label-tag tag-css' }, 'CSS / position:relative'),
+        h('br', null),
+        h('span', { className: 'label-tag tag-limitation' }, 'LIMITATION: bleeds into axis margins'),
+
+        // The wrapper div provides the scene background via CSS
+        h('div', {
+          className: 't1-wrapper',
+          role: 'img',
+          'aria-label': 'Temperature chart, technique 1: CSS background layer. Today\'s high 93°F at 14:00, low 61°F at 04:00–05:00.',
+          'aria-describedby': tableId,
+        },
+          h(ResponsiveContainer, { width: '100%', height: '100%' },
+            h(LineChart, { data: HOURLY_DATA, margin: CHART_MARGIN },
+              h(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255,255,255,0.12)' }),
+              h(XAxis, {
+                dataKey: 'hour',
+                stroke: 'rgba(255,255,255,0.5)',
+                tick: { fill: 'rgba(255,255,255,0.75)', fontSize: 10 },
+                tickLine: false,
+                interval: 3,
+              }),
+              h(YAxis, {
+                domain: [55, 100],
+                stroke: 'rgba(255,255,255,0.5)',
+                tick: { fill: 'rgba(255,255,255,0.75)', fontSize: 10 },
+                tickLine: false,
+                width: 32,
+                tickFormatter: v => v + '°',
+              }),
+              h(Tooltip, {
+                contentStyle: {
+                  background: 'rgba(15,23,42,0.92)',
+                  border: '1px solid rgba(148,163,184,0.25)',
+                  borderRadius: '0.4rem',
+                  fontSize: '0.8rem',
+                  color: '#f1f5f9',
+                },
+                formatter: (v) => [v + '°F', 'Temp'],
+              }),
+              h(Line, {
+                type: 'monotone',
+                dataKey: 'temp',
+                stroke: '#ffffff',
+                strokeWidth: 2.5,
+                dot: false,
+                activeDot: { r: 4, fill: '#fff', stroke: '#0f172a', strokeWidth: 2 },
+              })
+            )
+          )
+        ),
+
+        // sr-only data table fallback
+        h('table', { id: tableId, className: 'sr-only', 'aria-label': 'Today\'s hourly temperature readings' },
+          h('caption', null, 'Today\'s hourly temperature (°F)'),
+          h('thead', null,
+            h('tr', null,
+              h('th', { scope: 'col' }, 'Hour'),
+              h('th', { scope: 'col' }, 'Temp (°F)')
+            )
+          ),
+          h('tbody', null,
+            ...HOURLY_DATA.map(d =>
+              h('tr', { key: d.hour },
+                h('td', null, d.hour + ':00'),
+                h('td', null, d.temp)
+              )
+            )
+          )
+        ),
+
+        h('p', { className: 'note' },
+          'The scene gradient shows behind the entire SVG element — ',
+          h('strong', null, 'including the axis margins'),
+          ' (left and bottom gutters). This is the fundamental limitation: CSS cannot be told ',
+          'where Recharts computed the plot rectangle. The chart fills and grid backgrounds ',
+          'are set to transparent so the CSS layer shows through the plot area correctly, ',
+          'but there\'s no way to clip the CSS background to the plot rect alone without ',
+          'knowing the offset. See Technique 2 for the precise solution.'
+        )
+      );
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // TECHNIQUE 2: usePlotArea() + SVG <image> / gradient clipped to plot rect
+    //
+    // A custom component placed DIRECTLY inside <LineChart> (no <Customized>
+    // wrapper — that API is deprecated in Recharts 3.x and removed in 4.0).
+    //
+    // usePlotArea() is a public Recharts 3.x hook (since 3.1) that returns
+    // { x, y, width, height } — the exact plot rectangle in SVG-pixel space.
+    //
+    // We use an SVG linearGradient fill on a <rect> as the scene stand-in.
+    // In production (C1), swap the <rect> for an SVG <image href="scene.webp">
+    // using the same x/y/width/height positioning.
+    //
+    // A <clipPath> is applied to ensure no pixel of the scene bleeds into the
+    // axis margins even when chart margins are asymmetric.
+    // ════════════════════════════════════════════════════════════════════
+
+    // SceneBackground: the custom SVG component that reads the plot geometry
+    // via the usePlotArea() hook. Rendered directly inside <LineChart>.
+    function SceneBackground({ gradientId, clipId }) {
+      const plotArea = usePlotArea();
+
+      // On first render the plot area may be undefined (chart not yet measured)
+      if (!plotArea) return null;
+      const { x, y, width, height } = plotArea;
+
+      return h('g', { className: 'recharts-customized-scene-bg' },
+        h('defs', null,
+          // Scene stand-in: a vertical gradient — cold blue at bottom, hot orange at top
+          // Matches the feel of the Apple Weather-style temperature background in img-23.
+          // In C1, replace this gradientId with an SVG <image> or a CSS background trick.
+          h('linearGradient', {
+            id: gradientId,
+            x1: '0', y1: '1', x2: '0', y2: '0',   // bottom→top in SVG coords
+            gradientUnits: 'objectBoundingBox',
+          },
+            h('stop', { offset: '0%',   stopColor: '#1e3a5f', stopOpacity: 0.95 }),
+            h('stop', { offset: '20%',  stopColor: '#0e7490', stopOpacity: 0.90 }),
+            h('stop', { offset: '65%',  stopColor: '#ca8a04', stopOpacity: 0.85 }),
+            h('stop', { offset: '100%', stopColor: '#ea580c', stopOpacity: 0.80 })
+          ),
+
+          // clipPath confines the scene fill to exactly the plot rectangle.
+          // This is what Technique 1 cannot do with CSS alone.
+          h('clipPath', { id: clipId },
+            h('rect', { x, y, width, height })
+          )
+        ),
+
+        // The scene itself — a rect filled with the gradient, clipped to plot rect.
+        // In C1: replace with <image href={sceneUrl} x={x} y={y} width={width} height={height}
+        //         preserveAspectRatio="xMidYMid slice" clipPath={`url(#${clipId})`} />
+        h('rect', {
+          x, y, width, height,
+          fill: `url(#${gradientId})`,
+          clipPath: `url(#${clipId})`,
+        })
+      );
+    }
+
+    function Technique2() {
+      // Stable IDs for SVG defs (must be unique per page if multiple charts exist)
+      const gradientId = 't2-scene-gradient';
+      const clipId     = 't2-plot-clip';
+      const tableId    = 'sr-table-t2';
+
+      return h('div', { className: 'card' },
+        h('h2', null, 'Technique 2 — usePlotArea() + SVG clip'),
+        h('span', { className: 'label-tag tag-hook' }, 'Recharts 3.x usePlotArea() hook'),
+        h('br', null),
+        h('span', { className: 'label-tag tag-recommended' }, 'RECOMMENDED — exact plot rect only'),
+
+        h('div', {
+          style: { width: '100%', height: 260 },
+          role: 'img',
+          'aria-label': 'Temperature chart, technique 2: scene behind plot area only. Today\'s high 93°F at 14:00, low 61°F at 04:00–05:00.',
+          'aria-describedby': tableId,
+        },
+          h(ResponsiveContainer, { width: '100%', height: '100%' },
+            h(LineChart, { data: HOURLY_DATA, margin: CHART_MARGIN },
+
+              // SceneBackground is placed FIRST (renders behind everything else in SVG paint order).
+              // It reads the chart's Redux store via usePlotArea() to get the plot rect.
+              // No <Customized> wrapper needed — Recharts 3.x supports direct child components.
+              h(SceneBackground, { gradientId, clipId }),
+
+              h(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255,255,255,0.12)' }),
+              h(XAxis, {
+                dataKey: 'hour',
+                stroke: 'rgba(255,255,255,0.5)',
+                tick: { fill: 'rgba(255,255,255,0.75)', fontSize: 10 },
+                tickLine: false,
+                interval: 3,
+              }),
+              h(YAxis, {
+                domain: [55, 100],
+                stroke: 'rgba(255,255,255,0.5)',
+                tick: { fill: 'rgba(255,255,255,0.75)', fontSize: 10 },
+                tickLine: false,
+                width: 32,
+                tickFormatter: v => v + '°',
+              }),
+              h(Tooltip, {
+                contentStyle: {
+                  background: 'rgba(15,23,42,0.92)',
+                  border: '1px solid rgba(148,163,184,0.25)',
+                  borderRadius: '0.4rem',
+                  fontSize: '0.8rem',
+                  color: '#f1f5f9',
+                },
+                formatter: (v) => [v + '°F', 'Temp'],
+              }),
+              h(Line, {
+                type: 'monotone',
+                dataKey: 'temp',
+                stroke: '#ffffff',
+                strokeWidth: 2.5,
+                dot: false,
+                activeDot: { r: 4, fill: '#fff', stroke: '#0f172a', strokeWidth: 2 },
+              })
+            )
+          )
+        ),
+
+        // sr-only data table fallback
+        h('table', { id: tableId, className: 'sr-only', 'aria-label': 'Today\'s hourly temperature readings' },
+          h('caption', null, 'Today\'s hourly temperature (°F)'),
+          h('thead', null,
+            h('tr', null,
+              h('th', { scope: 'col' }, 'Hour'),
+              h('th', { scope: 'col' }, 'Temp (°F)')
+            )
+          ),
+          h('tbody', null,
+            ...HOURLY_DATA.map(d =>
+              h('tr', { key: d.hour },
+                h('td', null, d.hour + ':00'),
+                h('td', null, d.temp)
+              )
+            )
+          )
+        ),
+
+        h('p', { className: 'note' },
+          'The scene gradient is confined exactly to the plot rectangle — no bleed into axis margins. ',
+          h('code', null, 'usePlotArea()'),
+          ' (public API since Recharts 3.1) returns ',
+          h('code', null, '{ x, y, width, height }'),
+          ' in SVG-pixel space after the chart measures its axes. The component is placed ',
+          h('strong', null, 'directly inside <LineChart>'),
+          ' as a first child (no <Customized> wrapper — that API is deprecated in 3.x, ',
+          'removed in 4.0). The SVG <clipPath> is the belt-and-suspenders guard so the ',
+          'image stays in the plot area even if margins change.'
+        )
+      );
+    }
+
+    // ── Comparison table
+    function CompareTable() {
+      return h('table', { className: 'compare', 'aria-label': 'Technique comparison' },
+        h('thead', null,
+          h('tr', null,
+            h('th', null, 'Property'),
+            h('th', null, 'Technique 1 (CSS layer)'),
+            h('th', null, 'Technique 2 (usePlotArea + SVG clip)')
+          )
+        ),
+        h('tbody', null,
+          row('Scene confined to plot rect only', 'no', 'yes'),
+          row('Works without chart measuring first', 'yes', 'no — usePlotArea undefined on first render (graceful null return)'),
+          row('Works with real <img> / WebP photo', 'yes', 'yes (SVG <image href> replaces the <rect>)'),
+          row('Responsive (chart resize)', 'yes', 'yes — usePlotArea re-derives on resize'),
+          row('Recharts 4.0 safe', 'yes', 'yes (hooks survive; <Customized> is what gets removed)'),
+          row('Axis margins get scene', 'yes — unavoidable', 'no — only plot rect'),
+          row('Needs chart context (Redux store)', 'no', 'yes — component must be inside <LineChart>'),
+          row('Complexity', 'low', 'low (5–10 lines of JSX)'),
+        )
+      );
+    }
+
+    function row(prop, t1, t2) {
+      const yes = v => v === 'yes';
+      const no  = v => v === 'no' || v.startsWith('no —') || v.startsWith('yes —');
+      return h('tr', { key: prop },
+        h('td', null, prop),
+        h('td', { className: yes(t1) ? 'yes' : no(t1) ? 'no' : 'partial' }, t1),
+        h('td', { className: yes(t2) ? 'yes' : no(t2) ? 'no' : 'partial' }, t2)
+      );
+    }
+
+    // ── Root component
+    function App() {
+      return h('div', null,
+        h('div', { className: 'row' },
+          h(Technique1, null),
+          h(Technique2, null)
+        ),
+        h('div', { style: { maxWidth: 1100, marginTop: '2rem' } },
+          h('h2', { style: { fontSize: '0.95rem', marginBottom: '0.5rem', color: '#e2e8f0' } },
+            'Technique comparison'
+          ),
+          h(CompareTable, null)
+        )
+      );
+    }
+
+    createRoot(document.getElementById('app')).render(h(App, null));
+  </script>
+</body>
+</html>
