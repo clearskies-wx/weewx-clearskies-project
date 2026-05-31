@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A4 — Card footprint system &amp; grid-compatible sizing</title>
+<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+<style>
+/* ─── Design Tokens (as-built A1 set) ─────────────────────────────────── */
+:root {
+  color-scheme: light dark;
+
+  /* Spacing / layout */
+  --gap-grid: 1rem;
+  --container-max: 80rem;
+  --card-row: 11rem;        /* conceptual row unit */
+  --card-radius: 0.875rem;  /* rounded-xl: 0.625rem × 1.4 */
+  --card-pad: 1rem;
+
+  /* Breakpoints (reference, not used in CSS vars) */
+  /* 4-col ≥ 1024px  |  2-col ≥ 768px  |  1-col < 768px */
+
+  /* Light surface */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(0, 0, 0, 0.10);
+  --glass-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08);
+
+  /* Light text */
+  --fg: #18181b;
+  --fg-muted: #71717a;
+  --fg-dim: #a1a1aa;
+  --title-rule: rgba(0, 0, 0, 0.12);
+
+  /* Page chrome */
+  --page-bg: #f4f4f5;
+  --page-fg: #18181b;
+  --frame-bg: rgba(255,255,255,0.35);
+  --frame-border: rgba(0,0,0,0.15);
+  --legend-bg: rgba(255,255,255,0.60);
+  --legend-border: rgba(0,0,0,0.12);
+  --tokens-bg: rgba(255,255,255,0.55);
+  --badge-bg: rgba(0,0,0,0.08);
+  --badge-fg: #52525b;
+
+  /* Alert amber tint */
+  --alert-glass: rgba(255, 210, 100, 0.55);
+  --alert-border: rgba(200, 140, 0, 0.30);
+  --alert-fg: #78350f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glass-bg: rgba(30, 35, 55, 0.55);
+    --glass-border: rgba(255, 255, 255, 0.10);
+    --glass-shadow: 0 4px 28px rgba(0,0,0,0.45), 0 1px 4px rgba(0,0,0,0.30);
+    --fg: #e7e7ea;
+    --fg-muted: #a1a1aa;
+    --fg-dim: #71717a;
+    --title-rule: rgba(255,255,255,0.12);
+    --page-bg: #0d0f18;
+    --page-fg: #e7e7ea;
+    --frame-bg: rgba(20,24,40,0.60);
+    --frame-border: rgba(255,255,255,0.10);
+    --legend-bg: rgba(20,24,40,0.70);
+    --legend-border: rgba(255,255,255,0.10);
+    --tokens-bg: rgba(20,24,40,0.65);
+    --badge-bg: rgba(255,255,255,0.10);
+    --badge-fg: #a1a1aa;
+    --alert-glass: rgba(120, 85, 10, 0.55);
+    --alert-border: rgba(255, 200, 60, 0.25);
+    --alert-fg: #fbbf24;
+  }
+}
+
+/* ─── Reset & Base ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  margin: 0;
+  padding: 2rem 1.5rem 4rem;
+  background: var(--page-bg);
+  color: var(--page-fg);
+  line-height: 1.5;
+}
+
+/* ─── Page header ──────────────────────────────────────────────────────── */
+.page-header { max-width: 72rem; margin: 0 auto 2rem; }
+.page-header h1 {
+  font-size: 1.25rem; font-weight: 700; margin: 0 0 .35rem;
+  letter-spacing: -.01em;
+}
+.page-header p {
+  font-size: .88rem; color: var(--fg-muted); margin: 0 0 1.25rem; max-width: 72ch;
+}
+
+/* ─── Legend + Tokens boxes ────────────────────────────────────────────── */
+.meta-row {
+  display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-start;
+  margin-bottom: 2.5rem;
+}
+.legend, .tokens-box {
+  backdrop-filter: blur(8px) saturate(1.1);
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
+  background: var(--legend-bg);
+  border: 1px solid var(--legend-border);
+  border-radius: 0.875rem;
+  padding: .85rem 1.1rem;
+  font-size: .8rem;
+}
+.legend { flex: 1 1 28rem; min-width: 22rem; }
+.tokens-box { flex: 1 1 22rem; min-width: 20rem; }
+.legend h3, .tokens-box h3 {
+  font-size: .7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--fg-muted); margin: 0 0 .6rem;
+}
+.legend table { border-collapse: collapse; width: 100%; }
+.legend td { padding: .2rem .5rem .2rem 0; vertical-align: top; color: var(--fg); }
+.legend td:first-child {
+  font-weight: 700; font-size: .75rem; color: var(--fg-muted);
+  white-space: nowrap; padding-right: .75rem;
+}
+.legend td code {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-size: .72rem;
+  background: var(--badge-bg);
+  border-radius: .25rem;
+  padding: .05rem .3rem;
+  color: var(--fg);
+}
+.tokens-box dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: .15rem .75rem; }
+.tokens-box dt {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-size: .72rem; color: var(--fg-muted); white-space: nowrap;
+}
+.tokens-box dd {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-size: .72rem; color: var(--fg); margin: 0;
+}
+
+/* ─── Device frame wrapper ─────────────────────────────────────────────── */
+.frame-section { margin-bottom: 3rem; }
+.frame-label {
+  font-size: .75rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--fg-muted); margin: 0 0 .6rem;
+  display: flex; align-items: center; gap: .6rem;
+}
+.frame-label .cols-badge {
+  background: var(--badge-bg); color: var(--badge-fg);
+  border-radius: 999px; padding: .15rem .6rem; font-size: .68rem; font-weight: 600;
+}
+/* The outer scroller lets the fixed-width frame overflow on small screens */
+.frame-scroll { overflow-x: auto; padding-bottom: .5rem; }
+.frame {
+  /* fixed width per spec — intentionally NOT responsive; shows the breakpoint */
+  backdrop-filter: blur(6px) saturate(1.05);
+  -webkit-backdrop-filter: blur(6px) saturate(1.05);
+  background: var(--frame-bg);
+  border: 1px solid var(--frame-border);
+  border-radius: 1rem;
+  padding: 1rem;
+}
+/* The dusk-sky gradient backdrop lives here, behind the glass cards */
+.frame--4col {
+  width: 1200px;
+  background:
+    linear-gradient(170deg,
+      rgba(30,26,80,0.88)   0%,
+      rgba(60,50,120,0.80) 28%,
+      rgba(130,80,60,0.78) 56%,
+      rgba(200,110,40,0.82) 74%,
+      rgba(220,140,60,0.80) 88%,
+      rgba(180,100,40,0.75) 100%),
+    linear-gradient(180deg, #1e1a50 0%, #c86e28 100%);
+  border: 1px solid var(--frame-border);
+  backdrop-filter: none; /* gradient IS the backdrop here */
+  -webkit-backdrop-filter: none;
+}
+.frame--2col {
+  width: 800px;
+  background:
+    linear-gradient(170deg,
+      rgba(30,26,80,0.88) 0%,
+      rgba(60,50,120,0.80) 30%,
+      rgba(130,80,60,0.78) 58%,
+      rgba(200,110,40,0.82) 76%,
+      rgba(220,140,60,0.80) 90%,
+      rgba(180,100,40,0.75) 100%),
+    linear-gradient(180deg, #1e1a50 0%, #c86e28 100%);
+  border: 1px solid var(--frame-border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.frame--1col {
+  width: 380px;
+  background:
+    linear-gradient(170deg,
+      rgba(30,26,80,0.88) 0%,
+      rgba(60,50,120,0.80) 30%,
+      rgba(130,80,60,0.78) 58%,
+      rgba(200,110,40,0.82) 76%,
+      rgba(220,140,60,0.80) 90%,
+      rgba(180,100,40,0.75) 100%),
+    linear-gradient(180deg, #1e1a50 0%, #c86e28 100%);
+  border: 1px solid var(--frame-border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+@media (prefers-color-scheme: dark) {
+  .frame--4col, .frame--2col, .frame--1col {
+    background:
+      linear-gradient(170deg,
+        rgba(10, 8, 35, 0.93)   0%,
+        rgba(25,18,60,0.90)    28%,
+        rgba(70,35,20,0.88)    56%,
+        rgba(110,55,10,0.90)   74%,
+        rgba(130,70,15,0.88)   88%,
+        rgba(90,45,10,0.88)   100%),
+      linear-gradient(180deg, #0a0823 0%, #6e3208 100%);
+  }
+}
+
+/* ─── The CSS grids inside each frame ─────────────────────────────────── */
+.grid-4col {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--gap-grid);
+  grid-auto-rows: var(--card-row);
+}
+.grid-2col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--gap-grid);
+  grid-auto-rows: var(--card-row);
+}
+.grid-1col {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--gap-grid);
+  /* 1-col: cards are auto height — phone stack */
+  grid-auto-rows: auto;
+}
+
+/* ─── Glass Card ───────────────────────────────────────────────────────── */
+.card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--card-radius);
+  padding: var(--card-pad);
+  backdrop-filter: blur(8px) saturate(1.1);
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
+  box-shadow: var(--glass-shadow);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  min-height: 6rem;  /* fallback for 1-col auto-height */
+}
+.card--alert {
+  background: var(--alert-glass);
+  border-color: var(--alert-border);
+}
+
+/* Card header: title + thin rule */
+.card-title {
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--fg);
+  margin: 0 0 .5rem;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid var(--title-rule);
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  flex-shrink: 0;
+}
+.card-title iconify-icon {
+  font-size: 1rem;
+  opacity: .75;
+  flex-shrink: 0;
+}
+.card--alert .card-title {
+  color: var(--alert-fg);
+  border-bottom-color: var(--alert-border);
+}
+
+/* Footprint badge: top-right corner */
+.fp-badge {
+  position: absolute;
+  top: .5rem;
+  right: .55rem;
+  background: var(--badge-bg);
+  color: var(--badge-fg);
+  border-radius: .25rem;
+  font-size: .65rem;
+  font-weight: 700;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  padding: .1rem .35rem;
+  letter-spacing: .02em;
+}
+.card--alert .fp-badge {
+  background: rgba(200,140,0,0.15);
+  color: var(--alert-fg);
+}
+
+/* Placeholder body */
+.card-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .78rem;
+  color: var(--fg-dim);
+  font-style: italic;
+  text-align: center;
+  padding: .25rem;
+}
+/* Alert body different color */
+.card--alert .card-placeholder {
+  color: var(--alert-fg);
+  opacity: .7;
+}
+
+/* ─── Col/Row span helpers ─────────────────────────────────────────────── */
+/* 4-col spans */
+.col-span-1 { grid-column: span 1; }
+.col-span-2 { grid-column: span 2; }
+.col-span-3 { grid-column: span 3; }
+.col-span-4 { grid-column: span 4; }
+.row-span-1 { grid-row: span 1; }
+.row-span-2 { grid-row: span 2; }
+
+/* ─── Micro note ───────────────────────────────────────────────────────── */
+.micro-note {
+  font-size: .72rem;
+  color: var(--fg-muted);
+  margin-top: .75rem;
+  font-style: italic;
+}
+
+/* ─── Section dividers ─────────────────────────────────────────────────── */
+h2.section-heading {
+  font-size: .95rem;
+  font-weight: 700;
+  margin: 0 0 .5rem;
+  color: var(--page-fg);
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+}
+h2.section-heading .sub {
+  font-size: .78rem;
+  font-weight: 400;
+  color: var(--fg-muted);
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     PAGE HEADER
+══════════════════════════════════════════════════════════════════════════ -->
+<div class="page-header">
+  <h1>A4 — Card footprint system &amp; grid-compatible sizing</h1>
+  <p>
+    This mockup visualizes the proposed <strong>card footprint system</strong> for the Clear Skies
+    Now page. Each labeled box represents a real weather card sized to a fixed <em>footprint</em>
+    (column-span × row-span) on a CSS grid. The grid engine itself is not built yet — these
+    footprints are the sizing vocabulary being decided. Three device frames below show the same
+    card set at 4-column (desktop ≥&nbsp;1024&nbsp;px), 2-column (tablet ≥&nbsp;768&nbsp;px), and
+    1-column (phone &lt;&nbsp;768&nbsp;px) layouts, so you can judge proportions and responsive
+    collapse. Cards use the real A1 design tokens: translucent glass surface, blur, radius, and
+    spacing — layered over a dusk-sky gradient backdrop to make the translucency visible.
+  </p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     META ROW: Legend + Proposed Tokens
+══════════════════════════════════════════════════════════════════════════ -->
+<div class="meta-row">
+
+  <!-- Footprint Vocabulary Legend -->
+  <div class="legend">
+    <h3>Footprint vocabulary</h3>
+    <table>
+      <tr>
+        <td><code>tile</code></td>
+        <td>1 col × 1 row — compact stat tile</td>
+      </tr>
+      <tr>
+        <td><code>wide</code></td>
+        <td>2 cols × 1 row — side-by-side pair</td>
+      </tr>
+      <tr>
+        <td><code>panel</code></td>
+        <td>3 cols × 1 row — wide content panel</td>
+      </tr>
+      <tr>
+        <td><code>full</code></td>
+        <td>4 cols × 1 row — full-width strip (hero / alerts)</td>
+      </tr>
+      <tr>
+        <td><code>tall</code></td>
+        <td>+2 rows — cards that need vertical depth (dials, charts)</td>
+      </tr>
+      <tr>
+        <td><code>2×2</code></td>
+        <td>wide + tall — e.g. Wind Compass, Radar</td>
+      </tr>
+      <tr>
+        <td><code>4×1</code></td>
+        <td>full strip, single row — e.g. Active Alert, Highlights</td>
+      </tr>
+    </table>
+    <div style="margin-top:.75rem; font-size:.75rem; color:var(--fg-muted);">
+      Token values in use: <code>--gap-grid: 1rem</code> &nbsp;·&nbsp;
+      <code>container-max: 80rem</code> &nbsp;·&nbsp;
+      <code>--card-radius: 0.875rem</code> &nbsp;·&nbsp;
+      card surface ≈ 72% white (light) / 55% dark slate (dark) + blur(8px)
+    </div>
+  </div>
+
+  <!-- Proposed A4 Tokens -->
+  <div class="tokens-box">
+    <h3>Tokens proposed by A4</h3>
+    <dl>
+      <dt>--gap-grid</dt>        <dd>1rem</dd>
+      <dt>container-max</dt>    <dd>80rem (1280 px)</dd>
+      <dt>--card-row</dt>       <dd>11rem (conceptual row unit)</dd>
+      <dt>--card-radius</dt>    <dd>0.875rem (rounded-xl)</dd>
+      <dt>--card-pad</dt>       <dd>1rem</dd>
+      <dt>4-col breakpoint</dt> <dd>≥ 1024 px</dd>
+      <dt>2-col breakpoint</dt> <dd>≥ 768 px</dd>
+      <dt>1-col breakpoint</dt> <dd>&lt; 768 px</dd>
+      <dt>card surface</dt>     <dd>translucent glass + blur(8px) + saturate(1.1)</dd>
+      <dt>glass (light)</dt>    <dd>rgba(255,255,255, 0.72)</dd>
+      <dt>glass (dark)</dt>     <dd>rgba(30,35,55, 0.55)</dd>
+    </dl>
+  </div>
+
+</div><!-- /meta-row -->
+
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     FRAME 1 — Desktop · ≥1024px · 4 columns
+══════════════════════════════════════════════════════════════════════════ -->
+<div class="frame-section">
+  <div class="frame-label">
+    <iconify-icon icon="ph:desktop" style="font-size:1rem; opacity:.7"></iconify-icon>
+    Frame 1 — Desktop · ≥1024 px
+    <span class="cols-badge">4 columns · 1200 px wide</span>
+    <span class="cols-badge">grid-template-columns: repeat(4, 1fr) · gap: 1rem</span>
+  </div>
+
+  <div class="frame-scroll">
+    <div class="frame frame--4col">
+      <div class="grid-4col">
+
+        <!-- 1. Active Alert — full (4×1) -->
+        <div class="card card--alert col-span-4 row-span-1">
+          <div class="fp-badge">4×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:warning"></iconify-icon>
+            Active Alert
+          </div>
+          <div class="card-placeholder">[ full-width alert banner — amber-tinted glass ]</div>
+        </div>
+
+        <!-- 2. Current Conditions — 2×2 -->
+        <div class="card col-span-2 row-span-2">
+          <div class="fp-badge">2×2</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:cloud-sun"></iconify-icon>
+            Current Conditions
+          </div>
+          <div class="card-placeholder">[ hero temp · feels like · sky condition · temp curve along bottom ]</div>
+        </div>
+
+        <!-- 3. Wind Compass — 2×2 -->
+        <div class="card col-span-2 row-span-2">
+          <div class="fp-badge">2×2</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:wind"></iconify-icon>
+            Wind Compass
+          </div>
+          <div class="card-placeholder">[ wind compass dial — signature ]</div>
+        </div>
+
+        <!-- Row 3 — after the two 2×2 cards fill rows 2–3 -->
+
+        <!-- 4. Today's Forecast — 2×1 -->
+        <div class="card col-span-2 row-span-1">
+          <div class="fp-badge">2×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:calendar-blank"></iconify-icon>
+            Today's Forecast
+          </div>
+          <div class="card-placeholder">[ hourly forecast strip ]</div>
+        </div>
+
+        <!-- 5. Precipitation &amp; Barometer — 1×1 -->
+        <div class="card col-span-1 row-span-1">
+          <div class="fp-badge">1×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:drop"></iconify-icon>
+            Precip &amp; Barometer
+          </div>
+          <div class="card-placeholder">[ rain · pressure ]</div>
+        </div>
+
+        <!-- 6. Solar &amp; UV — 1×1 -->
+        <div class="card col-span-1 row-span-1">
+          <div class="fp-badge">1×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:sun"></iconify-icon>
+            Solar &amp; UV
+          </div>
+          <div class="card-placeholder">[ solar rad · UV index ]</div>
+        </div>
+
+        <!-- 7. AQI — 1×1 -->
+        <div class="card col-span-1 row-span-1">
+          <div class="fp-badge">1×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:wind"></iconify-icon>
+            AQI
+          </div>
+          <div class="card-placeholder">[ air quality index ]</div>
+        </div>
+
+        <!-- 8. Sun &amp; Moon — 1×1 -->
+        <div class="card col-span-1 row-span-1">
+          <div class="fp-badge">1×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:moon-stars"></iconify-icon>
+            Sun &amp; Moon
+          </div>
+          <div class="card-placeholder">[ rise · set · phase ]</div>
+        </div>
+
+        <!-- 9. Lightning — 1×1 (grouped with Sun &amp; Moon) -->
+        <div class="card col-span-1 row-span-1">
+          <div class="fp-badge">1×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:lightning"></iconify-icon>
+            Lightning
+          </div>
+          <div class="card-placeholder">[ strike count · distance ]</div>
+        </div>
+
+        <!-- 10. Recent Earthquake — 1×1 (grouped with Sun &amp; Moon) -->
+        <div class="card col-span-1 row-span-1">
+          <div class="fp-badge">1×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:waves"></iconify-icon>
+            Recent Earthquake
+          </div>
+          <div class="card-placeholder">[ mag · location · distance ]</div>
+        </div>
+
+        <!-- 11. Today's Highlights — full (4×1) -->
+        <div class="card col-span-4 row-span-1">
+          <div class="fp-badge">4×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:star"></iconify-icon>
+            Today's Highlights
+          </div>
+          <div class="card-placeholder">[ stat strip — high · low · humidity · dew point · pressure trend · visibility · gust ]</div>
+        </div>
+
+        <!-- 12. Radar — 2×2 -->
+        <div class="card col-span-2 row-span-2">
+          <div class="fp-badge">2×2</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:broadcast"></iconify-icon>
+            Radar
+          </div>
+          <div class="card-placeholder">[ radar map — animated loop ]</div>
+        </div>
+
+        <!-- 13. Webcam — 2×2 (needs vertical room for timelapse) -->
+        <div class="card col-span-2 row-span-2">
+          <div class="fp-badge">2×2</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:camera"></iconify-icon>
+            Webcam
+          </div>
+          <div class="card-placeholder">[ live camera snapshot ]</div>
+        </div>
+
+      </div><!-- /grid-4col -->
+    </div><!-- /frame--4col -->
+  </div><!-- /frame-scroll -->
+
+  <div class="micro-note">
+    Note: minor grid gaps may appear depending on card flow order — this demonstrates footprint
+    vocabulary and proportions, not a pixel-perfect final Now page layout.
+  </div>
+</div><!-- /frame-section 4col -->
+
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     FRAME 2 — Tablet · 768–1023px · 2 columns
+══════════════════════════════════════════════════════════════════════════ -->
+<div class="frame-section">
+  <div class="frame-label">
+    <iconify-icon icon="ph:device-tablet" style="font-size:1rem; opacity:.7"></iconify-icon>
+    Frame 2 — Tablet · 768–1023 px
+    <span class="cols-badge">2 columns · 800 px wide</span>
+    <span class="cols-badge">grid-template-columns: repeat(2, 1fr) · gap: 1rem</span>
+    <span class="cols-badge">spans halved: 4→2, 2→2 or 1</span>
+  </div>
+
+  <div class="frame-scroll">
+    <div class="frame frame--2col">
+      <div class="grid-2col">
+
+        <!-- 1. Active Alert — full → 2 cols (4→2) -->
+        <div class="card card--alert col-span-2 row-span-1">
+          <div class="fp-badge">2×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:warning"></iconify-icon>
+            Active Alert
+          </div>
+          <div class="card-placeholder">[ full-width alert banner ]</div>
+        </div>
+
+        <!-- 2. Current Conditions — 2×2 stays 2×2 (full width on 2-col = 2 cols) -->
+        <div class="card col-span-2 row-span-2">
+          <div class="fp-badge">2×2</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:cloud-sun"></iconify-icon>
+            Current Conditions
+          </div>
+          <div class="card-placeholder">[ hero temp · sky condition · temp curve ]</div>
+        </div>
+
+        <!-- 3. Wind Compass — 2×2 → 1×2 (halved to 1 col, 2 rows tall) -->
+        <div class="card col-span-1 row-span-2">
+          <div class="fp-badge">1×2</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:wind"></iconify-icon>
+            Wind Compass
+          </div>
+          <div class="card-placeholder">[ wind compass dial ]</div>
+        </div>
+
+        <!-- 4. Today's Forecast — 2×1 → 1×1 -->
+        <div class="card col-span-1 row-span-1">
+          <div class="fp-badge">1×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:calendar-blank"></iconify-icon>
+            Today's Forecast
+          </div>
+          <div class="card-placeholder">[ hourly forecast strip ]</div>
+        </div>
+
+        <!-- 5–8 tile cards: 1×1 each, pair up in 2-col grid -->
+        <div class="card col-span-1 row-span-1">
+          <div class="fp-badge">1×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:drop"></iconify-icon>
+            Precip &amp; Barometer
+          </div>
+          <div class="card-placeholder">[ rain · pressure ]</div>
+        </div>
+
+        <div class="card col-span-1 row-span-1">
+          <div class="fp-badge">1×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:sun"></iconify-icon>
+            Solar &amp; UV
+          </div>
+          <div class="card-placeholder">[ solar rad · UV index ]</div>
+        </div>
+
+        <div class="card col-span-1 row-span-1">
+          <div class="fp-badge">1×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:wind"></iconify-icon>
+            AQI
+          </div>
+          <div class="card-placeholder">[ air quality ]</div>
+        </div>
+
+        <div class="card col-span-1 row-span-1">
+          <div class="fp-badge">1×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:moon-stars"></iconify-icon>
+            Sun &amp; Moon
+          </div>
+          <div class="card-placeholder">[ rise · set · phase ]</div>
+        </div>
+
+        <!-- Lightning &amp; Earthquake grouped with Sun &amp; Moon -->
+        <div class="card col-span-1 row-span-1">
+          <div class="fp-badge">1×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:lightning"></iconify-icon>
+            Lightning
+          </div>
+          <div class="card-placeholder">[ strikes · distance ]</div>
+        </div>
+
+        <div class="card col-span-1 row-span-1">
+          <div class="fp-badge">1×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:waves"></iconify-icon>
+            Recent Earthquake
+          </div>
+          <div class="card-placeholder">[ mag · location ]</div>
+        </div>
+
+        <!-- Today's Highlights — full → 2 cols (4→2) -->
+        <div class="card col-span-2 row-span-1">
+          <div class="fp-badge">2×1</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:star"></iconify-icon>
+            Today's Highlights
+          </div>
+          <div class="card-placeholder">[ stat strip — high · low · humidity · pressure · gust ]</div>
+        </div>
+
+        <!-- 12. Radar — 2×2 stays 2×2 (full width, 2 rows) -->
+        <div class="card col-span-2 row-span-2">
+          <div class="fp-badge">2×2</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:broadcast"></iconify-icon>
+            Radar
+          </div>
+          <div class="card-placeholder">[ radar map ]</div>
+        </div>
+
+        <!-- 13. Webcam — 2×2 (full width on 2-col, 2 rows tall for timelapse) -->
+        <div class="card col-span-2 row-span-2">
+          <div class="fp-badge">2×2</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:camera"></iconify-icon>
+            Webcam
+          </div>
+          <div class="card-placeholder">[ camera snapshot ]</div>
+        </div>
+
+      </div><!-- /grid-2col -->
+    </div><!-- /frame--2col -->
+  </div><!-- /frame-scroll -->
+
+  <div class="micro-note">
+    Tablet: 4-col spans halved (full→2, wide→1 or 2). Tall cards retain row height.
+    Current Conditions spans full width (2 cols) to give the hero card prominence.
+  </div>
+</div><!-- /frame-section 2col -->
+
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     FRAME 3 — Phone · <768px · 1 column
+══════════════════════════════════════════════════════════════════════════ -->
+<div class="frame-section">
+  <div class="frame-label">
+    <iconify-icon icon="ph:device-mobile" style="font-size:1rem; opacity:.7"></iconify-icon>
+    Frame 3 — Phone · &lt;768 px
+    <span class="cols-badge">1 column · 380 px wide</span>
+    <span class="cols-badge">grid-template-columns: 1fr · gap: 1rem</span>
+    <span class="cols-badge">all cards full-width, stacked in reading order</span>
+  </div>
+
+  <div class="frame-scroll">
+    <div class="frame frame--1col">
+      <div class="grid-1col">
+
+        <!-- All cards: 1 col, auto height, reading order -->
+        <div class="card card--alert">
+          <div class="fp-badge">1×auto</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:warning"></iconify-icon>
+            Active Alert
+          </div>
+          <div class="card-placeholder" style="min-height:3rem">[ alert banner ]</div>
+        </div>
+
+        <div class="card">
+          <div class="fp-badge">1×auto</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:cloud-sun"></iconify-icon>
+            Current Conditions
+          </div>
+          <div class="card-placeholder" style="min-height:7rem">[ hero temp · sky · temp curve ]</div>
+        </div>
+
+        <div class="card">
+          <div class="fp-badge">1×auto</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:wind"></iconify-icon>
+            Wind Compass
+          </div>
+          <div class="card-placeholder" style="min-height:7rem">[ wind compass dial ]</div>
+        </div>
+
+        <div class="card">
+          <div class="fp-badge">1×auto</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:calendar-blank"></iconify-icon>
+            Today's Forecast
+          </div>
+          <div class="card-placeholder" style="min-height:5rem">[ hourly strip ]</div>
+        </div>
+
+        <div class="card">
+          <div class="fp-badge">1×auto</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:drop"></iconify-icon>
+            Precip &amp; Barometer
+          </div>
+          <div class="card-placeholder" style="min-height:4rem">[ rain · pressure ]</div>
+        </div>
+
+        <div class="card">
+          <div class="fp-badge">1×auto</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:sun"></iconify-icon>
+            Solar &amp; UV
+          </div>
+          <div class="card-placeholder" style="min-height:4rem">[ solar · UV index ]</div>
+        </div>
+
+        <div class="card">
+          <div class="fp-badge">1×auto</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:wind"></iconify-icon>
+            AQI
+          </div>
+          <div class="card-placeholder" style="min-height:4rem">[ air quality ]</div>
+        </div>
+
+        <div class="card">
+          <div class="fp-badge">1×auto</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:moon-stars"></iconify-icon>
+            Sun &amp; Moon
+          </div>
+          <div class="card-placeholder" style="min-height:4rem">[ rise · set · phase ]</div>
+        </div>
+
+        <div class="card">
+          <div class="fp-badge">1×auto</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:lightning"></iconify-icon>
+            Lightning
+          </div>
+          <div class="card-placeholder" style="min-height:4rem">[ strikes · distance ]</div>
+        </div>
+
+        <div class="card">
+          <div class="fp-badge">1×auto</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:waves"></iconify-icon>
+            Recent Earthquake
+          </div>
+          <div class="card-placeholder" style="min-height:4rem">[ mag · location ]</div>
+        </div>
+
+        <div class="card">
+          <div class="fp-badge">1×auto</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:star"></iconify-icon>
+            Today's Highlights
+          </div>
+          <div class="card-placeholder" style="min-height:4rem">[ stat strip ]</div>
+        </div>
+
+        <div class="card">
+          <div class="fp-badge">1×auto</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:broadcast"></iconify-icon>
+            Radar
+          </div>
+          <div class="card-placeholder" style="min-height:9rem">[ radar map ]</div>
+        </div>
+
+        <div class="card">
+          <div class="fp-badge">1×auto</div>
+          <div class="card-title">
+            <iconify-icon icon="ph:camera"></iconify-icon>
+            Webcam
+          </div>
+          <div class="card-placeholder" style="min-height:5rem">[ camera snapshot ]</div>
+        </div>
+
+      </div><!-- /grid-1col -->
+    </div><!-- /frame--1col -->
+  </div><!-- /frame-scroll -->
+
+  <div class="micro-note">
+    Phone: all cards collapse to full-width, auto height, stacked in reading order. No spans needed.
+    Taller cards (Radar, Current Conditions) get explicit min-height to preserve proportional weight.
+  </div>
+</div><!-- /frame-section 1col -->
+
+</body>
+</html>

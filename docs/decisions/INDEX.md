@@ -57,6 +57,7 @@ Every locked architecture or process decision for the Clear Skies project lives 
 | [ADR-048](ADR-048-theme-color-tokens.md) | Theme & color tokens (A1) — as-built shadcn/ui neutral base in OKLCH, light+dark, 6 AA-safe accents (default blue); references ADR-022/023 for branding/switch | Accepted | 2026-05-30 |
 | [ADR-049](ADR-049-hero-weather-icons.md) | Hero weather icons (A3) — Material Symbols (filled), recolored Meteocons-style gradients (gold sun, grey clouds, periwinkle moon) as inline SVG; Weather Icons/Meteocons-direct/emoji rejected | Accepted | 2026-05-30 |
 | [ADR-050](ADR-050-utility-stat-nav-icons.md) | Utility/stat/nav/alert icons (A3) — Phosphor (regular) base + curated cross-pack exceptions (Tabler uv-index, Material flood, Carbon tsunami); 13 alert glyphs; text-only stats; wind→C2, astro/AQI/earthquake deferred | Accepted | 2026-05-30 |
+| [ADR-051](ADR-051-card-footprint-model.md) | Card footprint model & grid-compatible sizing (A4) — 4-col footprints (tile/wide/panel/full + row-span), min-footprint per card, half-row track w/ zero-waste packing, universal card discipline (page-header/hero + controls cards, no free-floating content); foundation for the future operator drag-and-drop grid | Accepted | 2026-05-30 |
 
 > **Note:** This list is not assumed complete. The user has explicitly flagged that decisions get missed. New Pinned slots are added as they're identified, before the corresponding work begins.
 

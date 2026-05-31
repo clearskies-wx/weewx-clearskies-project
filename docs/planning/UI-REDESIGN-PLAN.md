@@ -137,7 +137,17 @@ the user reviews before it's binding.
   Material `flood`; Carbon `tsunami`); 13 weather-alert glyphs; text-only stats (feels-like, dew-point);
   wind icons excluded (→ C2 compass). Astro/AQI/earthquake glyphs **deferred** to C5/C6/seismic. Locked
   render: [mockups/A3-final-icons.html](../design/mockups/A3-final-icons.html).
-- **A4. Card model & grid-compatible sizing** (1/2/3/4-col footprints, spacing/row tokens; NOT the grid engine) → ADR.
+- **A4. Card model & grid-compatible sizing** → **[ADR-051](../decisions/ADR-051-card-footprint-model.md)
+  (Accepted 2026-05-30).** ✅ **DONE.** 4-col footprints (`tile`/`wide`/`panel`/`full` + row-span);
+  **min-footprint per card** (webcam/wind/radar/current-conditions = 2×2); **half-row grid track** (5.5rem)
+  with **zero-waste packing** (strips span 1, data cards 2, tall 4); **universal card discipline** — every
+  page is cards (page-header/hero card + controls strip; no free-floating text/buttons; no generic prose on
+  data pages); tokens `--gap-grid` 1rem / `--container-max` 80rem / `--card-row` 11rem / `--card-half-row`
+  5.5rem; 4→2→1 collapse; translucent glass (opacity at B3). Foundation for the **future operator
+  drag-and-drop grid**. Renders: [A4-card-grid.html](../design/mockups/A4-card-grid.html) +
+  [A4-page-anatomy.html](../design/mockups/A4-page-anatomy.html).
+  **Tracked follow-ons:** restore the Now hero (logo + station name) → **C1**; build an **operator manual**
+  (setup/use of the customizable dashboard) → its own deliverable; visitor-facing help destination → open.
 
 ### Track B — Research gates
 **B1 is decomposed into per-component data inventories** (folded into the Track C workflow below) — NOT one
@@ -165,7 +175,9 @@ records, etc. each have cards. Track C opens with a page inventory, then walks c
 
 - **C0. Page inventory** — enumerate every page/screen and the cards each holds (now/home, forecast, almanac,
   radar, earthquakes, alerts, records, …). Establishes the full Track C work list. → research note.
-- **C1. Current-conditions card** + **today's temperature curve** along the bottom (model: img-23). → ADR + exec plan.
+- **C1. Current-conditions card** + **today's temperature curve** along the bottom (model: img-23) +
+  **restore the Now-page hero** (page-header card = station logo + station name; per ADR-051, dropped & never
+  redesigned; ties to ADR-022 branding / ADR-049 logo alt). → ADR + exec plan.
 - **C2. ⭐ Wind compass** (loved; signature; info-inside-the-dial). → ADR + exec plan.
 - **C3. Forecast screen** — icon-rich columns + time-range tabs + (B1-permitting) expandable columns. → ADR + exec plan.
 - **C4. Per-metric stat treatment + detail grid** — the text/dial/gauge/curve table; uniform tiles; per-stat icons;
@@ -174,9 +186,15 @@ records, etc. each have cards. Track C opens with a page inventory, then walks c
 - **C6. AQI card** (B1-permitting; per-pollutant breakdown) + **radar legend/key**. → ADR + exec plan.
 
 ### Out of scope here — separate future plan
-- **Customizable card GRID** (fixed-column grid, operator move/resize, layout persistence, responsive collapse).
-  Its own plan + ADR(s). **Compatibility constraint:** everything in Track A/C must use grid-compatible card
-  footprints so nothing needs redesign when the grid lands. Do **not** build the grid engine here.
+- **Operator drag-and-drop customizable GRID** (operator add/remove/move tiles + layout persistence). The
+  **operator** customizes the dashboard their visitors see; Now page first. Its own plan + ADR(s). The
+  footprint contract it consumes is locked in **[ADR-051](../decisions/ADR-051-card-footprint-model.md)**
+  (footprints, min-footprints, half-row zero-waste packing, universal card discipline). **Compatibility
+  constraint:** everything in Track A/C uses grid-compatible footprints so nothing needs redesign when the
+  grid lands. Do **not** build the grid engine here.
+- **Operator manual** (how operators set up and use the customizable dashboard + the system generally). A
+  confirmed needed deliverable (per ADR-051); its own build, not part of this UI plan. Operator-facing
+  explainer prose pulled off data pages lands here.
 
 ---
 
@@ -210,9 +228,11 @@ Mockups are throwaway exploration artifacts, NOT the React implementation.
   [briefs/A2-background-system.md](briefs/A2-background-system.md) (3 deliverables, not yet executed).
 - **A3 (icon system)** — ✅ **DONE.** Hero family (ADR-049) + utility/stat/nav/alert family (ADR-050,
   Phosphor base). Deferred glyph sub-families tracked to their components (astro→C5, AQI→C6, earthquake→seismic).
-- **A4 (card model & grid-compatible sizing)** — remaining Track A foundation, via mockups.
-- **B2 + B3 global research gates** — Recharts background support + a11y-contrast/perf budget (can run
-  in parallel with Track A).
+- **A4 (card model & grid-compatible sizing)** — ✅ **DONE** — [ADR-051](../decisions/ADR-051-card-footprint-model.md)
+  Accepted 2026-05-30. **Track A foundations are now complete (A0–A4).**
+- **B2 + B3 global research gates** — Recharts background support + a11y-contrast/perf budget (B3 also sets
+  the final card-glass opacity for ADR-051). Can run in parallel; **A2 build brief + B2/B3 are the open
+  Track-A/B items** before Track C.
 
 Then walk Track C component by component (C1…C6, plus any additional cards from the full C0 work list) using the per-component workflow
 (prior-decision check → data inventory → composition → mockup → ADR → exec plan). Per-component data
