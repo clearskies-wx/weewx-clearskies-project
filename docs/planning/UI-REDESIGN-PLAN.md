@@ -182,8 +182,12 @@ records, etc. each have cards. Track C opens with a page inventory, then walks c
 4. **ADR** — lock composition + what's shown + treatment → Proposed → Accepted.
 5. **Execution plan → code.**
 
-- **C0. Page inventory** — enumerate every page/screen and the cards each holds (now/home, forecast, almanac,
-  radar, earthquakes, alerts, records, …). Establishes the full Track C work list. → research note.
+- **C0. Page inventory** — ✅ **DONE 2026-05-29** (built as a by-product of the A0 ADR-reconciliation gate).
+  Full card-level inventory: 11 routes, ~40 candidate cards, ~8 flagged net-new. Authoritative C1–C14 work
+  list lives in **[docs/design/C0-PAGE-INVENTORY.md](../design/C0-PAGE-INVENTORY.md)**. The named C1–C6
+  below are the signature components within that fuller list; the C0 file is authoritative for the full
+  enumeration. No ratification step — per-card drift is caught by the per-component workflow's
+  prior-decision check at each component.
 - **C1. Current-conditions card** + **today's temperature curve** along the bottom (model: img-23) +
   **restore the Now-page hero** (page-header card = station logo + station name; per ADR-051, dropped & never
   redesigned; ties to ADR-022 branding / ADR-049 logo alt). → ADR + exec plan.
@@ -248,8 +252,14 @@ Build session record + per-deliverable verification evidence: execution briefs i
 a browser): visual check vs. mockups in both themes, `@axe-core/playwright` on the hydrated SPA,
 keyboard-only walkthrough, and color-blindness pass. Ready-to-paste prompt:
 **[briefs/TRACK-A-TESTING-CONTINUATION.md](briefs/TRACK-A-TESTING-CONTINUATION.md)**.
-B2 and B3 are closed (see Track B above).
+B2 and B3 are closed (see Track B above). On-device Track-A testing remains open but does **not** block C1.
 
-Then walk Track C component by component (C1…C6, plus any additional cards from the full C0 work list) using the per-component workflow
-(prior-decision check → data inventory → composition → mockup → ADR → exec plan). Per-component data
-inventory (B1) happens just-in-time inside each.
+**C0 is done** — page inventory at [docs/design/C0-PAGE-INVENTORY.md](../design/C0-PAGE-INVENTORY.md)
+(built 2026-05-29 during A0; 11 routes, ~40 candidate cards, authoritative C1–C14 work list). No
+ratification step.
+
+**Next concrete step: C1** — Current-conditions card + today's temperature curve + restore the Now-page
+hero. Execute via the per-component workflow (prior-decision check → B1 data inventory → composition →
+mockup → Proposed ADR → execution brief). The C1 temp curve uses the B2 finding: Recharts
+`usePlotArea()` hook; chart config is file-based à la Belchertown `graphs.conf` (see
+[B2 findings](../design/B2-recharts-background-findings.md)).
