@@ -166,6 +166,16 @@ remain global gates run once.
 - **B1 (per-component, just-in-time). Provider-data inventory** — at the start of each Track C component,
   enumerate everything the providers can supply for that card's metric(s), so composition/design is grounded in
   real available data. This replaces the monolithic audit and makes the research bite-sized.
+  **Source of truth = our own authored artifacts, read in this order — NOT a live-traffic rediscovery:**
+  1. The API response models + canonical field mapping in `weewx-clearskies-api` (the `/current` and `/archive`
+     contracts — this enumerates every field, type, units, and always-present-vs-conditional). This is the answer.
+  2. Each provider module's `CAPABILITY` / `supplied_canonical_fields` declaration (per-provider supply set).
+  3. Our captured `docs/reference/api-docs/<provider>.md` and `docs/contracts/`.
+  4. The weewx 5.3 column reference at `docs/reference/weewx-5.3/` for archive columns feeding any series.
+  We wrote the contract and the code; the inventory is a READ of those, not a re-derivation from the wire. A live
+  `/current` + `/archive` hit on weather-dev is **demoted to an optional confirmation spot-check** — used ONLY to
+  check whether a contract-marked *conditional* field is actually populated for this station/provider, and only
+  when flagged to the lead first. Default B1 run touches no live endpoint.
 - **B2. Recharts background-image support** (global) — ✅ **DONE 2026-05-31.** Recharts CAN render a scene image behind the plot area. Recommended technique: `usePlotArea()` hook (Recharts 3.x public API); `<Customized>` is deprecated. Charts (including background image) are configured through chart config files (`graphs.conf`-style), not the dashboard UI. Findings: [docs/design/B2-recharts-background-findings.md](../design/B2-recharts-background-findings.md).
 - **B3. Accessibility-contrast + image-performance budget** (global) — ✅ **DONE 2026-05-31.** Card-glass opacity is an operator-configurable default; no hard-locked contrast value, no research gate. Shipped defaults: light `rgba(255,255,255,0.72)`, dark `rgba(30,35,55,0.55)`. PROVISIONAL flag removed. Findings: [docs/design/B3-contrast-performance-findings.md](../design/B3-contrast-performance-findings.md).
 
@@ -177,6 +187,9 @@ records, etc. each have cards. Track C opens with a page inventory, then walks c
 0. **Prior-decision check** — surface any existing decision for this surface (ADRs, current site, Phase-2 work);
    re-affirm or consciously depart (don't silently redo).
 1. **Data inventory (B1 slice)** — "here is everything the providers / weewx give us for this card."
+   Read our own authored artifacts (API `/current` + `/archive` contract → provider `CAPABILITY` decls →
+   captured api-docs / contracts → weewx column reference), in that order. Do NOT rediscover from live wire
+   responses; a live endpoint hit is an optional conditional-field spot-check only, flagged to the lead first.
 2. **Composition** — what's grouped on one card vs. split into separate cards.
 3. **Mockup** — quick artifact mockup(s) to react to (see Mockups below).
 4. **ADR** — lock composition + what's shown + treatment → Proposed → Accepted.
