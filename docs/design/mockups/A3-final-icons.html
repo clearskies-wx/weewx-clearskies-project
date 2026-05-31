@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A3 — Final curated icon set</title>
+<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+         margin: 0; padding: 2rem; background: #fafafa; color: #18181b; }
+  @media (prefers-color-scheme: dark) {
+    body { background:#0b0b0e; color:#e7e7ea; }
+    .card { background:#16161b !important; border-color:#2a2a31 !important; }
+    .ph-ref { background:#1f1f25; color:#d4d4d8; }
+    .name { color:#a1a1aa; }
+    h2 { border-color:#2a2a31; }
+    .deferred-section { background:#111116 !important; border-color:#2a2a31 !important; }
+    .deferred-row { border-color:#2a2a31 !important; color:#52525b !important; }
+    .wind-note { background:#1a1a20 !important; border-color:#2a2a31 !important; color:#71717a !important; }
+  }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  p.lead { color:#71717a; margin:.25rem 0 1.5rem; max-width:72ch; font-size:.9rem; }
+  h2 { font-size:1rem; margin:2rem 0 .75rem; border-bottom:1px solid #e4e4e7; padding-bottom:.35rem; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:1rem; }
+  .card { border:1px solid #e4e4e7; border-radius:12px; padding:1rem .75rem; text-align:center;
+          background:#fff; display:flex; flex-direction:column; align-items:center; gap:.5rem; }
+  .card iconify-icon { font-size:44px; }
+  .label { font-size:.82rem; font-weight:600; }
+  .name { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.72rem; color:#52525b; word-break:break-all; }
+  .pack { font-size:.68rem; font-weight:700; color:#fff; background:#6366f1; border-radius:4px;
+          padding:.15rem .4rem; text-transform:uppercase; letter-spacing:.04em; }
+  .pack.cross { background:#d97706; }
+  .pack.tabler { background:#0ea5e9; }
+  .note { font-size:.78rem; color:#71717a; }
+  .icon-empty { width:44px; height:44px; display:inline-block; }
+  .wind-note { font-size:.8rem; color:#52525b; background:#f4f4f5; border:1px solid #e4e4e7;
+               border-radius:8px; padding:.5rem .85rem; margin-top:.5rem; max-width:72ch; }
+
+  /* Deferred section */
+  .deferred-section { background:#f8f8fa; border:1px solid #e4e4e7; border-radius:12px;
+                       padding:1rem 1.25rem; margin-top:.5rem; opacity:.7; }
+  .deferred-row { display:flex; align-items:center; gap:.75rem; padding:.45rem 0;
+                  border-bottom:1px solid #e4e4e7; font-size:.85rem; color:#52525b; }
+  .deferred-row:last-child { border-bottom:none; }
+  .deferred-tag { font-size:.68rem; font-weight:700; color:#fff; background:#71717a; border-radius:4px;
+                   padding:.15rem .4rem; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+  .deferred-label { flex:1; }
+</style>
+</head>
+<body>
+
+  <h1>A3 — Final curated icon set</h1>
+  <p class="lead">
+    <strong>Locked worksheet.</strong> These are decided picks, not candidates.
+    Base pack is <strong>Phosphor</strong> (<code>ph:</code>) throughout.
+    Two alert glyphs and one stat glyph come from other packs — those cards carry an orange
+    <span class="pack cross" style="font-size:.68rem">cross-pack</span> tag and a blue
+    <span class="pack tabler" style="font-size:.68rem">Tabler</span> tag where noted.
+    Blank icon areas in Section 3 are intentional — those stats are text-only by design.
+  </p>
+
+  <!-- ═══════════════════════════════════════════════════════ SECTION 1 -->
+  <h2>1 · Stat Icons</h2>
+  <div class="grid">
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:thermometer"></iconify-icon>
+      <span class="label">Temperature</span>
+      <span class="name">ph:thermometer</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:drop-simple"></iconify-icon>
+      <span class="label">Humidity</span>
+      <span class="name">ph:drop-simple</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:umbrella"></iconify-icon>
+      <span class="label">Precip Chance</span>
+      <span class="name">ph:umbrella</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:eye"></iconify-icon>
+      <span class="label">Visibility</span>
+      <span class="name">ph:eye</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:sun"></iconify-icon>
+      <span class="label">Solar Radiation</span>
+      <span class="name">ph:sun</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:cloud-rain"></iconify-icon>
+      <span class="label">Rainfall</span>
+      <span class="name">ph:cloud-rain</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:snowflake"></iconify-icon>
+      <span class="label">Snowfall</span>
+      <span class="name">ph:snowflake</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:gauge"></iconify-icon>
+      <span class="label">Barometric Pressure</span>
+      <span class="name">ph:gauge</span>
+    </div>
+
+    <div class="card">
+      <span class="pack tabler">Tabler</span>
+      <iconify-icon icon="tabler:uv-index"></iconify-icon>
+      <span class="label">UV Index</span>
+      <span class="name">tabler:uv-index</span>
+      <span class="note">cross-pack</span>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ SECTION 2 -->
+  <h2>2 · Trend Arrows &nbsp;<span class="note">(one reusable set for any metric)</span></h2>
+  <div class="grid">
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:arrow-up"></iconify-icon>
+      <span class="label">Rising</span>
+      <span class="name">ph:arrow-up</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:arrow-down"></iconify-icon>
+      <span class="label">Falling</span>
+      <span class="name">ph:arrow-down</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:arrow-right"></iconify-icon>
+      <span class="label">Steady</span>
+      <span class="name">ph:arrow-right</span>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ SECTION 3 -->
+  <h2>3 · Text-Only Stats &nbsp;<span class="note">(no icon — intentional)</span></h2>
+  <div class="grid">
+
+    <div class="card">
+      <span class="icon-empty"></span>
+      <span class="label">Feels Like</span>
+      <span class="note">text only, no icon</span>
+    </div>
+
+    <div class="card">
+      <span class="icon-empty"></span>
+      <span class="label">Dew Point</span>
+      <span class="note">text only, no icon</span>
+    </div>
+
+  </div>
+  <p class="wind-note">
+    Wind speed / direction / gust are <strong>not</strong> in this icon family — they belong to the
+    C2 Wind Compass component and will be decided with that ADR.
+  </p>
+
+  <!-- ═══════════════════════════════════════════════════════ SECTION 4 -->
+  <h2>4 · Weather Alert Icons &nbsp;<span class="note">(13 types; Phosphor + 2 cross-pack)</span></h2>
+  <div class="grid">
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:fire"></iconify-icon>
+      <span class="label">Fire Weather</span>
+      <span class="name">ph:fire</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:hurricane"></iconify-icon>
+      <span class="label">Tropical / Hurricane</span>
+      <span class="name">ph:hurricane</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:lightning"></iconify-icon>
+      <span class="label">Thunderstorm</span>
+      <span class="name">ph:lightning</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:tornado"></iconify-icon>
+      <span class="label">Tornado</span>
+      <span class="name">ph:tornado</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:warning"></iconify-icon>
+      <span class="label">Warning (generic)</span>
+      <span class="name">ph:warning</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:warning-circle"></iconify-icon>
+      <span class="label">Watch (generic)</span>
+      <span class="name">ph:warning-circle</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:wind"></iconify-icon>
+      <span class="label">Wind</span>
+      <span class="name">ph:wind</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:sailboat"></iconify-icon>
+      <span class="label">Marine</span>
+      <span class="name">ph:sailboat</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:snowflake"></iconify-icon>
+      <span class="label">Snow / Winter</span>
+      <span class="name">ph:snowflake</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:thermometer"></iconify-icon>
+      <span class="label">Heat &amp; Cold</span>
+      <span class="name">ph:thermometer</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:cloud-fog"></iconify-icon>
+      <span class="label">Fog</span>
+      <span class="name">ph:cloud-fog</span>
+    </div>
+
+    <div class="card">
+      <span class="pack cross">cross-pack</span>
+      <iconify-icon icon="material-symbols:flood-outline-rounded"></iconify-icon>
+      <span class="label">Flood</span>
+      <span class="name">material-symbols:flood-outline-rounded</span>
+      <span class="note">Material Symbols</span>
+    </div>
+
+    <div class="card">
+      <span class="pack cross">cross-pack</span>
+      <iconify-icon icon="carbon:tsunami"></iconify-icon>
+      <span class="label">Tsunami</span>
+      <span class="name">carbon:tsunami</span>
+      <span class="note">Carbon</span>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ SECTION 5 -->
+  <h2>5 · Nav / Chrome + Misc &nbsp;<span class="note">(Phosphor)</span></h2>
+  <div class="grid">
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:list"></iconify-icon>
+      <span class="label">Menu</span>
+      <span class="name">ph:list</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:house"></iconify-icon>
+      <span class="label">Home</span>
+      <span class="name">ph:house</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:gear"></iconify-icon>
+      <span class="label">Settings</span>
+      <span class="name">ph:gear</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:magnifying-glass"></iconify-icon>
+      <span class="label">Search</span>
+      <span class="name">ph:magnifying-glass</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:x"></iconify-icon>
+      <span class="label">Close</span>
+      <span class="name">ph:x</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:caret-up"></iconify-icon>
+      <span class="label">Chevron Up</span>
+      <span class="name">ph:caret-up</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:caret-down"></iconify-icon>
+      <span class="label">Chevron Down</span>
+      <span class="name">ph:caret-down</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:caret-left"></iconify-icon>
+      <span class="label">Chevron Left</span>
+      <span class="name">ph:caret-left</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:caret-right"></iconify-icon>
+      <span class="label">Chevron Right</span>
+      <span class="name">ph:caret-right</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:arrows-clockwise"></iconify-icon>
+      <span class="label">Refresh</span>
+      <span class="name">ph:arrows-clockwise</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:arrow-square-out"></iconify-icon>
+      <span class="label">External Link</span>
+      <span class="name">ph:arrow-square-out</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:sun"></iconify-icon>
+      <span class="label">Theme Light</span>
+      <span class="name">ph:sun</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:moon"></iconify-icon>
+      <span class="label">Theme Dark</span>
+      <span class="name">ph:moon</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:trophy"></iconify-icon>
+      <span class="label">Records</span>
+      <span class="name">ph:trophy</span>
+    </div>
+
+    <div class="card">
+      <span class="pack">Phosphor</span>
+      <iconify-icon icon="ph:camera"></iconify-icon>
+      <span class="label">Webcam</span>
+      <span class="name">ph:camera</span>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ SECTION 6 -->
+  <h2>6 · Deferred &nbsp;<span class="note">(not decided — awaiting component ADRs)</span></h2>
+  <div class="deferred-section">
+    <div class="deferred-row">
+      <span class="deferred-tag">Deferred to component ADR</span>
+      <span class="deferred-label"><strong>Astro / almanac glyphs</strong> — decided with C5 Sun &amp; Moon arcs</span>
+    </div>
+    <div class="deferred-row">
+      <span class="deferred-tag">Deferred to component ADR</span>
+      <span class="deferred-label"><strong>AQI / air-quality set</strong> — decided with C6 AQI card</span>
+    </div>
+    <div class="deferred-row">
+      <span class="deferred-tag">Deferred to component ADR</span>
+      <span class="deferred-label"><strong>Earthquake / seismic glyph</strong> — operator disliked the EKG look; real seismograph glyph TBD</span>
+    </div>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A3 — Barometric pressure icon (pick one)</title>
+<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+         margin: 0; padding: 2rem; background: #fafafa; color: #18181b; }
+  @media (prefers-color-scheme: dark){ body{background:#0b0b0e;color:#e7e7ea;} .card{background:#16161b!important;border-color:#2a2a31!important;} .row{background:#16161b!important;border-color:#2a2a31!important;} }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  p.lead { color:#71717a; margin:.25rem 0 1.5rem; max-width:62ch; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:1rem; }
+  .card { border:1px solid #e4e4e7; border-radius:12px; padding:1.1rem .75rem; text-align:center;
+          background:#fff; display:flex; flex-direction:column; align-items:center; gap:.55rem; }
+  .card iconify-icon { font-size:46px; }
+  .name { font-family:ui-monospace,Menlo,monospace; font-size:.72rem; color:#52525b; word-break:break-all; }
+  .pack { font-size:.7rem; font-weight:600; color:#3f3f46; text-transform:uppercase; letter-spacing:.03em; }
+  .fallback { outline:2px dashed #a1a1aa; outline-offset:2px; }
+  .tag { font-size:.62rem; color:#a1a1aa; }
+  /* in-context preview */
+  h2 { font-size:1rem; margin:2rem 0 .75rem; }
+  .row { display:flex; align-items:center; gap:.6rem; border:1px solid #e4e4e7; border-radius:10px;
+         padding:.7rem 1rem; background:#fff; max-width:340px; margin-bottom:.5rem; }
+  .row iconify-icon { font-size:22px; color:#52525b; }
+  .row .label { font-size:.9rem; color:#71717a; }
+  .row .val { margin-left:auto; font-size:1.1rem; font-weight:600; }
+  @media (prefers-color-scheme: dark){ .name{color:#a1a1aa;} .row .label{color:#a1a1aa;} .row iconify-icon{color:#a1a1aa;} }
+</style>
+</head>
+<body>
+  <h1>Barometric pressure — pick one glyph (or "none")</h1>
+  <p class="lead">You said the generic gauge looks generic but you'd tolerate it. Before settling, here are
+  the <strong>dedicated barometer / pressure</strong> glyphs other packs draw — line style, to sit beside
+  Phosphor. <code>ph:gauge</code> (dashed) is the fallback. Below the grid, each is previewed at real
+  in-context size next to a pressure value so you can see how it actually reads.</p>
+
+  <div class="grid">
+    <div class="card fallback"><span class="pack">Phosphor</span><iconify-icon icon="ph:gauge"></iconify-icon><span class="name">ph:gauge</span><span class="tag">fallback</span></div>
+    <div class="card"><span class="pack">Phosphor</span><iconify-icon icon="ph:speedometer"></iconify-icon><span class="name">ph:speedometer</span></div>
+    <div class="card"><span class="pack">MDI</span><iconify-icon icon="mdi:barometer"></iconify-icon><span class="name">mdi:barometer</span></div>
+    <div class="card"><span class="pack">Weather Icons</span><iconify-icon icon="wi:barometer"></iconify-icon><span class="name">wi:barometer</span></div>
+    <div class="card"><span class="pack">Lets-icons (line)</span><iconify-icon icon="lets-icons:pressure-light"></iconify-icon><span class="name">lets-icons:pressure-light</span></div>
+    <div class="card"><span class="pack">Carbon</span><iconify-icon icon="carbon:pressure"></iconify-icon><span class="name">carbon:pressure</span></div>
+  </div>
+
+  <h2>In-context preview (how it reads next to the number)</h2>
+  <div class="row"><iconify-icon icon="ph:gauge"></iconify-icon><span class="label">Pressure</span><span class="val">30.12 in</span></div>
+  <div class="row"><iconify-icon icon="ph:speedometer"></iconify-icon><span class="label">Pressure</span><span class="val">30.12 in</span></div>
+  <div class="row"><iconify-icon icon="mdi:barometer"></iconify-icon><span class="label">Pressure</span><span class="val">30.12 in</span></div>
+  <div class="row"><iconify-icon icon="wi:barometer"></iconify-icon><span class="label">Pressure</span><span class="val">30.12 in</span></div>
+  <div class="row"><iconify-icon icon="lets-icons:pressure-light"></iconify-icon><span class="label">Pressure</span><span class="val">30.12 in</span></div>
+  <div class="row"><iconify-icon icon="carbon:pressure"></iconify-icon><span class="label">Pressure</span><span class="val">30.12 in</span></div>
+  <div class="row"><span style="width:22px"></span><span class="label">Pressure</span><span class="val">30.12 in</span></div>
+  <p class="lead" style="margin-top:.5rem">(last row = no icon, text only)</p>
+</body>
+</html>

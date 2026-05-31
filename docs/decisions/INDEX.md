@@ -54,6 +54,9 @@ Every locked architecture or process decision for the Clear Skies project lives 
 | [ADR-045](ADR-045-background-cache-warming.md) | Background cache warming — daemon thread pre-computes slow endpoints on configurable intervals; reuses ADR-017 CacheBackend | Proposed | 2026-05-27 |
 | [ADR-046](ADR-046-gem-active-faults.md) | GEM Global Active Faults Database for seismic fault overlay — CC-BY-SA 4.0, bundled GeoJSON, radius-clipped serving | Proposed | 2026-05-27 |
 | [ADR-047](ADR-047-background-system.md) | Background system (A2) — condition-keyed photo backgrounds (clear/cloudy/storm × day-night) + real on-glass rain/snow overlays; provider-driven snow/storm; server-computed scene tag + 15-min precip linger | Accepted | 2026-05-30 |
+| [ADR-048](ADR-048-theme-color-tokens.md) | Theme & color tokens (A1) — as-built shadcn/ui neutral base in OKLCH, light+dark, 6 AA-safe accents (default blue); references ADR-022/023 for branding/switch | Accepted | 2026-05-30 |
+| [ADR-049](ADR-049-hero-weather-icons.md) | Hero weather icons (A3) — Material Symbols (filled), recolored Meteocons-style gradients (gold sun, grey clouds, periwinkle moon) as inline SVG; Weather Icons/Meteocons-direct/emoji rejected | Accepted | 2026-05-30 |
+| [ADR-050](ADR-050-utility-stat-nav-icons.md) | Utility/stat/nav/alert icons (A3) — Phosphor (regular) base + curated cross-pack exceptions (Tabler uv-index, Material flood, Carbon tsunami); 13 alert glyphs; text-only stats; wind→C2, astro/AQI/earthquake deferred | Accepted | 2026-05-30 |
 
 > **Note:** This list is not assumed complete. The user has explicitly flagged that decisions get missed. New Pinned slots are added as they're identified, before the corresponding work begins.
 

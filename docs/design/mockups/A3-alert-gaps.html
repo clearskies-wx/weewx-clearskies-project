@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A3 — Flood &amp; Tsunami alert-icon gaps (pick one each)</title>
+<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+         margin: 0; padding: 2rem; background: #fafafa; color: #18181b; }
+  @media (prefers-color-scheme: dark) { body { background:#0b0b0e; color:#e7e7ea; } .card{background:#16161b!important;border-color:#2a2a31!important;} }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  p.lead { color:#71717a; margin:.25rem 0 1.5rem; max-width:60ch; }
+  h2 { font-size:1rem; margin:2rem 0 .75rem; border-bottom:1px solid #e4e4e7; padding-bottom:.35rem; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:1rem; }
+  .card { border:1px solid #e4e4e7; border-radius:12px; padding:1rem .75rem; text-align:center;
+          background:#fff; display:flex; flex-direction:column; align-items:center; gap:.5rem; }
+  .card iconify-icon { font-size:44px; }
+  .name { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.72rem; color:#52525b; word-break:break-all; }
+  .pack { font-size:.7rem; font-weight:600; color:#3f3f46; text-transform:uppercase; letter-spacing:.03em; }
+  .note { font-size:.78rem; color:#71717a; }
+  .ph-ref { display:inline-flex; align-items:center; gap:.4rem; font-size:.8rem; color:#3f3f46;
+            background:#f4f4f5; border-radius:8px; padding:.4rem .7rem; margin-top:.5rem; }
+  @media (prefers-color-scheme: dark){ .ph-ref{background:#1f1f25;color:#d4d4d8;} .name{color:#a1a1aa;} h2{border-color:#2a2a31;} }
+</style>
+</head>
+<body>
+  <h1>Flood &amp; Tsunami — pick one glyph each</h1>
+  <p class="lead">Neither Phosphor (the base pack) nor Lucide draws flood or tsunami, so these two
+  alert types must come from another Iconify pack. Below are the <strong>line / outline</strong>
+  candidates (closest to Phosphor's demure line weight). Phosphor's own <code>warning</code> is shown
+  for reference so you can judge stroke-weight match. Pick one name per row and tell me.</p>
+
+  <span class="ph-ref">Phosphor reference weight:
+    <iconify-icon icon="ph:warning" style="font-size:28px"></iconify-icon>
+    <code>ph:warning</code> &nbsp;·&nbsp;
+    <iconify-icon icon="ph:cloud-fog" style="font-size:28px"></iconify-icon>
+    <code>ph:cloud-fog</code>
+  </span>
+
+  <h2>FLOOD candidates</h2>
+  <div class="grid">
+    <div class="card"><span class="pack">Tabler</span><iconify-icon icon="tabler:flood"></iconify-icon><span class="name">tabler:flood</span></div>
+    <div class="card"><span class="pack">Remix (line)</span><iconify-icon icon="ri:flood-line"></iconify-icon><span class="name">ri:flood-line</span></div>
+    <div class="card"><span class="pack">Material (outline)</span><iconify-icon icon="material-symbols:flood-outline-rounded"></iconify-icon><span class="name">material-symbols:flood-outline-rounded</span></div>
+    <div class="card"><span class="pack">Carbon</span><iconify-icon icon="carbon:flood"></iconify-icon><span class="name">carbon:flood</span></div>
+    <div class="card"><span class="pack">Carbon</span><iconify-icon icon="carbon:flood-warning"></iconify-icon><span class="name">carbon:flood-warning</span></div>
+    <div class="card"><span class="pack">MDI</span><iconify-icon icon="mdi:flood"></iconify-icon><span class="name">mdi:flood</span></div>
+  </div>
+
+  <h2>TSUNAMI candidates</h2>
+  <div class="grid">
+    <div class="card"><span class="pack">Material (outline)</span><iconify-icon icon="material-symbols:tsunami-outline-rounded"></iconify-icon><span class="name">material-symbols:tsunami-outline-rounded</span></div>
+    <div class="card"><span class="pack">Carbon</span><iconify-icon icon="carbon:tsunami"></iconify-icon><span class="name">carbon:tsunami</span></div>
+    <div class="card"><span class="pack">Bootstrap (line)</span><iconify-icon icon="bi:tsunami"></iconify-icon><span class="name">bi:tsunami</span></div>
+    <div class="card"><span class="pack">MDI</span><iconify-icon icon="mdi:tsunami"></iconify-icon><span class="name">mdi:tsunami</span></div>
+    <div class="card"><span class="pack">Huge (line)</span><iconify-icon icon="hugeicons:tsunami"></iconify-icon><span class="name">hugeicons:tsunami</span></div>
+    <div class="card"><span class="pack">Weather Icons</span><iconify-icon icon="wi:tsunami"></iconify-icon><span class="name">wi:tsunami</span></div>
+  </div>
+
+  <p class="note" style="margin-top:2rem">Note: mixing one icon from Material/Carbon/Remix into a Phosphor-based
+  set is fine for a rarely-shown alert glyph — but the closer the stroke weight to <code>ph:warning</code> above,
+  the more cohesive the alert row will look.</p>
+</body>
+</html>
