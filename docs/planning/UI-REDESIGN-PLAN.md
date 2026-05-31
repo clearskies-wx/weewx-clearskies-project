@@ -1,8 +1,7 @@
 # UI-REDESIGN-PLAN — Clear Skies dashboard UI redesign (the "plan for the plan")
 
 **Status:** Active. This is a roadmap/index, not a decision record — decisions live in ADRs.
-**Track A foundations (A0–A4) are CODE-COMPLETE and deployed to weather-dev (2026-05-31)** — on-device
-visual/a11y/keyboard testing is the only open Track-A item (see Next action). Tracks B2/B3 + C downstream.
+**Track A foundations (A0–A4) are CODE-COMPLETE and deployed to weather-dev (2026-05-31); Track B research gates B2 + B3 are DONE (2026-05-31).** On-device visual/a11y/keyboard testing is the only remaining open item before Track C (see Next action).
 
 **Purpose:** Sequence the UI redesign as a series of **decision points**, each resolved into an
 ADR, each ADR operationalized into a **granular, prescriptive execution plan** that drives coding
@@ -167,9 +166,8 @@ remain global gates run once.
 - **B1 (per-component, just-in-time). Provider-data inventory** — at the start of each Track C component,
   enumerate everything the providers can supply for that card's metric(s), so composition/design is grounded in
   real available data. This replaces the monolithic audit and makes the research bite-sized.
-- **B2. Recharts background-image support** (global) — can Recharts render a scenic image behind the plot area? Gates C1 temp-curve styling.
-- **B3. Accessibility-contrast + image-performance budget** (global) — text-contrast floors over photos; image
-  weight/loading budget. Gates A2 and all photo-backed components. → research note / ADR.
+- **B2. Recharts background-image support** (global) — ✅ **DONE 2026-05-31.** Recharts CAN render a scene image behind the plot area. Recommended technique: `usePlotArea()` hook (Recharts 3.x public API); `<Customized>` is deprecated. Charts (including background image) are configured through chart config files (`graphs.conf`-style), not the dashboard UI. Findings: [docs/design/B2-recharts-background-findings.md](../design/B2-recharts-background-findings.md).
+- **B3. Accessibility-contrast + image-performance budget** (global) — ✅ **DONE 2026-05-31.** Card-glass opacity is an operator-configurable default; no hard-locked contrast value, no research gate. Shipped defaults: light `rgba(255,255,255,0.72)`, dark `rgba(30,35,55,0.55)`. PROVISIONAL flag removed. Findings: [docs/design/B3-contrast-performance-findings.md](../design/B3-contrast-performance-findings.md).
 
 ### Track C — Components, ALL pages (depend on A + B)
 **Scope = every page, not just the "now"/home page** — forecast page, almanac, radar, earthquakes, alerts,
@@ -246,14 +244,11 @@ code ✅ for every foundation item:
 Build session record + per-deliverable verification evidence: execution briefs in
 [briefs/](briefs/); scratchpad `c:\tmp\track-a-impl-scratch.md`.
 
-**The single open Track-A item is on-device TESTING** (the kickoff "definition of done" visual bar — needs
+**The single open Track-A/B item is on-device TESTING** (the kickoff "definition of done" visual bar — needs
 a browser): visual check vs. mockups in both themes, `@axe-core/playwright` on the hydrated SPA,
-keyboard-only walkthrough, color-blindness pass, and the **B3 card-glass contrast measurement** (sets the
-final `--card-glass` opacity; provisional values shipped). Ready-to-paste prompt:
+keyboard-only walkthrough, and color-blindness pass. Ready-to-paste prompt:
 **[briefs/TRACK-A-TESTING-CONTINUATION.md](briefs/TRACK-A-TESTING-CONTINUATION.md)**.
-- **B2 + B3 global research gates** — Recharts background support + a11y-contrast/perf budget (B3 also sets
-  the final card-glass opacity for ADR-051). Can run in parallel; **B2/B3 + on-device testing are the open
-  Track-A/B items** before Track C.
+B2 and B3 are closed (see Track B above).
 
 Then walk Track C component by component (C1…C6, plus any additional cards from the full C0 work list) using the per-component workflow
 (prior-decision check → data inventory → composition → mockup → ADR → exec plan). Per-component data
