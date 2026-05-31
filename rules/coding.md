@@ -243,6 +243,27 @@ Before saying "done":
 
 If you can't test the change (no dev server, no fixture data), say so explicitly — don't claim success on something you couldn't exercise.
 
+### Render and LOOK before declaring any UI/mockup change done (mandatory)
+
+**You cannot review a visual change by reading its markup.** A 2026-05-31 session burned ~2 hours and many agent rounds shipping broken renders — a card rendered at half its intended height (a CSS specificity bug), the temperature block collapsed and clipped out of view (`flex:1` + `overflow:hidden` + an `auto`-height SVG), a chart scaled to overflow the whole card — every one of them invisible while reading the HTML/CSS, and every one obvious the instant the page was actually rendered. Reading code, type-checking, and `axe` passing are **not** visual verification.
+
+**Every change to a mockup or any UI surface must be rendered to an image and visually inspected before it is shown to the user or called done.** For a static mockup no dev server is needed — render with headless Edge and open the PNG (the Read tool displays images):
+
+```
+& "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --headless=new --disable-gpu `
+  --screenshot="C:\tmp\render.png" --window-size=1400,900 "file:///<absolute-path-to.html>"
+```
+
+Then Read `C:\tmp\render.png`, **look at it**, fix what's visibly wrong, and re-render. Only forward/declare done once the render matches intent.
+
+- **The lead inspects the render, not the markup,** before sending any mockup to the user. Iterate the render loop yourself — it is fast and it is the only reliable check.
+- **Agents producing UI/mockups must render and inspect too.** An agent reporting "renders fine," "all checks pass," or "axe: 0 violations" **without having viewed the rendered image is not acceptance** — `axe` checks the DOM/accessibility, never layout or whether content is even visible. UI-agent prompts must require the render-and-view step and a description of what the rendered image actually showed.
+- If no browser is available to render, say so explicitly and do **not** claim the visual is correct.
+
+### Mockups show exactly what was asked — nothing more
+
+A mockup is a single thing to react to, not a kitchen sink. Do **not** add controls, cards, states, or annotations the user did not ask for. The same 2026-05-31 session repeatedly added unrequested noise the user had to reject — a theme/dark toggle, a "ghost" neighbour card, a degrade-state gallery, spec-notes panels. Build the specific surface requested, at its locked size (per the A4 grid mockups for Clear Skies cards), and leave everything else out unless the user asks for it.
+
 ---
 
 ## 5. Accessibility — WCAG 2.1 AA target

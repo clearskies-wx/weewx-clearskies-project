@@ -208,10 +208,14 @@ content fits the box (`overflow:hidden`), the box does not grow to the content.
    The footprint is a constraint, not a variable; if the content can't fit the locked box, that is a
    composition problem to solve (shrink/re-group), surfaced to the lead — NOT a license to resize the card.
 3. **Mockup** — **MUST be built on the actual Now-page grid: reuse the A4 grid CSS** (`grid-4col` +
-   `grid-auto-rows: 5.5rem` + the col/row-span helpers) and place the card at its **locked footprint** inside
-   that grid (other cells may be empty or ghosted for scale). **NEVER** render the card as a standalone,
-   full-width, or free/fixed-pixel-height box — that hides the true size and is exactly what produced
-   throw-away mockups. Verify the card renders at its footprint size with content clipped to the box.
+   `grid-auto-rows: 5.5rem` + explicit, conflict-free col/row-span classes) and place the card at its
+   **locked footprint** inside that grid. **NEVER** render the card as a standalone, full-width, or
+   free/fixed-pixel-height box — that hides the true size and produced throw-away mockups.
+   **Render it and LOOK before sending** (per [rules/coding.md](../../rules/coding.md) "Render and LOOK"):
+   screenshot the HTML headless, open the PNG, inspect it; reading markup or an `axe` pass is NOT
+   verification. The lead inspects the render, not the markup. **Keep the mockup minimal** — only the
+   surface requested at its locked size; no unrequested toggles, neighbour/ghost cards, degrade galleries,
+   or annotation panels.
 4. **ADR** — lock composition + what's shown + treatment → Proposed → Accepted.
 5. **Execution plan → code.**
 
