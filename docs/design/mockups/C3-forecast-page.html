@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C3 — Forecast Page mockup v5</title>
+<style>
+/* ── Locked fonts ─────────────────────────────────────────────────────────── */
+@font-face { font-family:'Manrope'; font-weight:400; font-style:normal; src:url('fonts/manrope-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family:'Manrope'; font-weight:600; font-style:normal; src:url('fonts/manrope-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family:'Manrope'; font-weight:700; font-style:normal; src:url('fonts/manrope-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family:'Outfit';  font-weight:400; font-style:normal; src:url('fonts/outfit-latin-400-normal.woff2')  format('woff2'); }
+@font-face { font-family:'Outfit';  font-weight:600; font-style:normal; src:url('fonts/outfit-latin-600-normal.woff2')  format('woff2'); }
+
+/* ── Design Tokens ────────────────────────────────────────────────────────── */
+:root {
+  color-scheme: light dark;
+
+  --gap-grid: 1rem;
+  --card-row: 11rem;
+  --card-radius: 0.875rem;
+  --card-pad: 1rem;
+
+  --glass-bg: rgba(255,255,255,0.72);
+  --glass-border: rgba(0,0,0,0.10);
+  --glass-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08);
+
+  --fg: #18181b;
+  --fg-muted: #71717a;
+  --fg-dim: #a1a1aa;
+  --title-rule: rgba(0,0,0,0.12);
+
+  --page-bg: #f4f4f5;
+  --page-fg: #18181b;
+  --frame-border: rgba(0,0,0,0.15);
+  --badge-bg: rgba(0,0,0,0.08);
+  --badge-fg: #52525b;
+
+  --font-sans: 'Manrope', system-ui, sans-serif;
+  --font-display: 'Outfit', system-ui, sans-serif;
+
+  --accent: oklch(0.48 0.22 260);
+  --accent-fg: #ffffff;
+  --tab-inactive-bg: rgba(0,0,0,0.07);
+  --tab-inactive-fg: #71717a;
+
+  --temp-hi: #c81e1e;
+  --temp-lo: #1d4ed8;
+
+  /* Detail panel: very subtle tint to visually separate from column area */
+  --detail-panel-bg: rgba(0,0,0,0.035);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glass-bg: rgba(30,35,55,0.55);
+    --glass-border: rgba(255,255,255,0.10);
+    --glass-shadow: 0 4px 28px rgba(0,0,0,0.45), 0 1px 4px rgba(0,0,0,0.30);
+    --fg: #e7e7ea;
+    --fg-muted: #a1a1aa;
+    --fg-dim: #71717a;
+    --title-rule: rgba(255,255,255,0.12);
+    --page-bg: #0d0f18;
+    --page-fg: #e7e7ea;
+    --frame-border: rgba(255,255,255,0.10);
+    --badge-bg: rgba(255,255,255,0.10);
+    --badge-fg: #a1a1aa;
+    --accent: oklch(0.70 0.15 260);
+    --accent-fg: #0d0f18;
+    --tab-inactive-bg: rgba(255,255,255,0.08);
+    --tab-inactive-fg: #a1a1aa;
+    --temp-hi: #f87171;
+    --temp-lo: #93c5fd;
+    --detail-panel-bg: rgba(255,255,255,0.04);
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  font-family: var(--font-sans);
+  margin: 0; padding: 2rem 1.5rem 4rem;
+  background: var(--page-bg); color: var(--page-fg); line-height: 1.5;
+}
+.page-header { max-width: 80rem; margin: 0 auto 1.25rem; }
+.page-header h1 { font-size: 1rem; font-weight: 700; margin: 0 0 .2rem; }
+.page-header p  { font-size: .8rem; color: var(--fg-muted); margin: 0; }
+
+/* ── Frame ────────────────────────────────────────────────────────────────── */
+.frame-scroll { overflow-x: auto; padding-bottom: .5rem; }
+.frame--4col {
+  width: 1200px; padding: 1rem; border-radius: 1rem;
+  border: 1px solid var(--frame-border);
+  background:
+    linear-gradient(170deg, rgba(30,26,80,.88) 0%, rgba(60,50,120,.80) 28%,
+      rgba(130,80,60,.78) 56%, rgba(200,110,40,.82) 74%,
+      rgba(220,140,60,.80) 88%, rgba(180,100,40,.75) 100%),
+    linear-gradient(180deg, #1e1a50 0%, #c86e28 100%);
+}
+@media (prefers-color-scheme: dark) {
+  .frame--4col {
+    background:
+      linear-gradient(170deg, rgba(10,8,35,.93) 0%, rgba(25,18,60,.90) 28%,
+        rgba(70,35,20,.88) 56%, rgba(110,55,10,.90) 74%,
+        rgba(130,70,15,.88) 88%, rgba(90,45,10,.88) 100%),
+      linear-gradient(180deg, #0a0823 0%, #6e3208 100%);
+  }
+}
+
+/* ── Grid ─────────────────────────────────────────────────────────────────── */
+.grid-4col {
+  display: grid; grid-template-columns: repeat(4,1fr);
+  gap: var(--gap-grid); grid-auto-rows: auto;
+}
+.col-span-4 { grid-column: span 4; }
+
+/* ── Glass Card ───────────────────────────────────────────────────────────── */
+.card {
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--card-radius); padding: var(--card-pad);
+  backdrop-filter: blur(8px) saturate(1.1);
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
+  box-shadow: var(--glass-shadow);
+  display: flex; flex-direction: column; position: relative; overflow: hidden;
+}
+
+/* ── Card title — inline with tabs ───────────────────────────────────────── */
+.card-title {
+  font-family: var(--font-sans); font-size: .82rem; font-weight: 600;
+  color: var(--fg); margin: 0 0 .5rem; padding-bottom: .4rem;
+  border-bottom: 1px solid var(--title-rule);
+  display: flex; align-items: center; gap: .35rem; flex-shrink: 0;
+}
+.card-title svg { width: 1rem; height: 1rem; opacity: .75; flex-shrink: 0; }
+.card-title .title-text { flex: 1; display: flex; align-items: center; gap: .35rem; }
+.title-tabs { display: flex; gap: .25rem; flex-shrink: 0; margin-left: auto; }
+.tab-pill {
+  font-family: var(--font-sans); font-size: .72rem; font-weight: 600;
+  border: none; border-radius: 999px; padding: .18rem .65rem; cursor: pointer; line-height: 1.5;
+}
+.tab-pill--active  { background: var(--accent); color: var(--accent-fg); }
+.tab-pill--inactive { background: var(--tab-inactive-bg); color: var(--tab-inactive-fg); }
+
+/* ── Page Header Card ─────────────────────────────────────────────────────── */
+.page-header-card {
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--card-radius); padding: .75rem 1rem;
+  backdrop-filter: blur(8px) saturate(1.1);
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
+  box-shadow: var(--glass-shadow);
+  display: flex; align-items: baseline; gap: 1rem;
+}
+.phc-title {
+  font-family: var(--font-sans); font-size: 1.1rem; font-weight: 700; color: var(--fg); margin: 0;
+}
+.phc-info {
+  font-family: var(--font-sans); font-size: .75rem; color: var(--fg-muted);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SURFACE B — Hourly Card: VISIBLE scrollbar, all 24 hours
+   ───────────────────────────────────────────────────────────────────────── */
+.hourly-scroller {
+  overflow-x: scroll;    /* always show scrollbar — signals more content */
+  overflow-y: hidden; position: relative; flex: 1;
+  scroll-snap-type: x mandatory;
+}
+/* Styled scrollbar — clearly visible */
+.hourly-scroller::-webkit-scrollbar { height: 7px; }
+.hourly-scroller::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.08); border-radius: 4px; margin: 0 2px;
+}
+.hourly-scroller::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.30); border-radius: 4px;
+}
+.hourly-scroller::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.48);
+}
+@media (prefers-color-scheme: dark) {
+  .hourly-scroller::-webkit-scrollbar-track { background: rgba(255,255,255,0.08); }
+  .hourly-scroller::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.30); }
+  .hourly-scroller::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.50); }
+}
+
+.hourly-table { display: flex; flex-direction: column; min-width: max-content; }
+.ht-row { display: flex; flex-direction: row; }
+.ht-cell {
+  width: 72px; flex-shrink: 0; scroll-snap-align: start;
+  display: flex; align-items: center; justify-content: center; padding: 0 .2rem;
+}
+.ht-cell--time   { height: 18px; }
+.ht-cell--icon   { height: 34px; }
+.ht-cell--temp   { height: 22px; }
+.ht-cell--precip { height: 18px; }
+.ht-cell--wind   { height: 30px; }  /* taller for wind symbol with tail */
+
+.ht-time {
+  font-family: var(--font-sans); font-size: .7rem; color: var(--fg-muted); white-space: nowrap;
+}
+/* Reduced temp: 0.85rem per v4 spec */
+.ht-temp {
+  font-family: var(--font-display); font-size: .85rem; font-weight: 600;
+  color: var(--fg); line-height: 1; letter-spacing: -.01em;
+}
+.ht-precip {
+  display: flex; align-items: center; gap: .1rem;
+  font-family: var(--font-sans); font-size: .7rem; color: var(--fg-muted);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SURFACE C — 7-Day Card:
+   - Full-width columns (flex:1 on each col cell)
+   - Compact dual trend lines (1.5px stroke, r=2 dots)
+   - ONE COHESIVE seamless expanded detail area below all columns
+   - Gap between accent bar and day text (padding-top)
+   ───────────────────────────────────────────────────────────────────────── */
+.daily-cols-wrap {
+  flex: 1; display: flex; flex-direction: column; overflow: visible;
+}
+
+/* The 7-day column table — one col per day, transposed rows */
+.dc-table {
+  display: flex; flex-direction: column; position: relative; width: 100%; overflow: visible;
+}
+
+.dc-row { display: flex; flex-direction: row; width: 100%; overflow: visible; }
+
+/* ALL column cells use flex:1 — evenly fills full card width */
+.dc-col-cell {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 .1rem;
+}
+
+/* Selected column — subtle highlight background */
+.dc-col-cell--selected {
+  background: rgba(0,0,0,0.04);
+}
+@media (prefers-color-scheme: dark) {
+  .dc-col-cell--selected { background: rgba(255,255,255,0.06); }
+}
+
+/* Row heights for full-page 7-day */
+.dc-row--day    .dc-col-cell { height: 28px; padding-top: 8px; }  /* 8px gap after accent bar */
+.dc-row--icon   .dc-col-cell { height: 40px; padding-top: 6px; }  /* 6px gap below day name */
+.dc-row--hilo   .dc-col-cell { height: 22px; }
+.dc-row--precip .dc-col-cell { height: 16px; }
+.dc-row--wind   .dc-col-cell { height: 60px; overflow: visible; }  /* tall enough for r=12 wind symbol + tail */
+
+/* Accent bar row — thin 3px bar at top; selected col shows accent color */
+.dc-row--accent-bar { height: 3px; }
+.dc-row--accent-bar .dc-col-cell {
+  height: 3px; padding: 0; align-items: stretch;
+}
+.dc-row--accent-bar .dc-col-cell--selected {
+  background: var(--accent);
+}
+
+/* Typography for full-page 7-day */
+.dc-day-txt {
+  font-family: var(--font-sans); font-size: .85rem; font-weight: 600;
+  color: var(--fg); white-space: nowrap; text-align: center;
+}
+.dc-day-txt--selected { color: var(--accent); }
+.dc-date-txt {
+  font-family: var(--font-sans); font-size: .7rem; color: var(--fg-muted);
+  white-space: nowrap; text-align: center; display: block;
+}
+/* Combined hi/lo on one line: "74°/58°" */
+.dc-hilo-txt {
+  display: flex; align-items: baseline; gap: 0;
+  font-family: var(--font-display); font-size: .85rem; font-weight: 600; line-height: 1;
+}
+.dc-hi-part { color: var(--temp-hi); }
+.dc-sep-part { color: var(--fg-muted); margin: 0 1px; }
+.dc-lo-part { color: var(--temp-lo); }
+.dc-precip-txt {
+  display: flex; align-items: center; gap: .08rem;
+  font-family: var(--font-sans); font-size: .7rem; color: var(--fg-muted);
+}
+
+/* ── ONE COHESIVE expanded detail area ────────────────────────────────────
+   - Spans full card width below ALL columns
+   - Subtle background tint to visually separate (like img-12 green region)
+   - NO borders, NO division lines, NO separators
+   - Content flows naturally in the space
+   ──────────────────────────────────────────────────────────────────────── */
+.dc-detail-panel {
+  /* Extend to card edges by overcoming the 1rem card-padding on each side */
+  width: calc(100% + 2rem);
+  margin: .5rem -1rem 0 -1rem;
+  background: var(--detail-panel-bg);
+  border-radius: 0 0 calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px);
+  padding: .65rem 1rem .85rem;
+  flex-shrink: 0;
+}
+.dc-detail-day-header {
+  font-family: var(--font-sans); font-size: .82rem; font-weight: 600;
+  color: var(--accent); margin: 0 0 .45rem;
+  /* Gentle heading — no rule line, no border */
+  opacity: 0.9;
+}
+.dc-detail-content {
+  display: flex; flex-direction: row; gap: 1.5rem; flex-wrap: wrap;
+  align-items: flex-start;
+}
+.dc-detail-item {
+  display: flex; align-items: baseline; gap: .3rem;
+  font-family: var(--font-sans); font-size: .82rem;
+}
+.dc-detail-label {
+  font-size: .72rem; color: var(--fg-muted); flex-shrink: 0;
+}
+.dc-detail-value { color: var(--fg); font-weight: 600; }
+.dc-narrative {
+  font-family: var(--font-sans); font-size: .82rem; color: var(--fg-muted);
+  line-height: 1.55; font-style: italic; flex: 1 1 200px; margin: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SURFACE D — Discussion Card
+   ───────────────────────────────────────────────────────────────────────── */
+.discussion-headline {
+  font-family: var(--font-sans); font-size: .9rem; font-weight: 600;
+  color: var(--fg); margin: 0 0 .5rem;
+}
+.discussion-body {
+  font-family: var(--font-sans); font-size: .9rem; color: var(--fg);
+  line-height: 1.6; margin: 0 0 .6rem;
+}
+.discussion-footer {
+  font-family: var(--font-sans); font-size: .75rem; color: var(--fg-muted);
+}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>C3 — Forecast Page mockup v5</h1>
+  <p>v5: Combined hi/lo on one line ("74°/58°"), icon gap from day name, combined dual trend lines with generous vertical space (45px), meaningful temp variation data.</p>
+</div>
+
+<div class="frame-scroll">
+  <div class="frame--4col">
+    <div class="grid-4col">
+
+      <!-- ── PAGE HEADER CARD (4×1) ────────────────────────────────────── -->
+      <div class="page-header-card col-span-4">
+        <h1 class="phc-title">Forecast</h1>
+        <span class="phc-info">Updated 3 hours ago · Open-Meteo</span>
+      </div>
+
+      <!-- ── SURFACE B: HOURLY CARD (4×auto, 24 hours, always-visible scrollbar) ─── -->
+      <div class="card col-span-4" id="hourly-card">
+        <div class="card-title">
+          <span class="title-text">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Hourly Forecast
+          </span>
+          <span class="title-tabs">
+            <button class="tab-pill tab-pill--active">Today</button>
+            <button class="tab-pill tab-pill--inactive">Tomorrow</button>
+          </span>
+        </div>
+        <div class="hourly-scroller" id="hourly-scroller-b">
+          <!-- 24 hourly columns injected by buildHourlyB() -->
+        </div>
+      </div><!-- /hourly-card -->
+
+
+      <!-- ── SURFACE C: 7-DAY CARD (4×auto, full-width columns, cohesive detail) ── -->
+      <!-- overflow:visible so the detail panel bg can reach card bottom edge -->
+      <div class="card col-span-4" style="overflow:visible; padding-bottom:0;">
+        <div class="card-title">
+          <span class="title-text">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            7-Day Forecast
+          </span>
+        </div>
+        <div class="daily-cols-wrap" id="daily-cols-c">
+          <!-- 7-day columns + detail panel injected by buildDailyC() -->
+        </div>
+      </div><!-- /daily-card -->
+
+
+      <!-- ── SURFACE D: DISCUSSION CARD (4×auto) ────────────────────────── -->
+      <div class="card col-span-4">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>
+          Forecast Discussion
+        </div>
+        <p class="discussion-headline">Area Forecast Discussion</p>
+        <p class="discussion-body">
+          A strong high pressure system dominating the region through Thursday will keep skies mostly clear and temperatures well above seasonal norms. An approaching frontal boundary from the west will introduce increasing cloud cover Friday afternoon, with scattered showers likely by Friday evening into Saturday. Models show good agreement on timing with the 500mb trough passage expected Saturday morning.
+        </p>
+        <p class="discussion-body">
+          Temperatures will moderate behind the front with highs returning to near-seasonal values by Sunday. Another brief dry period expected early next week before the next disturbance tracks through by mid-week.
+        </p>
+        <div class="discussion-footer">Issued 2:30 PM EDT · NWS Boston MA</div>
+      </div><!-- /discussion-card -->
+
+    </div><!-- /grid-4col -->
+  </div><!-- /frame--4col -->
+</div><!-- /frame-scroll -->
+
+<script>
+(function () {
+
+  /* ── DATA ──────────────────────────────────────────────────────────────── */
+  var hourlyB = [
+    { time: '1 PM',  temp: 71, precip: 0,  wind: 6,  bear: 225, cond: 'sun'   },
+    { time: '2 PM',  temp: 72, precip: 5,  wind: 8,  bear: 210, cond: 'sun'   },
+    { time: '3 PM',  temp: 74, precip: 15, wind: 10, bear: 200, cond: 'part'  },
+    { time: '4 PM',  temp: 73, precip: 20, wind: 11, bear: 180, cond: 'part'  },
+    { time: '5 PM',  temp: 71, precip: 25, wind: 12, bear: 170, cond: 'cloud' },
+    { time: '6 PM',  temp: 68, precip: 30, wind: 9,  bear: 160, cond: 'cloud' },
+    { time: '7 PM',  temp: 65, precip: 20, wind: 7,  bear: 150, cond: 'part'  },
+    { time: '8 PM',  temp: 62, precip: 10, wind: 6,  bear: 140, cond: 'part'  },
+    { time: '9 PM',  temp: 60, precip: 5,  wind: 5,  bear: 130, cond: 'moon'  },
+    { time: '10 PM', temp: 58, precip: 0,  wind: 4,  bear: 120, cond: 'moon'  },
+    { time: '11 PM', temp: 56, precip: 0,  wind: 4,  bear: 110, cond: 'moon'  },
+    { time: '12 AM', temp: 55, precip: 0,  wind: 3,  bear: 100, cond: 'moon'  },
+    { time: '1 AM',  temp: 54, precip: 0,  wind: 3,  bear: 100, cond: 'moon'  },
+    { time: '2 AM',  temp: 53, precip: 0,  wind: 3,  bear: 95,  cond: 'moon'  },
+    { time: '3 AM',  temp: 52, precip: 5,  wind: 4,  bear: 90,  cond: 'moon'  },
+    { time: '4 AM',  temp: 51, precip: 5,  wind: 4,  bear: 90,  cond: 'moon'  },
+    { time: '5 AM',  temp: 52, precip: 10, wind: 5,  bear: 100, cond: 'moon'  },
+    { time: '6 AM',  temp: 54, precip: 10, wind: 5,  bear: 110, cond: 'part'  },
+    { time: '7 AM',  temp: 57, precip: 5,  wind: 6,  bear: 130, cond: 'part'  },
+    { time: '8 AM',  temp: 60, precip: 5,  wind: 7,  bear: 150, cond: 'part'  },
+    { time: '9 AM',  temp: 63, precip: 10, wind: 8,  bear: 160, cond: 'part'  },
+    { time: '10 AM', temp: 66, precip: 10, wind: 9,  bear: 175, cond: 'sun'   },
+    { time: '11 AM', temp: 68, precip: 5,  wind: 10, bear: 190, cond: 'sun'   },
+    { time: '12 PM', temp: 70, precip: 0,  wind: 11, bear: 200, cond: 'sun'   },
+  ];
+
+  var dailyC = [
+    { day: 'Today',    date: 'Jun 1', hi: 78, lo: 62, precip: 20, wind: 12, bear: 225, cond: 'part',  expanded: false,
+      gust: '18 mph', sunrise: '5:47 AM', sunset: '8:12 PM', narrative: null },
+    { day: 'Thursday', date: 'Jun 2', hi: 75, lo: 58, precip: 5,  wind: 8,  bear: 180, cond: 'sun',   expanded: false,
+      gust: '12 mph', sunrise: '5:46 AM', sunset: '8:13 PM', narrative: null },
+    { day: 'Friday',   date: 'Jun 3', hi: 68, lo: 52, precip: 40, wind: 14, bear: 200, cond: 'cloud', expanded: false,
+      gust: '20 mph', sunrise: '5:46 AM', sunset: '8:14 PM', narrative: null },
+    { day: 'Saturday', date: 'Jun 4', hi: 72, lo: 55, precip: 15, wind: 10, bear: 135, cond: 'part',  expanded: true,
+      gust: '16 mph', sunrise: '5:45 AM', sunset: '8:15 PM',
+      narrative: 'Partly cloudy with a chance of afternoon showers developing ahead of an approaching frontal boundary. Winds becoming gusty by evening.' },
+    { day: 'Sunday',   date: 'Jun 5', hi: 80, lo: 64, precip: 0,  wind: 7,  bear: 90,  cond: 'sun',   expanded: false,
+      gust: '10 mph', sunrise: '5:45 AM', sunset: '8:16 PM', narrative: null },
+    { day: 'Monday',   date: 'Jun 6', hi: 82, lo: 66, precip: 5,  wind: 9,  bear: 110, cond: 'sun',   expanded: false,
+      gust: '13 mph', sunrise: '5:44 AM', sunset: '8:17 PM', narrative: null },
+    { day: 'Tuesday',  date: 'Jun 7', hi: 76, lo: 60, precip: 20, wind: 11, bear: 160, cond: 'part',  expanded: false,
+      gust: '15 mph', sunrise: '5:44 AM', sunset: '8:18 PM', narrative: null },
+  ];
+
+  /* ── ICON HELPERS ──────────────────────────────────────────────────────── */
+  function sunSVG(sz) {
+    var c = sz/2, ir = sz*0.34, or = sz*0.44, ray = sz*0.48;
+    var s = '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'" aria-hidden="true">'
+          + '<circle cx="'+c+'" cy="'+c+'" r="'+ir+'" fill="#f59e0b"/>';
+    for (var i=0; i<8; i++) {
+      var a = i*45*Math.PI/180;
+      s += '<line x1="'+(c+or*Math.cos(a))+'" y1="'+(c+or*Math.sin(a))
+          +'" x2="'+(c+ray*Math.cos(a))+'" y2="'+(c+ray*Math.sin(a))
+          +'" stroke="#f59e0b" stroke-width="'+(sz*0.07)+'" stroke-linecap="round"/>';
+    }
+    return s + '</svg>';
+  }
+  function partlySVG(sz) {
+    return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" aria-hidden="true">'
+      +'<circle cx="10" cy="9" r="3.5" fill="#f59e0b"/>'
+      +'<line x1="10" y1="4" x2="10" y2="2.5" stroke="#f59e0b" stroke-width="1.2" stroke-linecap="round"/>'
+      +'<line x1="14.2" y1="5.2" x2="15.2" y2="4.2" stroke="#f59e0b" stroke-width="1.2" stroke-linecap="round"/>'
+      +'<line x1="15.5" y1="9" x2="17" y2="9" stroke="#f59e0b" stroke-width="1.2" stroke-linecap="round"/>'
+      +'<path d="M7.5 17a4 4 0 0 1 0-8 4 4 0 0 1 3.8 2.8A3 3 0 1 1 14.5 17z" fill="#94a3b8"/>'
+      +'</svg>';
+  }
+  function cloudSVG(sz) {
+    return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" aria-hidden="true">'
+      +'<path d="M6 18a4.5 4.5 0 0 1 0-9 4.5 4.5 0 0 1 4.4 3.5A3.5 3.5 0 1 1 17 18z" fill="#94a3b8"/>'
+      +'</svg>';
+  }
+  function moonSVG(sz) {
+    return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" aria-hidden="true">'
+      +'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="#dde2ef" stroke="#adb5c9" stroke-width="0.5"/>'
+      +'</svg>';
+  }
+  function icon(cond, sz) {
+    if (cond==='sun')   return sunSVG(sz);
+    if (cond==='part')  return partlySVG(sz);
+    if (cond==='cloud') return cloudSVG(sz);
+    if (cond==='moon')  return moonSVG(sz);
+    return sunSVG(sz);
+  }
+  function dropSVG(sz) {
+    sz = sz || 9;
+    return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C8 8 5 13 5 16.5a7 7 0 0 0 14 0C19 13 16 8 12 2z"/></svg>';
+  }
+
+  /* ── APPROVED WIND SYMBOL (exact copy from C3-wind-symbol.html) ────────── */
+  /*
+    Parameters:
+      deg    — wind direction in degrees (0=N tail-up, 90=E, 180=S, 270=W)
+      speed  — wind speed string displayed in the circle
+      r      — circle radius in px
+    Returns: SVG string (inline)
+  */
+  function makeWindSymbol(deg, speed, r) {
+    var pad  = r * 1.4;
+    var cx   = r + pad;
+    var cy   = r + pad;
+
+    var tailExt   = r * 0.65;
+    var tailBHalf = r * 0.42;
+
+    var gap  = r * 0.1;
+    var tip  = cx+','+(cy - r - gap - tailExt);
+    var bL   = (cx - tailBHalf)+','+(cy - r - gap);
+    var bR   = (cx + tailBHalf)+','+(cy - r - gap);
+
+    var svgW = cx * 2;
+    var svgH = cy * 2;
+
+    var fontSize = r * 1.4;
+
+    return '<svg width="'+svgW+'" height="'+svgH+'"'
+      +' viewBox="0 0 '+svgW+' '+svgH+'"'
+      +' xmlns="http://www.w3.org/2000/svg"'
+      +' overflow="visible">'
+      /* Tail group: rotated deg° around the circle centre */
+      +'<g transform="rotate('+deg+', '+cx+', '+cy+')">'
+        +'<polygon points="'+tip+' '+bL+' '+bR+'" fill="#94a3b8" stroke="#6b7280" stroke-width="0.5" stroke-linejoin="round"/>'
+      +'</g>'
+      /* Circle body (on top of tail) */
+      +'<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="#cbd5e1" stroke="#94a3b8" stroke-width="0.8"/>'
+      /* Speed number — NOT in the rotated group, always upright */
+      +'<text x="'+cx+'" y="'+cy+'"'
+        +' text-anchor="middle"'
+        +' dominant-baseline="central"'
+        +' font-family="system-ui, -apple-system, sans-serif"'
+        +' font-weight="700"'
+        +' font-size="'+fontSize+'"'
+        +' fill="#1a1a1a">'+speed+'</text>'
+      +'</svg>';
+  }
+
+  /* ── BUILD SURFACE B — HOURLY (24h, visible scrollbar) ─────────────────── */
+  function buildHourlyB() {
+    var scroller = document.getElementById('hourly-scroller-b');
+    if (!scroller) return;
+
+    var N   = hourlyB.length;  /* 24 */
+    var COL = 72;
+    var W   = N * COL;
+
+    var temps = hourlyB.map(function(h){ return h.temp; });
+    var minT  = Math.min.apply(null, temps);
+    var maxT  = Math.max.apply(null, temps);
+    var range = maxT - minT || 1;
+    var tH    = 14;
+    var pad   = 2;
+
+    var trendPts = hourlyB.map(function(h, i) {
+      var cx = i * COL + COL/2;
+      var cy = tH - pad - (h.temp - minT) / range * (tH - 2*pad);
+      return cx + ',' + cy;
+    }).join(' ');
+
+    var timeRow='', iconRow='', tempRow='', precipRow='', windRow='';
+    hourlyB.forEach(function(h) {
+      timeRow   += '<div class="ht-cell ht-cell--time"><span class="ht-time">'+h.time+'</span></div>';
+      iconRow   += '<div class="ht-cell ht-cell--icon">'+icon(h.cond, 28)+'</div>';
+      tempRow   += '<div class="ht-cell ht-cell--temp"><span class="ht-temp">'+h.temp+'°</span></div>';
+      if (h.precip > 0) {
+        precipRow += '<div class="ht-cell ht-cell--precip"><span class="ht-precip">'+dropSVG(9)+h.precip+'%</span></div>';
+      } else {
+        precipRow += '<div class="ht-cell ht-cell--precip"><span class="ht-precip" style="opacity:0">'+dropSVG(9)+'0%</span></div>';
+      }
+      /* Wind symbol r=12, bearing, speed */
+      windRow += '<div class="ht-cell ht-cell--wind">'+makeWindSymbol(h.bear, h.wind, 12)+'</div>';
+    });
+
+    var trendSVG = '<svg width="'+W+'px" height="'+tH+'px" viewBox="0 0 '+W+' '+tH
+      +'" style="display:block;overflow:visible;flex-shrink:0;" aria-hidden="true">'
+      +'<polyline points="'+trendPts+'" fill="none" stroke="oklch(0.48 0.22 260)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
+    hourlyB.forEach(function(h, i) {
+      var cx = i * COL + COL/2;
+      var cy = tH - pad - (h.temp - minT) / range * (tH - 2*pad);
+      trendSVG += '<circle cx="'+cx+'" cy="'+cy+'" r="2" fill="oklch(0.48 0.22 260)"/>';
+    });
+    trendSVG += '</svg>';
+
+    scroller.innerHTML =
+      '<div class="hourly-table">'
+      +'<div class="ht-row">'+timeRow+'</div>'
+      +'<div class="ht-row">'+iconRow+'</div>'
+      +'<div class="ht-row">'+tempRow+'</div>'
+      +'<div style="padding:1px 0">'+trendSVG+'</div>'
+      +'<div class="ht-row">'+precipRow+'</div>'
+      +'<div class="ht-row">'+windRow+'</div>'
+      +'</div>';
+  }
+
+  /* ── BUILD SURFACE C — 7-DAY COLUMNS + ONE COHESIVE seamless detail area ── */
+  function buildDailyC() {
+    var container = document.getElementById('daily-cols-c');
+    if (!container) return;
+
+    var N = dailyC.length;  /* 7 */
+    var expandIdx = 3;      /* Saturday */
+
+    var his = dailyC.map(function(d){ return d.hi; });
+    var los = dailyC.map(function(d){ return d.lo; });
+    /* Use combined range (min lo to max hi) so both lines share the same Y scale */
+    /* Each line uses its own min/max so it spans the full chart height —
+       this maximises visible variation (standard weather chart approach) */
+    var minH = Math.min.apply(null, his), maxH = Math.max.apply(null, his);
+    var minL = Math.min.apply(null, los), maxL = Math.max.apply(null, los);
+    var ranH = maxH - minH || 1;
+    var ranL = maxL - minL || 1;
+
+    /* Trend SVG: 700 units wide, 7 equal cols = 100 each */
+    var svgW = 700;
+    var colW = svgW / N;
+    /* Generous trend area: 45px height gives clear peaks/valleys */
+    var tH   = 45;
+    var tPad = 4;
+
+    /* Hi trend: top half of chart (0 to tH*0.52), Lo trend: bottom half (tH*0.48 to tH) */
+    /* This keeps them visually separated while both show full variation */
+    var hiTop = tPad, hiBot = tH * 0.52;
+    var loTop = tH * 0.50, loBot = tH - tPad;
+
+    var hiPts = dailyC.map(function(d, i) {
+      var cx = i * colW + colW/2;
+      var cy = hiBot - (d.hi - minH) / ranH * (hiBot - hiTop);
+      return cx + ',' + cy;
+    }).join(' ');
+    var loPts = dailyC.map(function(d, i) {
+      var cx = i * colW + colW/2;
+      var cy = loBot - (d.lo - minL) / ranL * (loBot - loTop);
+      return cx + ',' + cy;
+    }).join(' ');
+
+    /* Helper: build a dc-row */
+    function mkRow(rowClass, cellsFn) {
+      var s = '<div class="dc-row dc-row--'+rowClass+'">';
+      dailyC.forEach(function(d, i) {
+        var selClass = (i === expandIdx) ? ' dc-col-cell--selected' : '';
+        s += '<div class="dc-col-cell'+selClass+'">';
+        s += cellsFn(d, i);
+        s += '</div>';
+      });
+      s += '</div>';
+      return s;
+    }
+
+    /* Accent bar row — 3px, selected col shows accent color */
+    var accentBarRow = '<div class="dc-row dc-row--accent-bar">';
+    dailyC.forEach(function(d, i) {
+      var selClass = (i === expandIdx) ? ' dc-col-cell--selected' : '';
+      accentBarRow += '<div class="dc-col-cell'+selClass+'"></div>';
+    });
+    accentBarRow += '</div>';
+
+    /* Day name + date — padding-top provides 8px gap after accent bar */
+    var dayRow = mkRow('day', function(d, i) {
+      var sel = (i === expandIdx) ? ' dc-day-txt--selected' : '';
+      return '<div style="text-align:center;">'
+        +'<span class="dc-day-txt'+sel+'">'+d.day+'</span>'
+        +'<span class="dc-date-txt">'+d.date+'</span>'
+        +'</div>';
+    });
+
+    var iconRow = mkRow('icon', function(d) { return icon(d.cond, 28); });
+    /* Combined hi/lo: "78°/62°" — hi red, slash muted, lo blue */
+    var hiloRow = mkRow('hilo', function(d) {
+      return '<span class="dc-hilo-txt">'
+        +'<span class="dc-hi-part">'+d.hi+'°</span>'
+        +'<span class="dc-sep-part">/</span>'
+        +'<span class="dc-lo-part">'+d.lo+'°</span>'
+        +'</span>';
+    });
+    var precipRow = mkRow('precip', function(d) {
+      if (d.precip > 0) return '<span class="dc-precip-txt">'+dropSVG(8)+d.precip+'%</span>';
+      return '<span class="dc-precip-txt" style="opacity:0">'+dropSVG(8)+'0%</span>';
+    });
+    var windRow = mkRow('wind', function(d) {
+      /* Wind symbol r=12 */
+      return makeWindSymbol(d.bear, d.wind, 12);
+    });
+
+    /* Combined trend SVG — both hi (red) and lo (blue), 45px tall: 1.5px stroke, r=2 dots */
+    var trendSVG = '<svg width="100%" height="'+tH+'px" viewBox="0 0 '+svgW+' '+tH
+      +'" preserveAspectRatio="none" style="display:block;overflow:visible;flex-shrink:0;" aria-hidden="true">'
+      /* Hi trend line */
+      +'<polyline points="'+hiPts+'" fill="none" stroke="#c81e1e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      /* Lo trend line */
+      +'<polyline points="'+loPts+'" fill="none" stroke="#1d4ed8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
+    /* Hi dots — same split-axis formula as hiPts */
+    dailyC.forEach(function(d, i) {
+      var cx = i * colW + colW/2;
+      var cy = hiBot - (d.hi - minH) / ranH * (hiBot - hiTop);
+      trendSVG += '<circle cx="'+cx+'" cy="'+cy+'" r="2" fill="#c81e1e" stroke="rgba(255,255,255,0.7)" stroke-width="0.8"/>';
+    });
+    /* Lo dots — same split-axis formula as loPts */
+    dailyC.forEach(function(d, i) {
+      var cx = i * colW + colW/2;
+      var cy = loBot - (d.lo - minL) / ranL * (loBot - loTop);
+      trendSVG += '<circle cx="'+cx+'" cy="'+cy+'" r="2" fill="#1d4ed8" stroke="rgba(255,255,255,0.7)" stroke-width="0.8"/>';
+    });
+    trendSVG += '</svg>';
+
+    /* ONE COHESIVE detail panel — NO borders, NO dividers
+       Subtle bg tint (--detail-panel-bg) spans full card width
+       Content: selected day header + wind gust + sunrise/sunset + narrative,
+       all flowing naturally without section breaks */
+    var expandedDay = dailyC[expandIdx];
+    var detailPanel =
+      '<div class="dc-detail-panel">'
+      +'<div class="dc-detail-day-header">'+expandedDay.day+', '+expandedDay.date+'</div>'
+      +'<div class="dc-detail-content">'
+        +'<div class="dc-detail-item">'
+          +'<span class="dc-detail-label">Wind gust</span>'
+          +'<span class="dc-detail-value">'+expandedDay.gust+'</span>'
+        +'</div>'
+        +'<div class="dc-detail-item">'
+          +'<span class="dc-detail-label">Sunrise</span>'
+          +'<span class="dc-detail-value">'+expandedDay.sunrise+'</span>'
+        +'</div>'
+        +'<div class="dc-detail-item">'
+          +'<span class="dc-detail-label">Sunset</span>'
+          +'<span class="dc-detail-value">'+expandedDay.sunset+'</span>'
+        +'</div>';
+    if (expandedDay.narrative) {
+      detailPanel += '<p class="dc-narrative">'+expandedDay.narrative+'</p>';
+    }
+    detailPanel += '</div></div>';
+
+    container.innerHTML =
+      '<div class="dc-table">'
+      /* accent bar */
+      + accentBarRow
+      /* 1. Day name (with date) */
+      + dayRow
+      /* 2. Weather icon (padding-top gives gap from day name) */
+      + iconRow
+      /* 3. Combined hi/lo temp */
+      + hiloRow
+      /* 4. Combined trend lines — 45px generous area */
+      + '<div style="padding:4px 0 3px">'+trendSVG+'</div>'
+      /* 5. Precip */
+      + precipRow
+      /* 6. Wind symbol */
+      + windRow
+      + '</div>'
+      + detailPanel;
+  }
+
+  /* ── INIT ──────────────────────────────────────────────────────────────── */
+  buildHourlyB();
+  buildDailyC();
+
+})();
+</script>
+</body>
+</html>
