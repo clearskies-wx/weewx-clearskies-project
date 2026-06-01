@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>C3 — Forecast Page mockup v5</title>
+<title>C3 — Forecast Page mockup v6</title>
 <style>
 /* ── Locked fonts ─────────────────────────────────────────────────────────── */
 @font-face { font-family:'Manrope'; font-weight:400; font-style:normal; src:url('fonts/manrope-latin-400-normal.woff2') format('woff2'); }
@@ -47,8 +47,8 @@
   --temp-hi: #c81e1e;
   --temp-lo: #1d4ed8;
 
-  /* Detail panel: very subtle tint to visually separate from column area */
-  --detail-panel-bg: rgba(0,0,0,0.035);
+  /* Detail panel: same tint as selected column so they blend as one block */
+  --detail-panel-bg: rgba(80,100,255,0.08);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -71,7 +71,7 @@
     --tab-inactive-fg: #a1a1aa;
     --temp-hi: #f87171;
     --temp-lo: #93c5fd;
-    --detail-panel-bg: rgba(255,255,255,0.04);
+    --detail-panel-bg: rgba(130,150,255,0.10);
   }
 }
 
@@ -163,6 +163,8 @@ body {
   overflow-x: scroll;    /* always show scrollbar — signals more content */
   overflow-y: hidden; position: relative; flex: 1;
   scroll-snap-type: x mandatory;
+  padding-bottom: 8px;   /* space so scrollbar never overlaps wind symbols */
+  min-height: 180px;     /* ensure enough height: all rows + trend line + scrollbar */
 }
 /* Styled scrollbar — clearly visible */
 .hourly-scroller::-webkit-scrollbar { height: 7px; }
@@ -191,7 +193,7 @@ body {
 .ht-cell--icon   { height: 34px; }
 .ht-cell--temp   { height: 22px; }
 .ht-cell--precip { height: 18px; }
-.ht-cell--wind   { height: 30px; }  /* taller for wind symbol with tail */
+.ht-cell--wind   { height: 42px; }  /* taller for wind symbol r=10 with tail */
 
 .ht-time {
   font-family: var(--font-sans); font-size: .7rem; color: var(--fg-muted); white-space: nowrap;
@@ -217,12 +219,32 @@ body {
   flex: 1; display: flex; flex-direction: column; overflow: visible;
 }
 
+/* Wrapper for the dc-table + detail panel — needed for continuous column shade */
+.dc-table-wrap {
+  position: relative; width: 100%; overflow: visible;
+}
+
+/* Continuous selected-column background overlay — spans table + detail panel as one band */
+.dc-selected-col-bg {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: calc(3 / 7 * 100%);    /* Saturday = index 3 of 7 */
+  width: calc(1 / 7 * 100%);
+  background: rgba(80,100,255,0.08);  /* subtle accent blue tint ~8% */
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 0;
+}
+@media (prefers-color-scheme: dark) {
+  .dc-selected-col-bg { background: rgba(130,150,255,0.10); }
+}
+
 /* The 7-day column table — one col per day, transposed rows */
 .dc-table {
   display: flex; flex-direction: column; position: relative; width: 100%; overflow: visible;
 }
 
-.dc-row { display: flex; flex-direction: row; width: 100%; overflow: visible; }
+.dc-row { display: flex; flex-direction: row; width: 100%; overflow: visible; position: relative; z-index: 1; }
 
 /* ALL column cells use flex:1 — evenly fills full card width */
 .dc-col-cell {
@@ -231,12 +253,10 @@ body {
   padding: 0 .1rem;
 }
 
-/* Selected column — subtle highlight background */
+/* Selected column — DO NOT apply background per-cell; that causes breaks.
+   The continuous background is handled by the .dc-selected-col-bg positioned div. */
 .dc-col-cell--selected {
-  background: rgba(0,0,0,0.04);
-}
-@media (prefers-color-scheme: dark) {
-  .dc-col-cell--selected { background: rgba(255,255,255,0.06); }
+  /* no background — continuous shade applied as positioned overlay */
 }
 
 /* Row heights for full-page 7-day */
@@ -244,10 +264,10 @@ body {
 .dc-row--icon   .dc-col-cell { height: 40px; padding-top: 6px; }  /* 6px gap below day name */
 .dc-row--hilo   .dc-col-cell { height: 22px; }
 .dc-row--precip .dc-col-cell { height: 16px; }
-.dc-row--wind   .dc-col-cell { height: 60px; overflow: visible; }  /* tall enough for r=12 wind symbol + tail */
+.dc-row--wind   .dc-col-cell { height: 44px; overflow: visible; }  /* tall enough for r=10 wind symbol + tail */
 
 /* Accent bar row — thin 3px bar at top; selected col shows accent color */
-.dc-row--accent-bar { height: 3px; }
+.dc-row--accent-bar { height: 3px; position: relative; z-index: 1; }
 .dc-row--accent-bar .dc-col-cell {
   height: 3px; padding: 0; align-items: stretch;
 }
@@ -287,11 +307,20 @@ body {
 .dc-detail-panel {
   /* Extend to card edges by overcoming the 1rem card-padding on each side */
   width: calc(100% + 2rem);
-  margin: .5rem -1rem 0 -1rem;
-  background: var(--detail-panel-bg);
+  margin: 0 -1rem 0 -1rem;
+  background: linear-gradient(to right,
+    var(--detail-panel-bg) 0%,
+    var(--detail-panel-bg) calc(1rem + 3 / 7 * (100% - 2rem)),
+    transparent               calc(1rem + 3 / 7 * (100% - 2rem)),
+    transparent               calc(1rem + 4 / 7 * (100% - 2rem)),
+    var(--detail-panel-bg) calc(1rem + 4 / 7 * (100% - 2rem)),
+    var(--detail-panel-bg) 100%
+  );
   border-radius: 0 0 calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px);
   padding: .65rem 1rem .85rem;
+  padding-top: .5rem;
   flex-shrink: 0;
+  position: relative; z-index: 1;  /* render above the continuous column bg overlay */
 }
 .dc-detail-day-header {
   font-family: var(--font-sans); font-size: .82rem; font-weight: 600;
@@ -336,7 +365,7 @@ body {
 
 <div class="page-header">
   <h1>C3 — Forecast Page mockup v5</h1>
-  <p>v5: Combined hi/lo on one line ("74°/58°"), icon gap from day name, combined dual trend lines with generous vertical space (45px), meaningful temp variation data.</p>
+  <p>v6: Icons 24px, wind symbols r=10 everywhere, hourly card expanded height, trend line 40px, Saturday column one continuous background shade.</p>
 </div>
 
 <div class="frame-scroll">
@@ -555,8 +584,8 @@ body {
     var minT  = Math.min.apply(null, temps);
     var maxT  = Math.max.apply(null, temps);
     var range = maxT - minT || 1;
-    var tH    = 14;
-    var pad   = 2;
+    var tH    = 40;
+    var pad   = 4;
 
     var trendPts = hourlyB.map(function(h, i) {
       var cx = i * COL + COL/2;
@@ -567,15 +596,15 @@ body {
     var timeRow='', iconRow='', tempRow='', precipRow='', windRow='';
     hourlyB.forEach(function(h) {
       timeRow   += '<div class="ht-cell ht-cell--time"><span class="ht-time">'+h.time+'</span></div>';
-      iconRow   += '<div class="ht-cell ht-cell--icon">'+icon(h.cond, 28)+'</div>';
+      iconRow   += '<div class="ht-cell ht-cell--icon">'+icon(h.cond, 24)+'</div>';
       tempRow   += '<div class="ht-cell ht-cell--temp"><span class="ht-temp">'+h.temp+'°</span></div>';
       if (h.precip > 0) {
         precipRow += '<div class="ht-cell ht-cell--precip"><span class="ht-precip">'+dropSVG(9)+h.precip+'%</span></div>';
       } else {
         precipRow += '<div class="ht-cell ht-cell--precip"><span class="ht-precip" style="opacity:0">'+dropSVG(9)+'0%</span></div>';
       }
-      /* Wind symbol r=12, bearing, speed */
-      windRow += '<div class="ht-cell ht-cell--wind">'+makeWindSymbol(h.bear, h.wind, 12)+'</div>';
+      /* Wind symbol r=10, bearing, speed */
+      windRow += '<div class="ht-cell ht-cell--wind">'+makeWindSymbol(h.bear, h.wind, 10)+'</div>';
     });
 
     var trendSVG = '<svg width="'+W+'px" height="'+tH+'px" viewBox="0 0 '+W+' '+tH
@@ -670,7 +699,7 @@ body {
         +'</div>';
     });
 
-    var iconRow = mkRow('icon', function(d) { return icon(d.cond, 28); });
+    var iconRow = mkRow('icon', function(d) { return icon(d.cond, 24); });
     /* Combined hi/lo: "78°/62°" — hi red, slash muted, lo blue */
     var hiloRow = mkRow('hilo', function(d) {
       return '<span class="dc-hilo-txt">'
@@ -684,8 +713,8 @@ body {
       return '<span class="dc-precip-txt" style="opacity:0">'+dropSVG(8)+'0%</span>';
     });
     var windRow = mkRow('wind', function(d) {
-      /* Wind symbol r=12 */
-      return makeWindSymbol(d.bear, d.wind, 12);
+      /* Wind symbol r=10 — uniform size across all displays */
+      return makeWindSymbol(d.bear, d.wind, 10);
     });
 
     /* Combined trend SVG — both hi (red) and lo (blue), 45px tall: 1.5px stroke, r=2 dots */
@@ -736,7 +765,10 @@ body {
     detailPanel += '</div></div>';
 
     container.innerHTML =
-      '<div class="dc-table">'
+      '<div class="dc-table-wrap">'
+      /* Continuous selected column background — one unbroken band behind all rows + detail */
+      + '<div class="dc-selected-col-bg" aria-hidden="true"></div>'
+      + '<div class="dc-table">'
       /* accent bar */
       + accentBarRow
       /* 1. Day name (with date) */
@@ -746,13 +778,14 @@ body {
       /* 3. Combined hi/lo temp */
       + hiloRow
       /* 4. Combined trend lines — 45px generous area */
-      + '<div style="padding:4px 0 3px">'+trendSVG+'</div>'
+      + '<div style="padding:4px 0 3px; position:relative; z-index:1;">'+trendSVG+'</div>'
       /* 5. Precip */
       + precipRow
       /* 6. Wind symbol */
       + windRow
       + '</div>'
-      + detailPanel;
+      + detailPanel
+      + '</div>';
   }
 
   /* ── INIT ──────────────────────────────────────────────────────────────── */

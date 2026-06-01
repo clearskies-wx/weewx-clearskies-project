@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>C3 — Now-page Forecast Card mockup v5</title>
+<title>C3 — Now-page Forecast Card mockup v6</title>
 <style>
 /* ── Locked fonts ─────────────────────────────────────────────────────────── */
 @font-face { font-family:'Manrope'; font-weight:400; font-style:normal; src:url('fonts/manrope-latin-400-normal.woff2') format('woff2'); }
@@ -167,7 +167,7 @@ body {
 }
 
 .hourly-table {
-  display: flex; flex-direction: column; width: 100%;
+  display: flex; flex-direction: column; width: 100%; flex: 1; min-height: 0;
 }
 .hourly-row-time,
 .hourly-row-icon,
@@ -182,9 +182,9 @@ body {
   padding: 0 .05rem;
 }
 /* Row heights */
-.hourly-row-time  .h-cell { height: 14px; }
-.hourly-row-icon  .h-cell { height: 20px; }
-.hourly-row-temp  .h-cell { height: 16px; }
+.hourly-row-time  .h-cell { height: 13px; }
+.hourly-row-icon  .h-cell { height: 26px; }
+.hourly-row-temp  .h-cell { height: 15px; }
 .hourly-row-precip .h-cell { height: 13px; }
 .hourly-row-wind   .h-cell { height: 26px; }  /* taller to fit wind symbol with tail */
 
@@ -225,10 +225,10 @@ body {
 
 /* Row heights for 7-day column strip in compact card */
 .dc-row--day    .dc-cell { height: 16px; }
-.dc-row--icon   .dc-cell { height: 28px; padding-top: 5px; }  /* 5px gap below day name */
+.dc-row--icon   .dc-cell { height: 30px; padding-top: 5px; }  /* 5px gap below day name */
 .dc-row--hilo   .dc-cell { height: 16px; }
-.dc-row--precip .dc-cell { height: 12px; }
-.dc-row--wind   .dc-cell { height: 44px; overflow: visible; }  /* tall enough for r=8 wind symbol + tail */
+.dc-row--precip .dc-cell { height: 12px; margin-top: 4px; }
+.dc-row--wind   .dc-cell { height: 44px; overflow: visible; }  /* tall enough for r=10 wind symbol + tail */
 
 .dc-day-txt {
   font-family: var(--font-sans); font-size: .85rem; font-weight: 600;
@@ -263,7 +263,7 @@ body {
 
 <div class="page-header">
   <h1>C3 — Now-page Forecast Card mockup v5</h1>
-  <p>v5: Combined hi/lo on one line ("74°/58°"), icon gap from day name, combined dual trend lines with generous vertical space (35px), meaningful temp variation data.</p>
+  <p>v6: Icons 24px, wind symbols r=10 on all tabs, precip/wind pushed down with more space above trend line.</p>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════
@@ -520,8 +520,8 @@ body {
     var minT  = Math.min.apply(null, temps);
     var maxT  = Math.max.apply(null, temps);
     var range = maxT - minT || 1;
-    var tH    = 10;
-    var pad   = 1.5;
+    var tH    = 22;
+    var pad   = 2;
 
     var trendPts = threeHour.map(function(h, i) {
       var cx = i * colW + colW/2;
@@ -532,7 +532,7 @@ body {
     var timeRow = '', iconRow = '', tempRow = '', precipRow = '', windRow = '';
     threeHour.forEach(function(h) {
       timeRow   += '<div class="h-cell"><span class="h-time-txt">'+h.time+'</span></div>';
-      iconRow   += '<div class="h-cell">'+icon(h.cond, 18)+'</div>';
+      iconRow   += '<div class="h-cell">'+icon(h.cond, 24)+'</div>';
       tempRow   += '<div class="h-cell"><span class="h-temp-txt">'+h.temp+'°</span></div>';
       if (h.precip > 0) {
         precipRow += '<div class="h-cell"><span class="h-precip-txt">'+dropSVG()+h.precip+'%</span></div>';
@@ -558,7 +558,7 @@ body {
       +'<div class="hourly-row-time">'+timeRow+'</div>'
       +'<div class="hourly-row-icon">'+iconRow+'</div>'
       +'<div class="hourly-row-temp">'+tempRow+'</div>'
-      +'<div style="padding:1px 0">'+trendSVG+'</div>'
+      +'<div style="padding:3px 0 2px; flex:1; display:flex; align-items:center;">'+trendSVG+'</div>'
       +'<div class="hourly-row-precip">'+precipRow+'</div>'
       +'<div class="hourly-row-wind">'+windRow+'</div>'
       +'</div>';
@@ -582,14 +582,14 @@ body {
     var ranL = maxL - minL || 1;
 
     /* SVG uses 700 units wide, each of 7 cols = 100 units
-       30px height: hi occupies top half, lo occupies bottom half — both show full variation */
-    var tH   = 30;
+       35px height: hi occupies top half, lo occupies bottom half — both show full variation */
+    var tH   = 35;
     var svgW = 700;
     var colW = svgW / N;
 
-    /* Hi: mapped to top half (2px..15px); Lo: mapped to bottom half (15px..28px) */
-    var hiTop = 2,  hiBot = 15;
-    var loTop = 15, loBot = 28;
+    /* Hi: mapped to top half (2px..17px); Lo: mapped to bottom half (18px..33px) */
+    var hiTop = 2,  hiBot = 17;
+    var loTop = 18, loBot = 33;
 
     var hiPts = daily.map(function(d, i) {
       var cx = i * colW + colW/2;
@@ -608,7 +608,7 @@ body {
 
     daily.forEach(function(d) {
       dayRow  += '<div class="dc-cell"><span class="dc-day-txt">'+d.day+'</span></div>';
-      iconRow += '<div class="dc-cell">'+icon(d.cond, 18)+'</div>';
+      iconRow += '<div class="dc-cell">'+icon(d.cond, 24)+'</div>';
       /* Combined hi/lo: "78°/62°" — hi red, slash muted, lo blue */
       hiloRow += '<div class="dc-cell"><span class="dc-hilo-txt">'
         +'<span class="dc-hi-part">'+d.hi+'°</span>'
@@ -620,8 +620,8 @@ body {
       } else {
         precipRow += '<div class="dc-cell"><span class="dc-precip-txt" style="opacity:0">'+dropSVG()+'0%</span></div>';
       }
-      /* Wind symbol r=8 (compact 7-day), bearing, speed */
-      windRow += '<div class="dc-cell">'+makeWindSymbol(d.bear, d.wind, 8)+'</div>';
+      /* Wind symbol r=10, bearing, speed */
+      windRow += '<div class="dc-cell">'+makeWindSymbol(d.bear, d.wind, 10)+'</div>';
     });
 
     /* Combined trend SVG — both hi (red) and lo (blue) lines, full-width, 30px tall, split-axis */
@@ -654,7 +654,7 @@ body {
       /* 3. Combined hi/lo temp */
       +'<div class="dc-row dc-row--hilo">'+hiloRow+'</div>'
       /* 4. Trend lines area — generous 35px */
-      +'<div style="padding:3px 0 2px">'+trendSVG+'</div>'
+      +'<div style="padding:3px 0 2px; flex:1; display:flex; align-items:center;">'+trendSVG+'</div>'
       /* 5. Precip */
       +'<div class="dc-row dc-row--precip">'+precipRow+'</div>'
       /* 6. Wind symbol */

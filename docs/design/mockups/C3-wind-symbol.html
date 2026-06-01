@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>C3 — Wind Symbol</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 2rem;
+      background: linear-gradient(135deg, #f5e6d3 0%, #e8d5c0 100%);
+      font-family: system-ui, -apple-system, sans-serif;
+      color: #1a1a1a;
+    }
+
+    h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      margin: 0 0 0.25rem;
+    }
+    p.sub {
+      font-size: 0.8rem;
+      color: rgba(0,0,0,0.5);
+      margin: 0 0 2rem;
+    }
+
+    .size-section {
+      margin-bottom: 2.5rem;
+    }
+    .size-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(0,0,0,0.45);
+      margin-bottom: 1.25rem;
+    }
+
+    .row {
+      display: flex;
+      gap: 2rem;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+
+    .symbol-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .dir-label {
+      font-size: 0.7rem;
+      color: rgba(0,0,0,0.5);
+      letter-spacing: 0.03em;
+      text-align: center;
+    }
+
+    /*
+      Wind symbol geometry
+      ─────────────────────────────────────────────────────────
+      • Circle body: white fill, centred at (cx, cy)
+      • Triangle tail: white fill, tip points outward from the
+        circle in the wind direction; base sits flush against
+        the circle edge
+      • Speed number: dark text, centred in the circle, NOT
+        rotated — always upright
+
+      Convention: deg=0 → wind blows toward NORTH (pointer up).
+      deg increases clockwise (90=E, 180=S, 270=W).
+
+      We build the tail pointing straight UP (toward 0°/North)
+      in SVG-space, then rotate the tail group around the circle
+      centre by `deg` degrees. The text element is NOT inside
+      the rotated group, so it stays upright.
+    */
+  </style>
+</head>
+<body>
+
+<h1>C3 — Wind Direction Symbol</h1>
+<p class="sub">Reproduction of BBC Weather–style wind speed circles with directional pointer tail</p>
+
+<!-- ─────────────────────────────────────────────────────── -->
+<!-- "Now card size" — 24px circle diameter (r=12)          -->
+<!-- ─────────────────────────────────────────────────────── -->
+<div class="size-section">
+  <div class="size-label">Now-card size — 20 px diameter</div>
+
+  <!-- Row 1: Cardinal -->
+  <div class="row" id="r1-small"></div>
+  <!-- Row 2: Ordinal -->
+  <div class="row" id="r2-small"></div>
+  <!-- Row 3: Secondary intercardinal -->
+  <div class="row" id="r3-small"></div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────── -->
+<!-- "Page card size" — 30px circle diameter (r=15)         -->
+<!-- ─────────────────────────────────────────────────────── -->
+<div class="size-section">
+  <div class="size-label">Page-card size — 24 px diameter</div>
+
+  <div class="row" id="r1-large"></div>
+  <div class="row" id="r2-large"></div>
+  <div class="row" id="r3-large"></div>
+</div>
+
+<script>
+/*
+  Wind symbol SVG generator
+  ─────────────────────────
+  Parameters:
+    deg    — wind direction in degrees (0=N, 90=E, 180=S, 270=W)
+    speed  — wind speed string displayed in the circle
+    r      — circle radius in px
+    label  — direction name shown below
+*/
+function makeWindSymbol(deg, speed, r, label) {
+  // Layout constants scaled to radius
+  // Add extra padding on all sides so the tail never clips at any rotation
+  const pad  = r * 1.4;
+  const cx   = r + pad;           // horizontal centre of circle
+  const cy   = r + pad;           // vertical centre of circle
+
+  // ── Tail geometry ──────────────────────────────────────────────────────────
+  // In img-09 the tail is a short, wide isoceles triangle:
+  //   • tip extends ~60% of r beyond the circle edge  (compact, not elongated)
+  //   • base width is about 50% of the circle diameter (fairly wide)
+  //   • base sits exactly on the circle edge (r from centre), not inside it
+  //
+  // Pointing straight UP (North) in SVG space:
+  //   tip   = (cx, cy - r - tailExt)      ← tip of pointer above circle
+  //   bL    = (cx - bHalf, cy - r)        ← left  base at circle top edge
+  //   bR    = (cx + bHalf, cy - r)        ← right base at circle top edge
+  const tailExt   = r * 0.65;   // extension beyond the circle edge
+  const tailBHalf = r * 0.42;   // half-width of the triangle base
+
+  const gap  = r * 0.1;
+  const tip  = `${cx},${cy - r - gap - tailExt}`;
+  const bL   = `${cx - tailBHalf},${cy - r - gap}`;
+  const bR   = `${cx + tailBHalf},${cy - r - gap}`;
+
+  // SVG canvas: centred on (cx,cy) with pad on all sides
+  const svgW = cx * 2;
+  const svgH = cy * 2;
+
+  // Font size for the speed number inside the circle
+  const fontSize = r * 1.4;
+
+  const svg = `
+<svg width="${svgW}" height="${svgH}"
+     viewBox="0 0 ${svgW} ${svgH}"
+     xmlns="http://www.w3.org/2000/svg"
+     overflow="visible">
+
+  <!-- Tail group: rotated deg° around the circle centre -->
+  <!-- transform-origin is set to cx,cy in SVG user space -->
+  <g transform="rotate(${deg}, ${cx}, ${cy})">
+    <polygon points="${tip} ${bL} ${bR}"
+             fill="#cbd5e1"/>
+  </g>
+
+  <!-- Circle body (on top of tail so it masks the base join) -->
+  <circle cx="${cx}" cy="${cy}" r="${r}" fill="#cbd5e1"/>
+
+  <!-- Speed number — NOT in the rotated group, always upright -->
+  <text x="${cx}" y="${cy}"
+        text-anchor="middle"
+        dominant-baseline="central"
+        font-family="system-ui, -apple-system, sans-serif"
+        font-weight="700"
+        font-size="${fontSize}"
+        fill="#1a1a1a">${speed}</text>
+</svg>`;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'symbol-wrap';
+  wrap.innerHTML = svg + `<span class="dir-label">${label}</span>`;
+  return wrap;
+}
+
+/*
+  Symbol list: [degrees, speed, label]
+  Degree convention: 0=N pointer, 90=E pointer, 180=S pointer, 270=W pointer
+*/
+const row1 = [
+  [0,   "8",  "N"],
+  [90,  "12", "E"],
+  [180, "5",  "S"],
+  [270, "19", "W"],
+];
+const row2 = [
+  [45,  "15", "NE"],
+  [135, "22", "SE"],
+  [225, "7",  "SW"],
+  [315, "11", "NW"],
+];
+const row3 = [
+  [22.5,  "9",  "NNE"],
+  [67.5,  "14", "ENE"],
+  [202.5, "6",  "SSW"],
+  [292.5, "18", "WNW"],
+];
+
+const rows = [row1, row2, row3];
+const ids  = ["r1","r2","r3"];
+
+// Render both sizes
+[
+  { suffix: "small", r: 10 },
+  { suffix: "large", r: 12 },
+].forEach(({ suffix, r }) => {
+  rows.forEach((rowData, i) => {
+    const container = document.getElementById(`${ids[i]}-${suffix}`);
+    rowData.forEach(([deg, speed, label]) => {
+      container.appendChild(makeWindSymbol(deg, speed, r, label));
+    });
+  });
+});
+</script>
+</body>
+</html>
