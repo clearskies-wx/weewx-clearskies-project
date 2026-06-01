@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>C2 — Current Wind card</title>
+  <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+  <style>
+/* ── Locked fonts ─────────────────────────────────────────────────────────── */
+@font-face { font-family:'Manrope'; font-weight:400; font-style:normal; src:url('fonts/manrope-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family:'Manrope'; font-weight:600; font-style:normal; src:url('fonts/manrope-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family:'Manrope'; font-weight:700; font-style:normal; src:url('fonts/manrope-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family:'Outfit';  font-weight:400; font-style:normal; src:url('fonts/outfit-latin-400-normal.woff2')  format('woff2'); }
+@font-face { font-family:'Outfit';  font-weight:600; font-style:normal; src:url('fonts/outfit-latin-600-normal.woff2')  format('woff2'); }
+
+/* ── Tokens — light theme ─────────────────────────────────────────────────── */
+:root {
+  color-scheme: light dark;
+  --font-sans: 'Manrope', system-ui, sans-serif;
+  --font-display: 'Outfit', system-ui, sans-serif;
+  --font-semibold: 600;
+  --font-normal: 400;
+  --text-card-title: 0.82rem;
+  --text-label: 0.75rem;
+
+  --gap-grid: 1rem;
+  --container-max: 80rem;
+  --card-half-row: 5.5rem;
+  --card-radius: 0.875rem;
+  --card-pad: 1rem;
+
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(0, 0, 0, 0.10);
+  --glass-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08);
+  --fg: #18181b;
+  --fg-muted: #71717a;
+  --fg-dim: #a1a1aa;
+  --title-rule: rgba(0, 0, 0, 0.12);
+  --page-bg: #f4f4f5;
+
+  --tick: rgba(63,63,70,0.42);
+  --tick-major: rgba(39,39,42,0.72);
+  --accent: #b45309;   /* amber-700 — ≥3:1 contrast on light glass */
+}
+
+/* ── Tokens — dark theme ──────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glass-bg: rgba(30,35,55,0.55);
+    --glass-border: rgba(255,255,255,0.10);
+    --glass-shadow: 0 4px 28px rgba(0,0,0,0.45), 0 1px 4px rgba(0,0,0,0.30);
+    --fg: #e7e7ea;
+    --fg-muted: #a1a1aa;
+    --fg-dim: #71717a;
+    --title-rule: rgba(255,255,255,0.12);
+    --page-bg: #0d0f18;
+    --tick: rgba(228,228,231,0.38);
+    --tick-major: rgba(244,244,245,0.80);
+    --accent: #fbbf24;   /* amber-400 — bright on dark */
+  }
+}
+
+/* ── Reset + body ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 3rem 1.5rem;
+  background: var(--page-bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  line-height: 1.4;
+}
+
+/* ── Grid — half-row tracks (A4 page anatomy convention) ─────────────────── */
+.grid-4col {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--gap-grid);
+  grid-auto-rows: var(--card-half-row);   /* 5.5rem per track */
+  max-width: var(--container-max);
+  margin: 0 auto;
+}
+.col-span-2 { grid-column: span 2; }
+.row-span-2 { grid-row: span 4; }   /* 4 half-row tracks ≈ 25rem including gaps */
+
+/* ── Glass card ───────────────────────────────────────────────────────────── */
+.card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--card-radius);
+  padding: var(--card-pad);
+  backdrop-filter: blur(8px) saturate(1.1);
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
+  box-shadow: var(--glass-shadow);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Card title ───────────────────────────────────────────────────────────── */
+.card-title {
+  font-family: var(--font-sans);
+  font-size: var(--text-card-title);   /* 0.82rem */
+  font-weight: var(--font-semibold);   /* 600 — semibold, NOT bold */
+  color: var(--fg);
+  margin: 0 0 .5rem;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid var(--title-rule);
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  flex-shrink: 0;
+}
+.card-title iconify-icon {
+  font-size: 1rem;
+  opacity: .75;
+  flex-shrink: 0;
+}
+
+/* ── Dial layout — prevents clipping ─────────────────────────────────────── */
+/*
+  The card is ~25rem tall (4 × 5.5rem + 3 × 1rem gaps).
+  Minus 1rem top pad + 1rem bottom pad = 23rem inner.
+  Minus ~1.5rem title+rule+margin = ~21.5rem for .dial-wrap.
+  max-height: 18rem keeps a comfortable margin.
+  min-height: 0 is CRITICAL — without it a flex item refuses to shrink
+  below its content size, causing the SVG to overflow and be clipped.
+*/
+.dial-wrap {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;   /* CRITICAL: allows flex item to shrink below content size */
+}
+
+.dial {
+  /* Size by width (well-defined in a grid column); aspect-ratio makes it square.
+     max-height caps it so it never overflows the card vertically. */
+  width: 100%;
+  max-width: 18rem;
+  max-height: 18rem;
+  aspect-ratio: 1 / 1;
+  display: block;
+}
+
+/* ── Center overlay — data stack inside the dial ─────────────────────────── */
+.center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: .1rem;
+  pointer-events: none;
+}
+
+.bearing {
+  font-family: var(--font-sans);
+  font-size: .95rem;
+  color: var(--fg-muted);
+  letter-spacing: .04em;
+}
+.bearing .card-dir {
+  color: var(--fg);
+  font-weight: 600;
+  margin-left: .2rem;
+}
+
+.speed {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: .3rem;
+  line-height: 1;
+  margin: .15rem 0 .3rem;
+}
+.speed .num {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 3rem;
+  color: var(--fg);
+  letter-spacing: -.01em;
+}
+.speed .unit {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.05rem;
+  color: var(--fg-muted);
+}
+
+.readouts {
+  display: flex;
+  flex-direction: column;
+  gap: .05rem;
+  margin-top: .15rem;
+}
+.readouts .row {
+  font-family: var(--font-sans);
+  font-size: .8rem;
+  color: var(--fg-muted);
+}
+.readouts .row .val {
+  color: var(--fg);
+  font-weight: 600;
+  margin-left: .3rem;
+}
+
+/* ── Screen-reader-only utility ───────────────────────────────────────────── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+  </style>
+</head>
+<body>
+
+<main>
+<h1 class="sr-only">Current Wind — card mockup</h1>
+<div class="grid-4col">
+  <div class="card col-span-2 row-span-2">
+    <div class="card-title">
+      <iconify-icon icon="ph:wind" aria-hidden="true"></iconify-icon>
+      Current Wind
+    </div>
+
+    <div class="dial-wrap">
+      <svg class="dial" viewBox="0 0 400 400" role="img">
+        <title>Wind compass showing 12 mph from NW at 305 degrees</title>
+        <g id="ticks"></g>
+        <!-- Cardinal labels — fills updated by JS to respect dark-mode token -->
+        <text x="200" y="46"  text-anchor="middle" dominant-baseline="middle"
+              font-family="'Manrope', sans-serif" font-size="15" font-weight="600"
+              fill="#71717a" id="lbl-n">N</text>
+        <text x="358" y="206" text-anchor="middle" dominant-baseline="middle"
+              font-family="'Manrope', sans-serif" font-size="15" font-weight="600"
+              fill="#71717a" id="lbl-e">E</text>
+        <text x="200" y="368" text-anchor="middle" dominant-baseline="middle"
+              font-family="'Manrope', sans-serif" font-size="15" font-weight="600"
+              fill="#71717a" id="lbl-s">S</text>
+        <text x="42"  y="206" text-anchor="middle" dominant-baseline="middle"
+              font-family="'Manrope', sans-serif" font-size="15" font-weight="600"
+              fill="#71717a" id="lbl-w">W</text>
+      </svg>
+
+      <div class="center" aria-live="polite">
+        <div class="bearing">305°<span class="card-dir">NW</span></div>
+        <div class="speed"><span class="num">12</span><span class="unit">mph</span></div>
+        <div class="readouts">
+          <div class="row">10-min avg<span class="val">9 mph</span></div>
+          <div class="row">Max gust<span class="val">21 mph</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</main>
+
+<script>
+(function () {
+  var NS = 'http://www.w3.org/2000/svg';
+  var g = document.getElementById('ticks');
+  var css = getComputedStyle(document.documentElement);
+  var cTick  = css.getPropertyValue('--tick').trim()       || 'rgba(63,63,70,0.42)';
+  var cMajor = css.getPropertyValue('--tick-major').trim() || 'rgba(39,39,42,0.72)';
+  var cAcc   = css.getPropertyValue('--accent').trim()     || '#b45309';
+  var cLbl   = css.getPropertyValue('--fg-muted').trim()   || '#71717a';
+
+  // Update cardinal label fills from computed CSS (for dark mode)
+  ['lbl-n','lbl-e','lbl-s','lbl-w'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.setAttribute('fill', cLbl);
+  });
+
+  var cx = 200, cy = 200, rOuter = 188;
+  var N = 120;        // one tick every 3°
+  var bearing = 305;  // wind direction
+
+  for (var i = 0; i < N; i++) {
+    var deg = (i / N) * 360;
+    var cardinal = (deg % 90 === 0);
+    var len = cardinal ? 20 : 11;
+    var a = (deg - 90) * Math.PI / 180;
+    var ax = Math.cos(a), ay = Math.sin(a);
+    var x1 = cx + (rOuter - len) * ax;
+    var y1 = cy + (rOuter - len) * ay;
+    var x2 = cx + rOuter * ax;
+    var y2 = cy + rOuter * ay;
+
+    // Highlight ticks within ~4° of bearing — creates the "two parallel marks" effect
+    var diff = Math.abs(((deg - bearing + 540) % 360) - 180);
+    var near = diff < 4;
+
+    var line = document.createElementNS(NS, 'line');
+    line.setAttribute('x1', x1);
+    line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2);
+    line.setAttribute('y2', y2);
+
+    if (near) {
+      line.setAttribute('stroke', cAcc);
+      line.setAttribute('stroke-width', '3.5');
+    } else {
+      line.setAttribute('stroke', cardinal ? cMajor : cTick);
+      line.setAttribute('stroke-width', cardinal ? '2.5' : '1.3');
+    }
+    line.setAttribute('stroke-linecap', 'round');
+    g.appendChild(line);
+  }
+
+  // Small triangular pointer just inside the rim at the bearing
+  // Provides SHAPE-based identification alongside color (a11y: not color-only)
+  var ba = (bearing - 90) * Math.PI / 180;
+  var bax = Math.cos(ba), bay = Math.sin(ba);
+  var tip = 163, base = 176, w = 0.06;
+  var p1x = cx + tip  * bax,               p1y = cy + tip  * bay;
+  var p2x = cx + base * Math.cos(ba - w),  p2y = cy + base * Math.sin(ba - w);
+  var p3x = cx + base * Math.cos(ba + w),  p3y = cy + base * Math.sin(ba + w);
+  var tri = document.createElementNS(NS, 'polygon');
+  tri.setAttribute('points', p1x+','+p1y+' '+p2x+','+p2y+' '+p3x+','+p3y);
+  tri.setAttribute('fill', cAcc);
+  g.appendChild(tri);
+})();
+</script>
+</body>
+</html>
