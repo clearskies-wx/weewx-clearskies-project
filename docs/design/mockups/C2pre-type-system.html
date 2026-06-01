@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C2pre — Type-system composition</title>
+<style>
+
+/* ── @font-face — reuse downloaded woff2, no new downloads ───────────── */
+/* THREE-WAY MATCH: font-family name here == CSS font-family == fonts.check() string */
+
+@font-face { font-family: 'Manrope'; font-weight: 400; font-style: normal;
+  src: url('fonts/manrope-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Manrope'; font-weight: 600; font-style: normal;
+  src: url('fonts/manrope-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Manrope'; font-weight: 700; font-style: normal;
+  src: url('fonts/manrope-latin-700-normal.woff2') format('woff2'); }
+
+@font-face { font-family: 'Outfit'; font-weight: 400; font-style: normal;
+  src: url('fonts/outfit-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Outfit'; font-weight: 600; font-style: normal;
+  src: url('fonts/outfit-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Outfit'; font-weight: 700; font-style: normal;
+  src: url('fonts/outfit-latin-700-normal.woff2') format('woff2'); }
+
+@font-face { font-family: 'Lexend'; font-weight: 400; font-style: normal;
+  src: url('fonts/lexend-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Lexend'; font-weight: 600; font-style: normal;
+  src: url('fonts/lexend-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Lexend'; font-weight: 700; font-style: normal;
+  src: url('fonts/lexend-latin-700-normal.woff2') format('woff2'); }
+
+/* ── Design tokens — verbatim from C1 ────────────────────────────────── */
+:root {
+  --gap-grid:      1rem;
+  --container-max: 80rem;
+  --card-half-row: 5.5rem;
+  --card-radius:   0.875rem;
+  --card-pad:      1rem;
+
+  --glass-bg:     rgba(255,255,255,0.92);
+  --glass-border: rgba(0,0,0,0.10);
+  --glass-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08);
+
+  --fg:         #18181b;
+  --fg-muted:   #5b5b63;
+  --title-rule: rgba(0,0,0,0.12);
+
+  --hi:          #c81e1e;
+  --lo:          #1d4ed8;
+  --curve-line:  #2563eb;
+  --curve-fill:  rgba(37,99,235,0.15);
+  --curve-future:#5b91e8;
+  --curve-now:   #dc2626;
+  --curve-grid:  rgba(0,0,0,0.14);
+
+  --scene: linear-gradient(160deg, #7fb6d6 0%, #a9d0e8 35%, #cfe5f3 70%, #eaf3fa 100%);
+}
+
+/* ── Reset ─────────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; }
+
+/* ── Page base — Manrope as the page default ────────────────────────────── */
+body {
+  font-family: 'Manrope', system-ui, sans-serif;
+  background: #dde3ea;
+  color: var(--fg);
+  padding: 2.5rem 2rem 5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Load-check bar ─────────────────────────────────────────────────────── */
+#load-bar {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 2.5rem;
+  align-items: center;
+}
+#load-bar .lb-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #5b5b63;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-family: system-ui, sans-serif;
+}
+.load-stamp {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: ui-monospace, 'Cascadia Code', Menlo, monospace;
+  padding: 0.15rem 0.55rem;
+  border-radius: 0.3rem;
+  white-space: nowrap;
+}
+.load-stamp.ok   { background: #dcfce7; color: #166534; }
+.load-stamp.fail { background: #fee2e2; color: #991b1b; }
+.load-stamp.wait { background: #f1f5f9; color: #64748b; }
+
+/* ── Section wrapper ────────────────────────────────────────────────────── */
+.section {
+  margin-bottom: 4rem;
+}
+.section-heading {
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #5b5b63;
+  margin-bottom: 0.5rem;
+}
+.section-q {
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #18181b;
+  margin-bottom: 1.25rem;
+  letter-spacing: -0.01em;
+}
+
+/* ── Scene wrapper ──────────────────────────────────────────────────────── */
+.scene {
+  background: var(--scene);
+  border-radius: 1rem;
+  padding: 1.5rem;
+}
+
+/* ── A4 grid — verbatim from C1 ─────────────────────────────────────────── */
+.grid {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--gap-grid);
+  grid-auto-rows: var(--card-half-row);
+  grid-auto-flow: row dense;
+}
+.span-hero { grid-column: span 4; grid-row: span 1; }
+.span-cc   { grid-column: span 2; grid-row: span 4; }
+
+/* ── Card — verbatim from C1 ────────────────────────────────────────────── */
+.card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(8px) saturate(1.1);
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
+  padding: var(--card-pad);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Hero internals — verbatim from C1 ─────────────────────────────────── */
+.hero { flex-direction: row; align-items: center; justify-content: space-between; gap: 1rem; }
+.hero-logo {
+  width: 3.25rem; height: 3.25rem; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.hero-text { text-align: right; }
+.hero-name { font-size: 1.35rem; font-weight: 700; line-height: 1.15; }
+.hero-loc  { font-size: .9rem; color: var(--fg-muted); margin-top: .15rem; }
+
+/* ── CC card internals — verbatim from C1 ──────────────────────────────── */
+.cc-title {
+  font-size: .8rem; font-weight: 700; color: var(--fg);
+  padding-bottom: .4rem; margin-bottom: .6rem;
+  border-bottom: 1px solid var(--title-rule); flex-shrink: 0;
+  font-family: 'Manrope', system-ui, sans-serif; /* explicit — never inherit a different family */
+}
+.cc-top { display: flex; align-items: center; gap: 1.1rem; flex: 1 1 auto; min-height: 0; }
+.cc-icon { width: 112px; height: 112px; flex-shrink: 0; }
+.cc-text { min-width: 0; display: flex; flex-direction: column; gap: .25rem; }
+
+/* ROLE: Outfit on the large temperature numeral group ONLY */
+.cc-temp {
+  display: flex; align-items: flex-start; line-height: .9;
+  font-family: 'Outfit', system-ui, sans-serif;
+}
+.cc-temp b    { font-size: 4.75rem; font-weight: 700; letter-spacing: -.03em; }
+.cc-temp span { font-size: 1.9rem; color: var(--fg-muted); margin-top: .35rem; }
+
+.cc-feels    { font-size: .85rem; color: var(--fg-muted); }
+.cc-sentence { font-size: .9rem;  color: var(--fg); line-height: 1.35; }
+.cc-hilo     { font-size: .85rem; font-weight: 600; color: var(--fg-muted); }
+.cc-hilo .h  { color: var(--hi); }
+.cc-hilo .l  { color: var(--lo); }
+
+.cc-curve { flex-shrink: 0; padding-top: .6rem; border-top: 1px solid var(--title-rule); }
+.cc-curve-label {
+  font-size: .68rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--fg-muted); margin-bottom: .25rem;
+}
+.cc-curve svg { display: block; width: 100%; height: 112px; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* ── Section 2: title-weight comparison ────────────────────────────────── */
+.weight-row {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: nowrap;
+}
+.weight-swatch {
+  flex: 1 1 0;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--glass-shadow);
+  padding: var(--card-pad);
+}
+.weight-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #5b5b63;
+  font-family: ui-monospace, 'Cascadia Code', Menlo, monospace;
+  margin-bottom: 0.6rem;
+}
+/* The title-under-test: Manrope, weight controlled by inline style on each swatch */
+.swatch-title {
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-size: .8rem;
+  color: var(--fg);
+  padding-bottom: .4rem;
+  margin-bottom: .5rem;
+  border-bottom: 1px solid var(--title-rule);
+}
+.swatch-sub {
+  font-size: .85rem;
+  color: var(--fg-muted);
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-weight: 400;
+}
+
+/* ── Section 3: chart A/B strips ───────────────────────────────────────── */
+.chart-row {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: nowrap;
+}
+.chart-panel {
+  flex: 1 1 0;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--glass-shadow);
+  padding: var(--card-pad);
+}
+.chart-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #5b5b63;
+  font-family: ui-monospace, 'Cascadia Code', Menlo, monospace;
+  margin-bottom: 0.5rem;
+}
+.chart-label-strip {
+  font-size: .68rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--fg-muted); margin-bottom: .25rem;
+  font-family: 'Manrope', system-ui, sans-serif;
+}
+.chart-panel svg { display: block; width: 100%; height: 112px; }
+
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     LOAD CHECK BAR
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="load-bar">
+  <span class="lb-label">Font load check:</span>
+  <span class="load-stamp wait" id="stamp-Manrope">Manrope — checking…</span>
+  <span class="load-stamp wait" id="stamp-Outfit">Outfit — checking…</span>
+  <span class="load-stamp wait" id="stamp-Lexend">Lexend — checking…</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     SECTION 1 — Proposed composition
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <p class="section-heading">Section 1</p>
+  <p class="section-q">Proposed composition — Outfit temp · Manrope body · Lexend chart labels</p>
+
+  <div class="scene">
+    <div class="grid">
+
+      <!-- HERO -->
+      <header class="card hero span-hero" aria-label="Weather station">
+        <span class="hero-logo" aria-hidden="true">
+          <svg width="40" height="40" viewBox="0 0 40 40">
+            <defs>
+              <linearGradient id="s1-gold" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#FFD24D"/><stop offset="1" stop-color="#F5A623"/>
+              </linearGradient>
+              <linearGradient id="s1-grey" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#F3F5F8"/><stop offset="1" stop-color="#C7CDD6"/>
+              </linearGradient>
+            </defs>
+            <circle cx="20" cy="17" r="6" fill="url(#s1-gold)"/>
+            <ellipse cx="22" cy="26" rx="8" ry="5" fill="url(#s1-grey)"/>
+            <ellipse cx="16" cy="27" rx="5" ry="4" fill="url(#s1-grey)"/>
+          </svg>
+        </span>
+        <div class="hero-text">
+          <h1 class="hero-name">Shane's Weather Station</h1>
+          <p class="hero-loc">Huntington Beach, CA</p>
+        </div>
+      </header>
+
+      <!-- CURRENT CONDITIONS -->
+      <article class="card span-cc" aria-labelledby="s1-cc-h">
+        <!-- cc-title: Manrope 600 (semibold) per proposed system -->
+        <h2 id="s1-cc-h" class="cc-title" style="font-weight:600;">Current Conditions</h2>
+
+        <div class="cc-top">
+          <svg class="cc-icon" role="img" aria-labelledby="s1-cc-icon-t" viewBox="0 0 24 24">
+            <title id="s1-cc-icon-t">Partly Cloudy</title>
+            <defs>
+              <linearGradient id="s1-cc-gold" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#FFD24D"/><stop offset="1" stop-color="#F5A623"/>
+              </linearGradient>
+              <linearGradient id="s1-cc-grey" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#F3F5F8"/><stop offset="1" stop-color="#C7CDD6"/>
+              </linearGradient>
+            </defs>
+            <path fill="url(#s1-cc-grey)" d="M6 20q-1.65 0-2.825-1.175T2 16t1.175-2.825T6 12q1.2 0 2.213.65t1.462 1.775l.25.575h.6q1.05 0 1.763.725T13 17.5t-.725 1.775T10.5 20z"/>
+            <path fill="url(#s1-cc-gold)" d="M14.975 17.2q-.1-1.575-1.137-2.725t-2.613-1.425q-.775-1.35-2.087-2.137T6.25 10q.65-1.825 2.225-2.912T12 6q2.5 0 4.25 1.75T18 12q0 1.625-.8 3.013T14.975 17.2M11 5V1h2v4zm6.65 2.75l-1.4-1.4l2.8-2.85l1.425 1.425zM19 13v-2h4v2zm.05 7.5l-2.8-2.85l1.4-1.4l2.85 2.8zM6.35 7.75L3.525 4.925L4.95 3.5l2.8 2.85z"/>
+          </svg>
+          <div class="cc-text">
+            <!-- OUTFIT on this element only -->
+            <div class="cc-temp" role="group" aria-label="Current temperature 72 degrees Fahrenheit">
+              <b>72</b><span aria-hidden="true">°F</span>
+            </div>
+            <!-- Manrope on everything below (inherited from body) -->
+            <p class="cc-feels">Feels like 75°F</p>
+            <p class="cc-sentence">Warm and Humid, Partly Cloudy, with Light Rain</p>
+            <p class="cc-hilo">
+              <span class="h" aria-hidden="true">High 78°</span>&nbsp;
+              <span class="l" aria-hidden="true">Low 59°</span>
+              <span class="sr-only">Today's high 78 degrees, low 59 degrees</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="cc-curve">
+          <p class="cc-curve-label" aria-hidden="true">Today's Temperature</p>
+          <div role="img" aria-label="Today's temperature, midnight to midnight.">
+            <!-- LEXEND on all SVG text elements — explicit font-family attribute required -->
+            <svg aria-hidden="true" viewBox="0 0 720 104" preserveAspectRatio="xMidYMid meet">
+              <line x1="32" y1="12" x2="714" y2="12" stroke="var(--curve-grid)" stroke-width="0.5"/>
+              <text x="28" y="16" text-anchor="end" font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">80°</text>
+              <line x1="32" y1="42" x2="714" y2="42" stroke="var(--curve-grid)" stroke-width="0.5"/>
+              <text x="28" y="46" text-anchor="end" font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">70°</text>
+              <line x1="32" y1="72" x2="714" y2="72" stroke="var(--curve-grid)" stroke-width="0.5"/>
+              <text x="28" y="76" text-anchor="end" font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">60°</text>
+              <line x1="32" y1="84" x2="714" y2="84" stroke="var(--curve-grid)" stroke-width="0.5"/>
+              <polygon points="32,60 117,69 174,75 231,66 288,51 345,42 401,36 401,84 32,84" fill="var(--curve-fill)"/>
+              <polyline points="32,60 117,69 174,75 231,66 288,51 345,42 401,36" fill="none" stroke="var(--curve-line)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <polyline points="401,36 458,18 515,27 572,42 629,54 714,63" fill="none" stroke="var(--curve-future)" stroke-width="2" stroke-dasharray="5 3" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="401" y1="14" x2="401" y2="84" stroke="var(--curve-now)" stroke-width="1.25" stroke-dasharray="2 2"/>
+              <text x="401" y="11" text-anchor="middle" font-size="14" font-weight="700" fill="var(--fg)" font-family="'Lexend', sans-serif">Now</text>
+              <circle cx="401" cy="36" r="4" fill="var(--curve-now)" stroke="var(--glass-bg)" stroke-width="1.5"/>
+              <text x="32"  y="100" text-anchor="start"  font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">12a</text>
+              <text x="203" y="100" text-anchor="middle" font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">6a</text>
+              <text x="373" y="100" text-anchor="middle" font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">12p</text>
+              <text x="543" y="100" text-anchor="middle" font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">6p</text>
+              <text x="714" y="100" text-anchor="end"    font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">12a</text>
+            </svg>
+          </div>
+          <table class="sr-only">
+            <caption>Today's hourly temperature</caption>
+            <thead><tr><th scope="col">Time</th><th scope="col">°F</th><th scope="col">Type</th></tr></thead>
+            <tbody>
+              <tr><td>12 AM</td><td>64</td><td>Actual</td></tr>
+              <tr><td>5 AM</td><td>59</td><td>Actual (overnight low)</td></tr>
+              <tr><td>1 PM</td><td>72</td><td>Actual (now)</td></tr>
+              <tr><td>3 PM</td><td>78</td><td>Forecast (high)</td></tr>
+              <tr><td>12 AM</td><td>63</td><td>Forecast</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+    </div><!-- /grid -->
+  </div><!-- /scene -->
+</div><!-- /section 1 -->
+
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     SECTION 2 — Card title weight comparison
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <p class="section-heading">Section 2</p>
+  <p class="section-q">Card title weight — Manrope at 700 / 600 / 400</p>
+
+  <div class="weight-row">
+
+    <!-- (a) 700 bold — current -->
+    <div class="weight-swatch">
+      <p class="weight-tag">700 bold (current)</p>
+      <p class="swatch-title" style="font-weight:700;">Current Conditions</p>
+      <p class="swatch-sub">Feels like 75°F &nbsp;·&nbsp; Partly Cloudy</p>
+    </div>
+
+    <!-- (b) 600 semibold -->
+    <div class="weight-swatch">
+      <p class="weight-tag">600 semibold</p>
+      <p class="swatch-title" style="font-weight:600;">Current Conditions</p>
+      <p class="swatch-sub">Feels like 75°F &nbsp;·&nbsp; Partly Cloudy</p>
+    </div>
+
+    <!-- (c) 400 regular -->
+    <div class="weight-swatch">
+      <p class="weight-tag">400 regular</p>
+      <p class="swatch-title" style="font-weight:400;">Current Conditions</p>
+      <p class="swatch-sub">Feels like 75°F &nbsp;·&nbsp; Partly Cloudy</p>
+    </div>
+
+  </div>
+</div><!-- /section 2 -->
+
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     SECTION 3 — Chart font: Manrope vs Lexend
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <p class="section-heading">Section 3</p>
+  <p class="section-q">Chart axis labels — Manrope (left) vs Lexend (right)</p>
+
+  <div class="chart-row">
+
+    <!-- LEFT: Manrope chart -->
+    <div class="chart-panel">
+      <p class="chart-tag">Manrope</p>
+      <p class="chart-label-strip">Today's Temperature</p>
+      <svg viewBox="0 0 720 104" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <line x1="32" y1="12" x2="714" y2="12" stroke="var(--curve-grid)" stroke-width="0.5"/>
+        <text x="28" y="16" text-anchor="end" font-size="14" fill="var(--fg)" font-family="'Manrope', sans-serif">80°</text>
+        <line x1="32" y1="42" x2="714" y2="42" stroke="var(--curve-grid)" stroke-width="0.5"/>
+        <text x="28" y="46" text-anchor="end" font-size="14" fill="var(--fg)" font-family="'Manrope', sans-serif">70°</text>
+        <line x1="32" y1="72" x2="714" y2="72" stroke="var(--curve-grid)" stroke-width="0.5"/>
+        <text x="28" y="76" text-anchor="end" font-size="14" fill="var(--fg)" font-family="'Manrope', sans-serif">60°</text>
+        <line x1="32" y1="84" x2="714" y2="84" stroke="var(--curve-grid)" stroke-width="0.5"/>
+        <polygon points="32,60 117,69 174,75 231,66 288,51 345,42 401,36 401,84 32,84" fill="var(--curve-fill)"/>
+        <polyline points="32,60 117,69 174,75 231,66 288,51 345,42 401,36" fill="none" stroke="var(--curve-line)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="401,36 458,18 515,27 572,42 629,54 714,63" fill="none" stroke="var(--curve-future)" stroke-width="2" stroke-dasharray="5 3" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="401" y1="14" x2="401" y2="84" stroke="var(--curve-now)" stroke-width="1.25" stroke-dasharray="2 2"/>
+        <text x="401" y="11" text-anchor="middle" font-size="14" font-weight="700" fill="var(--fg)" font-family="'Manrope', sans-serif">Now</text>
+        <circle cx="401" cy="36" r="4" fill="var(--curve-now)" stroke="var(--glass-bg)" stroke-width="1.5"/>
+        <text x="32"  y="100" text-anchor="start"  font-size="14" fill="var(--fg)" font-family="'Manrope', sans-serif">12a</text>
+        <text x="203" y="100" text-anchor="middle" font-size="14" fill="var(--fg)" font-family="'Manrope', sans-serif">6a</text>
+        <text x="373" y="100" text-anchor="middle" font-size="14" fill="var(--fg)" font-family="'Manrope', sans-serif">12p</text>
+        <text x="543" y="100" text-anchor="middle" font-size="14" fill="var(--fg)" font-family="'Manrope', sans-serif">6p</text>
+        <text x="714" y="100" text-anchor="end"    font-size="14" fill="var(--fg)" font-family="'Manrope', sans-serif">12a</text>
+      </svg>
+    </div>
+
+    <!-- RIGHT: Lexend chart -->
+    <div class="chart-panel">
+      <p class="chart-tag">Lexend</p>
+      <p class="chart-label-strip">Today's Temperature</p>
+      <svg viewBox="0 0 720 104" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <line x1="32" y1="12" x2="714" y2="12" stroke="var(--curve-grid)" stroke-width="0.5"/>
+        <text x="28" y="16" text-anchor="end" font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">80°</text>
+        <line x1="32" y1="42" x2="714" y2="42" stroke="var(--curve-grid)" stroke-width="0.5"/>
+        <text x="28" y="46" text-anchor="end" font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">70°</text>
+        <line x1="32" y1="72" x2="714" y2="72" stroke="var(--curve-grid)" stroke-width="0.5"/>
+        <text x="28" y="76" text-anchor="end" font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">60°</text>
+        <line x1="32" y1="84" x2="714" y2="84" stroke="var(--curve-grid)" stroke-width="0.5"/>
+        <polygon points="32,60 117,69 174,75 231,66 288,51 345,42 401,36 401,84 32,84" fill="var(--curve-fill)"/>
+        <polyline points="32,60 117,69 174,75 231,66 288,51 345,42 401,36" fill="none" stroke="var(--curve-line)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="401,36 458,18 515,27 572,42 629,54 714,63" fill="none" stroke="var(--curve-future)" stroke-width="2" stroke-dasharray="5 3" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="401" y1="14" x2="401" y2="84" stroke="var(--curve-now)" stroke-width="1.25" stroke-dasharray="2 2"/>
+        <text x="401" y="11" text-anchor="middle" font-size="14" font-weight="700" fill="var(--fg)" font-family="'Lexend', sans-serif">Now</text>
+        <circle cx="401" cy="36" r="4" fill="var(--curve-now)" stroke="var(--glass-bg)" stroke-width="1.5"/>
+        <text x="32"  y="100" text-anchor="start"  font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">12a</text>
+        <text x="203" y="100" text-anchor="middle" font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">6a</text>
+        <text x="373" y="100" text-anchor="middle" font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">12p</text>
+        <text x="543" y="100" text-anchor="middle" font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">6p</text>
+        <text x="714" y="100" text-anchor="end"    font-size="14" fill="var(--fg)" font-family="'Lexend', sans-serif">12a</text>
+      </svg>
+    </div>
+
+  </div>
+</div><!-- /section 3 -->
+
+
+<script>
+(async () => {
+  await document.fonts.ready;
+
+  // Three-way match: @font-face name == CSS font-family == fonts.check() string
+  const checks = [
+    { id: 'Manrope', family: 'Manrope' },
+    { id: 'Outfit',  family: 'Outfit'  },
+    { id: 'Lexend',  family: 'Lexend'  },
+  ];
+
+  for (const { id, family } of checks) {
+    const loaded = document.fonts.check(`700 16px "${family}"`);
+    const el = document.getElementById('stamp-' + id);
+    if (!el) continue;
+    if (loaded) {
+      el.textContent = id + ' ✓ loaded';
+      el.className   = 'load-stamp ok';
+    } else {
+      el.textContent = id + ' ✗ FELL BACK — NOT LOADED';
+      el.className   = 'load-stamp fail';
+    }
+  }
+})();
+</script>
+</body>
+</html>
