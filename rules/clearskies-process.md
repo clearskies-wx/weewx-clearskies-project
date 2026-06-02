@@ -249,3 +249,71 @@ When the task originated from a user prompt (not a plan-internal round), walk th
 **Why (2026-05-25):** Aeris `client_id` and `client_secret` were returned correctly by the API's `/setup/current-config` endpoint but silently dropped by the wizard's `_merge_from_api_current_config()` because `_FIELD_REMAP` had no entries for them. The operator was forced to re-enter keys that were already configured. Separately, `populate_from_config()` used a domain-scoped env var prefix (`WEEWX_CLEARSKIES_FORECAST_AERIS_`) instead of the actual provider-scoped prefix (`WEEWX_CLEARSKIES_AERIS_`), so the local fallback also failed.
 
 **Verify default branch name before writing it into briefs.** api repo = `main`, meta repo = `master`. Brief errors propagate when reused as templates.
+
+## UI implementation quality gates
+
+These rules apply to all Track C (component) implementation work. They exist because C1–C6 was marked "code-complete" while the code diverged from the approved mockups on every measurable axis — font sizes 23% too large, border separators missing, SVG geometry changed, layout properties wrong. Forensic comparison proved agents never opened the mockup files. These rules close the gaps that allowed that.
+
+**CX implementation briefs must include exact CSS values, not document references.** The UI-REDESIGN-PLAN and C0 inventory are strategic. Each CX implementation brief (C7-PLAN, C8-PLAN, etc.) must be **prescriptive to exact property values.** No handwaving. No "read the typography doc and apply it." Every acceptance criterion must include the exact values the agent must use, plus grep-checkable FAIL conditions. Example:
+
+```
+Card title — ALL cards on this page:
+  font-family: var(--font-sans)
+  font-size: var(--text-card-title, 0.82rem)
+  font-weight: 600 (semibold)
+  padding-bottom: 5px
+  border-bottom: 1px solid var(--border)
+
+FAIL CONDITIONS (grep-checkable):
+  - Any card h2 with className containing "text-base" → WRONG
+  - Any card h2 with "font-medium" → WRONG, should be font-semibold
+  - Any card h2 missing "border-b" or "borderBottom" → WRONG
+```
+
+The same level of specificity applies to every element: stat numerals, labels, gauges, chart axes, SVG geometry. If the mockup says `font-size: 18px`, the brief says `font-size: 18px` and the acceptance criteria says `FAIL if not 18px`.
+
+**Mockup-to-implementation handoff must be explicit.** When an approved HTML mockup exists, the CX implementation brief must include:
+
+```
+SOURCE OF TRUTH: docs/design/mockups/<mockup>.html
+Agent MUST open this file, extract the exact CSS values for the elements
+it is building, and use those values. If the code uses different values,
+that is a defect — not a refinement.
+```
+
+The brief must ALSO extract the key values from the mockup and list them inline (per the rule above), so there is no ambiguity even if the agent skips the file.
+
+**Why (2026-06-02):** C4 stat tiles mockup specified card titles at 13px with border-bottom separators. Every tile was implemented at 16px with no separators. The C4 brief told agents to read the typography spec and reference implementations but never said "open C4-stat-tiles.html and use its CSS values." The mockup was a Phase 0 artifact with no bridge back to Phase 2 code. The agents coded from a mental model.
+
+**Coordinator must QC agent work iteratively BEFORE it reaches the operator.** The coordinator is the quality gate between the agent and the operator. When an agent delivers code:
+
+1. Open the rendered output (dev server screenshot or headless render).
+2. Compare it against the mockup (if one exists) and the spec values from the brief.
+3. If there are discrepancies, **send it back to the agent for rework** with specific instructions ("card title is 16px, should be 13px per brief §X; border-bottom missing; fix these").
+4. Repeat until the output matches the spec.
+5. Only THEN report to the operator as complete.
+
+The operator should never see first-draft slop. If the coordinator cannot run the dev server in a session, the task stays open — do not declare it done based on `tsc` passing.
+
+**Visual verification (QC Gate 3) must be a side-by-side comparison, not a glance.** After the component is built:
+
+1. Screenshot the built component at the locked footprint size.
+2. If a mockup exists, screenshot the mockup at the same size.
+3. Open both images and compare — report specific discrepancies (font too large, border missing, SVG proportions changed), not "looks good."
+4. Run the brief's FAIL CONDITIONS as mechanical grep checks.
+
+"It renders without crashing" is NOT visual verification. "The card title is 13px with a 1px border-bottom and the gauge value is 18px Outfit 600" IS visual verification.
+
+**Auditor must check governing doc compliance mechanically.** For every UI card, the auditor must run these checks (grep or code inspection):
+
+- Every card h2/title uses `var(--text-card-title)` or equivalent 0.82rem — NOT `text-base`
+- Every card h2/title has `border-b` or `borderBottom` — NOT missing
+- Every card h2/title uses `font-semibold` (600) — NOT `font-medium` (500) or `font-bold` (700)
+- Stat numerals use `var(--font-display)` (Outfit) — NOT `var(--font-sans)` (Manrope)
+- Chart labels use `var(--font-chart)` (Lexend) — NOT system fonts
+
+These are pattern matches, not judgment calls. FAIL if any violation is found.
+
+**"Code-complete" requires coordinator visual sign-off.** The agent that writes the code cannot declare it done. The coordinator must render the output, verify it against the spec, and sign off. Self-attestation of visual quality is not accepted.
+
+**Why (2026-06-02):** C1–C6 were all self-attested as code-complete. QC gates checked `tsc` (compiles) and `vite build` (bundles) but never compared the rendered output against the mockups. Every tile card had wrong font sizes, missing separators, broken sr-only hiding, no vertical centering, and inconsistent text hierarchy. The operator discovered all of this during live testing — not during any QC gate.
