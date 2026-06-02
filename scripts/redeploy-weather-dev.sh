@@ -47,8 +47,10 @@ SERVICES=(
 # weewx LXD container, not on weather-dev. See docs/procedures/deploy-clearskies.md
 # "Deploying API changes to the weewx container" for the correct procedure.
 # CRITICAL: the read-only webcam bind-mount lives directly under the web root.
-# rsync must NEVER delete or write into it.
-WEBCAM_EXCLUDE="webcam/"
+# rsync must NEVER delete or write into it. webcam.json is a manually-managed
+# config file at the web root level — not part of the Vite build output — so it
+# must also be excluded from --delete pruning.
+WEBCAM_EXCLUDES=("webcam/" "webcam.json")
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -106,12 +108,15 @@ run_ubuntu "test -f ${DIST_DIR}/index.html"
 echo "[build] dist/ produced"
 
 # --- Step 4: publish dist/ → web root (protecting the webcam bind-mount) ---
-echo "--- [4/4] publish dist/ → ${WEB_ROOT} (excluding ${WEBCAM_EXCLUDE}) ---"
+echo "--- [4/4] publish dist/ → ${WEB_ROOT} (excluding ${WEBCAM_EXCLUDES[*]}) ---"
 # Trailing slash on the source copies dist/ CONTENTS into the web root.
-# --exclude='webcam/' keeps rsync from ever entering or deleting the read-only
-# bind-mount. With --delete this is doubly important: excluded paths are NOT
-# candidates for deletion, so the webcam mount and its contents are protected.
-rsync_opts=(-a --human-readable --exclude="${WEBCAM_EXCLUDE}")
+# --exclude keeps rsync from entering/deleting the excluded paths. With --delete
+# this is doubly important: excluded paths are NOT candidates for deletion, so
+# the webcam mount, its contents, and webcam.json are all protected.
+rsync_opts=(-a --human-readable)
+for excl in "${WEBCAM_EXCLUDES[@]}"; do
+    rsync_opts+=(--exclude="${excl}")
+done
 if [ "$use_delete" = "1" ]; then
     rsync_opts+=(--delete)
 fi
@@ -122,4 +127,5 @@ echo "[publish] web root updated"
 echo "=== Redeploy complete ==="
 echo "Verify:  curl -sI http://weather-dev/ | head -1   (expect 200)"
 echo "         curl -s  http://weather-dev/webcam/weather_cam.jpg -o /dev/null -w '%{http_code}\\n'"
+echo "         curl -s  http://weather-dev/webcam.json -o /dev/null -w '%{http_code}\\n'   (expect 200)"
 echo "         ssh ${SSH_HOST} \"lxc exec ${LXC_CONTAINER} -- systemctl is-active ${SERVICES[*]}\""
