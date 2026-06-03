@@ -71,6 +71,12 @@ date-range overrides) folds into the operator-replaceable set as future config s
 5. **Day/night = real sun position** (almanac sunrise/sunset — the same signal the dashboard already
    computes for auto-sunrise-sunset theming), NOT the theme toggle.
 
+   **Amendment (2026-06-03):** When the user explicitly selects Light or Dark mode (not System),
+   the background's daytime flag follows the theme toggle (Light → day variant, Dark → night
+   variant). System mode follows almanac as before. Sky and overlay fields always reflect actual
+   weather conditions regardless of theme choice. This override is applied client-side in
+   `AppLayout` — the BFF still emits the almanac-based `scene.daytime` unchanged.
+
 6. **Server emits a small structured `scene` descriptor; the dashboard just maps it to assets.** No
    client-side string-parsing of the conditions sentence, no weather logic in the dashboard. Shape:
    `scene: { sky: "clear"|"cloudy"|"storm", daytime: bool, overlay: "rain"|"snow"|null }`. **All three
