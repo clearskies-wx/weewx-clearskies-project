@@ -62,6 +62,7 @@ Belchertown-era operational howtos:
 
 ## Archive
 
+- [archive/MOBILE-BACKGROUND-POLISH-PLAN.md](archive/MOBILE-BACKGROUND-POLISH-PLAN.md) — Mobile layout fixes, background system polish, per-card collapse fixes. ✅ Complete 2026-06-03.
 - [archive/FORECAST-DETAIL-SNOW-PLAN.md](archive/FORECAST-DETAIL-SNOW-PLAN.md) — 7-day forecast detail panel enrichment + precipitation/snow support. ✅ Complete 2026-06-03.
 - [archive/AQI-CENTRALIZATION-PLAN.md](archive/AQI-CENTRALIZATION-PLAN.md) — Route AQI through weewx as the single hub. ✅ Complete 2026-04-29.
 - [archive/MQTT-TYPO-FIX-PLAN.md](archive/MQTT-TYPO-FIX-PLAN.md) — `mgtt://` → `mqtt://` fix. ✅ Complete 2026-04-29.
