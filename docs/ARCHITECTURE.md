@@ -164,6 +164,7 @@ Wizard step 7 (apply)
 | `/api/v1/almanac` | GET | Sun + moon snapshot for one date |
 | `/api/v1/almanac/sun-times` | GET | Year-long sunrise/sunset/daylight series |
 | `/api/v1/almanac/moon-phases` | GET | Per-day moon-phase grid (month or year) |
+| `/api/v1/almanac/seeing-forecast` | GET | 72-hour astronomical seeing forecast (7Timer ASTRO, 3-hour intervals) |
 | `/api/v1/charts/groups` | GET | Chart-group structure |
 | `/api/v1/reports` | GET | Available NOAA report files |
 | `/api/v1/reports/{year}/{month}` | GET | Monthly NOAA report (raw text) |
@@ -381,6 +382,7 @@ weewx_clearskies_api/providers/
 ├── aqi/              # aeris, openmeteo, openweathermap, iqair
 ├── alerts/           # nws, aeris, openweathermap
 ├── earthquakes/      # usgs, geonet, emsc, renass
+├── seeing/           # seven_timer (keyless, 7Timer ASTRO product)
 └── radar/            # rainviewer, openweathermap, aeris, iem_nexrad, noaa_mrms, msc_geomet, dwd_radolan, iframe
 ```
 
@@ -393,7 +395,7 @@ Each module: outbound API call → response parsing → canonical field translat
 | `memory` (default) | No config needed | Single worker (v0.1 default) |
 | `redis` (**active on weewx host**) | `CLEARSKIES_CACHE_URL=redis://localhost:6379/0` (set in `/etc/weewx-clearskies/secrets.env`) | Multi-worker deploys |
 
-Per-provider TTLs: forecast 30 min, alerts 5 min, AQI 15 min, radar metadata 5 min.
+Per-provider TTLs: forecast 30 min, alerts 5 min, AQI 15 min, radar metadata 5 min, seeing forecast 3 hours.
 
 ## Repo layout
 
