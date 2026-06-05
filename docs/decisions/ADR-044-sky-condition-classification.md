@@ -1,7 +1,7 @@
 ---
 status: Accepted
 date: 2026-05-26
-amended: 2026-05-28
+amended: 2026-06-05
 deciders: shane
 ---
 
@@ -154,13 +154,14 @@ Rain rate thresholds (AMS Glossary of Meteorology; WMO classification):
 
 **Gusty qualifier:** Append "and Gusty" when `windGust ≥ windSpeed + 12 mph` AND `windGust ≥ 18 mph`. This follows NWS ASOS practice where "gusty" means sustained-to-gust spread exceeds a meaningful threshold.
 
-> **As-built (commit eafb706):** Implemented in `conditions_text.py:build_weather_text()`.
+> **As-built (commit eafb706, amended 2026-06-05):** Implemented in `conditions_text.py:build_weather_text()`.
 > Both speeds are converted to mph before comparison regardless of station unit, so knot/m/s
-> stations evaluate the same thresholds. The qualifier only fires inside the `Beaufort > 0`
-> branch — when sustained wind is Calm, the entire wind component is omitted and "and Gusty"
-> does not appear floating alone (conscious design choice).
+> stations evaluate the same thresholds. The qualifier only fires for non-Calm wind
+> (Beaufort > 0) — "Calm and Gusty" is nonsensical.
 
-**Calm suppression:** Beaufort 0 (Calm) is omitted from the composed text — "Overcast" reads better than "Overcast and Calm."
+> **Amendment (2026-06-05):** Calm is no longer suppressed. Beaufort 0 ("Calm") appears in the
+> composed text like any other wind condition — calm is a real atmospheric state, not the absence
+> of data. Example: "Pleasant and Humid, Overcast, with Calm".
 
 ### 5. Temperature axis
 
