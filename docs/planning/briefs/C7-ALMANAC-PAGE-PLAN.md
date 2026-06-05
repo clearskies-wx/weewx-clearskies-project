@@ -440,6 +440,22 @@ Skyfield fallback: existing `useAlmanacEclipses()` (line 831) returns dates + ty
 
 ### PHASE 0 — Documentation & Assets (blocks ALL code)
 
+**T0.0 — ADR: Almanac visibility ranking system and unified color scale**
+- Owner: **coordinator** · Dep: none (blocks T1.4, T1.5, T1.7)
+- Files: `docs/decisions/ADR-0XX-almanac-visibility-rankings.md` (new, or amend existing ADR if one covers this)
+- Do: Document the unified 5-tier visibility ranking system used across all almanac cards (solar eclipses, lunar eclipses, meteor showers, planet viewing quality). Must capture:
+  - **Solar eclipse visibility tiers:** Fully Visible (O=100%, in path of totality/annularity), Mostly Visible (75%≤O<100%, deep partial), Partially Visible (1%≤O<75%), Barely Visible (O<10% or very low altitude), Not Visible (O=0%)
+  - **Lunar eclipse visibility tiers:** Visible All Night (all contacts altitude>0), Mostly Visible (peak>0, some contacts<0), Low in Sky (peak 0°–15°), Barely Visible (peak just above horizon), Not Visible (peak<0)
+  - **Meteor shower visibility tiers:** Excellent (dark skies, no moon, high radiant), Good (mostly dark, minimal moon), Fair (some moon interference), Poor (heavy moon or low radiant), Not Visible (below horizon)
+  - **Planet viewing quality:** Already documented in archived PLANET-VIEWING-QUALITY-PLAN.md — reference it, don't duplicate
+  - **Unified color scale:** Green (#22c55e) = Excellent/Fully Visible, Lime (#84cc16) = Good/Mostly Visible, Yellow (#eab308) = Fair/Partially Visible, Orange (#f97316) = Poor/Barely Visible, Red (#ef4444) = Not Visible
+  - **Data sources:** AstronomyAPI.com `obscuration` field (solar), peak `altitude` from eventHighlights (lunar), moon illumination + radiant altitude (meteor), 7Timer seeing forecast (planet viewing)
+  - **Computation formulas** for each tier boundary
+  - **Meteor shower catalog data provenance:** ZHR, velocity, radiant coordinates, duration, and parent body sourced from IMO (International Meteor Organization) annual meteor shower calendar. One-line descriptions sourced from IMO and AMS (American Meteor Society) published shower characteristic summaries. Document the authoritative URLs.
+  - **Eclipse data provenance:** Dates and types from Skyfield `eclipselib`. Contact times, altitudes, and obscuration from AstronomyAPI.com Events endpoint. Document the tier computation from obscuration (solar) and peak altitude (lunar).
+- Accept: ADR is Proposed with all tiers, formulas, color mapping, data sources, and provenance URLs. User approves before implementation.
+- QC: coordinator verifies all formulas are dimensionally correct and tier boundaries don't overlap
+
 **T0.1 — Save AstronomyAPI.com credentials**
 - Owner: **coordinator** · Dep: none
 - Files: `reference/CREDENTIALS.md`
@@ -528,7 +544,8 @@ Skyfield fallback: existing `useAlmanacEclipses()` (line 831) returns dates + ty
 - Files: `repos/weewx-clearskies-api/weewx_clearskies_api/data/meteor_showers.py` (modify), new `/etc/weewx-clearskies/meteor_showers.json` (template at `repos/weewx-clearskies-api/data/meteor_showers.json`), `config/settings.py` (add path setting)
 - Do:
   - Add `meteor_showers_catalog` path to `AlmanacSettings` (default: `/etc/weewx-clearskies/meteor_showers.json`)
-  - Create JSON catalog with ~25 showers (expand from current 12). Add fields: `id`, `description`, `solar_longitude_max`, `image` (filename). Keep existing fields.
+  - Create JSON catalog with ~25 showers (expand from current 12). Add fields: `id`, `description`, `velocity_kms`, `solar_longitude_max`, `image` (filename). Keep existing fields.
+  - **Data sources for new fields:** `description` — one-line editorial summary per shower sourced from IMO (imo.net/resources/calendar) and AMS (amsmeteors.org/meteor-showers) published shower characteristics (speed, brightness, color, parent body behavior). `velocity_kms` — IMO meteor shower working list (e.g., Perseids 59 km/s, Geminids 35 km/s). `solar_longitude_max` — IMO shower database. All static reference data, entered once into the JSON catalog.
   - Modify `compute_meteor_showers()` (line 1199) to read from JSON catalog instead of `METEOR_SHOWERS` Python list
   - Add JSON schema validation on load (warn on malformed entries, skip them, don't crash)
   - Fallback: if JSON file missing, use embedded Python catalog (existing `METEOR_SHOWERS` list)
