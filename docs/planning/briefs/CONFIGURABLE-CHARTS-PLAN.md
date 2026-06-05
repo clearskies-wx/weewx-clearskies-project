@@ -238,27 +238,30 @@ Recharts LineChart / BarChart / ComposedChart / RadialBarChart (wind rose)
 
 ---
 
-### PHASE 3 — Integration + Cleanup
+### PHASE 3 — Integration + Cleanup ✅ COMPLETE (2026-06-05)
 
-**T3.1 — Ship charts.conf.example**
-- Owner: Opus coordinator (direct)
-- Create: `repos/weewx-clearskies-api/etc/charts.conf.example`
-
-**T3.2 — Deploy and verify**
-- Owner: Opus coordinator (direct)
-- Push API + dashboard, deploy to weewx + weather-dev, verify every tab/chart/series.
-
-**T3.3 — Update OpenAPI contract**
+**T3.1 — Ship charts.conf.example** ✅ `fbfdb1a`
 - Owner: `clearskies-api-dev` · QC: Opus coordinator
-- Modify: `docs/contracts/openapi-v1.yaml`, dashboard sync copy.
+- Create: `etc/charts.conf.example` (252 lines). Well-commented ConfigObj/INI with global defaults, homepage (rolling ranges), averageclimate (xAxisGroupby=month), monthly (year/month dropdowns). Based on Belchertown graphs.conf format.
 
-**T3.4 — Delete hardcoded chart logic**
-- Owner: `clearskies-dashboard-dev` · QC: Opus coordinator
-- Remove `_BUILTIN_GROUPS` from `services/charts.py`, dead imports from old `charts.tsx`.
+**T3.2 — Deploy and verify** ✅ (done during Phase 2 closeout)
+- Both repos pushed, API deployed to weewx, dashboard deployed to weather-dev, Redis flushed.
 
-**T3.5 — Phase 3 audit**
+**T3.3 — Update OpenAPI contract** ✅ `c1a46bd`
+- Owner: `clearskies-api-dev` · QC: Opus coordinator
+- Modified: `docs/contracts/openapi-v1.yaml`. Added `GET /charts/config` endpoint + 5 response schemas (SeriesConfigResponse, ChartConfigResponse, ChartGroupConfigResponse, ChartsConfigData, ChartsConfigResponse). Updated `/climatology/monthly` with `fields` + `agg` query params. Valid YAML confirmed.
+
+**T3.4 — Delete hardcoded chart logic** ✅ `fbfdb1a` + `d2bbb0d` (test fix) + `f2bac35` (audit remediation)
+- Owner: `clearskies-api-dev` · QC: Opus coordinator
+- Removed `_BUILTIN_GROUPS` constant and fallback branch from `services/charts.py`. Updated docstrings in `endpoints/charts.py`. Removed dead `registry` parameter from `get_chart_groups()`. Dashboard dead code already removed in T2.4. 16 chart tests rewritten for config-driven path (all pass).
+
+**T3.5 — Phase 3 audit** ✅ `f2bac35` (remediation)
 - Owner: `clearskies-auditor` (Sonnet) · Final QC: Opus coordinator
-- Full audit: axe-core, keyboard nav, both themes, responsive, empty config graceful, no regressions, `tsc` + `ruff`/`mypy`, OpenAPI validates.
+- Audit: 3 findings (all low). 2 remediated, 1 deferred:
+  - F1 (low): Dead `registry` param removed from `get_chart_groups()` — REMEDIATED
+  - F2 (low): No wind rose example in charts.conf — DEFERRED to T4.1
+  - F3 (low): Stale year (2025) in example — REMEDIATED (added 2026)
+- Deployed to weewx, Redis flushed.
 
 ---
 
