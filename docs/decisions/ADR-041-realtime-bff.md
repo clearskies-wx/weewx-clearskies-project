@@ -101,6 +101,20 @@ retained only as historical context in git history (pre-stack-4334475).
 - Wizard changes (Phase 5 of the plan). _(unchanged — the wizard does not yet surface
   `[api] upstream_url` in its config-writer flow.)_
 
+## Amendment: computation boundaries (2026-06-05)
+
+**Motivation:** Phase 4 of the configurable charts system (June 2026) added a `/charts/wind-rose` endpoint to the API that performed Beaufort classification and direction binning — duplicating the BFF's existing `beaufort` injection in `UnitTransformer.transform_record()` and violating this ADR's boundary ("the API itself does no conversion," line 38) and ADR-042 line 71 ("Beaufort scale: BFF computes from wind speed … Dashboard does not carry Beaufort thresholds").
+
+**Computation boundary rules:**
+
+1. **API = general-purpose data access (ADR-010).** The API queries the weewx archive and serves raw observation/aggregate values. It has no awareness of chart types, visualization layouts, or rendering concerns. No chart-specific endpoint belongs in the API.
+2. **BFF = transformation authority (this ADR + ADR-042).** Unit conversion, derived-value computation (Beaufort, comfort index, barometer trend, cardinal directions), and enrichment (conditions text) happen here. The BFF is the single place where raw archive values become display-ready data.
+3. **Dashboard = rendering + presentation-level computation.** Client-side binning (e.g., direction × Beaufort matrix for wind rose), LTTB downsampling, chart layout, and theming. The dashboard reads BFF-provided derived fields (like `beaufort.value`) but does not recompute them from raw observations.
+
+**Test:** If a proposed API endpoint requires unit conversion, threshold classification, or produces output shaped for a specific chart type — it belongs in the BFF or dashboard, not the API.
+
+**Corrective action:** `/charts/wind-rose` deleted from the API. Direction × Beaufort binning moved to a dashboard utility (`wind-rose-binning.ts`) that reads the BFF-injected `beaufort` field from archive records. See [ARCHITECTURE.md Layer Responsibilities](../ARCHITECTURE.md#layer-responsibilities).
+
 ## References
 
 - Amends: [ADR-005](ADR-005-realtime-architecture.md) (realtime architecture)

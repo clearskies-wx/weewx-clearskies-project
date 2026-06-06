@@ -354,6 +354,12 @@ Authoritative status of every ADR (Pinned / Proposed / Accepted) lives in [docs/
 
 One non-ADR doc task: INSTALL docs must include a matrix of supported weewx environments (native Debian/Ubuntu, LXD container, Docker, Proxmox VM, Raspberry Pi) with the recommended install path for clearskies-api and clearskies-realtime in each.
 
+### Track D — Configurable charts + layer correction (2026-06-05)
+
+Operator-configurable `charts.conf`-driven charts system, replacing hardcoded charts. Wind rose, custom SQL, weather range, LTTB sampling, PNG/CSV export, migration tool. See [CONFIGURABLE-CHARTS-PLAN.md](briefs/CONFIGURABLE-CHARTS-PLAN.md).
+
+Post-audit layer correction: wind rose Beaufort binning moved from API to dashboard per ADR-041/042, `agg` parameter added to `/archive` for daily min/max flexibility, architecture docs amended with computation boundary rules. See [LAYER-CORRECTION-PLAN.md](briefs/LAYER-CORRECTION-PLAN.md).
+
 ### Parking-lot follow-ups (non-blocking)
 
 - **Register `live_network` pytest marker in `pyproject.toml`.** 3b-9's test-author flagged that the marker is referenced in agent definitions and briefs but is not registered in `[tool.pytest.ini_options].markers`. No 3b-9 test uses it (no live-network coverage in scope), so no impact this round. Address before any future round adds a test that opts into live-network calls — otherwise pytest will warn-on-unknown-marker. Single-line edit.

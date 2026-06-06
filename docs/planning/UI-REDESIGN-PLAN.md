@@ -569,6 +569,18 @@ C10 (reports/about/legal) ─────────────────┘
   confirmed needed deliverable (per ADR-051); its own build, not part of this UI plan. Operator-facing
   explainer prose pulled off data pages lands here.
 
+### Charts layer correction — deferred fix-its (2026-06-05)
+
+Surfaced by audits during the [LAYER-CORRECTION-PLAN.md](briefs/LAYER-CORRECTION-PLAN.md) work. None is blocking; all are tracked here for future rounds.
+
+| # | Item | Severity | File(s) | What to fix | Why deferred |
+|---|------|----------|---------|-------------|--------------|
+| LC-1 | WeatherRangeChart gradient colors are hardcoded hex | MEDIUM | `WeatherRangeChart.tsx` lines 559/565/569 + `tempGradientColor()` | `#4a90d9`/`#f5a623`/`#d0021b` → define `--range-chart-cool`/`--range-chart-mid`/`--range-chart-warm` CSS variables in theme tokens; verify dark-mode AA contrast | Theming refinement — chart renders correctly; colors need token migration + contrast audit |
+| LC-2 | Range chart table/CSV shows raw data | MEDIUM | `ConfigDrivenGroup.tsx` lines 457/520-533 | When `hasRangeChart`, "Show Table" and CSV export use `archiveData` (raw unaggregated records), not the high/low aggregated pairs the chart displays. Build dedicated `rangeTableData` from `rangeHighPoints`/`rangeLowPoints` | Table view for range charts was never spec'd in the plan; new feature work |
+| LC-3 | `agg` missing from `useArchive` deps array | LOW | `useWeatherData.ts` line 385 | Add `params?.agg` to the dependency array so the hook refetches when `agg` changes | Latent only — `agg` is a constant string per hook call today; no live bug |
+| LC-4 | No unit tests for `wind-rose-binning.ts` | LOW | `src/utils/wind-rose-binning.ts` | Add `wind-rose-binning.test.ts` covering: direction formula edge cases, Beaufort cap at 6+, calm handling, null/incomplete records, percentage math | New utility — plan acceptance bar was `tsc` + live visual equivalence |
+| LC-5 | Wasteful main archive fetch for range chart groups | LOW | `ConfigDrivenGroup.tsx` lines 343-346 | Add `skip: hasRangeChart` to the main `archiveResult` hook when range chart is active (couples with LC-2 — fix together) | Compounds LC-2; no user-visible bug on its own |
+
 ---
 
 ## Execution-plan brief template (per C-item)

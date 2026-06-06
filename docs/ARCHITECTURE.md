@@ -20,6 +20,18 @@ Last verified: 2026-05-29 (B-1 fix: all three Caddyfiles now route /api/v1/* to 
 | **Redis** | upstream (redis:7-alpine) | Cache for provider API responses (TTLs: forecast 30 min, alerts 5 min, AQI 15 min) | Redis 7.0.15 | 6379 | — |
 | **Design Tokens** | weewx-clearskies-design-tokens | Tailwind config + design variables npm package | Phase 6+ placeholder — no code yet. Tokens currently live in dashboard repo. | — | — |
 
+## Layer Responsibilities
+
+Computation boundaries between the three application layers. **No chart-specific or visualization-specific endpoint in the API.** The API is a general-purpose data access layer (ADR-010); chart-type awareness belongs in the dashboard.
+
+| Layer | Responsibility | Does NOT do |
+|-------|---------------|-------------|
+| **API** | General-purpose data access: query the weewx archive, serve raw observation/aggregate values, host provider modules, expose setup endpoints. Returns raw values with `usUnits` declaring the unit system. | Unit conversion, derived-value computation (Beaufort, comfort index), chart-specific binning or aggregation, presentation formatting. (ADR-041 line 38: "The API still passes raw archive values to the BFF — the API itself does no conversion.") |
+| **BFF (Realtime)** | Transformation gateway: proxy API responses, apply unit conversion to all outbound data (REST + SSE), compute derived values (Beaufort scale, comfort index, barometer trend direction, cardinal wind directions), run the conditions-text engine, serve SSE stream. Single conversion authority (ADR-042). | Database access, provider API calls, chart-type awareness, presentation layout. |
+| **Dashboard** | Rendering + presentation-level computation: display converted values, client-side binning for visualizations (e.g., wind rose direction×Beaufort matrix from BFF-provided fields), LTTB downsampling, chart layout, theming, accessibility. | Unit conversion, Beaufort/comfort-index threshold logic, raw SQL queries, provider API calls. (ADR-042 line 71: "Dashboard does not carry Beaufort thresholds.") |
+
+**Why this boundary exists (2026-06-05):** Phase 4 of the configurable charts system placed a wind rose endpoint (`/charts/wind-rose`) in the API that duplicated the BFF's Beaufort classification — violating ADR-041 and ADR-042. The BFF's `UnitTransformer.transform_record()` already injects `beaufort` into every archive record. The API endpoint was redundant domain logic in the wrong layer. Corrected by deleting the API endpoint and moving binning to the dashboard (which reads the BFF-injected `beaufort` field). See ADR-041 amendment.
+
 ## Authoritative port registry
 
 **These ports are locked. Do not use different ports without explicit user approval and an update to this table.**
@@ -154,7 +166,7 @@ Wizard step 7 (apply)
 |------|--------|---------|
 | `/api/v1/station` | GET | Station metadata (singleton). The `name` field is the operator's configured display location, read from `weewx.conf [Station] location` at startup. |
 | `/api/v1/current` | GET | Most recent observation. The `weatherText` field is always null in the API response; the BFF enrichment pipeline (`enrich_weather_text`) injects the composed conditions string before serving the dashboard (ADR-041, ADR-044). |
-| `/api/v1/archive` | GET | Historical archive records with pagination/filtering |
+| `/api/v1/archive` | GET | Historical archive records with pagination/filtering. Optional `agg` param (`min`/`max`/`avg`/`sum`/`count`) overrides per-field default aggregation for `interval=day` and `interval=hour`. |
 | `/api/v1/records` | GET | Section-grouped highs and lows |
 | `/api/v1/forecast` | GET | Forecast bundle (hourly + daily + discussion) |
 | `/api/v1/alerts` | GET | Active severe-weather alerts |

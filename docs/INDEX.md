@@ -13,6 +13,8 @@ This repo started as a Belchertown skin evaluation and pivoted to the Clear Skie
 ## Planning
 
 - **[planning/CLEAR-SKIES-PLAN.md](planning/CLEAR-SKIES-PLAN.md)** — phase tracker for the Clear Skies build (api / realtime / dashboard / stack repos). Plan body is an index — decision content lives in ADRs per [rules/clearskies-process.md](../rules/clearskies-process.md).
+- **[planning/briefs/CONFIGURABLE-CHARTS-PLAN.md](planning/briefs/CONFIGURABLE-CHARTS-PLAN.md)** — operator-configurable charts system (charts.conf, wind rose, custom SQL, weather range, LTTB, export, migration tool).
+- **[planning/briefs/LAYER-CORRECTION-PLAN.md](planning/briefs/LAYER-CORRECTION-PLAN.md)** — API data flexibility (`agg` param) + layer correction (wind rose Beaufort binning moved from API to dashboard per ADR-041/042).
 
 ## Decisions
 

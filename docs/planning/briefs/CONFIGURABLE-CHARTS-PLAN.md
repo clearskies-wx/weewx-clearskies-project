@@ -273,11 +273,11 @@ Recharts LineChart / BarChart / ComposedChart / RadialBarChart (wind rose)
 - Uses Recharts `RadialBarChart` + `RadialBar` + `PolarGrid` + `PolarAngleAxis` + `PolarRadiusAxis` (all confirmed in recharts v3.8.1). 16 direction bins × 7 Beaufort speed categories, stacked radially, operator-configurable colors.
 - Accept: Visually matches Belchertown wind rose. Tooltip, sr-only table, both themes. **Visual comparison by Opus.**
 
-**T4.2 — Wind rose API endpoint**
-- Owner: `clearskies-api-dev` · QC: Opus coordinator
-- Create: `services/wind_rose.py`, `endpoints/wind_rose.py`
-- Bins windSpeed × windDir → 16×7 matrix server-side.
-- Accept: `ruff` + `mypy` clean. Unit tests. Integration test on weewx.
+**T4.2 — Wind rose API endpoint — REFACTORED**
+- ~~Owner: `clearskies-api-dev` · QC: Opus coordinator~~
+- ~~Create: `services/wind_rose.py`, `endpoints/wind_rose.py`~~
+- ~~Bins windSpeed × windDir → 16×7 matrix server-side.~~
+- **Status: REFACTORED — wind rose endpoint removed from API; Beaufort binning moved to dashboard per ADR-041/042 layer correction.** The API endpoint duplicated BFF work (Beaufort classification). The BFF already injects `beaufort` into every archive record. Client-side binning in `src/utils/wind-rose-binning.ts` now reads the BFF field directly. See [LAYER-CORRECTION-PLAN.md](LAYER-CORRECTION-PLAN.md).
 
 **T4.3 — Custom SQL query support**
 - Owner: `clearskies-api-dev` · QC: Opus coordinator
@@ -285,10 +285,10 @@ Recharts LineChart / BarChart / ComposedChart / RadialBarChart (wind rose)
 - New endpoint: `GET /charts/custom-query/{series_id}` — executes cached query, returns `[{x, y}]`.
 - Accept: Operator's actual custom SQL from `graphs.conf` works. `INSERT` rejected. Invalid SQL → skip. Timeout enforced.
 
-**T4.4 — Weather range / radial temperature chart**
+**T4.4 — Weather range / radial temperature chart — COMPLETE**
 - Owner: `clearskies-dashboard-dev` · QC: Opus coordinator
 - Create: `src/components/charts/WeatherRangeChart.tsx`
-- Uses Recharts polar components for radial high/low temperature spread.
+- Custom SVG polar chart (not Recharts — same pattern as WindRoseChart). Uses new `agg` param on `/archive` to fetch daily min + max in parallel. See [LAYER-CORRECTION-PLAN.md](LAYER-CORRECTION-PLAN.md) Phase 4.
 
 **T4.5 — page_content support**
 - Owner: `clearskies-dashboard-dev` · QC: Opus coordinator
@@ -316,6 +316,8 @@ Recharts LineChart / BarChart / ComposedChart / RadialBarChart (wind rose)
 **T4.10 — Phase 4 audit**
 - Owner: `clearskies-auditor` (Sonnet) · Final QC: Opus coordinator
 - Full audit: wind rose, custom SQL, weather range, timespan_specific, page_content, PNG/CSV, LTTB, migration tool, sr-only tables, reduced-motion, `tsc`, `ruff`/`mypy`, axe-core, keyboard nav, both themes.
+
+> **Phase 4 note (2026-06-05):** The Phase 4 audit surfaced an architectural violation — the wind rose endpoint (T4.2) placed Beaufort classification and direction binning in the API, duplicating the BFF's existing `beaufort` injection per ADR-041/042. Corrected in [LAYER-CORRECTION-PLAN.md](LAYER-CORRECTION-PLAN.md): API endpoint deleted, computation moved to dashboard client-side binning utility. T4.4 (weather range chart) also delivered via the layer correction plan, using a new `agg` query parameter on `/archive` instead of a chart-specific endpoint.
 
 ---
 
