@@ -466,27 +466,32 @@ content fits the box (`overflow:hidden`), the box does not grow to the content.
     (`9cccb53`), webcam tab pills match forecast style (`f3351de`), main temp + feels-like show
     1 decimal place (`18b2fee`).
 
-- **C7. Almanac page** (7 existing cards re-skinned + 2 net-new arc visualizations).
-  Brief: [briefs/C7-ALMANAC-PAGE-PLAN.md](briefs/C7-ALMANAC-PAGE-PLAN.md).
+- **C7. Almanac page** (7 cards redesigned + AstronomyAPI.com eclipse integration + planet viewing quality).
+  ✅ **CODE-COMPLETE + deployed (2026-06-06).** Brief: [archive/C7-ALMANAC-PAGE-PLAN.md](../archive/C7-ALMANAC-PAGE-PLAN.md).
 
-  | Surface | Footprint | Build state | Inspiration |
-  |---|---|---|---|
-  | A. PageHeaderCard | `full` 4×1 half-row | Net-new | — |
-  | B. Sun details + Sun arc | `wide` 2×2 | Exists (text) + net-new (arc SVG) | img-11, img-14 |
-  | C. Moon details + Moon arc | `wide` 2×2 | Exists (text) + net-new (arc SVG) | img-11, img-14 |
-  | D. Positional data | `tile` 1×1 | Re-skin | — |
-  | E. Monthly Averages (Recharts) | `full` rowSpan=2 (4×2) | Re-skin | — |
-  | F. Planets visible | `wide` 2×1 | Re-skin | — |
-  | G. Lunar Eclipses | `tile` 1×1 | Re-skin | — |
-  | H. Meteor Showers | `full` 4×1 | Re-skin | — |
+  Seven surfaces delivered: **(A)** PageHeaderCard; **(B)** Sun & Moon combined card — 3-column layout
+  (sun data | enlarged dual arc SVG with dasharray traveled-arc | moon data), today+tomorrow two-column
+  tables, moon phase circle with crescent shadow, moon name badges, solstice/equinox footer;
+  **(C)** Planet Timeline — planet columns with NASA thumbnails + viewing quality badges (BFF-enriched
+  via 7Timer seeing forecast) + SVG Gantt sunset→sunrise timeline with sky gradient; **(D)** Monthly
+  Averages — Recharts ComposedChart with theme-aware colors (`var(--temp-hi)`/`var(--temp-lo)` CSS
+  variables) and systemic chart contrast correction (`ensureChartContrast` utility);
+  **(E)** Solar Eclipses — AstronomyAPI.com contact times, visibility tiers with theme-aware Tailwind
+  classes, zoomed eclipse photos, Eye/EyeSlash icons; **(F)** Lunar Eclipses — contact times, time
+  ranges color-matched to visibility, type badge modals; **(G)** Meteor Showers — horizontally
+  scrollable columns with streak images, ZHR, viewing quality from moon illumination + radiant altitude.
 
-  **Work:** migrate `almanac.tsx` to Grid + PageHeaderCard; build Sun arc SVG (sunrise→sunset arc
-  with current-position marker, per img-11) and Moon arc SVG (moonrise→moonset arch + phase glyph,
-  per NOTES item 9 "moon gets its own arch"); re-skin all existing cards with design-system tokens.
-  **Data:** `/almanac`, `/climatology/monthly`, `/almanac/planets`, `/almanac/moon-names`,
-  `/almanac/eclipses`, `/almanac/meteor-showers`.
+  **Key technical deliverables beyond the plan:** systemic chart contrast correction for all operator-
+  configured chart colors (`src/utils/chart-contrast.ts`); sky condition classifier fix (added missing
+  Mostly Clear/Partly Cloudy tiers to low-sigma branch, raised threshold from 0.70→0.78); nav rail
+  width reduction + 4-second auto-hide.
+
+  **Data:** `/almanac` (today+tomorrow), `/climatology/monthly`, `/almanac/planets` (BFF-enriched),
+  `/almanac/moon-names`, `/almanac/eclipses/lunar`, `/almanac/eclipses/solar` (AstronomyAPI.com),
+  `/almanac/meteor-showers`, `/almanac/seeing-forecast` (7Timer).
   **Deferred:** year-long sunrise/sunset chart, daylight chart, moon-phase calendar (require
   endpoints not yet built — `/almanac/sun-times`, `/almanac/moon-phases`; not in C7 scope).
+  Missing i18n keys (~12, all have hardcoded English fallbacks). Mock data incomplete for eclipses/meteors.
 
 - **C8. Seismic page** (2 existing cards re-skinned + map legend net-new + ADR-046 reconciliation).
   Brief: [briefs/C8-SEISMIC-PAGE-PLAN.md](briefs/C8-SEISMIC-PAGE-PLAN.md).
@@ -568,6 +573,10 @@ C10 (reports/about/legal) ─────────────────┘
 - **Operator manual** (how operators set up and use the customizable dashboard + the system generally). A
   confirmed needed deliverable (per ADR-051); its own build, not part of this UI plan. Operator-facing
   explainer prose pulled off data pages lands here.
+
+### Charts page — fully rebuilt as config-driven system (2026-06-05)
+
+The `/charts` page has been completely rebuilt as an operator-configurable system driven by `charts.conf`. The hardcoded chart groups and 1,144-line `charts.tsx` were replaced with dynamic rendering from API-served config (206 lines). Wind rose and weather range chart use custom SVG components; standard charts use Recharts. A migration tool (`clearskies-migrate-charts`) converts existing Belchertown `graphs.conf` files. Full plan and phase details: [CONFIGURABLE-CHARTS-PLAN.md](briefs/CONFIGURABLE-CHARTS-PLAN.md).
 
 ### Charts layer correction — deferred fix-its (2026-06-05)
 
@@ -745,10 +754,12 @@ documentation created: `rules/coding.md` §6 (Recharts discipline) + §7 (build 
 and 3 execution briefs in `docs/planning/briefs/`.
 
 **Remaining Track C work (see roadmap above for full detail):**
-- **C7** Almanac page (7 re-skins + sun/moon arcs net-new)
+- ~~**C7** Almanac page~~ — ✅ COMPLETE 2026-06-06
 - **C8** Seismic page (re-skin + map legend + ADR-046 reconciliation)
 - **C9** Records page (structural reconciliation + re-skin — **blocked on operator decision**)
 - **C10** Reports, About, Legal pages (grid migration batch)
+
+**Also pending:** Visual verification of the `/charts` page (configurable charts system, CONFIGURABLE-CHARTS-PLAN.md Phase 5 deferred items). Charts code is deployed but operator has not visually verified against live API data.
 
 **BATCHED DEPLOY + LIVE VERIFICATION (all repos, one pass — NOW PAGE COMPLETE).**
 C1–C6 are all code-complete but unpushed (including the 2026-06-02 polish pass). All Now-page

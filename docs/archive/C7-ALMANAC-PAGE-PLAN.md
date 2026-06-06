@@ -1,6 +1,6 @@
 # C7 — Almanac Page Redesign — Execution Plan
 
-**Status:** IN PROGRESS — Planet viewing quality sub-plan complete (2026-06-04). Remaining: Phase 0–3.
+**Status:** COMPLETE (2026-06-06). All surfaces implemented, deployed, and visually verified. Remaining deferred items tracked in UI-REDESIGN-PLAN.md.
 **Component:** C7 of the UI redesign. Parent roadmap: [UI-REDESIGN-PLAN.md](../../docs/planning/UI-REDESIGN-PLAN.md) Track C.
 **Per-component workflow:** [UI-REDESIGN-PLAN.md](../../docs/planning/UI-REDESIGN-PLAN.md) "Per-component workflow."
 
