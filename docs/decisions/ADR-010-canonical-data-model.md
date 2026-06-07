@@ -190,6 +190,8 @@ def normalize_earthquakes(provider_response: dict) -> list[EarthquakeRecord]: ..
 ### Extras handling
 At startup the API introspects the archive table's actual columns; core columns map to first-class fields, everything else routes to `extras` keyed by the weewx column name verbatim — so [ADR-035](ADR-035-user-driven-column-mapping.md) promotion can identify them deterministically.
 
+**Note on `/archive` vs `/current`:** The `extras` model above applies to the canonical `Observation` entity served by `/current`. The `/archive` endpoint operates differently: it serves **all** columns present in the weewx archive table — there is no stock/non-stock distinction or whitelist gate. Any column an operator has added via a weewx extension (e.g., `aqi` from an AirVisual extension, custom sensor readings) is directly queryable by passing its database column name as the `observation_type` in `charts.conf`. Columns not in the STOCK_COLUMN_MAP are served using their database column name as the field name (identity mapping). This means no API changes are needed to chart operator-added extension columns.
+
 ### weewx field-name alignment
 Where weewx names a concept, the canonical model uses that name (camelCase per weewx convention: `outTemp`, `outHumidity`, `windSpeed`, `windDir`, `windGust`, `barometer`, `pressure`, `altimeter`, `dewpoint`, `windchill`, `heatindex`, `rainRate`, `rain`, `radiation`, `UV`, `inTemp`, `inHumidity`, `extraTemp1`/`extraHumid1`, `soilTemp1`, `soilMoist1`, `leafTemp1`, `leafWet1`, `ET`, `hail`, `hailRate`). Where weewx has none, invent camelCase (`precipProbability`, `precipType`, `cloudCover`, `weatherCode`, `weatherText`, `tempMax`/`tempMin`, `gustMax`, `validTime`, `validDate`, `sunrise`/`sunset`).
 

@@ -391,7 +391,17 @@ The charts system is operator-configurable via `charts.conf`, a ConfigObj/INI fi
 
 **Wind rose:** uses client-side binning from the BFF-injected `beaufort` field (per ADR-041 computation boundary amendment, ADR-042). The dashboard makes a **separate raw archive fetch** (no `aggregate_interval`) for wind rose data, with `fields=windSpeed,windDir` and a high limit. This preserves the actual wind speed distribution for correct Beaufort classification — aggregated (AVG'd) wind speeds would smooth out higher categories. The dashboard reads `beaufort.value` from these raw records and bins into a 16-direction × 7-Beaufort-speed matrix. No Beaufort computation in the dashboard — the BFF is the single Beaufort authority.
 
-**Weather range chart:** custom SVG polar chart showing daily temperature range. Uses the `agg` query parameter on `/archive` with dual fetches (`agg=min` and `agg=max`) to get daily extremes.
+**Special series types:** The charts system recognizes three series names that trigger automatic rendering behavior — the dashboard switches chart component and data-fetching strategy without any additional operator config:
+
+| Series name | Rendering | Data strategy | Automatic behaviors |
+|-------------|-----------|---------------|---------------------|
+| `windRose` | Custom SVG polar chart (16 directions × 7 Beaufort speed bands) | Separate raw (unaggregated) archive fetch for `windSpeed`+`windDir`; no `aggregate_interval` | Uses BFF-injected `beaufort` field for speed classification. Default Beaufort colors: `#7cb5ec, #b2df8a, #f7a35c, #8c6bb1, #dd3497, #e4d354, #268bd2`. Operator can override via `beauford0`–`beauford6` keys in `charts.conf`. |
+| `weatherRange` | Recharts arearange (when `area_display = 1`) or columnrange (default). Polar only when `polar = true` is explicitly set. | Dual archive fetches: `agg=min` and `agg=max` with `aggregate_interval=86400` (daily) | JS applies 15-band temperature color zones (deep blue ≤0°F → red-orange ≤90°F → pink-red >110°F; Celsius equivalents for metric stations). Per Belchertown wiki: default is columnrange, NOT polar. |
+| `haysChart` | Recharts arearange, `polar=true` (always — this is a circular 24-hour wind chart by design) | Queries `windSpeed` (max) and `windGust` (max) with auto-calculated `aggregate_interval` | Emulates Mount Washington Observatory circular wind chart: hour of day on circle, wind speed as radius. `yAxis_softMax` config controls radial scale. |
+
+The system is fully config-driven: operators configure series names in `charts.conf`; the dashboard detects special names and switches chart components automatically. All other series render as standard Recharts time-series charts (line/spline/area/column/scatter).
+
+**Weather range chart:** Recharts arearange or columnrange showing daily temperature range with 15-band color zones. Uses dual archive fetches (`agg=min` and `agg=max`) to get daily extremes. Renders as Cartesian chart by default; polar only when `polar = true` is explicitly set in `charts.conf`.
 
 **Custom SQL queries:** operators define SQL in `charts.conf` (disk-only, same trust model as Belchertown). Queries are pre-validated at startup via `EXPLAIN`, executed in read-only transactions with a 10-second timeout and DDL keyword blocklist. Served via `GET /api/v1/charts/custom-query/{series_id}`.
 

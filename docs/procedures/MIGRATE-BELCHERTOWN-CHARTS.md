@@ -107,9 +107,37 @@ Most INI keys are identical between Belchertown and Clear Skies by design. The m
 | `generate` | `generate` | **Ignored** — Belchertown report-cadence flag; no effect in Clear Skies. Annotated with `# NOTE:` by the migration tool. |
 | `[[[[states]]]]` | — | **Ignored** — Belchertown-only Highcharts hooks. Annotated with `# UNSUPPORTED:` by the migration tool. |
 
+## Custom weewx extension columns
+
+Any column an operator has added to the weewx archive table — for example, `aqi` from an AirVisual extension, or any sensor reading added by a third-party weewx plugin — can be charted directly without changes to the API. Use the database column name as the `observation_type` in `charts.conf`:
+
+```ini
+[[[aqiSeries]]]
+    observation_type = aqi
+    name = Air Quality Index
+    type = line
+```
+
+The API's column registry is populated from the actual database schema at startup. Any column present in the database is available to chart. There is no stock/non-stock distinction or whitelist — all archive columns are served.
+
+The self-hide pruning feature (which removes series for columns not present in your database) means the chart will simply not appear if the extension is not installed. No error is shown; the chart group is silently removed.
+
+## Special series types handled by the migration tool
+
+The migration tool handles three series types with automatic behavior that must be preserved when migrating from Belchertown:
+
+| Series name | Migration tool action | Rendering |
+|-------------|----------------------|-----------|
+| `windRose` | Preserved as-is; no config changes needed | Client-side SVG polar chart, 16 directions × 7 Beaufort bands, uses BFF-injected `beaufort` field |
+| `weatherRange` | Preserved as-is; `area_display` and `polar` keys passed through | Recharts arearange (default or when `area_display = 1`) or columnrange. Only polar when `polar = true`. 15-band temperature color zones applied automatically. |
+| `haysChart` | Preserved as-is | Always polar Recharts arearange; circular 24-hour wind chart |
+| `rainTotal` (series name) | Auto-promoted: `aggregate_type` changed from `sum` to `sumcumulative`; `observation_type = rain` injected | Cumulative running total computed server-side via SUM-per-bucket then accumulation |
+
+These series names are detected at render time by the dashboard. No additional config is needed beyond the series name.
+
 ## Known differences and limitations
 
-1. **Rendering engine:** Belchertown uses Highcharts (server-rendered); Clear Skies uses Recharts (client-side React) for standard charts and custom SVG for wind rose and weather range charts. Visual appearance differs but data is equivalent.
+1. **Rendering engine:** Belchertown uses Highcharts (server-rendered); Clear Skies uses Recharts (client-side React) for standard charts, a custom SVG for the wind rose, and Recharts arearange for the weather range chart. Visual appearance differs but data is equivalent.
 
 2. **`generate` key:** Belchertown uses this to control which timespan groups (`day`, `week`, `month`, `year`) generate reports. Clear Skies ignores it — all configured groups are always served.
 

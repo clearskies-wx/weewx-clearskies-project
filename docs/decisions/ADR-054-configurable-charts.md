@@ -33,7 +33,7 @@ Key sub-decisions:
 
 3. **Wind rose as client-side SVG:** custom SVG polar chart in the dashboard, not Recharts `RadialBarChart` (better accessibility and control). Binning reads the BFF-injected `beaufort` field from archive records (ADR-042). No Beaufort computation in the dashboard (ADR-041 computation boundary amendment).
 
-4. **Weather range chart:** custom SVG polar chart showing daily temperature range. Uses dual `agg` fetch (`min` + `max`) via the `/archive?agg=min|max` parameter.
+4. **Weather range chart:** Recharts arearange/columnrange chart showing daily temperature range with 15-band temperature color zones (deep blue for cold through red for hot — matches Belchertown's `get_outTemp_color()` zones). Uses dual archive fetches (`agg=min` and `agg=max`) with `aggregate_interval=86400` (daily). Renders as Cartesian arearange (when `area_display = 1`) or columnrange (default); polar only when operator explicitly sets `polar = true`. This is NOT a polar chart by default — the initial implementation rendered it as a circular polar SVG regardless of config, which was incorrect. Rewritten 2026-06-07 as a standard Recharts arearange chart per Belchertown wiki behavior.
 
 5. **Migration tool:** `clearskies-migrate-charts` CLI converts Belchertown `graphs.conf` → `charts.conf`. Most INI keys are 1:1 by design; unsupported keys are annotated with `# NOTE:` comments. The tool also injects rendering defaults: `markerEnabled=false` on line/spline/area, `type=scatter` promotion for `lineWidth=0` series, `yAxisTickDecimals=2` for barometer, `yAxis_min=0` for rain.
 
@@ -43,13 +43,26 @@ Key sub-decisions:
 
 8. **BFF archive conversion (2026-06-07):** The BFF proxy now applies `transform_record()` to `/archive` responses, injecting `beaufort` and unit-converting all fields. Wind rose data uses a separate raw (unaggregated) archive fetch to preserve wind speed distribution for correct Beaufort classification.
 
-9. **Deferred:** UI-based chart config editor. Operators edit the INI file directly for v0.1.
+9. **Special series types (2026-06-07):** Three series names trigger automatic rendering behavior — the dashboard switches chart component and data strategy when it encounters them in the config:
+
+   | Series name | Rendering | Key automatic behaviors |
+   |-------------|-----------|------------------------|
+   | `windRose` | Custom SVG polar chart | 16 directions × 7 Beaufort speed bands. Raw (unaggregated) separate archive fetch for `windSpeed`+`windDir`. Default Beaufort colors, overridable via `beauford0`–`beauford6`. Always polar. |
+   | `weatherRange` | Recharts arearange (default) or columnrange. Polar ONLY when `polar=true` explicitly set. | 15-band temperature color zones (°F and °C variants). Dual archive fetch `agg=min`+`agg=max`, `aggregate_interval=86400`. |
+   | `haysChart` | Recharts arearange, always polar | Circular 24-hour wind chart (Mount Washington Observatory style). Queries `windSpeed`+`windGust` max. `yAxis_softMax` controls radial scale. |
+   | `rainTotal` (series name) | Standard time-series | Migration tool auto-promotes to `aggregate_type = sumcumulative`. Queries `rain` column with `observation_type = rain`. |
+
+   These behaviors are config-driven (series name in `charts.conf` triggers them) but not further operator-configurable at the component level — they match the Belchertown auto-behavior model exactly.
+
+10. **API serves all archive columns (2026-06-07):** The `/archive` endpoint has no stock/non-stock column gate. Any column present in the weewx archive table is queryable by passing its database column name as `observation_type`. The former `STOCK_COLUMN_MAP` was a convenience mapping for canonical field names, not a whitelist. Unmapped columns use their database column name as the API field name (identity mapping). This enables operators to chart any weewx extension column (e.g., `aqi` from an AirVisual extension) without API changes. The `ColumnRegistry` (used for self-hide pruning) is populated from the actual database schema at startup, not from a hardcoded list.
+
+11. **Deferred:** UI-based chart config editor. Operators edit the INI file directly for v0.1.
 
 ## Consequences
 
-- **API:** new `services/charts_config.py` parser, `GET /api/v1/charts/config` endpoint, `GET /api/v1/charts/custom-query/{series_id}` endpoint, `ChartsSettings` in config, migration tool in `tools/migrate_charts.py`. New `aggregate_interval` and `agg_map` query parameters on `/archive` for proportional scaling with per-field aggregation. Daily aggregation fixed to use `wsum/sumtime` for avg (no `avg` column in weewx day tables). Hourly aggregation `FROM_UNIXTIME` `%` escaping fixed. The `sumcumulative` aggregate type applies SQL SUM then post-processes query results into a running total.
+- **API:** new `services/charts_config.py` parser, `GET /api/v1/charts/config` endpoint, `GET /api/v1/charts/custom-query/{series_id}` endpoint, `ChartsSettings` in config, migration tool in `tools/migrate_charts.py`. New `aggregate_interval` and `agg_map` query parameters on `/archive` for proportional scaling with per-field aggregation. Daily aggregation fixed to use `wsum/sumtime` for avg (no `avg` column in weewx day tables). Hourly aggregation `FROM_UNIXTIME` `%` escaping fixed. The `sumcumulative` aggregate type applies SQL SUM then post-processes query results into a running total. `aggregate_interval` upper bound removed — accepts any value `≥60` seconds (was capped at 604800). All archive columns served: no STOCK_COLUMN_MAP whitelist gate on `/archive`; any column in the database is queryable by its column name.
 - **BFF (Realtime):** proxy now applies `transform_record()` to `/archive` responses (Shape 2b in `proxy.py`), injecting `beaufort` and unit-converting all fields. Values flattened to full-precision scalars; `beaufort` kept as ConvertedValue dict for wind rose binning.
-- **Dashboard:** `charts.tsx` rewritten from 1,144 to 206 lines. New `ConfigDrivenGroup`, `ConfigDrivenChart`, `WindRoseChart`, `WeatherRangeChart` components. Client-side `wind-rose-binning.ts` utility. Rendering defaults match Belchertown: markers off, Y-axis auto-scale, X-axis `minTickGap`, 10-color palette, `ensureChartContrast`, phantom right axis for uniform chart widths, sr-only tables wrapped in div. Wind rose uses separate raw archive fetch. Proportional `aggregate_interval` and `agg_map` computed from chart config.
+- **Dashboard:** `charts.tsx` rewritten from 1,144 to 206 lines. New `ConfigDrivenGroup`, `ConfigDrivenChart`, `WindRoseChart`, `WeatherRangeChart` components. Client-side `wind-rose-binning.ts` utility. Rendering defaults match Belchertown: markers off, Y-axis auto-scale, X-axis `minTickGap`, 10-color palette, `ensureChartContrast`, phantom right axis for uniform chart widths, sr-only tables wrapped in `div.sr-only`. Wind rose uses separate raw archive fetch. Proportional `aggregate_interval` and `agg_map` computed from chart config. `WeatherRangeChart` rewritten from circular polar SVG to Recharts arearange with 15-band temperature color zones (2026-06-07) — the initial implementation incorrectly rendered as a polar chart regardless of config; the correct default is Cartesian arearange (or columnrange). Monthly/yearly data flow fixed: `hasRangeChart` no longer blocks the main archive fetch; groups with both range and regular charts render all charts. Year/month dropdowns moved inside the Card. X-axis formatter uses the actual displayed date range. `time_length` string parsing added (`month`→2592000, `year`→31536000). `sr-only` floating text fixed for `WeatherRangeChart` and `HaysChart` tables. `agg_map` key aliasing fixed: FIELD_ALIASES applied to keys; `"None"` aggregate type filtered out.
 - **Hardcoded `_BUILTIN_GROUPS` deleted** from `services/charts.py`. The only chart source is the config file (or built-in defaults when no file exists).
 - **Operator familiarity preserved:** the config format is intentionally identical to Belchertown's `graphs.conf` — operators migrating from Belchertown can run the migration tool and get a working config immediately.
 - **No chart-specific API endpoints** beyond `custom-query`. The API serves general-purpose data (`/archive`, `/climatology/monthly`); the config tells the dashboard what to fetch and how to render. Per ADR-010 and ADR-041 computation boundary amendment.
@@ -83,7 +96,7 @@ Key sub-decisions:
 - `src/components/charts/ConfigDrivenChart.tsx` — renders any chart type from config
 - `src/components/charts/ConfigDrivenGroup.tsx` — group container with range selectors
 - `src/components/charts/WindRoseChart.tsx` — custom SVG polar wind rose
-- `src/components/charts/WeatherRangeChart.tsx` — custom SVG polar temperature range
+- `src/components/charts/WeatherRangeChart.tsx` — Recharts arearange/columnrange temperature range with 15-band color zones (rewritten 2026-06-07 from circular polar SVG)
 - `src/utils/wind-rose-binning.ts` — client-side direction × Beaufort binning
 
 ### Out of scope

@@ -1,9 +1,17 @@
 # Charts System — Fixit List
 
 **Source:** Operator visual review of deployed charts page (2026-06-06)
-**Status:** COLLECTING — operator is providing feedback, DO NOT ACT until list is complete
+**Status:** ACTIVE — system-level fixes from 2026-06-07 session applied (see "What was already done" below). Per-chart rendering issues (F1–F13) remain open; operator is providing additional feedback.
 
-**What was already done (2026-06-07):** The per-field `aggregate_type` system is complete. Supported types: `avg`, `max`, `min`, `sum`, `count`, `sumcumulative`. The `sumcumulative` type applies SUM per time bucket then accumulates into a running total — used for cumulative rain totals (replaces Belchertown's hardcoded `rainTotal` post-processing). The migration tool auto-promotes `rainTotal` series from `sum` to `sumcumulative`.
+**What was already done (2026-06-07):**
+
+- **Per-field `aggregate_type` system complete.** Supported types: `avg`, `max`, `min`, `sum`, `count`, `sumcumulative`. The `sumcumulative` type applies SUM per time bucket then accumulates into a running total — used for cumulative rain totals (replaces Belchertown's hardcoded `rainTotal` post-processing). Migration tool auto-promotes `rainTotal` series from `sum` to `sumcumulative`.
+- **API serves all archive columns.** Removed STOCK_COLUMN_MAP as a field validation gate on `/archive`. Any column in the weewx archive table (including operator-added extension columns like `aqi`) is directly queryable. Unmapped columns use their database column name as the field name (identity mapping). Fixes the Air Quality tab "unable to load chart data" error.
+- **WeatherRangeChart rewritten.** Was incorrectly rendering as a circular polar SVG regardless of config. Now renders as a standard Recharts arearange chart with Belchertown's 15-band temperature color zones (blue cold → green mild → red hot). Per Belchertown wiki: default is Cartesian arearange (or columnrange when `area_display` not set); only goes polar when `polar = true` explicitly set.
+- **`aggregate_interval` upper bound removed.** Was capped at 604800 (7 days); now accepts any value `≥60` seconds.
+- **Monthly/yearly data flow fixed.** `hasRangeChart` no longer blocks the main archive fetch. Groups with both range and regular charts render all charts. Year/month dropdowns moved inside Card. X-axis formatter uses actual displayed date range. `time_length` string parsing added (`month`→2592000, `year`→31536000).
+- **sr-only floating text fixed.** WeatherRangeChart and HaysChart sr-only data tables wrapped in `div.sr-only` — previously the text appeared as fixed-position floating artifacts on the page.
+- **`agg_map` key aliasing fixed.** FIELD_ALIASES applied to `agg_map` keys; `"None"` aggregate type filtered from the map before sending to API.
 
 ---
 
