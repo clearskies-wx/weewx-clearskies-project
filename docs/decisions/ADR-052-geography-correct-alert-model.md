@@ -1,7 +1,7 @@
 ---
 status: Accepted
 date: 2026-06-01
-amended: 2026-06-02
+amended: 2026-06-07
 deciders: shane
 supersedes:
 superseded-by:
@@ -165,3 +165,5 @@ Expanding direct provider coverage (Met Office API, JMA API, BoM API, IMD API, e
 ## Amendment history
 
 **Amended 2026-06-02: operator directive — OWM alerts default to level 2 rather than null.** Alerts deserve visibility regardless of provider metadata limitations. If an alert exists, it warrants advisory-level visibility; treating it as null downplays it. Changed: `severityLevel` null → 2, `severityLabel` null → "Alert" for OWM passthrough. Acceptance criterion 5 updated. Implementation guidance for `openweathermap.py` and `alert-banner.tsx` updated accordingly. The null branch in the dashboard banner is now reserved for future providers with genuinely indeterminate severity.
+
+**Amended 2026-06-07: Statement-tier alerts (level 1) rendered identically to Advisory (level 2).** The data model is unchanged — `severityLevel=1` remains valid for sorting and the NWS provider still maps Statement events to level 1. The change is purely visual: the dashboard color palette now uses the same amber treatment (`#ca8a04`) for both level 1 and level 2 instead of the previous slate grey (`#475569`) for level 1. Rationale: the grey treatment de-emphasized statements to the point of invisibility — the badge had insufficient contrast on dark backgrounds (WCAG §1.4.3 failure) and the muted color communicated "ignorable" rather than "informational." Statements are informational alerts that still deserve attention. Applied to NWS, Environment Canada, and the generic fallback color maps in `alert-colors.ts`.
