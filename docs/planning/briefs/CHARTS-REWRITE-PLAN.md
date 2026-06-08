@@ -43,8 +43,8 @@ Agents may ONLY `git add`, `git commit`, `git status`, `git log`, `git diff`. NO
 | # | Bug | Root cause | Fix |
 |---|-----|-----------|-----|
 | C1 | Archive fetch drops most fields | `fields` set only collects `observationType`, not `seriesId` fallback | Use `observationType ?? seriesId`, skip virtual series (windRose, weatherRange, haysChart), alias rainTotal→rain |
-| C2 | Custom SQL data never fetched | No client function, no hook, no merge | Add `getCustomQuery()` client, `useCustomQueries()` hook, merge into chart data by month index (climatology) or timestamp (archive) |
-| C3 | CLIMATOLOGY_FIELD_MAP keys don't match config | Map uses `outTemp:avg_max` but config sends `average_type=max` producing key `outTemp:max` | Add short-form keys to map |
+| C2 | Custom SQL data never fetched | No client function, no hook, no merge | Add `getCustomQuery()` client, `useCustomQueries()` hook, merge into grouped archive data by month index or timestamp (archive) |
+| C3 | ~~CLIMATOLOGY_FIELD_MAP keys don't match config~~ | **OBSOLETE (2026-06-07)** — `CLIMATOLOGY_FIELD_MAP` was removed. Grouped archive charts now call `GET /api/v1/archive/grouped` directly; there is no client-side field map. Two-level aggregation is expressed as `field:agg_type:avg_type` in the `fields` parameter (e.g., `outTemp:avg:max`). | No action needed. |
 
 ### HIGH (renders wrong)
 | # | Bug | Root cause | Fix |
@@ -145,14 +145,12 @@ The migration tool must bridge the gap between what Belchertown derives at runti
 **T1.2 — Custom SQL data pipeline**
 - Owner: `clearskies-dashboard-dev` · QC: coordinator (verify rain bars render)
 - Files: `client.ts` (add `getCustomQuery()`), `useWeatherData.ts` (add `useCustomQueries()` hook), `ConfigDrivenGroup.tsx` (merge)
-- Do: `useCustomQueries()` accepts array of series IDs, fetches all in parallel via `Promise.all`, returns `Record<seriesId, [{x,y}]>`. Merge into climatology data by month index (x=1-12 → row index 0-11). Merge into archive data by timestamp match. Support ANY number of custom SQL series per group.
+- Do: `useCustomQueries()` accepts array of series IDs, fetches all in parallel via `Promise.all`, returns `Record<seriesId, [{x,y}]>`. Merge into grouped archive data by month index (x=1-12 → row index 0-11). Merge into regular archive data by timestamp match. Support ANY number of custom SQL series per group.
 - Accept: Average Climate chart shows rain column bars. Custom SQL data appears in tooltips.
 
-**T1.3 — Fix climatology field map**
-- Owner: `clearskies-dashboard-dev` · QC: coordinator
-- File: `ConfigDrivenGroup.tsx`
-- Do: Add short-form keys (`outTemp:max`, `outTemp:min`, `rain:sum`, `rainTotal:sum`) alongside existing long-form keys in CLIMATOLOGY_FIELD_MAP.
-- Accept: All 3 temperature lines render on Average Climate tab.
+**T1.3 — Fix climatology field map** — **SUPERSEDED (2026-06-07)**
+- `CLIMATOLOGY_FIELD_MAP` and `useClimatologyMonthly` no longer exist. The `allClimatology` data store and `isChartClimatology` detection were removed. Grouped archive charts now use `useGroupedArchive` hook, which calls `GET /api/v1/archive/grouped` per-chart with `xAxis_groupby` detection. Two-level aggregation (`avg:max`, `avg:min`, `avg:sum`) is encoded as `field:agg_type:avg_type` in the API request and dispatched server-side. No client-side field map is needed.
+- Charts that were "climatology charts" are now "grouped archive charts" — they use independent per-chart data sourcing via `xAxis_groupby` detection, not a shared `allClimatology` response.
 
 ### PHASE 2 — Axis & tooltip fixes (Dashboard)
 
@@ -289,7 +287,7 @@ The migration tool must bridge the gap between what Belchertown derives at runti
 | 0 | T0.5 Re-migrate + deploy | Coordinator | Self |
 | 1 | T1.1 Field collection fix | `clearskies-dashboard-dev` | Coordinator: verify API request |
 | 1 | T1.2 Custom SQL pipeline | `clearskies-dashboard-dev` | Coordinator: verify rain bars |
-| 1 | T1.3 Climatology field map | `clearskies-dashboard-dev` | Coordinator: verify 3 temp lines |
+| 1 | ~~T1.3 Climatology field map~~ | SUPERSEDED — `CLIMATOLOGY_FIELD_MAP` removed; grouped archive via `useGroupedArchive` + `/archive/grouped` | — |
 | 2 | T2.1 Migration tool axis labels | `clearskies-api-dev` | Coordinator: re-migrate + verify |
 | 2 | T2.2 Right axis tick fix | `clearskies-dashboard-dev` | Coordinator: verify right axis numbers |
 | 2 | T2.3 Compass labels | `clearskies-dashboard-dev` | Coordinator: verify N/E/S/W |

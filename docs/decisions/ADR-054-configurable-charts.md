@@ -65,7 +65,44 @@ Key sub-decisions:
 - **Dashboard:** `charts.tsx` rewritten from 1,144 to 206 lines. New `ConfigDrivenGroup`, `ConfigDrivenChart`, `WindRoseChart`, `WeatherRangeChart` components. Client-side `wind-rose-binning.ts` utility. Rendering defaults match Belchertown: markers off, Y-axis auto-scale, X-axis `minTickGap`, 10-color palette, `ensureChartContrast`, phantom right axis for uniform chart widths, sr-only tables wrapped in `div.sr-only`. Wind rose uses separate raw archive fetch. Proportional `aggregate_interval` and `agg_map` computed from chart config. `WeatherRangeChart` rewritten from circular polar SVG to Recharts arearange with 15-band temperature color zones (2026-06-07) — the initial implementation incorrectly rendered as a polar chart regardless of config; the correct default is Cartesian arearange (or columnrange). Monthly/yearly data flow fixed: `hasRangeChart` no longer blocks the main archive fetch; groups with both range and regular charts render all charts. Year/month dropdowns moved inside the Card. X-axis formatter uses the actual displayed date range. `time_length` string parsing added (`month`→2592000, `year`→31536000). `sr-only` floating text fixed for `WeatherRangeChart` and `HaysChart` tables. `agg_map` key aliasing fixed: FIELD_ALIASES applied to keys; `"None"` aggregate type filtered out.
 - **Hardcoded `_BUILTIN_GROUPS` deleted** from `services/charts.py`. The only chart source is the config file (or built-in defaults when no file exists).
 - **Operator familiarity preserved:** the config format is intentionally identical to Belchertown's `graphs.conf` — operators migrating from Belchertown can run the migration tool and get a working config immediately.
-- **No chart-specific API endpoints** beyond `custom-query`. The API serves general-purpose data (`/archive`, `/climatology/monthly`); the config tells the dashboard what to fetch and how to render. Per ADR-010 and ADR-041 computation boundary amendment.
+- **No chart-specific API endpoints** beyond `custom-query`. The API serves general-purpose data (`/archive` for time-series, `/archive/grouped` for categorical grouped aggregation); the config tells the dashboard what to fetch and how to render. Per ADR-010 and ADR-041 computation boundary amendment.
+
+- **No climatology concept.** `xAxis_groupby` charts (Average Climate, monthly averages) use `GET /api/v1/archive/grouped` with a calendar `group_by` parameter. There is no separate `/climatology/*` endpoint family. The `xAxis_groupby` key in `charts.conf` triggers grouped-archive fetching; time-range selection then replaces what was previously a dedicated climatology endpoint.
+
+- **`/archive/grouped` endpoint** (`GET /api/v1/archive/grouped`): General-purpose categorical aggregation grouped by calendar period.
+
+  | Parameter | Type | Description |
+  |-----------|------|-------------|
+  | `group_by` | string | Grouping period: `month`, `day`, `hour`, or `year` |
+  | `fields` | string | Comma-separated field specs: `field:agg_type` or `field:agg_type:avg_type` |
+  | `from` | integer (optional) | Start epoch timestamp (Unix seconds) |
+  | `to` | integer (optional) | End epoch timestamp (Unix seconds) |
+  | `force_full_period` | boolean (optional) | When true, fills missing calendar slots with null |
+
+  Response shape:
+  ```json
+  {
+    "data": {
+      "labels": ["Jan", "Feb", ...],
+      "series": { "outTemp": [45.2, 48.1, ...], "rain": [1.2, null, ...] }
+    },
+    "generatedAt": "2026-06-07T12:00:00Z"
+  }
+  ```
+
+  Per-field aggregation dispatch (resolved from the `field:agg_type[:avg_type]` spec):
+
+  | Spec example | Meaning |
+  |---|---|
+  | `outTemp:avg:max` | Average of daily MAX values (Belchertown "avg_max") |
+  | `outTemp:avg:min` | Average of daily MIN values (Belchertown "avg_min") |
+  | `rain:avg:sum` | Average of period totals |
+  | `outTemp:avg` | Straight average across all records in the period |
+  | `rain:sum` | Direct SUM across all records |
+  | `outTemp:max` | Direct MAX across all records |
+  | `outTemp:min` | Direct MIN across all records |
+
+- **`average_type` per-series config key:** Operators specify two-level aggregation in `charts.conf` via `average_type`. The dashboard encodes this as `field:aggregate_type:average_type` in the `fields` parameter sent to `/archive/grouped`. Example: `aggregate_type = avg` + `average_type = max` → `outTemp:avg:max` (average of daily highs).
 
 ## Acceptance criteria
 
