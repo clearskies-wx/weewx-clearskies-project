@@ -7,7 +7,11 @@ reference/CREDENTIALS.md
 # IDE & OS
 .vscode/
 .idea/
-.claude/
+
+# Claude Code — track agents and shared settings, ignore machine-specific files
+.claude/*
+!.claude/agents/
+!.claude/settings.json
 .mcp.json
 *.swp
 *.swo
@@ -33,6 +37,9 @@ tmp/
 weewx-output/
 Belchertown-dev/
 *.backup.*
+
+# Nextcloud-synced local files (credentials, machine-specific config)
+.local/
 
 # Child repos (independent git repos per ADR-036) — meta tracks the directory marker only
 repos/*
