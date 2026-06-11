@@ -684,7 +684,12 @@ paths:
     get:
       tags: [Branding]
       summary: Operator branding configuration
+      deprecated: true
       description: |
+        **Deprecated** — branding config moves to static file served by Caddy
+        (`/branding.json`). See ADR-022 amendment 2026-06-10. This endpoint
+        will be removed in a future release.
+
         Returns the operator-configured branding metadata: site title,
         logo (light and dark variants), favicon URL, and social media
         profile links. Fields are omitted when not configured.

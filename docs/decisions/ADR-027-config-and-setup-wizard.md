@@ -241,10 +241,9 @@ Reduced from the original 9-step design during live testing (2026-05-20). Remove
 
 DB type + connection; input mode (`direct` / `mqtt`); MQTT fields when mqtt is selected: `mqtt_broker_host`, `mqtt_broker_port`, `mqtt_topic`, `mqtt_client_id`, `mqtt_username`, `mqtt_password` (env var reference only — stored in `secrets.env`), `mqtt_tls`, `mqtt_qos`, `mqtt_keepalive`; forecast provider + credentials per [ADR-007](ADR-007-forecast-providers.md); alert provider; station identity (populated from `/station` endpoint); public hostname for the docker-compose Caddy path; logging destination; UI's own bind/port + TLS cert paths + `[ui] enabled` flag (latter not flippable from the UI — would lock the operator out). Topology and bind addresses for api/realtime are auto-configured from the DB connection and available in the master config for power users.
 
-NOT collected: theme/branding ([ADR-022](ADR-022-theming-branding-mechanism.md)), i18n locale ([ADR-021](ADR-021-i18n-strategy.md)), end-user accounts (none — see [ADR-008](ADR-008-auth-model.md)).
+Collected in Appearance step: theme/branding ([ADR-022](ADR-022-theming-branding-mechanism.md)) — wizard writes `branding.json` directly. NOT collected: i18n locale ([ADR-021](ADR-021-i18n-strategy.md)), end-user accounts (none — see [ADR-008](ADR-008-auth-model.md)).
 
 ## Out of scope
-- Dashboard runtime config (theme, palette, station-name display) — served by API ([ADR-022](ADR-022-theming-branding-mechanism.md)).
 - Long-lived daemon admin UI — deferred.
 - End-user accounts (multi-user roles, ACLs) — single admin credential at v0.1.
 
