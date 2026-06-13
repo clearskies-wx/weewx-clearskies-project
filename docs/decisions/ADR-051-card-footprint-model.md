@@ -189,11 +189,14 @@ free-floating page-level content anywhere on the site.
 
 **Context:** The original ADR defines the half-row (5.5rem) as the base grid track. Implementation
 revealed three issues: (1) control strips (buttons, dropdowns) are functionally thinner than 5.5rem —
-they were hacked with `py-2` padding overrides to appear compact inside half-row cards; (2) 7 of 9 pages
-override the grid to `md:auto-rows-[auto]`, bypassing the track system entirely; (3) mobile responsive
-token values were added (card-row 13rem mobile / 11rem desktop) but never documented in the ADR. This
-amendment introduces a quarter-row base track, eliminates row-gap in favor of card margins, documents
-mobile token values, and adds the `--card-content-max` token.
+they were hacked with `py-2` padding overrides to appear compact inside half-row cards; (2) the rigid
+grid track system is only appropriate for the Now page (operator-customizable grid with known card
+footprints) — all other pages need content-adaptive card heights (`auto-rows-[auto]`) because their
+cards contain variable-length content (forecast tables, charts, record lists, legal text); (3) mobile
+responsive token values were added (card-row 13rem mobile / 11rem desktop) but never documented in
+the ADR. This amendment introduces a quarter-row base track, eliminates row-gap in favor of card
+margins, documents mobile token values, adds the `--card-content-max` token, and clarifies that rigid
+grid tracks apply only to the Now page.
 
 ### Changes to the Decision
 
@@ -245,6 +248,24 @@ self-constrain via `maxHeight: var(--card-content-max)` so they never overflow t
 | Data card (default) | `1` | 4 | 11rem | 13rem |
 | Tall card | `2` | 8 | 22rem | 26rem |
 
+**7. Rigid grid tracks apply to the Now page only; all other pages use content-adaptive heights.**
+
+The quarter-row track system (`md:auto-rows-[var(--card-quarter-row)]`) enforces rigid card heights
+that are correct for the Now page — the operator-customizable grid where cards have known footprints
+and will eventually support drag-and-drop layout. On all other pages (Forecast, Charts, Almanac,
+Seismic, Records, Reports, About, Legal), cards must be **content-adaptive**: they use `auto-rows-[auto]`
+so cards grow to fit their content, with `min-h` from `rowSpan` tokens preventing collapse.
+
+The original implementation had 7 of 9 pages setting `md:auto-rows-[auto]` — this was misidentified
+as "bypassing the track system" and removed. In fact, those pages needed content-driven heights because
+their cards contain variable-length content (forecast tables, charts, record lists, report data, legal
+text) that cannot be predicted at grid-definition time.
+
+**Implementation:** The `PageLayout` template (used by all non-Now pages) passes `auto-rows-[auto]`
+as the grid's `md:auto-rows` value. The Now page's grid retains `md:auto-rows-[var(--card-quarter-row)]`.
+Cards still declare `rowSpan` for `min-h` sizing, but the grid does not constrain their maximum height
+on non-Now pages.
+
 ### Updated sizing tokens table (replaces original)
 
 | Token | Mobile (<768px) | Desktop (md ≥768px) | Meaning |
@@ -268,3 +289,5 @@ self-constrain via `maxHeight: var(--card-content-max)` so they never overflow t
 - [ ] Graphic containers (gauges, arcs, tile-card charts) self-constrain via `maxHeight: var(--card-content-max)`.
 - [ ] No ad-hoc Card className overrides for sizing (`py-2`, manual `min-h-[var(--card-half-row)]`) in route files.
 - [ ] Token arithmetic holds: quarter × 2 = half, quarter × 4 = row, quarter × 8 = tall (both viewports).
+- [ ] Now page grid uses `md:auto-rows-[var(--card-quarter-row)]` (rigid tracks for operator-customizable layout).
+- [ ] All non-Now pages (via PageLayout) use `auto-rows-[auto]` — cards grow to fit content, with `min-h` from `rowSpan` preventing collapse.
