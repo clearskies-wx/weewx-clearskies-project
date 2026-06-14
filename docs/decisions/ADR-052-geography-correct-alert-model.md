@@ -122,7 +122,7 @@ Expanding direct provider coverage (Met Office API, JMA API, BoM API, IMD API, e
 - [ ] OWM provider sets `severityLevel=2` and `severityLabel="Alert"` (operator directive — advisory-level default). Does NOT set null.
 - [ ] OpenAPI contract updated: AlertRecord schema reflects new fields; `?severity=` becomes `?minLevel=`.
 - [ ] Dashboard `AlertRecord` TypeScript type updated.
-- [ ] Dashboard alert banner renders native label (`severityLabel`) when available, falls back to event text.
+- [ ] Dashboard alert banner does NOT render `severityLabel` as a visual badge. Severity is communicated via icon panel color, icon, and ARIA roles.
 - [ ] Dashboard alert banner uses level-2 (yellow/advisory) glass, `ph:warning`, `role="status"` for OWM alerts (arrive with `severityLevel=2`, `severityLabel="Alert"`). Null treatment reserved for future providers with indeterminate severity.
 - [ ] 5 new alert icons (earthquake, volcano, hail, landslide, air) added to `alert-icon-map.tsx`.
 - [ ] `alert-category.ts` maps all 33 Aeris international hazard codes to icon categories.
@@ -146,7 +146,7 @@ Expanding direct provider coverage (Met Office API, JMA API, BoM API, IMD API, e
 - `src/api/types.ts`: Update `AlertRecord` interface.
 - `src/components/icons/alert-icon-map.tsx`: Add 5 new Material Symbols inline SVGs (same pattern as existing `Flood` and `Tsunami` cross-pack components). Expand the switch statement in `AlertIcon`.
 - `src/components/icons/alert-category.ts`: Expand category mapping to cover all 33 Aeris international hazard codes (`AW.XX` prefix → category).
-- `src/components/shared/alert-banner.tsx`: Use `severityLabel` for display when non-null; fall back to `event`. Use `severityLevel` for ARIA urgency (4 → `role="alert"`, 1–3 → `role="status"`, null → `role="status"`). Apply severity-keyed glass color when `severityLevel` non-null; neutral alert glass when null. Note: OWM alerts arrive with `severityLevel=2` and `severityLabel="Alert"` by default, so the null branch is reserved for future providers with genuinely indeterminate severity.
+- `src/components/shared/alert-banner.tsx`: Do NOT render `severityLabel` as a visual badge — severity is communicated via icon panel color and ARIA roles. Use `severityLevel` for ARIA urgency (4 → `role="alert"`, 1–3 → `role="status"`, null → `role="status"`). Apply severity-keyed glass color when `severityLevel` non-null; neutral alert glass when null. Note: OWM alerts arrive with `severityLevel=2` and `severityLabel="Alert"` by default, so the null branch is reserved for future providers with genuinely indeterminate severity.
 
 **Out of scope:**
 - Changing the OWM provider to use the Push Weather Alerts API (opaque pricing, manual signup).
@@ -165,5 +165,7 @@ Expanding direct provider coverage (Met Office API, JMA API, BoM API, IMD API, e
 ## Amendment history
 
 **Amended 2026-06-02: operator directive — OWM alerts default to level 2 rather than null.** Alerts deserve visibility regardless of provider metadata limitations. If an alert exists, it warrants advisory-level visibility; treating it as null downplays it. Changed: `severityLevel` null → 2, `severityLabel` null → "Alert" for OWM passthrough. Acceptance criterion 5 updated. Implementation guidance for `openweathermap.py` and `alert-banner.tsx` updated accordingly. The null branch in the dashboard banner is now reserved for future providers with genuinely indeterminate severity.
+
+**Amended 2026-06-13: Severity badge removed from alert banner display.** The `severityLabel` text badge (e.g., "STATEMENT", "WARNING", "Amber") is no longer rendered in the alert banner UI. The severity information is already communicated through the colored left icon panel, the icon itself, and ARIA roles — the badge was redundant visual noise. The `severityLabel` field remains in the canonical data model for programmatic use (ARIA labels, sorting, logging) but has no visual representation in the banner. Acceptance criterion "Dashboard alert banner renders native label (`severityLabel`) when available" is amended to exclude visual badge rendering.
 
 **Amended 2026-06-07: Statement-tier alerts (level 1) rendered identically to Advisory (level 2).** The data model is unchanged — `severityLevel=1` remains valid for sorting and the NWS provider still maps Statement events to level 1. The change is purely visual: the dashboard color palette now uses the same amber treatment (`#ca8a04`) for both level 1 and level 2 instead of the previous slate grey (`#475569`) for level 1. Rationale: the grey treatment de-emphasized statements to the point of invisibility — the badge had insufficient contrast on dark backgrounds (WCAG §1.4.3 failure) and the muted color communicated "ignorable" rather than "informational." Statements are informational alerts that still deserve attention. Applied to NWS, Environment Canada, and the generic fallback color maps in `alert-colors.ts`.
