@@ -1,11 +1,11 @@
 # Security baseline
 
 **Status:** Draft (Phase 1 deliverable; companion to the source ADRs and [`rules/coding.md`](../../rules/coding.md))
-**Last updated:** 2026-05-06 (§8 revised — DCO mechanism resolved; dep-audit workflow scoping gap added)
+**Last updated:** 2026-06-14 (post-merge architecture: realtime folded into API per ADR-058; Phase 5 hardening complete)
 
 This document is the per-component security checklist the Clear Skies project commits to. It consolidates the security-relevant decisions scattered across 7 ADRs and `coding.md` §1, plus cross-cutting controls not pinned to any single ADR (security headers, request limits, systemd/Docker hardening, dependency auditing, per-repo `SECURITY.md`).
 
-**Scope.** Every Clear Skies repo: `weewx-clearskies-api`, `weewx-clearskies-realtime`, `weewx-clearskies-dashboard`, `weewx-clearskies-stack`. Excludes `weewx-clearskies-design-tokens` (deferred to Phase 6+ per [ADR-001](../decisions/ADR-001-component-breakdown.md)).
+**Scope.** Every Clear Skies repo: `weewx-clearskies-api`, `weewx-clearskies-dashboard`, `weewx-clearskies-stack`. Excludes `weewx-clearskies-design-tokens` (deferred to Phase 6+ per [ADR-001](../decisions/ADR-001-component-breakdown.md)). The `weewx-clearskies-realtime` repo is deprecated — the realtime service has been merged into the API per ADR-058.
 
 **Posture.** Software is AS-IS under GPL v3 per [ADR-003](../decisions/ADR-003-license.md) — no warranty, no support window, no LTS. This document is the standard the maintainer holds the project to during development; deployments inherit the same controls. Per [ADR-018](../decisions/ADR-018-api-versioning-policy.md) there is no security-backport commitment for prior versions.
 
@@ -32,7 +32,7 @@ Every control below traces to one of these sources.
 
 ## 2. Cross-cutting controls (every Clear Skies repo)
 
-Apply identically to api, realtime, dashboard, stack.
+Apply identically to api, dashboard, stack.
 
 | Control | Source | How | Verify |
 |---|---|---|---|
@@ -59,6 +59,9 @@ FastAPI + SQLAlchemy backend. Largest attack surface — most controls live here
 | Per-IP rate limit | This doc | Middleware-based; default 60 req/min per IP for unauthenticated paths; bypassed when `X-Clearskies-Proxy-Auth` is valid. Storage: Redis when `CLEARSKIES_CACHE_URL` is set per [ADR-017](../decisions/ADR-017-provider-response-caching.md), in-process otherwise (single-worker only). | Integration test exhausts quota → 429 with `Retry-After` |
 | CORS locked to known origins | This doc | Default = same-origin (browser served by the same proxy as the api per [ADR-037](../decisions/ADR-037-inbound-traffic-architecture.md)); operator can add an additional dashboard origin via config | Integration test asserts unconfigured origin is rejected |
 | Response security headers | This doc | `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`; `Server:` header suppressed. HSTS / CSP / `X-Frame-Options` are set by the reverse proxy, not here. | Integration test inspects response headers |
+| `X-Forwarded-For` trusted proxy restriction | ADR-060 | XFF only honored when direct TCP peer is in `_TRUSTED_PROXIES` (default: `127.0.0.1`, `::1`); otherwise direct peer IP is used | Integration test with spoofed XFF from non-trusted IP → uses direct IP |
+| Archive query time-range cap | This doc | Raw archive queries capped at 366 days; ValueError raised with clear message | Integration test with >366-day range → 400 |
+| DB query timeout | This doc | SQLite: `connect_args={"timeout": 30}`; MariaDB: `read_timeout=30, write_timeout=30` on engine creation | Integration test with intentionally slow query → timeout |
 
 ### 3.2 Authentication
 
@@ -116,29 +119,29 @@ FastAPI + SQLAlchemy backend. Largest attack surface — most controls live here
 
 | Control | Source | How | Verify |
 |---|---|---|---|
-| systemd unit hardening | This doc | `NoNewPrivileges=yes`, `ProtectSystem=strict`, `ProtectHome=yes`, `PrivateTmp=yes`, `ProtectKernelTunables=yes`, `ProtectKernelModules=yes`, `ProtectControlGroups=yes`, `RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX`, `RestrictNamespaces=yes`, `LockPersonality=yes`, `MemoryDenyWriteExecute=yes`, `CapabilityBoundingSet=` (empty), `AmbientCapabilities=` (empty), `SystemCallFilter=@system-service`, `SystemCallErrorNumber=EPERM`, `ReadWritePaths=` listing only the config + data dirs (no log dir — logs go to stdout per [ADR-029](../decisions/ADR-029-logging-format-destinations.md)) | Reviewer confirms unit file; `systemd-analyze security weewx-clearskies-api` exposure score ≤ 3.0 ("OK" or better) |
+| systemd unit hardening | This doc | `User=clearskies`, `NoNewPrivileges=yes`, `ProtectSystem=strict`, `ProtectHome=yes`, `PrivateTmp=yes`, `ProtectKernelTunables=yes`, `ProtectKernelModules=yes`, `ProtectControlGroups=yes`, `RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX`, `RestrictNamespaces=yes`, `LockPersonality=yes`, `CapabilityBoundingSet=` (empty), `AmbientCapabilities=` (empty), `SystemCallFilter=@system-service`, `SystemCallErrorNumber=EPERM`, `ReadWritePaths=` listing only the config + data dirs (no log dir — logs go to stdout per [ADR-029](../decisions/ADR-029-logging-format-destinations.md)). Note: `MemoryDenyWriteExecute` is excluded — Python requires W+X memory pages. | Reviewer confirms unit file; `systemd-analyze security weewx-clearskies-api` exposure score ≤ 3.0 (actual: 2.8) |
 | Docker non-root user | This doc | `USER api` in Dockerfile; uid mapped explicitly | `docker inspect` shows non-root |
 | Docker drop-all-caps | This doc | `cap_drop: [ALL]` in compose; `cap_add` empty | `docker inspect` shows no caps |
 | Docker read-only root fs | This doc | `read_only: true` in compose; explicit `tmpfs` for `/tmp`; data + log volumes are bind-mounts | `docker inspect` shows `ReadonlyRootfs: true` |
 | Docker `no-new-privileges` | This doc | `security_opt: [no-new-privileges:true]` in compose | `docker inspect` shows the flag |
 | Docker `HEALTHCHECK` directive | [ADR-030](../decisions/ADR-030-health-check-readiness-probes.md) | curl loopback `/health/ready`; interval/timeout aligned with default poll cadence | `docker inspect` shows healthcheck config |
 
+### 3.9 SSE (Server-Sent Events)
+
+| Control | Source | How | Verify |
+|---|---|---|---|
+| Max concurrent SSE subscribers | ADR-060 | `SSEEmitter` enforces `_MAX_SUBSCRIBERS = 500`; returns 503 when exceeded | Integration test opens 501 connections → 503 |
+| Backpressure on slow consumers | This doc | Per-subscriber queue maxsize=64; stalled subscribers ejected (unsubscribed) after overflow | Unit test for queue overflow → unsubscribe |
+| SSE keepalive | This doc | 15-second comment-line keepalive prevents proxy/firewall timeout | Integration test confirms keepalive timing |
+| Rate limiting on SSE connection establishment | This doc | `RateLimitMiddleware` applies to `GET /sse` like any other request (60/min/IP default) | Rate limit test against /sse endpoint |
+
 ---
 
-## 4. weewx-clearskies-realtime
+## 4. weewx-clearskies-realtime (DEPRECATED)
 
-Smaller surface — same principles, narrower scope. Service is read-only on the weewx loop pipeline (subscribes to MQTT or watches loop packet socket per [ADR-005](../decisions/ADR-005-realtime-architecture.md)) and serves SSE clients.
+**This section is retained for historical reference only.** The realtime service has been merged into the API per [ADR-058](../decisions/ADR-058-fold-realtime-into-api.md). All controls previously listed here now apply as part of §3 (weewx-clearskies-api). SSE-specific controls are in §3.9.
 
-| Category | Differences from api |
-|---|---|
-| Network & HTTP | Same loopback default, dual-stack, request limits. SSE connections are long-lived; rate-limiting is on connection ESTABLISHMENT, not per-event. |
-| Authentication | Same `X-Clearskies-Proxy-Auth` optional secret. No end-user auth. |
-| Data access | **No DB access in v0.1** — service consumes loop packets only. weewx archive is the api's domain. |
-| Secrets | Same `secrets.env` 0600 + env-var injection. Realtime needs MQTT broker creds when in MQTT-subscriber mode per [ADR-005](../decisions/ADR-005-realtime-architecture.md). |
-| Input validation | Validate every loop packet field via Pydantic before publishing as SSE event. Malformed packet → drop + warning log, do not propagate. |
-| Logging | Same JSON + redaction. |
-| Health | Same `/health/live` + `/health/ready` on loopback, default port 8082 (distinct from api's 8081). |
-| Process hardening | Same systemd + Docker control set as api. |
+Port 8766 (realtime main) and 8082 (realtime health) are eliminated.
 
 ---
 
@@ -168,7 +171,13 @@ Meta repo with `docker-compose.yml`, `Caddyfile`, INSTALL guide, example HA conf
 | Compose pins image digests | [`coding.md`](../../rules/coding.md) §1 | Every `image:` reference is `@sha256:...` (or a versioned tag in dev-only profiles, clearly marked) | Reviewer scans `docker-compose.yml` |
 | Caddy auto-LE TLS | [ADR-034](../decisions/ADR-034-deployment-topology-default.md) | Caddyfile uses `tls user@example.com` directive; auto-renewal is Caddy's default | Smoke test in deploy-rehearsal env confirms cert issued |
 | Caddy enforces security headers | This doc | Caddyfile sets HSTS (`Strict-Transport-Security: max-age=31536000; includeSubDomains`), CSP (per dashboard §5), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: <minimal>` | curl response inspection in deploy-rehearsal env |
-| Caddy proxies to inner services on loopback | [ADR-037](../decisions/ADR-037-inbound-traffic-architecture.md) | `reverse_proxy 127.0.0.1:8765` for api; `reverse_proxy 127.0.0.1:8766` for realtime; dashboard served as static file root | Reviewer confirms Caddyfile |
+| Caddy proxies to inner services on loopback | [ADR-037](../decisions/ADR-037-inbound-traffic-architecture.md) | `reverse_proxy https://api:8765` for `/api/v1/*` and `/sse`; `reverse_proxy config:9876` for wizard/admin; dashboard served as static file root | Reviewer confirms Caddyfile |
+| HSTS | This doc | `Strict-Transport-Security "max-age=31536000; includeSubDomains"` in Caddyfile header block | curl response inspection |
+| Content-Security-Policy | This doc | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'` | curl response inspection |
+| Permissions-Policy | This doc | `geolocation=(), microphone=(), camera=()` | curl response inspection |
+| Server header suppression | This doc | Global `header -Server` + per-block `-Server` | curl error response inspection (no Server header on 404/502) |
+| SSE flush (no buffering) | This doc | `flush_interval -1` on `/sse` reverse_proxy block | SSE client receives events immediately |
+| Request body size limit | This doc | `request_body { max_size 2MB }` global directive | POST >2MB → 413 |
 | Bind-mount config dir | [ADR-027](../decisions/ADR-027-config-and-setup-wizard.md) + [ADR-028](../decisions/ADR-028-update-mechanism.md) | `/etc/weewx-clearskies/` mounted into containers; `secrets.env` permission preserved by setup script | INSTALL doc; smoke test in deploy-rehearsal env |
 
 ---
@@ -177,17 +186,17 @@ Meta repo with `docker-compose.yml`, `Caddyfile`, INSTALL guide, example HA conf
 
 What's automated, per repo. CI fails the PR (= blocks merge) on every check below.
 
-| Gate | api | realtime | dashboard | stack |
-|---|---|---|---|---|
-| DCO sign-off on every commit | ✅ | ✅ | ✅ | ✅ |
-| Lockfile present + used (`npm ci` / `uv sync --locked`) | ✅ | ✅ | ✅ | N/A (no app deps) |
-| `pip-audit` (Python) / `npm audit --audit-level=high` (JS) | ✅ | ✅ | ✅ | N/A |
-| `gitleaks` secret scan on diff + tree | ✅ | ✅ | ✅ | ✅ |
-| Linter — ruff for Python (incl. `S` security rules), ESLint for JS | ✅ | ✅ | ✅ | N/A |
-| Type check — mypy strict / pyright; tsc | ✅ | ✅ | ✅ | N/A |
-| Test suite — pytest (both DB backends per [ADR-012](../decisions/ADR-012-database-access-pattern.md)) / vitest + Playwright | ✅ | ✅ | ✅ | N/A |
-| `axe-core` accessibility scan on built dashboard | N/A | N/A | ✅ | N/A |
-| Third-party GHA actions pinned by SHA | ✅ | ✅ | ✅ | ✅ |
+| Gate | api | dashboard | stack |
+|---|---|---|---|
+| DCO sign-off on every commit | ✅ | ✅ | ✅ |
+| Lockfile present + used (`npm ci` / `uv sync --locked`) | ✅ | ✅ | N/A (no app deps) |
+| `pip-audit` (Python) / `npm audit --audit-level=high` (JS) | ✅ | ✅ | N/A |
+| `gitleaks` secret scan on diff + tree | ✅ | ✅ | ✅ |
+| Linter — ruff for Python (incl. `S` security rules), ESLint for JS | ✅ | ✅ | N/A |
+| Type check — mypy strict / pyright; tsc | ✅ | ✅ | N/A |
+| Test suite — pytest (both DB backends per [ADR-012](../decisions/ADR-012-database-access-pattern.md)) / vitest + Playwright | ✅ | ✅ | N/A |
+| `axe-core` accessibility scan on built dashboard | N/A | ✅ | N/A |
+| Third-party GHA actions pinned by SHA | ✅ | ✅ | ✅ |
 
 Manual / pre-release verification is in [`coding.md`](../../rules/coding.md) §4 and §5.8 (per-change + pre-ship audits).
 
@@ -198,11 +207,10 @@ Manual / pre-release verification is in [`coding.md`](../../rules/coding.md) §4
 These choices are not pinned by any ADR and may be revised during Phase 2+ implementation. Revisions go into this document, not into a new ADR.
 
 - **Request body limit defaults to 1 MiB.** Concrete risk: a legitimately-large markdown blob to `/content/about` or `/content/legal` could trip 413. Mitigation if it does: bump default OR exempt the `/content/*` paths via per-path config.
-- **Per-IP rate-limit storage.** With `CLEARSKIES_CACHE_URL` set, rate-limit state lives in Redis (consistent with [ADR-017](../decisions/ADR-017-provider-response-caching.md)'s multi-worker requirement); without it, in-process storage is single-worker-only. A multi-worker deploy without Redis silently delivers N × the documented rate budget. Phase 2 work must enforce the Redis dependency at startup when worker count > 1.
 - **Markdown rendering** uses `react-markdown` with sanitizing defaults. A future contributor swapping in a non-sanitizing alternative (raw `marked` + `dangerouslySetInnerHTML` outside the allowlisted component) silently removes XSS protection. Phase 3 ESLint config locks `react/no-danger` exceptions to the one component allowlisted in §5.
-- **realtime health port = 8082** is invented in this document, not pinned by [ADR-030](../decisions/ADR-030-health-check-readiness-probes.md) (which only specifies 8081 for api). If another service later wants 8082, this document is the conflict point.
 - **DCO enforcement mechanism** (resolved 2026-05-05): custom GHA workflow at `.github/workflows/dco.yml` per repo. The workflow rejects PRs whose commits lack a `Signed-off-by:` trailer matching the commit author. GitHub's built-in DCO app was rejected because it requires per-org installation; the custom workflow scales without that overhead.
-- **dep-audit workflow scoping** (resolved in api repo 2026-05-06; latent in other four repos). Phase 1's `dep-audit.yml` ran `pip-audit --strict` with no manifest argument, which audits the entire CI runner Python environment (including the runner's own pip, which carries CVEs unrelated to this project). The bug only surfaces when a manifest exists in the repo. Fixed in the api repo: install uv, run `uv export --format requirements-txt --no-emit-project`, and audit the resulting requirements file. Other four repos (realtime, dashboard, stack, design-tokens) still skip cleanly because they have no manifest yet; each gets the same one-line workflow patch when it lands its first real code commit.
+- **dep-audit workflow scoping** (resolved in api repo 2026-05-06; latent in other repos). Phase 1's `dep-audit.yml` ran `pip-audit --strict` with no manifest argument, which audits the entire CI runner Python environment (including the runner's own pip, which carries CVEs unrelated to this project). The bug only surfaces when a manifest exists in the repo. Fixed in the api repo: install uv, run `uv export --format requirements-txt --no-emit-project`, and audit the resulting requirements file. Other repos (dashboard, stack, design-tokens) still skip cleanly because they have no manifest yet; each gets the same one-line workflow patch when it lands its first real code commit.
+- **Rate-limit storage is in-process only; multi-worker deployments need Redis backend.** With `CLEARSKIES_CACHE_URL` set, rate-limit state lives in Redis (consistent with [ADR-017](../decisions/ADR-017-provider-response-caching.md)'s multi-worker requirement); without it, in-process storage is single-worker-only. A multi-worker deploy without Redis silently delivers N × the documented rate budget per worker. Phase 2+ work must enforce the Redis dependency at startup when worker count > 1.
 - **Dashboard CSP is provisional.** The header above is a starting point; radar tile providers per [ADR-015](../decisions/ADR-015-radar-map-tiles-strategy.md) and any chart-library Web Worker scripts may require additions during Phase 3.
 
 ---
@@ -222,6 +230,6 @@ This document is co-authoritative with the source ADRs. Drift between this doc a
 
 ## 10. References
 
-- ADRs: [ADR-003](../decisions/ADR-003-license.md), [ADR-005](../decisions/ADR-005-realtime-architecture.md), [ADR-008](../decisions/ADR-008-auth-model.md), [ADR-012](../decisions/ADR-012-database-access-pattern.md), [ADR-015](../decisions/ADR-015-radar-map-tiles-strategy.md), [ADR-017](../decisions/ADR-017-provider-response-caching.md), [ADR-018](../decisions/ADR-018-api-versioning-policy.md), [ADR-027](../decisions/ADR-027-config-and-setup-wizard.md), [ADR-028](../decisions/ADR-028-update-mechanism.md), [ADR-029](../decisions/ADR-029-logging-format-destinations.md), [ADR-030](../decisions/ADR-030-health-check-readiness-probes.md), [ADR-034](../decisions/ADR-034-deployment-topology-default.md), [ADR-037](../decisions/ADR-037-inbound-traffic-architecture.md), [ADR-038](../decisions/ADR-038-data-provider-module-organization.md).
+- ADRs: [ADR-003](../decisions/ADR-003-license.md), [ADR-005](../decisions/ADR-005-realtime-architecture.md), [ADR-008](../decisions/ADR-008-auth-model.md), [ADR-012](../decisions/ADR-012-database-access-pattern.md), [ADR-015](../decisions/ADR-015-radar-map-tiles-strategy.md), [ADR-017](../decisions/ADR-017-provider-response-caching.md), [ADR-018](../decisions/ADR-018-api-versioning-policy.md), [ADR-027](../decisions/ADR-027-config-and-setup-wizard.md), [ADR-028](../decisions/ADR-028-update-mechanism.md), [ADR-029](../decisions/ADR-029-logging-format-destinations.md), [ADR-030](../decisions/ADR-030-health-check-readiness-probes.md), [ADR-034](../decisions/ADR-034-deployment-topology-default.md), [ADR-037](../decisions/ADR-037-inbound-traffic-architecture.md), [ADR-038](../decisions/ADR-038-data-provider-module-organization.md), [ADR-058](../decisions/ADR-058-fold-realtime-into-api.md), [ADR-060](../decisions/ADR-060-sse-emitter.md), [ADR-061](../decisions/ADR-061-caddy-hardening.md).
 - Code rules: [`rules/coding.md`](../../rules/coding.md) §1, §3, §4, §5.
 - Companion contracts: [`openapi-v1.yaml`](openapi-v1.yaml), [`canonical-data-model.md`](canonical-data-model.md).
