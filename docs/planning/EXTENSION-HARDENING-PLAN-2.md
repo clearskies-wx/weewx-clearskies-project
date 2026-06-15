@@ -2,7 +2,7 @@
 
 **Goal:** (1) Restore the broken Clear Skies site by fixing the Caddyfile routing gap left by the ADR-058 implementation and removing the erroneous API instance on weather-dev, (2) debug and verify the hardened ClearSkiesLoopRelay extension's socket data flow, (3) complete Phase 2-3 integration tests from the original EXTENSION-HARDENING-PLAN, (4) standardize vocabulary across all project documentation, and (5) consolidate 62 individual ADRs into a small set of logical documents with flowcharts.
 
-**Status:** Phases 1-2 complete. Phases 2A-2B added. Phase 2A next.
+**Status:** Phases 1-3 complete. Phase 4 complete. Phases 5-6 remaining.
 
 **Source:** EXTENSION-HARDENING-PLAN Phases 2-3 (incomplete), post-ADR-058 deployment gap (Caddyfile still routes to port 8766), vocabulary inconsistency incident (2026-06-14).
 
@@ -133,12 +133,19 @@ Meta repo (`.`):
 | weather-dev | `caddy.service` | active | Routes to `https://192.168.7.20:8765` |
 | weather-dev | `weewx-clearskies-config.service` | active | Wizard cleaned of all realtime/MQTT dead code |
 
-**All repos clean — everything committed and pushed.**
+**All repos clean — everything committed and pushed (through session 3).**
+
+**Session 4 (2026-06-15) — what was completed:**
+
+1. **Phase 4 complete (Vocabulary standardization).** T4.1: Canonical vocabulary table approved by user — 12 component names, banned terms defined, rules for historical context. Table added to ARCHITECTURE.md. T4.2: 32 files updated across ADRs, plans, briefs, design docs, procedures, reference, contracts. Three parallel agents did mechanical replacement; coordinator then fixed 7 semantic breaks where mechanical BFF→API replacement created architecturally wrong passages (ADR-041 computation boundaries, ADR-042 MQTT references, ADR-054 file references, C1-conditions-engine.md enrichment descriptions, CONTAINER-ACCESS.md topology). All committed locally (not pushed).
+
+**Current state after session 4:**
+
+All repos clean locally. Phase 4 vocabulary commit (`15f1eb2`) plus one follow-up fix are committed but not pushed.
 
 **Remaining work:**
-- Phase 4 (Vocabulary standardization) — not started
 - Phase 5 (ADR consolidation) — not started
-- Phase 6 (Commit all changes) — Phases 2A/2B/3 committed. Phases 4/5 pending.
+- Phase 6 (Commit all changes) — Phase 4 committed locally. Phase 5 pending. Push pending user instruction.
 - [DASHBOARD-API-FIX-PLAN.md](DASHBOARD-API-FIX-PLAN.md) — separate plan for dashboard/API unit label fixes
 
 **Key files to read first (coordinator reads these directly — not delegated):**
@@ -754,9 +761,9 @@ T3.3 connection limit ─ PASS
 T3.4 graceful shutdown ─ PASS
          │
          ▼
-Phase 4 (Vocabulary — can start T4.1 in parallel with Phases 2A-3)
-T4.1 define canonical vocabulary table ──────┐
-T4.2 apply vocabulary fixes (dep: T4.1) ─────┘
+Phase 4 (Vocabulary) — DONE (2026-06-15 session 4)
+T4.1 define canonical vocabulary table ─ DONE (approved by user)
+T4.2 apply vocabulary fixes ─ DONE (32 files, 227 ins / 198 del + semantic fixes)
          │
          ▼
 Phase 5 (ADR consolidation — dep: T4.2)
