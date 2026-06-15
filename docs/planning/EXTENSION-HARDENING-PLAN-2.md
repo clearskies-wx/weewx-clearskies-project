@@ -112,6 +112,35 @@ Meta repo (`.`):
 - `rules/clearskies-process.md` — delegation rule corrected
 - `docs/planning/EXTENSION-HARDENING-PLAN-2.md` — Phase 2A/2B added
 
+**Session 3 (2026-06-14) — what was completed:**
+
+1. **Phase 2A complete (all 5 tasks).** Extension moved to `restful_services` (derived fields confirmed: barometer, dewpoint, appTemp, windchill, heatindex, humidex — 47 fields). Accept loop hardened (1s timeout, silent TimeoutError, clean shutdown verified). ADR-010 amended and Accepted (ConvertedValue dicts for `/current`, flat scalars for `/archive`). REST `/current` now returns ConvertedValue dicts (JSONResponse bypass for Pydantic validation). Single unit authority from `api.conf [units]` via transformer — `load_units_block()` from weewx.conf removed from runtime path.
+
+2. **Phase 2B complete (all sub-phases).** T2B-A: `/setup/apply` accepts units config, wizard sends units to API on apply, pre-fills from API on re-run. T2B-B: `write_realtime_conf()` deleted (123 lines), step 5 MQTT routes removed, `_restart_local_realtime` removed, `realtime_bind_*` removed from topology (539 total deletions across 3 files). T2B-C: State model cleaned (mqtt_*, realtime_bind_*, input_mode removed), admin config UI "realtime" component removed, test code cleaned (224 deletions across 4 test files).
+
+3. **Phase 3 complete (all 4 integration tests PASS).** T3.1 error isolation: weewx survived socket deletion, clean restart. T3.2 API reconnection: disconnect → 4s backoff → reconnect → SSE resumed. T3.3 connection limit: 9th rejected, warning logged. T3.4 graceful shutdown: clean stop, no timeout warning, socket removed.
+
+4. **All changes committed and pushed** to GitHub across all 4 repos. Deployed to containers.
+
+5. **Dashboard regression discovered.** After deployment, precipitation card lost unit labels, AQI card shows null category, forecast page missing unit designations, reports page missing all units, lightning and seismic hardcode "km". Root cause: (a) prior agent rewrite stripped precipitation card labels, (b) BFF enrichment not wired on non-/current endpoints, (c) `epa_category()` never called. **Separate plan created: [DASHBOARD-API-FIX-PLAN.md](DASHBOARD-API-FIX-PLAN.md).**
+
+**Current state of containers after session 3:**
+
+| Container | Service | Status | Notes |
+|-----------|---------|--------|-------|
+| weewx | `weewx.service` | active | Extension v1.1.0 in restful_services, 47 fields, derived values present |
+| weewx | `weewx-clearskies-api.service` | active | ConvertedValue dicts on /current, single unit authority, units envelope with 47 fields |
+| weather-dev | `caddy.service` | active | Routes to `https://192.168.7.20:8765` |
+| weather-dev | `weewx-clearskies-config.service` | active | Wizard cleaned of all realtime/MQTT dead code |
+
+**All repos clean — everything committed and pushed.**
+
+**Remaining work:**
+- Phase 4 (Vocabulary standardization) — not started
+- Phase 5 (ADR consolidation) — not started
+- Phase 6 (Commit all changes) — Phases 2A/2B/3 committed. Phases 4/5 pending.
+- [DASHBOARD-API-FIX-PLAN.md](DASHBOARD-API-FIX-PLAN.md) — separate plan for dashboard/API unit label fixes
+
 **Key files to read first (coordinator reads these directly — not delegated):**
 - This plan
 - [CLAUDE.md](../../CLAUDE.md) — operating rules, git safety
@@ -714,15 +743,15 @@ T2A.5 single unit authority ─ DONE (api.conf [units] via transformer, weewx.co
          ▼
 Phase 2B (Wizard ADR-058 migration) — DONE (2026-06-14 session 3)
 2B-A: T2B-A.1 ─ DONE, T2B-A.2 ─ DONE, T2B-A.3 ─ DONE
-2B-B: T2B-B.1 → T2B-B.2, T2B-B.3, T2B-B.4  (parallel, dep: 2B-A)
-2B-C: T2B-C.1, T2B-C.2, T2B-C.3  (parallel, dep: 2B-B)
+2B-B: T2B-B.1-B.4 ─ DONE (539 lines deleted)
+2B-C: T2B-C.1-C.3 ─ DONE (state, admin UI, tests cleaned)
          │
          ▼
-Phase 3 (Integration tests — validates full pipeline + wizard config)
-T3.1 error isolation ──────┐
-T3.2 API reconnection ─────┤  parallel
-T3.3 connection limit ─────┤
-T3.4 graceful shutdown ────┘
+Phase 3 (Integration tests) — DONE (2026-06-14 session 3)
+T3.1 error isolation ─ PASS
+T3.2 API reconnection ─ PASS
+T3.3 connection limit ─ PASS
+T3.4 graceful shutdown ─ PASS
          │
          ▼
 Phase 4 (Vocabulary — can start T4.1 in parallel with Phases 2A-3)
