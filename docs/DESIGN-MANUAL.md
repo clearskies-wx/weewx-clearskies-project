@@ -336,6 +336,7 @@ Base library: Phosphor (regular weight). Cross-pack exceptions noted per row.
 | Rainfall | `ph:cloud-rain` |
 | Snowfall | `ph:snowflake` |
 | Pressure | `ph:gauge` |
+| Wind | `ph:wind` (used on Wind Compass card title and readout block) |
 | UV Index | `tabler:uv-index` (cross-pack, Tabler MIT) |
 | AQI content icon | `ph:leaf` |
 | Precipitation content | `ph:drop` |
@@ -356,8 +357,13 @@ Base library: Phosphor (regular weight). Cross-pack exceptions noted per row.
 | Snow/winter | `ph:snowflake` |
 | Heat/cold | `ph:thermometer` |
 | Fog | `ph:cloud-fog` |
-| Flood | `material-symbols:flood-outline-rounded` (cross-pack) |
-| Tsunami | `carbon:tsunami` (cross-pack) |
+| Flood | `material-symbols:flood-outline-rounded` (cross-pack, inline SVG at `icons/flood.tsx`) |
+| Tsunami | `mdi:tsunami` (cross-pack, inline SVG at `icons/tsunami.tsx`) |
+| Earthquake | `material-symbols:earthquake-outlined` (cross-pack, inline SVG at `icons/earthquake.tsx`) |
+| Volcano | `material-symbols:volcano-outlined` (cross-pack, inline SVG at `icons/volcano.tsx`) |
+| Landslide | `material-symbols:landslide-outlined` (cross-pack, inline SVG at `icons/landslide.tsx`) |
+| Hail | `material-symbols:weather_hail-outlined` (cross-pack, inline SVG at `icons/weather-hail.tsx`) |
+| Air quality / dust / smoke | `material-symbols:air-outlined` (cross-pack, inline SVG at `icons/air.tsx`) |
 
 ### Nav/Chrome Icons (Phosphor, regular weight)
 
