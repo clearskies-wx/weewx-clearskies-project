@@ -1,0 +1,910 @@
+# Clear Skies — API Manual
+
+Single authority for all Clear Skies API implementation rules. Consumers: API dev agents and human reviewers.
+
+When this document conflicts with any other source (ADRs, code comments, conversation history), **this document wins**. ADRs explain *why* decisions were made; this manual says *what to do*.
+
+Companion documents:
+
+- **ARCHITECTURE.md** — system topology, ports, containers (what the system IS)
+- **PROVIDER-MANUAL.md** — provider module rules
+- **contracts/canonical-data-model.md** — per-field data catalog (the field inventory)
+
+Last updated: 2026-06-18
+
+---
+
+## Contents
+
+1. [Purpose and Principles](#1-purpose-and-principles)
+2. [Data Model](#2-data-model)
+3. [Database Access](#3-database-access)
+4. [Versioning](#4-versioning)
+5. [Column Mapping](#5-column-mapping)
+6. [Unit System](#6-unit-system)
+7. [skin.conf Compliance](#7-skinconf-compliance)
+8. [Conditions Text Engine](#8-conditions-text-engine)
+9. [Charts System — API Side](#9-charts-system--api-side)
+10. [weewx Integration](#10-weewx-integration)
+11. [SSE and Realtime](#11-sse-and-realtime)
+12. [Anti-Patterns](#12-anti-patterns)
+
+---
+
+## §1 Purpose and Principles
+
+### What the API is
+
+The API (`weewx-clearskies-api`) is the weewx application layer — not merely a dashboard backend. It is the canonical programmatic interface to weewx station data. Any client (dashboard, Home Assistant, third-party scripts) that needs weather station data connects to the API. The API does not exist solely to serve the dashboard.
+
+The API runs on the weewx host, co-located with the weewx process and its archive database (per ADR-056). This co-location is a deployment constraint, not a preference — the API reads `weewx.conf` locally and shares the filesystem with the weewx archive.
+
+### Computation boundary
+
+The API owns three distinct layers of responsibility:
+
+1. **Data access.** Query the weewx archive database via SQLAlchemy. Return raw observation and aggregate values.
+2. **Unit conversion and derived values.** Convert raw values to operator display units. Compute Beaufort scale, comfort index selector, barometer trend direction, and cardinal wind directions. This is the enrichment pipeline.
+3. **Provider data.** Aggregate external data (forecast, AQI, alerts, earthquakes, radar) via internal provider plugin modules. Apply the same unit conversion pipeline to provider-sourced data.
+
+The dashboard owns rendering and presentation-level computation: client-side binning for visualizations (wind rose direction-by-Beaufort matrix), LTTB downsampling, chart layout, theming. The dashboard reads API-provided derived fields but does not recompute them.
+
+**The test:** If a proposed endpoint handler requires unit conversion, threshold classification, or produces output shaped for a specific chart type, it belongs in the enrichment pipeline or the dashboard — not in the endpoint handler.
+
+### General-purpose data access
+
+The API exposes general-purpose data access endpoints. It does not expose chart-specific or visualization-specific endpoints. The API serves `/archive` time-series, `/archive/grouped` categorical aggregates, `/current` observation snapshot, and `/charts/config` for operator-defined chart definitions. The dashboard determines what to fetch and how to render it.
+
+Do not create endpoint paths named after a chart type (e.g., `/charts/wind-rose`, `/charts/temperature-range`). The single exception is `/charts/custom-query/{series_id}`, which executes operator-defined SQL from `charts.conf` — not a chart-type endpoint, a config-driven query executor.
+
+### Setup mode
+
+When `settings.configured = False`, the API starts in setup mode. In setup mode:
+
+- Only setup endpoints under `/setup/*` are active.
+- `/api/v1/status` returns `{"configured": false}` and is always active regardless of mode.
+- All other `/api/v1/*` endpoints return HTTP 503 with an RFC 9457 problem body: `{"type": "urn:clearskies:not-configured", "title": "Station not configured", "status": 503}`.
+- No database connection is established. No provider modules load. No data routers run.
+- The SSE stream is not available.
+
+After the operator completes the setup wizard and the API receives `POST /setup/apply`, the API writes its config files and restarts into normal mode.
+
+### Startup sequence
+
+The API startup executes in the following ordered steps. Steps marked **fatal** exit the process non-zero on failure. Steps marked **non-fatal** log a warning and continue.
+
+| Step | Action | Error handling |
+|------|--------|----------------|
+| 1 | Load and validate `settings` from `api.conf` and `secrets.env` | Fatal |
+| 2 | Initialize structured JSON logging (stdout, stdlib `logging`) | Fatal |
+| 3 | Initialize TLS (load or generate Ed25519 self-signed certificate) | Fatal |
+| 4 | Initialize trust manager (load pinned fingerprints and session store) | Fatal |
+| 5 | Start FastAPI engine, mount middleware (CORS, security headers, request size limit) | Fatal |
+| 6 | Run write probe against the database; exit non-zero if writes succeed | Fatal |
+| 7 | Run schema reflection (`MetaData.reflect()` on archive table) → populate column registry | Fatal |
+| 8 | Read `weewx.conf` for station metadata auto-detection | Non-fatal (warning) |
+| 9 | Load unit system config (`api.conf [units]`); validate column units | Non-fatal (warnings per mismatch) |
+| 10 | Load station metadata (lat, lon, altitude, timezone, station name) | Non-fatal |
+| 11 | Initialize ephemeris (pvlib Ineichen-Perez clear-sky model, Skyfield for almanac) | Non-fatal |
+| 12 | Load reports config (`api.conf [reports]`) | Non-fatal |
+| 13 | Load content config (custom pages, hidden pages) | Non-fatal |
+| 14 | Initialize cache backend (memory or Redis per `api.conf [cache]`) | Non-fatal (falls back to memory) |
+| 15 | Start cache warmer daemon thread | Non-fatal |
+| 16 | Load database metrics | Non-fatal |
+| 17 | Initialize provider registry; load per-domain provider modules | Non-fatal per provider |
+| 18 | Load per-domain provider settings (forecast, AQI, alerts, earthquakes, radar) | Non-fatal per domain |
+| 19 | Run health probe (loopback `/health/ready` on port 8081) | Non-fatal |
+| 20 | Initialize SSE infrastructure (emitter, 64-packet overflow buffer, 15-second keepalive) | Fatal |
+| 21 | Initialize `UnitTransformer` with loaded unit config | Fatal |
+| 22 | Register enrichment processors in order (see §8 for processor registration order) | Fatal |
+| 23 | Wire endpoint enrichment (barometer trend, wind rolling average, conditions text, etc.) | Fatal |
+| 24 | Serve (uvicorn begins accepting connections) | — |
+
+This is a 24-step process. Each step has explicit error handling. Do not collapse steps or add silent fallbacks that mask startup failures.
+
+---
+
+## §2 Data Model
+
+For the complete per-field inventory — field names, types, units by unit system, and provider-to-canonical mapping tables — see `contracts/canonical-data-model.md`.
+
+### Naming
+
+Use weewx-aligned camelCase in both Python and JSON. Python field names and JSON key names are identical — no alias mechanism, no snake_case-to-camelCase translation at serialization time. The Pydantic ruff rule N815 (mixed-case variables) is suppressed on model fields.
+
+### Entity types
+
+The canonical data model defines 9 core entity types and 2 container types:
+
+| Entity | Description |
+|--------|-------------|
+| `Observation` | Single current-conditions snapshot (loop-packet-derived) |
+| `ArchiveRecord` | One archive interval record (DB-derived) |
+| `HourlyForecastPoint` | Hourly forecast from a provider module |
+| `DailyForecastPoint` | Daily forecast summary from a provider module |
+| `ForecastDiscussion` | Full NWS Area Forecast Discussion text |
+| `AlertRecord` | Single severe-weather alert |
+| `EarthquakeRecord` | Single earthquake event |
+| `AQIReading` | Air quality index reading from a provider module |
+| `StationMetadata` | Station identity (name, lat, lon, alt, timezone) |
+| `ForecastBundle` | Container: hourly + daily + discussion in one response |
+| `AlertList` | Container: list of active alerts |
+
+### Response shapes
+
+**Observation endpoints** (`/current`, SSE stream) return `ConvertedValue` dicts for each observation field:
+
+```json
+{"value": 22.5, "label": "°C", "formatted": "22.5"}
+```
+
+**Archive endpoints** (`/archive`, `/archive/grouped`) return flat scalars except for `beaufort`, which retains its `ConvertedValue` dict to allow dashboard-side wind rose binning without recomputing Beaufort from wind speed.
+
+Both endpoint classes carry a `units` envelope (see below).
+
+### Units metadata
+
+Every API response carries a `units` metadata block. Use display-friendly symbols (`°F`, `mph`, `inHg`) not weewx-internal identifiers (`degree_F`, `mile_per_hour`, `inHg`). Example:
+
+```json
+{
+  "units": {
+    "temperature": "°F",
+    "speed": "mph",
+    "pressure": "inHg",
+    "rain": "in",
+    "rainRate": "in/hr"
+  }
+}
+```
+
+Never return a response that omits the `units` block.
+
+### Time
+
+Use UTC ISO-8601 with a `Z` suffix on all time fields in API responses: `"2026-06-18T14:30:00Z"`. Never include local-time strings. Python `datetime` objects must carry `tzinfo=UTC` — naive datetimes are forbidden in API-layer code. Display-side timezone conversion happens in the dashboard using the station's IANA timezone from `StationMetadata`.
+
+### Nullability
+
+Every field is `Optional[T]`. The key is always present in the response; use `null` for missing values. Never omit a key because the value is absent.
+
+Pydantic model config:
+
+```python
+model_config = ConfigDict(
+    extra="forbid",
+    populate_by_name=True,
+)
+```
+
+Serialize with `model.model_dump_json(exclude_none=False)` — `null` values must appear in the output, not be stripped. Serialize `inf` and `NaN` as strings (`ser_json_inf_nan="strings"`) to produce valid JSON.
+
+### Provenance
+
+Every record carries a `source: str` field. Use `"weewx"` for archive-derived data. Use the provider module's identifier string (e.g., `"open_meteo"`, `"nws"`, `"openweathermap"`) for upstream-derived data.
+
+### Custom columns
+
+Non-core columns (columns the operator has mapped from their archive schema but that do not correspond to a canonical entity field) go into `extras: dict[str, Any]`. Stock weewx columns never appear in `extras` — they appear at their canonical field names.
+
+The `/archive` endpoint serves all columns present in the archive schema with no whitelist gate. Any column in the database is queryable by passing its column name as `observation_type`.
+
+### Earthquake fields
+
+Earthquake fields are unit-system-invariant: depth in km, magnitude as a dimensionless number, coordinates as WGS84 decimal degrees. These fields do not appear in the `units` block and do not pass through the unit conversion layer.
+
+### Prose layers
+
+Three layers of text prose exist in the data model:
+
+| Layer | Field | Source | Transport |
+|-------|-------|--------|-----------|
+| Conditions text | `weatherText` | Conditions engine (§8) | REST only (`/current`) |
+| Daily forecast prose | `narrative` | Provider daily forecast | REST (`/forecast`) |
+| Area forecast discussion | `ForecastDiscussion` | NWS AFD API | REST (`/forecast/discussion`) |
+
+`weatherText` is not included in the SSE field map.
+
+### Pydantic configuration summary
+
+| Setting | Value |
+|---------|-------|
+| `extra` | `"forbid"` |
+| `exclude_none` | `False` (always serialize null) |
+| Field naming | camelCase (ruff N815 suppressed) |
+| Serialization | `model.model_dump_json(exclude_none=False)` |
+| Inf/NaN | `"strings"` |
+
+---
+
+## §3 Database Access
+
+### Driver
+
+Use SQLAlchemy 2.x with parameterized queries throughout. Never concatenate SQL strings with user-supplied or operator-supplied values. Use SQLAlchemy Core for read-heavy aggregation queries (not ORM). Refer to `rules/coding.md` §1 for the parameterized-query requirement.
+
+### Backends
+
+Support SQLite (weewx default) and MariaDB. Write no per-driver code paths in endpoint handlers — SQLAlchemy abstracts the dialect. The same endpoint code must work on both backends.
+
+### Read-only enforcement
+
+Apply defense in depth across two independent layers:
+
+1. **Database-level grants.** For MariaDB: operator provisions `GRANT SELECT ON weewx.* TO 'clearskies'@'localhost'`. For SQLite: open the file with `?mode=ro&uri=true` plus filesystem read-only permissions. Document the exact SQL grant in `INSTALL.md`.
+2. **Startup write probe.** At startup (step 6), attempt a write to a throwaway table. If the write succeeds, log an error and exit non-zero. The API refuses to start if it has write access. This probe runs before schema reflection and before any endpoint is registered.
+
+The startup write probe is not optional. Do not remove it or make it conditional.
+
+### Schema introspection
+
+At startup (step 7), run `MetaData.reflect()` against the archive table. The reflected column list populates the column registry. Endpoints select columns from the operator's mapping (§5) derived from this registry — not from a hardcoded column list.
+
+Re-introspection is triggered by the config UI when the operator re-runs the mapping flow (e.g., after adding a new weewx extension). The API never re-reflects mid-request.
+
+### Connection lifecycle
+
+Yield a SQLAlchemy session per request via FastAPI dependency injection. Close the session at request end. Do not hold long-lived sessions in endpoint code.
+
+### Pool settings
+
+| Backend | Pool type | pool_size | max_overflow |
+|---------|-----------|-----------|--------------|
+| SQLite | `NullPool` | — | — |
+| MariaDB | `QueuePool` | 5 | 10 |
+
+Use `NullPool` for SQLite because SQLite's `?mode=ro` URI does not support connection pooling safely.
+
+### Security constraints
+
+| Constraint | Value |
+|------------|-------|
+| Archive query time-range cap | 366 days maximum |
+| DB query timeout | 30 seconds (both engines) |
+| Custom SQL source | Config file only — never from HTTP request body or query params |
+| Custom SQL validation | `EXPLAIN` pre-validation at startup, read-only transaction, 10-second timeout, DDL keyword blocklist |
+
+---
+
+## §4 Versioning
+
+### URL path versioning
+
+All API endpoints use the `/api/v1/` path prefix. The version segment is `v1`. Do not add `v2` segments until a breaking change is required.
+
+### What constitutes a breaking change
+
+A major version bump (`v1` → `v2`) is required when any of the following occur:
+
+- An endpoint is removed or its path changes
+- A required field is removed from a response schema
+- A field's type or nullability changes in a backward-incompatible way
+- A field is renamed
+- Validation is tightened in a way that rejects previously valid requests
+- A response's default behavior changes in a way that breaks existing clients
+
+### What does not require a version bump
+
+- Adding a new endpoint
+- Adding a new optional field to a response
+- Loosening validation (accepting more input shapes)
+- Adding a new query parameter (optional, with documented defaults)
+- Performance improvements with no wire-shape change
+
+### No support-window promise
+
+Clear Skies is GPL v3 software provided AS-IS. Do not include any support-window, security-backport, LTS, or end-of-life schedule language anywhere in API documentation or code comments.
+
+### Error format
+
+All error responses across all API versions use RFC 9457 `application/problem+json`. Never return a plain-text or HTML error body. The minimum error response shape:
+
+```json
+{
+  "type": "urn:clearskies:<error-code>",
+  "title": "Human-readable title",
+  "status": 400
+}
+```
+
+The `type` field is a URN, not a URL. Use `urn:clearskies:` as the prefix for all Clear Skies error types.
+
+### OpenAPI
+
+FastAPI auto-generates the OpenAPI specification. The spec is served at:
+
+- `/api/v1/docs` — Swagger UI (interactive)
+- `/api/v1/redoc` — ReDoc (readable)
+- `/api/v1/openapi.json` — machine-readable spec
+
+The canonical committed contract is `docs/contracts/openapi-v1.yaml`. When the implementation diverges from this contract, update the contract — do not suppress FastAPI's auto-generation to match a stale file.
+
+---
+
+## §5 Column Mapping
+
+### Auto-mapping stock columns
+
+Stock weewx columns (`outTemp`, `barometer`, `windSpeed`, etc.) auto-map silently at startup using a built-in lookup table. The operator does not interact with stock column mapping. The auto-map table ships as part of the API repo.
+
+### Presenting non-stock columns
+
+Non-stock columns discovered by schema reflection (step 7) are presented to the operator in the config UI wizard. For each non-stock column, the wizard offers a heuristic name-match suggestion (case-insensitive substring match against the canonical field catalog) and lets the operator pick a canonical field or select "not mapped."
+
+### Persistence
+
+The confirmed mapping persists in the operator's `api.conf` under `[column_mapping]`. The mapping takes effect on the next request — no service restart required when the operator updates a mapping through the config UI.
+
+### Auto-advance
+
+When all discovered columns are stock and auto-mapped, the wizard skips the mapping table step entirely. The step auto-advances to the next wizard step without operator input.
+
+### Battery and diagnostic column exclusion
+
+Columns matching any of the patterns `*Battery*`, `*Link*`, or `*Status*` are excluded from the mapping suggestion list. These columns carry sensor metadata, not weather observations. They are silently skipped — no warning to the operator.
+
+### Validation at submit
+
+The mapping table validates before advancing. Flag these errors inline with visual callouts:
+
+- **Duplicate canonical mapping** — two archive columns mapped to the same canonical field
+- **Invalid canonical name** — the operator entered a field name not in the canonical catalog
+
+The step cannot advance while any inline error is present.
+
+### weewx metadata import
+
+Use `import weewx.units` to access `obs_group_dict` for unit group auto-detection. This maps each stock weewx field name to its `group_*` identifier, enabling the wizard to auto-populate the unit group for operator-confirmed custom columns where the group can be inferred from the field name pattern.
+
+---
+
+## §6 Unit System
+
+### Scope
+
+The API implements full weewx unit system compatibility across 14 unit groups. The dashboard has zero unit knowledge — it renders the `label` and `formatted` strings the API provides without performing any unit math.
+
+### Unit groups
+
+| Group | Valid units | Default (US) |
+|-------|-------------|--------------|
+| group_temperature | degree_F, degree_C, degree_K, degree_E | degree_F |
+| group_speed | mile_per_hour, km_per_hour, knot, meter_per_second | mile_per_hour |
+| group_speed2 | mile_per_hour2, km_per_hour2, knot2, meter_per_second2 | mile_per_hour2 |
+| group_pressure | inHg, mbar, hPa, kPa | inHg |
+| group_pressurerate | inHg_per_hour, mbar_per_hour, hPa_per_hour, kPa_per_hour | inHg_per_hour |
+| group_rain | inch, cm, mm | inch |
+| group_rainrate | inch_per_hour, cm_per_hour, mm_per_hour | inch_per_hour |
+| group_altitude | foot, meter | foot |
+| group_distance | mile, km | mile |
+| group_direction | degree_compass | degree_compass |
+| group_radiation | watt_per_meter_squared | watt_per_meter_squared |
+| group_uv | uv_index | uv_index |
+| group_percent | percent | percent |
+| group_moisture | centibar | centibar |
+| group_volt | volt | volt |
+
+### The API is the single conversion authority
+
+The API converts all values to operator display units before any response leaves the service. This applies to both REST responses and SSE events. The dashboard never receives raw weewx units — it receives converted values with labels attached.
+
+### Target unit system inference
+
+Derive the operator's target unit system (US / METRIC / METRICWX) from `api.conf [units][[groups]]`:
+
+1. Check `group_temperature`.
+2. If `degree_F` → target is US.
+3. If `degree_C` → check `group_rain`: if `mm` → target is METRICWX; otherwise target is METRIC.
+
+This inference is used internally for system-level documentation. The API converts per-field using the explicit per-group configuration — it does not apply a blanket unit system conversion.
+
+### Column unit validation at startup
+
+At startup (step 9), `_validate_column_units()` cross-checks the operator's confirmed unit settings against weewx metadata (`obs_group_dict`). On a mismatch, log a warning — do not exit. The operator-confirmed unit wins. Never silently revert to a different unit without the operator's explicit action.
+
+### REST conversion path
+
+1. Read archive record with `usUnits` field.
+2. Look up each field's group via `obs_group_dict`.
+3. Convert from archive source unit to operator display unit using `units/conversion.py`.
+4. Attach `label` (from `units/labels.py`) and `formatted` string (from `api.conf [units][[string_formats]]`).
+5. Return `{"value": ..., "label": "...", "formatted": "..."}`.
+
+### SSE conversion path
+
+1. Receive loop packet from socket reader (Unix socket from `ClearSkiesLoopRelay`).
+2. Read `usUnits` field from the packet to identify the source unit system.
+3. Convert each observation field to operator display unit.
+4. Attach label.
+5. Emit via SSE.
+
+### Additional unit configuration
+
+| Config subsection | Controls | v0.1 status |
+|-------------------|----------|-------------|
+| `[[string_formats]]` | Decimal places per unit (`degree_F = %.1f`) | Supported |
+| `[[labels]]` | Display symbols per unit (`degree_F = " °F"`) | Supported |
+| `[[ordinates]]` | Compass direction labels (N, NNE, NE, …) | Supported |
+| `[[trend]]` | Barometer trend window and grace period | Supported |
+| `[[time_formats]]` | strftime patterns for different contexts | Out of scope v0.1 |
+| `[[degree_days]]` | Base temperatures for HDD/CDD/GDD | Out of scope v0.1 |
+
+### Derived values
+
+| Derived field | Computation | Location |
+|---------------|-------------|----------|
+| Beaufort number and label | Computed from wind speed in any source unit; converted to m/s internally before applying Beaufort thresholds | `units/derived.py` |
+| `comfortIndex` | String selector: `"windChill"` (appTemp ≤ 50 °F), `"heatIndex"` (appTemp ≥ 80 °F), or `"none"` (moderate range). Dashboard reads this string to decide which comfort field to display. | `units/derived.py` |
+| `barometerTrendDirection` | Direction string from `enrichment/barometer_trend.py` over the operator-configured trend window | Enrichment pipeline |
+| `windDirCardinal`, `windGustDirCardinal` | 16-point compass codes computed by the API | Enrichment pipeline |
+
+The dashboard does not recompute any of these from raw observations.
+
+### Conversion factor accuracy
+
+Conversion factors in `units/conversion.py` must exactly match weewx's own values. Source: weewx Python source code at `weewx/units.py`. Do not use approximations, Wikipedia values, or reference-book constants. Floating-point precision is handled by `string_formats` rounding at format time — do not round intermediate values.
+
+### File layout
+
+```
+weewx_clearskies_api/
+└── units/
+    ├── __init__.py
+    ├── groups.py        # Group definitions, valid units, field→group mapping
+    ├── conversion.py    # Conversion factors (from weewx source)
+    ├── labels.py        # Display symbols per unit
+    ├── transformer.py   # Applies conversion + formatting to data dicts
+    └── derived.py       # API-computed derived fields: beaufort(), comfort_index()
+```
+
+---
+
+## §7 skin.conf Compliance
+
+### Section disposition table
+
+| skin.conf section | Disposition | Where it lands |
+|-------------------|-------------|----------------|
+| `[Units][[Groups]]` | KEEP | `api.conf [units][[groups]]` |
+| `[Units][[StringFormats]]` | KEEP | `api.conf [units][[string_formats]]` |
+| `[Units][[Labels]]` | KEEP | `api.conf [units][[labels]]` |
+| `[Units][[Ordinates]]` | KEEP | `api.conf [units][[ordinates]]` |
+| `[Units][[TimeFormats]]` | KEEP | `api.conf [units][[time_formats]]` |
+| `[Units][[DegreeDays]]` | KEEP | `api.conf` |
+| `[Units][[Trend]]` | KEEP | `api.conf` |
+| `[Units][[TimeZone]]` | KEEP | Pre-fills wizard station step |
+| `[Labels][[Generic]]` | KEEP | i18n override file |
+| `[Texts]` | REPLACE | react-i18next (ingest translations) |
+| `[Extras]` — branding | KEEP | Wizard branding step |
+| `[Extras]` — feature toggles | INGEST, DEFER | Parsed and stored; display deferred |
+| `[Extras]` — provider config | INGEST | Map API keys to provider config |
+| `[Extras]` — social | KEEP | Wizard social config step |
+| `[Extras]` — PWA/manifest | KEEP | Generate `manifest.json` |
+| `[Extras]` — MQTT | IGNORE | MQTT eliminated (per ADR-058) |
+| `[Almanac]` — moon_phases | KEEP | Feed 8 lunar phase labels into i18n |
+| `[Generators]` | IGNORE | Cheetah-specific; silently skip |
+| `[CheetahGenerator]` | IGNORE | Cheetah-specific; silently skip |
+| `[ImageGenerator]` | IGNORE | Cheetah-specific; silently skip |
+| `[CopyGenerator]` | IGNORE | Cheetah-specific; silently skip |
+
+Silently skip IGNORE sections — no warnings to the operator for expected ignores. Log warnings for unknown `[Extras]` keys but do not treat them as fatal.
+
+### Wizard import flow
+
+The wizard offers two paths at step 0:
+
+1. **Start fresh** — begin with defaults; no file import.
+2. **Import from existing skin** — operator uploads a `skin.conf` file.
+
+The parser uses `configobj` (same library weewx uses). Each subsequent wizard step displays imported values with a visual indicator ("imported from Belchertown") and allows the operator to edit before advancing.
+
+### Image import resolution order
+
+When a `skin.conf` import includes image paths (e.g., `logo_image`, `logo_image_dark`, `favicon`):
+
+1. **Local filesystem** — if the wizard and weewx host are the same machine, resolve the path relative to the source skin directory and copy to Clear Skies static assets.
+2. **API endpoint** — for split-host deployments, `GET /setup/skin-file?skin=Belchertown&path=images/logo.png` serves the file from the weewx host. Validate that the requested path stays within the skin directory (no directory traversal). Wizard downloads and stores locally.
+3. **Neither accessible** — display an amber warning listing unreachable files with their original paths. Operator uploads replacements in the Branding wizard step or copies manually.
+
+### Generated skin.conf
+
+The wizard writes a `skin.conf` to `/etc/weewx/skins/ClearSkies/skin.conf` when the operator applies configuration. This file contains `[Units]` (all subsections), `[Labels][[Generic]]`, `[Extras]` (branding, social, feature toggles), and `[Almanac]`. Cheetah sections are omitted. The API reads unit preferences from `api.conf [units]` at runtime — the generated `skin.conf` is the portable canonical copy. Only the wizard writes these files; they cannot drift.
+
+---
+
+## §8 Conditions Text Engine
+
+### Overview
+
+The conditions text engine is a multi-module stateful system that produces the `weatherText` field in `/current` responses. It runs as part of the API's enrichment pipeline. `weatherText` is a REST-only field — it is not included in the SSE field map.
+
+### Sky condition
+
+**Primary source (daytime):** Solar radiation analysis via the clear sky index (kc) with temporal variability.
+
+- Compute `kc = GHI_measured / GHI_clearsky`, clamped to [0, 1.2].
+- Clear-sky model: Ineichen-Perez via pvlib-python, using station coordinates and Linke turbidity from pvlib's built-in climatological table.
+- Alternatively: use weewx's `maxSolarRad` as the clear-sky reference when available.
+- Maintain a 30-minute sliding window of kc values (~360 samples at 5-second intervals).
+- Classify using a 2D (σ, mean) table:
+
+**Low sigma (σ(kc) < 0.08) — uniform sky:**
+
+| σ(kc) | mean(kc) | Classification |
+|-------|----------|----------------|
+| < 0.08 | ≥ 0.85 | Clear |
+| < 0.08 | 0.70–0.85 | Mostly Clear |
+| < 0.08 | 0.50–0.70 | Partly Cloudy |
+| < 0.08 | 0.30–0.50 | Mostly Cloudy |
+| < 0.08 | < 0.30 | Cloudy |
+
+**High sigma (σ(kc) ≥ 0.08) — variable sky:**
+
+| σ(kc) | mean(kc) | Classification |
+|-------|----------|----------------|
+| ≥ 0.08 | ≥ 0.85 | Mostly Clear |
+| ≥ 0.08 | 0.60–0.85 | Partly Cloudy |
+| ≥ 0.08 | < 0.60 | Mostly Cloudy |
+
+The σ threshold of 0.08 reflects actual sensor accuracy: Davis 6450 pyranometer ±5% and weewx `maxSolarRad` model ±4% combined error means a perfectly clear sky can produce kc ~0.93 from systematic bias alone. A threshold of 0.95 would be inside the noise floor.
+
+**Secondary source (night / twilight / startup / no pyranometer):** Provider cloud cover or provider weather text, via these priority levels:
+
+1. Provider weather text — normalize to Clear Skies vocabulary via keyword matching (longest match wins).
+2. Provider cloud cover % — NWS ASOS/METAR sky cover categories (CLR 0–6%, FEW 7–31%, SCT 32–56%, BKN 57–87%, OVC 88–100%).
+3. Neither available — omit sky descriptor.
+
+### Day/night display vocabulary
+
+Apply NWS standard day/night vocabulary at display time:
+
+| Classification | Day display | Night display |
+|----------------|-------------|---------------|
+| Clear | Sunny | Clear |
+| Mostly Clear | Mostly Sunny | Mostly Clear |
+| Partly Cloudy | Partly Cloudy | Partly Cloudy |
+| Mostly Cloudy | Mostly Cloudy | Mostly Cloudy |
+| Cloudy | Cloudy | Cloudy |
+
+Solar zenith > 96° = night; 80–96° = civil twilight (fall back to provider); < 80° = day. Compute zenith from station coordinates and timestamp via pvlib `solarposition` or equivalent.
+
+### Precipitation
+
+**Primary source:** Local rain gauge (`rainRate`). Use WMO/AMS thresholds (in in/hr; convert from station units before comparing):
+
+| rainRate | Category |
+|----------|----------|
+| 0 or null | No precipitation |
+| > 0 and < 0.10 | Light Rain |
+| ≥ 0.10 and < 0.30 | Moderate Rain |
+| ≥ 0.30 | Heavy Rain |
+
+**Frozen precipitation:** When `rainRate > 0` AND provider reports `precipType` of "snow", "freezing-rain", or "sleet", use the provider's type only if the Stull (2011) wet-bulb temperature is ≤ 35 °F. Above 35 °F, frozen precipitation is thermodynamically implausible — use "Rain" regardless of provider forecast.
+
+Wet-bulb formula (Stull 2011, T in °C, RH in %):
+
+```
+Tw = T × atan(0.151977 × (RH + 8.313659)^0.5) + atan(T + RH)
+   − atan(RH − 1.676331) + 0.00391838 × RH^1.5 × atan(0.023101 × RH)
+   − 4.686035
+```
+
+### Wind
+
+Beaufort scale thresholds (WMO standard; all comparisons use m/s internally — convert from station unit before comparing):
+
+| Beaufort | m/s range | Label |
+|----------|-----------|-------|
+| 0 | < 0.5 | Calm |
+| 1 | 0.5–1.5 | Very Light Breeze |
+| 2 | 1.6–3.3 | Light Breeze |
+| 3 | 3.4–5.4 | Gentle Breeze |
+| 4 | 5.5–7.9 | Moderate Breeze |
+| 5 | 8.0–10.7 | Fresh Breeze |
+| 6 | 10.8–13.8 | Strong Breeze |
+| 7 | 13.9–17.1 | Near Gale |
+| 8 | 17.2–20.7 | Gale |
+| 9 | 20.8–24.4 | Strong Gale |
+| 10 | 24.5–28.4 | Storm |
+| 11 | 28.5–32.6 | Violent Storm |
+| 12 | ≥ 32.7 | Hurricane |
+
+Labels use sentence case. Beaufort 0 ("Calm") appears in the composed text — calm is a real atmospheric state, not the absence of data.
+
+**Gusty qualifier:** Append "and Gusty" when `windGust ≥ windSpeed + 12 mph` AND `windGust ≥ 18 mph`. Convert both speeds to mph before comparison regardless of station unit. The qualifier only fires when wind is not Calm (Beaufort > 0).
+
+### Temperature-comfort (2D matrix)
+
+**Temperature axis** — apparent temperature (`appTemp` in °F):
+
+| Tier | appTemp range | Base label |
+|------|---------------|------------|
+| 1 | ≤ −10 °F | Dangerously Cold |
+| 2 | −9 to 0 °F | Bitter Cold |
+| 3 | 1 to 10 °F | Extreme Cold |
+| 4 | 11 to 20 °F | Very Cold |
+| 5 | 21 to 32 °F | Cold |
+| 6 | 33 to 45 °F | Chilly |
+| 7 | 46 to 60 °F | Cool |
+| 8 | 61 to 75 °F | Pleasant |
+| 9 | 76 to 85 °F | Warm |
+| 10 | 86 to 95 °F | Hot |
+| 11 | 96 to 104 °F | Very Hot |
+| 12 | ≥ 105 °F | Dangerously Hot |
+
+**Moisture axis** — dewpoint (°F):
+
+| Tier | Dewpoint range | Moisture modifier |
+|------|----------------|-------------------|
+| A | < 45 °F | (omitted) |
+| B | 45–54 °F | (omitted) |
+| C | 55–59 °F | Slightly Humid |
+| D | 60–64 °F | Humid |
+| E | 65–69 °F | Very Humid |
+| F | 70–74 °F | Oppressive |
+| G | ≥ 75 °F | Miserable |
+
+**Composition rules:**
+
+1. Cold temperatures (appTemp ≤ 32 °F, tiers 1–5): always omit moisture modifier. Output = temperature label only.
+2. Warm temperatures, dry moisture (tiers 6–12 × A–B): output = temperature label only.
+3. Warm temperatures, humid moisture (tiers 6–12 × C–G): output = temperature label + "and" + moisture label.
+4. **NWS Heat Index danger escalation** (overrides rules 1–3): HI ≥ 125 °F → "Extreme Danger Heat"; HI ≥ 104 °F → "Dangerous Heat".
+5. **NWS Wind Chill danger escalation** (overrides rules 1–3): WC ≤ −45 °F → "Extreme Danger Cold"; WC ≤ −25 °F → "Dangerous Cold".
+6. **Near-saturation override:** When dewpoint depression (outTemp − dewpoint) ≤ 5 °F, append "and Foggy" to any output from rules 1–5.
+
+When `appTemp` is null or absent, omit the temperature-comfort component entirely.
+
+### Input stability
+
+Apply three stability mechanisms before any threshold comparison:
+
+**Smoothing windows:**
+
+| Input | Window |
+|-------|--------|
+| Solar radiation (kc) | 30 min |
+| UV | 10 min |
+| appTemp, dewpoint, outTemp | 10 min |
+| windSpeed, windGust | 5 min |
+| rainRate | 2 min |
+| heatIndex, windChill | 10 min |
+
+**Hysteresis bands:**
+
+| Dimension | Band |
+|-----------|------|
+| Temperature thresholds | ±2 °F |
+| Wind thresholds | ±2 mph |
+| Dewpoint thresholds | ±2 °F |
+| Rain rate thresholds | ±0.02 in/hr |
+
+**Minimum hold time:** 5 minutes. After composition, hold the conditions text string for 5 minutes before allowing any change, even when smoothed + hysteresis inputs produce a different result.
+
+### Composition order
+
+Assemble components in this order: **[temperature-comfort, sky, wind, precipitation]**. Drop null or omitted components.
+
+| Number of non-null parts | Format |
+|--------------------------|--------|
+| 1 | `"{part}"` |
+| 2 | `"{a}, with {b}"` |
+| 3+ | `"{a}, {b}, with {last}"` |
+
+Examples: "Warm and Humid, Overcast, with Light Rain" / "Pleasant, Partly Cloudy, with Moderate Breeze" / "Chilly, with Light Rain".
+
+### Startup
+
+Until 36 samples accumulate (~3 minutes at 5-second intervals), fall back to provider cloud cover for sky condition. If no provider data is available, report sky condition absent (wind and comfort components still compose). The 36-sample guard provides enough statistical power for a first classification — the full 30-minute window is the steady-state buffer size, not the startup threshold.
+
+### Transport
+
+`weatherText` is REST-only. It appears in `/current` responses. It is not transmitted via SSE.
+
+### Enrichment processor registration order
+
+Register processors in this exact order — the smoother must run before classifiers:
+
+1. `input_smoother`
+2. `uv_smoother`
+3. `sky_tap`
+4. `wind_rolling_window`
+5. `lightning_strike_buffer`
+6. `scene_packet_tap`
+
+### Endpoint enrichment registration
+
+Two endpoint keys receive enrichment:
+
+| Endpoint key | Enrichments registered |
+|--------------|------------------------|
+| `"current"` | barometer_trend, wind_rolling_average, lightning_history, weather_text, uv, scene (6 total) |
+| `"almanac/planets"` | planet_viewing (1 total) |
+
+---
+
+## §9 Charts System — API Side
+
+### Configuration format
+
+Charts are configured in `charts.conf`, a ConfigObj/INI file with three-level nesting: group → chart → series. The format is intentionally identical to Belchertown's `graphs.conf` so that migrating operators can reuse their existing configuration.
+
+Parse `charts.conf` at API startup in `services/charts_config.py`. Never re-parse mid-request.
+
+### Self-hide pruning
+
+At startup, after parsing `charts.conf`, prune any series whose `observation_type` is not in the column registry. Cascade the removal: if all series in a chart are removed, remove the chart. If all charts in a group are removed, remove the group. Serve the pruned config tree from `GET /api/v1/charts/config`.
+
+Operators do not see charts for data their station does not collect.
+
+### Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/v1/charts/config` | GET | Returns the full pruned config tree |
+| `/api/v1/charts/custom-query/{series_id}` | GET | Executes a pre-validated operator-defined SQL query |
+| `/api/v1/archive` | GET | Time-series archive data with optional aggregation |
+| `/api/v1/archive/grouped` | GET | Categorical aggregation grouped by calendar period |
+
+Do not add chart-type-specific endpoints. The API provides general-purpose data access; the dashboard determines what to fetch and how to render it.
+
+### Custom SQL security
+
+Accept custom SQL from `charts.conf` on disk only. Never accept SQL from HTTP request bodies or query parameters. Apply these controls in sequence:
+
+1. **EXPLAIN pre-validation** at startup — run `EXPLAIN` on each custom query. Queries that fail `EXPLAIN` are logged as errors and excluded from the config tree.
+2. **DDL keyword blocklist** — reject any query containing `CREATE`, `DROP`, `ALTER`, `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` (case-insensitive).
+3. **Read-only transaction** — execute in a read-only SQLAlchemy transaction.
+4. **10-second timeout** — abort queries exceeding 10 seconds.
+
+### Archive query parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `observation_type` | string | Column name from the archive schema |
+| `from` | integer | Start epoch timestamp (Unix seconds) |
+| `to` | integer | End epoch timestamp (Unix seconds) |
+| `aggregate_interval` | integer | Bucket size in seconds (≥ 60, no upper cap) |
+| `agg_map` | string | Per-field aggregation: `field:agg_type` comma-separated |
+
+The `aggregate_interval` parameter accepts any value ≥ 60 seconds — there is no upper bound.
+
+### Supported aggregate types
+
+| Type | Behavior |
+|------|----------|
+| `avg` | SQL AVG |
+| `max` | SQL MAX |
+| `min` | SQL MIN |
+| `sum` | SQL SUM |
+| `count` | SQL COUNT |
+| `sumcumulative` | SQL SUM per bucket, then running total post-processed in Python |
+
+The `sumcumulative` type replaces Belchertown's hardcoded `rainTotal` post-processing. Use it for cumulative rain totals.
+
+### Archive grouped endpoint
+
+`GET /api/v1/archive/grouped` provides categorical aggregation grouped by calendar period:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `group_by` | string | Grouping period: `month`, `day`, `hour`, or `year` |
+| `fields` | string | Comma-separated field specs: `field:agg_type` or `field:agg_type:avg_type` |
+| `from` | integer (optional) | Start epoch timestamp |
+| `to` | integer (optional) | End epoch timestamp |
+| `force_full_period` | boolean (optional) | Fill missing calendar slots with null when true |
+
+There is no separate `/climatology/*` endpoint family. Use `/archive/grouped` for all calendar-grouped aggregation.
+
+### Archive conversion
+
+Apply `transform_record()` to all `/archive` responses. This injects `beaufort` and unit-converts all fields. Values are flattened to full-precision scalars. The exception: `beaufort` retains its `ConvertedValue` dict form so the dashboard wind rose can bin by Beaufort number without re-deriving from wind speed.
+
+### All archive columns served
+
+The `/archive` endpoint has no column whitelist gate. Any column present in the weewx archive schema is queryable by its database column name. The column registry (populated at startup by schema reflection) governs self-hide pruning — not endpoint access.
+
+---
+
+## §10 weewx Integration
+
+### Co-location constraint
+
+Deploy the API on the same host as weewx. This is an architecture constraint (per ADR-056 and ADR-034), not a recommendation. The API reads `weewx.conf` from the local filesystem; the weewx archive database is on the same host; the loop relay Unix socket is on the same host.
+
+### weewx.units import
+
+Use `import weewx.units` to access `obs_group_dict` for unit group auto-detection at startup. This is the authoritative mapping from weewx field name to unit group.
+
+Import path: auto-detect by checking standard install paths, then read from `api.conf [weewx] python_path` if the operator has set a custom path. Store the resolved path in config on first successful import.
+
+### Graceful degradation
+
+If `import weewx.units` fails (weewx not installed at the detected path), log a warning and continue. The API still serves data. Unit group auto-detection is unavailable; the operator must specify unit groups manually in the wizard.
+
+Never make the weewx import a fatal startup failure.
+
+### Security boundary
+
+The API imports only `weewx.units`. It never imports:
+
+- `weewx.engine` — the weewx engine
+- `weewx.drivers` — hardware driver modules
+- `weewx.manager` — the database manager
+
+Importing engine or driver modules could trigger hardware initialization, file locks, or database writes. Importing manager could provide accidental write access to the archive. These imports are forbidden.
+
+---
+
+## §11 SSE and Realtime
+
+### Endpoint
+
+The SSE stream is served at `GET /sse` on API port 8765. Caddy routes both `/api/v1/*` and `/sse` to port 8765. There is no separate realtime service (the former `weewx-clearskies-realtime` is deprecated per ADR-058).
+
+### Event format
+
+Each SSE event uses the named event type `"loop"`:
+
+```
+event: loop
+data: {"outTemp": {"value": 72.3, "label": "°F", "formatted": "72.3"}, ..., "units": {...}}
+```
+
+The data field is a unit-converted JSON object in the same shape as `/current` responses, excluding `weatherText` (REST-only). Every SSE event carries the `units` metadata block.
+
+### Input: Unix socket
+
+The socket reader connects to the Unix socket at `/var/run/weewx-clearskies/loop.sock` published by the `ClearSkiesLoopRelay` weewx extension. The socket reader auto-reconnects with exponential backoff on weewx restart. MQTT is eliminated — direct mode via Unix socket is the only input path.
+
+### Keepalive and buffer
+
+- 15-second keepalive comment (`": keepalive"`) sent to all connected clients to prevent proxy timeout.
+- 64-packet overflow buffer. When the buffer is full, the oldest packet is dropped.
+
+### Module-level state
+
+Twelve enrichment processors run in the API process. Several carry intentional process-level state:
+
+- Ring buffers (solar radiation kc window, wind rolling window)
+- Sky condition classifier (30-minute kc buffer, current classification)
+- Scene descriptor (current background image state)
+- Lightning strike buffer
+
+This state is preserved correctly in a single-process deployment. Multi-worker deployment would require state sharing — this is out of scope for v0.1. The API runs as a single uvicorn worker.
+
+### Caddy routing
+
+Both `/api/v1/*` and `/sse` route to the API at port 8765. Example Caddyfile stanzas (single-host, dual-stack):
+
+```
+handle /api/v1/* {
+    reverse_proxy localhost:8765
+}
+handle /sse {
+    reverse_proxy localhost:8765
+}
+```
+
+For dual-stack binding (IPv4 and IPv6), bind Caddy on both `0.0.0.0:443` and `[::]:443`. The API listens on `0.0.0.0:8765` (loopback or LAN depending on topology — see ARCHITECTURE.md for the authoritative port registry and topology rules).
+
+---
+
+## §12 Anti-Patterns
+
+Never do any of the following.
+
+| Anti-pattern | Correct approach |
+|--------------|-----------------|
+| **Create chart-specific API endpoints** (e.g., `/charts/wind-rose`, `/charts/temperature-range`). | The API is general-purpose data access. Serve `/archive` and let the dashboard determine rendering. Use `/charts/custom-query/{series_id}` only for operator-defined SQL queries from `charts.conf`. |
+| **Duplicate Beaufort, comfort-index, or unit conversion thresholds in dashboard code.** | The API computes all derived values. The dashboard reads `beaufort.value`, `comfortIndex`, and `label` strings. It performs zero unit math. |
+| **Hardcode weewx column names in endpoint handlers.** | Use the column registry populated by schema reflection at startup. Endpoints select columns from the operator's mapping — never from a hardcoded list. |
+| **Serve local-time strings in API responses.** | All time fields use UTC ISO-8601 with a `Z` suffix. Display-side timezone conversion happens in the dashboard using the station's IANA timezone from `StationMetadata`. |
+| **Write to the weewx database.** | The API is read-only by architecture. The startup write probe enforces this. The API never holds a writable DB connection. |
+| **Import `weewx.engine`, `weewx.drivers`, or `weewx.manager`.** | Import only `weewx.units`. Engine and driver imports risk hardware initialization and file locks. Manager imports risk write access. |
+| **Accept custom SQL from HTTP.** | Custom SQL comes from `charts.conf` on disk only. Config file is operator-controlled (same trust model as Belchertown). HTTP-supplied SQL is rejected unconditionally. |
+| **Return a response without the `units` metadata block.** | Every API response — observation, archive, forecast, AQI, alert — carries the `units` block. Use `exclude_none=False` serialization. |
+| **Place secrets in `.conf` files.** | Secrets (API keys, DB passwords, cache URL with credentials) go in `secrets.env` (mode 0600), injected as environment variables. Config files (`api.conf`, `charts.conf`) are operator-readable and must contain no credentials. |
+| **Exceed the 366-day time-range cap on archive queries.** | Enforce a 366-day maximum on all archive time-range parameters. Return HTTP 400 with RFC 9457 body when the requested range exceeds the cap. |
+| **Use a separate conversion layer between the API and dashboard.** | The former realtime BFF proxy is eliminated. The API converts directly. Caddy routes `/api/v1/*` and `/sse` both to the API at port 8765. There is no intermediate service. |
+| **Use MQTT as the loop packet input.** | MQTT input mode is eliminated (per ADR-058). The only input path is the Unix socket at `/var/run/weewx-clearskies/loop.sock` from the `ClearSkiesLoopRelay`. |
