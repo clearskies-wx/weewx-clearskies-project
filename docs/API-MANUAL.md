@@ -520,33 +520,37 @@ The conditions text engine is a multi-module stateful system that produces the `
 
 ### Sky condition
 
-**Primary source (daytime):** Solar radiation analysis via the clear sky index (kc) with temporal variability.
+**Primary source (daytime):** Variability Index (VI) analysis adapted from CAELUS (Ruiz-Arias & Gueymard 2023).
 
-- Compute `kc = GHI_measured / GHI_clearsky`, clamped to [0, 1.2].
-- Clear-sky model: Ineichen-Perez via pvlib-python, using station coordinates and Linke turbidity from pvlib's built-in climatological table.
-- Alternatively: use weewx's `maxSolarRad` as the clear-sky reference when available.
-- Maintain a 30-minute sliding window of kc values (~360 samples at 5-second intervals).
-- Classify using a 2D (σ, mean) table:
+- Measure GHI (radiation from weewx) and clear-sky reference (maxSolarRad from weewx).
+- Bin 5-second LOOP packets into 1-minute averages. Maintain a 30-minute ring buffer of MinuteRecord entries.
+- Compute four indices from the ring buffer:
 
-**Low sigma (σ(kc) < 0.08) — uniform sky:**
+| Index | Formula | Window |
+|-------|---------|--------|
+| Kcs | latest GHI / latest maxSolarRad, clamped [0, 1.2] | Latest minute |
+| Km | mean(all GHI) / mean(all maxSolarRad) | 30 min |
+| Kv | Σ\|Δ(GHI - mean_GHI)\| / window_span | 30 min |
+| Kvf | Same formula as Kv | 10 min |
 
-| σ(kc) | mean(kc) | Classification |
-|-------|----------|----------------|
-| < 0.08 | ≥ 0.85 | Clear |
-| < 0.08 | 0.70–0.85 | Mostly Clear |
-| < 0.08 | 0.50–0.70 | Partly Cloudy |
-| < 0.08 | 0.30–0.50 | Mostly Cloudy |
-| < 0.08 | < 0.30 | Cloudy |
+Kv is the cumulative absolute first-derivative of GHI's deviation from the rolling mean — it measures the total "path length" of the deviation signal. Smooth signals produce near-zero Kv; jagged signals (broken clouds) produce high Kv.
 
-**High sigma (σ(kc) ≥ 0.08) — variable sky:**
+- Classify using the CAELUS six-class decision tree (first match wins):
 
-| σ(kc) | mean(kc) | Classification |
-|-------|----------|----------------|
-| ≥ 0.08 | ≥ 0.85 | Mostly Clear |
-| ≥ 0.08 | 0.60–0.85 | Partly Cloudy |
-| ≥ 0.08 | < 0.60 | Mostly Cloudy |
+| # | Class | Conditions | NWS Display |
+|---|-------|-----------|-------------|
+| 1 | CLOUD_ENHANCEMENT | Kcs > 1.06 AND Kv > 0.20 AND Kvf > 0.20 | Partly Cloudy |
+| 2 | CLOUDLESS | Km > 0.6 AND Kcs ∈ [0.85, 1.15] AND Kv < 0.03 | Clear |
+| 3 | OVERCAST | Km < 0.3 AND Kv < 0.10 | Cloudy |
+| 4 | THIN_CLOUDS | Km > 0.5 AND Kv ∈ [0.03, 0.08) | Mostly Clear |
+| 5 | THICK_CLOUDS | Km < 0.4 AND Kv ∈ [0.04, 0.16) | Mostly Cloudy |
+| 6 | SCATTER_CLOUDS | Everything else in cloudy zone | Partly Cloudy |
 
-The σ threshold of 0.08 accounts for typical pyranometer accuracy and clear-sky model error. A perfectly clear sky can produce kc ~0.93 from systematic bias alone — a threshold of 0.95 would be inside the noise floor. Operators use diverse sensor hardware; thresholds must be sensor-agnostic.
+Thresholds from CAELUS `options.py` (Table 3), validated on 54 BSRN stations across all major climate zones. Sensor-agnostic — operators use diverse pyranometer hardware.
+
+**Temporal coherence filter:** A raw classification must persist for 15 consecutive minutes before becoming the stable label. On startup, 3-minute grace applies. Replaces the previous per-threshold hysteresis.
+
+**Startup backfill:** On API restart, `backfill()` seeds the ring buffer from archive records (last 30 minutes) for immediate classification. Full accuracy after ~30 minutes of live LOOP data.
 
 **Secondary source (night / twilight / startup / no pyranometer):** Provider cloud cover or provider weather text, via these priority levels:
 
@@ -663,7 +667,7 @@ Apply three stability mechanisms before any threshold comparison:
 
 | Input | Window |
 |-------|--------|
-| Solar radiation (kc) | 30 min |
+| Solar radiation (GHI → 1-min bins) | 30 min |
 | UV | 10 min |
 | appTemp, dewpoint, outTemp | 10 min |
 | windSpeed, windGust | 5 min |
@@ -681,6 +685,8 @@ Apply three stability mechanisms before any threshold comparison:
 
 **Minimum hold time:** 5 minutes. After composition, hold the conditions text string for 5 minutes before allowing any change, even when smoothed + hysteresis inputs produce a different result.
 
+**Sky condition stability:** The sky classifier uses a temporal coherence filter instead of hysteresis — a raw classification must persist for 15 consecutive minutes before replacing the stable label. This is independent of the 5-minute conditions text hold time, which still applies to the composed `weatherText` string.
+
 ### Composition order
 
 Assemble components in this order: **[temperature-comfort, sky, wind, precipitation]**. Drop null or omitted components.
@@ -695,7 +701,7 @@ Examples: "Warm and Humid, Overcast, with Light Rain" / "Pleasant, Partly Cloudy
 
 ### Startup
 
-Until 36 samples accumulate (~3 minutes at 5-second intervals), fall back to provider cloud cover for sky condition. If no provider data is available, report sky condition absent (wind and comfort components still compose). The 36-sample guard provides enough statistical power for a first classification — the full 30-minute window is the steady-state buffer size, not the startup threshold.
+On API restart, `backfill()` seeds the sky classifier's ring buffer from archive records (last 30 minutes), enabling immediate classification. A 3-minute startup grace period applies to the temporal coherence filter. If no archive records are available (fresh install), fall back to provider cloud cover until the ring buffer accumulates ≥ 3 minutes of live LOOP data. If no provider data is available, report sky condition absent (wind and comfort components still compose).
 
 ### Transport
 

@@ -266,7 +266,7 @@ The API hosts a multi-module, stateful conditions-text engine that produces the 
 | Module | Role |
 |--------|------|
 | `weewx_clearskies_api/sse/conditions_text.py` | Stateless composer — assembles the `weatherText` string from per-component labels |
-| `weewx_clearskies_api/sse/sky_condition.py` | Stateful classifier — 30-min rolling kc-buffer, produces the sky label |
+| `weewx_clearskies_api/sse/sky_condition.py` | Stateful classifier — VI-based (CAELUS), 30-min ring buffer of 1-min GHI averages, produces the sky label |
 | `weewx_clearskies_api/sse/temperature_comfort.py` | Stateless 2D matrix — maps (appTemp, dewpoint) to comfort label |
 | `weewx_clearskies_api/sse/enrichment/weather_text.py` | Enrichment adapter — reads smoothed inputs + sky class, calls `build_weather_text()`, injects result into the `/current` response dict |
 
@@ -278,9 +278,9 @@ The API hosts a multi-module, stateful conditions-text engine that produces the 
 
 **Registration:** The API's `__main__.py` registers `enrich_weather_text` against the `"current"` endpoint key. Every `GET /api/v1/current` response is enriched before being returned to the browser.
 
-**Sky classification thresholds (ADR-044, amended 2026-06-08):** σ(kc) threshold = 0.08, hysteresis ±0.03. Low sigma: Clear ≥0.85, Mostly Clear ≥0.70, Partly Cloudy ≥0.50, Mostly Cloudy ≥0.30, Cloudy <0.30. High sigma: Mostly Clear ≥0.85, Partly Cloudy ≥0.60, Mostly Cloudy <0.60. Display vocabulary: "Sunny"/"Mostly Sunny" during day, "Clear"/"Mostly Clear" at night per NWS standard.
+**Sky classification (ADR-044, amended 2026-06-18):** Variability Index (VI) system adapted from CAELUS. Four indices (Kcs, Km, Kv, Kvf) computed from 1-minute GHI averages over a 30-minute ring buffer. Six-class decision tree: CLOUDLESS→"Clear", THIN_CLOUDS→"Mostly Clear", SCATTER_CLOUDS→"Partly Cloudy", THICK_CLOUDS→"Mostly Cloudy", OVERCAST→"Cloudy", CLOUD_ENHANCEMENT→"Partly Cloudy". Temporal coherence filter (15-min persistence). Startup backfill from archive records.
 
-**Startup behavior:** The solar kc-buffer requires approximately 3 minutes of loop packets before the sky classifier can produce a result. During this warm-up window, `weatherText` may be `null`. Once data accumulates, the engine produces output continuously. When solar analysis is unavailable (night, twilight, no pyranometer), the engine falls back to provider cloud cover via `_cloud_pct_to_sky()` in `enrichment/weather_text.py`, which maps cloud cover percentage to the sky label with day/night vocabulary awareness.
+**Startup behavior:** On API restart, `backfill()` seeds the sky classifier's ring buffer from archive records (last 30 minutes), enabling immediate classification. The temporal coherence filter applies a 3-minute startup grace. Full CAELUS-quality classification after ~30 minutes of live LOOP data. When solar analysis is unavailable (night, twilight, no pyranometer), the engine falls back to provider cloud cover via `_cloud_pct_to_sky()` in `enrichment/weather_text.py`, which maps cloud cover percentage to the sky label with day/night vocabulary awareness.
 
 ## Input mode (ADR-058)
 

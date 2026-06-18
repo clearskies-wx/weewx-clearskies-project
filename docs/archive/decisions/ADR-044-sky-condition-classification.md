@@ -35,32 +35,41 @@ During daytime, the station's pyranometer is the authoritative source. Provider 
 
 > **Amendment (2026-06-08):** Thresholds revised for sensor accuracy. Typical pyranometer accuracy and clear-sky model error means a perfectly clear sky can produce kc ~0.93 from systematic bias alone — the previous Clear threshold of 0.95 was inside the noise floor. Thresholds must be sensor-agnostic; operators use diverse hardware. σ threshold corrected from 0.10 to 0.08 (matching deployed code). Intermediate low-sigma tiers restored (the June 5 simplification conflated opacity with coverage, but thin cirrus/haze legitimately produces low-sigma intermediate kc). "Overcast"/"Heavily Overcast" replaced with "Cloudy" per NWS display vocabulary. Day/night display vocabulary added (§2).
 
-**Low sigma (< 0.08) — uniform sky, no cloud transits detected:**
+> **Amendment (2026-06-18):** §1a rewritten. σ(kc)-based classification replaced with Variability Index (VI) system adapted from CAELUS (Ruiz-Arias & Gueymard 2023). Four indices (Kcs, Km, Kv, Kvf) replace mean(kc) + σ(kc). Six-class decision tree replaces 2D (σ, mean) table. Temporal coherence filter (15-min persistence) replaces per-threshold hysteresis. 5-second data binned to 1-minute averages before index computation. Archive records used for startup backfill. All sensor-specific references removed — system is sensor-agnostic.
 
-| σ(kc) | mean(kc) | Classification | Physical meaning |
-|---|---|---|---|
-| < 0.08 | ≥ 0.85 | Clear | Uniform irradiance near clear-sky level |
-| < 0.08 | 0.70–0.85 | Mostly Clear | Thin uniform dimming (cirrus, haze, marine layer) |
-| < 0.08 | 0.50–0.70 | Partly Cloudy | Thin uniform overcast |
-| < 0.08 | 0.30–0.50 | Mostly Cloudy | Moderate uniform overcast |
-| < 0.08 | < 0.30 | Cloudy | Thick uniform cover |
+**Variability Index (VI) classification** adapted from CAELUS (Ruiz-Arias & Gueymard 2023), validated on 54 BSRN stations across all major climate zones.
 
-**High sigma (≥ 0.08) — variable sky, cloud transits detected:**
+**Data resolution:** 5-second LOOP packets are binned into 1-minute averages. The 30-minute ring buffer holds up to 30 one-minute records.
 
-| σ(kc) | mean(kc) | Classification | Physical meaning |
-|---|---|---|---|
-| ≥ 0.08 | ≥ 0.85 | Mostly Clear | Infrequent cloud passages, mostly sun |
-| ≥ 0.08 | 0.60–0.85 | Partly Cloudy | Frequent cloud passages |
-| ≥ 0.08 | < 0.60 | Mostly Cloudy | Mostly cloud with sun breaks |
+**Four indices computed from the ring buffer:**
 
-σ(kc) threshold of 0.08 separates uniform skies from broken/variable skies. The 30-minute window provides ~360 samples at 5-second intervals — sufficient statistical power for variance estimation.
+| Index | Formula | Window | Purpose |
+|-------|---------|--------|---------|
+| Kcs | GHI / maxSolarRad, clamped [0, 1.2] | Latest minute | Instantaneous clear-sky index |
+| Km | mean(GHI) / mean(maxSolarRad) | 30 min | Mean normalized irradiance |
+| Kv | Σ\|Δ(GHI - mean_GHI)\| / T | 30 min | Coarse variability — total "path length" of deviation signal |
+| Kvf | Same as Kv | 10 min | Fine variability — catches rapid cloud transits |
 
-**Startup:** Until **~3 minutes** of data accumulates (**36 samples** at ~5-second intervals),
-fall back to provider cloud cover. If no provider either, report no sky condition
-(wind/comfort only). The minimum-samples guard (`_MIN_SAMPLES = 36`) provides enough
-statistical power for a first classification without requiring the full 30-minute window.
-The full 30-minute window is the steady-state buffer size for variance estimation, not the
-startup threshold.
+Kv is the key new metric: the cumulative absolute first-derivative of GHI's deviation from the rolling mean, normalized by time. A smooth signal (uniform overcast, clear sky) produces near-zero Kv. A jagged signal (broken clouds, rapid transits) produces high Kv.
+
+**Six-class decision tree (evaluated top to bottom, first match wins):**
+
+| # | Class | Conditions | NWS Display |
+|---|-------|-----------|-------------|
+| 1 | CLOUD_ENHANCEMENT | Kcs > 1.06 AND Kv > 0.20 AND Kvf > 0.20 AND maxSolarRad > 100 | Partly Cloudy |
+| 2 | CLOUDLESS | Km > 0.6 AND Kcs ∈ [0.85, 1.15] AND Kv < 0.03 | Clear |
+| 3 | OVERCAST | Km < 0.3 AND Kv < 0.10 | Cloudy |
+| 4 | THIN_CLOUDS | Km > 0.5 AND Kv ∈ [0.03, 0.08) | Mostly Clear |
+| 5 | THICK_CLOUDS | Km < 0.4 AND Kv ∈ [0.04, 0.16) | Mostly Cloudy |
+| 6 | SCATTER_CLOUDS | Everything else in cloudy zone | Partly Cloudy |
+
+CLOUDLESS has relaxed Kcs bounds [0.80, 1.20] at high solar zenith angles (morning/evening, approximated via maxSolarRad < 200 W/m²).
+
+Threshold constants from CAELUS `options.py` (Table 3 in the paper). Sensor-agnostic — validated across diverse equipment worldwide.
+
+**Startup and backfill:** The ring buffer requires ≥ 3 minutes of data before classification. On API startup, `backfill()` seeds the ring from archive records (last 30 minutes), enabling immediate classification. As live LOOP packets arrive, 1-minute bins are appended and archive entries age out naturally. Full CAELUS-quality data after ~30 minutes of live data.
+
+**Temporal coherence filter:** Replaces per-threshold hysteresis. A raw classification must persist for 15 consecutive minutes before becoming the stable label. On startup, a 3-minute grace period applies. This prevents rapid flicker at class boundaries — physically, sky conditions do not change every minute.
 
 #### 1b. Secondary source: provider conditions (night / twilight / no pyranometer)
 
@@ -99,13 +108,11 @@ Provider data is used only when solar radiation analysis is unavailable: at nigh
 
 - **Night** (solar zenith > 90°): No solar classification possible. Use provider cloud cover or omit sky descriptor.
 - **Civil twilight** (zenith 80–90°): Solar classification unreliable. Fall back to provider cloud cover; if unavailable, omit sky descriptor.
-- **GHI noise floor:** The code sets `_NOISE_FLOOR = 0.0` W/m² — readings at or above 0 are
-  accepted into the kc buffer. A separate guard (`maxSolarRad < 50 W/m²`) already excludes
-  night and deep-twilight periods before any GHI value is evaluated; in practice this makes
-  the 10 W/m² floor redundant. The effective operational threshold is the `maxSolarRad < 50`
-  guard: below it, no readings are added regardless of GHI. The `_NOISE_FLOOR = 0.0`
-  constant catches only physically invalid negative sensor readings.
-- **Cloud-edge enhancement** (kc > 1.0): Evidence of nearby clouds. Sustained enhancement within the window contributes to elevated σ(kc), naturally classifying as Partly Cloudy.
+- **GHI noise floor:** The code sets `_MIN_SOLAR_RAD = 20.0` W/m² — readings are only
+  accepted into the ring buffer when `maxSolarRad ≥ 20 W/m²`. This guard excludes night and
+  deep-twilight periods before any GHI value is evaluated. Below this threshold no readings
+  are added regardless of GHI.
+- **Cloud-edge enhancement** (Kcs > 1.0): Cloud enhancement is a first-class CAELUS category (CLOUD_ENHANCEMENT): requires Kcs > 1.06, Kv > 0.20, Kvf > 0.20, and sun sufficiently above horizon (maxSolarRad > 100). Maps to "Partly Cloudy" — nearby clouds with sun.
 - **Anomalous turbidity — smoke, dust, haze:** Climatological Linke turbidity underestimates actual atmospheric extinction during wildfire smoke, dust storms, or heavy haze. This produces artificially low kc (sky appears "cloudier" than it is). **Detection heuristic:** when kc is persistently low (mean < 0.70) AND σ(kc) is very low (< 0.03) AND provider reports clear or few clouds AND local temperature/humidity are inconsistent with thick cloud cover (e.g., high temp, low humidity), flag as "Hazy" or "Smoky" instead of "Mostly Cloudy." This heuristic is imperfect but catches the most common false classification. When AQI data is available and elevated (PM2.5 > 35 µg/m³ or AQI > 100), the confidence in a smoke/haze diagnosis increases.
 - **Snow on pyranometer:** Produces kc ≈ 0, indistinguishable from overcast. Cannot be detected from radiation data alone. If temperature is well below freezing and provider reports clear, consider adding a data-quality warning.
 
@@ -342,7 +349,7 @@ Each component independently selects its source:
 
 | Component | Primary | Fallback |
 |---|---|---|
-| Sky condition | Solar radiation kc + σ(kc) analysis (day) | Provider cloud cover % (night, twilight, startup, no pyranometer) |
+| Sky condition | Solar radiation VI analysis (Kcs/Km/Kv/Kvf, day) | Provider cloud cover % (night, twilight, no pyranometer) |
 | Precipitation | Local rain gauge | Provider precipType (with wet-bulb filter) |
 | Wind | Local anemometer | (no fallback — omit if absent) |
 | Temperature-comfort | Local appTemp + dewpoint + outTemp | (no fallback — omit if absent) |
@@ -353,11 +360,11 @@ Local sensor data is always authoritative over provider forecasts. Provider data
 
 | Option | Verdict |
 |---|---|
-| A. Clear sky index (kc) + temporal variability (2D) | **Selected.** Scientifically grounded, pyranometer-only. |
+| A. Clear sky index (kc) + temporal variability (2D) | Superseded by Option E (2026-06-18). Scientifically grounded but σ(kc) cannot distinguish cloud opacity from cloud coverage; VI captures irradiance shape σ cannot. |
 | B. Provider cloud cover only | Insufficient — not always available, defaults to "Clear." |
 | C. Fixed GHI thresholds | Rejected. Ignores solar geometry. |
 | D. Diffuse fraction (D/G) | Requires hardware most home stations lack. |
-| E. CAELUS 6-class (Ruiz-Arias & Gueymard 2023) | Overkill for weather display. |
+| E. CAELUS 6-class (Ruiz-Arias & Gueymard 2023) | **Selected (2026-06-18)** — adapted for weather display. VI captures irradiance shape that σ cannot. |
 
 ## Consequences
 
@@ -381,7 +388,7 @@ Local sensor data is always authoritative over provider forecasts. Provider data
 - Duchon, C.E. & O'Malley, M.S. (1999). Estimating cloud type from pyranometer observations. *J. Applied Meteorology*, 38, 132–141.
 - Dürr, B. & Philipona, R. (2001). Automatic cloud amount detection by surface longwave downward radiation measurements. *J. Geophysical Research*, 109, D05201.
 - Reno, M.J. & Hansen, C.W. (2016). Identification of periods of clear sky irradiance in time series of GHI measurements. *Renewable Energy*, 90, 520–531.
-- Ruiz-Arias, J.A. & Gueymard, C.A. (2023). CAELUS: Classification of sky conditions from 1-min time series. *Solar Energy*, 262, 111824.
+- Ruiz-Arias, J.A. & Gueymard, C.A. (2023). CAELUS: Classification of sky conditions from 1-min time series. *Solar Energy*, 263, 111895. Source: https://github.com/jararias/caelus
 - Correa, C.D. et al. (2022). A method for clear-sky identification and long-term trends assessment. *AGU Earth and Space Science*, 9(3).
 - Stull, R. (2011). Wet-bulb temperature from relative humidity and air temperature. *J. Applied Meteorology and Climatology*, 50(11), 2267–2269.
 - Kasten, F. & Czeplak, G. (1980). Solar and terrestrial radiation dependent on the amount and type of cloud. *Solar Energy*, 24(2), 177–189.
