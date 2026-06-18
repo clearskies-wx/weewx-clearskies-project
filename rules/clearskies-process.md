@@ -27,12 +27,23 @@ Incident history and rationale at [reference/process-rule-history.md](../referen
 
 **Recover lost state immediately.** If the user references a decision you can't find in files: STOP. Tell them. Ask for context. Write it down before the next item.
 
-**UI decisions follow a separate lifecycle.** Non-UI ADRs follow the standard lifecycle (Proposed → Accepted → rarely Superseded). UI-related ADRs follow an extended lifecycle:
+**All ADRs follow the manual consolidation lifecycle.** After acceptance, prescriptive rules are extracted into the target manual, then the ADR is archived:
 1. Decision needed → draft ADR as Proposed
 2. User approves → ADR becomes Accepted
-3. Rules extracted into `docs/DESIGN-MANUAL.md` (the single authority for UI design rules)
-4. ADR archived → moved to `docs/archive/decisions/`, status "Archived — consolidated into DESIGN-MANUAL.md"
-5. Future reference → archived ADR explains *why*; the design manual is where you *follow* it
+3. Rules extracted into the target manual:
+   - API rules → `docs/API-MANUAL.md`
+   - Provider rules → `docs/PROVIDER-MANUAL.md`
+   - Ops/security/config rules → `docs/OPERATIONS-MANUAL.md`
+   - Dashboard technical rules → `docs/DASHBOARD-MANUAL.md`
+   - UI design rules → `docs/DESIGN-MANUAL.md`
+4. ADR archived → moved to `docs/archive/decisions/`, status "Archived — consolidated into {MANUAL-NAME}.md"
+5. Future reference → archived ADR explains *why*; the manual is where you *follow* it
+
+**Doc-code sync is part of task completion.** A task is not done until governing documents reflect the code changes. The coordinator checks this at every QC gate. An agent that ships code without updating the affected manual or ARCHITECTURE.md has not completed the task — same as shipping code without tests.
+
+**Manual authority hierarchy:** Manuals > ADRs > code comments > conversation history. ARCHITECTURE.md = what IS (reference). Manuals = what TO DO (prescriptive). When a manual and ARCHITECTURE.md conflict, investigate — one is stale. Fix the stale one.
+
+**Manual-update discipline:** Any code change that affects manual rules must update the manual in the same commit. A code change that adds behavior not covered by any manual must either (a) update the manual or (b) draft an ADR for user approval first if the behavior is a new architectural decision.
 
 ## ADR content standards
 

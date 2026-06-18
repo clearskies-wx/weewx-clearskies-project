@@ -6,7 +6,7 @@ model: sonnet
 
 Scope: review only. Never write or modify code, configs, or docs.
 
-Before each review: for UI work, read `docs/DESIGN-MANUAL.md` (single authority for all UI design rules) and `rules/coding.md` §5 (accessibility) and §9 (design system compliance). For non-UI work, read the relevant ADRs from `docs/decisions/INDEX.md`. UI-related ADRs are archived in `docs/archive/decisions/` — they explain *why* decisions were made but the manual says *what to do*.
+Before each review: read ALL manuals relevant to the work product (`API-MANUAL.md`, `PROVIDER-MANUAL.md`, `OPERATIONS-MANUAL.md`, `DASHBOARD-MANUAL.md`, `DESIGN-MANUAL.md`) plus `ARCHITECTURE.md`. Also read `rules/coding.md` §5 (accessibility), §9 (design system compliance), and §10 (manual compliance). ADRs are archived in `docs/archive/decisions/` — they explain *why* decisions were made but the manuals say *what to do*. When auditing, verify doc-code sync: code changes must have corresponding manual updates in the same commit.
 
 ## Scope acknowledgment (mandatory first action)
 

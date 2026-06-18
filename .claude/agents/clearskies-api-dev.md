@@ -6,8 +6,10 @@ model: sonnet
 
 Scope: clearskies-api repo. Backend Python only.
 
+Before any code change, read `docs/API-MANUAL.md` and `docs/PROVIDER-MANUAL.md`. These are the single authority for API implementation rules. Before reporting a task complete, verify that any governing documents affected by your code changes have been updated in the same commit. If you added an endpoint, it must appear in ARCHITECTURE.md. If you changed enrichment behavior, API-MANUAL.md must reflect it. Doc-code drift is a defect, not a cleanup task.
+
 Hard constraints:
-- ADRs are authoritative. Conflicts → SendMessage the lead. Do not override silently.
+- Manuals are authoritative. ADRs explain why; manuals say what to do. Conflicts → SendMessage the lead. Do not override silently.
 - All SQL parameterized. No string interpolation into queries.
 - Input validation at every trust boundary.
 - Endpoint shape must match `docs/contracts/openapi-v1.yaml`.

@@ -335,9 +335,9 @@ Non-stock columns discovered by schema reflection (step 7) are presented to the 
 
 The confirmed mapping persists in the operator's `api.conf` under `[column_mapping]`. The mapping takes effect on the next request — no service restart required when the operator updates a mapping through the config UI.
 
-### Auto-advance
+### Operator confirmation required
 
-When all discovered columns are stock and auto-mapped, the wizard skips the mapping table step entirely. The step auto-advances to the next wizard step without operator input.
+When all discovered columns are stock, the wizard presents the mapping table with pre-filled suggestions and requires operator confirmation before advancing. The operator always confirms — nothing auto-maps silently and the step never auto-advances (per ADR-056 amendment to ADR-035).
 
 ### Battery and diagnostic column exclusion
 
@@ -597,16 +597,16 @@ Beaufort scale thresholds (WMO standard; all comparisons use m/s internally — 
 |----------|-----------|-------|
 | 0 | < 0.5 | Calm |
 | 1 | 0.5–1.5 | Very Light Breeze |
-| 2 | 1.6–3.3 | Light Breeze |
-| 3 | 3.4–5.4 | Gentle Breeze |
-| 4 | 5.5–7.9 | Moderate Breeze |
-| 5 | 8.0–10.7 | Fresh Breeze |
-| 6 | 10.8–13.8 | Strong Breeze |
-| 7 | 13.9–17.1 | Near Gale |
+| 2 | 1.6–3.3 | Light breeze |
+| 3 | 3.4–5.4 | Gentle breeze |
+| 4 | 5.5–7.9 | Moderate breeze |
+| 5 | 8.0–10.7 | Fresh breeze |
+| 6 | 10.8–13.8 | Strong breeze |
+| 7 | 13.9–17.1 | Near gale |
 | 8 | 17.2–20.7 | Gale |
-| 9 | 20.8–24.4 | Strong Gale |
+| 9 | 20.8–24.4 | Strong gale |
 | 10 | 24.5–28.4 | Storm |
-| 11 | 28.5–32.6 | Violent Storm |
+| 11 | 28.5–32.6 | Violent storm |
 | 12 | ≥ 32.7 | Hurricane |
 
 Labels use sentence case. Beaufort 0 ("Calm") appears in the composed text — calm is a real atmospheric state, not the absence of data.
@@ -799,6 +799,19 @@ There is no separate `/climatology/*` endpoint family. Use `/archive/grouped` fo
 ### Archive conversion
 
 Apply `transform_record()` to all `/archive` responses. This injects `beaufort` and unit-converts all fields. Values are flattened to full-precision scalars. The exception: `beaufort` retains its `ConvertedValue` dict form so the dashboard wind rose can bin by Beaufort number without re-deriving from wind speed.
+
+### Special series types
+
+Four series names in `charts.conf` trigger automatic rendering behavior — the dashboard switches chart component and data-fetching strategy without additional operator config:
+
+| Series name | Rendering | Key automatic behaviors |
+|-------------|-----------|------------------------|
+| `windRose` | Custom SVG polar chart (16 directions × 7 Beaufort speed bands) | Raw (unaggregated) separate archive fetch for `windSpeed`+`windDir`. Default Beaufort colors, overridable via `beaufort0`–`beaufort6` keys. Always polar. |
+| `weatherRange` | Recharts arearange (default) or columnrange. Polar ONLY when `polar=true` explicitly set. | 15-band temperature color zones (°F and °C variants). Dual archive fetch `agg=min`+`agg=max`, `aggregate_interval=86400`. |
+| `haysChart` | Recharts arearange, always polar | Circular 24-hour wind chart (Mount Washington Observatory style). Queries `windSpeed`+`windGust` max. `yAxis_softMax` controls radial scale. |
+| `rainTotal` | Standard time-series | Migration tool auto-promotes to `aggregate_type = sumcumulative`. Queries `rain` column with `observation_type = rain`. |
+
+All other series render as standard Recharts time-series charts (line/spline/area/column/scatter).
 
 ### All archive columns served
 

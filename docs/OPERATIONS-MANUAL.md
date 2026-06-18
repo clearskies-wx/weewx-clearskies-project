@@ -251,7 +251,7 @@ Configure the reverse proxy to disable response buffering on the `/sse` path and
 
 ### Reference Caddyfile
 
-A complete reference Caddyfile for the single-host compose path. The two-host path differs only in the `reverse_proxy` upstream address (use the weewx host address instead of the Docker service name `api`).
+A complete reference Caddyfile for the single-host compose path. The two-host path differs in the `reverse_proxy` upstream address (use the weewx host address instead of the Docker service name `api`) **and** in TLS verification: replace `tls_insecure_skip_verify` with `tls { ca_pool /etc/weewx-clearskies/api-cert.pem }` — disabling TLS verification is not acceptable when Caddy and the API are on different hosts over a non-loopback network (see §12 anti-pattern).
 
 ```caddyfile
 weather.example.com {
@@ -298,6 +298,7 @@ weather.example.com {
     handle /wizard*    { reverse_proxy config:9876 }
     handle /bootstrap* { reverse_proxy config:9876 }
     handle /login*     { reverse_proxy config:9876 }
+    handle /logout*    { reverse_proxy config:9876 }
     handle /admin*     { reverse_proxy config:9876 }
     handle /static/*   { reverse_proxy config:9876 }
 
@@ -791,6 +792,10 @@ Rate limiting is bypassed for requests that carry a valid `X-Clearskies-Proxy-Au
 
 Rate limiting applies to `GET /sse` connections like any other path. An IP that opens 60+ SSE connections in a minute is rate-limited.
 
+### CORS policy
+
+Default: same-origin. The operator may add one additional dashboard origin via `[api] cors_origins` in `api.conf` (comma-separated list). Never use wildcard `*` — it defeats the same-origin policy enforced by Caddy's security headers and exposes the API to cross-site request abuse. CORSMiddleware is in the middleware stack (see §7) and processes every request.
+
 ### Input validation
 
 Every HTTP endpoint uses Pydantic models with `extra="forbid"` wired via FastAPI `Depends()`. Undeclared query parameters are rejected with HTTP 422. Undeclared body fields are rejected with HTTP 422. There are no unvalidated inputs to the API. Provider wire responses are also validated by per-provider Pydantic models — malformed provider responses raise `ProviderProtocolError`, not silent data corruption.
@@ -885,6 +890,7 @@ All runtime services run under the `clearskies` system user. This user has:
 - No home directory
 - No sudo access
 - No membership in any privileged group except `weewx-ro` (DB read) and `weewx` (socket access)
+- No access to `/etc/shadow` or other privileged system files — verify access denied on direct read attempt after install
 
 Create with: `useradd --system --no-create-home --shell /usr/sbin/nologin clearskies`
 

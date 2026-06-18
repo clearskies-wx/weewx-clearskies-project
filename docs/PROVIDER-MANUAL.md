@@ -561,14 +561,12 @@ The old `advisory | watch | warning` severity enum is removed. The `?severity=` 
 
 ### Severity level mapping across national systems
 
-| Level | NWS | MeteoAlarm (EU) | UK Met Office | JMA |
-|---|---|---|---|---|
-| 4 (Extreme) | Warning | Red | Red | Emergency/Urgent Warning |
-| 3 (Severe) | Watch | Orange | Amber | Warning |
-| 2 (Moderate) | Advisory | Yellow | Yellow | Advisory |
-| 1 (Minor) | Statement | Green | — | — |
-
-Apply the same tier structure to BoM (AU), IMD (India), INMET (Brazil), SAWS (South Africa), KMA (South Korea), and SMN (Mexico) as documented in ADR-052.
+| Level | NWS (US/CA) | MeteoAlarm (EU) | UK Met Office | JMA (Japan) | BoM (Australia) | IMD (India) | INMET (Brazil) | SAWS (S. Africa) | KMA (S. Korea) | SMN (Mexico) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 4 (Extreme) | Warning | Red | Red | Emergency/Urgent Warning | Severe/Very Dangerous | Red | Red (Grande Perigo) | Level 9–10 | Red | Red/Purple |
+| 3 (Severe) | Watch | Orange | Amber | Warning | Warning | Orange | Orange (Perigo) | Level 5–8 | Orange | Orange |
+| 2 (Moderate) | Advisory | Yellow | Yellow | Advisory | Watch | Yellow | Yellow (Atenção) | Level 3–4 | Yellow | Yellow |
+| 1 (Minor) | Statement | Green | — | — | Advice | Green | Gray | Level 1–2 | Green | Green |
 
 ### NWS provider severity fix
 

@@ -1,6 +1,8 @@
 # Security baseline
 
-**Status:** Draft (Phase 1 deliverable; companion to the source ADRs and [`rules/coding.md`](../../rules/coding.md))
+> **ARCHIVED — 2026-06-18.** Absorbed into [`docs/OPERATIONS-MANUAL.md`](../OPERATIONS-MANUAL.md) §10 (Security Model). This file is no longer authoritative. Consult the Operations Manual for current security rules.
+
+**Status:** Archived (was Draft; absorbed into OPERATIONS-MANUAL.md)
 **Last updated:** 2026-06-14 (post-merge architecture: realtime folded into API per ADR-058; Phase 5 hardening complete)
 
 This document is the per-component security checklist the Clear Skies project commits to. It consolidates the security-relevant decisions scattered across 7 ADRs and `coding.md` §1, plus cross-cutting controls not pinned to any single ADR (security headers, request limits, systemd/Docker hardening, dependency auditing, per-repo `SECURITY.md`).

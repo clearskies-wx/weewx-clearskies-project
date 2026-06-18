@@ -18,7 +18,7 @@ One name per component. Code class names (`DirectAdapter`, `UnitTransformer`, `C
 | **Dashboard** | React SPA — the weather UI that site visitors see. | `weewx-clearskies-dashboard` | ~~frontend~~ (ambiguous with front-end host) |
 | **Loop relay** | weewx extension that relays loop packets to a Unix socket for the API to read. Code class: `ClearSkiesLoopRelay`. | `weewx-clearskies-extension` | ~~the extension~~ (too vague when other extensions exist) |
 | **Socket reader** | Component inside the API that connects to the loop relay's Unix socket and reads packets. Code class: `DirectAdapter`. | (part of API) | ~~DirectAdapter~~ as a component name, ~~API DirectAdapter~~ |
-| **Config UI** | Setup wizard + ongoing admin interface. Contains the **wizard** (7-step first-run flow) and the **admin** (ongoing config management). | `weewx-clearskies-stack` | ~~config wizard~~, ~~wizard~~ when meaning the whole config UI |
+| **Config UI** | Setup wizard + ongoing admin interface. Contains the **wizard** (multi-step first-run flow; steps defined by `templates/wizard/step_*.html` in the stack repo) and the **admin** (ongoing config management). | `weewx-clearskies-stack` | ~~config wizard~~, ~~wizard~~ when meaning the whole config UI |
 | **Caddy** | Reverse proxy, TLS termination, static file server — entry point for all browser traffic. | upstream `caddy:2-alpine` | ~~web server~~ as a proper name |
 | **Enrichment pipeline** | Processors inside the API that add derived values (Beaufort, comfort index, conditions text, barometer trend, wind averages) to data before it reaches the dashboard. | (part of API) | ~~enrichment modules~~, ~~BFF enrichment~~ |
 | **Unit converter** | Component inside the API that transforms raw observation values to operator display units. Code class: `UnitTransformer`. | (part of API) | ~~conversion layer~~, ~~BFF conversion~~ |
@@ -37,7 +37,7 @@ Previous: 2026-06-08 (sky condition thresholds corrected for sensor accuracy, da
 |---------|------|-------------|------------|-----------|-------------|
 | **API** | weewx-clearskies-api | REST API + SSE for real-time data, unit conversion, enrichment pipeline, derived values. Queries weewx archive, aggregates provider data, serves setup endpoints. (ADR-058) | FastAPI (Python 3.12+), sync handlers, SQLAlchemy 2.x sync, sse-starlette, uvicorn | 8765 | 8081 |
 | **Dashboard** | weewx-clearskies-dashboard | Weather UI (static SPA, 9 pages + custom pages) | React 19, Vite 8, Tailwind CSS v4, shadcn/ui, Recharts, Leaflet, **Phosphor** (utility/nav/alert) + **inline Material Symbols SVG** (hero weather, ADR-049/050); Lucide retained for deferred glyph families only, i18next | None (init container) | — |
-| **Config UI** | weewx-clearskies-stack | Setup wizard (8 steps) + ongoing config admin | FastAPI, Jinja2, HTMX, Pico CSS (Python-only, no Node build step) | 9876 | — |
+| **Config UI** | weewx-clearskies-stack | Setup wizard + ongoing config admin | FastAPI, Jinja2, HTMX, Pico CSS (Python-only, no Node build step) | 9876 | — |
 | **Caddy** | upstream (caddy:2-alpine) | Reverse proxy, TLS termination (auto Let's Encrypt), static file server | Caddy | 80, 443 | — |
 | **Redis** | upstream (redis:7-alpine) | Cache for provider API responses (TTLs: forecast 30 min, alerts 5 min, AQI 15 min) | Redis 7.0.15 | 6379 | — |
 | **Design Tokens** | weewx-clearskies-design-tokens | Tailwind config + design variables npm package | Phase 6+ placeholder — no code yet. Tokens currently live in dashboard repo. | — | — |
@@ -122,7 +122,7 @@ All three Caddyfile variants (frontend-host, single-host, examples/reverse-proxy
 |-------------|-------------|----------------|
 | `/api/v1/*` | `api:8765` — API serves directly, applies unit conversion | Weather data JSON endpoints (unit-converted by API) |
 | `/sse` | `api:8765` — API serves SSE stream directly | Server-Sent Events stream (unit-converted by API) |
-| `/wizard*` | `config:9876` (local Docker network) | Setup wizard (7-step flow) |
+| `/wizard*` | `config:9876` (local Docker network) | Setup wizard |
 | `/bootstrap*` | `config:9876` | First-run admin credential setup |
 | `/login*`, `/logout*` | `config:9876` | Admin auth |
 | `/admin*` | `config:9876` | Ongoing config management |
@@ -142,7 +142,7 @@ Security headers on all responses: `X-Content-Type-Options: nosniff`, `X-Frame-O
 | single-host (compose) | `https://api:8765` | Docker network service name |
 | native / reverse-proxy | `https://localhost:8765` | Both services are on the same host |
 
-`tls_verify = false` applies in all three cases when the API uses its default self-signed certificate.
+`tls_verify = false` applies in the single-host and native/reverse-proxy cases when the API uses its default self-signed certificate. For the two-host frontend-host topology, use `tls { ca_pool /etc/weewx-clearskies/api-cert.pem }` instead — disabling TLS verification is not acceptable when Caddy and the API communicate over a non-loopback network. See OPERATIONS-MANUAL.md §12.
 
 > **Removed (ADR-058, 2026-06-14):** The `[api] upstream_url` config section in `realtime.conf` is eliminated. There is no intermediate proxy — the API serves all endpoints directly. Caddy routes to the API; no intermediate service.
 
@@ -161,7 +161,7 @@ An LXD disk device mounts the host path `/mnt/weewx/webcam` read-only into the `
 
 ### Configuration flow
 
-The setup wizard (stack repo, step 7 of 8) collects webcam settings: enabled flag, image URL, video URL, and refresh interval. On apply (`/wizard/apply`), the wizard writes two outputs:
+The setup wizard (stack repo) collects webcam settings: enabled flag, image URL, video URL, and refresh interval. On apply (`/wizard/apply`), the wizard writes two outputs:
 
 | Output | Path | Purpose |
 |--------|------|---------|
@@ -188,48 +188,39 @@ Wizard step 7 (apply)
   → renders webcam card if enabled, hides gracefully on error
 ```
 
-## API endpoints (30+ total, verified from code)
+## API endpoints
 
-### Data endpoints (under `/api/v1`, 15 routers)
+### Endpoint categories
 
-| Path | Method | Purpose |
-|------|--------|---------|
-| `/api/v1/station` | GET | Station metadata (singleton). The `name` field is the operator's configured display location, read from `weewx.conf [Station] location` at startup. |
-| `/api/v1/current` | GET | Most recent observation. The `weatherText` field is produced by the API's enrichment pipeline (`enrich_weather_text`) — the conditions-text engine runs within the API and injects the composed conditions string before the response leaves the API (ADR-044, ADR-058). |
-| `/api/v1/archive` | GET | Historical archive records with pagination/filtering. Optional `agg` param (`min`/`max`/`avg`/`sum`/`count`) overrides per-field default aggregation for `interval=day` and `interval=hour`. Optional `aggregate_interval` (seconds, ≥60) groups records into fixed-width time buckets via `FLOOR(dateTime/N)*N` for proportional scaling. Optional `agg_map` (`field:func,...`) applies per-field SQL aggregation within custom-interval buckets; defaults to AVG. Supported functions: `avg`, `max`, `min`, `sum`, `count`, `sumcumulative`. `sumcumulative` applies SUM per bucket then accumulates into a running total (for cumulative rain, etc.). |
-| `/api/v1/archive/grouped` | GET | Categorical aggregation grouped by calendar period (`group_by=month\|day\|hour\|year`). `fields` param accepts `field:agg_type` or `field:agg_type:avg_type` specs (e.g. `outTemp:avg:max` = avg of daily highs, `rain:sum` = period total). Optional `from`/`to` epoch bounds; optional `force_full_period` to fill missing slots with null. Response: `{data:{labels,series},generatedAt}`. Used by `xAxis_groupby` charts (Average Climate, monthly averages). Replaces the former `/climatology/monthly` endpoint. |
-| `/api/v1/records` | GET | Section-grouped highs and lows |
-| `/api/v1/forecast` | GET | Forecast bundle (hourly + daily + discussion) |
-| `/api/v1/alerts` | GET | Active severe-weather alerts |
-| `/api/v1/aqi/current` | GET | Current air quality index |
-| `/api/v1/aqi/history` | GET | Historical AQI from archive |
-| `/api/v1/earthquakes` | GET | Recent earthquakes within configured radius |
-| `/api/v1/almanac` | GET | Sun + moon snapshot for one date |
-| `/api/v1/almanac/sun-times` | GET | Year-long sunrise/sunset/daylight series |
-| `/api/v1/almanac/moon-phases` | GET | Per-day moon-phase grid (month or year) |
-| `/api/v1/almanac/seeing-forecast` | GET | 72-hour astronomical seeing forecast (7Timer ASTRO, 3-hour intervals) |
-| `/api/v1/charts/groups` | GET | Chart-group structure |
-| `/api/v1/charts/config` | GET | Full chart configuration tree (groups, charts, series) parsed from `charts.conf` |
-| `/api/v1/charts/custom-query/{series_id}` | GET | Execute operator-defined SQL query from `charts.conf` (read-only, pre-validated at startup) |
-| `/api/v1/reports` | GET | Available NOAA report files |
-| `/api/v1/reports/{year}/{month}` | GET | Monthly NOAA report (raw text) |
-| `/api/v1/reports/{year}` | GET | Yearly NOAA report (raw text) |
-| `/api/v1/pages` | GET | Dashboard navigation list |
-| `/api/v1/pages/{slug}/content` | GET | Page markdown content |
-| `/api/v1/content/about` | GET | About page markdown content |
-| `/api/v1/content/legal` | GET | Legal/privacy page markdown content |
-| `/api/v1/capabilities` | GET | Runtime capability registry |
-| `/api/v1/branding` | GET | Operator branding (accent, logos, theme defaults) — **Deprecated** (branding moves to static file via Caddy `/branding.json`, see ADR-022 amendment 2026-06-10) |
-| `/api/v1/radar/providers/{id}/frames` | GET | Radar frame index |
-| `/api/v1/radar/providers/{id}/tiles/{z}/{x}/{y}` | GET | Binary tile proxy (keyed providers) |
+The API exposes endpoints across four categories, each on a different port or URL prefix. The **OpenAPI spec** at `/api/v1/openapi.json` (Swagger UI at `/api/v1/docs`, ReDoc at `/api/v1/redoc`) is the authoritative inventory for data endpoints — it is auto-generated by FastAPI from route decorators and always complete by construction. This document describes the categories and stable operational surfaces; it does not maintain a competing hand-written endpoint list.
+
+| Category | Port | Prefix | Authoritative source | Purpose |
+|----------|------|--------|---------------------|---------|
+| **Data endpoints** | 8765 | `/api/v1/*` | OpenAPI spec (`/api/v1/openapi.json`) | Weather data, forecasts, alerts, AQI, earthquakes, almanac, charts, radar, reports, pages, branding, capabilities |
+| **SSE endpoint** | 8765 | `/sse` | This document | Real-time loop-packet stream (named event type `"loop"`) |
+| **Setup endpoints** | 8765 | `/setup/*` | This document | Config UI wizard-to-API channel (no `/api/v1` prefix) |
+| **Health endpoints** | 8081 | `/health/*`, `/metrics` | This document | Liveness, readiness, Prometheus metrics (loopback only) |
+
+### Data endpoints — representative examples
+
+The OpenAPI spec lists 35+ data endpoints. Key groups for orientation:
+
+| Group | Representative endpoints | Notes |
+|-------|------------------------|-------|
+| Core observation | `/api/v1/current`, `/api/v1/archive`, `/api/v1/archive/grouped`, `/api/v1/station` | `/current` includes enrichment pipeline output (`weatherText`, `beaufort`, `comfortIndex`). `/archive` supports `aggregate_interval`, `agg_map`, `sumcumulative`. `/archive/grouped` replaces the former `/climatology/monthly` endpoint. |
+| Forecast & alerts | `/api/v1/forecast`, `/api/v1/alerts`, `/api/v1/aqi/current`, `/api/v1/aqi/history` | Provider-backed; single source per deploy per domain. |
+| Almanac | `/api/v1/almanac`, `/api/v1/almanac/sun-times`, `/api/v1/almanac/moon-phases`, `/api/v1/almanac/seeing-forecast`, `/api/v1/almanac/planets`, `/api/v1/almanac/moon-names`, `/api/v1/almanac/eclipses/lunar`, `/api/v1/almanac/eclipses/solar`, `/api/v1/almanac/meteor-showers`, `/api/v1/almanac/positions` | Skyfield-based; background cache warming for expensive computations. |
+| Earthquakes | `/api/v1/earthquakes`, `/api/v1/earthquakes/config`, `/api/v1/earthquakes/faults` | `/faults` serves GEM Active Faults GeoJSON radius-clipped. `/config` returns provider configuration. |
+| Charts | `/api/v1/charts/config`, `/api/v1/charts/groups`, `/api/v1/charts/custom-query/{series_id}` | Config-driven; custom SQL from `charts.conf` only (disk-only trust model). |
+| Radar | `/api/v1/radar/providers/{id}/frames`, `/api/v1/radar/providers/{id}/tiles/{z}/{x}/{y}` | Keyed providers proxied server-side; keys never reach browser. |
+| Content & nav | `/api/v1/pages`, `/api/v1/pages/{slug}/content`, `/api/v1/reports`, `/api/v1/content/about`, `/api/v1/content/legal` | |
+| Infrastructure | `/api/v1/status`, `/api/v1/capabilities`, `/api/v1/records` | `/status` returns `{configured: bool}` — works in both setup and configured modes. |
 
 ### SSE endpoint (merged from realtime service per ADR-058)
 
 | Port | Path | Purpose |
 |------|------|---------|
 | 8765 | `GET /sse` | Server-Sent Events stream — events with `type: "loop"`, data = unit-converted JSON. 15-second keepalive comments. Caddy proxies `/sse` to this endpoint. |
-
-OpenAPI docs: `/api/v1/docs` (Swagger), `/api/v1/redoc`, `/api/v1/openapi.json`.
 
 ### Setup endpoints (under `/setup`, NO `/api/v1` prefix)
 
@@ -329,26 +320,28 @@ Config UI is a standalone FastAPI app, run via `weewx-clearskies-config` CLI on 
 | `/logout` | POST | End session |
 | `/health` | GET | Returns `{"status": "ok"}` |
 
-### Wizard (7-step setup flow)
+### Wizard (multi-step setup flow)
 
-| Route | Method | Purpose |
-|-------|--------|---------|
+Wizard steps are defined by `wizard/routes.py` and `templates/wizard/step_*.html` in the stack repo. The step inventory evolves as the wizard gains features — see the code for the current step list.
+
+**URL patterns:**
+
+| Pattern | Method | Purpose |
+|---------|--------|---------|
 | `/wizard` | GET | Full wizard page (starts at step 1) |
-| `/wizard/step/1` | POST | API connection verification |
-| `/wizard/step/2` | POST | Database configuration |
-| `/wizard/step/2/test` | POST | Test DB connection |
-| `/wizard/step/3` | POST | Column mapping |
-| `/wizard/step/4` | GET/POST | Station identity |
-| `/wizard/step/4/timezone` | POST | Timezone lookup |
-| `/wizard/step/5` | GET | Input mode (formerly MQTT / input mode — MQTT eliminated per ADR-058; wizard update pending) |
-| `/wizard/step/5/test` | POST | Test MQTT connection (MQTT eliminated per ADR-058; wizard update pending) |
-| `/wizard/step/6` | POST | Provider selection + API keys |
-| `/wizard/step/6/key-fields/{domain}/{id}` | GET | Inline key entry fields |
-| `/wizard/step/6/test-key/{id}` | POST | Test provider connectivity |
-| `/wizard/step/7` | GET/POST | Webcam settings (enabled, image URL, video URL, refresh interval) |
-| `/wizard/step/8` | GET | Review summary |
+| `/wizard/step/{N}` | GET/POST | Step-specific form render and submission |
+| `/wizard/step/{N}/test` | POST | Inline connectivity test for a step (DB, provider, etc.) |
+| `/wizard/step/{N}/key-fields/{domain}/{id}` | GET | HTMX fragment for provider key entry fields |
+| `/wizard/step/{N}/test-key/{id}` | POST | HTMX fragment for provider key test result |
+| `/wizard/{name}` | GET/POST | Named steps (e.g. `/wizard/import`, `/wizard/eula`, `/wizard/units`, `/wizard/privacy`, `/wizard/features`, `/wizard/tls`) |
 | `/wizard/apply` | POST | Finalize config + write files (writes `api.conf`, `webcam.json` to `/etc/weewx-clearskies/`, `stack.conf`) |
 | `/wizard/restart-status` | GET | Service restart status |
+
+**Step categories** (not exhaustive — see code for full list): API connection, skin import, EULA, database, schema/column mapping, station identity, display units, provider selection + API keys, webcam, appearance/branding, privacy/legal, feature settings, TLS configuration, review + apply.
+
+### CLI wizard
+
+`weewx_clearskies_config/cli_wizard.py` provides an interactive terminal wizard and a headless (non-interactive, flag-driven) configuration path for SSH-only or automated installs. Both paths reuse the same wizard backend modules as the web UI (WizardState, apply_wizard). The CLI wizard covers a subset of the web wizard's steps: database, schema, station, providers, API keys, topology, bind addresses, review + apply. Headless mode accepts all settings as CLI flags for unattended deploys.
 
 ### Admin (ongoing config)
 
@@ -523,27 +516,20 @@ weewx-clearskies-stack/
 └── tests/                      # Wizard tests
 ```
 
-## Authoritative ADRs by component
+## Authoritative manuals by component
 
-| Component | Primary ADRs |
-|-----------|-------------|
-| Component breakdown | ADR-001 |
-| Tech stack | ADR-002 |
-| Deployment topology | ADR-034 |
-| API | ADR-010 (data model), ADR-012 (DB access), ADR-018 (versioning) |
-| Realtime (historical — merged into API) | ADR-058 (fold realtime into API), ADR-005 (superseded), ADR-041 (amended), ADR-042 (units — now API authority) |
-| Dashboard | ADR-002, ADR-024 (page taxonomy). **UI design rules:** [`docs/DESIGN-MANUAL.md`](DESIGN-MANUAL.md) (single authority — replaces ADR-009/022/023/026/047/048/049/050/051/062, which are archived) |
-| Config UI / Wizard | ADR-027 (wizard), ADR-038a-wizard-api-channel (wizard-to-API channel) |
-| Auth | ADR-008, ADR-037 (inbound traffic) |
-| Providers | ADR-006 (compliance), ADR-007 (forecast), ADR-038-data-provider-module-organization |
-| Caching | ADR-017 |
-| Theming / Branding | [`docs/DESIGN-MANUAL.md`](DESIGN-MANUAL.md) §15 (ADR-022/023 archived) |
-| i18n | ADR-021 |
-| Health / Readiness | ADR-030 |
-| Observability / Metrics | ADR-031 |
-| Logging | ADR-029 |
-| Security | contracts/security-baseline.md |
-| Filesystem permissions | ADR-061 |
+All ADRs have been consolidated into authoritative manuals. ADRs are archived in `docs/archive/decisions/` — they explain *why* decisions were made but are not the operational authority.
+
+| Component | Authority |
+|-----------|----------|
+| API (data model, units, enrichment, DB, SSE) | [`docs/API-MANUAL.md`](API-MANUAL.md) |
+| Provider modules (caching, external APIs, compliance) | [`docs/PROVIDER-MANUAL.md`](PROVIDER-MANUAL.md) |
+| Deployment, security, auth, config, monitoring | [`docs/OPERATIONS-MANUAL.md`](OPERATIONS-MANUAL.md) |
+| Dashboard (technical behavior, i18n, routes, performance) | [`docs/DASHBOARD-MANUAL.md`](DASHBOARD-MANUAL.md) |
+| Dashboard (visual design, tokens, icons, cards) | [`docs/DESIGN-MANUAL.md`](DESIGN-MANUAL.md) |
+| System topology, ports, containers, routing | This document (ARCHITECTURE.md) |
+
+Historical note: meta ADRs (component breakdown ADR-001, tech stack ADR-002, license ADR-003, repo naming ADR-004, multi-station scope ADR-011, versioning ADR-032, workspace layout ADR-036) are archived — their substance is captured in this document.
 
 > **Note:** ADR-038a (`ADR-038a-wizard-api-channel.md`) was originally numbered ADR-038, sharing the number with the data-provider module organization ADR. Renumbered to 038a on 2026-05-23.
 

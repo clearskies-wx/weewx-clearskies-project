@@ -120,7 +120,7 @@ Any code that listens, connects, resolves, parses, validates, formats, logs, or 
 
 **Anti-patterns:** hardcoded `127.0.0.1` defaults; regex like `^(\d{1,3}\.){3}\d{1,3}$` for IP validation; documentation that only shows `192.168.x.y`; storing IPs as `VARCHAR(15)`; calling `gethostbyname`; building URLs by string-concatenation around IPv6 literals.
 
-This rule applies project-wide — it governs the configuration UI's listener (per [ADR-027](../docs/decisions/ADR-027-config-and-setup-wizard.md)), the api and realtime services' listeners, any health-check probe code, any outbound provider call, any logging that includes a remote address, and any future networking code.
+This rule applies project-wide — it governs the configuration UI's listener (per ADR-027, now in `docs/OPERATIONS-MANUAL.md` §4), the api and realtime services' listeners, any health-check probe code, any outbound provider call, any logging that includes a remote address, and any future networking code.
 
 ### Pin dependency versions
 
@@ -437,4 +437,16 @@ The Clear Skies dashboard uses Recharts v3.x for all chart components. Recharts 
 2. If the user's prompt conflicts with the design manual, stop and ask before writing code.
 3. If existing code doesn't comply with the design manual, surface the gap and ask before building on top of it.
 4. If the design manual doesn't cover the case, flag it — don't invent.
-5. Archived UI-related ADRs (in `docs/archive/decisions/`) explain *why* decisions were made. The design manual says *what to do*. When the two conflict, the manual wins — the ADR is historical context.
+5. Archived ADRs (in `docs/archive/decisions/`) explain *why* decisions were made. Manuals say *what to do*. When the two conflict, the manual wins — the ADR is historical context.
+
+## 10. Manual compliance
+
+Before modifying code in any Clear Skies repo, read the governing manual for that domain:
+
+- API code (endpoints, data model, units, enrichment, DB) → read `docs/API-MANUAL.md`
+- Provider modules (external APIs, caching, error handling) → read `docs/PROVIDER-MANUAL.md`
+- Deployment, config, security, monitoring → read `docs/OPERATIONS-MANUAL.md`
+- Dashboard technical behavior (hooks, data flow, routing, i18n) → read `docs/DASHBOARD-MANUAL.md`
+- UI visual code (design tokens, components, styling) → read `docs/DESIGN-MANUAL.md` (already in §9)
+
+Manual rules are prescriptive. If the code doesn't match the manual, the code is wrong unless the manual is explicitly marked as pending implementation. When a code change affects manual rules, update the manual in the same commit (see CLAUDE.md doc-code sync rule).

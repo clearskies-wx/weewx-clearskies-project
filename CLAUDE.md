@@ -18,8 +18,12 @@ At the start of a task, identify which domain(s) apply and read the matching fil
 | Ratbert VM, LXD containers, freepbx, adguard | [rules/ratbert-lxd.md](../Windows%20Server/rules/ratbert-lxd.md) + [reference/ratbert-lxd.md](../Windows%20Server/reference/ratbert-lxd.md) |
 | Home Assistant, automations | [rules/homeassistant.md](../Windows%20Server/rules/homeassistant.md) + [reference/homeassistant.md](../Windows%20Server/reference/homeassistant.md) |
 | GitHub operations (branches, PRs, releases) | [rules/github.md](rules/github.md) |
-| Clear Skies project (planning, ADRs, contracts, research) | [rules/clearskies-process.md](rules/clearskies-process.md) — facts live in ADRs at [docs/decisions/](docs/decisions/) and contracts at [docs/contracts/](docs/contracts/) |
-| Clear Skies architecture (services, containers, endpoints, routing, deployment) | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — **read first, before any ADRs** + [rules/clearskies-process.md](rules/clearskies-process.md) |
+| Clear Skies project (planning, ADRs, contracts, research) | [rules/clearskies-process.md](rules/clearskies-process.md) — facts live in ADRs at [docs/archive/decisions/](docs/archive/decisions/) and contracts at [docs/contracts/](docs/contracts/) |
+| Clear Skies architecture (services, containers, endpoints, routing, deployment) | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — **read first, before any manuals** + [rules/clearskies-process.md](rules/clearskies-process.md) |
+| API development, data model, units, enrichment, DB access, SSE | [docs/API-MANUAL.md](docs/API-MANUAL.md) + [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Provider modules, external APIs, caching, compliance | [docs/PROVIDER-MANUAL.md](docs/PROVIDER-MANUAL.md) |
+| Deployment, security, auth, monitoring, config, wizard | [docs/OPERATIONS-MANUAL.md](docs/OPERATIONS-MANUAL.md) |
+| Dashboard technical behavior, i18n, timezone, performance, data refresh | [docs/DASHBOARD-MANUAL.md](docs/DASHBOARD-MANUAL.md) |
 | UI design, visual patterns, tokens, component styling, card anatomy, backgrounds, icons | [docs/DESIGN-MANUAL.md](docs/DESIGN-MANUAL.md) — **single authority for all UI design rules**. ADRs explain *why*; the manual says *what to do*. |
 | Writing or modifying code in any language (Python, PHP, JS/TS, shell, Cheetah, SQL) | [rules/coding.md](rules/coding.md) |
 
@@ -47,6 +51,24 @@ These rules apply to ALL repos, ALL domains. No exceptions.
 **If an agent reports unexpected repo state, STOP.** Diverged remote, unknown commits, merge conflicts, branches that shouldn't exist — any of these mean the coordinator halts all work on that repo and reports to the user immediately. No autonomous resolution. The user decides what to do.
 
 **Why (2026-05-28):** A previous session's agent used worktree isolation, committed 14 commits, and pushed them to GitHub — all without the user's knowledge. The primary checkout never moved. A later session's agent pulled and merged those unknown commits without asking. The user discovered code they never approved in their repo. Agents operating outside the local checkout and pushing without approval is the root cause of half-done, unreviewed work landing in the codebase.
+
+### Doc-code sync
+
+**Governing documents update with the code that changes them.** When a code change adds, removes, or modifies behavior that is described in a governing document (ARCHITECTURE.md, any manual in `docs/`, `rules/*.md`), the same commit (or PR) must update the governing document to match. "I'll update the docs later" is not acceptable — later never comes, and the next agent reads the stale doc and builds on it.
+
+**What counts as a governing document change:**
+- Adding/removing/renaming an API endpoint → update ARCHITECTURE.md + API-MANUAL.md
+- Changing port numbers, config keys, file paths → update ARCHITECTURE.md + OPERATIONS-MANUAL.md
+- Adding/modifying a provider module → update PROVIDER-MANUAL.md
+- Changing unit conversion, enrichment pipeline, or data model → update API-MANUAL.md
+- Changing dashboard hooks, data flow, or technical behavior → update DASHBOARD-MANUAL.md
+- Changing UI design patterns, tokens, or components → update DESIGN-MANUAL.md
+
+**What does NOT require a doc update:** Internal refactoring that doesn't change external behavior. Bug fixes that restore documented behavior. Test-only changes.
+
+**For items that morph over time** (wizard steps, provider list, endpoint inventory): the governing document references the code as the source of truth for the volatile parts, and documents only the stable patterns.
+
+**Enforcement:** The coordinator verifies doc-code sync before reporting any task complete. Auditor agents flag doc-code drift as a finding. When an agent discovers a doc-code mismatch during work, it fixes the doc as part of the current task — not defer it.
 
 ### Collaboration style
 
