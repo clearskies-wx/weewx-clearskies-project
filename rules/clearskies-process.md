@@ -264,6 +264,12 @@ When the task originated from a user prompt (not a plan-internal round), walk th
 
 **No "promotion candidates" in v0.1 contracts.** Stock weewx columns are first-class. `extras` carries operator-custom columns only.
 
+## Belchertown reference discipline
+
+**Check Belchertown's implementation before building equivalent features.** The Belchertown skin source is in this repo (`bin/user/belchertown.py`, `skins/Belchertown/`). Before implementing any feature that Belchertown already handles — charts, data formatting, archive queries, configuration — read how Belchertown does it and carry forward the correct patterns. Don't re-derive from first principles when a working reference exists.
+
+**Why (2026-06-18):** The archive_interval was hardcoded as 300 across the entire Clear Skies stack. Belchertown correctly reads it from weewx.conf and passes it to the frontend. We had the code in the repo and didn't look at it. Every timing-dependent component was built on a false assumption.
+
 ## Communication rules
 
 **Plain English to the user.** Define every technical term the first time it appears in a conversation. One phrase, not a paragraph. If a reply uses 5+ unfamiliar terms, rewrite.

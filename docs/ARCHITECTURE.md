@@ -394,6 +394,21 @@ All config in `/etc/weewx-clearskies/` (search order: `CLEARSKIES_CONFIG` env va
 
 **Startup behavior when config missing:** The API raises `FileNotFoundError` and exits non-zero if `api.conf` is absent. It does not start in an "unconfigured" mode.
 
+## weewx configuration ingestion
+
+The API reads operator-specific parameters from weewx.conf at startup and exposes them to all consumers. These values are NOT hardcoded — they vary per installation.
+
+| weewx.conf section | Key | `StationInfo` field | `/station` field | Default | Purpose |
+|---|---|---|---|---|---|
+| `[StdArchive]` | `archive_interval` | `archive_interval` | `archiveIntervalSeconds` | 300 | Archive record cadence in seconds. Drives chart proportional scaling, sky classifier freshness (`is_daytime()` threshold = 5× interval), temperature comfort hold time (5× interval), and barometer trend grace. |
+| `[Station]` | `week_start` | `week_start` | `weekStartDay` | 6 (Sunday) | First day of calendar week (0=Monday, 6=Sunday). Dashboard uses it for `time_length = week` chart groups to compute calendar-week boundaries instead of a rolling 7-day window. |
+
+**Data flow:** `load_station_metadata()` in `services/station.py` reads both values from the parsed weewx.conf `ConfigObj` → stores on `StationInfo` → exposed via `GET /api/v1/station` as `archiveIntervalSeconds` and `weekStartDay` → consumed by the dashboard's `ConfigDrivenGroup` component for chart data fetching and proportional aggregate scaling.
+
+**Enrichment wiring:** At startup, `__main__.py` passes `archive_interval` to `sky_condition.configure()`, `temperature_comfort.configure()`, and (as the default `trend_time_grace`) to `barometer_trend.configure()`.
+
+**Reference implementation:** Belchertown's `belchertown.py:370-376` reads `config_dict["StdArchive"]["archive_interval"]` and converts to milliseconds for the frontend. `belchertown.py:2548` reads `config_dict["Station"].get("week_start", 6)` for calendar-week span computation.
+
 ## Charts configuration
 
 The charts system is operator-configurable via `charts.conf`, a ConfigObj/INI file (same format as weewx `skin.conf` — operator familiarity, per ADR-027). Three-level nesting: group → chart → series, matching Belchertown's `graphs.conf` structure.

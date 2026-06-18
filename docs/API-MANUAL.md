@@ -126,7 +126,7 @@ The canonical data model defines 9 core entity types and 2 container types:
 | `AlertRecord` | Single severe-weather alert |
 | `EarthquakeRecord` | Single earthquake event |
 | `AQIReading` | Air quality index reading from a provider module |
-| `StationMetadata` | Station identity (name, lat, lon, alt, timezone) |
+| `StationMetadata` | Station identity (name, lat, lon, alt, timezone, archiveIntervalSeconds, weekStartDay) |
 | `ForecastBundle` | Container: hourly + daily + discussion in one response |
 | `AlertList` | Container: list of active alerts |
 

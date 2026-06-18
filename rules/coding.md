@@ -153,6 +153,8 @@ Note: SHA-pinning npm/PyPI packages is not standard practice — lockfiles are t
 
 10. **Uploaded files land in the config directory with restrictive permissions.** No executable MIME types. Never serve uploaded content from the web root — Caddy serves operator files from `/etc/weewx-clearskies/` via explicit routes.
 
+11. **Never hardcode weewx operational parameters.** Values like `archive_interval`, `week_start`, unit system, and database type vary per operator installation. Read them from weewx.conf (via the API's `load_station_metadata()` / `StationInfo`) and pass them through the stack. Do not use magic numbers like `300` for "5-minute archive interval" — the operator may run 60s, 300s, or 600s. The reference pattern is Belchertown's `belchertown.py:370-376`: read from `config_dict["StdArchive"]["archive_interval"]`, expose to consumers, use everywhere. **How to apply:** Before writing any timing constant, ask: "does this value depend on the operator's weewx configuration?" If yes, it must come from the config, not from a literal. When adding a new timing-dependent feature, check what Belchertown does first — `bin/user/belchertown.py` and `skins/Belchertown/` are in this repo. **Why (2026-06-18):** `archive_interval` was hardcoded as `300` across the entire Clear Skies stack. Belchertown correctly reads it from weewx.conf. Every timing-dependent component was built on a false assumption.
+
 ---
 
 ## 2. Readability — code should self-document
