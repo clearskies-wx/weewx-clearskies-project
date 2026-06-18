@@ -368,15 +368,19 @@ Local sensor data is always authoritative over provider forecasts. Provider data
 
 ## Consequences
 
-- New dependency: `pvlib-python` in whichever repo hosts the sky condition logic (MIT license, well-maintained).
-- 30-minute startup delay for solar-radiation-based classification. Provider cloud cover fills the gap.
-- Rolling buffer of ~360 kc values (~3 KB memory). Negligible.
-- Linke turbidity climatology introduces small errors during anomalous atmospheric events. Accepted.
-- Existing `local_conditions.py` thresholds need updating to match this ADR. The naive single-reading Kt thresholds are replaced by the 2D (mean + σ) classification.
+> **Updated (2026-06-18):** Consequences revised to reflect VI-based system.
+
+- No new dependencies: sky_condition.py uses only stdlib (collections, time, typing). pvlib-python is no longer required — maxSolarRad from weewx serves as the clear-sky reference.
+- Startup backfill from archive records eliminates the previous 3+ minute warm-up delay.
+- Ring buffer of 30 MinuteRecord entries (~1 KB memory). Negligible.
+- Sensor-agnostic: CAELUS thresholds validated across 54 BSRN stations with diverse equipment. No assumptions about specific pyranometer models.
+- `sky_condition.py` module in the API repo implements the full CAELUS-adapted classification.
 
 ## Implementation guidance
 
-- New module for sky condition: computes solar position, clear-sky GHI, maintains rolling kc buffer, classifies using the 2D table.
+> **Updated (2026-06-18):** Guidance revised to reflect VI-based system.
+
+- Module: `weewx_clearskies_api/sse/sky_condition.py` — bins 5-second LOOP packets to 1-minute averages, computes four indices (Kcs, Km, Kv, Kvf), classifies via CAELUS decision tree, applies temporal coherence filter.
 - Station coordinates from config (wizard writes latitude, longitude, altitude).
 - Called on each loop packet containing a `radiation` field. On each REST proxy request, use the latest classification from the rolling buffer.
 - All threshold comparisons use canonical units internally (m/s for wind, °F for dewpoint, in/hr for rain rate) — convert from source unit before comparing.
