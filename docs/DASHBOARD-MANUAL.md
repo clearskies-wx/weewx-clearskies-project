@@ -441,3 +441,6 @@ The browser `EventSource` API reconnects automatically. Manual retry logic dupli
 
 **Never pass raw loop packet field names to components.**
 Apply `WEEWX_TO_OBSERVATION` field mapping on merge. Components receive observation field names, not weewx internal names.
+
+**Never share data fetches between cards via page-level props.**
+Each card owns its data. A card that needs archive data calls `useArchive` internally with its own parameters (`fields`, `aggregate_interval`, time window). Pages do not fetch archive data and pass it down. This keeps cards self-contained — a developer working on one card does not need to understand or coordinate with the page's data plumbing. Cards that only need a sparkline should use `aggregate_interval` to downsample; cards that need accurate peaks/sums (e.g. today's hi/lo) fetch raw records. Shared hooks like `useRealtimeObservation` (SSE-backed, singleton connection) are the exception — those are inherently global.
