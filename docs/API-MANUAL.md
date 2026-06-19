@@ -530,10 +530,12 @@ The conditions text engine is a multi-module stateful system that produces the `
 |-------|---------|--------|
 | Kcs | latest GHI / latest maxSolarRad, clamped [0, 1.2] | Latest minute |
 | Km | mean(all GHI) / mean(all maxSolarRad) | 30 min |
-| Kv | Σ\|Δ(GHI - mean_GHI)\| / window_span | 30 min |
+| Kv | Σ\|ΔGHI - ΔmaxSolarRad\| / window_span | 30 min |
 | Kvf | Same formula as Kv | 10 min |
 
-Kv is the cumulative absolute first-derivative of GHI's deviation from the rolling mean — it measures the total "path length" of the deviation signal. Smooth signals produce near-zero Kv; jagged signals (broken clouds) produce high Kv.
+Kv is the cumulative absolute first-derivative of **clear-sky-detrended** GHI. Each minute-to-minute GHI change has the corresponding maxSolarRad change subtracted before taking the absolute value and summing. This removes the deterministic solar geometry signal (the sun rising and setting changes GHI even under clear skies) and isolates cloud-induced variability. Without detrending, a clear afternoon's steady GHI decline produces Kv above the CLOUDLESS threshold (0.03), causing false "Mostly Sunny" classifications.
+
+**Scientific basis:** Detrending by a clear-sky model to isolate cloud variability from solar geometry is standard practice in solar energy research. Stein et al. 2012 (Sandia Variability Index, SAND2012-3464C) defined variability as the ratio of measured GHI path length to clear-sky path length. Coimbra et al. 2013 established that dividing by clear-sky irradiance produces a near-stationary signal whose fluctuations reflect only atmospheric (cloud) effects. CAELUS uses centered rolling windows (batch mode) which partially suppress the geometry trend; our real-time trailing window uses explicit clear-sky detrending to achieve the same effect.
 
 - Classify using CAELUS set-based logic (matching the reference implementation at `github.com/jararias/caelus`). Three anchor classes are evaluated independently; the cloudy zone is the residual:
 
