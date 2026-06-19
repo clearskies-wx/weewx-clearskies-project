@@ -143,7 +143,7 @@ The locked Vite + React 19 + Tailwind 4 + shadcn + Recharts + Lucide stack is **
 The spike code lives at `weather-dev:/home/ubuntu/spike/clearskies-spike/` and the dev server is currently bound to `0.0.0.0:5173`. Tear-down + re-run:
 
 ```sh
-ssh ratbert "lxc exec weather-dev -- bash -lc '
+ssh -F .local/ssh/config weather-dev "bash -lc '
 # Stop running dev server
 [ -f /tmp/vite.pid ] && kill \$(cat /tmp/vite.pid) 2>/dev/null
 rm -rf /home/ubuntu/spike/clearskies-spike

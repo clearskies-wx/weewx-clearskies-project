@@ -38,6 +38,25 @@ These apply regardless of domain.
 - **NO LOOPS.** Do not repeatedly attempt the same fix or command hoping for a different result.
 - **When you don't know, search the web.** Don't guess at procedures from training data. Search official docs and reputable community sources before running anything destructive or unfamiliar.
 
+### SSH access to containers — HARD RULES
+
+**Direct SSH to `weewx` and `weather-dev`.** Always use `ssh -F .local/ssh/config <host> "<command>"`. The SSH config at `.local/ssh/config` defines host aliases. Keys live in `.local/ssh/` (project directory).
+
+**NEVER go through ratbert with `lxc exec` to reach `weewx` or `weather-dev`.** Direct SSH is configured and works. The `ssh ratbert "lxc exec <container> -- ..."` pattern is WRONG for these two containers. It was the old access method; direct SSH replaced it.
+
+**The only container that still requires `lxc exec` through ratbert is `cloud`** (legacy Belchertown, no direct SSH configured): `ssh -F .local/ssh/config ratbert "lxc exec cloud -- <command>"`.
+
+**Do NOT use `~/.ssh/` for keys.** That directory does not replicate between machines. All keys are in `.local/ssh/`.
+
+| Container | SSH command | What runs there |
+|-----------|------------|-----------------|
+| `weewx` | `ssh -F .local/ssh/config weewx "<cmd>"` | weewx engine, MariaDB, Clear Skies API (port 8765), Redis |
+| `weather-dev` | `ssh -F .local/ssh/config weather-dev "<cmd>"` | Dashboard static files, config UI (port 9876), Caddy (ports 80/443) |
+| `cloud` | `ssh -F .local/ssh/config ratbert "lxc exec cloud -- <cmd>"` | Legacy Belchertown, Nextcloud, Apache, EMQX |
+| `ratbert` | `ssh -F .local/ssh/config ratbert "<cmd>"` | LXD host — container management ONLY |
+
+**Why (2026-06-18):** Agents repeatedly used the old `lxc exec` pattern from stale docs, failing to connect or running commands on the wrong host. Direct SSH was set up specifically so agents don't need to traverse ratbert.
+
 ### Git safety — agents and coordinator
 
 These rules apply to ALL repos, ALL domains. No exceptions.

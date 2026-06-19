@@ -11,7 +11,7 @@ Load alongside [rules/weather-skin.md](../rules/weather-skin.md) when working on
 - **DocumentRoot:** `/var/www/weewx/` on cloud (which is the SAME filesystem as `/var/www/weewx/` on the weewx container — see "Static site sync" below)
 - **Cert renewal:** certbot.timer (daily); cert issued 2026-04-25
 - **NPM role:** **Not used for `weather.shaneburkhardt.com`.** Same hosting model as `nextcloud.shaneburkhardt.com` (Nextcloud) — Apache on the cloud container terminates TLS directly. NPM is in the path for *other* hostnames but not this one. (Confirmed by user 2026-04-29.)
-- **Access:** `ssh ratbert "lxc exec cloud -- <command>"`
+- **Access:** `ssh -F .local/ssh/config ratbert "lxc exec cloud -- <command>"` (cloud has no direct SSH — must go through ratbert)
 
 ### Static site sync (weewx → cloud)
 
@@ -123,29 +123,31 @@ End-to-end live data delivery to browser visitors verified working (2026-04-29).
 
 ### From DILBERT
 
+SSH config at `.local/ssh/config` defines host aliases. Always use `-F .local/ssh/config`.
+
 ```bash
-# SSH into weewx container
-ssh ratbert "lxc exec weewx -- bash"
+# SSH into weewx container (DIRECT — do NOT go through ratbert with lxc exec)
+ssh -F .local/ssh/config weewx
 
 # Or run commands directly
-ssh ratbert "lxc exec weewx -- systemctl status weewx"
+ssh -F .local/ssh/config weewx "systemctl status weewx"
 
 # View generated output (LIVE site files — same filesystem on both containers)
-ssh ratbert "lxc exec weewx -- ls -la /var/www/weewx/"
-ssh ratbert "lxc exec cloud -- ls -la /var/www/weewx/"   # same dir via lxd shared disk
+ssh -F .local/ssh/config weewx "ls -la /var/www/weewx/"
+ssh -F .local/ssh/config ratbert "lxc exec cloud -- ls -la /var/www/weewx/"   # cloud has no direct SSH
 
 # Check weewx version
-ssh ratbert "lxc exec weewx -- weewxd --version"
+ssh -F .local/ssh/config weewx "weewxd --version"
 ```
 
 ### Database access
 
 ```bash
 # From DILBERT, query weewx database
-ssh ratbert "lxc exec weewx -- mysql -u weewx -p<password> weewx -e 'SELECT * FROM archive LIMIT 5;'"
+ssh -F .local/ssh/config weewx "mysql -u weewx -p<password> weewx -e 'SELECT * FROM archive LIMIT 5;'"
 
 # Or get a shell into weewx and use mysql CLI
-ssh ratbert "lxc exec weewx -- mysql -u weewx -p weewx"
+ssh -F .local/ssh/config weewx "mysql -u weewx -p weewx"
 ```
 
 ## Staging / development paths
@@ -158,7 +160,7 @@ Before modifying production skin:
 
 **Weewx restart:**
 ```bash
-ssh ratbert "lxc exec weewx -- systemctl restart weewx"
+ssh -F .local/ssh/config weewx "systemctl restart weewx"
 ```
 
 ## Deployment checklist

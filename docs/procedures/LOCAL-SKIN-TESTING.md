@@ -11,10 +11,10 @@ Always test changes locally first on a dev path to avoid breaking the live weath
 On the weewx container:
 
 ```bash
-ssh ratbert "lxc exec weewx -- bash"
+ssh -F .local/ssh/config weewx
 
 # Inside weewx container:
-cd /home/weewx/skins/
+cd /etc/weewx/skins/
 cp -r Belchertown Belchertown-dev
 ```
 
@@ -23,14 +23,14 @@ cp -r Belchertown Belchertown-dev
 Edit `/etc/weewx/weewx.conf` on the weewx container:
 
 ```bash
-ssh ratbert "lxc exec weewx -- nano /etc/weewx/weewx.conf"
+ssh -F .local/ssh/config weewx "nano /etc/weewx/weewx.conf"
 ```
 
 Find the `[Belchertown]` section and add or update:
 
 ```ini
 [Belchertown]
-    skin_dir = /home/weewx/skins/Belchertown-dev
+    skin_dir = /etc/weewx/skins/Belchertown-dev
     # ... other settings ...
 ```
 
@@ -46,23 +46,23 @@ For now, ask in a chat if unsure — configuration varies by weewx version.
 Restart weewx to use the dev skin:
 
 ```bash
-ssh ratbert "lxc exec weewx -- systemctl restart weewx"
+ssh -F .local/ssh/config weewx "systemctl restart weewx"
 ```
 
 Check if it's working:
 
 ```bash
-ssh ratbert "lxc exec weewx -- tail -f /var/log/weewx/weewx.log"
+ssh -F .local/ssh/config weewx "tail -f /var/log/weewx/weewx.log"
 ```
 
 Look for errors about the skin path. If weewx starts without errors, the dev skin is active.
 
 ### 4. View the output
 
-If weewx publishes to `/var/www/html/weather/`:
+If weewx publishes to `/var/www/weewx/`:
 
 ```bash
-ssh ratbert "lxc exec cloud -- curl http://localhost/weather/index.html | head -20"
+ssh -F .local/ssh/config ratbert "lxc exec cloud -- curl http://localhost/weather/index.html | head -20"
 ```
 
 Or check from DILBERT (if weather.shaneburkhardt.com is accessible internally):
@@ -73,8 +73,8 @@ curl http://weather.shaneburkhardt.com/
 
 ## Making changes
 
-1. Edit files in `/home/weewx/skins/Belchertown-dev/` (HTML, CSS, JavaScript)
-2. Force weewx to regenerate output: `ssh ratbert "lxc exec weewx -- weewxd --gen-stats"`
+1. Edit files in `/etc/weewx/skins/Belchertown-dev/` (HTML, CSS, JavaScript)
+2. Force weewx to regenerate output: `ssh -F .local/ssh/config weewx "weewxd --gen-stats"`
 3. Reload the browser to see changes
 
 ## Testing checklist
@@ -92,12 +92,12 @@ If the dev skin is broken and weewx won't start:
 
 ```bash
 # Revert to the original production skin
-ssh ratbert "lxc exec weewx -- rm -rf /home/weewx/skins/Belchertown-dev"
+ssh -F .local/ssh/config weewx "rm -rf /etc/weewx/skins/Belchertown-dev"
 
 # Edit weewx.conf back to original Belchertown path
 # (or comment out the dev path, restart weewx)
 
-ssh ratbert "lxc exec weewx -- systemctl restart weewx"
+ssh -F .local/ssh/config weewx "systemctl restart weewx"
 ```
 
 ## Committing changes
@@ -116,14 +116,14 @@ Once dev changes are tested and verified:
 
 **If weewx generates no HTML:**
 
-1. Check weewx status: `ssh ratbert "lxc exec weewx -- systemctl status weewx"`
-2. Check permissions on output dir: `ssh ratbert "lxc exec weewx -- ls -la /var/www/html/weather/"`
-3. Check logs: `ssh ratbert "lxc exec weewx -- journalctl -u weewx -n 50"`
+1. Check weewx status: `ssh -F .local/ssh/config weewx "systemctl status weewx"`
+2. Check permissions on output dir: `ssh -F .local/ssh/config weewx "ls -la /var/www/weewx/"`
+3. Check logs: `ssh -F .local/ssh/config weewx "journalctl -u weewx -n 50"`
 
 **If the skin displays but no data:**
 
-1. Verify database has recent data: `ssh ratbert "lxc exec weewx -- mysql -u weewx -p weewx -e 'SELECT dateTime, temp_out FROM archive ORDER BY dateTime DESC LIMIT 1;'"`
-2. Check if weewx engine is collecting: `ssh ratbert "lxc exec weewx -- cat /var/log/weewx/weewx.log | tail -20"`
+1. Verify database has recent data: `ssh -F .local/ssh/config weewx "mysql -u weewx -p weewx -e 'SELECT dateTime, temp_out FROM archive ORDER BY dateTime DESC LIMIT 1;'"`
+2. Check if weewx engine is collecting: `ssh -F .local/ssh/config weewx "cat /var/log/weewx/weewx.log | tail -20"`
 
 ---
 

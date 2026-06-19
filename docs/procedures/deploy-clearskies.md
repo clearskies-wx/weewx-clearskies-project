@@ -16,7 +16,7 @@ Two scripts in `scripts/`:
 ## Prerequisites
 
 - Commits already **pushed to GitHub** (the container pulls from GitHub, not from DILBERT).
-- SSH access to the LXD host: `ssh ratbert` works.
+- SSH access configured: `ssh -F .local/ssh/config weewx` and `ssh -F .local/ssh/config weather-dev` both work.
 - One-time standup done: all five repos cloned at `/home/ubuntu/repos/<name>` inside the
   `weather-dev` container, and the container set up (Caddy, systemd units, web root, webcam mount).
 - Run from a bash-capable shell on DILBERT (Git Bash / WSL).
@@ -100,16 +100,16 @@ When you change code in `weewx-clearskies-api`, deploy to the weewx container:
 
 ```bash
 # 1. Pull the latest code on the weewx container
-ssh ratbert "lxc exec weewx -- sudo -u ubuntu bash -lc 'cd /home/ubuntu/repos/weewx-clearskies-api && git pull --ff-only'"
+ssh -F .local/ssh/config weewx "sudo -u ubuntu bash -lc 'cd /home/ubuntu/repos/weewx-clearskies-api && git pull --ff-only'"
 
 # 2. Restart the API service
-ssh ratbert "lxc exec weewx -- systemctl restart weewx-clearskies-api"
+ssh -F .local/ssh/config weewx "systemctl restart weewx-clearskies-api"
 
 # 3. Verify it started correctly (should NOT say "setup mode")
-ssh ratbert "lxc exec weewx -- journalctl -u weewx-clearskies-api --since '10 sec ago' --no-pager | head -5"
+ssh -F .local/ssh/config weewx "journalctl -u weewx-clearskies-api --since '10 sec ago' --no-pager | head -5"
 
 # 4. Verify the API responds through Caddy on weather-dev
-ssh ratbert "lxc exec weather-dev -- curl -s -o /dev/null -w '%{http_code}\n' http://localhost/api/v1/current"
+ssh -F .local/ssh/config weather-dev "curl -s -o /dev/null -w '%{http_code}\n' http://localhost/api/v1/current"
 ```
 
 **Cache note:** The API uses Redis (or in-memory fallback) for caching (30-min TTL for forecast, 5-min for AQI). Restarting the API service clears the in-memory cache. The first request after restart will fetch fresh data from the upstream provider (Aeris, OWM, etc.).
@@ -120,19 +120,19 @@ ssh ratbert "lxc exec weather-dev -- curl -s -o /dev/null -w '%{http_code}\n' ht
 
 ```bash
 # 1. Dashboard serves (expect HTTP/1.1 200)
-ssh ratbert "lxc exec weather-dev -- curl -sI http://localhost/ | head -1"
+ssh -F .local/ssh/config weather-dev "curl -sI http://localhost/ | head -1"
 
 # 2. Webcam still served (the bind-mount survived the rsync) — expect 200 if a capture exists
-ssh ratbert "lxc exec weather-dev -- curl -s -o /dev/null -w '%{http_code}\n' http://localhost/webcam/weather_cam.jpg"
+ssh -F .local/ssh/config weather-dev "curl -s -o /dev/null -w '%{http_code}\n' http://localhost/webcam/weather_cam.jpg"
 
 # 3. API through Caddy (expect 200 + unit-converted JSON)
-ssh ratbert "lxc exec weather-dev -- curl -s -o /dev/null -w '%{http_code}\n' http://localhost/api/v1/current"
+ssh -F .local/ssh/config weather-dev "curl -s -o /dev/null -w '%{http_code}\n' http://localhost/api/v1/current"
 
 # 4. Config UI service active
-ssh ratbert "lxc exec weather-dev -- systemctl is-active weewx-clearskies-config"
+ssh -F .local/ssh/config weather-dev "systemctl is-active weewx-clearskies-config"
 
 # 5. Confirm webcam is still a mounted, read-only bind (NOT a plain dir rsync recreated)
-ssh ratbert "lxc exec weather-dev -- findmnt /var/www/clearskies/webcam"
+ssh -F .local/ssh/config weather-dev "findmnt /var/www/clearskies/webcam"
 ```
 
 Checks:
@@ -149,7 +149,7 @@ container and rebuild:
 
 ```bash
 # On the container, as ubuntu, in the affected repo(s):
-ssh ratbert "lxc exec weather-dev -- sudo -u ubuntu bash -lc 'cd /home/ubuntu/repos/weewx-clearskies-dashboard && git log --oneline -5'"
+ssh -F .local/ssh/config weather-dev "sudo -u ubuntu bash -lc 'cd /home/ubuntu/repos/weewx-clearskies-dashboard && git log --oneline -5'"
 # Then (coordinator/operator decision — agents do NOT git checkout): check out the known-good
 # commit and re-run ./scripts/redeploy-weather-dev.sh --skip-pull to rebuild + republish.
 ```

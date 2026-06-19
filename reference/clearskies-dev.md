@@ -55,9 +55,8 @@ API address is remote   → MQTT mode (broker bridges loop packets between hosts
 
 | Host | IP | Role | Services |
 |---|---|---|---|
-| **weewx** (LXD container) | 192.168.7.20 | weewx + API | weewx, weewx-clearskies-api (port 8765 TLS) |
-| **weather-dev** (LXD container) | 192.168.2.113 | Dashboard host | weewx-clearskies-config (9876), weewx-clearskies-realtime (8766), dashboard static files, Apache |
-| **nextcloud** (LXD container) | 192.168.7.2 | MQTT broker | EMQX (port 1883) |
+| **weewx** (LXD container) | 192.168.7.20 | weewx + API | weewx, weewx-clearskies-api (port 8765 TLS), Redis (port 6379 loopback) |
+| **weather-dev** (LXD container) | 192.168.2.113 | Dashboard + config host | weewx-clearskies-config (9876), dashboard static files, Caddy (ports 80/443) |
 
 ### One-door reverse proxy (ADR-037)
 
@@ -66,8 +65,8 @@ All public traffic goes through ONE web server. Browser uses relative URLs (`/ap
 | Browser path | Proxied to |
 |---|---|
 | `/` (SPA) | Static dashboard files |
-| `/api/v1/*` | clearskies-api (127.0.0.1:8765) |
-| `/sse` | clearskies-realtime (127.0.0.1:8766) |
+| `/api/v1/*` | clearskies-api on weewx host (port 8765 TLS) |
+| `/sse` | clearskies-api on weewx host (port 8765 TLS) — SSE merged into API per ADR-058 |
 
 For docker-compose: Caddy is the proxy (bundled, automatic, zero-config).
 For native install: operator's existing web server (Apache/nginx/Caddy). Project ships example configs.
@@ -76,7 +75,7 @@ CORS is a non-issue by design — everything is same-origin through the proxy.
 
 ### Production docker-compose (ADR-034)
 
-The production `docker-compose.yml` (Caddy + api + realtime + dashboard) is in the stack repo root. `docker compose up` yields a working stack with auto-LE TLS. Built and tested on weather-dev 2026-05-22 — all 3 images build, dashboard init container populates shared volume, Caddy serves SPA. The dev/test compose (MariaDB + seed data) remains at `dev/docker-compose.yml`.
+The production `docker-compose.yml` (Caddy + api + dashboard) is in the stack repo root. `docker compose up` yields a working stack with auto-LE TLS. The dev/test compose (MariaDB + seed data) remains at `dev/docker-compose.yml`. The realtime service was merged into the API per ADR-058.
 
 **There should be NO clearskies-api running on weather-dev.** The API belongs on the weewx host (where the DB and weewx.conf live).
 
@@ -121,15 +120,22 @@ Owner: `ubuntu`. Container IP: `192.168.2.113` (DHCP/SLAAC on `br-vlan2`).
 
 ## SSH access
 
-Direct SSH to weather-dev from DILBERT (as ubuntu):
+Direct SSH from DILBERT using the project SSH config at `.local/ssh/config`. Always use `-F .local/ssh/config`.
 
 ```bash
-ssh weather-dev "<command>"
+# Direct SSH to weather-dev
+ssh -F .local/ssh/config weather-dev "<command>"
+
+# Direct SSH to weewx
+ssh -F .local/ssh/config weewx "<command>"
+
+# Ratbert host (LXD management only — NOT for accessing weewx or weather-dev)
+ssh -F .local/ssh/config ratbert "<command>"
 ```
 
-SSH config entry (`~/.ssh/config`): `Host weather-dev` → `192.168.2.113`, user `ubuntu`, key `~/.ssh/claude_weather_dev`.
+**Do NOT go through ratbert with `lxc exec` to reach weewx or weather-dev.** Direct SSH is configured and works. The only container that still requires `lxc exec` through ratbert is `cloud` (legacy Belchertown, no direct SSH).
 
-Ratbert is also reachable via `ssh ratbert` (same key) for LXD management commands that need to run on the host.
+Keys and config live in `.local/ssh/` (project directory, replicates via Nextcloud). NOT in `~/.ssh/`.
 
 ## Sync: DILBERT to weather-dev
 

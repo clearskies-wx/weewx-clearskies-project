@@ -26,14 +26,16 @@ The Belchertown skin source is cloned from https://github.com/inguy24/weewx-belc
 - After approval, merge to production deploy branch
 - Redeploy weewx skin on `cloud` container
 
-## Belchertown skin lives in `/home/weewx/skins/Belchertown/`
+## Belchertown skin lives in `/etc/weewx/skins/Belchertown/`
 
 On the `weewx` container:
-- Main skin template: `/home/weewx/skins/Belchertown/skin.conf`
-- HTML/CSS templates: `/home/weewx/skins/Belchertown/html/` and `/home/weewx/skins/Belchertown/css/`
-- Generated output: `/var/www/html/` (symlinked or copied from weewx output)
+- Skin config: `/etc/weewx/skins/Belchertown/skin.conf`
+- Templates: `/etc/weewx/skins/Belchertown/*.html.tmpl`, `*.inc`
+- Static assets: `/etc/weewx/skins/Belchertown/style.css`, `/etc/weewx/skins/Belchertown/js/belchertown.js.tmpl`
+- Python backend: `/etc/weewx/bin/user/belchertown.py`
+- Generated output: `/var/www/weewx/` (shared via LXD disk device to cloud container)
 
-**Access:** `ssh ratbert "lxc exec weewx -- <command>"` (no direct SSH to weewx container)
+**Access:** `ssh -F .local/ssh/config weewx "<command>"` (direct SSH — do NOT go through ratbert with `lxc exec`)
 
 ## Separate dev skin path from production
 
