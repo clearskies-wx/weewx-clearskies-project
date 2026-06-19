@@ -535,16 +535,45 @@ The conditions text engine is a multi-module stateful system that produces the `
 
 Kv is the cumulative absolute first-derivative of GHI's deviation from the rolling mean — it measures the total "path length" of the deviation signal. Smooth signals produce near-zero Kv; jagged signals (broken clouds) produce high Kv.
 
-- Classify using the CAELUS six-class decision tree (first match wins):
+- Classify using CAELUS set-based logic (matching the reference implementation at `github.com/jararias/caelus`). Three anchor classes are evaluated independently; the cloudy zone is the residual:
 
-| # | Class | Conditions | NWS Display |
-|---|-------|-----------|-------------|
-| 1 | CLOUD_ENHANCEMENT | Kcs > 1.06 AND Kv > 0.20 AND Kvf > 0.20 | Partly Cloudy |
-| 2 | CLOUDLESS | Km > 0.6 AND Kcs ∈ [0.85, 1.15] AND Kv < 0.03 | Clear |
-| 3 | OVERCAST | Km < 0.3 AND Kv < 0.10 | Cloudy |
-| 4 | THIN_CLOUDS | Km > 0.5 AND Kv ∈ [0.03, 0.08) | Mostly Clear |
-| 5 | THICK_CLOUDS | Km < 0.4 AND Kv ∈ [0.04, 0.16) | Mostly Cloudy |
-| 6 | SCATTER_CLOUDS | Everything else in cloudy zone | Partly Cloudy |
+**Anchor classes (independent):**
+
+| Class | Conditions | Display label |
+|-------|-----------|---------------|
+| CLOUD_ENHANCEMENT | Kcs > 1.06 AND Kv > 0.20 AND Kvf > 0.20 | Clear |
+| CLOUDLESS | Km > 0.6 AND Kcs ∈ [0.85, 1.15] AND Kv < 0.03 | Clear |
+| OVERCAST zone | Km < 0.3 AND Kv < 0.10 | (sub-split below) |
+
+**Cloudy zone residual** (NOT cloudless, NOT overcast, NOT cloud enhancement):
+
+| Class | Conditions | Display label |
+|-------|-----------|---------------|
+| THIN_CLOUDS | Km > 0.5 AND Kv ∈ [0.03, 0.08) | Mostly Clear |
+| THICK_CLOUDS | Km < 0.4 AND Kv ∈ [0.04, 0.16) | Mostly Cloudy |
+| SCATTER_CLOUDS | Everything else in cloudy zone | Km-dependent (see below) |
+
+**SCATTER_CLOUDS Km sub-split** (patchy cumulus, sun in and out):
+
+| Km range | Display label |
+|----------|---------------|
+| > 0.6 | Clear, Scattered Clouds |
+| 0.5–0.6 | Mostly Clear, Scattered Clouds |
+| 0.4–0.5 | Partly Cloudy |
+| < 0.4 | Mostly Cloudy |
+
+"Scattered Clouds" descriptor only appears when the sky is predominantly clear — at Partly Cloudy and below, the base label carries it alone.
+
+**OVERCAST zone Km×Kv sub-split** (Km < 0.3, Kv < 0.10):
+
+| Km | Kv | Display label |
+|----|-----|---------------|
+| 0.15–0.30 | ≥ 0.03 (textured) | Cloudy |
+| 0.15–0.30 | < 0.03 (flat) | Overcast |
+| < 0.15 | ≥ 0.03 (textured) | Overcast |
+| < 0.15 | < 0.03 (flat) | Heavy Overcast |
+
+Kv distinguishes a uniform blanket (Overcast — flat curve) from a lumpy thick deck (Cloudy — textured curve). Heavy Overcast = thick AND flat (near-zero light, no variability).
 
 Thresholds from CAELUS `options.py` (Table 3), validated on 54 BSRN stations across all major climate zones. Sensor-agnostic — operators use diverse pyranometer hardware.
 
@@ -552,23 +581,23 @@ Thresholds from CAELUS `options.py` (Table 3), validated on 54 BSRN stations acr
 
 **Startup backfill:** On API restart, `backfill()` seeds the ring buffer from archive records (last 30 minutes) for immediate classification. Full accuracy after ~30 minutes of live LOOP data.
 
-**Secondary source (night / twilight / startup / no pyranometer):** Provider cloud cover or provider weather text, via these priority levels:
-
-1. Provider weather text — normalize to Clear Skies vocabulary via keyword matching (longest match wins).
-2. Provider cloud cover % — NWS ASOS/METAR sky cover categories (CLR 0–6%, FEW 7–31%, SCT 32–56%, BKN 57–87%, OVC 88–100%).
-3. Neither available — omit sky descriptor.
+**Secondary source (night / twilight / startup / no pyranometer):** Provider cloud cover percentage, via `_cloud_pct_to_sky()`. Cannot produce "Scattered Clouds" composites (no Kv from a cloud percentage). Thresholds: ≤10% Clear, ≤25% Mostly Clear, ≤50% Partly Cloudy, ≤85% Mostly Cloudy, ≤95% Cloudy, >95% Overcast.
 
 ### Day/night display vocabulary
 
-Apply NWS standard day/night vocabulary at display time:
+Apply day/night vocabulary at display time via substring replacement ("Clear"→"Sunny", "Mostly Clear"→"Mostly Sunny"):
 
 | Classification | Day display | Night display |
 |----------------|-------------|---------------|
 | Clear | Sunny | Clear |
+| Clear, Scattered Clouds | Sunny, Scattered Clouds | Clear, Scattered Clouds |
 | Mostly Clear | Mostly Sunny | Mostly Clear |
+| Mostly Clear, Scattered Clouds | Mostly Sunny, Scattered Clouds | Mostly Clear, Scattered Clouds |
 | Partly Cloudy | Partly Cloudy | Partly Cloudy |
 | Mostly Cloudy | Mostly Cloudy | Mostly Cloudy |
 | Cloudy | Cloudy | Cloudy |
+| Overcast | Overcast | Overcast |
+| Heavy Overcast | Heavy Overcast | Heavy Overcast |
 
 Solar zenith > 96° = night; 80–96° = civil twilight (fall back to provider); < 80° = day. Compute zenith from station coordinates and timestamp via pvlib `solarposition` or equivalent.
 
