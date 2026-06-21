@@ -372,14 +372,17 @@ approved by the operator/project lead.
 ### SCATTER_CLOUDS Km sub-splits
 
 CAELUS defines SCATTER_CLOUDS as a single catch-all class. The user researched and
-approved sub-splitting by Km to provide more descriptive labels:
+approved sub-splitting by Km to provide more descriptive labels. Boundaries are derived
+from the Kasten-Czeplak (1980) formula (§5), which maps Km to NWS okta categories.
+CAELUS class boundaries (0.6/0.5/0.4) were NOT used — those describe solar production
+categories, not weather display categories (see ADR-044 §1).
 
-| Km range within SCATTER_CLOUDS | Display label | Rationale |
-|---|---|---|
-| > 0.6 | Clear, Scattered Clouds | Predominantly clear sky, occasional cloud transits |
-| 0.5–0.6 | Mostly Clear, Scattered Clouds | More transits but sky still mostly clear |
-| 0.4–0.5 | Partly Cloudy | Standard NWS forecast label for mid-range |
-| < 0.4 | Mostly Cloudy | Cloud cover dominant, approaching THICK_CLOUDS |
+| Km range | K-C oktas | Display label | Rationale |
+|---|---|---|---|
+| > 0.97 | 0–2 (CLR/FEW) | Clear, Scattered Clouds | Very high clearness with confirmed cloud transits |
+| 0.85–0.97 | 2–4 (FEW/SCT) | Mostly Clear, Scattered Clouds | Mostly clear, some transits |
+| 0.52–0.85 | 4–7 (SCT/BKN) | Partly Cloudy | Standard NWS forecast label for mid-range |
+| < 0.52 | 7+ (BKN/OVC) | Mostly Cloudy | Cloud cover dominant |
 
 "Scattered Clouds" descriptor rule: only pairs with "Clear" / "Mostly Clear" labels.
 Once coverage reaches "Partly Cloudy" or denser, the base label carries the meaning

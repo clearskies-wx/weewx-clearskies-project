@@ -375,7 +375,7 @@ Custom cards (v2) will be stored inside the dashboard web root at `/var/www/clea
 - Owner: `clearskies-stack-dev` (Sonnet)
 - Files: `admin/routes.py`, new template `templates/admin/sky_classification.html`
 - Do: Admin section where operators adjust sky condition classifier thresholds:
-  - SCATTER_CLOUDS Km sub-split boundaries (default: 0.6 / 0.5 / 0.4)
+  - SCATTER_CLOUDS Km sub-split boundaries (default: 0.97 / 0.85 / 0.52 — derived from Kasten-Czeplak 1980: Km 0.97 ≈ 2 oktas FEW, Km 0.85 ≈ 4 oktas SCT, Km 0.52 ≈ 7 oktas BKN)
   - OVERCAST Km×Kv sub-split boundaries (default: Km 0.15, Kv 0.03)
   - SZA guard threshold (default: 5° elevation)
   - Display: K-C reference table (Km ↔ okta ↔ NWS label), current threshold values, sensor accuracy guidance ("Davis ±3-5%, Ambient ~±15% — tight thresholds may be unreliable on consumer equipment"), "Reset to defaults" button.
