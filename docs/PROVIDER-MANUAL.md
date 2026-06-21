@@ -256,7 +256,7 @@ Five forecast provider modules ship at v0.1:
 
 | Module | Location | Key required | Coverage | Constraints |
 |---|---|---|---|---|
-| `aeris` | `providers/forecast/aeris.py` | Yes | US, Canada, Europe + global | Developer trial free tier |
+| `aeris` | `providers/forecast/aeris.py` | Yes | US, Canada, Europe + global | Developer trial free tier. Operator selects forecast model: Standard (`/forecasts`) or Xcast (`/xcast/forecasts`, ML-enhanced temp/wind). Config key: `aeris_forecast_model` in `[forecast]` (default: `xcast`). Xcast applies to hourly only; daynight always uses standard. |
 | `nws` | `providers/forecast/nws.py` | No (User-Agent header required) | USA only | USA-only geographic gate |
 | `openmeteo` | `providers/forecast/openmeteo.py` | No (free, non-commercial) | Global | No alerts endpoint |
 | `openweathermap` | `providers/forecast/openweathermap.py` | Yes | Global | Hourly/daily/alerts require One Call 3.0 subscription |

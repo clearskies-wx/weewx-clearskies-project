@@ -113,6 +113,12 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | [ADR-005](../archive/decisions/ADR-005-realtime-architecture.md) | Realtime architecture | ADR-058 | 2026-04-30 |
 | [ADR-019](../archive/decisions/ADR-019-units-handling.md) | Units handling (original) | ADR-041, ADR-042 | 2026-05-02 |
 
+## Accepted — pending consolidation into PROVIDER-MANUAL.md
+
+| ADR | Title | Date |
+|---|---|---|
+| [ADR-063](ADR-063-aeris-xcast-model-selection.md) | Aeris forecast model selection (Standard vs Xcast) | 2026-06-20 |
+
 ---
 
 ## Status legend
