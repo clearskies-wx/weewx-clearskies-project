@@ -302,6 +302,11 @@ weather.example.com {
         file_server
     }
 
+    handle /card-manifest.json {
+        root * /srv/dashboard
+        file_server
+    }
+
     handle /webcam/* {
         root * /var/www/clearskies
         file_server
