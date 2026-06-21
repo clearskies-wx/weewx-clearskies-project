@@ -1,8 +1,21 @@
 # Admin Page & Card Plugin Architecture — Execution Plan
 
-**Status:** APPROVED
+**Status:** IN PROGRESS
 **Created:** 2026-06-21
 **Components:** Dashboard SPA (`weewx-clearskies-dashboard`), Config UI (`weewx-clearskies-stack`), API (`weewx-clearskies-api`)
+
+### Phase completion tracker
+
+| Phase | Status | Commit | Date |
+|-------|--------|--------|------|
+| **0A** — ADRs + Manual Updates | **COMPLETE** | `f638cbb` | 2026-06-21 |
+| **0B** — Card Plugin Architecture (Dashboard) | NOT STARTED | — | — |
+| **1** — Dynamic Now Page (Dashboard) | NOT STARTED | — | — |
+| **2** — Page Visibility: Static Config + Dashboard | NOT STARTED | — | — |
+| **3** — Admin Landing Page + Expanded Sections (Stack) | NOT STARTED | — | — |
+| **4** — Now Page Card Layout Editor (Stack) | NOT STARTED | — | — |
+| **5** — API Architecture Cleanup | NOT STARTED | — | — |
+| **6** — Deploy + Final Verification | NOT STARTED | — | — |
 
 ---
 
@@ -164,7 +177,7 @@ Custom cards (v2) will be stored inside the dashboard web root at `/var/www/clea
 
 ## 3. Implementation Phases
 
-### PHASE 0A — ADRs + Manual Updates (Documentation First)
+### PHASE 0A — ADRs + Manual Updates (Documentation First) ✅ COMPLETE (f638cbb, 2026-06-21)
 
 **Why first:** Agents read the governing manuals before implementing. The card plugin architecture, layout configuration, page visibility move, and admin landing page are all new architectural decisions. If the manuals don't describe these before coding starts, agents have no authoritative guidance. ADRs document the decisions; manuals become the implementation rules.
 
