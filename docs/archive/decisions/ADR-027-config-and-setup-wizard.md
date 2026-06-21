@@ -247,6 +247,45 @@ Collected in Appearance step: theme/branding ([ADR-022](ADR-022-theming-branding
 - Long-lived daemon admin UI — deferred.
 - End-user accounts (multi-user roles, ACLs) — single admin credential at v0.1.
 
+## Amendment: 2026-06-21
+
+### Admin landing page at `/admin`
+
+**Problem:** The config UI currently has `/admin/config` (a section-level config editor) but no `/admin` landing page. Bare `/admin` returns 404. After initial setup, operators who navigate to the natural URL (`/admin`) hit a dead end. The existing `/admin/config` page lists sections by config file (`api.conf` server, `api.conf` database, etc.) rather than by domain — operators think in terms of "providers" and "appearance," not which INI file stores the value.
+
+Additionally, several configuration areas that the wizard collects are not editable after initial setup: branding (accent color, logos, site title, favicon), social links, analytics (GA ID), privacy regions, TLS settings, and feature flags (earthquake radius/magnitude). An operator who wants to change their Google Analytics ID after initial setup must re-run the entire wizard or manually edit `branding.json` — neither is discoverable or convenient.
+
+**Decision:** The config UI adds an admin landing page at `/admin`. The landing page is the default post-login destination (replacing the current redirect to `/admin/config`). It organizes all configuration areas by domain:
+
+- **Station Identity** — station name, location, altitude
+- **Database** — DB type, connection
+- **Providers** — forecast, alerts, AQI, earthquakes, radar, seeing (each with key management)
+- **Appearance** — accent color, logos, site title, favicon, theme mode, custom CSS
+- **Social** — Mastodon, GitHub, Twitter/X, Facebook URLs
+- **Analytics & Privacy** — GA ID, privacy region toggles
+- **Webcam** — enabled, image/video URLs, refresh interval
+- **Pages** — per-page visibility checkboxes (see ADR-024 amendment 2026-06-21)
+- **Now Page Layout** — card layout editor (see ADR-064, ADR-065)
+- **Column Mapping** — observation column mapping
+- **TLS** — mode, domain, email, provider
+- **Sky Classification** — sensor-model-aware threshold calibration for the CAELUS-based sky condition classifier (see below)
+
+Each section shows a summary of current values with an "Edit" link that loads the edit form via HTMX fragment swap. The existing `/admin/config/{component}/{section}` CRUD is preserved — the landing page provides the navigation layer above it.
+
+**Redirect logic:** If `api.conf` does not exist (setup has not been run), `/admin` redirects to `/wizard`. This check already exists for `/` in `app.py`; the amendment extends it to `/admin`.
+
+**"Re-run Setup Wizard" link:** The landing page includes a link to `/wizard` at the bottom for operators who prefer the guided sequential flow.
+
+**Sky classification calibration section rationale:** The CAELUS-based sky condition classifier (ADR-044) uses threshold boundaries derived from Kasten & Czeplak (1980) to sub-split the cloudy zone into NWS-vocabulary sky labels. The Km thresholds that map clearness index to okta-equivalent labels (FEW → SCT → BKN) are calibrated for research-grade pyranometers. Consumer-grade sensors (Davis Vantage ±3–5%, Ambient Weather ±10–15%) introduce measurement error that can cause threshold-boundary oscillation — a station hovering near Km 0.85 may flip between "Scattered Clouds" and "Partly Cloudy" every few minutes due to sensor noise, not actual cloud changes.
+
+Exposing these thresholds in the admin UI allows operators to widen or shift sub-split boundaries to match their sensor's accuracy envelope. The defaults are derived from the Kasten-Czeplak clear-sky irradiance model (Kasten & Czeplak 1980, "Solar and terrestrial radiation dependent on the amount and type of cloud," *Solar Energy* 24(2):177–189, doi:10.1016/0038-092X(80)90391-6), which relates Km (clearness index = GHI/GHI_clear) to fractional cloud cover in oktas. The mapping: Km ≥ 0.97 ≈ 0–2 oktas (FEW), Km ≥ 0.85 ≈ 2–4 oktas (SCT), Km ≥ 0.52 ≈ 4–7 oktas (BKN). These translate to NWS labels per Federal Meteorological Handbook No. 1 (FMH-1, Surface Weather Observations and Reports, OFCM 2019) §12.3 Table 12-2: FEW = 1–2 oktas, SCT = 3–4, BKN = 5–7, OVC = 8.
+
+The admin section displays the Kasten-Czeplak reference table alongside sensor accuracy guidance and a "Reset to defaults" button. Full scientific derivation is in `docs/reference/sky-classification-science.md`.
+
 ## References
-- Related: [ADR-001](ADR-001-component-breakdown.md), [ADR-002](ADR-002-tech-stack.md), [ADR-006](ADR-006-compliance-model.md), [ADR-007](ADR-007-forecast-providers.md), [ADR-008](ADR-008-auth-model.md), [ADR-021](ADR-021-i18n-strategy.md), [ADR-022](ADR-022-theming-branding-mechanism.md), [ADR-029](ADR-029-logging-format-destinations.md), [ADR-030](ADR-030-health-check-readiness-probes.md), [ADR-037](ADR-037-inbound-traffic-architecture.md).
+- Related: [ADR-001](ADR-001-component-breakdown.md), [ADR-002](ADR-002-tech-stack.md), [ADR-006](ADR-006-compliance-model.md), [ADR-007](ADR-007-forecast-providers.md), [ADR-008](ADR-008-auth-model.md), [ADR-021](ADR-021-i18n-strategy.md), [ADR-022](ADR-022-theming-branding-mechanism.md), [ADR-029](ADR-029-logging-format-destinations.md), [ADR-030](ADR-030-health-check-readiness-probes.md), [ADR-037](ADR-037-inbound-traffic-architecture.md), [ADR-044](ADR-044-sky-condition-classification.md), [ADR-064](../../decisions/ADR-064-card-plugin-contract.md), [ADR-065](../../decisions/ADR-065-now-page-layout-configuration.md).
 - Coding rules: [coding.md §1](../../rules/coding.md) (IPv4/IPv6-agnostic listener).
+- Citations:
+  - Kasten, F. & Czeplak, G. (1980). "Solar and terrestrial radiation dependent on the amount and type of cloud." *Solar Energy*, 24(2), 177–189. doi:10.1016/0038-092X(80)90391-6.
+  - OFCM (2019). *Federal Meteorological Handbook No. 1 (FMH-1): Surface Weather Observations and Reports.* §12.3, Table 12-2. Office of the Federal Coordinator for Meteorological Services.
+  - Stein, J.S., Hansen, C.W., & Reno, M.J. (2012). "The Variability Index: A New and Novel Metric for Quantifying Irradiance and PV Output Variability." Sandia National Laboratories, SAND2012-2088C.

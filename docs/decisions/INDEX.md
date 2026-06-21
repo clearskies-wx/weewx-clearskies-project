@@ -119,6 +119,20 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 |---|---|---|
 | [ADR-063](ADR-063-aeris-xcast-model-selection.md) | Aeris forecast model selection (Standard vs Xcast) | 2026-06-20 |
 
+## Accepted — pending consolidation into DASHBOARD-MANUAL.md + ARCHITECTURE.md + OPERATIONS-MANUAL.md + DESIGN-MANUAL.md
+
+| ADR | Title | Date |
+|---|---|---|
+| [ADR-064](ADR-064-card-plugin-contract.md) | Card plugin contract | 2026-06-21 |
+| [ADR-065](ADR-065-now-page-layout-configuration.md) | Now page layout configuration | 2026-06-21 |
+
+## Amendments (2026-06-21)
+
+| ADR | Amendment | Location |
+|---|---|---|
+| ADR-024 | Page visibility moves from API to static config (`pages.json`) | [ADR-024 amendment 2026-06-21](../archive/decisions/ADR-024-page-taxonomy.md) |
+| ADR-027 | Admin landing page at `/admin` with domain-organized sections | [ADR-027 amendment 2026-06-21](../archive/decisions/ADR-027-config-and-setup-wizard.md) |
+
 ---
 
 ## Status legend

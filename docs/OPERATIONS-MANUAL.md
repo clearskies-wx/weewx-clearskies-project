@@ -290,7 +290,24 @@ weather.example.com {
         file_server
     }
 
+    handle /pages.json {
+        header Cache-Control no-cache
+        root * /etc/weewx-clearskies
+        file_server
+    }
+
+    handle /now-layout.json {
+        header Cache-Control no-cache
+        root * /etc/weewx-clearskies
+        file_server
+    }
+
     handle /webcam/* {
+        root * /var/www/clearskies
+        file_server
+    }
+
+    handle /cards/* {
         root * /var/www/clearskies
         file_server
     }
@@ -376,6 +393,8 @@ The service refuses to start with no config file and no `--init` flag. A missing
 | `secrets.env` | All secrets: DB passwords, API keys, proxy secret, admin credential hash | **Yes** | **0600** |
 | `branding.json` | Operator branding: accent colour, logos, theme, social links, analytics identifiers | No | 0644 |
 | `webcam.json` | Webcam config: enabled flag, image URL, video URL, refresh interval | No | 0644 |
+| `pages.json` | Page visibility: `{ "hidden": [...] }`. Dashboard reads at boot. Written by admin UI. | No | 0644 |
+| `now-layout.json` | Now page card layout: `{ "version": 1, "cards": [...] }`. Dashboard reads at boot. Written by admin card layout editor. | No | 0644 |
 | `api-cert.pem` | API TLS certificate (Ed25519 self-signed, auto-generated) | No | 0644 |
 | `api-key.pem` | API TLS private key | **Yes** | **0600** |
 | `ui-cert.pem` | Config UI TLS certificate (auto-generated when `--tls` active) | No | 0644 |
@@ -383,7 +402,7 @@ The service refuses to start with no config file and no `--init` flag. A missing
 
 **`secrets.env` is the most restricted file in the entire installation.** Mode 0600, owner `clearskies:clearskies`. Caddy never reads it. The deploy user reads it only to write it. No other file's permissions may be as permissive as this file is restrictive — no other file carries secrets, but this one carries all of them.
 
-Keep `branding.json` and `webcam.json` in `/etc/weewx-clearskies/`, never in the web root. Dashboard deploys use `rsync --delete` which wipes `/var/www/clearskies/` on every run. Caddy serves both files via a dedicated route that points at `/etc/weewx-clearskies/`.
+Keep `branding.json`, `webcam.json`, `pages.json`, and `now-layout.json` in `/etc/weewx-clearskies/`, never in the web root. Dashboard deploys use `rsync --delete` which wipes `/var/www/clearskies/` on every run. Caddy serves all four files via dedicated routes pointing at `/etc/weewx-clearskies/`.
 
 ### Secret naming convention
 
@@ -420,6 +439,60 @@ The config UI is a standalone FastAPI application on port 9876. It is distribute
 During normal operation, access it at `https://your-site.example.com/admin` via the reverse proxy, which routes `/wizard*`, `/bootstrap*`, `/login*`, `/admin*`, and `/static/*` to `localhost:9876`. This means the config UI benefits from the site's real TLS certificate and does not require a separate browser certificate exception.
 
 For first-run bootstrap before the reverse proxy is configured, run `weewx-clearskies-config` directly and access it at the URL shown in the startup banner (defaults to `[::]:9876`).
+
+### Admin landing page
+
+The config UI serves an admin landing page at `/admin`. This is the default post-login destination.
+
+**Redirect logic:** If `api.conf` does not exist (setup has not been run), `/admin` redirects to `/wizard`.
+
+**Domain-organized sections:** The landing page organizes all configuration areas by domain, not by config file:
+
+| Section | Config source | What it manages |
+|---------|--------------|-----------------|
+| Station Identity | `stack.conf [ui]` | Station name, location, altitude |
+| Database | `api.conf [database]` | DB type, connection |
+| Providers | `api.conf [forecast/alerts/aqi/earthquakes/radar/seeing]` | Provider selection + API keys |
+| Appearance | `branding.json` | Accent color, logos, site title, favicon, theme mode, custom CSS |
+| Social | `branding.json` | Mastodon, GitHub, Twitter/X, Facebook URLs |
+| Analytics & Privacy | `branding.json` | GA ID, privacy region toggles |
+| Webcam | `stack.conf [webcam]` | Enabled, image/video URLs, refresh interval |
+| Pages | `pages.json` | Per-page visibility checkboxes |
+| Now Page Layout | `now-layout.json` | Card layout editor (drag-and-drop) |
+| Column Mapping | `api.conf [column_mapping]` | Observation column mapping |
+| TLS | `stack.conf [tls]` | Mode, domain, email, provider |
+| Sky Classification | `api.conf [sky_classification]` | CAELUS threshold calibration |
+
+Each section shows a summary of current values with an "Edit" link that loads the edit form via HTMX fragment swap.
+
+**"Re-run Setup Wizard" link:** At the bottom of the landing page for operators who prefer the guided sequential flow.
+
+### Page visibility management
+
+The Pages section of the admin landing page provides checkboxes for all 9 built-in pages. The "Now" checkbox is always checked and disabled — Now cannot be hidden. Saving writes `/etc/weewx-clearskies/pages.json`. The dashboard reads this file at boot and filters its navigation and routes.
+
+Page visibility is NOT managed through the API. The API's `GET /pages` returns all 9 built-in pages unconditionally. Filtering is the dashboard's responsibility.
+
+### Card layout editor
+
+The Now Page Layout section of the admin landing page provides a drag-and-drop card layout editor:
+
+- **Card palette:** Available cards not currently in the layout, populated from `card-manifest.json` (a build-time JSON file in the dashboard's `dist/` output). Each card shows its thumbnail, display name, and allowed footprint options.
+- **Active grid:** Current layout, populated from `now-layout.json` (or the compiled-in default). Cards can be reordered by drag-and-drop (Sortable.js, vendored, MIT license).
+- **Keyboard accessibility:** Move-up / move-down / add / remove buttons alongside drag-and-drop. Drag-and-drop is not the only interaction method.
+- **Footprint selector:** Each card in the active grid shows a dropdown of its `allowedLayouts` — only configurations the card supports.
+- **Save:** POST writes `/etc/weewx-clearskies/now-layout.json`. Card types are validated against the manifest to prevent unknown types.
+
+### Sky classification calibration
+
+The Sky Classification section allows operators to adjust the CAELUS-based sky condition classifier thresholds. The section displays:
+
+- Current threshold values for SCATTER_CLOUDS Km sub-splits and OVERCAST Km×Kv sub-splits.
+- The Kasten-Czeplak reference table mapping Km values to okta equivalents and NWS labels.
+- Sensor accuracy guidance (Davis ±3–5%, Ambient ~±15%).
+- A "Reset to defaults" button.
+
+Thresholds are saved to `api.conf [sky_classification]` and read by the API at startup. Changes require an API restart to take effect.
 
 ### Wizard pattern
 

@@ -48,8 +48,8 @@ Computation boundaries between the three application layers. **No chart-specific
 
 | Layer | Responsibility | Does NOT do |
 |-------|---------------|-------------|
-| **API** | General-purpose data access AND transformation: query the weewx archive, serve raw observation/aggregate values, host provider modules, expose setup endpoints. Unit conversion, derived-value computation (Beaufort scale, comfort index, barometer trend direction, cardinal wind directions). Enrichment pipeline (conditions text, weather text, barometer trend, wind rolling window averages, scene descriptor). SSE streaming at `GET /sse`. Single conversion authority (ADR-042, ADR-058). | Chart-specific binning or aggregation, presentation formatting, chart-type awareness. |
-| **Dashboard** | Rendering + presentation-level computation: display converted values, client-side binning for visualizations (e.g., wind rose direction×Beaufort matrix from API-provided fields), LTTB downsampling, chart layout, theming, accessibility. | Unit conversion, Beaufort/comfort-index threshold logic, raw SQL queries, provider API calls. (ADR-042: "Dashboard does not carry Beaufort thresholds.") |
+| **API** | General-purpose data access AND transformation: query the weewx archive, serve raw observation/aggregate values, host provider modules, expose setup endpoints. Unit conversion, derived-value computation (Beaufort scale, comfort index, barometer trend direction, cardinal wind directions). Enrichment pipeline (conditions text, weather text, barometer trend, wind rolling window averages, scene descriptor). SSE streaming at `GET /sse`. Single conversion authority (ADR-042, ADR-058). | Chart-specific binning or aggregation, presentation formatting, chart-type awareness, UI control plane (page visibility, card layout — these are static config served by Caddy, not API concerns). |
+| **Dashboard** | Rendering + presentation-level computation: display converted values, client-side binning for visualizations (e.g., wind rose direction×Beaufort matrix from API-provided fields), LTTB downsampling, chart layout, theming, accessibility. Page visibility filtering from `pages.json`. Dynamic Now page card rendering from `now-layout.json` and the card plugin registry (ADR-064). | Unit conversion, Beaufort/comfort-index threshold logic, raw SQL queries, provider API calls. (ADR-042: "Dashboard does not carry Beaufort thresholds.") |
 
 **Why the computation boundary matters (ADR-041 amendment 2026-06-05, updated for ADR-058):** The API is the single conversion and enrichment authority. Chart-type-specific logic (binning, aggregation for a specific visualization) belongs in the dashboard. A proposed API endpoint that requires domain-specific computation — Beaufort classification, comfort index, conditions text — belongs in the API's enrichment pipeline, not as a raw data endpoint. The dashboard reads API-provided derived fields (like `beaufort.value`) but does not recompute them from raw observations.
 
@@ -89,7 +89,9 @@ Each repo builds its own container image independently (ADR-034). A dashboard CS
 >
 > **API startup time: ~2 minutes.** After `systemctl restart weewx-clearskies-api`, the service runs a cache warmer that makes outbound API calls to configured providers (Aeris, NWS, etc.) before uvicorn binds to port 8765. The service is not ready to serve requests until the cache warm completes. When scripting restarts, wait at least 120 seconds before hitting endpoints — `sleep 10` is not enough.
 
-> **Native dashboard / dev deploy (2026-05-29):** On the `weather-dev` LXD container the dashboard is NOT run as a Docker init container. Instead the source is pulled to `/home/ubuntu/repos/weewx-clearskies-dashboard`, built natively with `npm run build` (Vite → `dist/`), and the built `dist/` is rsync'd into the Caddy web root `/var/www/clearskies/` (excluding the read-only `webcam/` bind-mount). API and Config UI run as systemd units (`weewx-clearskies-{api,config}.service`). The full redeploy is automated by `scripts/redeploy-weather-dev.sh`; source-only refresh by `scripts/sync-to-weather-dev.sh`. Procedure: [procedures/deploy-clearskies.md](procedures/deploy-clearskies.md). The Docker init-container model above is the compose deployment path.
+> **Native dashboard / dev deploy (2026-05-29):** On the `weather-dev` LXD container the dashboard is NOT run as a Docker init container. Instead the source is pulled to `/home/ubuntu/repos/weewx-clearskies-dashboard`, built natively with `npm run build` (Vite → `dist/`), and the built `dist/` is rsync'd into the Caddy web root `/var/www/clearskies/` (excluding the read-only `webcam/` bind-mount and the `cards/` directory). API and Config UI run as systemd units (`weewx-clearskies-{api,config}.service`). The full redeploy is automated by `scripts/redeploy-weather-dev.sh`; source-only refresh by `scripts/sync-to-weather-dev.sh`. Procedure: [procedures/deploy-clearskies.md](procedures/deploy-clearskies.md). The Docker init-container model above is the compose deployment path.
+>
+> **Cards directory (v2 prep, ADR-064):** `/var/www/clearskies/cards/` is reserved for third-party card assets (v2 scope). The redeploy script excludes this directory from rsync (`--exclude cards/`), same isolation pattern as `webcam/`. Empty until v2 adds the card import mechanism. Caddy serves `/cards/*` from this directory.
 
 ## Default topology: two-host split (ADR-034, amended ADR-058)
 
@@ -128,7 +130,11 @@ All three Caddyfile variants (frontend-host, single-host, examples/reverse-proxy
 | `/admin*` | `config:9876` | Ongoing config management |
 | `/branding.json` | `file_server` from `/etc/weewx-clearskies/` | Operator branding config (accent, logos, theme, social, analytics) |
 | `/webcam.json` | `file_server` from `/etc/weewx-clearskies/` | Webcam config JSON (safe from rsync --delete; lives outside web root) |
+| `/pages.json` | `file_server` from `/etc/weewx-clearskies/` | Page visibility config. `Cache-Control: no-cache`. Dashboard reads at boot to filter nav + routes. (ADR-024 amendment 2026-06-21) |
+| `/now-layout.json` | `file_server` from `/etc/weewx-clearskies/` | Now page card layout config. `Cache-Control: no-cache`. Dashboard reads at boot; falls back to compiled-in default on 404. (ADR-065) |
+| `/card-manifest.json` | `file_server` from `/srv/dashboard` (build output) | Build-time card metadata manifest. Read by the admin card layout editor. Not operator-editable. |
 | `/webcam/*` | `file_server` from `/var/www/clearskies/webcam/` | Live webcam still + timelapse. No `try_files` — returns 404 for missing files. |
+| `/cards/*` | `file_server` from `/var/www/clearskies/cards/` | v2: third-party card assets. Directory excluded from redeploy rsync. Empty until v2. |
 | `/static/*` | `config:9876` | Config UI static assets (CSS, JS) |
 | `/*` (fallback) | `/srv/dashboard` static files (shared volume from init container) | React SPA with `try_files` fallback to `index.html` |
 
@@ -213,7 +219,7 @@ The OpenAPI spec lists 35+ data endpoints. Key groups for orientation:
 | Earthquakes | `/api/v1/earthquakes`, `/api/v1/earthquakes/config`, `/api/v1/earthquakes/faults` | `/faults` serves GEM Active Faults GeoJSON radius-clipped. `/config` returns provider configuration. |
 | Charts | `/api/v1/charts/config`, `/api/v1/charts/groups`, `/api/v1/charts/custom-query/{series_id}` | Config-driven; custom SQL from `charts.conf` only (disk-only trust model). |
 | Radar | `/api/v1/radar/providers/{id}/frames`, `/api/v1/radar/providers/{id}/tiles/{z}/{x}/{y}` | Keyed providers proxied server-side; keys never reach browser. |
-| Content & nav | `/api/v1/pages`, `/api/v1/pages/{slug}/content`, `/api/v1/reports`, `/api/v1/content/about`, `/api/v1/content/legal` | |
+| Content & nav | `/api/v1/pages`, `/api/v1/pages/{slug}/content`, `/api/v1/reports`, `/api/v1/content/about`, `/api/v1/content/legal` | `/pages` returns all 9 built-in pages unconditionally — page visibility filtering is the dashboard's responsibility via `pages.json` (ADR-024 amendment 2026-06-21). |
 | Infrastructure | `/api/v1/status`, `/api/v1/capabilities`, `/api/v1/records` | `/status` returns `{configured: bool}` — works in both setup and configured modes. |
 
 ### SSE endpoint (merged from realtime service per ADR-058)
@@ -385,6 +391,8 @@ All config in `/etc/weewx-clearskies/` (search order: `CLEARSKIES_CONFIG` env va
 | `charts.conf` | API | Chart groups, charts, series (ConfigObj/INI, migrated from Belchertown `graphs.conf`) | No (generated by `clearskies-migrate-charts`) |
 | `branding.json` | Dashboard (via Caddy) | Site branding: accent color, logos, theme mode, social URLs, GA tracking ID, privacy regions. Served by Caddy `handle /branding.json` route — **never in the web root** (rsync --delete would destroy it). | No (written by wizard) |
 | `webcam.json` | Dashboard (via Caddy) | Webcam enabled flag, image/video URLs, refresh interval. Served by Caddy `handle /webcam.json` route — **never in the web root** (rsync --delete would destroy it). | No (written by wizard step 7) |
+| `pages.json` | Dashboard (via Caddy) | Page visibility: `{ "hidden": ["seismic", "reports"] }`. Dashboard reads at boot to filter nav + routes. "Now" cannot be hidden. Served by Caddy `handle /pages.json` — **never in the web root.** Absent file = all pages visible. (ADR-024 amendment 2026-06-21) | No (written by admin UI) |
+| `now-layout.json` | Dashboard (via Caddy) | Now page card layout: `{ "version": 1, "cards": [{ "type", "footprint", "rowSpan" }] }`. Dashboard reads at boot; absent file = compiled-in default layout. Served by Caddy `handle /now-layout.json` — **never in the web root.** (ADR-065) | No (written by admin card layout editor) |
 | `ui-cert.pem` | Config UI | Self-signed TLS cert (mode 0644) | No (auto-generated with `--tls`) |
 | `ui-key.pem` | Config UI | TLS private key (mode 0600) | No (auto-generated with `--tls`) |
 

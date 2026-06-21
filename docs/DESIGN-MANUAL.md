@@ -547,6 +547,19 @@ The hero is the Now-page page-header card (station logo + station name). It is a
 - **Do:** Use `footprint` and `rowSpan` props. Let the card own its padding.
 - **Don't:** Add `!py-*`, `!px-*`, `min-h-[...]`, or `maxHeight` overrides in `className`.
 
+### Card Thumbnails (Admin Layout Editor)
+
+- **Description:** Static preview images used by the admin card layout editor to represent cards in the drag-and-drop palette.
+- **Dimensions:** ~200×150px. Consistent aspect ratio across all thumbnails.
+- **Format:** PNG. Transparent background is acceptable.
+- **Location:** `public/card-thumbnails/{card-type}.png` in the dashboard repo. Built into `dist/card-thumbnails/` by Vite.
+- **Content:** Stylized representation of the card's content area — enough to recognize the card at glance. Placeholder images with card name + Phosphor icon are acceptable for initial implementation; pixel-perfect screenshots are not required.
+- **Naming:** File name matches the card's `type` field from `card-metadata.ts` (e.g., `aqi.png`, `wind-compass.png`, `radar.png`).
+- **Manifest reference:** Each card's `thumbnail` field in `card-manifest.json` points to the thumbnail path relative to the build root (e.g., `"/card-thumbnails/aqi.png"`).
+- **Accessibility:** Thumbnails are decorative in the admin context (the card `displayName` provides the text alternative). The admin editor renders them with `alt=""`.
+- **Do:** Keep all 14 thumbnails visually consistent (same dimensions, same style).
+- **Don't:** Use screenshots of the live dashboard — these would break on theme/data changes and are unnecessarily heavy.
+
 ### CardHeader + CardTitle
 
 - **Description:** Structured header slot with title and optional controls.

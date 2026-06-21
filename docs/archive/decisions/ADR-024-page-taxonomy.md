@@ -153,6 +153,26 @@ barometer+precip combined) was split during C4 (2026-06-01) and subsequently red
 adding dewpoint (primary, bold, with temperature unit suffix) + relative humidity (secondary).
 This is a content addition, not a structural taxonomy change.
 
+## Amendment: 2026-06-21
+
+### Page visibility moves from API to static config
+
+**Problem:** The original decision said "each built-in is hide-able per operator config" but did not specify *where* the visibility state lives. During implementation, page hiding was placed in the API: `api.conf [pages] hidden`, a `PagesSettings` class, `wire_hidden_pages()` wiring at startup, and `get_pages()` endpoint filtering. This is an architectural violation. The API is the data layer between weewx, external providers, and the dashboard — it is not a UI control plane. Page visibility is a presentation concern: it determines which navigation items and routes the dashboard renders. It has no relationship to weather data, enrichment, or provider modules.
+
+The violation also creates an operational coupling: changing which pages are visible requires editing `api.conf` and restarting the API service (~2 minutes warm cache), when the change is purely cosmetic and affects only the browser.
+
+**Decision:** Page visibility moves to `/etc/weewx-clearskies/pages.json`, a static JSON file served by Caddy — the same pattern used for `branding.json` and `webcam.json`. The dashboard reads this file at boot and filters its navigation and route table. The API's `GET /pages` endpoint returns all 9 built-in pages unconditionally — it no longer filters. The `PagesSettings` class, `wire_hidden_pages()`, and `get_visible_pages()` are removed from the API.
+
+**Format:** `{ "hidden": ["seismic", "reports"] }`. "Now" cannot be hidden — enforced by the admin UI (checkbox disabled) and the dashboard (ignores "now" if present in the hidden list). An absent file or a parse error is treated as `{ "hidden": [] }` (all pages visible).
+
+**Caddy route:** `handle /pages.json` serves from `/etc/weewx-clearskies/` with `Cache-Control: no-cache`.
+
+**Admin UI:** The config UI gains a page visibility section with checkboxes for all 9 built-in pages. The "Now" checkbox is always checked and disabled. Saves write `pages.json`.
+
+**Why static file, not API endpoint:** The same reasoning as `branding.json` — this is operator configuration consumed directly by the browser, not weather data. Serving it as a static file through Caddy means changes take effect on next page load with no service restart. The API stays focused on its domain: weather data access and enrichment.
+
+**Migration:** Operators with `[pages] hidden` in `api.conf` will see a one-time log message from the API at startup: "The [pages] section is deprecated; page visibility has moved to pages.json. See CHANGELOG." The API ignores the section; it does not error. The admin UI reads existing `api.conf [pages] hidden` values (if present) and migrates them to `pages.json` on first save.
+
 ## References
-- Related: [ADR-002](ADR-002-tech-stack.md), [ADR-009](ADR-009-design-direction.md), [ADR-010](ADR-010-canonical-data-model.md), [ADR-011](ADR-011-multi-station-scope.md), [ADR-014](ADR-014-almanac-data-source.md), [ADR-015](ADR-015-radar-map-tiles-strategy.md), [ADR-022](ADR-022-theming-branding-mechanism.md), [ADR-023](ADR-023-light-dark-mode-mechanism.md), [ADR-026](ADR-026-accessibility-commitments.md), [ADR-027](ADR-027-config-and-setup-wizard.md).
+- Related: [ADR-002](ADR-002-tech-stack.md), [ADR-009](ADR-009-design-direction.md), [ADR-010](ADR-010-canonical-data-model.md), [ADR-011](ADR-011-multi-station-scope.md), [ADR-014](ADR-014-almanac-data-source.md), [ADR-015](ADR-015-radar-map-tiles-strategy.md), [ADR-022](ADR-022-theming-branding-mechanism.md), [ADR-023](ADR-023-light-dark-mode-mechanism.md), [ADR-026](ADR-026-accessibility-commitments.md), [ADR-027](ADR-027-config-and-setup-wizard.md), [ADR-064](../../decisions/ADR-064-card-plugin-contract.md), [ADR-065](../../decisions/ADR-065-now-page-layout-configuration.md).
 - Walk: [CLEAR-SKIES-CONTENT-DECISIONS.md](../reference/CLEAR-SKIES-CONTENT-DECISIONS.md), [DESIGN-INSPIRATION-NOTES.md](../reference/DESIGN-INSPIRATION-NOTES.md), [BELCHERTOWN-CONTENT-INVENTORY.md](../reference/BELCHERTOWN-CONTENT-INVENTORY.md).

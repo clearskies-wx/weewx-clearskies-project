@@ -22,7 +22,9 @@ Last updated: 2026-06-18
 5. [Performance Budget](#5-performance-budget)
 6. [Charts System — Dashboard Side](#6-charts-system--dashboard-side)
 7. [Data Refresh & Realtime](#7-data-refresh--realtime)
-8. [Anti-Patterns](#8-anti-patterns)
+8. [Card Plugin Contract](#8-card-plugin-contract)
+9. [Dynamic Now Page & Page Visibility](#9-dynamic-now-page--page-visibility)
+10. [Anti-Patterns](#10-anti-patterns)
 
 ---
 
@@ -408,7 +410,107 @@ Use native `fetch` only. Do not add axios, ky, or TanStack Query.
 
 ---
 
-## §8 Anti-Patterns
+## §8 Card Plugin Contract
+
+### Card metadata
+
+Every card — built-in and future third-party — declares metadata in a plain data file with no React imports:
+
+- **`type`** — unique string identifier (e.g., `"aqi"`, `"wind-compass"`). The `CardType` is a string literal union of all registered card types.
+- **`displayName`** — human-readable name for the admin layout editor (e.g., `"Air Quality Index"`).
+- **`apiEndpoints`** — array of API endpoint paths the card needs (e.g., `["/api/v1/aqi/current"]`). Card authors determine these by reading the published OpenAPI spec at `/api/v1/openapi.json`. The container deduplicates across all active cards and fetches each endpoint once.
+- **`allowedLayouts`** — array of `{ footprint, rowSpan }` configurations the card supports. A card may render differently for each. The operator selects from this list in the layout editor. Example: `[{ footprint: "tile", rowSpan: 1 }, { footprint: "wide", rowSpan: 1 }]`.
+- **`thumbnail`** — path to a static preview image for the admin layout editor (relative to the build output root, e.g., `"/card-thumbnails/aqi.png"`).
+
+The metadata file (`card-metadata.ts`) has **no React imports**. This is enforced by the build-time manifest script importing it in a non-React context.
+
+### Card component props
+
+Every card component receives a uniform props shape:
+
+- **`dataBag`** — `Record<string, any>` keyed by API endpoint path. The container populates the bag by fetching all unique endpoints declared by active cards. Each card extracts the specific fields it needs internally. The loose typing is deliberate: a strongly-typed bag would require the container to know every endpoint's response shape, re-coupling page and card.
+- **`layout`** — `{ footprint: CardFootprint; rowSpan: 1 | 2 | 2.5 }`. The active layout configuration for this card instance, selected by the operator via the layout editor.
+- **`stationTz`** — IANA timezone string from station metadata.
+
+Each card handles its own loading and error states based on whether its required data is present in the bag.
+
+### Card registry
+
+The card registry (`card-registry.ts`) combines metadata with lazy React component references. It provides:
+
+- `getCard(type)` — returns the full registration (metadata + component) for a card type.
+- `getAllCards()` — returns all registered cards.
+- `getBuiltinCards()` — returns only built-in cards (excludes future v2 custom cards).
+- `getEndpointsForCards(types)` — collects and deduplicates all API endpoints for a set of card types.
+
+### Build-time card manifest
+
+A prebuild script reads only the metadata file (no React) and writes `card-manifest.json` to the build output (`dist/`). This JSON artifact contains all card metadata (type, displayName, apiEndpoints, allowedLayouts, thumbnail path) and is consumed by the admin card layout editor (Python/HTMX) — no React required. The script runs as a `"prebuild"` entry in `package.json`, before `tsc -b && vite build`.
+
+### Self-extraction pattern
+
+Cards extract their own data from the data bag using their declared endpoint paths. The extraction logic lives inside the card component, not in the page container. This is the key architectural invariant: the container does not know what data each card needs or how it renders. Example pattern:
+
+```
+// Inside AqiCard component
+const aqiData = dataBag["/api/v1/aqi/current"];
+if (!aqiData) return <CardSkeleton />;
+// ... render using aqiData
+```
+
+### 14 built-in cards
+
+All 14 Now page cards conform to the plugin contract. Their card types, endpoint declarations, and allowed layouts match the current hardcoded arrangement in `now.tsx`. The full inventory is defined in `card-metadata.ts`.
+
+---
+
+## §9 Dynamic Now Page & Page Visibility
+
+### Now page as container
+
+The Now page is a generic container that renders cards from a layout configuration:
+
+1. Fetch the layout config via `fetchNowLayout()` on mount (fetches `/now-layout.json`; falls back to `DEFAULT_NOW_LAYOUT` on 404 or parse error).
+2. Look up each card in the card registry.
+3. Collect all unique API endpoints from active cards via `getEndpointsForCards()`.
+4. Fetch each unique endpoint once, build the data bag.
+5. Render cards in layout order: for each entry, render `card.component` with `{ dataBag, layout, stationTz }`.
+6. The NowHeroCard renders outside the grid unconditionally — it is a layout element, not a configurable card.
+
+**React hooks constraint:** All data-fetching hooks must be called unconditionally at the top of the component (React rules of hooks). Endpoints not needed by the active card set use skip/enabled flags on hooks — never conditional hook calls. `tsc --noEmit` catches hook ordering violations.
+
+### Layout config types
+
+- `NowLayoutEntry` — `{ type: CardType; footprint: CardFootprint; rowSpan: 1 | 2 | 2.5 }`.
+- `NowLayoutConfig` — `{ version: 1; cards: NowLayoutEntry[] }`.
+- `DEFAULT_NOW_LAYOUT` — compiled-in constant matching the current hardcoded card arrangement (14 cards, current sizes and order). Used when `/now-layout.json` is absent or unparseable.
+
+### Layout config fetch
+
+`fetchNowLayout()` fetches `/now-layout.json` from Caddy. On 404 or parse error, returns `DEFAULT_NOW_LAYOUT`. Never throws. Cards not in the layout don't render — this is how operators hide individual Now page cards.
+
+### Page visibility
+
+The dashboard reads `/pages.json` at boot to determine which pages are visible. Format: `{ "hidden": ["seismic", "reports"] }`. Absent file or parse error = `{ "hidden": [] }` (all pages visible).
+
+**Navigation filtering:** `NAV_ITEMS` in the nav rail and mobile bottom nav are filtered by the visibility config. Hidden pages are removed from navigation. "Now" is never filtered — it is always visible regardless of the config.
+
+**Route filtering:** Routes for hidden pages render the 404 (Not Found) page. Hidden pages are not merely absent from navigation — they are unreachable.
+
+**"Now" protection:** The dashboard ignores "now" if present in the hidden list. This is enforced independently of the admin UI's disabled checkbox — defense in depth.
+
+### Branded 404 page
+
+The Not Found page (`not-found.tsx`) renders:
+
+- Operator logo (theme-aware, from `useBranding`).
+- A weather-themed pun (randomly selected from a built-in array of 8–10 options).
+- "Back to Now" link.
+- WCAG AA compliant (contrast, heading hierarchy, keyboard focus).
+
+---
+
+## §10 Anti-Patterns
 
 Never do the following in dashboard code.
 
@@ -444,3 +546,9 @@ Apply `WEEWX_TO_OBSERVATION` field mapping on merge. Components receive observat
 
 **Never share data fetches between cards via page-level props.**
 Each card owns its data. A card that needs archive data calls `useArchive` internally with its own parameters (`fields`, `aggregate_interval`, time window). Pages do not fetch archive data and pass it down. This keeps cards self-contained — a developer working on one card does not need to understand or coordinate with the page's data plumbing. Cards that only need a sparkline should use `aggregate_interval` to downsample; cards that need accurate peaks/sums (e.g. today's hi/lo) fetch raw records. Shared hooks like `useRealtimeObservation` (SSE-backed, singleton connection) are the exception — those are inherently global.
+
+**Never read page visibility from the API.**
+Page visibility is a static config (`/pages.json`) served by Caddy. The API's `GET /pages` returns all 9 built-in pages unconditionally — it does not filter. The dashboard reads `/pages.json` at boot and filters navigation and routes locally. Do not add API logic for page hiding.
+
+**Never bypass the card plugin contract on the Now page.**
+All Now page cards must conform to the card plugin contract (§8). Do not add cards to the Now page by directly importing components and passing specific props — use the card registry and data bag pattern. The Now page container does not know what data each card needs.
