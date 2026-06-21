@@ -10,11 +10,11 @@
 |-------|--------|--------|------|
 | **0A** — ADRs + Manual Updates | **COMPLETE** | `f638cbb` | 2026-06-21 |
 | **0B** — Card Plugin Architecture (Dashboard) | **COMPLETE** | `07160ae`–`85e3860` (auditor: 0 findings) | 2026-06-21 |
-| **1** — Dynamic Now Page (Dashboard) | NOT STARTED | — | — |
+| **1** — Dynamic Now Page (Dashboard) | **COMPLETE** | `295c67a`, fix `a433b3b` (auditor: 1 medium deferred [F1 getEndpointsForCards skip flags], 1 low remediated [F2 null init]) | 2026-06-21 |
 | **2** — Page Visibility: Static Config + Dashboard | **COMPLETE** | stack `929ebf6`, dash `716cb25`, fix `f021350` (auditor: 1 low, remediated) | 2026-06-21 |
-| **3** — Admin Landing Page + Expanded Sections (Stack) | NOT STARTED | — | — |
+| **3** — Admin Landing Page + Expanded Sections (Stack) | **COMPLETE** | `665e91b`–`7715611`, fix `83f128c` (auditor: 1 low doc-drift, 1 low dead code, 1 low a11y heading — all remediated) | 2026-06-21 |
 | **4** — Now Page Card Layout Editor (Stack) | NOT STARTED | — | — |
-| **5** — API Architecture Cleanup | NOT STARTED | — | — |
+| **5** — API Architecture Cleanup | **COMPLETE** | api `806534b`, meta `1b1b594`, fix `6d26e6e` (auditor: 2 medium doc-sync remediated, 1 low deprecation log deferred, 1 low ruff deferred to post-push) | 2026-06-21 |
 | **6** — Deploy + Final Verification | NOT STARTED | — | — |
 
 ---
