@@ -87,7 +87,7 @@ The API startup executes in the following ordered steps. Steps marked **fatal** 
 | 10 | Load station metadata (lat, lon, altitude, timezone, station name) | Non-fatal |
 | 11 | Initialize ephemeris (pvlib Ineichen-Perez clear-sky model, Skyfield for almanac) | Non-fatal |
 | 12 | Load reports config (`api.conf [reports]`) | Non-fatal |
-| 13 | Load content config (custom pages, hidden pages) | Non-fatal |
+| 13 | Load content config (custom pages) | Non-fatal |
 | 14 | Initialize cache backend (memory or Redis per `api.conf [cache]`) | Non-fatal (falls back to memory) |
 | 15 | Start cache warmer daemon thread | Non-fatal |
 | 16 | Load database metrics | Non-fatal |
