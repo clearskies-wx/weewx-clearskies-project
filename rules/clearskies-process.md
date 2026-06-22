@@ -109,6 +109,10 @@ Use the Nygard format. Template at `docs/decisions/_TEMPLATE.md`. Required: Stat
 
 **Foreground for fast tasks.** If an agent's task takes <2 min (verify git state, extract git stats, run one command), use foreground mode. Background is for tasks >5 min where parallel work is possible.
 
+**Agents commit locally, never on production containers.** Code is edited and committed on the local machine (DILBERT/CATBERT), pushed to GitHub, then pulled onto weewx/weather-dev. Agents must never commit directly on a production container. If an agent needs to run tests on weewx, it reads results — it does not edit source or commit there. The deploy flow is always: local commit → push to GitHub → `git pull --ff-only` on the target host → restart service.
+
+**Why (2026-06-22):** An agent committed directly on the weewx container (production API host). The commit couldn't be pushed to GitHub because weewx has no GitHub credentials. The automated Nextcloud sync nearly destroyed it. Recovery required extracting the commit as a git bundle and replaying it locally. Commits on production bypass the local-review-then-deploy workflow and create orphaned state that's one sync cron away from data loss.
+
 **Pre-flight repo verification before EVERY agent dispatch.** Before spawning any agent that will modify a repo, the coordinator runs `git status` and `git log --oneline -1` on the target repo. If there are uncommitted changes, unexpected HEAD, or any other surprise — STOP and report to the user. Do not dispatch the agent. Additionally, every agent prompt must include this block:
 
 > **Git restrictions:** You must NOT run `git pull`, `git push`, `git fetch`, `git rebase`, `git merge`, or `git checkout` of remote branches. You may only `git add`, `git commit`, `git status`, `git log`, `git diff`. If the remote is ahead or behind, STOP and report via SendMessage. Do not resolve it yourself.

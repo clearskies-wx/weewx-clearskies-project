@@ -75,6 +75,26 @@ These are settled — do not re-derive or re-propose alternatives:
 
 **What's next:** Phase 5 (admin UI rework in stack repo), Phase 6 (tests), Phase 7 (audit), Phase 8 (deploy).
 
+### Session 2 progress (2026-06-22)
+
+**Phases completed:** 5, 6 (admin UI rework, testing).
+
+**Meta repo** (weather-belchertown, branch `master`): pushed to origin at `32c0b62`. 1 new local commit pending (process rule addition to clearskies-process.md — not yet committed).
+
+**API repo** (weewx-clearskies-api, branch `main`): pushed to origin at `2bc9c9d`.
+- `tests/test_auto_calibration.py` — complete rewrite: 72 tests across 10 groups (percentile helper, monthly baseline, state transitions, drift, station type, flat fallback, process_packet gates, v2 persistence, v1 migration, timezone binning). All 72 passing. Full suite: 3210 passed, 358 skipped, 3 pre-existing failures.
+
+**Stack repo** (weewx-clearskies-stack, branch `main`): pushed to origin at `47cd514`.
+- `haze_calibration.html` — removed calibration param form + CLI bootstrap aside + 90-day status. Added 12-month grid, drift warnings, reset button, API-unreachable handling.
+- `admin/routes.py` — `_HAZE_DEFAULTS` trimmed to 2 keys. `_read_calibration_state()` replaced with API call via `_get_api_client()` helper. POST saves only `haze_detection` + `gamma`. New `POST /admin/haze-calibration/reset` route. `import time` removed.
+- `landing.html` — haze card shows `overall_state` + "N/12 months calibrated" instead of "Samples (90-day)". API-unreachable handling.
+
+**Stack NOT YET deployed** to weather-dev. API NOT YET restarted with new tests (tests were run but service not restarted — no code changes to the service itself in this session).
+
+**Lesson captured:** Added rule to `rules/clearskies-process.md` — "Agents commit locally, never on production containers." Prior session committed directly on weewx; recovery required git-bundle extraction. The rule file edit is uncommitted.
+
+**What's next:** Phase 7 (audit + QA), Phase 8 (deploy + verify).
+
 ---
 
 ## What Changes
