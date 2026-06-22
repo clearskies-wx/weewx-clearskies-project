@@ -1,8 +1,8 @@
 # Haze/Fog/NWS Text — Implementation Plan
 
-**Status:** IN PROGRESS — Phase 7 complete, awaiting user approval before Phase 8  
+**Status:** IN PROGRESS — Phase 8 complete, awaiting user approval before Phase 9  
 **Created:** 2026-06-21  
-**Updated:** 2026-06-21 (Phase 7 complete)  
+**Updated:** 2026-06-22 (Phase 8 complete)  
 **Origin:** Replaces Part 2 of [HAZE-FOG-NWS-TEXT-PLAN.md](HAZE-FOG-NWS-TEXT-PLAN.md) (research plan)  
 **Components:** API (`weewx-clearskies-api`), Stack (`weewx-clearskies-stack`), Dashboard (`weewx-clearskies-dashboard`)
 
@@ -34,7 +34,7 @@ The UI-LEGAL-WIZARD-PLAN is the reference standard for plan structure. This rewr
 | 5 | Fog/Mist Improvements | ✅ COMPLETE | api: 8c52591, 80f606d |
 | 6 | Nighttime Mode + Auto-Calibration | ✅ COMPLETE | api: b979935 (T6.1), cff995f + 2fd438b (T6.2/T6.3) |
 | 7 | NWS Text System | ✅ COMPLETE | api: b9c9964 (T7.2), 718dd67 (T7.1), 8cecb28 (T7.3), 01a2f1d (wiring) |
-| 8 | Bootstrap & Configuration | ⬜ NOT STARTED | — |
+| 8 | Bootstrap & Configuration | ✅ COMPLETE | api: 22ddcc9 (T8.2a), 66e1183 (T8.1), stack: 4a32ea0 (T8.2b) |
 | 9 | Integration Testing & QA | ⬜ NOT STARTED | — |
 | 10 | Deploy & Final Verification | ⬜ NOT STARTED | — |
 
@@ -337,8 +337,25 @@ New subsections to add:
 
 ### PHASE 8 — Track A: Bootstrap & Configuration (A3 continued, A7)
 
-**T8.1 — Implement EPA AQS CSV import**
-**T8.2 — Add haze configuration to api.conf + admin UI**
+**T8.2a — Add haze configuration keys to api.conf**
+- Owner: `clearskies-api-dev` (Sonnet)
+- Files: modified `config/settings.py` (58 insertions), `sse/auto_calibration.py` (32 insertions), `sse/haze_condition.py` (20 insertions), `__main__.py` (15 insertions), `CONFIG.md`, `etc/api.conf.example`
+- Implements: ConditionsSettings extended with haze_detection, calibration_percentile, calibration_window_days, calibration_min_samples, gamma. auto_calibration.configure() replaces hardcoded constants. haze_condition.set_enabled() toggle. Wired at startup.
+- Commit: 22ddcc9
+
+**T8.1 — OpenAQ-based calibration bootstrap**
+- Owner: `clearskies-api-dev` (Sonnet) + Coordinator (commit)
+- Files: new `bootstrap/__init__.py`, `bootstrap/openaq_client.py`, `bootstrap/importer.py` (895 lines total), modified `__main__.py`
+- Implements: CLI `clearskies-api bootstrap [--years N] [--max-distance-km N]`. OpenAQ API v3 client (stdlib urllib, rate-limited). Finds nearest PM2.5 monitor, pulls historical hourly data, matches against weewx archive, computes Kcs, seeds auto-calibration baseline. Read-only archive access. Year-chunked pagination.
+- Design change (user directive 2026-06-22): EPA AQS dropped entirely. Manual CSV import dropped. OpenAQ is the single bootstrap source worldwide (141 countries). Rationale: simpler UX (no file downloads), single API for all locations.
+- Commit: 66e1183
+
+**T8.2b — Admin UI haze calibration page**
+- Owner: `clearskies-api-dev` (Sonnet)
+- Repo: weewx-clearskies-stack
+- Files: new `templates/admin/haze_calibration.html` (255 lines), modified `admin/routes.py` (130 insertions), modified `templates/admin/landing.html` (31 insertions)
+- Implements: Haze calibration admin page with status display (bootstrapping/calibrated/well-calibrated), sample count, baseline Kcs, configuration form (haze_detection toggle, calibration parameters, gamma), bootstrap CLI note. Landing page link in Advanced section.
+- Commit: 4a32ea0
 
 ### PHASE 9 — Integration Testing & QA
 
