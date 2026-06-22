@@ -589,7 +589,7 @@ Thresholds from CAELUS `options.py` (Table 3), validated on 54 BSRN stations acr
 
 **Kv/Kvf clear-sky detrending:** Described in the index formula table above. Scientific reasoning for why detrending is necessary: ADR-044 §2. Full citations: `docs/reference/sky-classification-science.md` §2.
 
-**Haze/smoke detection — known gap:** ADR-044 §1c describes a detection heuristic but it has not been implemented. Needs further research on AQI thresholds for diverse regions.
+**Haze/smoke detection:** Implemented — see §8 Haze detection subsection below (ADR-067).
 
 **Secondary source (night / twilight / startup / no pyranometer):** Provider cloud cover percentage, via `_cloud_pct_to_sky()`. Cannot produce "Scattered Clouds" composites (no Kv from a cloud percentage). Thresholds: ≤10% Clear, ≤25% Mostly Clear, ≤50% Partly Cloudy, ≤85% Mostly Cloudy, ≤95% Cloudy, >95% Overcast. Note: these code thresholds differ from the NWS ASOS okta-based thresholds in ADR-044 §1b (0–6/7–31/32–56/57–87/88–100). The code thresholds are wider bins implemented as a pragmatic approximation. Operator adjustability is planned via the admin UI.
 
@@ -767,6 +767,271 @@ Two endpoint keys receive enrichment:
 |--------------|------------------------|
 | `"current"` | barometer_trend, wind_rolling_average, lightning_history, weather_text, uv, scene (6 total) |
 | `"almanac/planets"` | planet_viewing (1 total) |
+
+### Haze detection
+
+Two-channel confirmation is required before the engine labels conditions as hazy. Haze is only reported when BOTH channels confirm: (1) pyranometer Kcs deficit below the auto-calibrated clean-sky baseline (§8 Auto-calibration baseline) AND (2) PM2.5 or PM10 from an observed-data AQI provider (ADR-066) exceeds the confirmation threshold.
+
+**Solar elevation gate:** el > 10° required. The Ryan-Stolzenbach model underestimates maxSolarRad by ~20% below this elevation, making Kcs unreliable. Haze detection is inactive when el ≤ 10°.
+
+**PM confirmation thresholds:**
+
+| Condition | PM threshold | Applied when |
+|-----------|-------------|--------------|
+| Dry haze | PM2.5 > 12 µg/m³ | RH < 80% (EPA "Moderate" breakpoint) |
+| Humid disambiguation | PM2.5 > 35 µg/m³ | T-Td ≤ 4°F (distinguishes particulate haze from fog) |
+| Coarse-mode dust/sand | PM10 > 50 µg/m³ | Any RH |
+
+**f(RH) hygroscopic correction:** Applied to the Kcs-deficit channel before threshold comparison:
+
+```
+f(RH) = [(1 - RH) / (1 - RH_ref)]^(-γ)
+```
+
+Default γ = 0.45 (moderate, composition-unknown). γ is a composition property (range 0.12 for mineral dust to 1.52 for sea salt per Hanel 1976 and Tang 1996) — it is NOT a particle-size property. Operator-configurable by region via admin UI.
+
+**RH type discriminator:**
+
+| RH range | Classification |
+|----------|---------------|
+| < 80% | Dry haze |
+| 80–90% | Damp haze (hygroscopic swelling enhances scattering) |
+| > 90% | Defer to fog/mist detection (ADR-069) — do NOT report haze |
+
+**Gates and suppression:**
+
+1. **Wet deposition gate:** Suppress haze during active precipitation and for 30 minutes after rain ends. Rain scavenges aerosols.
+2. **Temporal coherence:** 15-minute persistence filter (matches sky classifier). Prevents haze label flicker.
+3. **Clear-sky-only constraint:** Haze is a clear-sky modifier. Do NOT apply haze when sky is classified as Mostly Cloudy, Cloudy, Overcast, or Heavy Overcast. "Hazy and Overcast" is invalid.
+4. **Stale PM data:** If last PM reading is > 2 hours old, treat as unavailable. Do not conclude "no haze" from stale data — absence of fresh evidence is not evidence of absence.
+
+**Haze-eligible providers:** Only AQI providers where `ProviderCapability.is_observed_source = True` (ADR-066). Open-Meteo (CAMS model) and OWM (SILAM model) are not observed-data sources and their PM readings are never used for haze confirmation.
+
+**Graceful degradation:** When no observed PM data is available, the haze channel is absent. The existing sky classifier continues operating unchanged. No haze label is emitted.
+
+**Display format:**
+
+| Verbosity | Format |
+|-----------|--------|
+| Standard / verbose | "Sunny. Hazy." — separate sentence (NWS convention) |
+| Terse | "Sunny, Hazy" — compound form |
+
+**WMO weather code:** 05 (Haze). Priority ordering: precipitation > fog > mist > haze > sky.
+
+---
+
+### Auto-calibration baseline
+
+The haze detection channel compares current Kcs against a station-specific clean-sky baseline. This baseline is computed from a rolling sample of locally measured clean-sky Kcs values rather than a fixed global constant, because station altitude, local horizon obstructions, and seasonal water vapor all shift the expected Kcs.
+
+**Rolling window:** 90-day seasonal window. cos(Z) normalization via Kcs handles the diurnal cycle — no time-of-day binning is needed or used.
+
+**Percentile target:** 90th–95th percentile of qualifying clean-sky Kcs samples ("clean ceiling"). Higher than the 85th percentile used in climate research (Renner et al. 2019) because haze detection needs a reference that excludes routinely hazy-but-accepted days.
+
+**Clean-sample selection criteria** — a sample qualifies only when ALL of the following are true:
+
+1. PM2.5 < 12 µg/m³ AND PM10 < 50 µg/m³ (EPA "Good" AQI breakpoints)
+2. Solar elevation > 10°
+3. Sky classifier returns CLOUDLESS or THIN_CLOUDS
+4. No rain in the prior 30 minutes
+
+**Sample count thresholds:**
+
+| Count | State | Behavior |
+|-------|-------|----------|
+| < 22 | bootstrapping | Haze detection inactive — no false positives from uncalibrated baseline |
+| 22–50 | calibrated | Haze detection active |
+| > 50 | well-calibrated | Full confidence |
+
+**Fallback:** When the 90-day window has fewer than 15 samples (e.g., extended haze episode or seasonal transition), widen to 180-day window. If still fewer than 15 samples, haze detection is inactive.
+
+**Persistent storage:** Baseline samples and current percentile are written to `/etc/weewx-clearskies/calibration.json` (or SQLite) and read back on API restart.
+
+**Bootstrap data sources** for new installs without enough live history:
+
+| Source | Coverage | Cost | Format |
+|--------|----------|------|--------|
+| EPA AQS annual CSV | US (hourly PM2.5, parameter code 88101, 1980–present) | Free | CSV |
+| OpenAQ S3 archive | 141 countries, 2016–present | Free, no credentials | CSV/JSON |
+| Aeris historical archive | January 2024–present | Aeris subscribers only | API |
+
+Bootstrap import: `clearskies-api bootstrap --pm-source file.csv --format epa-aqs` (CLI) or admin UI file upload.
+
+**maxSolarRad recomputation for NULL archive records:** Pre-weewx 4.0 archive records may have NULL maxSolarRad. Recompute using the Ryan-Stolzenbach formula (lat/lon/altitude + timestamp + atc=0.80). Output is computationally identical to what weewx 4.0+ stores. Implemented in `sse/auto_calibration.py`; the reference formula is `weewx/wxformulas.py:solar_rad_RS()`.
+
+---
+
+### Fog/mist detection
+
+Replaces the single-variable T-Td ≤ 1°F near-saturation override (Temperature-comfort rule 6). The multi-parameter algorithm below achieves >90% hit rate vs ~40% false-alarm rate from single-variable T-Td detection (Izett et al. 2018, PMC6208920). Note: the Temperature-comfort rule 6 text remains in place until a dedicated cleanup pass — this subsection is the operative rule.
+
+**T-Td gate (ASOS standard):** Widened from 1°F to ≤ 4°F. Fog and mist are suppressed when T-Td > 4°F.
+
+**Fog/mist split:**
+
+| T-Td | Classification | WMO code |
+|------|---------------|----------|
+| ≤ 2°F | Foggy | 45 (Fog) |
+| 2–4°F | Misty | 10 (Mist) |
+
+**Wind gate:** Convert from the operator's configured unit system to m/s before comparison.
+
+| Wind speed | Fog-eligible | Mist-eligible |
+|------------|-------------|---------------|
+| ≤ 3 m/s (~7 mph) | Yes | Yes |
+| 3–7 m/s (~15 mph) | No | Yes |
+| > 7 m/s | No — suppressed | No — suppressed |
+
+**Daytime solar suppression:**
+
+| Condition | Result |
+|-----------|--------|
+| Kcs > 0.3 AND T-Td 2–4°F | Suppress — humid air, not fog |
+| Kcs > 0.3 AND T-Td ≤ 2°F | Do NOT suppress — dense fog persists through sunrise |
+
+**PM2.5 disambiguation:** When T-Td ≤ 4°F AND PM2.5 > 35 µg/m³, report "Hazy" rather than "Foggy" or "Misty". Elevated PM in near-saturated conditions indicates particulate haze with moisture absorption, not water-droplet fog. Only applied when fresh PM data is available; if PM data is absent or stale, fog/mist classification proceeds without this check.
+
+**Additional gates:**
+
+1. **Rain gate:** Suppress fog/mist during active precipitation. Precipitation fog is a distinct phenomenon not reported here.
+2. **Fog dissipation:** After sunrise, suppress fog label when Kcs > 0.5 AND T-Td is widening beyond 4°F. Prevents a stale fog label persisting into a sunny morning.
+3. **Temporal coherence:** 15-minute persistence filter. Prevents rapid cycling when T-Td oscillates near threshold.
+
+**Display format:** "Foggy." or "Misty." as a separate sentence (NWS convention).
+
+**Irreducible limitation:** Without a visibility sensor, the engine reports conditions favorable for fog, not confirmed fog. This matches WMO Code 4680 automated-station constraints.
+
+---
+
+### Nighttime mode
+
+At night (solar elevation below the haze detection gate, el ≤ 10–15°), the pyranometer contributes nothing to haze detection. Three channels are assigned distinct data sources:
+
+| Condition | Nighttime source |
+|-----------|-----------------|
+| Cloud cover | Provider observation (existing behavior, unchanged) |
+| Haze / smoke | Provider current-conditions present weather field |
+| Fog / mist | Local multi-parameter detection (ADR-069) — T-Td + wind |
+
+**Rationale for split:** Provider stations (ASOS/AWOS at airports, EPA monitors) have visibility sensors and present weather detectors. For haze, their sensor suite outperforms PM-only local estimation. For fog, the station-level T-Td measurement is genuinely more local than the nearest airport observation (potentially 10+ km away) — hyper-local sensors add real value for radiation fog that forms post-sunset.
+
+**Sunrise handoff:** When solar elevation crosses the haze detection gate (10–15°), the full local two-channel model resumes. Provider haze/smoke stops being authoritative; local detection takes over.
+
+**Fog continuity:** `detect_fog_mist()` runs continuously regardless of mode. At night, solar radiation is zero, so daytime solar suppression does not trigger — fog detection proceeds on T-Td and wind alone. There is no handoff gap at sunrise; the solar dissipation check (Kcs > 0.5) simply becomes active as an additive condition.
+
+**Provider data freshness:** If provider data is > 2 hours old at night, nighttime haze is unavailable — not "no haze." Apply the same stale-data suppression rule as daytime PM (absence of fresh data is not evidence of absence).
+
+**Graceful degradation:** Provider absent or present-weather field missing = no haze reported at night. Fog/mist continues from local detection unaffected.
+
+---
+
+### Observation model
+
+A METAR-like structured intermediate representation is populated from the enrichment pipeline on each observation cycle, before text generation. All fields are nullable.
+
+**Local-source to METAR/WMO field mapping:**
+
+| Local source | METAR/WMO field |
+|-------------|----------------|
+| `outTemp` | Temperature |
+| `dewpoint` | Dewpoint |
+| `windSpeed` + `windDir` + `windGust` | Wind group |
+| CAELUS sky class | Sky condition (CLR / FEW / SCT / BKN / OVC) |
+| Haze detection (ADR-067) | Present weather HZ |
+| Fog/mist detection (ADR-069) | Present weather FG / BR |
+| Precipitation type + rate | Present weather RA / SN / FZRA / etc. |
+| `barometer` + trend | Pressure group |
+
+**CAELUS-to-okta mapping:**
+
+| CAELUS class | METAR sky code | Oktas |
+|-------------|---------------|-------|
+| CLOUDLESS | CLR | 0 |
+| THIN_CLOUDS | FEW / SCT | 1–4 |
+| SCATTERED | SCT | 3–4 |
+| MOSTLY_CLOUDY | BKN | 5–7 |
+| OVERCAST | OVC | 8 |
+
+Specific okta assignment within each CAELUS class uses the Km sub-ranges defined in the SCATTER_CLOUDS sub-split table (§8 Sky condition).
+
+---
+
+### Present weather codes
+
+The `_derive_weather_code()` function emits WMO Code Table 4677/4680 codes. Priority ordering (highest to lowest):
+
+1. Precipitation (RA / SN / FZRA / etc.)
+2. Thunderstorm (96)
+3. Fog (45)
+4. Mist (10) — new, ADR-069
+5. Haze (05) — new, ADR-067
+6. Sky condition
+
+**Active code set:**
+
+| WMO code | Phenomenon | Status |
+|----------|-----------|--------|
+| 05 | Haze | Added — ADR-067 |
+| 10 | Mist | Added — ADR-069 |
+| 45 | Fog | Existing |
+| 48 | Depositing rime fog (ice on surfaces + fog) | Added — ADR-070 |
+| 60–69 | Rain variants | Existing |
+| 70–79 | Snow variants | Existing |
+| 79 | Ice pellets | Existing |
+| 96 | Thunderstorm | Existing |
+
+Anti-pattern: do NOT emit both a precipitation code and a fog/mist/haze code for the same observation cycle. Precipitation takes priority; fog/mist/haze codes are suppressed during active precipitation.
+
+---
+
+### Text generation engine
+
+Three verbosity levels are available. `weatherText` carries the terse level (backward compatible). Two new fields are added to `/api/v1/current`.
+
+**Verbosity levels:**
+
+| Level | Field | Style |
+|-------|-------|-------|
+| Terse | `weatherText` | Current style — compound form OK: "Sunny, Hazy, Warm and Humid." |
+| Standard | `weatherTextStandard` | NWS one-sentence per component: "Sunny. Hazy. Temperature near 85. South winds around 8 mph." |
+| Verbose | `weatherTextVerbose` | Full narrative: "Currently 85°F under hazy sunshine. Dew point 72°F. South winds around 8 mph." |
+
+**GFE threshold tables** (ported from AWIPS-II GFE text formatter, public domain):
+
+Sky coverage buckets (6):
+
+| Coverage | Label |
+|----------|-------|
+| 0–5% | Clear / Sunny |
+| 5–25% | Mostly Clear / Mostly Sunny |
+| 26–50% | Partly Cloudy / Partly Sunny |
+| 50–69% | Mostly Cloudy |
+| 70–87% | Cloudy |
+| 87–100% | Overcast |
+
+Wind descriptor thresholds (natively in mph; convert to operator unit system before rendering):
+
+| Threshold | Descriptor |
+|-----------|-----------|
+| < 5 mph | Calm |
+| 5–15 mph | Light |
+| ~N mph (sustained) | Around N |
+| N–M mph range | N to M |
+| Gusts | "Gusts up to N" when gust > sustained + 10 mph |
+
+Wind category breaks: 25 / 30 / 40 / 50 / 74 mph.
+
+Temperature decade phrases (verbose level only): "upper 80s", "lower 20s". GFE thresholds are natively in °F; the text engine converts to the operator's configured unit system before rendering.
+
+**NWS phrasing conventions:**
+
+1. Haze and fog appear as separate sentences at standard and verbose levels: "Sunny. Hazy." not "Hazy and Sunny".
+2. Precipitation modifies sky with "with": "Mostly Cloudy with Light Rain."
+3. Day/night terminology: "Sunny" / "Clear" at night; "Partly Sunny" / "Partly Cloudy". Day/night determined by `is_daytime()` from the sky classifier (solar elevation based).
+
+**Unit-aware rendering:** GFE threshold tables are defined in US units (mph, °F). The text engine converts thresholds to the operator's configured unit system (US / Metric / MetricWX) before composing output. The source thresholds in mph/°F are the reference for porting; rendered output uses operator units throughout.
+
+**Backward compatibility:** `weatherText` continues to carry terse output. Existing dashboard code reading `weatherText` is unchanged. `weatherTextStandard` and `weatherTextVerbose` are additive fields.
 
 ---
 

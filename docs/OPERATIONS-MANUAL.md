@@ -9,7 +9,7 @@ Companion documents:
 - **[API-MANUAL.md](API-MANUAL.md)** — API implementation rules
 - **[PROVIDER-MANUAL.md](PROVIDER-MANUAL.md)** — provider module rules
 
-Last updated: 2026-06-18
+Last updated: 2026-06-21
 
 ---
 
@@ -377,6 +377,17 @@ Hand-rolled Python settings classes, parsed from ConfigObj. Do not use Pydantic 
 | `[input]` | `InputSettings` |
 | `[units]` | `UnitsSettings` |
 
+#### ConditionsSettings keys
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `haze_detection` | bool | `true` | Enable or disable the haze detection engine. When `false`, sky classification runs without haze confirmation and haze-related calibration is inactive. |
+| `haze_gamma` | float | `0.45` | Hygroscopic correction gamma parameter in the f(RH) correction factor. Controls how strongly relative humidity scales apparent extinction. Valid range: 0.12–1.52 (composition-dependent). Default 0.45 is appropriate for mixed continental aerosol. |
+| `haze_aqi_provider` | string | (inherits from `[aqi]`) | AQI provider used for haze PM data. Must be an observed-data provider (Aeris or IQAir). Falls back to the `[aqi]` section provider if not set. Model-based providers (Open-Meteo) are not accepted here — the haze engine will log an error and disable haze confirmation if a non-observed provider is configured. |
+| `calibration_percentile` | float | `0.92` | Percentile for clean-sky baseline computation. The baseline Kcs is taken at this percentile of accumulated clean-sky samples in the rolling window. Valid range: 0.90–0.95. |
+| `calibration_window_days` | int | `90` | Rolling window size in days for seasonal baseline computation. Samples older than this window are excluded from the current percentile. A 180-day fallback window activates automatically when the 90-day window has fewer than 15 samples. |
+| `calibration_min_samples` | int | `22` | Minimum number of clean-sky samples required in the current window before the baseline activates. Until this threshold is reached, haze detection is inactive. Calibration state reports "bootstrapping" below this value, "calibrated" from 22 to 50, and "well-calibrated" above 50. |
+
 ### Config directory
 
 Default location: `/etc/weewx-clearskies/`
@@ -467,6 +478,9 @@ The config UI serves an admin landing page at `/admin`. This is the default post
 | Column Mapping | `api.conf [column_mapping]` | Observation column mapping |
 | TLS | `stack.conf [tls]` | Mode, domain, email, provider |
 | Sky Classification | `api.conf [sky_classification]` | CAELUS threshold calibration |
+| Haze Calibration | `api.conf [conditions]` + calibration storage | Baseline status, clean-day count, confidence level, PM data import, gamma override |
+
+The Haze Calibration section shows the current calibration state (bootstrapping / calibrated / well-calibrated), the number of clean-sky samples accumulated in the current 90-day window, the current baseline Kcs percentile value, and an import interface for historical PM data. It also provides a toggle to enable or disable haze detection without removing the calibration data.
 
 Each section shows a summary of current values with an "Edit" link that loads the edit form via HTMX fragment swap.
 
@@ -511,11 +525,70 @@ Each wizard step follows this contract:
 - Partial progress is persisted to disk when each step's form is submitted — a partial wizard run produces a valid partial config, not an empty or corrupt file.
 - Re-running the wizard pre-populates all fields from the existing config.
 
+#### AQI provider selection
+
+The wizard presents the following AQI provider options. The wizard suggests observed-data providers when haze detection is enabled.
+
+| Provider | Data type | Coverage | API key required | Haze-eligible |
+|----------|-----------|----------|-----------------|---------------|
+| Aeris (Xweather) | Observed — blended real-time monitoring networks | Global | Yes (PWSWeather Contributor Plan provides free access) | Yes — recommended for haze detection |
+| IQAir | Observed — hybrid monitoring + crowd-sourced | Global | Yes | Yes |
+| Open-Meteo | Model-based — CAMS atmospheric composition model | Global | No | No |
+| OpenWeatherMap | Model-based — SILAM atmospheric dispersion model (deprecated) | Global | Yes | No |
+
+Providers marked as "Observed" return measured PM2.5/PM10 concentrations from monitoring stations. Providers marked as "Model-based" return atmospheric model predictions. Only observed-data providers are eligible for haze confirmation — the haze detection engine checks the `is_observed_source` capability flag on the configured provider and disables haze confirmation if the provider is model-based.
+
+OpenWeatherMap AQI is deprecated. It continues to function with a deprecation warning logged at each call. It will be removed in the next major version.
+
+The wizard annotates each provider's option label to show observed vs. model-based and haze eligibility. When haze detection is enabled (`[conditions] haze_detection = true`), the wizard recommends Aeris and warns if the operator selects a model-based provider.
+
 ### CLI wizard
 
 `cli_wizard.py` provides an interactive terminal wizard (for operators who cannot open a browser) and a headless flag-driven mode (for scripted provisioning). Both share the `WizardState` backend with the web wizard — they produce the same config output.
 
 Use the CLI wizard for SSH-only installs where opening a browser on the LAN is not feasible.
+
+### Haze calibration bootstrap
+
+The haze detection baseline requires a minimum of 22 clean-sky samples in a 90-day window before it activates. Without historical PM data, building this baseline from real-time observations takes 4–6 months depending on local weather and air quality. Bootstrapping from historical PM data activates the baseline immediately.
+
+**Step 1 — Determine PM data source.**
+
+- **US stations:** Download EPA AQS annual CSV files from `https://aqs.epa.gov/aqsweb/airdata/download_files.html`. Select "Hourly Data" → PM2.5 FRM/FEM (parameter code 88101). Download the year(s) matching your weewx archive range. Files are free, require no registration, and contain quality-assured hourly PM2.5 concentrations from all US reference monitors.
+
+  For data from the past 6 months (not yet in the AQS release), supplement with AirNow hourly observation files from `https://files.airnowtech.org/airnow/YYYY/YYYYMMDD/`.
+
+- **Non-US stations:** Download from the OpenAQ AWS S3 archive at `s3://openaq-data-archive`. The archive is publicly accessible with no credentials required and is organized by `records/csv.gz/locationid={id}/year={year}/month={month}/`. Data coverage begins approximately 2016 for most government reference monitor networks across 141 countries. Locate the nearest sensor ID using the OpenAQ explore interface at `https://explore.openaq.org/`.
+
+- **Aeris subscribers:** The Xweather historical archive endpoint (`https://data.api.xweather.com/airquality/archive/{action}`) provides hourly PM2.5 and PM10 from January 2024 onward. Each archive request counts as 5× a normal API access against the subscription allotment. Use this path only if EPA AQS lacks a nearby monitor and an Xweather subscription is already active.
+
+**Step 2 — Import via admin UI.**
+
+Navigate to Admin → Sky Classification → Haze Calibration → Import Historical PM Data. Upload the CSV file. Select the file format: EPA AQS, Generic CSV (columns: timestamp, PM2.5, PM10), or OpenAQ. The system validates timestamps, PM concentration values (accepted range: 0–999 µg/m³), and deduplicates by timestamp.
+
+**Step 3 — Import via CLI.**
+
+```bash
+clearskies-api bootstrap --pm-source file.csv --format epa-aqs
+# or
+clearskies-api bootstrap --pm-source file.csv --format generic
+# or
+clearskies-api bootstrap --pm-source file.csv --format openaq
+```
+
+Both the admin UI and CLI import paths produce identical calibration output. Use whichever is accessible.
+
+**Step 4 — Monitor import progress.**
+
+The admin UI shows: import progress, total records imported, number qualifying as clean-sky samples (PM2.5 < 12 µg/m³, PM10 < 50 µg/m³, solar elevation > 10°, sky clear, no recent rain), and the current baseline state. A nearest-station distance warning appears when the nearest PM monitor is more than 25 km from the station coordinates.
+
+**Step 5 — maxSolarRad recomputation (pre-weewx 4.0 archives).**
+
+weewx 4.0.0 began natively archiving `maxSolarRad`. Stations running older weewx versions have NULL in this column for historical records, which prevents Kcs computation. The bootstrap process automatically recomputes `maxSolarRad` for these records using the Ryan-Stolzenbach formula, given the station's latitude, longitude, and altitude from `weewx.conf`. Recomputed values are computationally identical to what weewx would have stored.
+
+**Step 6 — Calibration activates.**
+
+Once ≥ 22 clean-sky samples are accumulated in a 90-day window, the calibration state transitions from "bootstrapping" to "calibrated" and haze detection becomes active. The admin UI Haze Calibration section reflects the current state. If the sample count drops below 15 (extended haze episode, seasonal transition), the baseline widens to a 180-day fallback window. If still insufficient, haze detection deactivates gracefully — no false positives are emitted from an uncalibrated baseline.
 
 ---
 
@@ -1108,7 +1181,7 @@ The controls in this manual trace to the following ADRs. When this manual and an
 | §1 Deployment | ADR-001, ADR-034, ADR-039, ADR-058 |
 | §2 Authentication | ADR-008, ADR-027 |
 | §3 Network Architecture | ADR-037, ADR-060 |
-| §4 Configuration | ADR-027, ADR-038a |
+| §4 Configuration | ADR-027, ADR-038a, ADR-066, ADR-068 |
 | §5 Logging | ADR-029 |
 | §6 Health and Readiness | ADR-030 |
 | §7 Observability | ADR-031 |

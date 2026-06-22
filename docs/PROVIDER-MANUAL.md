@@ -9,7 +9,7 @@ Companion documents:
 - **ARCHITECTURE.md** — system topology, provider module layout
 - **contracts/canonical-data-model.md** — per-field data catalog
 
-Last updated: 2026-06-18
+Last updated: 2026-06-21
 
 ---
 
@@ -95,6 +95,7 @@ Every module exports a static `CAPABILITY` structure at module-load time. For mo
 | `auth_required` | list[str] | Operator-config keys required (e.g., `["AERIS_CLIENT_ID", "AERIS_CLIENT_SECRET"]`). Empty list for keyless providers. |
 | `default_poll_interval_seconds` | int | Recommended polling cadence. |
 | `operator_notes` | string | Free text surfaced in the configuration UI for provider-specific quirks and ToS reminders. |
+| `is_observed_source` | bool | Whether the provider returns observed (measured) data from monitoring stations vs. model/forecast data. Default `True`. Only model-based AQI providers (Open-Meteo AQI, OWM AQI) set `False`. Used by the haze detection engine (ADR-067) to determine which PM2.5/PM10 data is eligible for haze confirmation. Non-AQI modules omit this field or leave it at the default. |
 
 Radar modules add these optional fields to the capability declaration:
 
@@ -307,12 +308,28 @@ The two paths do not coordinate. An operator can use both simultaneously.
 
 ### Day-1 AQI provider set
 
-| Module | Location | Key required | Coverage |
-|---|---|---|---|
-| `aeris` | `providers/aqi/aeris.py` | Yes | Global; 8 regional AQI scales |
-| `openmeteo` | `providers/aqi/openmeteo.py` | No | Global; US EPA and European AQI |
-| `openweathermap` | `providers/aqi/openweathermap.py` | Yes | Global; OWM 1-5 ordinal scale |
-| `iqair` | `providers/aqi/iqair.py` | Yes | Global; US EPA and China MEP scales |
+| Module | Location | Key required | Coverage | Data type | Haze-eligible |
+|---|---|---|---|---|---|
+| `aeris` | `providers/aqi/aeris.py` | Yes | Global; 8 regional AQI scales | Observed (monitoring networks) | Yes |
+
+| `iqair` | `providers/aqi/iqair.py` | Yes | Global; US EPA and China MEP scales | Observed (monitors + crowd-sourced) | Yes |
+| `openmeteo` | `providers/aqi/openmeteo.py` | No | Global; US EPA and European AQI | Model-based (CAMS forecast) | No |
+| `openweathermap` | `providers/aqi/openweathermap.py` | Yes | Global; OWM 1-5 ordinal scale | Model-based (SILAM forecast) — **DEPRECATED** | No |
+
+### Observed vs model data classification
+
+Haze detection (ADR-067) requires *observed* PM2.5/PM10 — actual measurements from monitoring stations, not atmospheric model predictions. Providers that return model or forecast PM data cannot confirm that particulate matter is physically present at the station at the time of observation; they predict what should be present based on emissions inventories and atmospheric transport modeling.
+
+The `is_observed_source` capability flag on each provider module controls haze eligibility. The haze detection engine ignores PM2.5 and PM10 values from any provider where `is_observed_source = False`.
+
+| Provider | `is_observed_source` | Data origin |
+|---|---|---|
+| `aeris` | `True` | Blended real-time monitoring networks (observed) |
+| `iqair` | `True` | Monitoring stations + crowd-sourced sensors (observed) |
+| `openmeteo` | `False` | CAMS global atmospheric composition model (forecast) |
+| `openweathermap` | `False` | SILAM atmospheric dispersion model (forecast) — deprecated |
+
+Operators may still configure model-based providers for general AQI display. Only the haze detection engine enforces the `is_observed_source` gate; the AQI card renders normally regardless of which provider is configured.
 
 ### Multi-jurisdiction AQI — pass-through architecture
 
@@ -340,13 +357,56 @@ Each AQI provider that supports multiple scales requires an operator-configurabl
 | Provider | Setting | Valid values | Default |
 |---|---|---|---|
 | Aeris | `aeris_aqi_filter` | `airnow`, `china`, `india`, `eaqi`, `caqi`, `uk`, `de`, `cai` | `airnow` |
+
 | OpenMeteo | `openmeteo_aqi_index` | `us_aqi`, `european_aqi` | `us_aqi` |
 | IQAir | `iqair_aqi_scale` | `us`, `cn` | `us` |
-| OpenWeatherMap | (none) | — | Always returns OWM 1-5 ordinal |
+| OpenWeatherMap | (none) | — | Always returns OWM 1-5 ordinal — **DEPRECATED** |
 
 Pass the configured setting as the appropriate query parameter on each API call. Aeris: `filter=`. OpenMeteo: determines which variable name to request. IQAir: determines whether to read `aqius` or `aqicn`.
 
 The setup wizard auto-suggests the regional setting based on the operator's station lat/lon → country lookup.
+
+### Aeris AQI provider
+
+**Module:** `providers/aqi/aeris.py`  
+**`is_observed_source`:** `True`
+
+**Endpoint:** Aeris conditions endpoint — `GET /conditions/{lat},{lon}` — returns current air quality with PM2.5, PM10, O3, NO2, SO2, and CO values alongside the composite AQI and scale.
+
+**Auth:** Reuses existing Aeris (Xweather) credentials. The module reads `AERIS_CLIENT_ID` and `AERIS_CLIENT_SECRET` from `secrets.env` — the same credential pair used by the forecast module. No additional key registration is required if the operator already has an Aeris forecast subscription.
+
+**Rate limits:** Per Aeris subscription tier. PWSWeather Contributor Plan (free for PWS data contributors): 1,000 API accesses/day at 100/minute. Air quality endpoints count as standard API accesses (1x multiplier for current conditions; the archive endpoint carries a 5x multiplier — see §3 cache warming).
+
+**Regional configuration:** The `aeris_aqi_filter` setting in `[aqi]` selects the AQI scale (default: `airnow`). Valid values: `airnow`, `china`, `india`, `eaqi`, `caqi`, `uk`, `de`, `cai`. Passed as the `filter=` query parameter on each API call.
+
+**Canonical field mapping:**
+
+| Aeris wire field | Canonical field | Notes |
+|---|---|---|
+| `periods[0].aqi` | `aqi` | Composite AQI for the selected scale |
+| `periods[0].category.p` | `aqiCategory` | Pass through as-is |
+| `periods[0].pollutants[N].valueUGM3` where `type == "pm25"` | `pollutantPM25` | µg/m³; pollutants is an array of typed objects, not keyed by name |
+| `periods[0].pollutants[N].valueUGM3` where `type == "pm10"` | `pollutantPM10` | µg/m³ |
+| `periods[0].pollutants[N].valuePPB` → ppm where `type == "o3"` | `pollutantO3` | Convert ppb to ppm |
+| `periods[0].pollutants[N].valuePPB` → ppm where `type == "no2"` | `pollutantNO2` | Convert ppb to ppm |
+| `periods[0].pollutants[N].valuePPB` → ppm where `type == "so2"` | `pollutantSO2` | Convert ppb to ppm |
+| `periods[0].pollutants[N].valuePPB` → ppm where `type == "co"` | `pollutantCO` | Convert ppb to ppm |
+
+**`is_observed_source = True`** — Aeris blends real-time data from monitoring networks. PM2.5 and PM10 values are observed concentrations eligible for haze confirmation.
+
+**ToS:** https://www.xweather.com/legal/terms  
+**Key signup:** https://www.pwsweather.com/contributor-plan/ (free for PWS contributors) or https://www.xweather.com/
+
+### OpenWeatherMap AQI provider (deprecated)
+
+**Module:** `providers/aqi/openweathermap.py`  
+**`is_observed_source`:** `False`
+
+**Deprecated.** OWM AQI uses the SILAM atmospheric dispersion model — it returns predicted PM concentrations, not observed measurements. PM2.5 and PM10 values from this provider are not eligible for haze confirmation. The module logs a deprecation warning at startup when configured and logs a warning on each `fetch()` call. The module continues to function for general AQI display.
+
+Operators should migrate to Aeris or AirNow for haze-eligible AQI data. OWM AQI will be removed in the next major version.
+
+Existing operator behavior is unchanged: the AQI card renders normally. Only haze detection is affected — the haze engine ignores PM data from this provider.
 
 ### AQI card rendering
 

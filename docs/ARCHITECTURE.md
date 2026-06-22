@@ -275,6 +275,14 @@ The API hosts a multi-module, stateful conditions-text engine that produces the 
 | `weewx_clearskies_api/sse/sky_condition.py` | Stateful classifier — VI-based (CAELUS), 30-min ring buffer of 1-min GHI averages, produces the sky label |
 | `weewx_clearskies_api/sse/temperature_comfort.py` | Stateless 2D matrix — maps (appTemp, dewpoint) to comfort label |
 | `weewx_clearskies_api/sse/enrichment/weather_text.py` | Enrichment adapter — reads smoothed inputs + sky class, calls `build_weather_text()`, injects result into the `/current` response dict |
+| `weewx_clearskies_api/sse/haze_condition.py` | Haze detection — two-channel (Kcs deficit + PM), solar elevation gate, f(RH) correction |
+| `weewx_clearskies_api/sse/auto_calibration.py` | Clean-sky baseline — 90-day rolling percentile, persistent storage, bootstrap |
+| `weewx_clearskies_api/sse/text_generation.py` | NWS-style text engine — terse/standard/verbose verbosity, GFE threshold tables |
+| `weewx_clearskies_api/sse/observation_model.py` | Structured local observation model — METAR-like field mapping |
+
+**AQI data flow:** PM2.5/PM10 from observed-data AQI providers (Aeris, IQAir) flow through the enrichment pipeline via new 60-minute smoothing buffers in `input_smoother.py`. Smoothed PM values feed the haze detection module and fog/mist disambiguation. Model-based AQI providers (Open-Meteo) are excluded from haze confirmation. At night (solar elevation below the 10-15° detection gate), haze/smoke defers to provider current conditions observations; fog/mist remains local.
+
+**New response fields on `/api/v1/current`:** `weatherTextStandard` (NWS one-sentence format) and `weatherTextVerbose` (full narrative). `weatherText` continues to carry terse format (backward compatible).
 
 **Inputs:** smoothed loop-packet fields via `enrichment/input_smoother.py` — `rainRate` (2 min), `windSpeed`/`windGust` (5 min), `appTemp`/`dewpoint`/`outTemp`/`heatindex`/`windchill` (10 min), `radiation`+`maxSolarRad` (30 min kc rolling window). No database access.
 
@@ -473,7 +481,7 @@ Read-only enforcement (defense-in-depth): DB user with `SELECT`-only grants + st
 weewx_clearskies_api/providers/
 ├── _common/          # HTTP client, retry/backoff, error taxonomy, capability registry
 ├── forecast/         # aeris, nws, openmeteo, openweathermap, wunderground
-├── aqi/              # aeris, openmeteo, openweathermap, iqair
+├── aqi/              # aeris, iqair, openmeteo, openweathermap (deprecated)
 ├── alerts/           # nws, aeris, openweathermap
 ├── earthquakes/      # usgs, geonet, emsc, renass
 ├── seeing/           # seven_timer (keyless, 7Timer ASTRO product)
