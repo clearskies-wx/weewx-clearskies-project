@@ -389,12 +389,18 @@ New subsections to add:
 
 **Pytest results:** 354 new tests passing. Full suite: 3188+ passed, 358 skipped, 3 pre-existing failures (OWM Redis cache × 2, weewx metadata × 1).
 
-### PHASE 10 — Deploy & Final Verification
+### PHASE 10 — Deploy & Final Verification (PARTIAL)
 
-**T10.1 — Deploy API**
-**T10.2 — Deploy Dashboard (if UI changes)**
-**T10.3 — Deploy Wizard updates**
-**T10.4 — End-to-end verification**
+**T10.1 — Deploy API** ✅ Deployed at commit `170805f` (includes openaq_api_key fix). Service restarted, weatherText/weatherTextStandard/weatherTextVerbose confirmed live.
+**T10.2 — Deploy Dashboard** ✅ No dashboard changes in this plan (no-op).
+**T10.3 — Deploy Wizard updates** ✅ Deployed at commit `861e121` (includes about_content fixes + openaq_api_key round-trip). Config UI restarted.
+**T10.4 — End-to-end verification** ⬜ Blocked pending seasonal calibration rework.
+
+**Bugs fixed during Phase 10 deployment:**
+- Wizard 422 on apply: `ApplyRequest` missing `openaq_api_key` field (API `170805f`, stack `2d44b34`)
+- Station description not sticking: template prefix, branding.json read-back, gated merge (stack `941a961`, `52a3de7`, `861e121`)
+
+**Follow-on:** Auto-calibration rework to monthly-normals model. See [SEASONAL-CALIBRATION-PLAN.md](SEASONAL-CALIBRATION-PLAN.md).
 
 ---
 
