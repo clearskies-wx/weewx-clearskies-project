@@ -325,6 +325,10 @@ Rendered as inline SVG with `<linearGradient>` fills, Meteocons-style palette. S
 | Moon | `#86C3DB` → `#72B9D5` (periwinkle) |
 | Rain | soft blue (tunable) |
 | Snow | pale icy white (tunable) |
+| Haze layer (day) | `#C4B99A` → `#A89878` (dusty tan) |
+| Haze layer (night) | `#8A8A7A` → `#6A6A5A` (smoky gray) |
+
+**Haze hero icon (ADR-067):** Day variant: muted/pale sun disk with reduced ray intensity, overlaid with horizontal lines in smoky gray/dusty tan gradient. Night variant: obscured/dimmed stars with dirty haze layer. Follows the existing Meteocons-style inline SVG with `<linearGradient>` fills. Exact SVG geometry TBD — separate design task.
 
 ### Utility/Stat/Nav Icons
 
@@ -370,6 +374,8 @@ Base library: Phosphor (regular weight). Cross-pack exceptions noted per row.
 | Hail | `material-symbols:weather_hail-outlined` (cross-pack, inline SVG at `icons/weather-hail.tsx`) |
 | Air quality / dust / smoke | `material-symbols:air-outlined` (cross-pack, inline SVG at `icons/air.tsx`) |
 
+**Haze/smoke condition:** Uses the existing `material-symbols:air-outlined` icon (same as Air quality / dust / smoke alert). No separate haze alert icon — haze is an air quality condition and shares the same visual treatment.
+
 ### Nav/Chrome Icons (Phosphor, regular weight)
 
 | Category | Icon |
@@ -413,7 +419,11 @@ ADR-050 accepted 2026-06-16. Icon assignments above and in the utility/alert tab
 | Mostly Cloudy / Cloudy / Overcast | `cloudy_day` | `cloudy_night` |
 | Thunderstorm | `storm_day` | `storm_night` |
 | Foggy | maps to cloudy | maps to cloudy (no dedicated fog photo) |
+| Hazy (clear sky + haze) | `hazy_day` (desaturated clear with warm overlay) | `hazy_night` (dimmed clear night with warm overlay) |
+| Misty | maps to cloudy | maps to cloudy (same as Foggy) |
 | Unknown / startup | maps to clear | maps to clear |
+
+Haze backgrounds are desaturated versions of the clear-sky backgrounds with a warm-toned overlay filter (`sepia(0.15) brightness(0.92) contrast(0.95)`). The haze condition always pairs with a clear/mostly-clear sky classification — never with cloudy/overcast (ADR-067: haze is a clear-sky modifier only). Mist uses the same background as Foggy (cloudy mapping). If dedicated haze photo assets are not available, fall back to clear-sky backgrounds with the CSS overlay filter applied.
 
 On-glass overlays layer on top of the base condition background:
 
