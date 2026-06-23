@@ -113,7 +113,7 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | [ADR-019](../archive/decisions/ADR-019-units-handling.md) | Units handling (original) | ADR-041, ADR-042 | 2026-05-02 |
 | [ADR-044](../archive/decisions/ADR-044-sky-condition-classification.md) | Current conditions text / sky condition classification | ADR-073 | 2026-05-26 |
 
-## Proposed
+## Accepted — pending consolidation into API-MANUAL.md
 
 | ADR | Title | Date |
 |---|---|---|
