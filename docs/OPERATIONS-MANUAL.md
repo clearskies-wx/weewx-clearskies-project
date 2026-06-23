@@ -573,9 +573,9 @@ When all three are true, bootstrap runs automatically after persisted state is l
 7. Distributes samples into per-month bins (station local time determines the month).
 8. Saves to `/etc/weewx-clearskies/calibration.json` in v2 (month-keyed) format.
 
-**maxSolarRad recomputation (pre-weewx 4.0 archives).**
+**Clear-sky GHI source for bootstrap (ADR-072).**
 
-weewx 4.0.0 began natively archiving `maxSolarRad`. Stations running older weewx versions have NULL in this column for historical records, which prevents Kcs computation. The bootstrap process automatically recomputes `maxSolarRad` for these records using the Ryan-Stolzenbach formula, given the station's latitude, longitude, and altitude from `weewx.conf`. Recomputed values are computationally identical to what weewx would have stored.
+The bootstrap importer uses CAMS McClear historical clear-sky GHI (via `pvlib.iotools.get_cams()`) for Kcs computation — not the archive's `maxSolarRad` column. McClear provides atmosphere-adjusted GHI at ground level with real atmospheric conditions, eliminating the sunrise/sunset Kcs poisoning that affected the Ryan-Stolzenbach model. A free SoDa account (https://www.soda-pro.com/) is required; set `WEEWX_CLEARSKIES_SODA_EMAIL` to the registered email before running bootstrap. The `maxSolarRad` archive column is no longer used by the bootstrap importer.
 
 **Progressive activation after bootstrap.**
 

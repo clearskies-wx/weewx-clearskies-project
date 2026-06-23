@@ -891,7 +891,7 @@ Dashboard never shows null data — absent sensors silently defer to provider pr
 
 **Persistent storage:** Baseline samples and computed percentiles are written to `/etc/weewx-clearskies/calibration.json` (v2 format, month-keyed structure) and read back on API restart. v1 format (flat sample list) is automatically migrated to v2 on load by distributing flat samples into month buckets using station timezone.
 
-**maxSolarRad recomputation for NULL archive records:** Pre-weewx 4.0 archive records may have NULL maxSolarRad. Recompute using the Ryan-Stolzenbach formula (lat/lon/altitude + timestamp + atc=0.80). Output is computationally identical to what weewx 4.0+ stores. Implemented in `sse/auto_calibration.py`; the reference formula is `weewx/wxformulas.py:solar_rad_RS()`.
+**Clear-sky GHI for bootstrap Kcs computation:** The bootstrap importer uses CAMS McClear historical clear-sky GHI (fetched via `pvlib.iotools.get_cams()`) instead of the archive's `maxSolarRad` column. McClear provides atmosphere-adjusted GHI at ground level with real atmospheric conditions — this eliminates the sunrise/sunset Kcs poisoning that occurred with the Ryan-Stolzenbach model (ADR-072). The `maxSolarRad` archive column is fetched but not used for Kcs computation (retained in the query for future fallback use). Implemented in `bootstrap/mcclear_client.py`; gate: McClear GHI > 50 W/m²; Kcs ceiling: 1.5.
 
 ### Haze detection configuration (api.conf [conditions])
 
