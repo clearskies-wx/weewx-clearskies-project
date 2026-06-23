@@ -520,7 +520,7 @@ The conditions text engine is a multi-module stateful system that produces the `
 
 ### Sky condition
 
-**Primary source (daytime):** Variability Index (VI) analysis adapted from CAELUS (Ruiz-Arias & Gueymard 2023).
+**Primary source (daytime):** Kv-first decision tree in the Duchon & O'Malley (1999) tradition, using CAELUS-derived indices (Ruiz-Arias & Gueymard 2023). See ADR-073 for full scientific reasoning.
 
 - Measure GHI (radiation from weewx) and clear-sky reference (maxSolarRad from weewx).
 - Bin 5-second LOOP packets into 1-minute averages. Maintain a 30-minute ring buffer of MinuteRecord entries.
@@ -533,67 +533,78 @@ The conditions text engine is a multi-module stateful system that produces the `
 | Kv | Σ\|ΔGHI - ΔmaxSolarRad\| / window_span | 30 min |
 | Kvf | Same formula as Kv | 10 min |
 
-Kv is the cumulative absolute first-derivative of **clear-sky-detrended** GHI. Each minute-to-minute GHI change has the corresponding maxSolarRad change subtracted before taking the absolute value and summing. This removes the deterministic solar geometry signal (the sun rising and setting changes GHI even under clear skies) and isolates cloud-induced variability. Without detrending, a clear afternoon's steady GHI decline produces Kv above the CLOUDLESS threshold (0.03), causing false "Mostly Sunny" classifications.
+Kv is the cumulative absolute first-derivative of **clear-sky-detrended** GHI. Each minute-to-minute GHI change has the corresponding maxSolarRad change subtracted before taking the absolute value and summing. This removes the deterministic solar geometry signal (the sun rising and setting changes GHI even under clear skies) and isolates cloud-induced variability. Without detrending, a clear afternoon's steady GHI decline produces elevated Kv, causing false "Mostly Clear" classifications.
 
-**Scientific basis:** See ADR-044 §2 for why clear-sky detrending is necessary and the research (Stein et al. 2012, Coimbra et al. 2013) that establishes it as standard practice. Full citations in `docs/reference/sky-classification-science.md` §2.
+**Scientific basis:** See ADR-073 §2 for why clear-sky detrending is necessary and the research (Stein et al. 2012, Coimbra et al. 2013) that establishes it as standard practice. Full citations in `docs/reference/sky-classification-science.md` §2.
 
-- Classify using CAELUS set-based logic (matching the reference implementation at `github.com/jararias/caelus`). Three anchor classes are evaluated independently; the cloudy zone is the residual:
+**Classification — Kv-first decision tree:**
 
-**Anchor classes (independent):**
+*Step 0: Pre-checks*
 
-| Class | Conditions | Display label |
-|-------|-----------|---------------|
-| CLOUD_ENHANCEMENT | Kcs > 1.06 AND Kv > 0.20 AND Kvf > 0.20 | Clear |
-| CLOUDLESS | Km > 0.6 AND Kcs ∈ [0.85, 1.15] AND Kv < 0.03 | Clear |
-| OVERCAST zone | Km < 0.3 AND Kv < 0.10 | (sub-split below) |
+- Night/twilight (max(radiation, maxSolarRad) < 20 W/m²) → clear ring buffer, return None
+- Solar elevation < 5° → return last stable label (SZA guard; see below)
+- Ring buffer < 3 entries → return None (insufficient data)
 
-**Cloudy zone residual** (NOT cloudless, NOT overcast, NOT cloud enhancement):
+*Step 1: Cloud enhancement (evaluated before Kv split)*
 
-| Class | Conditions | Display label |
-|-------|-----------|---------------|
-| THIN_CLOUDS | Km > 0.5 AND Kv ∈ [0.03, 0.08) | Mostly Clear |
-| THICK_CLOUDS | Km < 0.4 AND Kv ∈ [0.04, 0.16) | Mostly Cloudy |
-| SCATTER_CLOUDS | Everything else in cloudy zone | Km-dependent (see below) |
+| Conditions | Display label |
+|-----------|---------------|
+| Kcs > 1.06 AND Kv > 0.20 AND Kvf > 0.20 AND maxSolarRad > 100 W/m² | Partly Cloudy |
 
-**SCATTER_CLOUDS Km sub-split** (patchy cumulus, sun in and out). Boundaries from Kasten-Czeplak (1980) `Km = 1 - 0.75 × (N/8)^3.4` — maps Km to NWS okta-based sky coverage categories. CAELUS is the detection engine (identifies the cloud pattern); K-C is the translation layer (maps Km to weather display labels). See ADR-044 §1 and §6 for why this separation is necessary.
+Cloud enhancement (GHI exceeding clear-sky) physically requires nearby cloud edges — a broken-cloud scenario. Maps to "Partly Cloudy" rather than "Clear" for physical accuracy. See ADR-073 §6.
 
-| Km range | K-C oktas | Display label |
-|----------|-----------|---------------|
-| > 0.97 | 0–2 (CLR/FEW) | Clear, Scattered Clouds |
-| 0.85–0.97 | 2–4 (FEW/SCT) | Mostly Clear, Scattered Clouds |
-| 0.52–0.85 | 4–7 (SCT/BKN) | Partly Cloudy |
-| < 0.52 | 7+ (BKN/OVC) | Mostly Cloudy |
+*Step 2: Primary axis — Kv (Kv < 0.05 = uniform sky; Kv ≥ 0.05 = variable sky)*
 
-"Scattered Clouds" descriptor only appears when sky is predominantly clear (K-C FEW or better). At Partly Cloudy and denser, the base label carries it alone.
+Six independent papers confirm the inverted-U relationship between cloud fraction and irradiance variability: variability peaks at ~50% cloud fraction and drops to near-zero at 0% (clear) and 100% (overcast). Low Kv means uniform sky (either clear or fully overcast). Elevated Kv means broken coverage. See ADR-073 §1.
 
-**OVERCAST zone Km×Kv sub-split** (Km < 0.3, Kv < 0.10):
+*Step 3: Uniform sky (Kv < 0.05) — Km distinguishes clear vs. overcast*
 
-| Km | Kv | Display label |
-|----|-----|---------------|
-| 0.15–0.30 | ≥ 0.03 (textured) | Cloudy |
-| 0.15–0.30 | < 0.03 (flat) | Overcast |
-| < 0.15 | ≥ 0.03 (textured) | Overcast |
-| < 0.15 | < 0.03 (flat) | Heavy Overcast |
+| Conditions | Display label |
+|-----------|---------------|
+| Km > 0.85 AND Kcs > 0.80 | Clear |
+| Km > 0.35 | Overcast |
+| Km ≤ 0.35 | Heavy Overcast |
 
-Kv distinguishes a uniform blanket (Overcast — flat curve) from a lumpy thick deck (Cloudy — textured curve). Heavy Overcast = thick AND flat (near-zero light, no variability).
+In the uniform branch, Kv has confirmed no cloud-edge transitions. Every non-clear outcome is overcast by definition (NWS OVC, 8/8, no gaps). Km distinguishes cloud thickness within the overcast family: thin to moderate uniform layer (Overcast) vs. thick layer with low transmittance, correlated with imminent precipitation (Heavy Overcast).
 
-Thresholds from CAELUS `options.py` (Table 3), validated on 54 BSRN stations across all major climate zones. Sensor-agnostic — operators use diverse pyranometer hardware.
+*Step 4: Variable sky (Kv ≥ 0.05) — Km distinguishes coverage degree*
 
-**Temporal coherence filter:** A raw classification must persist for 15 consecutive minutes before becoming the stable label. On startup, 3-minute grace applies. Replaces the previous per-threshold hysteresis.
+| Conditions | Display label |
+|-----------|---------------|
+| Km > 0.85 | Mostly Clear |
+| Km > 0.60 | Partly Cloudy |
+| Km > 0.40 | Mostly Cloudy |
+| Km ≤ 0.40 | Cloudy |
+
+In the variable branch, Kv has confirmed cloud-edge transitions exist. "Cloudy" here (NWS: 87–100%, includes 7/8 BKN) differs from "Overcast" (8/8 OVC) by the existence of breaks — Kv confirms them even when infrequent.
+
+**Threshold constants:**
+
+| Constant | Value | Role |
+|---|---|---|
+| `_KV_UNIFORM` | 0.05 | Primary split: uniform vs. variable sky |
+| `_UNIFORM_CLEAR_MIN_KM` | 0.85 | Uniform branch: clear sky minimum Km |
+| `_UNIFORM_CLEAR_MIN_KCS` | 0.80 | Uniform branch: clear sky Kcs sanity check |
+| `_UNIFORM_HEAVY_MAX_KM` | 0.35 | Uniform branch: heavy overcast maximum Km |
+| `_VARIABLE_CLEAR_MIN_KM` | 0.85 | Variable branch: mostly clear minimum Km |
+| `_VARIABLE_PARTLY_MIN_KM` | 0.60 | Variable branch: partly cloudy minimum Km |
+| `_VARIABLE_MOSTLY_MIN_KM` | 0.40 | Variable branch: mostly cloudy minimum Km |
+
+Threshold initial values are from physical reasoning and literature review; not per-station calibrated. Tuning deferred to post-deployment observation. See ADR-073 §1.
+
+**Temporal coherence filter:** A raw classification must persist for 15 consecutive minutes before becoming the stable label. On startup, 3-minute grace applies.
 
 **Startup backfill:** On API restart, `backfill()` seeds the ring buffer from archive records (last 30 minutes) for immediate classification. Full accuracy after ~30 minutes of live LOOP data.
 
-**GHI mirroring across sunrise/sunset:** At sunrise, the trailing 30-minute window has only a few minutes of data. Under overcast, this inflates Km (diffuse radiation at low angles is a high fraction of the small clear-sky reference), producing incorrect sunny/scattered labels. The mirroring algorithm (adapted from CAELUS `sky_indices.py:mirror_ghi_with_pandas()`) generates synthetic pre-sunrise data points using cos(zenith) interpolation from post-sunrise measurements, stabilizing the rolling statistics. Station coordinates (lat/lon/altitude from `services/station.py`) and Skyfield ephemeris (from `services/almanac.py`) are used to compute cos(zenith) for both real and mirrored entries. Full scientific description in `docs/reference/sky-classification-science.md` §3.
+**GHI mirroring across sunrise/sunset:** At sunrise, the trailing 30-minute window has only a few minutes of data. Under overcast, this inflates Km (diffuse radiation at low angles is a high fraction of the small clear-sky reference), producing incorrect sunny/scattered labels. The mirroring algorithm (adapted from CAELUS `sky_indices.py:mirror_ghi_with_pandas()`) generates synthetic pre-sunrise data points using cos(zenith) interpolation from post-sunrise measurements, stabilizing the rolling statistics. Station coordinates (lat/lon/altitude from `services/station.py`) and Skyfield ephemeris (from `services/almanac.py`) are used to compute cos(zenith) for both real and mirrored entries. Full scientific description in `docs/reference/sky-classification-science.md` §3. See ADR-073 §4.
 
-**SZA < 85° classification guard:** When solar elevation < 5° (SZA > 85°), `classify()` returns None. The downstream consumer (`enrichment/weather_text.py`) falls back to provider cloud cover. This matches CAELUS's own SZA filter. Solar elevation is computed via Skyfield from station coordinates (same ephemeris used by the almanac service). The previous `_MIN_SOLAR_RAD = 20 W/m²` proxy is retained for ring buffer data acceptance — data still accumulates below the SZA threshold to be available when elevation crosses 5°.
-
-**Kv/Kvf clear-sky detrending:** Described in the index formula table above. Scientific reasoning for why detrending is necessary: ADR-044 §2. Full citations: `docs/reference/sky-classification-science.md` §2.
+**SZA < 85° classification guard:** When solar elevation < 5° (SZA > 85°), `classify()` returns None. The downstream consumer (`enrichment/weather_text.py`) falls back to provider cloud cover. Solar elevation is computed via Skyfield from station coordinates (same ephemeris used by the almanac service). The `_MIN_SOLAR_RAD = 20 W/m²` proxy is retained for ring buffer data acceptance — data still accumulates below the SZA threshold to be available when elevation crosses 5°. See ADR-073 §5.
 
 **Haze/smoke detection:** Implemented — see §8 Haze detection subsection below (ADR-067).
 
-**Secondary source (night / twilight / startup / no pyranometer):** Provider cloud cover percentage, via `_cloud_pct_to_sky()`. Cannot produce "Scattered Clouds" composites (no Kv from a cloud percentage). Thresholds: ≤10% Clear, ≤25% Mostly Clear, ≤50% Partly Cloudy, ≤85% Mostly Cloudy, ≤95% Cloudy, >95% Overcast. Note: these code thresholds differ from the NWS ASOS okta-based thresholds in ADR-044 §1b (0–6/7–31/32–56/57–87/88–100). The code thresholds are wider bins implemented as a pragmatic approximation. Operator adjustability is planned via the admin UI.
+**Secondary source (night / twilight / startup / no pyranometer):** Provider cloud cover percentage, via `_cloud_pct_to_sky()`. Thresholds: ≤10% Clear, ≤25% Mostly Clear, ≤50% Partly Cloudy, ≤85% Mostly Cloudy, ≤95% Cloudy, >95% Overcast. Note: these code thresholds are wider bins than NWS ASOS okta-based categories and are a pragmatic approximation. Operator adjustability planned via the admin UI.
 
-**Scientific basis and operator calibration:** ADR-044 records the scientific reasoning behind every threshold and classification decision. Full citations in `docs/reference/sky-classification-science.md`. SCATTER_CLOUDS Km sub-split and OVERCAST Km×Kv sub-split thresholds are operator-adjustable via the admin UI (`docs/planning/ADMIN-CARD-ARCHITECTURE-PLAN.md` Phase 3, T3.5).
+**Scientific basis:** ADR-073 records the scientific reasoning behind every threshold and classification decision. Full citations in `docs/reference/sky-classification-science.md`.
 
 ### Day/night display vocabulary
 
@@ -602,9 +613,7 @@ Apply day/night vocabulary at display time via substring replacement ("Clear"→
 | Classification | Day display | Night display |
 |----------------|-------------|---------------|
 | Clear | Sunny | Clear |
-| Clear, Scattered Clouds | Sunny, Scattered Clouds | Clear, Scattered Clouds |
 | Mostly Clear | Mostly Sunny | Mostly Clear |
-| Mostly Clear, Scattered Clouds | Mostly Sunny, Scattered Clouds | Mostly Clear, Scattered Clouds |
 | Partly Cloudy | Partly Cloudy | Partly Cloudy |
 | Mostly Cloudy | Mostly Cloudy | Mostly Cloudy |
 | Cloudy | Cloudy | Cloudy |
@@ -612,6 +621,8 @@ Apply day/night vocabulary at display time via substring replacement ("Clear"→
 | Heavy Overcast | Heavy Overcast | Heavy Overcast |
 
 Solar zenith > 96° = night; 85–96° = twilight/SZA guard zone (fall back to provider); < 85° = day (solar classification active). Solar elevation computed via Skyfield from station lat/lon/altitude (`services/almanac.py`). The SZA < 85° guard (elevation ≥ 5°) gates classification; below this threshold `classify()` returns None and the provider fallback supplies the sky label.
+
+**Scientific basis:** ADR-073 (supersedes ADR-044). Full citations in `docs/reference/sky-classification-science.md`.
 
 ### Precipitation
 
