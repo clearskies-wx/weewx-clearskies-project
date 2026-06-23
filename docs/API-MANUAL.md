@@ -946,7 +946,32 @@ Replaces the single-variable T-Td ≤ 1°F near-saturation override (Temperature
 
 **Display format:** "Foggy." or "Misty." as a separate sentence (NWS convention).
 
-**Irreducible limitation:** Without a visibility sensor, the engine reports conditions favorable for fog, not confirmed fog. This matches WMO Code 4680 automated-station constraints.
+**Irreducible limitation:** Without a visibility sensor, the engine reports conditions favorable for fog, not confirmed fog. The provider cross-check mitigates this by requiring a visibility-equipped station to corroborate, but the fundamental limitation remains for hyper-local fog events. This matches WMO Code 4680 automated-station constraints.
+
+---
+
+### Provider cross-check (fog/mist)
+
+Local T-Td detection identifies conditions favorable for fog but cannot confirm ground-level visibility reduction without a visibility sensor. To reduce false positives — particularly in coastal environments where marine-layer humidity routinely drives T-Td below 2°F without producing fog — the engine requires provider corroboration before reporting fog or mist.
+
+**Bidirectional confirmation table:**
+
+| Local sensors | Provider observation | Result |
+|---|---|---|
+| Favorable (T-Td ≤ 2°F, calm) | Reports fog/mist | **Foggy/Misty** — both agree |
+| Favorable | No fog/mist reported | **Suppress** — near-saturation but no visibility confirmation |
+| Favorable | Provider data stale/unavailable | **Allow local** — absence of data is not evidence of absence |
+| Not favorable (T-Td > 4°F or windy) | Reports fog/mist | **No adoption** — local conditions do not support fog at this station |
+
+**Provider keyword matching:** Lowercase provider weather text, substring search for `"fog"` or `"mist"`. Matches: "Fog", "Dense Fog", "Patchy Fog", "Fog/Mist", "Mist", etc.
+
+**Stale-data grace:** When provider data is unavailable (> 2 hours old or never set), the cross-check does not fire. Local detection stands on its own. This prevents the system from going silent about fog when the provider is down.
+
+**Scientific justification:** ASOS/AWOS visibility sensors (WMO, ICAO) are the operational standard for fog detection. This station lacks a visibility sensor; the cross-check supplements local thermodynamic detection with a remote visibility observation from the nearest equipped station.
+
+**Tradeoff:** Reduced false positives at the cost of delayed detection for genuinely hyper-local fog events. Real fog at the station may not be reported until the provider's station (~5-30 min lag) also detects it. For stations in marine-layer-prone coastal environments, this tradeoff favors accuracy over immediacy.
+
+**Graceful degradation:** When no forecast provider is configured or the provider does not supply current weather text, the cross-check is inactive. Local fog detection operates standalone (original behavior).
 
 ---
 

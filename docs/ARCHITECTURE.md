@@ -280,7 +280,7 @@ The API hosts a multi-module, stateful conditions-text engine that produces the 
 | `weewx_clearskies_api/sse/conditions_text.py` | Stateless composer — assembles the `weatherText` string from per-component labels |
 | `weewx_clearskies_api/sse/sky_condition.py` | Stateful classifier — VI-based (CAELUS), 30-min ring buffer of 1-min GHI averages, produces the sky label |
 | `weewx_clearskies_api/sse/temperature_comfort.py` | Stateless 2D matrix — maps (appTemp, dewpoint) to comfort label |
-| `weewx_clearskies_api/sse/enrichment/weather_text.py` | Enrichment adapter — reads smoothed inputs + sky class, calls `build_weather_text()`, injects result into the `/current` response dict |
+| `weewx_clearskies_api/sse/enrichment/weather_text.py` | Enrichment adapter — reads smoothed inputs + sky class, calls `build_weather_text()`, injects result into the `/current` response dict. Provider cross-check for fog/mist confirmation. |
 | `weewx_clearskies_api/sse/haze_condition.py` | Haze detection — two-channel (Kcs deficit + PM), solar elevation gate, f(RH) correction |
 | `weewx_clearskies_api/sse/auto_calibration.py` | Clean-sky baseline — monthly-normals model, 12 per-month Kcs baselines, 3-year rolling window, automatic bootstrap with smart sensor selection, sensor info persistence. Bootstrap uses McClear clear-sky GHI (ADR-072). |
 | `weewx_clearskies_api/bootstrap/mcclear_client.py` | McClear data fetcher — retrieves historical clear-sky GHI via `pvlib.iotools.get_cams()` for bootstrap Kcs computation (ADR-072) |
