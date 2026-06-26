@@ -104,10 +104,23 @@ Save to `docs/reference/wms-t-implementation-ref.md`. This is NOT a manual secti
 
 The coordinator inlines relevant sections of this document into the agent prompt for T3.2 and T4.6. The agent should also be pointed at the PoC source code directly (`docs/reference/wms-t-poc/`).
 
+### D6 — Amend the main radar plan
+Once D3 is accepted and D4/D5 are written, update [RADAR-PROVIDER-REPLACEMENT-PLAN.md](RADAR-PROVIDER-REPLACEMENT-PLAN.md):
+- Replace "TBD — pending research" in T3.2 with the concrete implementation approach from D5
+- Replace "Partially blocked" in T3.5 and T4.2 with specific guidance from D5
+- Replace "BLOCKED by research" in T4.6 with the WMS-T satellite rendering approach
+- Remove the BLOCKED banners from Phases 3 and 4
+- Update the agent assignments table: change Phase R status from BLOCKING to COMPLETE, unblock Phases 3-4
+- Change plan status from REVISING to APPROVED
+- Reference the new ADR number in T0.3's notes
+
+This completes the plan — all tasks have concrete implementation guidance and no blocked dependencies remain. The plan is ready for execution.
+
 ### Dependency chain
 ```
 Research (D1, D2) → ADR draft (D3, Proposed) → user approval → ADR Accepted
-→ Manual updates (D4) + Implementation ref (D5) → Phases 3-4 of main plan UNBLOCKED
+→ Manual updates (D4) + Implementation ref (D5) → Amend main plan (D6)
+→ Phases 3-4 of main plan UNBLOCKED → plan status APPROVED
 ```
 
 ---
