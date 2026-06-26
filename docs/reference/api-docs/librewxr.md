@@ -1,6 +1,7 @@
 # LibreWxR API Reference
 
-Captured: 2026-06-24 from https://github.com/JoshuaKimsey/LibreWXR README + live API at api.librewxr.net
+Captured: 2026-06-26 from https://github.com/JoshuaKimsey/LibreWXR README + live API at api.librewxr.net
+Verified: 2026-06-26 — weather-maps.json structure confirmed unchanged against live public API
 
 ---
 

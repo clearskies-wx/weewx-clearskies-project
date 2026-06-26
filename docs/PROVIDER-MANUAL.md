@@ -151,7 +151,7 @@ End users register and manage their own API keys with each provider. The project
 
 ### No proxied calls through a project service
 
-Do not proxy provider API calls through any project-run infrastructure. Each operator's deployment calls providers directly using their own credentials. The only server-side proxy allowed is the tile proxy for keyed radar providers (Aeris, OpenWeatherMap) — this is an anti-browser-key-exposure measure within a single operator's deployment, not a cross-operator proxy.
+Do not proxy provider API calls through any project-run infrastructure. Each operator's deployment calls providers directly using their own credentials. Two server-side proxies are allowed: (1) the API tile proxy for keyed radar providers (OpenWeatherMap) — an anti-browser-key-exposure measure within a single operator's deployment, and (2) the Caddy reverse proxy for LibreWxR — routing all tile/alert traffic through the operator's own Caddy so visitors never contact external services directly. Neither is a cross-operator proxy.
 
 ### Per-provider documentation requirements
 
@@ -607,53 +607,104 @@ Dashboard progressive fill rule (max 4 columns, no horizontal scroll):
 
 ### Map library
 
-Use **Leaflet** with **OpenStreetMap** base tiles. OSM attribution is required. Do not use MapLibre — it is a heavier WebGL stack with no advantage for the use cases here. Do not use Mapbox — Mapbox JMA tilesets are raster-array / GL-JS-only and incompatible with Leaflet; Japan radar falls back to RainViewer at v0.1.
+Use **Leaflet** with **OpenStreetMap** base tiles. OSM attribution is required. Do not use MapLibre — it is a heavier WebGL stack with no advantage for the use cases here.
 
 ### Day-1 radar provider modules
 
-Eight modules ship at v0.1 in `providers/radar/`:
+Modules in `providers/radar/`:
 
-| Module | Type | Key required | Coverage |
-|---|---|---|---|
-| `rainviewer` | XYZ tiles | No | Global mosaic (default fallback) |
-| `openweathermap` | XYZ tiles | Yes | Global — labeled "Model precipitation" in UI, NOT "Radar" |
-| `aeris` | XYZ tiles | Yes | Global real radar mosaic (AerisWeather Maps API) |
-| `iem_nexrad` | WMS-T | No | US CONUS NEXRAD (Iowa Environmental Mesonet) |
-| `noaa_mrms` | WMS-T | No | US AK / HI / PR / Guam (NOAA MapServer) |
-| `msc_geomet` | WMS-T | No | Canada national mosaic (Environment Canada) |
-| `dwd_radolan` | WMS-T | No | Germany RADOLAN (DWD GeoWebService) |
-| `iframe` | Iframe | Operator-supplied URL | Operator-defined (BoM Australia, MetService NZ, etc.) |
+| Module | Type | Key required | Coverage | Status |
+|---|---|---|---|---|
+| `rainviewer` | XYZ tiles (browser-direct to CDN) | No | Global mosaic | **Default.** Degraded since Jan 2026: zoom 7 max, no nowcast, single color scheme (Universal Blue), PNG only. |
+| `librewxr` | XYZ tiles (Caddy-proxied) | No | Global (public API) or operator-defined (self-hosted) | **Optional upgrade.** Zoom 12, 13 color schemes, WebP, 60-min nowcast, satellite, weather alerts. |
+| `openweathermap` | XYZ tiles (API-proxied) | Yes | Global — labeled "Model precipitation" in UI, NOT "Radar" | Active |
+| `msc_geomet` | WMS-T | No | Canada national mosaic (Environment Canada) | Active (not in wizard — regional) |
+| `dwd_radolan` | WMS-T | No | Germany RADOLAN (DWD GeoWebService) | Active (not in wizard — regional) |
+| `iframe` | Iframe | Operator-supplied URL | Operator-defined (BoM Australia, MetService NZ, etc.) | Active |
+| `iem_nexrad` | WMS-T | No | US CONUS NEXRAD (Iowa Environmental Mesonet) | **Deprecated.** Logs migration warning. Raw imagery too noisy — use LibreWxR instead. |
+| `noaa_mrms` | WMS-T | No | US AK / HI / PR / Guam (NOAA MapServer) | **Deprecated.** Logs migration warning. Raw imagery too noisy — use LibreWxR instead. |
 
-### Keyed provider proxy
+**Removed from radar domain:** `aeris` — 3,000 map units/day is unviable for radar tiles. Aeris is retained for forecast, AQI, and alerts domains.
 
-For `aeris` and `openweathermap`, clearskies-api proxies tile requests server-side. API keys must never reach the browser.
+### Tile routing model
 
-- Tile proxy endpoint: `GET /radar/providers/{provider_id}/tiles/{z}/{x}/{y}`
-- Frame metadata endpoint: `GET /radar/providers/{id}/frames`
+Three routing patterns exist depending on the provider:
 
-Keyless providers (`rainviewer`, `iem_nexrad`, `noaa_mrms`, `msc_geomet`, `dwd_radolan`) are fetched directly by the browser — no proxy needed or permitted for these.
+| Pattern | Providers | How it works |
+|---|---|---|
+| **Caddy-proxied** | `librewxr` | Caddy reverse-proxies `/librewxr/*` to the LibreWxR instance (public API or self-hosted). Browser talks to Caddy only. API never touches tile or alert traffic — it provides metadata (capabilities, frame lists) only. |
+| **API-proxied** | `openweathermap` | API proxies tile requests server-side via `GET /api/v1/radar/providers/{id}/tiles/{z}/{x}/{y}`. API keys never reach the browser. |
+| **Browser-direct** | `rainviewer`, `msc_geomet`, `dwd_radolan` | Browser fetches tiles directly from the provider CDN/WMS. No proxy involved. |
+
+**Frame metadata for all providers:** `GET /api/v1/radar/providers/{id}/frames` — API fetches upstream metadata, normalizes to canonical `RadarFrameList`, caches.
+
+### LibreWxR module rules
+
+- **Configurable upstream:** `[radar] librewxr_endpoint` in `api.conf`. Default: `https://api.librewxr.net` (public API, no SLA). Operators can point to a self-hosted instance.
+- **Metadata fetch:** `GET {endpoint}/public/weather-maps.json` — RainViewer v2-compatible wire format. Cached 60 seconds.
+- **No `get_tile()` method.** Caddy proxies tiles directly. The API never handles tile bytes for LibreWxR.
+- **Capability declaration includes:**
+  - Provider name and attribution string
+  - Geographic bounds (bounding box from `[radar] librewxr_bounds` config, or empty = global)
+  - Caddy proxy path prefix (`/librewxr`) for tiles and alerts
+  - Available features: `nowcast` (bool), `color_schemes` (list of `{id, name}`), `alerts` (bool)
+  - Tile URL template (relative to Caddy): `/librewxr/{path}/{size}/{z}/{x}/{y}/{color}/{options}.webp`
+  - Alert URL: `/librewxr/v2/alerts`
+  - Refresh interval (from `[radar] librewxr_refresh_interval` config, default 600 seconds)
+- **Rate limiter:** polite-use guard (5 req/s) for weather-maps.json fetches — prevents hammering the metadata endpoint.
+- **Alert overlay data:** LibreWxR `/v2/alerts` returns GeoJSON FeatureCollection with WMO CAP metadata (severity, urgency, event, headline, expiry). Supports `?bbox=` query. Routed through Caddy at `/librewxr/v2/alerts`.
+- **Color schemes:** 13 schemes (IDs 0–11 + 255). List comes from `weather-maps.json` → `radar.colorSchemes`. Dashboard uses the `color` path segment in tile URLs.
+- **License:** AGPL-3.0 (code), CC-BY-4.0 (data).
+
+### RainViewer degradation note
+
+RainViewer gutted its free API tier on 2026-01-01:
+- Zoom capped at 7 (was 8+)
+- Nowcast discontinued
+- Single color scheme (Universal Blue only)
+- PNG only (no WebP)
+- 100 req/IP/min rate limit
+
+RainViewer remains the default because it works out of the box with zero infrastructure. The wizard displays a degradation note so operators know what they're getting. Operators who want better quality upgrade to LibreWxR.
 
 ### OpenWeatherMap radar label
 
 Always label OpenWeatherMap radar as **"Model precipitation"** in the UI, operator notes, and documentation. Never label it as "Radar." It provides model-derived precipitation data, not true radar reflectivity.
 
+### Geographic bounds
+
+Provider capabilities include a geographic bounding box. The dashboard enforces `maxBounds` on the Leaflet map to prevent zooming out past the provider's coverage area.
+
+- **RainViewer:** global (no bounds restriction)
+- **LibreWxR (public API):** global (no bounds restriction)
+- **LibreWxR (self-hosted):** bounds from `[radar] librewxr_bounds` config (operator sets this in wizard). For BBOX-cropped instances, the bounds match the crop area.
+- **No bounds configured:** map allows global zoom (default behavior)
+
 ### Setup wizard radar suggestion
 
-The wizard reads operator lat/lon and suggests a radar module:
+The wizard suggests radar providers based on simplicity, not quality:
 
-| Region | Suggested module |
-|---|---|
-| US CONUS | `iem_nexrad` |
-| US AK / HI / PR / Guam | `noaa_mrms` |
-| Canada | `msc_geomet` |
-| Germany | `dwd_radolan` |
-| All other regions | `rainviewer` |
+| Recommendation | Provider | Note |
+|---|---|---|
+| Primary (all regions) | `rainviewer` | Works everywhere, zero setup |
+| Alternative (all regions) | `librewxr` | "Better quality — requires public API or self-hosting" |
 
-Operator may override the suggestion freely.
+Operator may override the suggestion freely. Regional providers (`msc_geomet`, `dwd_radolan`) are not surfaced in the wizard — they exist for operators who configure manually.
 
 ### Attribution
 
-Render attribution per each source's terms on the radar map. Required attribution strings come from the respective provider's terms. Both the in-map Leaflet attribution control and any below-map caption must agree.
+Render attribution per each source's terms on the radar map. Required attribution strings:
+
+| Provider | Attribution |
+|---|---|
+| `rainviewer` | `"RainViewer (https://www.rainviewer.com/)"` |
+| `librewxr` | `"LibreWxR (https://librewxr.net/) — Data: CC-BY-4.0"` |
+| `openweathermap` | `"OpenWeatherMap (https://openweathermap.org/)"` |
+| `msc_geomet` | `"Environment and Climate Change Canada"` |
+| `dwd_radolan` | `"Deutscher Wetterdienst"` |
+| Base map (always) | `"© OpenStreetMap contributors"` |
+
+Both the in-map Leaflet attribution control and any below-map caption must agree.
 
 ---
 
@@ -959,3 +1010,5 @@ The following patterns are forbidden. Any pull request introducing them must be 
 | Referencing the legacy ReNASS endpoint `renass.unistra.fr` | Returns 404 since EPOS-France migration; use `api.franceseisme.fr` |
 | Labeling OpenWeatherMap radar as "Radar" | It is model precipitation data; must be labeled "Model precipitation" |
 | Adding a `mapbox_jma` module | Dropped from day-1 set — Mapbox JMA tilesets are raster-array / GL-JS-only, incompatible with Leaflet |
+| Routing LibreWxR tile traffic through the API | Caddy proxies LibreWxR tiles and alerts directly; the API provides metadata only. Routing tiles through the API wastes resources and adds latency. |
+| Adding `aeris` as a radar provider | Removed — 3,000 map units/day is unviable for radar tiles. Aeris is retained for forecast/AQI/alerts only. |

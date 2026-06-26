@@ -1275,52 +1275,58 @@ For dual-stack binding (IPv4 and IPv6), bind Caddy on both `0.0.0.0:443` and `[:
 
 ## §12 Radar Endpoints and Capability Model
 
-### Capability model extension for multi-layer providers
+### Radar capability metadata
 
-The `ProviderCapability` dataclass supports an optional `layers` list for providers that offer multiple data layers (e.g., the unified NOAA provider). Single-layer providers (LibreWxR, RainViewer, MSC, DWD, OWM) continue working unchanged — `layers` is optional and defaults to `None`.
+The `/api/v1/capabilities` response includes radar provider metadata. For LibreWxR, this is richer than for other providers because LibreWxR supports multiple features (nowcast, color schemes, alerts) that the dashboard adapts to.
 
-Each layer in the list declares:
+LibreWxR capability declaration includes:
 
 | Field | Type | Description |
 |---|---|---|
-| `layer_id` | string | Stable identifier (e.g., `"nexrad"`, `"mrms"`, `"goes_visible"`, `"spc_day1_cat"`) |
-| `layer_name` | string | Display name for the UI layer panel |
-| `layer_type` | string | One of: `"radar"`, `"satellite"`, `"overlay"`, `"alerts"` |
-| `wms_endpoint_url` | string or None | Full WMS endpoint URL (for WMS layers the browser fetches directly) |
-| `tile_url_template` | string or None | XYZ tile URL template (for tile-based layers) |
-| `wms_layer_name` | string or None | WMS layer name parameter (e.g., `"nexrad-n0r-wmst"`) |
-| `time_enabled` | bool | Whether this layer supports time-based animation (has frame metadata) |
-| `geographic_coverage` | string | Coverage description (e.g., `"CONUS"`, `"US all territories"`) |
-| `default_enabled` | bool | Whether the layer is enabled by default in the dashboard |
-| `browser_direct` | bool | `True` = browser fetches tiles directly from the source. `False` = tiles proxied through the API. |
+| `provider` | string | `"librewxr"` |
+| `attribution` | string | `"LibreWxR (https://librewxr.net/) — Data: CC-BY-4.0"` |
+| `bounds` | `{south, west, north, east}` or `null` | Geographic bounding box from `[radar] librewxr_bounds` config. `null` = global. |
+| `caddy_prefix` | string | `"/librewxr"` — the Caddy proxy path prefix for tiles and alerts |
+| `tile_url_template` | string | `/librewxr/{path}/{size}/{z}/{x}/{y}/{color}/{options}.webp` |
+| `alert_url` | string | `/librewxr/v2/alerts` |
+| `nowcast` | bool | Whether nowcast frames are available |
+| `color_schemes` | list of `{id, name}` | Available color schemes (from `weather-maps.json`) |
+| `alerts` | bool | Whether weather alerts are available |
+| `refresh_interval` | int | Seconds between dashboard frame metadata re-fetches (from `[radar] librewxr_refresh_interval` config, default 600) |
 
-The `/api/v1/capabilities` response includes `layers` when present on a provider's capability declaration. The dashboard uses this to populate the layer panel in the expanded radar view.
+RainViewer capability is minimal: provider name, attribution, and `degraded: true` with `operator_notes` documenting the free-tier limitations.
 
 ### Radar endpoints
 
-**Frame metadata:**
-- `GET /api/v1/radar/providers/{id}/frames` — existing endpoint, returns frame timestamps for the primary radar layer.
-- `GET /api/v1/radar/providers/{id}/layers/{layer_id}/frames` — **new** per-layer frame metadata for multi-layer providers. Returns time steps for a specific sub-layer (e.g., NOAA MRMS, NOAA satellite bands). The endpoint fetches WMS-T GetCapabilities and extracts the TIME dimension for the requested layer.
+**Frame metadata (all providers):**
+- `GET /api/v1/radar/providers/{id}/frames` — API fetches upstream metadata (e.g., `weather-maps.json` for LibreWxR/RainViewer), normalizes to canonical `RadarFrameList`, caches (60s TTL for LibreWxR, existing TTL for others).
 
-**Tile proxy:**
-- `GET /api/v1/radar/providers/{provider_id}/tiles/{z}/{x}/{y}` — serves tile bytes for proxied providers. Query parameters: `?t=` (frame timestamp), `?color=` (color scheme ID, LibreWxR only).
-- Internal constant renamed: `_KEYED_RADAR_PROVIDERS` → `_PROXIED_RADAR_PROVIDERS`. Contains `librewxr` and `openweathermap` (not `aeris` — removed from radar).
+**Tile proxy (keyed providers only):**
+- `GET /api/v1/radar/providers/{provider_id}/tiles/{z}/{x}/{y}` — serves tile bytes for keyed providers. Currently only `openweathermap` uses this endpoint. Query parameters: `?t=` (frame timestamp).
+- `_PROXIED_RADAR_PROVIDERS` contains `openweathermap` only. LibreWxR tiles go through Caddy, not the API. RainViewer tiles go direct to CDN.
+
+**LibreWxR tiles are NOT proxied by the API.** Caddy handles tile routing via `/librewxr/*`. The API provides metadata only (capabilities + frame lists). This is a deliberate architecture boundary — the API never touches tile traffic for LibreWxR.
 
 ### LibreWxR configuration
 
-Config field: `[radar] librewxr_endpoint` in `api.conf`.
-Default: `https://api.librewxr.net`.
-Self-hosted operators provide their own URL. The API fetches tile bytes from this endpoint and serves them to the browser via the tile proxy.
+Config fields in `api.conf`:
+
+| Field | Section | Default | Description |
+|---|---|---|---|
+| `librewxr_endpoint` | `[radar]` | `https://api.librewxr.net` | LibreWxR instance URL. Public API or self-hosted. |
+| `librewxr_bounds` | `[radar]` | *(empty = global)* | Geographic bounding box `south,west,north,east` (e.g., `32.0,-120.5,35.5,-114.5` for SoCal). Dashboard enforces `maxBounds` from this. |
+| `librewxr_refresh_interval` | `[radar]` | `600` | Seconds between dashboard frame metadata re-fetches. Operator matches this to their LibreWxR instance's `LIBREWXR_FETCH_INTERVAL`. |
 
 ### Deprecated providers
 
 `iem_nexrad` and `noaa_mrms` modules remain on disk. When configured, they log a migration warning at startup:
 ```
-WARNING: Radar provider 'iem_nexrad' is deprecated. Migrate to 'noaa' for unified US radar coverage.
+WARNING: Radar provider 'iem_nexrad' is deprecated. Consider migrating to 'librewxr' for better radar quality.
+WARNING: Radar provider 'noaa_mrms' is deprecated. Consider migrating to 'librewxr' for better radar quality.
 ```
 They continue to function as before — no breaking change for existing operators.
 
-`aeris` is removed from `_PROXIED_RADAR_PROVIDERS` and from the radar domain's capability wiring. Aeris credentials are still wired for forecast/AQI/alerts.
+`aeris` is removed from radar. Aeris credentials remain wired for forecast/AQI/alerts.
 
 ---
 

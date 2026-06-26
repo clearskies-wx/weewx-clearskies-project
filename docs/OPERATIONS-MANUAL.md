@@ -634,6 +634,60 @@ The admin UI shows the selected sensor (name, distance, coordinates) and provide
 
 To clear an override and return to automatic selection, use the "Clear override" button on the admin haze calibration page, or remove `openaq_sensor_id` from `[conditions]` in `api.conf`.
 
+### Radar provider configuration
+
+#### RadarSettings keys (`[radar]` in `api.conf`)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `provider` | string | `rainviewer` | Active radar provider. Valid values: `rainviewer`, `librewxr`, `openweathermap`, `msc_geomet`, `dwd_radolan`, `iem_nexrad` (deprecated), `noaa_mrms` (deprecated), `iframe`. |
+| `librewxr_endpoint` | string | `https://api.librewxr.net` | LibreWxR instance URL. Public API or self-hosted operator URL. Only used when `provider = librewxr`. |
+| `librewxr_bounds` | string | *(empty = global)* | Geographic bounding box `south,west,north,east` (e.g., `32.0,-120.5,35.5,-114.5`). Dashboard enforces `maxBounds` from this value. Leave empty for global coverage (public API). Set for BBOX-cropped self-hosted instances. |
+| `librewxr_refresh_interval` | int | `600` | Seconds between dashboard frame metadata re-fetches. Operator matches this to their LibreWxR instance's `LIBREWXR_FETCH_INTERVAL`. The API includes this value in the capability response so the dashboard knows how often to poll. |
+
+#### LibreWxR deployment modes
+
+**Public API (`api.librewxr.net`):**
+- Zero infrastructure. No SLA or usage guarantees.
+- Set `librewxr_endpoint = https://api.librewxr.net` (the default).
+- Leave `librewxr_bounds` empty (global coverage).
+- Good for evaluation or low-traffic personal dashboards.
+
+**Self-hosted:**
+- Operator deploys and maintains their own LibreWxR instance.
+- Set `librewxr_endpoint` to the self-hosted URL (must be reachable by Caddy on the front-end host).
+- Set `librewxr_bounds` to match the instance's coverage area (especially for BBOX-cropped instances).
+- Recommend `LIBREWXR_MAX_FRAMES=24` or higher for smoother animation (default is 12).
+- Match `librewxr_refresh_interval` to the instance's `LIBREWXR_FETCH_INTERVAL`.
+- See LibreWxR documentation at https://librewxr.net/docs/ for self-hosting setup. Clear Skies does not provide LibreWxR infrastructure config.
+
+#### Caddy proxy route for LibreWxR
+
+When the operator configures LibreWxR as the radar provider, the wizard writes a Caddy reverse proxy route:
+
+```
+handle /librewxr/* {
+    uri strip_prefix /librewxr
+    reverse_proxy {librewxr_endpoint}
+}
+```
+
+This route proxies all LibreWxR traffic (tiles, alerts, satellite) through Caddy. Visitors' browsers contact Caddy only — they never connect directly to the LibreWxR instance.
+
+Self-hosted operators must ensure their LibreWxR instance is network-reachable by Caddy. The instance does not need to be publicly accessible — only Caddy needs to reach it.
+
+#### RainViewer (default, degraded)
+
+RainViewer works out of the box with zero configuration. The browser fetches tiles directly from the RainViewer CDN — no Caddy proxy needed.
+
+Since January 2026, the free tier is degraded:
+- Max zoom: 7 (was 8+)
+- No nowcast
+- Single color scheme (Universal Blue only)
+- PNG only (no WebP)
+
+The wizard displays a degradation note when RainViewer is selected so operators understand the limitations.
+
 ---
 
 ## §5 Logging

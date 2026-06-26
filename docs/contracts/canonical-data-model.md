@@ -606,7 +606,7 @@ What the canonical layer carries for radar:
 - **`CapabilityDeclaration`** entry per configured radar provider — `providerId`, `geographicCoverage`, optional `operatorNotes`. (See [`#/components/schemas/CapabilityDeclaration`](openapi-v1.yaml).)
 - **`RadarFrame`** entries via `/radar/providers/{provider_id}/frames` — list of `{time: UTC ISO, kind: past|current|nowcast}`. Source: each provider module's frame index.
 
-Day-1 provider set per ADR-015: `rainviewer`, `openweathermap`, `aeris`, `iem_nexrad`, `noaa_mrms`, `msc_geomet`, `dwd_radolan`, plus `iframe` config slot. (Japan radar at v0.1 uses RainViewer fallback; `mapbox_jma` deferred per ADR-015 2026-05-11 amendment — raster-array tilesets are not Leaflet-compatible.)
+Provider set per ADR-015 (amended 2026-06-26): `rainviewer` (default, degraded), `librewxr` (optional, Caddy-proxied), `openweathermap`, `msc_geomet`, `dwd_radolan`, plus `iframe` config slot. `iem_nexrad` and `noaa_mrms` are deprecated (log migration warning). `aeris` removed from radar domain (retained for forecast/AQI/alerts).
 
 URL templates and tile content types live inside each provider module at `weewx_clearskies_api/providers/radar/{provider}.py` capability declaration; not re-stated here.
 

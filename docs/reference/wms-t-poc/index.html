@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WMS-T Radar Animation PoC</title>
+
+  <!-- Leaflet 1.9.4 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
+
+  <!-- leaflet-timedimension 1.1.1 control styles -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-timedimension@1.1.1/dist/leaflet.timedimension.control.min.css" />
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; }
+    #map-container { position: relative; width: 100vw; height: 80vh; }
+    #map { width: 100%; height: 100%; }
+
+    /* Loading overlay — covers the map until all frames are cached */
+    #loading-overlay {
+      position: absolute; inset: 0; z-index: 1000;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: #1a1a2e;
+    }
+    #loading-overlay.hidden { display: none; }
+    #loading-text {
+      font-size: 0.95rem; color: #ccc; margin-bottom: 16px;
+    }
+    #progress-track {
+      width: 280px; height: 6px; background: #333;
+      border-radius: 3px; overflow: hidden;
+    }
+    #progress-bar {
+      height: 100%; width: 0%; background: #4a9eff;
+      border-radius: 3px; transition: width 0.15s ease;
+    }
+    #progress-pct {
+      font-size: 0.8rem; color: #888; margin-top: 8px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #info { padding: 16px 24px; max-width: 900px; }
+    #info h1 { font-size: 1.2rem; margin-bottom: 8px; }
+    #info p { font-size: 0.85rem; line-height: 1.5; color: #bbb; margin-bottom: 6px; }
+    #info code { background: #2a2a4a; padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; }
+    #request-log {
+      margin: 12px 24px; padding: 12px;
+      background: #0d0d1a; border: 1px solid #333; border-radius: 4px;
+      max-height: 120px; overflow-y: auto;
+      font-family: monospace; font-size: 0.75rem; color: #7a7;
+    }
+    #request-log .log-entry { margin-bottom: 2px; }
+    #stats { padding: 4px 24px; font-size: 0.8rem; color: #888; }
+  </style>
+</head>
+<body>
+  <div id="map-container">
+    <div id="map"></div>
+    <div id="loading-overlay">
+      <div id="loading-text">Loading radar frames&hellip;</div>
+      <div id="progress-track"><div id="progress-bar"></div></div>
+      <div id="progress-pct">0 / 0 frames</div>
+    </div>
+  </div>
+  <div id="stats"></div>
+  <div id="request-log"></div>
+  <div id="info">
+    <h1>WMS-T Radar Animation PoC</h1>
+    <p>
+      Single <code>L.TileLayer.WMS</code> wrapped with
+      <code>L.timeDimension.layer.wms</code>. The TIME parameter swaps per
+      frame advance &mdash; no pre-rendered layers, no simultaneous server
+      requests. Open DevTools Network tab to confirm: one set of tile
+      requests per frame, not hundreds at once.
+    </p>
+    <p>
+      All 24 frames are fully pre-loaded before animation starts &mdash;
+      the progress bar shows overall loading state, and playback begins
+      only when every frame is cached. Looping is seamless because the
+      cache holds all frames (nothing is evicted between loops).
+    </p>
+    <p>
+      Endpoint: <code>mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0r-t.cgi</code>
+      &bull; Layer: <code>nexrad-n0r-wmst</code>
+      &bull; Last 2 hours, 5-min intervals (24 frames)
+    </p>
+  </div>
+
+  <!-- Leaflet 1.9.4 -->
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+
+  <!-- iso8601-js-period (leaflet-timedimension dependency) -->
+  <script src="https://cdn.jsdelivr.net/npm/iso8601-js-period@0.2.1/iso8601.min.js"></script>
+
+  <!-- leaflet-timedimension 1.1.1 -->
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-timedimension@1.1.1/dist/leaflet.timedimension.min.js"></script>
+
+  <script>
+    // ---------------------------------------------------------------
+    // Time range: last 2 hours in 5-minute steps
+    // ---------------------------------------------------------------
+    var now = new Date();
+    now.setMinutes(Math.floor(now.getMinutes() / 5) * 5, 0, 0);
+    var twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+
+    var startISO = twoHoursAgo.toISOString().replace('.000Z', 'Z');
+    var endISO = now.toISOString().replace('.000Z', 'Z');
+
+    // ---------------------------------------------------------------
+    // Request logging
+    // ---------------------------------------------------------------
+    var requestCount = 0;
+    var logEl = document.getElementById('request-log');
+    var statsEl = document.getElementById('stats');
+
+    function logRequest(url) {
+      requestCount++;
+      var timeMatch = url.match(/TIME=([^&]+)/i);
+      var timeVal = timeMatch ? decodeURIComponent(timeMatch[1]) : '?';
+      var entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.textContent = '#' + requestCount + ' TIME=' + timeVal;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+      statsEl.textContent = 'Total WMS requests: ' + requestCount +
+        ' | Active layer TIME changes, not pre-rendered layers';
+    }
+
+    var origGetTileUrl = L.TileLayer.WMS.prototype.getTileUrl;
+    L.TileLayer.WMS.prototype.getTileUrl = function (coords) {
+      var url = origGetTileUrl.call(this, coords);
+      if (url.indexOf('nexrad') !== -1) {
+        logRequest(url);
+      }
+      return url;
+    };
+
+    // ---------------------------------------------------------------
+    // Loading overlay elements
+    // ---------------------------------------------------------------
+    var overlayEl = document.getElementById('loading-overlay');
+    var progressBarEl = document.getElementById('progress-bar');
+    var progressPctEl = document.getElementById('progress-pct');
+    var loadingTextEl = document.getElementById('loading-text');
+
+    // ---------------------------------------------------------------
+    // Map setup — autoPlay OFF, we control when playback starts
+    // ---------------------------------------------------------------
+    var map = L.map('map', {
+      center: [39.0, -98.5],
+      zoom: 5,
+      timeDimension: true,
+      timeDimensionOptions: {
+        timeInterval: startISO + '/' + endISO,
+        period: 'PT5M',
+        currentTime: twoHoursAgo.getTime()
+      },
+      timeDimensionControl: true,
+      timeDimensionControlOptions: {
+        autoPlay: false,
+        loopButton: true,
+        timeSliderDragUpdate: true,
+        minSpeed: 1,
+        maxSpeed: 10,
+        speedStep: 1,
+        playerOptions: {
+          transitionTime: 400,
+          loop: true,
+          buffer: 30,
+          minBufferReady: 1
+        }
+      }
+    });
+
+    // ---------------------------------------------------------------
+    // Base map
+    // ---------------------------------------------------------------
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      maxZoom: 19
+    }).addTo(map);
+
+    // ---------------------------------------------------------------
+    // IEM NEXRAD WMS-T layer
+    // Cache ALL frames (30 > 24) so nothing is evicted during loops.
+    // ---------------------------------------------------------------
+    var nexradWms = L.tileLayer.wms(
+      'https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0r-t.cgi',
+      {
+        layers: 'nexrad-n0r-wmst',
+        format: 'image/png',
+        transparent: true,
+        opacity: 0.7,
+        version: '1.1.1',
+        attribution: 'NEXRAD &copy; <a href="https://mesonet.agron.iastate.edu/">Iowa Environmental Mesonet</a>'
+      }
+    );
+
+    var tdNexrad = L.timeDimension.layer.wms(nexradWms, {
+      updateTimeDimension: false,
+      cache: 30,
+      cacheBackward: 30,
+      cacheForward: 30,
+      wmsVersion: '1.1.1'
+    });
+    tdNexrad.addTo(map);
+
+    // ---------------------------------------------------------------
+    // Dual-layer demo (n0q — toggled via layer control)
+    // ---------------------------------------------------------------
+    var nexradN0qWms = L.tileLayer.wms(
+      'https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q-t.cgi',
+      {
+        layers: 'nexrad-n0q-wmst',
+        format: 'image/png',
+        transparent: true,
+        opacity: 0.5,
+        version: '1.1.1'
+      }
+    );
+
+    var tdNexradN0q = L.timeDimension.layer.wms(nexradN0qWms, {
+      updateTimeDimension: false,
+      cache: 30,
+      cacheBackward: 30,
+      cacheForward: 30,
+      wmsVersion: '1.1.1'
+    });
+
+    var overlays = {
+      'NEXRAD n0r (base reflectivity)': tdNexrad,
+      'NEXRAD n0q (higher resolution)': tdNexradN0q
+    };
+    L.control.layers(null, overlays, { collapsed: false, position: 'topright' }).addTo(map);
+
+    // ---------------------------------------------------------------
+    // Preload ALL frames before starting animation
+    //
+    // Strategy: walk through every time step sequentially. Each step
+    // forces leaflet-timedimension to create a hidden WMS layer for
+    // that time, which fetches the tiles. We track loaded frames via
+    // the timeload event and show a progress bar. Animation starts
+    // only when all frames are cached.
+    // ---------------------------------------------------------------
+    var allTimes = map.timeDimension.getAvailableTimes();
+    var totalFrames = allTimes.length;
+    var loadedTimes = new Set();
+    var preloadIdx = 0;
+    var preloadComplete = false;
+
+    progressPctEl.textContent = '0 / ' + totalFrames + ' frames';
+
+    function onFrameLoaded(e) {
+      loadedTimes.add(e.time);
+      var count = loadedTimes.size;
+      var pct = Math.round((count / totalFrames) * 100);
+      progressBarEl.style.width = pct + '%';
+      progressPctEl.textContent = count + ' / ' + totalFrames + ' frames';
+
+      if (count >= totalFrames && !preloadComplete) {
+        preloadComplete = true;
+        loadingTextEl.textContent = 'Ready!';
+
+        // Brief pause so user sees "Ready!", then hide and play
+        setTimeout(function () {
+          overlayEl.classList.add('hidden');
+          // Reset to first frame and start animation
+          map.timeDimension.setCurrentTime(allTimes[0]);
+          setTimeout(function () {
+            var player = map.timeDimensionControl._player;
+            if (player) player.start();
+          }, 200);
+        }, 400);
+      }
+    }
+
+    map.timeDimension.on('timeload', onFrameLoaded);
+
+    function preloadNext() {
+      if (preloadIdx >= totalFrames) return;
+
+      var currentIdx = preloadIdx;
+      preloadIdx++;
+
+      loadingTextEl.textContent =
+        'Loading radar frames… (' + (currentIdx + 1) + '/' + totalFrames + ')';
+
+      // Register handlers BEFORE setting time to avoid race condition
+      var advanced = false;
+      function advance() {
+        if (advanced) return;
+        advanced = true;
+        setTimeout(preloadNext, 80);
+      }
+
+      var fallback = setTimeout(function () {
+        loadedTimes.add(allTimes[currentIdx]);
+        var count = loadedTimes.size;
+        progressBarEl.style.width = Math.round((count / totalFrames) * 100) + '%';
+        progressPctEl.textContent = count + ' / ' + totalFrames + ' frames';
+        advance();
+      }, 3000);
+
+      map.timeDimension.once('timeload', function () {
+        clearTimeout(fallback);
+        advance();
+      });
+
+      map.timeDimension.setCurrentTime(allTimes[currentIdx]);
+    }
+
+    // Start preloading from frame 0
+    preloadNext();
+  </script>
+</body>
+</html>

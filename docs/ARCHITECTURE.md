@@ -100,28 +100,31 @@ Each repo builds its own container image independently (ADR-034). A dashboard CS
 
 ```
 weewx host                          front-end host
-+-----------------------+           +----------------------------------+
-| api :8765 (TLS)       |           | caddy :80/:443                   |
-|   health :8081 (lo)   |  network  |   serves dashboard static files  |
-|   reads weewx.conf    |<--------->|   proxies /api/v1/* to API :8765 |
-|   reads weewx archive |           |   proxies /sse to API :8765      |
-|   serves /api/v1/*    |           |                                  |
-|   serves /sse (SSE)   |           | dashboard (init)                 |
-|   serves /setup/*     |           |   builds SPA, copies to volume   |
-|   unit conversion     |           +----------------------------------+
-|   enrichment pipeline |
++-----------------------+           +------------------------------------------+
+| api :8765 (TLS)       |           | caddy :80/:443                           |
+|   health :8081 (lo)   |  network  |   serves dashboard static files          |
+|   reads weewx.conf    |<--------->|   proxies /api/v1/* to API :8765         |
+|   reads weewx archive |           |   proxies /sse to API :8765              |
+|   serves /api/v1/*    |           |   proxies /librewxr/* to LibreWxR (opt.) |
+|   serves /sse (SSE)   |           |                                          |
+|   serves /setup/*     |           | dashboard (init)                         |
+|   unit conversion     |           |   builds SPA, copies to volume           |
+|   enrichment pipeline |           +------------------------------------------+
 |   derived values      |
-|                       |
-| redis :6379 (optional)|
-|   loopback only       |
-+-----------------------+
+|                       |           LibreWxR instance (external, optional)
+| redis :6379 (optional)|           +------------------------------------------+
+|   loopback only       |           | Public API (api.librewxr.net) or         |
++-----------------------+           | self-hosted (operator's responsibility)  |
+                                    | Caddy proxies /librewxr/* here           |
+                                    | Serves radar tiles, alerts, satellite    |
+                                    +------------------------------------------+
 ```
 
 **Single-host alternative:** All services on one machine. Caddy proxies to local Docker network name `api:8765` for both `/api/v1/*` and `/sse`. API uses direct mode (Unix socket to weewx engine).
 
 ## Caddy routing
 
-All three Caddyfile variants (frontend-host, single-host, examples/reverse-proxy) route both `/api/v1/*` and `/sse` directly to the API at port 8765. There is no intermediate proxy — the API serves both REST and SSE directly (ADR-058).
+All three Caddyfile variants (frontend-host, single-host, examples/reverse-proxy) route both `/api/v1/*` and `/sse` directly to the API at port 8765. There is no intermediate proxy — the API serves both REST and SSE directly (ADR-058). When the operator configures LibreWxR as the radar provider, the wizard adds a `/librewxr/*` reverse proxy route pointing at the LibreWxR instance (public API or self-hosted). This route strips the `/librewxr` prefix before forwarding. LibreWxR is an external service — not a Clear Skies container.
 
 | Path pattern | Destination | What it serves |
 |-------------|-------------|----------------|
@@ -136,6 +139,7 @@ All three Caddyfile variants (frontend-host, single-host, examples/reverse-proxy
 | `/pages.json` | `file_server` from `/etc/weewx-clearskies/` | Page visibility config. `Cache-Control: no-cache`. Dashboard reads at boot to filter nav + routes. (ADR-024 amendment 2026-06-21) |
 | `/now-layout.json` | `file_server` from `/etc/weewx-clearskies/` | Now page card layout config. `Cache-Control: no-cache`. Dashboard reads at boot; falls back to compiled-in default on 404. (ADR-065) |
 | `/card-manifest.json` | `file_server` from `/srv/dashboard` (build output) | Build-time card metadata manifest. Read by the admin card layout editor. Not operator-editable. |
+| `/librewxr/*` | Reverse proxy → LibreWxR instance (configured endpoint, strip `/librewxr` prefix) | Radar tiles, satellite tiles, alerts. Browser talks to Caddy only — API never touches tile or alert traffic. Only present when operator configures LibreWxR as radar provider. Wizard writes this route automatically. |
 | `/webcam/*` | `file_server` from `/var/www/clearskies/webcam/` | Live webcam still + timelapse. No `try_files` — returns 404 for missing files. |
 | `/cards/*` | `file_server` from `/var/www/clearskies/cards/` | v2: third-party card assets. Directory excluded from redeploy rsync. Empty until v2. |
 | `/static/*` | `config:9876` | Config UI static assets (CSS, JS) |
@@ -221,7 +225,7 @@ The OpenAPI spec lists 35+ data endpoints. Key groups for orientation:
 | Almanac | `/api/v1/almanac`, `/api/v1/almanac/sun-times`, `/api/v1/almanac/moon-phases`, `/api/v1/almanac/seeing-forecast`, `/api/v1/almanac/planets`, `/api/v1/almanac/moon-names`, `/api/v1/almanac/eclipses/lunar`, `/api/v1/almanac/eclipses/solar`, `/api/v1/almanac/meteor-showers`, `/api/v1/almanac/positions` | Skyfield-based; background cache warming for expensive computations. |
 | Earthquakes | `/api/v1/earthquakes`, `/api/v1/earthquakes/config`, `/api/v1/earthquakes/faults` | `/faults` serves GEM Active Faults GeoJSON radius-clipped. `/config` returns provider configuration. |
 | Charts | `/api/v1/charts/config`, `/api/v1/charts/groups`, `/api/v1/charts/custom-query/{series_id}` | Config-driven; custom SQL from `charts.conf` only (disk-only trust model). |
-| Radar | `/api/v1/radar/providers/{id}/frames`, `/api/v1/radar/providers/{id}/tiles/{z}/{x}/{y}` | Keyed providers proxied server-side; keys never reach browser. |
+| Radar | `/api/v1/radar/providers/{id}/frames`, `/api/v1/radar/providers/{id}/tiles/{z}/{x}/{y}` | Frame metadata for all providers. Tile proxy for keyed providers only (`openweathermap`). LibreWxR tiles go through Caddy (`/librewxr/*`), not the API. RainViewer tiles go direct to CDN. |
 | Content & nav | `/api/v1/pages`, `/api/v1/pages/{slug}/content`, `/api/v1/reports`, `/api/v1/content/about`, `/api/v1/content/legal` | `/pages` returns all 9 built-in pages unconditionally — page visibility filtering is the dashboard's responsibility via `pages.json` (ADR-024 amendment 2026-06-21). |
 | Infrastructure | `/api/v1/status`, `/api/v1/capabilities`, `/api/v1/records` | `/status` returns `{configured: bool}` — works in both setup and configured modes. |
 
@@ -384,6 +388,7 @@ Wizard steps are defined by `wizard/routes.py` and `templates/wizard/step_*.html
 | `/reports` | Reports | Yes |
 | `/about` | About | Yes |
 | `/legal` | Legal/Privacy | Yes |
+| `/radar` | Expanded Radar View (full-viewport overlay) | Yes |
 | `/:slug` | Custom pages | Yes |
 | `/*` | 404 Not Found | Yes |
 
@@ -490,7 +495,7 @@ weewx_clearskies_api/providers/
 ├── alerts/           # nws, aeris, openweathermap
 ├── earthquakes/      # usgs, geonet, emsc, renass
 ├── seeing/           # seven_timer (keyless, 7Timer ASTRO product)
-└── radar/            # rainviewer, openweathermap, aeris, iem_nexrad, noaa_mrms, msc_geomet, dwd_radolan, iframe
+└── radar/            # rainviewer, librewxr, openweathermap, iem_nexrad (deprecated), noaa_mrms (deprecated), msc_geomet, dwd_radolan, iframe
 ```
 
 Each module: outbound API call → response parsing → canonical field translation → capability declaration → error handling. Keyed providers proxied server-side (keys never reach browser).

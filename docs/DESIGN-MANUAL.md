@@ -991,3 +991,123 @@ Every form field in the wizard uses this exact structure:
 - Never add parallax or scroll-driven animations.
 - Never add a transition animation when switching themes — the swap must be instant.
 - Never ignore `prefers-reduced-motion: reduce` — disable all tweens when the user has set this preference.
+
+---
+
+## 19. Radar Card & Expanded View Design
+
+### Radar card (Now page)
+
+The radar card uses the standard card anatomy (§6) with a Leaflet map filling the content area.
+
+**Card header:**
+- `CardTitle`: "Radar" (standard card title styling — `var(--text-card-title)`, semibold, border-bottom).
+- `HeaderButton`: Phosphor `ArrowsOut` icon (expand to fullscreen). Position: right side of header, using the standard `ControlsStrip` pattern.
+
+**Card content:**
+- Leaflet map fills 100% of the card content area.
+- No padding between card border and map edge.
+- Legend gradient: horizontal bar below the map, inside the card. Height: 8px. Full width. Gradient colors from the active provider's color scheme.
+- Attribution line: small text below the legend (`var(--text-micro)`, `var(--muted-foreground)`).
+- Nowcast indicator: when animation crosses from past to nowcast frames, a subtle label or opacity change indicates "Forecast" data.
+
+**Dark/light theme:**
+- Base map tiles switch between light and dark variants (OSM Carto light/dark or equivalent).
+- Card glass, header, legend use standard theme tokens.
+
+### Expanded radar overlay
+
+Full-viewport overlay. Not a new page layout — an overlay that takes over the viewport.
+
+**Layout (desktop ≥1024px):**
+```
++-----------------------------------------------+
+| [X Close]                          (top-right) |
+|                                                 |
+|            Leaflet map (fills viewport)         |
+|                                                 |
+|                           +-------------------+ |
+|                           | Layer/config panel | |
+|                           | (right sidebar)    | |
+|                           | 320px width        | |
+|                           +-------------------+ |
+|                                                 |
+| [|<<  <  ▶  >  >>|] ---- time slider ---- [2x] |
++-------------------------------------------------+
+```
+
+**Layout (mobile <1024px):**
+```
++---------------------------+
+| [X Close]                 |
+|                           |
+|    Leaflet map            |
+|    (fills remaining)      |
+|                           |
++---------------------------+
+| Bottom sheet (drag handle)|
+| Layer/config panel        |
+| Half-height default       |
++---------------------------+
+| Time slider + controls    |
++---------------------------+
+```
+
+**Close button:**
+- Position: top-right, floating over the map.
+- Phosphor `X` icon, `aria-label="Close radar view"`.
+- `z-index: var(--z-overlay-controls)` (above map, below modals).
+- Size: 44×44px minimum tap target.
+- Background: semi-transparent card glass token.
+
+**Time slider (bottom bar):**
+- Full-width bar at bottom of viewport.
+- Height: 56px desktop, 64px mobile (≥44px tap targets).
+- Background: semi-transparent card glass token.
+- Controls (left to right): skip-to-start, step-back, play/pause, step-forward, skip-to-end, time slider track, speed selector, timestamp display.
+- Slider track: filled segment for past frames, distinct color segment for nowcast frames.
+- Timestamp: formatted in station timezone, `var(--text-card-value)` size.
+
+**Layer/config panel:**
+- **Desktop:** Right sidebar, 320px width, collapsible (toggle button on left edge). Semi-transparent card glass background.
+- **Mobile:** Bottom sheet with drag handle. Half-height default, full-height on drag. ≥44px tap targets on all controls.
+- **Contents (in order):**
+  1. Color scheme picker (LibreWxR only): grid of 13 swatches, 4 columns. Each swatch: 48×48px, rounded, shows gradient preview. Selected swatch has ring border (`var(--ring)`).
+  2. Opacity slider: label "Radar opacity", range 0-100%, default 70%. Standard slider control.
+  3. Alert toggle (LibreWxR only): labeled switch "Weather alerts", default on.
+  4. Wind arrows toggle (LibreWxR only): labeled switch "Wind arrows", default off.
+- Controls hidden when not applicable to the active provider (e.g., color schemes hidden for RainViewer).
+
+**Alert polygon styling:**
+- Severity-colored using WMO CAP severity mapping:
+  - Extreme: red stroke (`#dc2626`), red fill at 20% opacity.
+  - Severe: orange stroke (`#ea580c`), orange fill at 20% opacity.
+  - Moderate: yellow stroke (`#ca8a04`), yellow fill at 15% opacity.
+  - Minor: green stroke (`#16a34a`), green fill at 10% opacity.
+  - Unknown: gray stroke (`#6b7280`), gray fill at 10% opacity.
+- Stroke width: 2px.
+- On hover/focus: popup with alert headline and event type.
+
+**Z-order (bottom to top):**
+1. Base map tiles (OpenStreetMap)
+2. Radar tiles (XYZ animated layer)
+3. Wind arrow tiles (optional, LibreWxR only)
+4. Alert polygons (GeoJSON overlay, LibreWxR only)
+5. Map controls (zoom, attribution)
+6. Time slider bar
+7. Layer/config panel
+8. Close button
+
+**Dark/light theme:**
+- Base map: light theme uses light OSM tiles, dark theme uses dark OSM tiles.
+- Controls (time slider, panel, close button): use card glass tokens, adapting to theme.
+- Alert polygon colors are fixed (severity-semantic, not theme-dependent).
+
+### Responsive breakpoints
+
+| Breakpoint | Panel behavior | Time slider | Controls |
+|---|---|---|---|
+| ≥1024px (desktop) | Right sidebar, 320px | Full bottom bar | All visible |
+| <1024px (mobile) | Bottom sheet, drag handle | Simplified bottom bar | Stack vertically in bottom sheet |
+
+All interactive elements: ≥44px tap targets on mobile (WCAG 2.5.8).

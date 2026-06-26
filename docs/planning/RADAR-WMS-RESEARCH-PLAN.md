@@ -1,9 +1,55 @@
 # WMS-T Radar Rendering Research — Work Plan
 
-**Status:** NOT STARTED
+**Status:** COMPLETE — D1-D3 delivered; D4-D6 cancelled (provider direction changed)
 **Created:** 2026-06-25
-**Blocks:** [RADAR-PROVIDER-REPLACEMENT-PLAN.md](RADAR-PROVIDER-REPLACEMENT-PLAN.md) Phases 3-4 (dashboard)
+**Informed:** [RADAR-PROVIDER-REPLACEMENT-PLAN.md](RADAR-PROVIDER-REPLACEMENT-PLAN.md) — revised 2026-06-26 based on these findings
 **Session type:** Dedicated research session (separate from the main plan execution)
+
+### Session outcome (2026-06-26)
+
+**Completed:** D1 (research doc), D2 (PoC — working WMS-T animation against
+live IEM NEXRAD), D3 (ADR-074, Proposed). The WMS-T rendering pattern is
+proven and documented.
+
+**Cancelled:** D4 (manual updates), D5 (implementation reference), D6 (plan
+amendment). The provider architecture decision chose LibreWxR (XYZ tiles)
+over NOAA direct (WMS-T). WMS-T rendering is no longer on the critical
+path, so these deliverables are not needed.
+
+**What the research surfaced:** Raw NOAA WMS-T imagery is visually noisy
+compared to processed providers (LibreWxR, RainViewer). LibreWxR provides
+smoothing, denoising, satellite, alerts, and nowcasting — but self-hosting
+requires 3-4 GB RAM minimum for full CONUS with no sub-region scoping.
+The public API has no usage terms or guarantees. A custom MRMS processing
+pipeline (possibly borrowing LibreWxR techniques for personal use) remains
+an option to explore.
+
+### Resolution (2026-06-26)
+
+The open questions from the research session were resolved in a follow-up
+conversation. Decisions made:
+
+1. **Provider architecture:** LibreWxR (self-hosted with regional BBOX
+   cropping fork for personal use). NOAA direct path dropped — raw WMS-T
+   imagery is too noisy and would require building post-processing that
+   LibreWxR already provides. Custom MRMS pipeline not pursued.
+2. **MRMS processing pipeline:** Not scoped. LibreWxR already processes
+   MRMS data with smoothing, denoising, despeckle, and nowcasting.
+3. **ADR-074 (WMS-T rendering):** Superseded. The decision is technically
+   valid but no longer on the critical path. Retained as reference if
+   WMS-T is ever needed for a future provider.
+4. **Clear Skies integration model:** RainViewer stays as default provider.
+   LibreWxR added as optional. Caddy proxies LibreWxR traffic (tiles,
+   alerts). API provides metadata/capabilities only — no tile proxying.
+   Dashboard bounded by provider's geographic coverage (maxBounds from
+   capabilities).
+5. **Personal LibreWxR fork:** Separate project, not part of Clear Skies.
+   BBOX cropping to SoCal (~32°N–35.5°N, ~120.5°W–~114.5°W) reduces
+   resource requirements from ~3 GB RAM to ~1 GB. Execution handed off
+   to Opus in the personal infrastructure project.
+
+These decisions feed directly into the revised
+[RADAR-PROVIDER-REPLACEMENT-PLAN.md](RADAR-PROVIDER-REPLACEMENT-PLAN.md).
 
 ---
 

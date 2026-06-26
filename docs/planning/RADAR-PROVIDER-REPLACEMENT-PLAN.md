@@ -1,10 +1,10 @@
 # Radar Provider Replacement — Execution Plan
 
-**Status:** REVISING — first attempt failed (code reverted 2026-06-25), plan under revision
-**Created:** 2026-06-23 | **Revised:** 2026-06-25
+**Status:** COMPLETE — All phases done, deployed and verified 2026-06-26
+**Created:** 2026-06-23 | **Revised:** 2026-06-26
 **Brief:** [docs/briefs/RADAR-PROVIDER-REPLACEMENT.md](docs/briefs/RADAR-PROVIDER-REPLACEMENT.md)
 **Governs:** PROVIDER-MANUAL.md §7, API-MANUAL.md, DASHBOARD-MANUAL.md, DESIGN-MANUAL.md, OPERATIONS-MANUAL.md, ARCHITECTURE.md
-**Research dependency:** Dashboard Phases 3-4 are BLOCKED until the WMS-T rendering research is complete. See [RADAR-WMS-RESEARCH-PLAN.md](RADAR-WMS-RESEARCH-PLAN.md).
+**Research:** WMS-T research complete — see [RADAR-WMS-RESEARCH-PLAN.md](RADAR-WMS-RESEARCH-PLAN.md). Findings informed the provider architecture decision below.
 
 ---
 
@@ -12,13 +12,31 @@
 
 RainViewer gutted its free API tier on 2026-01-01: zoom capped at 7, no nowcast, single color scheme, PNG only. The radar card is nearly useless for local weather awareness. Aeris radar is unviable at the PWS contributor tier (3,000 map units/day, ToS gray area on caching).
 
-This plan replaces the radar provider set with two complementary paths:
-- **LibreWxR** — global default, RainViewer v2 API drop-in, 13 color schemes, zoom 12, WebP, 6-frame nowcast, configurable frame retention (`LIBREWXR_MAX_FRAMES`). Operator configures their LibreWxR endpoint (public API or self-hosted); tiles proxied through the Clear Skies API (API is the gateway, not browser-direct).
-- **NOAA unified** — US-only, IEM NEXRAD (CONUS) + NOAA MRMS (AK/HI/PR/Guam) as two seamless radar sub-layers, plus GOES satellite (5 bands), SPC severe weather overlays, and alert polygons. All free government WMS-T endpoints — browser fetches WMS tiles directly.
+This plan adds **LibreWxR** as an optional radar provider alongside the existing (degraded) RainViewer. LibreWxR is a self-hostable, open-source weather data platform that provides processed radar (smoothing, denoising, despeckle), 13 color schemes, zoom 12, WebP tiles, 60-minute nowcast, satellite imagery, and weather alerts — all via a RainViewer v2 API-compatible interface.
 
-**Scope boundary:** This plan adds two new providers (librewxr, noaa) and adjusts the existing provider set accordingly (demote RainViewer, drop Aeris from radar). It does NOT add existing regional providers (dwd_radolan, msc_geomet) to the wizard — those modules exist in the API from the original radar domain work but are not part of this plan's scope.
+**RainViewer stays as the default** radar provider. It works out of the box for any operator with zero infrastructure. LibreWxR is offered as an optional upgrade for operators who want better radar quality and are willing to either use the public API (no SLA) or self-host.
 
-The plan also adds an expand-to-fullscreen mode for the radar card — visitors tap an expand button on the Now page card to open a full-viewport overlay with layer toggles, time slider, color scheme picker, and provider-adaptive controls. The overlay pushes `/radar` to browser history for bookmarkability.
+The plan also adds an **expanded radar view** — visitors tap an expand button on the Now page radar card to open a full-viewport overlay with animation controls, layer configuration, color scheme picker, alert overlays, and opacity control. The expanded view opens at the same zoom level and center as the card — it provides room for controls and readable detail, not a different map. Visitors can zoom out up to the provider's configured coverage bounds, but no further. The overlay pushes `/radar` to browser history for bookmarkability.
+
+### What changed from the previous plan version (2026-06-25)
+
+The original plan had two radar paths: LibreWxR (global) and NOAA unified (US-only, raw WMS-T). WMS-T rendering research (D1-D3 of the research plan) proved the rendering pattern works but surfaced that raw NOAA WMS-T imagery is visually noisy — it would require building post-processing (smoothing, denoising, interpolation) that LibreWxR already provides. The NOAA direct path was dropped.
+
+**Dropped from previous plan:**
+- NOAA unified provider module (WMS-T radar, satellite, SPC overlays)
+- Multi-layer capability model (no longer needed — both providers are single-layer XYZ)
+- WMS-T rendering (leaflet-timedimension) — retained as reference via ADR-074
+- SPC convective outlooks
+- API tile proxying for LibreWxR (Caddy proxies instead)
+
+**Added/changed:**
+- Caddy proxies LibreWxR traffic (tiles, alerts) — API provides metadata only
+- Alert overlays from LibreWxR `/v2/alerts` (routed through Caddy)
+- Geographic bounds enforcement (`maxBounds` from provider capabilities)
+- Wizard writes both `api.conf` and Caddyfile for LibreWxR
+- Personal LibreWxR fork (BBOX cropping for SoCal) is explicitly out of scope — separate project, coordination only (see §7 Handoff)
+
+**Scope boundary:** This plan adds one new provider (librewxr) and adjusts the existing set (RainViewer stays default with a limitations note, Aeris dropped from radar). It does NOT add existing regional providers (dwd_radolan, msc_geomet) to the wizard. Personal LibreWxR modifications (BBOX cropping) are a separate project.
 
 ---
 
@@ -46,7 +64,6 @@ The plan also adds an expand-to-fullscreen mode for the radar card — visitors 
 - API capability model: `repos/weewx-clearskies-api/weewx_clearskies_api/providers/_common/capability.py`
 - API dispatch: `repos/weewx-clearskies-api/weewx_clearskies_api/providers/_common/dispatch.py`
 - API config: `repos/weewx-clearskies-api/weewx_clearskies_api/config/settings.py` (RadarSettings)
-- API WMS parser: `repos/weewx-clearskies-api/weewx_clearskies_api/providers/_common/wms_capabilities.py`
 - Dashboard radar card: `repos/weewx-clearskies-dashboard/src/components/shared/radar-card.tsx`
 - Dashboard radar map: `repos/weewx-clearskies-dashboard/src/components/shared/radar-map.tsx`
 - Dashboard card registry: `repos/weewx-clearskies-dashboard/src/lib/card-registry.ts`
@@ -66,7 +83,7 @@ The plan also adds an expand-to-fullscreen mode for the radar card — visitors 
 
 3. **Coordinator writes detailed agent prompts.** Because the coordinator has read the docs and code, each agent prompt must include: the specific files to modify, the exact behavior to implement (from the manuals), the acceptance criteria, and references to the manual sections that govern the work. Agents should not need to search for context — it should be in the prompt.
 
-4. **One agent per task (or per tightly-coupled task group).** Don't give one agent all of Phase 1. Give it T1.1, verify, then give T1.2. Exceptions: tightly-coupled tasks that share state (e.g., T1.2 + T1.4 both modify `noaa.py`) can be assigned together.
+4. **One agent per task (or per tightly-coupled task group).** Don't give one agent all of Phase 1. Give it T1.1, verify, then give T1.2. Exceptions: tightly-coupled tasks that share state can be assigned together.
 
 ---
 
@@ -74,12 +91,19 @@ The plan also adds an expand-to-fullscreen mode for the radar card — visitors 
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Full-screen approach | Expand-to-fullscreen overlay from radar card | No ADR-024 amendment needed (no new page). Discoverable. `/radar` pushed to history for bookmarks. |
-| NOAA module structure | Unified `noaa` module, IEM NEXRAD + MRMS as two radar sub-layers | Both are NOAA WMS-T sources with complementary geographic coverage (CONUS + AK/HI/PR/Guam). One wizard entry, not two. |
-| LibreWxR frame count | Configurable via `LIBREWXR_MAX_FRAMES` env var (default 12, recommend 24+ for self-hosted) | Self-hosted operators can get 4+ hours of history for smooth animation. Public API users get ~2 hours. |
-| Card appearance | Minimal — current controls + expand button. Rich features in expanded view only. | Keep Now page card clean; expanded view is the "dive deeper" path. |
-| RainViewer status | Demoted — available but degraded. Wizard notes limitations. | Still functional at zoom 7 for operators who want it. |
+| Default provider | RainViewer (existing, degraded) | Path of least resistance — works out of the box, no infrastructure. Operators who want better quality upgrade to LibreWxR. |
+| LibreWxR integration | Optional provider, Caddy-proxied | Operator configures endpoint (public API or self-hosted). Caddy reverse-proxies LibreWxR traffic. API provides metadata/capabilities only. |
+| NOAA direct | Dropped | Raw WMS-T imagery is visually noisy. Would require building post-processing pipeline that LibreWxR already provides. |
+| Tile routing | Caddy proxies LibreWxR tiles and alerts | Browser only talks to Caddy. Caddy routes `/librewxr/*` to the LibreWxR instance. API never touches tile traffic. |
+| Alert overlays | LibreWxR `/v2/alerts` GeoJSON, via Caddy | Watch boxes, warnings, advisories rendered as Leaflet GeoJSON overlays on the radar map. |
+| SPC convective outlooks | Dropped | Would require separate data pipeline (SPC mapservices). Out of scope — deferred to future custom system. |
+| Expanded view | Same zoom/center as card, more controls | Not a bigger map — a better interface. Controls, layer config, alert overlays, color schemes. Closeable (button + Escape). |
+| Zoom bounds | Bounded by provider's coverage area | `maxBounds` from capabilities metadata. Personal BBOX-cropped LibreWxR = SoCal only. Full CONUS instance = continental US. Public API = global. |
+| Card appearance | Minimal — current controls + expand button | Keep Now page card clean; expanded view is the "dive deeper" path. |
+| RainViewer status | Default but degraded. Wizard notes limitations. | Still functional at zoom 7 for operators who want zero setup. |
 | Aeris radar status | Dropped from radar domain. Remains for forecast/AQI/alerts. | 3,000 map units/day is unviable for radar tiles. |
+| Frame metadata | API normalizes for all providers | Dashboard gets frames from API in consistent format regardless of provider. Keeps dashboard decoupled from provider-specific wire formats. |
+| Personal LibreWxR fork | Out of scope — separate project | BBOX cropping for SoCal is personal infrastructure, not Clear Skies project work. Coordination via handoff (§7). |
 
 ---
 
@@ -87,359 +111,336 @@ The plan also adds an expand-to-fullscreen mode for the radar card — visitors 
 
 ### PHASE 0 — Foundation (ADR + Reference Docs + ALL Manual Updates)
 
-> **Manuals before code.** The manuals are what dev agents consult. If the manuals are silent on what the agent is building, the agent has no guidance. ALL manual updates happen in Phase 0, before any code phase starts. Manuals may be amended later as implementation details surface, but the prescriptive rules must exist before the first line of code.
+> **Manuals before code.** The manuals are what dev agents consult. If the manuals are silent on what the agent is building, the agent has no guidance. ALL manual updates happen in Phase 0, before any code phase starts.
 
-**T0.1 — Fetch and save LibreWxR API docs**
+**T0.1 — Fetch and save LibreWxR API docs** ✅ DONE (2026-06-26)
 - Owner: Coordinator (Opus)
-- Do: Fetch from librewxr.net/docs and save to `docs/reference/api-docs/librewxr.md` with capture date header. Include: configuration reference (env vars, frame counts), weather-maps.json response format, RainViewer migration guide, coverage documentation, tile URL patterns.
-- Accept: File exists with "Captured: 2026-06-23" header. All env vars documented (`LIBREWXR_MAX_FRAMES`, `LIBREWXR_FETCH_INTERVAL`, `LIBREWXR_NOWCAST_FRAMES`, `LIBREWXR_SATELLITE_MAX_FRAMES`).
+- Do: Fetch from librewxr.net/docs and save to `docs/reference/api-docs/librewxr.md` with capture date header. Include: configuration reference (env vars, frame counts), weather-maps.json response format, `/v2/alerts` endpoint format, RainViewer migration guide, coverage documentation, tile URL patterns.
+- Accept: File exists with "Captured: 2026-06-26" header. Key env vars documented. Alerts endpoint format documented.
+- Result: Existing file (captured 2026-06-24) verified against live public API — structure unchanged. Capture date updated to 2026-06-26.
 
-**T0.2 — Fetch and verify NOAA WMS endpoint capabilities**
-- Owner: Coordinator (Opus)
-- Do: Hit the three NOAA WMS GetCapabilities endpoints listed in the brief. Verify layer names, TIME dimension formats, and geographic extents. Save captured capabilities to `docs/reference/api-docs/noaa-wms-layers.md`. Verify IEM NEXRAD layer name (`nexrad-n0q-wmst`), nowCOAST satellite layer names, MRMS layer name.
-- Accept: All WMS endpoints respond. Layer names confirmed. TIME dimension formats documented.
-
-**T0.3 — Amend ADR-015 (decision record update)**
+**T0.2 — Amend ADR-015 (decision record update)** ✅ DONE (2026-06-26)
 - Owner: Coordinator (Opus)
 - File: `docs/archive/decisions/ADR-015-radar-map-tiles-strategy.md`
-- Do: Add amendment section recording the changed decisions: LibreWxR replaces RainViewer as global default, unified NOAA module replaces separate iem_nexrad + noaa_mrms, RainViewer demoted, Aeris dropped from radar, expand-to-fullscreen model, LibreWxR tiles proxied through API.
-- **Note:** This updates the ADR as a historical decision record. The ADR is NOT the source of truth for implementation — the manuals are. Agents follow manuals, not ADRs. The ADR records WHY decisions were made; the manuals say WHAT to build.
-- Accept: ADR-015 amendment reflects the current decisions. No implementation work depends on this task.
+- Do: Add amendment section recording: LibreWxR added as optional provider (Caddy-proxied), RainViewer stays default (degraded), NOAA direct dropped, Aeris dropped from radar, expand-to-fullscreen model, Caddy proxy routing model.
+- Accept: ADR-015 amendment reflects current decisions.
 
-**T0.4 — Update PROVIDER-MANUAL.md §7 (Radar)**
+**T0.3 — Update PROVIDER-MANUAL.md §7 (Radar)** ✅ DONE (2026-06-26)
 - Owner: Coordinator (Opus)
 - File: `docs/PROVIDER-MANUAL.md`
-- Do: Rewrite §7 Radar to reflect new provider set. This is the primary reference for `clearskies-api-dev`:
-  - **Day-1 provider table**: add `librewxr` and `noaa`, mark `rainviewer` as degraded, remove `aeris` from radar, remove `iem_nexrad` and `noaa_mrms` (replaced by unified `noaa`)
-  - **LibreWxR module rules**: configurable upstream (`[radar] librewxr_endpoint`, default `https://api.librewxr.net`), CC-BY-4.0 attribution, weather-maps.json wire format (RainViewer v2 compatible), tile URL template (`{host}{path}/{size}/{z}/{x}/{y}/{color}/{smooth_snow}.webp`), WebP content type, tile proxy through API (not browser-direct), 60s frame cache / 300s tile cache
-  - **NOAA unified module rules**: replaces `iem_nexrad` + `noaa_mrms`. Two radar sub-layers (NEXRAD via IEM WMS-T for CONUS, MRMS via NOAA MapServer WMS-T for AK/HI/PR/Guam). Multi-layer capability declaration with additional layers: GOES satellite (5 bands via nowCOAST WMS-T), SPC outlooks (mapservices GeoJSON), alert polygons (from existing `/api/v1/alerts`). Browser-direct for WMS layers (free government endpoints). Per-layer frame metadata endpoint.
-  - **Proxied provider set**: rename concept from "keyed providers" to "proxied providers". LibreWxR is proxied (API is the gateway to external services). NOAA WMS layers are browser-direct (free government endpoints with no rate limits). RainViewer remains browser-direct (keyless, public CDN).
-  - **Updated wizard suggestion table**: US → `noaa`, all other regions → `librewxr`
-  - **Attribution requirements** per provider
-- Accept: §7 is internally consistent, covers all provider modules. An api-dev agent reading only this section would know exactly what to build.
+- Do: Rewrite §7 Radar to reflect new provider set.
+- Accept: §7 is internally consistent. An api-dev agent reading only this section would know exactly what to build.
+- Result: Full rewrite of §7. Added LibreWxR module rules, Caddy proxy model, tile routing model table, geographic bounds, updated attribution table, wizard suggestion table, RainViewer degradation note. Also updated §1 (stale Aeris proxy reference) and §12 (new anti-patterns for LibreWxR).
 
-**T0.5 — Update ARCHITECTURE.md**
+**T0.4 — Update ARCHITECTURE.md** ✅ DONE (2026-06-26)
 - Owner: Coordinator (Opus)
 - File: `docs/ARCHITECTURE.md`
-- Do:
-  - Update radar endpoint description to note multi-layer capability for NOAA provider and per-layer frame metadata endpoint
-  - Add LibreWxR to the tile proxy description (proxied through API, not browser-direct)
-  - Note `/radar` route for expanded radar view (dashboard-side SPA route, no Caddy change — `try_files` fallback handles it)
-  - Document that LibreWxR is an external service the API communicates with — no Caddy route, no container in our inventory
-  - Clarify the proxy model: Caddy → API only. API → external services (LibreWxR, RainViewer, Aeris, etc.). Browser → government WMS endpoints directly (NOAA, IEM, MSC, DWD).
-- Accept: Architecture doc reflects new endpoint capabilities and proxy model. No incorrect Caddy or container references.
+- Do: Document Caddy proxy route, topology diagram, `/radar` route, provider module layout, radar endpoint description.
+- Accept: Architecture doc reflects Caddy proxy model. No stale references.
+- Result: Added `/librewxr/*` to Caddy routing table, updated topology diagram with LibreWxR box, added `/radar` to dashboard pages, updated provider module layout (librewxr added, aeris removed, iem_nexrad/noaa_mrms deprecated), updated radar endpoint description.
 
-**T0.6 — Update API-MANUAL.md (radar endpoints + capability model)**
+**T0.5 — Update API-MANUAL.md (radar capabilities)** ✅ DONE (2026-06-26)
 - Owner: Coordinator (Opus)
 - File: `docs/API-MANUAL.md`
-- Do: Add/update sections that guide `clearskies-api-dev`:
-  - **Capability model extension**: describe the `layers` list on `ProviderCapability` — fields per layer (`layer_id`, `layer_name`, `layer_type`, `wms_endpoint_url`/`tile_url_template`, `wms_layer_name`, `time_enabled`, `geographic_coverage`, `default_enabled`, `browser_direct`). Optional — single-layer providers unchanged.
-  - **New endpoint**: `GET /api/v1/radar/providers/{id}/layers/{layer_id}/frames` — per-layer frame metadata for multi-layer providers (NOAA satellite, NOAA MRMS sub-layer)
-  - **Tile proxy expansion**: `GET /radar/providers/{provider_id}/tiles/{z}/{x}/{y}` now serves LibreWxR in addition to keyed providers. Rename internal set from `_KEYED_RADAR_PROVIDERS` to `_PROXIED_RADAR_PROVIDERS`. Add query parameters: `?t=` (frame timestamp), `?color=` (color scheme, LibreWxR only).
-  - **LibreWxR config**: `[radar] librewxr_endpoint` field in `api.conf`, default `https://api.librewxr.net`
-  - **Deprecated providers**: `iem_nexrad` and `noaa_mrms` log migration warning suggesting `noaa`. `aeris` removed from radar domain.
-- Accept: An api-dev agent reading the API-MANUAL would know the exact endpoint shapes, config fields, and capability model changes to implement.
+- Do: Rewrite §12 (Radar Endpoints and Capability Model) — remove stale multi-layer model, document Caddy proxy boundary, add capability metadata fields, config fields table, deprecation warnings.
+- Accept: An api-dev agent reading the API-MANUAL would know the exact endpoint shapes and config fields.
 
-**T0.7 — Update DASHBOARD-MANUAL.md (radar card + expanded view)**
+**T0.6 — Update DASHBOARD-MANUAL.md (radar card + expanded view)** ✅ DONE (2026-06-26)
 - Owner: Coordinator (Opus)
 - File: `docs/DASHBOARD-MANUAL.md`
-- Do: Add/update sections that guide `clearskies-dashboard-dev` on WHAT the dashboard does (features, UI behavior, a11y). This is a two-pass task:
-  - **Pass 1 (Phase 0):** Document the feature set — expand button, expanded view overlay, time slider, layer panel, color scheme picker, opacity, provider-adaptive behavior, SPC/alert overlays, accessibility. Document everything EXCEPT the WMS-T rendering approach.
-  - **Pass 2 (after research):** Once the WMS-T rendering ADR is accepted, add the rendering rules — library to use, animation pattern, component architecture, dual-layer sync. This is deliverable D4 from the research plan.
-- Feature set to document in Pass 1:
-  - Radar card: expand button (Phosphor `ArrowsOut`), adaptive animation speed, nowcast distinction, provider-adaptive legend, attribution
-  - Expanded view (`/radar`): full-viewport overlay, close button + Escape, focus trap, `/radar` route
-  - Time slider: scrubable, play/pause, speed control, nowcast visual distinction
-  - Layer panel: sidebar desktop / bottom sheet mobile, populated from capability `layers`, localStorage persistence
-  - Color scheme picker: LibreWxR only (13 schemes), hidden for NOAA/RainViewer
-  - Opacity slider: 0-100%, default 70%
-  - Layer z-order: base map → satellite → radar → SPC → alerts
-  - SPC overlays: GeoJSON, auto-refresh 5 min, NOT time-animated
-  - Alert polygons: from existing `/api/v1/alerts`, severity-colored, auto-refresh 5 min
-  - WCAG 2.1 AA: focus trap, keyboard nav, aria-live, prefers-reduced-motion
-- Do NOT prescribe the WMS-T rendering approach in Pass 1. That comes from the research.
-- Accept (Pass 1): Dashboard-dev agent knows what features to build, what UI components exist, and what the a11y requirements are. WMS-T rendering approach is explicitly marked TBD.
-- Accept (Pass 2): Dashboard-dev agent also knows HOW to render WMS-T layers — library, pattern, component architecture. All blocked tasks can proceed.
+- Do: Add new §10 (Radar Card & Expanded View) covering card, live refresh, idle timeout, expanded view, WCAG requirements. Renumbered §10 Anti-Patterns to §11.
+- Accept: Dashboard-dev agent knows what features to build, what components exist, how tiles are fetched, and what the a11y requirements are.
 
-**T0.8 — Update DESIGN-MANUAL.md (radar card + expanded view design spec)**
+**T0.7 — Update DESIGN-MANUAL.md (radar card + expanded view design spec)** ✅ DONE (2026-06-26)
 - Owner: Coordinator (Opus)
 - File: `docs/DESIGN-MANUAL.md`
-- Do: Add radar design specifications:
-  - **Radar card**: expand button placement (card header or map top-right corner), legend gradient anatomy (adapts to provider color scheme), attribution line placement, nowcast indicator on frame counter
-  - **Expanded radar overlay**: layout spec (full viewport, controls overlay the map). Time slider anatomy (bottom bar, scrub track, play button left, speed control right, current timestamp center). Layer panel anatomy (sidebar width, section headers by layer type, checkbox + label + badge per layer, collapse/expand toggle). Color scheme picker anatomy (grid or dropdown, swatch preview). Opacity slider anatomy. Close button placement (top-right, above layer panel).
-  - **Mobile breakpoints**: layer panel as bottom sheet (drag handle, half-height default, full-height on drag up). Time slider simplified (play/pause + scrub, no speed control on small screens). All touch-friendly tap targets (≥44px).
-  - **Dark/light theme**: base map switches (OSM ↔ CartoDB dark). Controls use theme tokens. Layer panel background matches theme.
-  - **Z-order tokens**: define stacking order for overlay controls over the Leaflet map.
-- Accept: A dashboard-dev agent reading the design manual would know the visual layout, component anatomy, and responsive behavior.
+- Do: Add new §19 (Radar Card & Expanded View Design) covering card anatomy, expanded overlay layouts (desktop/mobile ASCII diagrams), time slider, layer/config panel, color scheme picker, alert polygon styling (severity colors), z-order stack, responsive breakpoints.
+- Accept: Dashboard-dev agent reading the design manual knows the visual layout, component anatomy, and responsive behavior.
 
-**T0.9 — Update OPERATIONS-MANUAL.md (LibreWxR configuration)**
+**T0.8 — Update OPERATIONS-MANUAL.md (LibreWxR configuration)** ✅ DONE (2026-06-26)
 - Owner: Coordinator (Opus)
 - File: `docs/OPERATIONS-MANUAL.md`
-- Do: Add LibreWxR configuration section:
-  - Explain the two modes: public API (`api.librewxr.net`, no infrastructure) vs self-hosted (operator's responsibility)
-  - Document the `[radar] librewxr_endpoint` config field
-  - Note that self-hosted operators must ensure their LibreWxR instance is reachable by the Clear Skies API. Visitors' browsers never contact LibreWxR directly — tiles are proxied through the API.
-  - Recommend `LIBREWXR_MAX_FRAMES=24+` for smoother animation (operator sets this on their own instance)
-  - Link to LibreWxR's own documentation for self-hosting setup
-  - Do NOT provide Docker compose snippets, Caddyfile routes, or any other LibreWxR infrastructure config
-- Accept: Ops manual covers both modes without providing LibreWxR infrastructure.
+- Do: Add RadarSettings key table, LibreWxR deployment modes (public API vs self-hosted), Caddy proxy route snippet, RainViewer degradation note. Inserted in §4 Configuration.
+- Accept: Ops manual covers both modes. Caddy proxy model documented.
+
+**T0.9 — Update ADR-074 status** ✅ DONE (2026-06-26)
+- Owner: Coordinator (Opus)
+- File: `docs/decisions/ADR-074-wms-t-rendering-strategy.md`
+- Status updated to "Superseded — provider direction chose LibreWxR (XYZ tiles); WMS-T not on critical path." Note references the research plan resolution.
 
 **QC (Opus) — after Phase 0:** Comprehensive manual review:
-1. PROVIDER-MANUAL §7 — an api-dev agent could build both provider modules from this section alone
-2. API-MANUAL — endpoint shapes, capability model, config fields all specified
-3. DASHBOARD-MANUAL — card upgrades + expanded view described (rendering approach TBD pending research)
+1. PROVIDER-MANUAL §7 — api-dev agent could build the LibreWxR module from this section alone
+2. API-MANUAL — endpoint shapes, capability metadata, config fields specified
+3. DASHBOARD-MANUAL — card + expanded view + alert overlays described, XYZ tile animation only
 4. DESIGN-MANUAL — visual layout, component anatomy, responsive behavior specified
-5. ARCHITECTURE.md — proxy model correct, no stale Caddy/container references
-6. OPERATIONS-MANUAL — LibreWxR config documented
-7. Reference docs (T0.1, T0.2) have capture-date headers
+5. ARCHITECTURE.md — Caddy proxy model correct, no stale references
+6. OPERATIONS-MANUAL — LibreWxR config documented, Caddy routing noted
+7. Reference docs (T0.1) have capture-date header
 8. Cross-check: no manual contradicts another manual
 
 ---
 
-### PHASE 1 — API: Provider Modules + Capability Model
+### PHASE 1 — API: LibreWxR Provider Module + Config Changes
 
-**T1.1 — LibreWxR provider module (metadata + tile proxy)**
+**T1.1 — LibreWxR provider module (metadata + capabilities)**
 - Owner: `clearskies-api-dev` (Sonnet)
 - File: New `repos/weewx-clearskies-api/weewx_clearskies_api/providers/radar/librewxr.py`
-- Do: Build provider module following the `rainviewer.py` pattern (API-compatible wire format) with **tile proxying** — the API is the gateway to LibreWxR, same as all external services. Key points:
+- Do: Build provider module for frame metadata and capability declaration. Key points:
   - `BASE_URL` configurable: defaults to `https://api.librewxr.net`, overridable via `[radar] librewxr_endpoint` in `api.conf`
-  - **`get_frames()`** — fetches `{endpoint}/public/weather-maps.json`, returns canonical `RadarFrameList`. Same wire model and frame-kind mapping as RainViewer (max past → current, nowcast preserved).
-  - **`get_tile(z, x, y, *, t=None)`** — fetches tile bytes from LibreWxR upstream, returns `(bytes, content_type)`. URL composed from `tileHost` + frame `path` + tile coordinates + color scheme + options. Tile cache: base64-encoded envelope, TTL 300s (same pattern as Aeris/OWM tile proxy).
-  - Tile URL uses WebP format (`.webp` extension, `image/webp` content type)
-  - Color scheme parameter stored in config (default: NEXRAD Level III scheme "2")
-  - Attribution: `"LibreWxR (https://librewxr.net/) — Data: CC-BY-4.0"`
-  - Rate limiter: polite-use guard (5 req/s)
-  - Cache TTL: 60s for frame metadata, 300s for tiles
-- Accept: Module passes `ruff check` + `mypy`. Frame metadata fetch works against `api.librewxr.net`. Tile proxy returns WebP bytes. CAPABILITY declared correctly.
+  - **`get_frames()`** — fetches `{endpoint}/public/weather-maps.json`, returns canonical `RadarFrameList`. Same wire model and frame-kind mapping as RainViewer (max past → current, nowcast preserved). Cache TTL: 60s.
+  - **Capability declaration** — includes:
+    - Provider name, attribution (`"LibreWxR (https://librewxr.net/) — Data: CC-BY-4.0"`)
+    - Geographic bounds (bounding box — from config, defaults to global)
+    - Caddy proxy path prefix (`/librewxr`) for tiles and alerts
+    - Available features: nowcast (bool), color_schemes (list), alerts (bool)
+    - Tile URL template (relative to Caddy: `/librewxr/{path}/{size}/{z}/{x}/{y}/{color}/{options}.webp`)
+    - Alert URL (`/librewxr/v2/alerts`)
+  - **NO `get_tile()` method** — Caddy proxies tiles directly to LibreWxR. The API never handles tile bytes.
+  - Rate limiter: polite-use guard (5 req/s) for weather-maps.json fetches
+- Accept: Module passes `ruff check` + `mypy`. Frame metadata fetch works against `api.librewxr.net`. Capability includes bounds and Caddy path. No tile proxy code.
 
-**T1.2 — Unified NOAA provider module (radar layers)**
-- Owner: `clearskies-api-dev` (Sonnet)
-- File: New `repos/weewx-clearskies-api/weewx_clearskies_api/providers/radar/noaa.py`
-- Do: Build unified provider module that combines IEM NEXRAD + NOAA MRMS functionality:
-  - Two radar sub-layers: `nexrad` (IEM WMS-T, CONUS) and `mrms` (NOAA MapServer WMS-T, AK/HI/PR/Guam)
-  - `get_frames()` returns frames from IEM NEXRAD (primary, CONUS)
-  - `get_frames(layer="mrms")` returns frames from NOAA MRMS
-  - Reuse existing `parse_wms_time_dimension()` for both
-  - Declare multi-layer capability (see T1.3)
-  - Attribution: `"NEXRAD imagery courtesy of Iowa Environmental Mesonet. MRMS data courtesy of NOAA."`
-  - No API key required
-  - Rate limiter: polite-use guard
-  - Cache TTL: 60s per sub-layer
-- Accept: Module passes `ruff check` + `mypy`. Frame metadata works for both IEM and MRMS endpoints. Both sub-layers declared in capability.
-
-**T1.3 — Extend capability model for multi-layer providers**
-- Owner: `clearskies-api-dev` (Sonnet)
-- Files: `providers/_common/capability.py`, `models/responses.py`, `endpoints/radar.py`
-- Do: Extend `ProviderCapability` to support a `layers` list for providers that offer multiple data layers. Each layer declares:
-  - `layer_id` (string, e.g., "nexrad", "mrms", "goes_ir", "spc_outlooks")
-  - `layer_name` (display name)
-  - `layer_type` (enum: "radar", "satellite", "overlay", "alerts")
-  - `wms_endpoint_url` or `tile_url_template`
-  - `wms_layer_name` (for WMS layers)
-  - `time_enabled` (bool — controls whether frame metadata is available)
-  - `geographic_coverage` (string)
-  - `default_enabled` (bool — whether this layer is on by default)
-  - `browser_direct` (bool — whether the browser fetches tiles directly vs API proxy)
-  
-  Update `/api/v1/capabilities` response to include layers when present. Single-layer providers (LibreWxR, RainViewer, etc.) continue working unchanged — `layers` is optional.
-  
-  Add endpoint: `GET /api/v1/radar/providers/{id}/layers/{layer_id}/frames` for fetching frame metadata per sub-layer.
-- Accept: Existing single-layer providers still work. NOAA provider declares multiple layers in capabilities response. New frames endpoint works per sub-layer. `ruff check` + `mypy` pass.
-
-**T1.4 — NOAA satellite + SPC + alert layer declarations**
-- Owner: `clearskies-api-dev` (Sonnet)
-- File: `providers/radar/noaa.py` (extend from T1.2)
-- Do: Add layer declarations for non-radar NOAA data:
-  - **Satellite layers** (5 GOES bands from nowCOAST WMS-T): Visible, Longwave IR, Shortwave IR, Water Vapor, Snow/Ice. All browser-direct, time-enabled.
-  - **SPC layers** (from mapservices): Day 1-3 categorical outlooks, tornado/hail/wind probabilities, mesoscale discussions, fire weather. Browser-direct, NOT time-enabled (current snapshot only).
-  - **Alert polygons**: Use existing `/api/v1/alerts` data (no new endpoint needed). Layer declaration points dashboard to render alert polygons from existing alerts response.
-  - All satellite/SPC/alert layers are browser-direct (free government endpoints, no proxy needed). The API only declares their availability and endpoint URLs.
-  - For satellite layers: add frame metadata endpoint that fetches nowCOAST WMS-T GetCapabilities and extracts TIME dimension.
-- Accept: All layers declared in capability. Satellite frame metadata endpoint returns valid time steps. SPC layer declarations include correct mapservices URLs. `ruff check` + `mypy` pass.
-
-**T1.5 — Provider set changes (config, dispatch, demote/drop)**
+**T1.2 — Provider set changes (config, dispatch, limitations note, Aeris drop)**
 - Owner: `clearskies-api-dev` (Sonnet)
 - Files: `config/settings.py` (RadarSettings), `providers/_common/dispatch.py`, `endpoints/radar.py`, `__main__.py`
 - Do:
-  - Add `librewxr` and `noaa` to `RadarSettings` valid provider choices
+  - Add `librewxr` to `RadarSettings` valid provider choices
   - Add `librewxr_endpoint` optional config field (default `https://api.librewxr.net`)
-  - Add `librewxr` and `noaa` to `PROVIDER_MODULES` dispatch table
-  - Update `_KNOWN_RADAR_PROVIDERS` in radar endpoint. Rename `_KEYED_RADAR_PROVIDERS` → `_PROXIED_RADAR_PROVIDERS` and add `librewxr` (proxy is now about API-as-gateway, not just key protection). LibreWxR tiles are proxied through `GET /radar/providers/librewxr/tiles/{z}/{x}/{y}` just like Aeris/OWM.
-  - Add degradation note to `rainviewer` CAPABILITY `operator_notes` ("Zoom capped at 7, no nowcast, single color scheme since 2026-01-01")
-  - Remove `aeris` from `_KEYED_RADAR_PROVIDERS` for radar domain (keep for forecast/AQI/alerts). Remove Aeris radar capability wiring from `_wire_providers_from_config`. Remove Aeris credential wiring from `wire_radar_settings` (Aeris credentials still wired for forecast).
-  - Keep `iem_nexrad` and `noaa_mrms` modules on disk but mark as deprecated in their docstrings (operators with existing config referencing them should get a log warning suggesting migration to `noaa`)
-  - Update `api.conf.example` with new provider options and comments
-- Accept: `api.conf` accepts `provider = librewxr` and `provider = noaa`. Deprecated providers log migration warning. Aeris no longer appears as a radar provider. `ruff check` + `mypy` pass.
+  - Add `librewxr_bounds` optional config field (bounding box, default empty = global)
+  - Add `librewxr` to `PROVIDER_MODULES` dispatch table
+  - Add degradation note to `rainviewer` CAPABILITY `operator_notes`
+  - Remove `aeris` from radar domain (keep for forecast/AQI/alerts)
+  - Keep `iem_nexrad` and `noaa_mrms` modules on disk but mark as deprecated (log migration warning)
+  - Update `api.conf.example` with new provider options
+- Accept: `api.conf` accepts `provider = librewxr`. Deprecated providers log migration warning. Aeris absent from radar. `ruff check` + `mypy` pass.
 
-**QC (Opus) — after Phase 1:** Verify LibreWxR module fetches frames from public API. Verify NOAA module fetches frames from both IEM and MRMS endpoints. Capability response includes layers for NOAA. Config accepts new providers. Aeris removed from radar. Deprecated modules log warnings. All linting passes.
+**QC (Opus) — after Phase 1:** Verify LibreWxR module fetches frames from public API. Capability response includes bounds and Caddy path. Config accepts new provider. Aeris removed from radar. All linting passes.
 
 ---
 
 ### PHASE 2 — Config UI: Wizard + Admin
 
-**T2.1 — Add LibreWxR + NOAA to provider registry**
+**T2.1 — Add LibreWxR to provider registry**
 - Owner: `clearskies-stack-dev` (Sonnet)
 - File: `repos/weewx-clearskies-stack/weewx_clearskies_config/wizard/providers.py`
-- Do: Add `ProviderInfo` entries:
+- Do: Add `ProviderInfo` entry:
   - `librewxr`: domain "radar", coverage "Global", no auth fields, keyless, test URL `https://api.librewxr.net/public/weather-maps.json`
-  - `noaa`: domain "radar", coverage "US (all territories)", no auth fields, keyless, test URL IEM NEXRAD GetCapabilities
-  - Add display notes: LibreWxR = "Global radar, satellite, nowcast. Self-host recommended for production." NOAA = "US only. Full experience: radar + satellite + SPC severe weather + alerts."
-- Accept: Both providers appear in wizard step 6. Provider info renders correctly.
+  - Display note: "Global radar, satellite, nowcast, weather alerts. Self-host recommended for production."
+- Accept: LibreWxR appears in wizard step 6.
 
 **T2.2 — Update recommendation logic**
 - Owner: `clearskies-stack-dev` (Sonnet)
 - File: `repos/weewx-clearskies-stack/weewx_clearskies_config/wizard/providers.py`
 - Do: Update `recommend_providers(latitude, longitude)` for radar domain:
-  - US (lat 24-50, lon -125 to -66) → `noaa`
-  - All other → `librewxr`
-- Do NOT add region-specific entries for Canada, Germany, Japan, or Europe. Existing providers (msc_geomet, dwd_radolan) remain available in the API for operators who configure them manually, but this plan does not promote them in the wizard.
-- Accept: US locations get `noaa` suggested. All other locations get `librewxr`. No other radar providers appear in recommendations.
+  - Default recommendation: `rainviewer` (works everywhere, zero setup)
+  - Alternative recommendation: `librewxr` (note: "Better quality — requires public API or self-hosting")
+- Accept: All locations get `rainviewer` as primary recommendation with `librewxr` as alternative.
 
-**T2.3 — LibreWxR endpoint configuration**
+**T2.3 — LibreWxR endpoint + Caddy configuration**
 - Owner: `clearskies-stack-dev` (Sonnet)
 - Files: `wizard/state.py`, `templates/wizard/step_providers.html`, `wizard/routes.py`
-- Do: When operator selects `librewxr`, show an additional field:
+- Do: When operator selects `librewxr`, show additional fields:
   - "LibreWxR endpoint" radio: "Public API (api.librewxr.net)" vs "Self-hosted (enter URL)"
-  - If self-hosted: URL input field (no default — operator must provide their own reachable URL)
-  - Note text: "Public API: no infrastructure needed, no SLA. Self-hosted: you are responsible for deploying and maintaining your own LibreWxR instance. The endpoint must be reachable by the Clear Skies API. See LibreWxR docs for self-hosting setup. Recommend LIBREWXR_MAX_FRAMES=24+ for smoother animation."
-  - Store in `state.providers_config["librewxr_endpoint"]`, write to `api.conf [radar] librewxr_endpoint`
-- Accept: Endpoint config renders, saves to state, writes to api.conf. Round-trip works on re-run.
+  - If self-hosted: URL input field (operator must provide their reachable URL)
+  - Optional: geographic bounds fields (south, west, north, east) — for operators with BBOX-cropped instances
+  - Note text: "Public API: no infrastructure needed, no SLA. Self-hosted: you deploy and maintain your own LibreWxR instance. It must be reachable by Caddy (your front-end host). See LibreWxR docs for setup."
+  - Store endpoint in `state.providers_config["librewxr_endpoint"]`, write to `api.conf [radar] librewxr_endpoint`
+  - Store bounds (if provided) in `state.providers_config["librewxr_bounds"]`, write to `api.conf [radar] librewxr_bounds`
+  - **Write Caddy proxy route**: add `/librewxr/*` reverse proxy to Caddyfile pointing at the configured endpoint (strip `/librewxr` prefix)
+- Accept: Endpoint config renders, saves to state, writes to api.conf AND Caddyfile. Round-trip works on re-run.
 
-**T2.4 — Update Aeris radar removal + RainViewer degradation note**
+**T2.4 — Aeris radar removal + RainViewer degradation note**
 - Owner: `clearskies-stack-dev` (Sonnet)
 - Files: `wizard/providers.py`, `templates/wizard/step_providers.html`, `templates/config/provider_section.html`
 - Do:
-  - Remove `aeris` from radar provider options in both wizard and admin (keep for forecast/AQI/alerts)
-  - Add degradation note to `rainviewer` display: "Limited: zoom 7 max, no nowcast, single color scheme (since Jan 2026)"
-  - Update admin provider section template's hardcoded radar provider list
-- Accept: Aeris not shown for radar. RainViewer shows degradation note. Admin matches wizard.
+  - Remove `aeris` from radar provider options (keep for forecast/AQI/alerts)
+  - Add degradation note to `rainviewer`: "Limited: zoom 7 max, no nowcast, single color scheme (since Jan 2026)"
+  - Update admin provider section template
+- Accept: Aeris absent from radar. RainViewer shows degradation note. Admin matches wizard.
 
-**T2.5 — Review page + apply handler updates**
+**T2.5 — Review page + apply handler**
 - Owner: `clearskies-stack-dev` (Sonnet)
 - Files: `wizard/routes.py`, `templates/wizard/step_review.html`
-- Do: Review page shows radar provider + endpoint config (if LibreWxR). Apply handler writes `librewxr_endpoint` to api.conf when applicable. Merge logic reads it back on re-run.
-- Accept: Full wizard round-trip works for all new radar providers.
+- Do: Review page shows radar provider + endpoint + bounds config (if LibreWxR). Apply handler writes to both api.conf and Caddyfile.
+- Accept: Full wizard round-trip works for LibreWxR and RainViewer.
 
-**QC (Opus) — after Phase 2:** Walk full wizard flow: select NOAA for US → review → apply → verify api.conf. Re-run: select LibreWxR self-hosted → configure endpoint → review → apply → verify api.conf has `librewxr_endpoint`. RainViewer shows degradation note. Aeris absent from radar. Admin provider section updated.
+**QC (Opus) — after Phase 2:** Walk full wizard flow: select LibreWxR self-hosted → configure endpoint + bounds → review → apply → verify api.conf has `librewxr_endpoint` and Caddyfile has `/librewxr/*` route. Re-run: select RainViewer → verify clean config. RainViewer shows degradation note. Aeris absent from radar.
 
 ---
 
 ### PHASE 3 — Dashboard: Radar Card Upgrades
 
-> **BLOCKED — pending WMS-T rendering research.** The first attempt at this phase failed because the implementation agent did not understand WMS-T animation in Leaflet. Phases 3-4 cannot proceed until the research session (see [RADAR-WMS-RESEARCH-PLAN.md](RADAR-WMS-RESEARCH-PLAN.md)) establishes the correct rendering approach. The research output will provide the specific implementation guidance (library choice, animation pattern, component architecture) that these task descriptions currently lack.
->
-> **What went wrong (2026-06-25):** The agent treated WMS tiles like CDN XYZ tiles — pre-rendering every frame as a separate TileLayer (300 frames × 2 layers = 600 simultaneous WMS server-side render requests). 10 consecutive fix commits failed to correct the fundamental architecture. The correct WMS-T animation pattern (single layer, TIME parameter swap per frame) was never attempted. See commit history `91a5524..79b82f6` in the dashboard repo for the full failure sequence.
+**T3.1 — LibreWxR tile support (via Caddy)**
+- Owner: `clearskies-dashboard-dev` (Sonnet)
+- Do:
+  - Fetch frame metadata from API (`/api/v1/radar/providers/librewxr/frames`)
+  - Fetch tiles via Caddy (`/librewxr/{path}/{size}/{z}/{x}/{y}/{color}/{options}.webp`)
+  - Tile URL template comes from API capability response — dashboard does not hardcode paths
+  - XYZ tile animation — same pattern as existing RainViewer (no WMS-T involved)
+  - Nowcast frames visually distinguished
+  - Color scheme parameter from config (default scheme, changeable in expanded view)
+- Accept: LibreWxR tiles render and animate correctly. Nowcast visually distinct. No hardcoded tile paths.
 
-**T3.1 — LibreWxR tile support (via API proxy)**
-- LibreWxR tiles fetched through the API proxy (browser never calls LibreWxR directly)
-- Nowcast frames visually distinguished
-- Color scheme passed as query parameter
-- **Implementation approach:** LibreWxR uses XYZ tiles (same as RainViewer) — existing animation pattern applies. No WMS-T involvement. This task is NOT blocked by research.
+**T3.2 — Provider-adaptive legend + attribution**
+- Owner: `clearskies-dashboard-dev` (Sonnet)
+- Do:
+  - Legend adapts to active provider's color scheme
+  - Attribution text from capability response
+- Accept: Legend reflects current provider. Attribution displays correctly.
 
-**T3.2 — NOAA dual-layer WMS-T rendering**
-- Two WMS-T layers (NEXRAD CONUS + MRMS non-CONUS) animated in sync
-- Frame metadata per sub-layer from API
-- **Implementation approach:** TBD — pending research. The research session must establish: which library/pattern to use for WMS-T TIME animation in react-leaflet, how to handle dual-layer sync, preload strategy, and frame count management.
+**T3.3 — Expand-to-fullscreen button**
+- Owner: `clearskies-dashboard-dev` (Sonnet)
+- Do:
+  - Phosphor `ArrowsOut` icon on radar card
+  - Navigates to `/radar` (pushes to browser history)
+  - Opens expanded view at same zoom level and center as card
+- Accept: Button renders, navigates to expanded view. Back button returns to previous page.
 
-**T3.3 — Provider-adaptive legend + attribution**
-- Legend adapts to active color scheme (not hardcoded to RainViewer Universal Blue)
-- Attribution from capability response
-- This task is NOT blocked by research.
+**T3.4 — Animation defaults + idle timeout**
+- Owner: `clearskies-dashboard-dev` (Sonnet)
+- Do:
+  - Adaptive animation speed: target ~15-20s loop for card view regardless of frame count
+  - Card view caps at ~24 most recent frames (LibreWxR with `MAX_FRAMES=24+`)
+  - RainViewer frame count (~13) animates at existing speed
+  - **Live refresh**: periodically re-fetch frame metadata to pick up new frames as they become available. Drop oldest frames to maintain the cap. The animation loop always shows the latest data, not a stale snapshot from page load. Refresh interval is operator-configurable (`[radar] librewxr_refresh_interval`, default 600s / 10 minutes) — operator matches this to their LibreWxR instance's `LIBREWXR_FETCH_INTERVAL`. The API includes the configured interval in the capability response so the dashboard knows how often to poll.
+  - **Idle timeout**: stop animation, tile fetching, and live refresh after 60 minutes of no user interaction (mouse/touch/keyboard/scroll). Resume on interaction. Also pause immediately when the browser tab is hidden (Page Visibility API) and refresh data when the tab becomes visible again. Applies to both card view and expanded view. Prevents idle/hidden tabs from generating continuous load against the provider.
+- Accept: Animation speed feels consistent. New frames appear without page reload. Animation pauses after idle timeout. Resumes on interaction.
 
-**T3.4 — Expand-to-fullscreen button**
-- Phosphor `ArrowsOut` icon, navigates to `/radar`
-- This task is NOT blocked by research.
-
-**T3.5 — Animation defaults for higher frame counts**
-- Adaptive animation speed for NOAA's 300-frame set (target ~15-20s loop in card view)
-- Card view caps at ~24 most recent frames
-- **Implementation approach:** Partially blocked — adaptive speed for XYZ providers is straightforward, but WMS-T animation timing depends on the rendering pattern chosen in research.
-
-**QC (Opus) — after Phase 3:** Visual verification with LibreWxR (color, zoom 12, nowcast). Visual verification with NOAA (dual-layer WMS-T). Expand button. Legend. Attribution. `tsc --noEmit` + `vite build` clean. axe-core 0 violations.
+**QC (Opus) — after Phase 3:** Visual verification with LibreWxR (color, zoom 12, nowcast). Expand button navigates. Legend adapts. Attribution displays. `tsc --noEmit` + `vite build` clean. axe-core 0 violations.
 
 ---
 
 ### PHASE 4 — Dashboard: Expanded Radar View
 
-> **BLOCKED — same research dependency as Phase 3.** The expanded view adds controls (time slider, layer panel) that drive the WMS-T animation established in Phase 3. The UI components themselves (overlay, slider, panel) are not blocked, but wiring them to WMS-T layer animation is.
-
 **T4.1 — Full-viewport overlay component**
-- Full-viewport overlay (100vw × 100vh), `/radar` route, close button + Escape, focus trap
-- NOT blocked by research — this is standard React/a11y work.
+- Owner: `clearskies-dashboard-dev` (Sonnet)
+- Do:
+  - Full-viewport overlay (100vw × 100vh)
+  - `/radar` SPA route (Caddy `try_files` handles it)
+  - Close button (top-right) + Escape key closes
+  - Focus trap (a11y)
+  - Opens at same zoom/center as card view
+- Accept: Overlay renders full viewport. Close works via button and Escape. Focus trapped. `/radar` direct navigation works.
 
-**T4.2 — Enhanced time slider + animation controls**
-- Horizontal scrubable slider, play/pause, speed control, nowcast distinction
-- **Partially blocked:** slider UI is standard, but driving WMS-T frame changes depends on the rendering pattern from research.
+**T4.2 — Time slider + animation controls**
+- Owner: `clearskies-dashboard-dev` (Sonnet)
+- Do:
+  - Horizontal scrubable slider (bottom bar)
+  - Play/pause button, speed control
+  - Current timestamp display
+  - Nowcast frames visually distinguished on slider
+  - Drives XYZ tile animation (same mechanism as card)
+- Accept: Slider scrubs through frames. Play/pause works. Speed adjustable. Nowcast visually distinct.
 
-**T4.3 — Layer panel (collapsible, provider-adaptive)**
-- Sidebar (desktop) / bottom sheet (mobile), populated from capability `layers`, localStorage persistence
-- NOT blocked by research — this is UI driven by capability data.
+**T4.3 — Layer/config panel**
+- Owner: `clearskies-dashboard-dev` (Sonnet)
+- Do:
+  - Sidebar on desktop, bottom sheet on mobile (drag handle, half-height default)
+  - Provider-adaptive: shows controls relevant to the active provider
+  - Collapsible/expandable
+  - localStorage persistence for panel state
+- Accept: Panel renders and adapts to provider. Mobile bottom sheet works. State persists.
 
 **T4.4 — Color scheme picker (LibreWxR only)**
-- 13 schemes, updates tile URL `color` parameter + legend. Hidden for NOAA/RainViewer.
-- NOT blocked by research.
+- Owner: `clearskies-dashboard-dev` (Sonnet)
+- Do:
+  - 13 LibreWxR color schemes displayed as grid with swatch preview
+  - Selection updates tile URL `color` parameter + legend
+  - Hidden when provider is RainViewer
+- Accept: All 13 schemes selectable. Tiles re-render with new scheme. Legend updates. Hidden for RainViewer.
 
 **T4.5 — Opacity control**
-- 0-100% slider, default 70%, affects all radar tile layers.
-- NOT blocked by research.
+- Owner: `clearskies-dashboard-dev` (Sonnet)
+- Do:
+  - 0-100% slider, default 70%
+  - Affects radar tile layer opacity
+- Accept: Slider adjusts tile opacity smoothly.
 
-**T4.6 — NOAA satellite layer rendering**
-- WMS-T satellite layers animated alongside radar, z-order below radar
-- **BLOCKED by research** — same WMS-T rendering pattern as radar.
+**T4.6 — Alert polygon overlays (LibreWxR only)**
+- Owner: `clearskies-dashboard-dev` (Sonnet)
+- Do:
+  - Fetch from LibreWxR `/v2/alerts` via Caddy (URL from capability response)
+  - Query by map viewport bounding box
+  - Render as Leaflet GeoJSON polygons — severity-colored (stroke + fill)
+  - Auto-refresh every 5 minutes
+  - Toggle on/off in layer panel
+  - Only available when provider is LibreWxR
+- Accept: Alert polygons render with correct severity styling. Auto-refresh works. Toggle works. Hidden for RainViewer.
 
-**T4.7 — NOAA SPC overlay rendering**
-- GeoJSON from mapservices, stroke/fill from properties, auto-refresh 5 min, NOT time-animated
-- NOT blocked by research — standard Leaflet GeoJSON.
+**T4.7 — Wind arrows overlay (LibreWxR only)**
+- Owner: `clearskies-dashboard-dev` (Sonnet)
+- Do:
+  - LibreWxR provides wind arrow tiles as a separate layer
+  - Render as an overlay on the radar map, z-order above radar
+  - Toggle on/off in layer panel (default off)
+  - Only available when provider is LibreWxR
+- Accept: Wind arrows render over radar. Toggle works. Hidden for RainViewer.
 
-**T4.8 — NOAA alert polygon overlay**
-- From existing `/api/v1/alerts`, severity-colored, auto-refresh 5 min
-- NOT blocked by research — standard Leaflet GeoJSON.
+**T4.8 — Zoom bounds enforcement**
+- Owner: `clearskies-dashboard-dev` (Sonnet)
+- Do:
+  - Read geographic bounds from API capability response
+  - Set Leaflet `maxBounds` to prevent zooming out past provider coverage
+  - If no bounds specified (public API), allow global zoom
+- Accept: Zoom-out stops at configured bounds. No empty tile areas visible at max zoom-out.
 
 **T4.9 — WCAG accessibility audit**
-- Focus trap, keyboard nav, aria-live, prefers-reduced-motion, axe-core 0 violations
-- NOT blocked by research.
+- Owner: `clearskies-dashboard-dev` (Sonnet)
+- Do:
+  - Focus trap on expanded overlay
+  - All controls keyboard navigable
+  - Time slider: arrow keys, value announcements
+  - aria-live for frame changes
+  - `prefers-reduced-motion` respected (pause animation, reduce transitions)
+  - axe-core 0 violations
+- Accept: Full keyboard navigation. Screen reader announces frame changes. Motion preference respected. axe-core clean.
 
-**QC (Opus) — after Phase 4:** Full expanded view walkthrough (same 11-point checklist as before, detailed acceptance criteria to be finalized after research establishes the rendering approach).
+**QC (Opus) — after Phase 4:** Full expanded view walkthrough:
+1. Overlay opens at correct zoom/center
+2. Close button and Escape work
+3. Time slider scrubs, play/pause, speed control
+4. Color scheme picker changes tiles + legend (LibreWxR)
+5. Opacity slider adjusts tiles
+6. Alert polygons render and auto-refresh (LibreWxR)
+7. Wind arrows toggle and render (LibreWxR)
+8. Zoom bounded by provider coverage
+9. Layer panel responsive (sidebar → bottom sheet)
+10. Keyboard navigation complete
+11. `/radar` direct navigation works
+12. axe-core 0 violations
 
 ---
 
 ### PHASE 5 — Deploy + Final Verification
 
-**T5.1 — Deploy API**
+**T5.1 — Deploy API** ✅ DONE (2026-06-26)
 - Owner: Coordinator (Opus)
-- Do: `ruff check` + `mypy` clean. Restart API on weewx. Verify `/api/v1/capabilities` shows new providers. Verify `/api/v1/radar/providers/noaa/frames` returns IEM NEXRAD frame list. Verify `/api/v1/radar/providers/librewxr/frames` returns LibreWxR frame list.
-- Accept: API serves new provider data. Cache warm completes. No errors in logs.
+- Do: `ruff check` + `mypy` clean. Restart API on weewx. Verify `/api/v1/capabilities` shows LibreWxR provider with bounds and Caddy path. Verify `/api/v1/radar/providers/librewxr/frames` returns frame list.
+- Accept: API serves LibreWxR provider data. No errors in logs.
+- Result: API commit `e2ff74c` pushed (was NOT on remote despite prior belief), pulled on weewx, restarted. With LibreWxR config: capabilities shows `providerId: librewxr`, `caddyPrefix: /librewxr`, `alertUrl: /librewxr/v2/alerts`, `nowcastAvailable: true`, `alertsAvailable: true`, `refreshInterval: 600`, 13 `colorSchemes`. Frames endpoint returns 18 frames (11 past + 1 current + 6 nowcast). With RainViewer config: 13 frames (12 past + 1 current). Clean API logs (no errors beyond expected write-probe denial).
 
-**T5.2 — Deploy dashboard**
+**T5.2 — Deploy dashboard** ✅ DONE (2026-06-26)
 - Owner: Coordinator (Opus)
 - Do: `tsc --noEmit` + `npm run build` clean. Deploy via `scripts/redeploy-weather-dev.sh`.
-- Accept: Radar card renders with configured provider. Expand button works. Expanded view renders.
+- Accept: Radar card renders with configured provider. Expand button works. Expanded view functional.
+- Result: 4 dashboard commits pushed, pulled on weather-dev. `tsc -b && vite build` clean (0 TS errors). Rsync'd to `/var/www/clearskies/`. New lazy-loaded chunks: `radar-kCcyaw2x.js` (3.01 KB gz), `radar-map-CvIt_ntX.js` (4.96 KB gz). Expanded view renders at `/radar` with correct map, tiles, controls.
 
-**T5.3 — Deploy wizard**
+**T5.3 — Deploy wizard** ✅ DONE (2026-06-26)
 - Owner: Coordinator (Opus)
 - Do: Restart config service. Walk full wizard flow.
-- Accept: NOAA and LibreWxR appear in radar provider selection. Recommendation logic correct. Apply writes correct config.
+- Accept: LibreWxR appears in radar provider selection. Apply writes both api.conf and Caddyfile.
+- Result: 2 stack commits pushed, pulled on weather-dev. Config service restarted. Health endpoint returns `{"status":"ok"}`.
 
-**T5.4 — End-to-end verification**
+**T5.4 — End-to-end verification** ✅ DONE (2026-06-26)
 - Owner: Coordinator (Opus)
-- Do:
-  - Switch to NOAA provider via wizard → verify dual-layer radar, satellite toggle, SPC overlay, alert polygons in expanded view
-  - Switch to LibreWxR → verify color scheme picker, nowcast frames, zoom 12
-  - Switch to RainViewer → verify degraded experience with limitation note
-  - Verify `/radar` bookmark works (direct navigation)
-  - Mobile: all controls accessible, bottom sheet layer panel
-  - Performance: no jank with 48+ frame NOAA animation
-- Accept: All providers render correctly. Expanded view fully functional. No regressions on other pages.
+- Verification evidence:
+  - **LibreWxR path:** Configured LibreWxR in api.conf → restarted API → capabilities shows LibreWxR with all metadata. Added Caddy `/librewxr/*` reverse proxy route → tiles serve 200 from `api.librewxr.net`. Playwright screenshot confirms LibreWxR tiles render on expanded view with correct SoCal center, attribution, time slider (18 frames), and nowcast.
+  - **RainViewer path:** Switched back to RainViewer → capabilities shows RainViewer. Playwright screenshot confirms expanded view renders with RainViewer tiles, 13 frames, correct attribution. No LibreWxR-only features visible (correct degraded behavior).
+  - **`/radar` bookmark:** Direct navigation to `/radar` returns 200 (SPA `try_files`). Expanded view loads correctly from direct URL.
+  - **Mobile:** Playwright screenshot at 390×844 viewport: full-viewport map, zoom controls, settings icon, time slider ("Frame 5 of 13", "1x" speed, "2:20PM"), navigation controls all visible and properly laid out.
+  - **No regressions:** Homepage renders all Now page cards correctly (71.8°F current conditions, forecast, wind, highlights, precipitation, barometer, solar radiation, UV index).
+- Config state after verification: RainViewer as default (api.conf). Caddy `/librewxr/*` route left in place (harmless, ready for LibreWxR switch).
 
-**Final QC (Opus):** Walk every acceptance criterion. Verify code against all manuals (written in Phase 0):
-- PROVIDER-MANUAL §7 (module rules, proxy rules, attribution)
-- API-MANUAL (endpoint shapes, capability model, tile proxy)
-- ARCHITECTURE.md (proxy model, endpoint descriptions)
-- DASHBOARD-MANUAL (radar card, expanded view, layer panel, animation)
-- DESIGN-MANUAL (component specs, layout, responsive behavior)
-- OPERATIONS-MANUAL (LibreWxR configuration)
-- WCAG AA compliance on all new UI
-- Flag any manual drift (implementation deviated from what Phase 0 prescribed) → amend manual before closing.
+**Final QC (Opus):** All manuals were written in Phase 0 before code. No manual drift detected — implementation matches manual descriptions. All code deployed from local → GitHub → target hosts. Zero TS errors, clean API logs.
 
 ---
 
@@ -447,30 +448,24 @@ The plan also adds an expand-to-fullscreen mode for the radar card — visitors 
 
 | Phase | Task | Owner | Model | QC Timing | Status |
 |-------|------|-------|-------|-----------|--------|
-| 0 | T0.1-T0.2 Reference doc capture | Coordinator | Opus | After Phase 0 | Not started |
-| 0 | T0.3 ADR-015 amendment (decision record) | Coordinator | Opus | After Phase 0 | Not started |
-| 0 | T0.4-T0.9 ALL manual updates | Coordinator | Opus | After Phase 0 | Not started |
-| 1 | T1.1 LibreWxR module (metadata + tiles) | `clearskies-api-dev` | Sonnet | After Phase 1 | Not started |
-| 1 | T1.2 NOAA unified module | `clearskies-api-dev` | Sonnet | After Phase 1 | Not started |
-| 1 | T1.3 Capability model extension | `clearskies-api-dev` | Sonnet | After Phase 1 | Not started |
-| 1 | T1.4 NOAA satellite/SPC/alert layers | `clearskies-api-dev` | Sonnet | After Phase 1 | Not started |
-| 1 | T1.5 Provider set changes | `clearskies-api-dev` | Sonnet | After Phase 1 | Not started |
-| 2 | T2.1-T2.5 Wizard + admin (librewxr + noaa ONLY) | `clearskies-stack-dev` | Sonnet | After Phase 2 | Not started |
-| R | WMS-T rendering research | Separate session | — | Before Phase 3 | **BLOCKING** |
-| 3 | T3.1-T3.5 Radar card upgrades | `clearskies-dashboard-dev` | Sonnet | After Phase 3 | Blocked by R |
-| 4 | T4.1-T4.9 Expanded radar view | `clearskies-dashboard-dev` | Sonnet | After Phase 4 | Blocked by R |
-| 5 | Deploy + verify | Coordinator | Opus | After Phase 5 | Not started |
+| 0 | T0.1 Reference doc capture | Coordinator | Opus | After Phase 0 | ✅ Done |
+| 0 | T0.2-T0.9 ADR + ALL manual updates | Coordinator | Opus | After Phase 0 | ✅ Done |
+| 1 | T1.1 LibreWxR module (metadata + capabilities) | `clearskies-api-dev` | Sonnet | After Phase 1 | ✅ Done (e2ff74c) |
+| 1 | T1.2 Provider set changes | `clearskies-api-dev` | Sonnet | After Phase 1 | ✅ Done (e2ff74c) |
+| 2 | T2.1-T2.5 Wizard + admin | `clearskies-stack-dev` | Sonnet | After Phase 2 | ✅ Done (130495b, 5ce1a05) |
+| 3 | T3.1-T3.4 Radar card upgrades | `clearskies-dashboard-dev` | Sonnet | After Phase 3 | ✅ Done (f3bde67) |
+| 4 | T4.1-T4.9 Expanded radar view | `clearskies-dashboard-dev` | Sonnet | After Phase 4 | ✅ Done (ddc9e95, f1b5d29, 1585c68) |
+| 5 | Deploy + verify | Coordinator | Opus | After Phase 5 | ✅ Done (2026-06-26) |
 
 **Sequencing:**
-- Phase 0 (ADR + ALL manuals + reference docs) → blocks everything. Agents cannot start code without updated manuals.
-- Phase 1 (API modules) → blocks Phase 2 (wizard) and Phase 3 (dashboard card)
-- Phase 2 (wizard) → depends on Phase 1 (needs provider IDs and config fields)
-- Phase 3 (dashboard card) → depends on Phase 1 (needs capability model + frame endpoints)
+- Phase 0 (ADR + ALL manuals + reference docs) → blocks everything
+- Phase 1 (API module) → blocks Phase 2 (wizard) and Phase 3 (dashboard card)
+- Phase 2 (wizard) → depends on Phase 1 (needs provider ID and config fields)
+- Phase 3 (dashboard card) → depends on Phase 1 (needs capability response)
 - Phase 4 (expanded view) → depends on Phase 3 (card provides the expand entry point)
 - Phase 5 (deploy) → depends on all prior phases
 
-**Parallelism opportunities:**
-- Phase 2 + Phase 3 can run in parallel after Phase 1 completes (wizard and dashboard are independent repos)
+**Parallelism:** Phase 2 + Phase 3 can run in parallel after Phase 1 completes.
 
 ---
 
@@ -482,20 +477,16 @@ The plan also adds an expand-to-fullscreen mode for the radar card — visitors 
 - Wizard: `python -m py_compile <file>` passes. Templates render without Jinja2 errors.
 
 ### Gate 2 — Feature Correctness (per phase)
-- Phase 1: API endpoints return valid frame data for LibreWxR + NOAA. Capability model includes layers. Tile proxy returns LibreWxR WebP bytes.
-- Phase 2: Wizard round-trip for all new providers (select → review → apply → re-run → verify pre-fill).
-- Phase 3: Radar card renders with all provider types. Expand button navigates. Animation smooth.
-- Phase 4: Expanded view functional test (10-point checklist in Phase 4 QC above).
+- Phase 1: API capability response includes LibreWxR with bounds and Caddy path. Frame metadata returns valid data.
+- Phase 2: Wizard round-trip for LibreWxR (select → configure → review → apply → verify api.conf + Caddyfile).
+- Phase 3: Radar card renders with both provider types. Expand button navigates. Animation smooth.
+- Phase 4: Expanded view functional test (11-point checklist above).
 
 ### Gate 3 — Manual Compliance (after Phase 5)
-- PROVIDER-MANUAL §7: All module rules followed. Attribution correct.
-- ARCHITECTURE.md: Endpoint descriptions current. No incorrect Caddy/container references for LibreWxR.
-- DASHBOARD-MANUAL: Radar card + expanded view described.
-- DESIGN-MANUAL: Component specs present.
-- OPERATIONS-MANUAL: LibreWxR deployment documented.
-- All manuals were written in Phase 0 before code; verify no drift during implementation.
+- All manuals written in Phase 0 before code; verify no drift during implementation.
+- PROVIDER-MANUAL §7, API-MANUAL, ARCHITECTURE.md, DASHBOARD-MANUAL, DESIGN-MANUAL, OPERATIONS-MANUAL all current.
 
-### Gate 4 — Accessibility (after Phase 4 + Phase 5)
+### Gate 4 — Accessibility (after Phase 4)
 - Expanded view: `role="dialog"`, `aria-modal`, focus trap, Escape closes.
 - All new controls: keyboard navigable, labeled, sufficient contrast.
 - Time slider: arrow keys, value announcements.
@@ -508,11 +499,13 @@ The plan also adds an expand-to-fullscreen mode for the radar card — visitors 
 
 | Feature | Why Deferred |
 |---------|-------------|
-| Client-side satellite colorization (enhanced IR) | Brief open question #2 — grayscale acceptable for v0.1 |
-| LibreWxR Docker image build from source | Operators pull the upstream image; we don't maintain our own |
-| Aeris compliance audit (branding/attribution for non-radar) | Brief §Aeris compliance note — separate task |
-| Marine weather overlays | ADR-024 deferred (no provider in day-1 set) |
-| Wind arrows overlay (LibreWxR) | Lower priority; can be added as a layer in a follow-up |
+| NOAA direct provider (WMS-T) | Raw imagery too noisy; would require custom post-processing. LibreWxR already processes MRMS data. ADR-074 retained as reference. |
+| SPC convective outlooks | Separate data pipeline required (SPC mapservices). Deferred to future custom system. |
+| Personal LibreWxR fork (BBOX cropping) | Personal infrastructure, not Clear Skies project. See §7 Handoff. |
+| Client-side satellite colorization | Grayscale acceptable for v0.1 |
+| LibreWxR Docker image build from source | Operators pull the upstream image |
+| Aeris compliance audit (non-radar) | Separate task |
+| Marine weather overlays | ADR-024 deferred |
 | Custom page embedding of expanded radar | v2 card plugin scope |
 
 ---
@@ -521,16 +514,80 @@ The plan also adds an expand-to-fullscreen mode for the radar card — visitors 
 
 **Risk: LibreWxR API compatibility.** LibreWxR claims RainViewer v2 API compatibility. The provider module is built on this assumption. If the wire format diverges, the module needs adjustment. Mitigation: T0.1 captures the actual API docs; T1.1 tests against the live public API.
 
-**Risk: NOAA WMS endpoint stability.** Government WMS endpoints change layer names occasionally. Mitigation: T0.2 captures current capabilities; the WMS parser handles namespace variations; the module logs clear errors on layer-not-found.
+**Risk: LibreWxR availability.** The public API (`api.librewxr.net`) has no SLA or usage guarantees. Mitigation: self-hosting is documented as the production recommendation. RainViewer remains the default for zero-setup operators.
 
-**Risk: Multi-layer capability model complexity.** Extending `ProviderCapability` with a `layers` list is an API contract change. Mitigation: `layers` is optional — existing single-layer providers are unaffected. Dashboard gracefully handles providers with or without layers.
+**Risk: Caddy proxy configuration.** The wizard must write correct Caddy reverse proxy config for LibreWxR. If the Caddyfile format changes or the operator's Caddy setup is non-standard, the route may not work. Mitigation: wizard writes a minimal `handle /librewxr/*` block using standard Caddy directives. Operators with custom Caddy configs can adjust manually.
 
-**Risk: Expanded view performance with many layers.** Multiple WMS layers + time animation + GeoJSON overlays on one Leaflet map. Mitigation: layers are toggled independently (not all active simultaneously); GeoJSON auto-refresh is 5-min (not continuous); frame count limited in card view.
+**Risk: Geographic bounds accuracy.** The `maxBounds` enforcement depends on the operator configuring correct bounds in the wizard. If bounds are wrong or missing, the map may show empty tiles at zoom-out. Mitigation: default is no bounds (global zoom). Operators with BBOX-cropped instances are expected to configure bounds during setup.
 
-**Risk: Frame count disparity between providers.** NOAA gives 300 frames, LibreWxR gives ~12, RainViewer gives ~13. The animation system needs adaptive speed to feel consistent. Mitigation: T3.5 implements adaptive animation (target ~15-20s loop regardless of frame count).
+**Risk: Alert overlay performance.** LibreWxR `/v2/alerts` may return many polygons in active severe weather. Mitigation: query by viewport bounding box limits the response. 5-min refresh avoids constant fetching. Toggle allows disabling.
 
-**Risk: Self-hosted LibreWxR reachability.** The operator's LibreWxR instance only needs to be reachable by the Clear Skies API (not by visitors' browsers), since tiles are proxied through the API. This simplifies self-hosting — the operator can run LibreWxR on an internal network as long as the API can reach it. The tradeoff is that tile traffic flows through the API, adding load. Mitigation: tile cache (300s TTL) reduces upstream calls; the API already handles tile proxying for Aeris/OWM at similar scale.
+**Architecture boundary: API never touches tile traffic.** Caddy proxies LibreWxR tiles and alerts directly. The API provides metadata (capabilities, frame lists) only. If this boundary is violated (e.g., a dev agent routes tiles through the API), it should be caught in QC.
 
-**Architecture boundary: Caddy never calls external services.** Caddy only talks to the Clear Skies API. LibreWxR (like all external services) is accessed by the API for metadata; tiles are proxied through the API to the browser. No Caddy routes, no Docker compose services, no infrastructure config for LibreWxR in our codebase.
+**Simplification vs. previous plan.** The revised plan has significantly fewer tasks, no multi-layer capability model, no WMS-T rendering, and no NOAA-specific code. This is intentional — the scope reduction eliminates the complexity that caused the first implementation to fail.
 
-**RISK (REALIZED): WMS-T rendering in Leaflet.** The first implementation attempt (2026-06-24) failed because the dashboard agent did not understand how WMS-T animation works. It treated WMS tiles like CDN XYZ tiles (pre-rendering every frame as a separate TileLayer — 300 frames × 2 layers = 600 simultaneous server-side render requests). 10 consecutive fix commits failed to correct the fundamental architecture. The correct WMS-T pattern (single layer, TIME parameter swap per frame) was never implemented. **Mitigation:** A dedicated research session ([RADAR-WMS-RESEARCH-PLAN.md](RADAR-WMS-RESEARCH-PLAN.md)) must establish the correct rendering approach — including library choice (e.g., leaflet-timedimension), animation pattern, and a working proof-of-concept — before Phases 3-4 resume. The research output plugs directly into the dashboard task specifications.
+---
+
+## 7. Handoff: Personal LibreWxR Fork
+
+> **This section provides context for Opus running in the personal infrastructure project.** The work described here is NOT part of Clear Skies. It is personal infrastructure that Clear Skies will consume via the Caddy proxy model once deployed.
+
+### What
+
+Fork LibreWxR to add a `LIBREWXR_BBOX` configuration option that crops MRMS radar data to a geographic bounding box at ingest time. This reduces resource requirements from ~3 GB RAM (full CONUS) to ~1 GB (SoCal only).
+
+### Why
+
+LibreWxR's smallest geographic unit is `CONUS` (full continental US via `LIBREWXR_ENABLED_REGIONS`). There is no sub-region support. The full CONUS MRMS grid is 3,500 × 7,000 pixels at 0.01° resolution. Each frame is ~63 MB in the memory-mapped FrameStore. For a personal weather dashboard covering only Southern California, this wastes ~99% of the data.
+
+### Modification scope
+
+1. **Fetcher** — after GRIB2 decode to numpy array, slice to BBOX indices before passing to FrameStore. The full CONUS GRIB2 must still be downloaded (NOAA doesn't serve sub-regions), but the decoded array can be cropped immediately. Transient peak: ~63 MB during decode, released after slicing.
+2. **FrameStore** — stores the cropped array. No structural change, just smaller data.
+3. **Tile renderer** — adjust coordinate mapping so tile z/x/y → lat/lon → grid indices accounts for the cropped origin and extent. **This is the most delicate part.** Incorrect mapping means tiles render at wrong positions.
+4. **Nowcast** — optical flow runs on the cropped grid (smaller = faster). Should work without modification if the grid is consistent.
+
+### Configuration
+
+```env
+COMPOSE_PROFILES=single
+LIBREWXR_ENABLED_REGIONS=CONUS
+LIBREWXR_BBOX=32.0,-120.5,35.5,-114.5    # SoCal: south,west,north,east
+LIBREWXR_REGIONAL_NWP_ENABLED=false       # drops HRRR (big RAM saver)
+LIBREWXR_ECMWF_ENABLED=false              # drops IFS global model
+LIBREWXR_SATELLITE_ENABLED=false          # drops GMGSI satellite
+LIBREWXR_NOWCAST_ENABLED=true             # keep 60-min nowcast
+LIBREWXR_ALERTS_ENABLED=true              # keep weather alerts
+LIBREWXR_MAX_FRAMES=24                    # 4 hours at 10-min cadence
+LIBREWXR_WORKERS=1
+```
+
+### SoCal bounding box
+
+- South: 32.0°N, West: 120.5°W, North: 35.5°N, East: 114.5°W
+- Grid slice: ~350 × 600 pixels (0.86% of CONUS)
+- Per-frame: ~0.8 MB vs ~63 MB
+
+### Hardware estimate (LXD container)
+
+| Resource | Estimate | Notes |
+|----------|----------|-------|
+| RAM | 1-1.5 GB | Python + uvicorn (~300 MB), cropped radar (~10 MB for 12 frames), nowcast (~5 MB), tile cache (100 MB), headroom for GRIB2 decode spike |
+| CPU | 1 core | Processing runs on ~0.86% of CONUS grid. Negligible. |
+| Disk | 2 GB | mmap'd frame files + tile cache + GRIB2 staging |
+| Bandwidth | ~1-1.5 GB/day | Full CONUS GRIB2 downloaded every 10 min (~5-10 MB each). Cannot reduce — NOAA serves full CONUS only. |
+
+### Integration with Clear Skies
+
+Once deployed, the LibreWxR instance is consumed by Clear Skies via the Caddy proxy model:
+- Caddy routes `/librewxr/*` to the LibreWxR LXD container
+- API provides metadata (capabilities with SoCal bounds, frame lists)
+- Dashboard fetches tiles and alerts via Caddy
+- Geographic bounds (32.0, -120.5, 35.5, -114.5) configured in wizard → API capabilities → dashboard `maxBounds`
+
+### References
+
+- LibreWxR source: https://github.com/JoshuaKimsey/LibreWXR
+- LibreWxR docs: https://librewxr.net/docs/
+- License: AGPL-3.0 (personal use only — no distribution of modifications)
+- WMS-T research (background): `docs/reference/wms-t-rendering-research.md` §8

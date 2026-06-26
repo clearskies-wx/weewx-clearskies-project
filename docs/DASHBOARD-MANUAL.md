@@ -24,7 +24,8 @@ Last updated: 2026-06-18
 7. [Data Refresh & Realtime](#7-data-refresh--realtime)
 8. [Card Plugin Contract](#8-card-plugin-contract)
 9. [Dynamic Now Page & Page Visibility](#9-dynamic-now-page--page-visibility)
-10. [Anti-Patterns](#10-anti-patterns)
+10. [Radar Card & Expanded View](#10-radar-card--expanded-view)
+11. [Anti-Patterns](#11-anti-patterns)
 
 ---
 
@@ -510,7 +511,113 @@ The Not Found page (`not-found.tsx`) renders:
 
 ---
 
-## §10 Anti-Patterns
+## §10 Radar Card & Expanded View
+
+### Radar card (Now page)
+
+The radar card renders an animated XYZ tile map using Leaflet. Both RainViewer and LibreWxR use the same XYZ tile animation pattern — no WMS-T rendering is involved.
+
+**Tile fetching by provider:**
+
+| Provider | Tile source | Frame metadata source |
+|---|---|---|
+| `librewxr` | Caddy proxy (`/librewxr/{path}/{size}/{z}/{x}/{y}/{color}/{options}.webp`) | API `GET /api/v1/radar/providers/librewxr/frames` |
+| `rainviewer` | Direct to CDN (`{host}{path}/{size}/{z}/{x}/{y}/{color}/{smooth}_{snow}.png`) | API `GET /api/v1/radar/providers/rainviewer/frames` |
+
+Tile URL templates come from the API capability response. The dashboard does not hardcode tile paths.
+
+**Expand button:** Phosphor `ArrowsOut` icon in the card header. Navigates to `/radar` (pushes to browser history). Opens the expanded view at the same zoom level and center as the card.
+
+**Animation:**
+- Adaptive speed: target ~15-20 second loop regardless of frame count. LibreWxR with 24+ frames and RainViewer with ~13 frames should both feel smooth.
+- Card view caps at ~24 most recent frames.
+- Nowcast frames visually distinguished (dashed border on timeline, opacity pulse, or similar visual marker).
+
+**Provider-adaptive legend:** Legend gradient reflects the active provider's color scheme. Updates when the color scheme changes (LibreWxR only — RainViewer has a single scheme).
+
+**Attribution:** Displayed per PROVIDER-MANUAL.md §7. Both the Leaflet attribution control and any below-card caption must agree.
+
+### Live refresh
+
+Periodically re-fetch frame metadata to pick up new frames as they become available. Drop oldest frames to maintain the cap. The animation loop always shows the latest data, not a stale snapshot from page load.
+
+- Refresh interval: from API capability response `refresh_interval` field (operator-configurable, default 600 seconds).
+- On new frames: seamlessly append to the animation loop, drop oldest to maintain cap.
+- Applies to both card view and expanded view.
+
+### Idle timeout
+
+Stop animation, tile fetching, and live refresh after 60 minutes of no user interaction (mouse, touch, keyboard, scroll). Resume on interaction.
+
+- **Tab visibility:** Pause immediately when the browser tab is hidden (Page Visibility API). When the tab becomes visible again, refresh frame metadata before resuming animation (data may have changed while hidden).
+- Applies to both card view and expanded view.
+- Purpose: prevent idle/hidden tabs from generating continuous load against the provider.
+
+### Expanded radar view (`/radar`)
+
+Full-viewport overlay with enhanced controls. Pushed as a SPA route (`/radar`) for bookmarkability — Caddy `try_files` handles it. Not a new "page" in the page taxonomy; it's an overlay that opens from the radar card.
+
+**Overlay behavior:**
+- Full viewport (100vw × 100vh).
+- Opens at the same zoom level and center as the card — it provides room for controls and readable detail, not a different map.
+- Close button (top-right, Phosphor `X`) + Escape key closes. Returns to the previous page.
+- Focus trap for accessibility (Tab/Shift-Tab cycles within the overlay).
+- Direct navigation to `/radar` renders the expanded view at the provider's default center/zoom.
+
+**Time slider (bottom bar):**
+- Horizontal scrubable slider showing all frames.
+- Play/pause button, speed control (0.5x, 1x, 2x).
+- Current timestamp display (formatted in station timezone).
+- Nowcast frames visually distinguished on the slider (different color segment or marker).
+- Drives the same XYZ tile animation as the card.
+
+**Layer/config panel:**
+- Sidebar on desktop (right side), bottom sheet on mobile (drag handle, half-height default).
+- Provider-adaptive: shows controls relevant to the active provider.
+- Collapsible/expandable. State persists in localStorage.
+
+**Color scheme picker (LibreWxR only):**
+- 13 color schemes displayed as a grid with swatch preview.
+- Selection updates the `color` path segment in tile URLs + legend.
+- Hidden when provider is RainViewer.
+- Selected scheme persists in localStorage.
+
+**Opacity slider:**
+- 0-100%, default 70%.
+- Affects radar tile layer opacity only (base map unaffected).
+
+**Alert polygon overlays (LibreWxR only):**
+- Fetched from LibreWxR `/v2/alerts` via Caddy (URL from capability response).
+- Query by map viewport bounding box (`?bbox=`).
+- Rendered as Leaflet GeoJSON polygons — severity-colored (stroke + fill per WMO CAP severity).
+- Auto-refresh every 5 minutes.
+- Toggle on/off in layer panel (default: on).
+- Only available when provider is LibreWxR. Hidden for RainViewer.
+
+**Wind arrows overlay (LibreWxR only):**
+- LibreWxR provides wind arrow tiles as a separate layer.
+- Rendered as an overlay on the radar map, z-order above radar tiles.
+- Toggle on/off in layer panel (default: off).
+- Only available when provider is LibreWxR.
+
+**Zoom bounds enforcement:**
+- Read geographic bounds from API capability response.
+- Set Leaflet `maxBounds` to prevent zooming out past provider coverage.
+- No bounds configured = allow global zoom (default behavior).
+
+### WCAG 2.1 AA requirements for radar
+
+- Expanded overlay: `role="dialog"`, `aria-modal="true"`, focus trap.
+- All controls keyboard navigable (Tab, Enter, Space, Arrow keys).
+- Time slider: Arrow keys move between frames, value announced via `aria-valuenow` / `aria-valuetext`.
+- Frame changes: `aria-live="polite"` region announces current timestamp.
+- `prefers-reduced-motion`: pause animation automatically, reduce transitions.
+- All interactive elements: visible focus indicator, ≥44px tap targets on mobile.
+- axe-core: 0 violations on both card and expanded view.
+
+---
+
+## §11 Anti-Patterns
 
 Never do the following in dashboard code.
 
