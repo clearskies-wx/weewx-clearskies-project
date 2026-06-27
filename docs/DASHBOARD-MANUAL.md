@@ -9,7 +9,7 @@ Companion documents:
 - **API-MANUAL.md** — API implementation rules (data model, units, enrichment)
 - **ARCHITECTURE.md** — system topology, dashboard pages, routes
 
-Last updated: 2026-06-18
+Last updated: 2026-06-27
 
 ---
 
@@ -133,6 +133,75 @@ Never call `toLocaleString()` without an explicit `timeZone` option. Always supp
 ### No per-user TZ override
 
 No per-user time zone override at v0.1. All visitors see station-local time. Phase 6+ enhancement: localStorage override using `Intl.DateTimeFormat` (client-side only, no server change).
+
+### Station clock utility
+
+`utils/station-clock.ts` is the single module for station-date logic. Every component that needs to know the station's current date or time imports from this module. No component computes station dates ad-hoc.
+
+The module exports four functions (ADR-075 §6):
+
+```typescript
+/** Extract stationClock.date from an API response. */
+export function getStationDate(response: { stationClock?: StationClock }): string;
+
+/** Increment a YYYY-MM-DD date string by n days. */
+export function addDays(dateStr: string, n: number): string;
+
+/** Is the given validDate "today" at the station? */
+export function isStationToday(validDate: string, stationDate: string): boolean;
+
+/** Convert stationClock.time to epoch ms for elapsed-time comparisons. */
+export function stationTimeMs(stationClock: StationClock): number;
+```
+
+The `stationClock` block is present on every API response:
+
+```json
+{
+  "data": { "..." : "..." },
+  "stationClock": {
+    "date": "2026-06-27",
+    "time": "2026-06-27T22:30:00-04:00",
+    "timezone": "America/New_York"
+  }
+}
+```
+
+- `date` — station-local date as YYYY-MM-DD. Canonical answer to "what day is it at the station?"
+- `time` — station-local time as ISO-8601 with UTC offset.
+- `timezone` — IANA identifier (redundant with `StationMetadata.timezone`; included for self-contained responses).
+
+### Approved temporal patterns
+
+Authority: ADR-075.
+
+| Need | Pattern | Source |
+|------|---------|--------|
+| "What date is it at the station?" | Read `stationClock.date` from the most recent API response | API |
+| "What time is it at the station?" | Read `stationClock.time`, or convert `Date.now()` using station IANA TZ via `Intl.DateTimeFormat` | API or Intl |
+| "Is this forecast entry today?" | Compare `entry.validDate === stationClock.date` | API |
+| "Format a timestamp for display" | `formatLocalTime(iso, stationTz, locale)` from `utils/time.ts` | Existing utility |
+| "Has enough time elapsed since X?" | `Date.now() - new Date(iso).getTime() > thresholdMs` | Native (UTC epoch math) |
+| "Should I refetch?" | `Date.now() > new Date(freshness.validUntil).getTime()` | API freshness envelope |
+| "Tomorrow's date at the station" | Increment `stationClock.date` by one day via `addDays()` | Derived from API |
+
+`Date.now()` used for display ticks — arc position updates, "last updated N seconds ago" elapsed-time display — is approved. These are not station-date computations. Mark such uses with `// ADR-075: display tick, not data refresh`.
+
+### Banned temporal patterns
+
+These are grep-checkable FAIL conditions (ADR-075 §6). Any of the following in dashboard source is a violation:
+
+```
+FAIL: new Date() used to determine station-local date or time
+      (Date.now() is OK for UTC epoch elapsed-time math)
+FAIL: .toISOString().split('T')[0] used to derive a station-local date
+      (this gives a UTC date, not station-local)
+FAIL: index === 0 as a proxy for "today" in forecast or any date-ordered list
+FAIL: Hardcoded setInterval for data refresh without reference to freshness.validUntil
+      or freshness.refreshInterval
+FAIL: toLocaleString() or Intl.DateTimeFormat() without explicit timeZone option
+FAIL: Any "is it daytime?" check that doesn't use station timezone or stationClock
+```
 
 ---
 
@@ -409,6 +478,60 @@ Use native `fetch` only. Do not add axios, ky, or TanStack Query.
 - `getBranding()` fetches `/branding.json` — a static file served by Caddy — not `/api/v1/branding`.
 - All other data comes from `/api/v1/*`.
 
+### Freshness-driven polling
+
+Every cacheable API response carries a `freshness` block (ADR-075 §4):
+
+```json
+{
+  "data": { "..." : "..." },
+  "freshness": {
+    "generatedAt": "2026-06-28T02:30:00Z",
+    "validUntil": "2026-06-28T03:00:00Z",
+    "refreshInterval": 1800
+  }
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `generatedAt` | When the API produced this response (UTC ISO-8601 Z) |
+| `validUntil` | When the data should be considered stale. When `Date.now()` exceeds this timestamp, trigger a background refetch. |
+| `refreshInterval` | How often the data type typically updates at the source (seconds). Cards that want proactive polling use this as their poll interval. |
+
+`useApiQuery` is extended to schedule refetches from `validUntil`. When `Date.now()` exceeds the `validUntil` epoch, `useApiQuery` triggers a background refetch automatically. Cards do not set their own timers.
+
+No hardcoded `setInterval` for data refresh. A call like `setInterval(fetch, 60_000)` is a banned pattern (§11). All refetch cadence comes from the `freshness` block.
+
+The stale-while-revalidate pattern (§7 existing rule) applies to freshness-driven refetches. Never show skeletons during a background refetch where valid data already exists.
+
+SSE responses and setup endpoints do not carry a `freshness` block — those are push-based or non-cacheable.
+
+### Idle detection
+
+The `useIdleDetector()` hook maintains a single idle state for the entire app tree. It is not per-card.
+
+**Tracked events:** mouse move, keypress, scroll (passive listener), touch (passive listener).
+
+**Provider:** `IdleDetectorProvider` wraps the app tree. Consumer cards call `useIsIdle()` to read the current idle state.
+
+**Idle behavior (ADR-075 §7):**
+
+| Setting | Type | Default | Meaning |
+|---------|------|---------|---------|
+| `idleTimeout` | integer (minutes) | 30 | Minutes of no interaction before idle mode activates |
+| `idleRefreshFactor` | integer | 10 | Multiplier applied to `refreshInterval` during idle |
+
+After `idleTimeout` minutes of no user interaction, all polling cards multiply their `refreshInterval` by `idleRefreshFactor`. A card that normally polls every 30 seconds polls every 300 seconds (5 minutes) while idle.
+
+The SSE connection stays open during idle — it is push-based and has no cost to keeping alive.
+
+Any user interaction (mouse move, keypress, scroll, touch) resets the idle timer and immediately restores normal refresh rates.
+
+Setting `idleTimeout` to `0` disables idle detection entirely. Use this for wall-display and kiosk deployments that must refresh at full rate indefinitely.
+
+`idleTimeout` and `idleRefreshFactor` are served to the dashboard as part of station metadata (populated by the operator via the wizard/admin UI).
+
 ---
 
 ## §8 Card Plugin Contract
@@ -432,6 +555,16 @@ Every card component receives a uniform props shape:
 - **`dataBag`** — `Record<string, any>` keyed by API endpoint path. The container populates the bag by fetching all unique endpoints declared by active cards. Each card extracts the specific fields it needs internally. The loose typing is deliberate: a strongly-typed bag would require the container to know every endpoint's response shape, re-coupling page and card.
 - **`layout`** — `{ footprint: CardFootprint; rowSpan: 1 | 2 | 2.5 }`. The active layout configuration for this card instance, selected by the operator via the layout editor.
 - **`stationTz`** — IANA timezone string from station metadata.
+
+**`stationClock` in dataBag:** Every API response stored in `dataBag` includes `stationClock` and `freshness` blocks at the response envelope level (ADR-075 §3–4). A card that needs station-date logic reads `stationClock.date` from its response data via `getStationDate()` from `utils/station-clock.ts`. Cards must not use `new Date()` to determine the station-local date. Example:
+
+```typescript
+// Inside ForecastCard component
+const forecastData = dataBag["/api/v1/forecast/daily"];
+if (!forecastData) return <CardSkeleton />;
+const stationDate = getStationDate(forecastData);
+// Compare entry.validDate === stationDate, not index === 0
+```
 
 Each card handles its own loading and error states based on whether its required data is present in the bag.
 
@@ -659,3 +792,18 @@ Page visibility is a static config (`/pages.json`) served by Caddy. The API's `G
 
 **Never bypass the card plugin contract on the Now page.**
 All Now page cards must conform to the card plugin contract (§8). Do not add cards to the Now page by directly importing components and passing specific props — use the card registry and data bag pattern. The Now page container does not know what data each card needs.
+
+**Never use `new Date()` to determine station-local date or time.**
+`new Date()` returns the visitor's browser-local time, not the station's time. Use `stationClock.date` from the API response for all date-boundary logic. `Date.now()` is approved for UTC epoch elapsed-time math and display ticks (arc position updates, "last updated N seconds ago") — mark those uses with `// ADR-075: display tick, not data refresh`.
+
+**Never use `.toISOString().split('T')[0]` to derive a station-local date.**
+`toISOString()` returns UTC. Splitting it at `'T'` gives a UTC date, which differs from the station-local date near midnight. Use `stationClock.date` from the API response instead.
+
+**Never use array index as a proxy for "today" in forecast or date-ordered lists.**
+`index === 0` means "first in the array," not "today." When the provider has already rolled to tomorrow's forecast, the first entry is tomorrow, not today. Compare `entry.validDate === stationClock.date` using `isStationToday()` from `utils/station-clock.ts` instead.
+
+**Never hardcode `setInterval` for data refresh without referencing freshness.**
+Each API response carries `freshness.validUntil` (when to refetch) and `freshness.refreshInterval` (the data type's update cadence). Use these fields to drive refresh timing via `useApiQuery`. Magic numbers like `60_000` or `300_000` in a data-refresh `setInterval` are a violation.
+
+**Never use `Date.now()` for "is it daytime?" checks outside station-clock utilities.**
+Daytime status comes from the scene descriptor or `stationClock`, not browser-local time. Any daytime determination that does not use the station timezone or `stationClock` is a banned pattern.
