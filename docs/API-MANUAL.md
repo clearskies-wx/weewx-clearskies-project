@@ -10,7 +10,7 @@ Companion documents:
 - **PROVIDER-MANUAL.md** — provider module rules
 - **contracts/canonical-data-model.md** — per-field data catalog (the field inventory)
 
-Last updated: 2026-06-24
+Last updated: 2026-06-27
 
 ---
 
@@ -164,6 +164,121 @@ Never return a response that omits the `units` block.
 ### Time
 
 Use UTC ISO-8601 with a `Z` suffix on all time fields in API responses: `"2026-06-18T14:30:00Z"`. Never include local-time strings. Python `datetime` objects must carry `tzinfo=UTC` — naive datetimes are forbidden in API-layer code. Display-side timezone conversion happens in the dashboard using the station's IANA timezone from `StationMetadata`.
+
+#### Station clock contract (ADR-075)
+
+The API is the sole source of "what time is it at the station." Every API response includes a `stationClock` block computed at response time. It does not require a database query or any external call.
+
+```json
+{
+  "stationClock": {
+    "date": "2026-06-27",
+    "time": "2026-06-27T22:30:00-04:00",
+    "timezone": "America/New_York"
+  }
+}
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `date` | YYYY-MM-DD | Station-local date. The canonical answer to "what day is it at the station?" The dashboard uses this for all date-boundary logic (forecast "Today" labeling, high/low today, almanac "tomorrow"). |
+| `time` | ISO-8601 with UTC offset | Station-local time with UTC offset included. The offset lets the dashboard convert to UTC epoch for elapsed-time math without a timezone library. |
+| `timezone` | IANA identifier string | e.g., `"America/New_York"`. Redundant with `StationMetadata.timezone` but included for self-contained interpretation of each response. |
+
+#### Timezone source priority
+
+The API resolves the station timezone using this priority chain at startup:
+
+| Priority | Source | When used |
+|----------|--------|-----------|
+| 1 | Operator setting in `api.conf` or wizard | Always preferred when set |
+| 2 | weewx.conf `[Station] timezone` | Auto-detected at startup |
+| 3 | OS timezone of the weewx host | Fallback when weewx.conf has no timezone |
+| 4 | UTC + startup warning | Last resort; operator must configure |
+
+The wizard auto-populates the timezone from the OS timezone during initial setup. The operator can change it in the admin UI. weewx stores all data as UTC and treats the OS timezone as the local-time reference — the API must be the explicit timezone authority for all downstream consumers (ADR-075).
+
+### Response envelope
+
+Every API response follows this envelope shape:
+
+```json
+{
+  "data": { "...": "..." },
+  "stationClock": {
+    "date": "2026-06-27",
+    "time": "2026-06-27T22:30:00-04:00",
+    "timezone": "America/New_York"
+  },
+  "freshness": {
+    "generatedAt": "2026-06-28T02:30:00Z",
+    "validUntil": "2026-06-28T03:00:00Z",
+    "refreshInterval": 1800
+  },
+  "units": { "...": "..." },
+  "generatedAt": "2026-06-28T02:30:00Z"
+}
+```
+
+`stationClock` is present in every response. `freshness` is present in all cacheable REST responses. Responses that do **not** carry `freshness`:
+
+- **SSE events** — real-time push; no polling cycle.
+- **Setup endpoints** (`/setup/*`) — one-time configuration flow; no caching concern.
+
+### Data freshness
+
+Every cacheable REST response includes a `freshness` block:
+
+```json
+{
+  "freshness": {
+    "generatedAt": "2026-06-28T02:30:00Z",
+    "validUntil": "2026-06-28T03:00:00Z",
+    "refreshInterval": 1800
+  }
+}
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `generatedAt` | UTC ISO-8601 Z | When the API produced this response. |
+| `validUntil` | UTC ISO-8601 Z | When the data should be considered stale. After this time, the dashboard refetches. |
+| `refreshInterval` | integer (seconds) | How often this data type typically updates at the source. Cards use this as a proactive poll interval. |
+
+The dashboard uses `validUntil` to schedule refetches (`Date.now() > new Date(freshness.validUntil).getTime()`), not hardcoded intervals. Cards may also use `refreshInterval` to set a proactive poll timer so they do not have to wait until the response has already expired.
+
+#### Per-domain defaults
+
+Per-domain `refreshInterval` defaults are configured in the `[freshness]` section of `api.conf`. The operator can override any domain's interval there.
+
+| Domain | `refreshInterval` | `validUntil` | Rationale |
+|--------|-------------------|-------------|-----------|
+| Current observation (REST) | `archiveIntervalSeconds` (from weewx.conf) | generatedAt + archiveInterval | Matches weewx archive write cadence |
+| SSE loop packets | — (push) | — | Real-time; no polling needed |
+| Forecast | 1800 (30 min) | generatedAt + 30 min | Provider update cadence |
+| Alerts | 300 (5 min) | generatedAt + 5 min | Safety-critical |
+| AQI | 900 (15 min) | generatedAt + 15 min | Provider update cadence |
+| Almanac (daily) | 86400 (24 hr) | station-local next midnight | Changes once per calendar day |
+| Almanac (positions) | 60 (1 min) | generatedAt + 1 min | Continuously changing |
+| Radar frames | 300 (5 min) | generatedAt + 5 min | Frame metadata cadence |
+| Earthquakes | 300 (5 min) | generatedAt + 5 min | USGS update cadence |
+| Records | `archiveIntervalSeconds` (from weewx.conf) | generatedAt + archiveInterval | New records appear at archive write cadence |
+| Charts config | 86400 (24 hr) | generatedAt + 24 hr | Static unless operator edits |
+| Station metadata | 86400 (24 hr) | generatedAt + 24 hr | Static unless operator edits |
+| Seeing forecast | 10800 (3 hr) | generatedAt + 3 hr | 7Timer update cadence |
+
+The `current_observation` and `records` domains derive their `refreshInterval` from `archiveIntervalSeconds` (read from `weewx.conf [StdArchive] archive_interval`, already loaded by the API at startup via `StationInfo`). This ensures the dashboard polls at the cadence data actually arrives — not faster (wasted requests) or slower (stale data). Do not hardcode a magic number like `300` for these domains.
+
+### Idle configuration
+
+Idle settings are operator-configured in `api.conf` (wizard/admin) and served to the dashboard as part of station metadata:
+
+| Setting | Type | Default | Meaning |
+|---------|------|---------|---------|
+| `idleTimeout` | integer (minutes) | 30 | After this many minutes of no user interaction (mouse move, keypress, scroll, touch), cards reduce their refresh rate by multiplying `refreshInterval` by `idleRefreshFactor`. |
+| `idleRefreshFactor` | integer | 10 | Divisor applied to `refreshInterval` during idle. Factor 10 means a 30-second refresh card refreshes every 300 seconds when idle. |
+
+Setting `idleTimeout` to `0` disables idle detection entirely (kiosk / wall-display mode — cards refresh at full rate indefinitely). The SSE connection stays open regardless of idle state; it is push-based and has no polling cost. Any user interaction (mouse move, keypress, scroll, touch) resets the idle timer and immediately restores normal refresh rates.
 
 ### Nullability
 
@@ -1348,3 +1463,8 @@ Never do any of the following.
 | **Exceed the 366-day time-range cap on archive queries.** | Enforce a 366-day maximum on all archive time-range parameters. Return HTTP 400 with RFC 9457 body when the requested range exceeds the cap. |
 | **Use a separate conversion layer between the API and dashboard.** | The former realtime BFF proxy is eliminated. The API converts directly. Caddy routes `/api/v1/*` and `/sse` both to the API at port 8765. There is no intermediate service. |
 | **Use MQTT as the loop packet input.** | MQTT input mode is eliminated (per ADR-058). The only input path is the Unix socket at `/var/run/weewx-clearskies/loop.sock` from the `ClearSkiesLoopRelay`. |
+| **Use naive datetimes (no tzinfo) in API-layer Python code.** | All `datetime` objects in API code must carry `tzinfo=UTC`. Use `datetime.now(UTC)`, never `datetime.now()`. Naive datetimes are a silent source of DST and timezone bugs (ADR-075). |
+| **Return local-time strings in responses (except `stationClock.time`).** | All timestamps use UTC ISO-8601 Z. The only exception is `stationClock.time`, which carries a UTC offset for self-contained interpretation. No other response field may contain a local-time string. |
+| **Omit `stationClock` from a response envelope.** | Every API response includes `stationClock`. It is computed at response time from the station's configured timezone — no DB query required (ADR-075). |
+| **Omit `freshness` from a cacheable response.** | Every cacheable REST response includes `freshness`. Only SSE events and setup endpoints omit it (ADR-075). |
+| **Hardcode refresh intervals that should come from weewx.conf.** | `current_observation` and `records` derive their `refreshInterval` from `archiveIntervalSeconds`. Do not use magic numbers like `300` for these domains — the actual archive interval is station-specific (ADR-075). |
