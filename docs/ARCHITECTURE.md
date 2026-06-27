@@ -4,7 +4,7 @@ Single source of truth for what each service is, where it runs, what it exposes,
 
 Authoritative for current system state. ADRs are authoritative for *why* decisions were made. If this document conflicts with an ADR, investigate — one of them is stale.
 
-Last verified: 2026-06-24 (sky classification: mean-of-ratios Km, dynamic thresholds, SZA guard raised to 15°, auto_calibration.py + mcclear_client.py removed; ADR-072 McClear bootstrap superseded).
+Last verified: 2026-06-27 (ADR-075 temporal consistency model: stationClock + freshness response envelope, [freshness] config section, idle timeout). Previous: 2026-06-24 (sky classification: mean-of-ratios Km, dynamic thresholds, SZA guard raised to 15°, auto_calibration.py + mcclear_client.py removed; ADR-072 McClear bootstrap superseded).
 
 ---
 
@@ -28,7 +28,7 @@ One name per component. Code class names (`DirectAdapter`, `UnitTransformer`, `C
 | **Operator** | Person who installs, configures, and maintains Clear Skies. | — | ~~site owner~~ |
 | **Visitor** | Person viewing the weather dashboard in a browser. | — | ~~user~~ alone (ambiguous), ~~end user~~ when meaning visitor |
 
-Previous: 2026-06-08 (sky condition thresholds corrected for sensor accuracy, day/night display vocabulary added, Known gap #8 resolved).
+Previous (2026-06-08): sky condition thresholds corrected for sensor accuracy, day/night display vocabulary added, Known gap #8 resolved.
 
 ---
 
@@ -275,6 +275,55 @@ Additionally, `GET /health` exists on the main port (8765) returning `{"status":
 
 All errors returned as RFC 9457 `application/problem+json`.
 
+### API response envelope (ADR-075)
+
+All cacheable API endpoints return a standard response shape. Non-cacheable responses (SSE events, setup endpoints) omit the `freshness` block.
+
+```json
+{
+  "data": { ... },
+  "stationClock": {
+    "date": "2026-06-27",
+    "time": "2026-06-27T22:30:00-04:00",
+    "timezone": "America/New_York"
+  },
+  "freshness": {
+    "generatedAt": "2026-06-28T02:30:00Z",
+    "validUntil": "2026-06-28T03:00:00Z",
+    "refreshInterval": 1800
+  },
+  "units": { ... },
+  "generatedAt": "2026-06-28T02:30:00Z"
+}
+```
+
+**`stationClock`** — present on ALL API responses. The station's current local date and time, computed at response time from the configured station timezone. No database query required. Fields:
+- `date` — station-local date as YYYY-MM-DD. Canonical answer to "what day is it at the station?" The dashboard uses this for all date-boundary logic (forecast "Today" labeling, almanac day transitions, etc.).
+- `time` — station-local time as ISO-8601 with UTC offset. The UTC offset is included so the dashboard can convert to epoch ms for elapsed-time math without a timezone library.
+- `timezone` — IANA identifier (e.g., `"America/New_York"`).
+
+The station clock timezone authority chain (highest to lowest priority):
+
+| Priority | Source | When used |
+|----------|--------|-----------|
+| 1 | Operator setting in `api.conf` or wizard | Always preferred when set |
+| 2 | weewx.conf `[Station] timezone` | Auto-detected at startup |
+| 3 | OS timezone of the weewx host | Fallback when weewx.conf has no timezone |
+| 4 | UTC + startup warning | Last resort; operator must configure |
+
+**`freshness`** — present on cacheable responses ONLY. Not present on SSE events or setup endpoints. Fields:
+- `generatedAt` — UTC ISO-8601 Z timestamp when the API produced this response.
+- `validUntil` — UTC ISO-8601 Z timestamp after which the data should be considered stale. The dashboard schedules background refetches when `Date.now() > validUntilMs`.
+- `refreshInterval` — integer seconds. How often this data type typically updates at the source. Cards use this as a proactive poll timer.
+
+Per-domain `refreshInterval` defaults are configured in `api.conf [freshness]` (see Configuration files below). The `current_observation` and `records` domains derive their default from `archive_interval` (see weewx configuration ingestion below).
+
+**`data`** — the response-specific payload (observation, forecast, alerts, etc.).
+
+**`units`** — unit labels for all numeric fields (existing; unchanged by ADR-075).
+
+**`generatedAt`** — UTC timestamp of response generation (existing top-level field; also mirrored inside `freshness.generatedAt` on cacheable responses).
+
 ### Conditions text engine (ADR-073)
 
 The API hosts a multi-module, stateful conditions-text engine that produces the `weatherText` field on every `GET /api/v1/current` response. (Formerly in the realtime service; merged into the API per ADR-058.)
@@ -402,7 +451,7 @@ All config in `/etc/weewx-clearskies/` (search order: `CLEARSKIES_CONFIG` env va
 
 | File | Used by | Contains | Exists in examples? |
 |------|---------|----------|-------------------|
-| `api.conf` | API | Server bind, DB connection, providers, logging, TLS, input mode, socket path, SSE bind, unit conversion config (absorbs former `realtime.conf` settings per ADR-058) | Yes (`config/api.conf.example`) |
+| `api.conf` | API | Server bind, DB connection, providers, logging, TLS, input mode, socket path, SSE bind, unit conversion config (absorbs former `realtime.conf` settings per ADR-058), `[freshness]` per-domain refresh intervals and idle timeout config (ADR-075) | Yes (`config/api.conf.example`) |
 | `realtime.conf` | **DEPRECATED** — realtime service merged into API per ADR-058 | Input mode, MQTT settings, socket path, SSE bind, health bind, upstream API URL, unit conversion config | Yes (`config/realtime.conf.example`) — deprecated |
 | `stack.conf` | Config UI | UI bind/port, TLS, `[ui] enabled` flag | **No — does not exist** |
 | `secrets.env` | All (mode 0600) | DB password, API keys, admin credentials, proxy secret | No (generated by wizard) |
@@ -432,6 +481,8 @@ The API reads operator-specific parameters from weewx.conf at startup and expose
 **Data flow:** `load_station_metadata()` in `services/station.py` reads both values from the parsed weewx.conf `ConfigObj` → stores on `StationInfo` → exposed via `GET /api/v1/station` as `archiveIntervalSeconds` and `weekStartDay` → consumed by the dashboard's `ConfigDrivenGroup` component for chart data fetching and proportional aggregate scaling.
 
 **Enrichment wiring:** At startup, `__main__.py` passes `archive_interval` to `sky_condition.configure()`, `temperature_comfort.configure()`, and (as the default `trend_time_grace`) to `barometer_trend.configure()`.
+
+**Temporal model wiring (ADR-075):** At startup, `archive_interval` also sets the default `refreshInterval` for the `current_observation` and `records` freshness domains. A station with `archive_interval = 60` refreshes current-observation at 60s; a station with `archive_interval = 900` refreshes at 900s. Operator override via `[freshness]` section in `api.conf`.
 
 **Reference implementation:** Belchertown's `belchertown.py:370-376` reads `config_dict["StdArchive"]["archive_interval"]` and converts to milliseconds for the frontend. `belchertown.py:2548` reads `config_dict["Station"].get("week_start", 6)` for calendar-week span computation.
 
