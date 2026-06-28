@@ -63,11 +63,11 @@ foreach ($item in $links) {
 
 if (-not $SkipRepos) {
     $repos = @(
-        @{ Name = "weewx-clearskies-api";           Url = "https://github.com/inguy24/weewx-clearskies-api.git" }
-        @{ Name = "weewx-clearskies-dashboard";      Url = "https://github.com/inguy24/weewx-clearskies-dashboard.git" }
-        @{ Name = "weewx-clearskies-design-tokens";  Url = "https://github.com/inguy24/weewx-clearskies-design-tokens.git" }
-        @{ Name = "weewx-clearskies-realtime";       Url = "https://github.com/inguy24/weewx-clearskies-realtime.git" }
-        @{ Name = "weewx-clearskies-stack";          Url = "https://github.com/inguy24/weewx-clearskies-stack.git" }
+        @{ Name = "weewx-clearskies-api";           Url = "https://github.com/clearskies-wx/weewx-clearskies-api.git" }
+        @{ Name = "weewx-clearskies-dashboard";      Url = "https://github.com/clearskies-wx/weewx-clearskies-dashboard.git" }
+        @{ Name = "weewx-clearskies-stack";          Url = "https://github.com/clearskies-wx/weewx-clearskies-stack.git" }
+        @{ Name = "weewx-clearskies-extension";      Url = "https://github.com/clearskies-wx/weewx-clearskies-extension.git" }
+        @{ Name = "weewx-clearskies-truesun";        Url = "https://github.com/clearskies-wx/weewx-clearskies-truesun.git" }
     )
 
     foreach ($repo in $repos) {

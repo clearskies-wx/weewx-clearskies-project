@@ -256,12 +256,13 @@ Track gzipped JS bundle size at each round close against ADR-033's 200 KB target
 
 ## GitHub remotes
 
-All repos under `github.com/inguy24/`:
+All repos under `github.com/clearskies-wx/`:
 
+- `weewx-clearskies-project` (this repo — docs, manuals, rules, planning)
 - `weewx-clearskies-api`
-- `weewx-clearskies-realtime`
 - `weewx-clearskies-dashboard`
 - `weewx-clearskies-stack`
-- `weewx-clearskies-design-tokens`
+- `weewx-clearskies-extension`
+- `weewx-clearskies-truesun`
 
-Branching policy (pre-1.0): no feature branches. Commit straight to `main` (api repos) / `master` (meta repo).
+Branching policy (pre-1.0): no feature branches. Commit straight to `main`.

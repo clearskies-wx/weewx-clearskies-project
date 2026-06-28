@@ -68,7 +68,7 @@ Clone or copy the extension repo to the weewx host, then install:
 ```bash
 # Option A: Clone from GitHub
 cd /tmp
-git clone https://github.com/inguy24/weewx-clearskies-extension.git
+git clone https://github.com/clearskies-wx/weewx-clearskies-extension.git
 sudo weectl extension install /tmp/weewx-clearskies-extension
 
 # Option B: Copy from local machine

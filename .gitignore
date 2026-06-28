@@ -33,9 +33,7 @@ tmp/
 *.cache
 .pytest_cache/
 
-# Weewx dev artifacts
-weewx-output/
-Belchertown-dev/
+# Backup files
 *.backup.*
 
 # Nextcloud-synced local files (credentials, machine-specific config)

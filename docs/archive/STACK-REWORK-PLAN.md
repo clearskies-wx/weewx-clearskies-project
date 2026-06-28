@@ -77,7 +77,7 @@ The lead has read verbatim content of: `docker-compose.yml`, `Caddyfile`, `.env.
 - Mounts: config dir, weewx.conf, weewx.sdb (SQLite) or DB connection (MariaDB), ephemeris cache
 - Health check on port 8081
 - Build context points to `../../weewx-clearskies-api` (sibling repo)
-- Image: `ghcr.io/inguy24/weewx-clearskies-api:${CLEARSKIES_VERSION:-0.1.0}`
+- Image: `ghcr.io/clearskies-wx/weewx-clearskies-api:${CLEARSKIES_VERSION:-0.1.0}`
 - Env file: secrets.env
 - Network: exposes API port to host (for cross-host access from frontend Caddy)
 - Volumes: `clearskies-cache` (ephemeris)

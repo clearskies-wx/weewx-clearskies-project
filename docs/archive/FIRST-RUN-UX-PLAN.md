@@ -122,7 +122,7 @@ Task E needs both A (health endpoint) and D (wizard accessible via Caddy).
     build:
       context: ../../weewx-clearskies-stack
       dockerfile: Dockerfile
-    image: ghcr.io/inguy24/weewx-clearskies-config:${CLEARSKIES_VERSION:-0.1.0}
+    image: ghcr.io/clearskies-wx/weewx-clearskies-config:${CLEARSKIES_VERSION:-0.1.0}
     restart: unless-stopped
     volumes:
       - ${CLEARSKIES_CONFIG_DIR:-./config}:/etc/weewx-clearskies

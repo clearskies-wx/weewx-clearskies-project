@@ -20,7 +20,7 @@
 **What happened before this plan:**
 1. The FIXIT-ARCHITECTURE-PLAN merged the realtime service into the API (ADR-058). All 5 phases completed.
 2. During post-merge integration testing, we discovered the ClearSkiesLoopRelay weewx extension (which serves loop packets to the API via a Unix socket) was never deployed. It existed as `weewx_ext.py` in the deprecated realtime repo but had no deployment path.
-3. A new standalone repo `weewx-clearskies-extension` was created at `repos/weewx-clearskies-extension/` with the extension code ported from the realtime repo. GitHub remote: `https://github.com/inguy24/weewx-clearskies-extension`.
+3. A new standalone repo `weewx-clearskies-extension` was created at `repos/weewx-clearskies-extension/` with the extension code ported from the realtime repo. GitHub remote: `https://github.com/clearskies-wx/weewx-clearskies-extension`.
 4. A security audit of the extension code found 11 issues (see findings table below).
 5. A new backlog (`docs/planning/FIXIT-BACKLOG-2.md`) tracks 11 post-merge gaps including the extension issues.
 6. The extension code currently has partial edits from this session — `_max_clients` and `_socket_group` were added to `__init__` but the enforcement code was NOT written. The code is NOT production-ready.

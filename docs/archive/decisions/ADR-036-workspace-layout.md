@@ -15,7 +15,7 @@ superseded-by:
 Two structural constraints frame the decision:
 
 1. **Claude Code's `CLAUDE.md` discovery walks up the filesystem from cwd.** The meta directory holding `CLAUDE.md` must be an *ancestor* of each repo, not a sibling.
-2. **Each Clear Skies repo must be a standalone git repository** — distribution requires `git clone https://github.com/inguy24/weewx-clearskies-api` to produce a complete project.
+2. **Each Clear Skies repo must be a standalone git repository** — distribution requires `git clone https://github.com/clearskies-wx/weewx-clearskies-api` to produce a complete project.
 
 Working from `c:\CODE\weather-belchertown\` (already home of shared `CLAUDE.md`, `rules/`, `reference/`, `docs/`).
 

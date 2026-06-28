@@ -39,15 +39,15 @@ User intent (verbatim): "this needs to be clear to me and others this is weewx r
 - A weewx user searching GitHub for "weewx" surfaces all five repos as a coherent family.
 - Repo URLs are slightly longer; install commands and docs accept this trade.
 - Future modules in this project family adopt the same prefix.
-- The existing fork at `github.com/inguy24/weewx-belchertown` keeps its name (it tracks an upstream); the prefix convention applies only to *new* Clear Skies repos.
-- All five repos created under `github.com/inguy24/`.
+- The existing fork at `github.com/clearskies-wx/weewx-belchertown` keeps its name (it tracks an upstream); the prefix convention applies only to *new* Clear Skies repos.
+- All five repos created under `github.com/clearskies-wx/`.
 
 ## Implementation guidance
 
 - Repo descriptions begin with the project family — e.g., "weewx-clearskies-api · Read-only HTTP/JSON API over weewx data."
 - Documentation cross-references use the full prefixed name on first mention; subsequent references can shorten (e.g., "the api service" within a doc that already established context).
 - Python packages within `weewx-clearskies-api` and `-realtime` use module names like `weewx_clearskies_api` (snake_case, prefix retained) so `pip` installs of those packages have unambiguous names too.
-- npm package for `weewx-clearskies-design-tokens` (when extracted in Phase 6+) uses the scope `@inguy24/weewx-clearskies-design-tokens` or similar.
+- npm package for `weewx-clearskies-design-tokens` (when extracted in Phase 6+) uses the scope `@clearskies-wx/weewx-clearskies-design-tokens` or similar.
 
 ## References
 
