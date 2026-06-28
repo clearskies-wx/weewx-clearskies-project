@@ -661,12 +661,22 @@ Tile URL templates come from the API capability response. The dashboard does not
 
 **Expand button:** Phosphor `ArrowsOut` icon in the card header. Navigates to `/radar` (pushes to browser history). Opens the expanded view at the same zoom level and center as the card.
 
+**Frame progress bar (FrameProgressBar component):**
+- Replaces the old `<input type="range">` slider (expanded view) and text-only "Frame X of Y" counter (card view).
+- Used in BOTH card view and expanded view.
+- 6px track with a 12px playhead dot.
+- Color-coded: past frames use muted foreground color; nowcast/forecast frames use the primary accent color.
+- Vertical tick mark at the past/nowcast boundary.
+- Clickable to seek to any frame.
+- Keyboard accessible: `role="slider"`, ArrowLeft/ArrowRight to step between frames.
+- "Forecast" text label hidden on mobile (`hidden md:inline` / `hidden md:block`) to prevent word-wrap on narrow viewports.
+
 **Animation:**
 - Adaptive speed: target ~15-20 second loop regardless of frame count. LibreWxR with 24+ frames and RainViewer with ~13 frames should both feel smooth.
 - Card view caps at ~24 most recent frames.
-- Nowcast frames visually distinguished (dashed border on timeline, opacity pulse, or similar visual marker).
+- Nowcast frames visually distinguished via the FrameProgressBar color coding (accent color for nowcast/forecast segment).
 
-**Provider-adaptive legend:** Legend gradient reflects the active provider's color scheme. Updates when the color scheme changes (LibreWxR only — RainViewer has a single scheme).
+**Provider-adaptive legend:** Legend gradient reflects the active provider's color scheme. Updates when the color scheme changes (LibreWxR only — RainViewer has a single scheme). Uses `z-[1001]` to render above Leaflet's internal control panes (z-1000).
 
 **Attribution:** Displayed per PROVIDER-MANUAL.md §7. Both the Leaflet attribution control and any below-card caption must agree.
 
@@ -698,10 +708,10 @@ Full-viewport overlay with enhanced controls. Pushed as a SPA route (`/radar`) f
 - Direct navigation to `/radar` renders the expanded view at the provider's default center/zoom.
 
 **Time slider (bottom bar):**
-- Horizontal scrubable slider showing all frames.
+- FrameProgressBar component (same as card view) replaces the old `<input type="range">` slider.
 - Play/pause button, speed control (0.5x, 1x, 2x).
 - Current timestamp display (formatted in station timezone).
-- Nowcast frames visually distinguished on the slider (different color segment or marker).
+- Nowcast frames visually distinguished via FrameProgressBar color coding (accent color segment).
 - Drives the same XYZ tile animation as the card.
 
 **Layer/config panel:**
@@ -732,6 +742,16 @@ Full-viewport overlay with enhanced controls. Pushed as a SPA route (`/radar`) f
 - Rendered as an overlay on the radar map, z-order above radar tiles.
 - Toggle on/off in layer panel (default: off).
 - Only available when provider is LibreWxR.
+
+**Satellite imagery layer (LibreWxR only):**
+- Toggleable layer in the expanded radar view. Toggle labeled "Satellite imagery" in the `RadarLayerPanel`.
+- Only shown when the API capability response reports `satelliteAvailable === true`.
+- Satellite TileLayers render BELOW radar tiles (zIndex 100) with independent animation sharing play/pause state.
+- Tile URL pattern: `{caddyPrefix}/{path}/{size}/{z}/{x}/{y}/0/0_0.webp` (from `satelliteTileUrlTemplate` on the capability response).
+- Source: NOAA GMGSI composite — daytime visible over longwave IR with natural terminator crossfade. Hourly cadence. Coverage: ±72.7° latitude.
+- Preload mechanism: static first frame is rendered initially until tiles are cached, preventing tile flickering during animation.
+- Staleness guard: frames older than 24 hours are filtered out (LibreWxR public API satellite pipeline sometimes goes stale).
+- State persisted to localStorage key `clearskies-radar-satellite`.
 
 **Zoom bounds enforcement:**
 - Read geographic bounds from API capability response.

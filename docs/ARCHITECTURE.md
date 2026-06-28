@@ -4,7 +4,7 @@ Single source of truth for what each service is, where it runs, what it exposes,
 
 Authoritative for current system state. ADRs are authoritative for *why* decisions were made. If this document conflicts with an ADR, investigate — one of them is stale.
 
-Last verified: 2026-06-27 (ADR-075 temporal consistency model: stationClock + freshness response envelope, [freshness] config section, idle timeout). Previous: 2026-06-24 (sky classification: mean-of-ratios Km, dynamic thresholds, SZA guard raised to 15°, auto_calibration.py + mcclear_client.py removed; ADR-072 McClear bootstrap superseded).
+Last verified: 2026-06-27 (radar: satellite frames on RadarFrameList, satelliteAvailable + satelliteTileUrlTemplate on capability, FrameProgressBar replaces range input, RadarLegend z-[1001]). Previous: 2026-06-27 (ADR-075 temporal consistency model: stationClock + freshness response envelope, [freshness] config section, idle timeout).
 
 ---
 
@@ -225,7 +225,7 @@ The OpenAPI spec lists 35+ data endpoints. Key groups for orientation:
 | Almanac | `/api/v1/almanac`, `/api/v1/almanac/sun-times`, `/api/v1/almanac/moon-phases`, `/api/v1/almanac/seeing-forecast`, `/api/v1/almanac/planets`, `/api/v1/almanac/moon-names`, `/api/v1/almanac/eclipses/lunar`, `/api/v1/almanac/eclipses/solar`, `/api/v1/almanac/meteor-showers`, `/api/v1/almanac/positions` | Skyfield-based; background cache warming for expensive computations. |
 | Earthquakes | `/api/v1/earthquakes`, `/api/v1/earthquakes/config`, `/api/v1/earthquakes/faults` | `/faults` serves GEM Active Faults GeoJSON radius-clipped. `/config` returns provider configuration. |
 | Charts | `/api/v1/charts/config`, `/api/v1/charts/groups`, `/api/v1/charts/custom-query/{series_id}` | Config-driven; custom SQL from `charts.conf` only (disk-only trust model). |
-| Radar | `/api/v1/radar/providers/{id}/frames`, `/api/v1/radar/providers/{id}/tiles/{z}/{x}/{y}` | Frame metadata for all providers. Tile proxy for keyed providers only (`openweathermap`). LibreWxR tiles go through Caddy (`/librewxr/*`), not the API. RainViewer tiles go direct to CDN. |
+| Radar | `/api/v1/radar/providers/{id}/frames`, `/api/v1/radar/providers/{id}/tiles/{z}/{x}/{y}` | Frame metadata for all providers. **Satellite frames** (LibreWxR only) returned alongside radar frames when available. Tile proxy for keyed providers only (`openweathermap`). LibreWxR tiles go through Caddy (`/librewxr/*`), not the API. RainViewer tiles go direct to CDN. |
 | Content & nav | `/api/v1/pages`, `/api/v1/pages/{slug}/content`, `/api/v1/reports`, `/api/v1/content/about`, `/api/v1/content/legal` | `/pages` returns all 9 built-in pages unconditionally — page visibility filtering is the dashboard's responsibility via `pages.json` (ADR-024 amendment 2026-06-21). |
 | Infrastructure | `/api/v1/status`, `/api/v1/capabilities`, `/api/v1/records` | `/status` returns `{configured: bool}` — works in both setup and configured modes. |
 

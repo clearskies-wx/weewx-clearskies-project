@@ -9,7 +9,7 @@ Companion documents:
 - **ARCHITECTURE.md** — system topology, provider module layout
 - **contracts/canonical-data-model.md** — per-field data catalog
 
-Last updated: 2026-06-21
+Last updated: 2026-06-27
 
 ---
 
@@ -641,14 +641,16 @@ Three routing patterns exist depending on the provider:
 ### LibreWxR module rules
 
 - **Configurable upstream:** `[radar] librewxr_endpoint` in `api.conf`. Default: `https://api.librewxr.net` (public API, no SLA). Operators can point to a self-hosted instance.
-- **Metadata fetch:** `GET {endpoint}/public/weather-maps.json` — RainViewer v2-compatible wire format. Cached 60 seconds.
-- **No `get_tile()` method.** Caddy proxies tiles directly. The API never handles tile bytes for LibreWxR.
+- **Metadata fetch:** `GET {endpoint}/public/weather-maps.json` — RainViewer v2-compatible wire format. Cached 60 seconds. Parses both `radar` and `satellite.infrared` frames.
+- **Satellite frames:** The LibreWxR module parses `satellite.infrared` frames from `weather-maps.json` and returns them as `satelliteFrames` on the `RadarFrameList` response. Source: NOAA GMGSI composite (daytime visible over longwave IR with natural terminator crossfade). Hourly cadence. Coverage: ±72.7° latitude. Staleness guard: frames older than 24 hours are filtered out.
+- **No `get_tile()` method.** Caddy proxies tiles directly (both radar and satellite). The API never handles tile bytes for LibreWxR.
 - **Capability declaration includes:**
   - Provider name and attribution string
   - Geographic bounds (bounding box from `[radar] librewxr_bounds` config, or empty = global)
   - Caddy proxy path prefix (`/librewxr`) for tiles and alerts
-  - Available features: `nowcast` (bool), `color_schemes` (list of `{id, name}`), `alerts` (bool)
+  - Available features: `nowcast` (bool), `color_schemes` (list of `{id, name}`), `alerts` (bool), `satelliteAvailable` (bool)
   - Tile URL template (relative to Caddy): `/librewxr/{path}/{size}/{z}/{x}/{y}/{color}/{options}.webp`
+  - Satellite tile URL template: `{caddyPrefix}/{path}/{size}/{z}/{x}/{y}/0/0_0.webp` (via `satelliteTileUrlTemplate` field)
   - Alert URL: `/librewxr/v2/alerts`
   - Refresh interval (from `[radar] librewxr_refresh_interval` config, default 600 seconds)
 - **Rate limiter:** polite-use guard (5 req/s) for weather-maps.json fetches — prevents hammering the metadata endpoint.

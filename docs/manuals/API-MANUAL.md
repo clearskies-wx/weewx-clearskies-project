@@ -1411,6 +1411,8 @@ LibreWxR capability declaration includes:
 | `nowcast` | bool | Whether nowcast frames are available |
 | `color_schemes` | list of `{id, name}` | Available color schemes (from `weather-maps.json`) |
 | `alerts` | bool | Whether weather alerts are available |
+| `satelliteAvailable` | bool | Whether satellite imagery frames are available (parsed from `satellite.infrared` in `weather-maps.json`) |
+| `satelliteTileUrlTemplate` | string or `null` | Satellite tile URL template: `{caddyPrefix}/{path}/{size}/{z}/{x}/{y}/0/0_0.webp`. `null` when satellite is unavailable. |
 | `refresh_interval` | int | Seconds between dashboard frame metadata re-fetches (from `[radar] librewxr_refresh_interval` config, default 600) |
 
 RainViewer capability is minimal: provider name, attribution, and `degraded: true` with `operator_notes` documenting the free-tier limitations.
@@ -1419,6 +1421,7 @@ RainViewer capability is minimal: provider name, attribution, and `degraded: tru
 
 **Frame metadata (all providers):**
 - `GET /api/v1/radar/providers/{id}/frames` — API fetches upstream metadata (e.g., `weather-maps.json` for LibreWxR/RainViewer), normalizes to canonical `RadarFrameList`, caches (60s TTL for LibreWxR, existing TTL for others).
+- **Satellite frames (LibreWxR only):** The `RadarFrameList` response includes a `satelliteFrames` field containing satellite imagery frame metadata parsed from `satellite.infrared` in `weather-maps.json`. Frames older than 24 hours are filtered out (staleness guard). The field is present but empty for non-LibreWxR providers.
 
 **Tile proxy (keyed providers only):**
 - `GET /api/v1/radar/providers/{provider_id}/tiles/{z}/{x}/{y}` — serves tile bytes for keyed providers. Currently only `openweathermap` uses this endpoint. Query parameters: `?t=` (frame timestamp).

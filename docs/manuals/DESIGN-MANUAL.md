@@ -1007,9 +1007,10 @@ The radar card uses the standard card anatomy (§6) with a Leaflet map filling t
 **Card content:**
 - Leaflet map fills 100% of the card content area.
 - No padding between card border and map edge.
-- Legend gradient: horizontal bar below the map, inside the card. Height: 8px. Full width. Gradient colors from the active provider's color scheme.
+- FrameProgressBar: 6px track with 12px playhead dot, color-coded past (muted foreground) / nowcast (primary accent) segments, vertical tick at past/nowcast boundary. Clickable to seek, keyboard accessible (`role="slider"`, ArrowLeft/ArrowRight). "Forecast" label hidden on mobile (`hidden md:inline`).
+- Legend gradient: horizontal bar below the map, inside the card. Height: 8px. Full width. Gradient colors from the active provider's color scheme. Uses `z-[1001]` to render above Leaflet's internal control panes (z-1000).
 - Attribution line: small text below the legend (`var(--text-micro)`, `var(--muted-foreground)`).
-- Nowcast indicator: when animation crosses from past to nowcast frames, a subtle label or opacity change indicates "Forecast" data.
+- Nowcast indicator: the FrameProgressBar uses accent color for nowcast/forecast frames vs. muted foreground for past frames, with a vertical tick mark at the boundary.
 
 **Dark/light theme:**
 - Base map tiles switch between light and dark variants (OSM Carto light/dark or equivalent).
@@ -1074,8 +1075,9 @@ Full-viewport overlay. Not a new page layout — an overlay that takes over the 
 - **Contents (in order):**
   1. Color scheme picker (LibreWxR only): grid of 13 swatches, 4 columns. Each swatch: 48×48px, rounded, shows gradient preview. Selected swatch has ring border (`var(--ring)`).
   2. Opacity slider: label "Radar opacity", range 0-100%, default 70%. Standard slider control.
-  3. Alert toggle (LibreWxR only): labeled switch "Weather alerts", default on.
-  4. Wind arrows toggle (LibreWxR only): labeled switch "Wind arrows", default off.
+  3. Satellite imagery toggle (LibreWxR only): labeled switch "Satellite imagery", default off. Only shown when `satelliteAvailable === true`. State persisted to localStorage key `clearskies-radar-satellite`.
+  4. Alert toggle (LibreWxR only): labeled switch "Weather alerts", default on.
+  5. Wind arrows toggle (LibreWxR only): labeled switch "Wind arrows", default off.
 - Controls hidden when not applicable to the active provider (e.g., color schemes hidden for RainViewer).
 
 **Alert polygon styling:**
@@ -1090,13 +1092,15 @@ Full-viewport overlay. Not a new page layout — an overlay that takes over the 
 
 **Z-order (bottom to top):**
 1. Base map tiles (OpenStreetMap)
-2. Radar tiles (XYZ animated layer)
-3. Wind arrow tiles (optional, LibreWxR only)
-4. Alert polygons (GeoJSON overlay, LibreWxR only)
-5. Map controls (zoom, attribution)
-6. Time slider bar
-7. Layer/config panel
-8. Close button
+2. Satellite tiles (zIndex 100, optional, LibreWxR only — renders BELOW radar)
+3. Radar tiles (XYZ animated layer)
+4. Wind arrow tiles (optional, LibreWxR only)
+5. Alert polygons (GeoJSON overlay, LibreWxR only)
+6. Map controls (zoom, attribution)
+7. RadarLegend (`z-[1001]` — above Leaflet's internal control panes at z-1000)
+8. Time slider bar
+9. Layer/config panel
+10. Close button
 
 **Dark/light theme:**
 - Base map: light theme uses light OSM tiles, dark theme uses dark OSM tiles.
