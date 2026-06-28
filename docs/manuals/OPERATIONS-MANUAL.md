@@ -509,7 +509,7 @@ The config UI serves an admin landing page at `/admin`. This is the default post
 |---------|--------------|-----------------|
 | Station Identity | `stack.conf [ui]` | Station name, location, altitude |
 | Database | `api.conf [database]` | DB type, connection |
-| Providers | `api.conf [forecast/alerts/aqi/earthquakes/radar/seeing]` | Provider selection + API keys |
+| Providers | API `/setup/current-config` (authoritative); local `api.conf` fallback | Provider selection + API keys. Radar section includes LibreWxR endpoint mode, self-hosted URL, and geographic bounds when LibreWxR is configured. |
 | Appearance | `branding.json` | Accent color, logos, site title, favicon, theme mode, custom CSS |
 | Social | `branding.json` | Facebook, Twitter/X, Instagram, YouTube URLs |
 | Analytics & Privacy | `branding.json` | GA ID, privacy region toggles |

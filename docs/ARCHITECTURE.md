@@ -4,7 +4,7 @@ Single source of truth for what each service is, where it runs, what it exposes,
 
 Authoritative for current system state. ADRs are authoritative for *why* decisions were made. If this document conflicts with an ADR, investigate — one of them is stale.
 
-Last verified: 2026-06-27 (radar: satellite frames on RadarFrameList, satelliteAvailable + satelliteTileUrlTemplate on capability, FrameProgressBar replaces range input, RadarLegend z-[1001]). Previous: 2026-06-27 (ADR-075 temporal consistency model: stationClock + freshness response envelope, [freshness] config section, idle timeout).
+Last verified: 2026-06-28 (admin provider sections read from API /setup/current-config instead of local api.conf; LibreWxR config fields added to admin radar section; CurrentConfigProviderSection extended with provider-specific fields). Previous: 2026-06-27 (radar: satellite frames on RadarFrameList, satelliteAvailable + satelliteTileUrlTemplate on capability, FrameProgressBar replaces range input, RadarLegend z-[1001]).
 
 ---
 
@@ -119,6 +119,8 @@ weewx host                          front-end host
                                     | Serves radar tiles, alerts, satellite    |
                                     +------------------------------------------+
 ```
+
+**Current LibreWxR deploy:** `librewxr` LXD container on Ratbert (192.168.7.22, VLAN 7). Runs a forked LibreWXR (`inguy24/LibreWXR`) with `LIBREWXR_BBOX=32.0,-120.5,35.5,-114.5` (SoCal crop). Docker image `librewxr-bbox:latest` built from the fork. Caddy on weather-dev proxies `/librewxr/*` to `http://192.168.7.22:8080`. BBOX reduces per-frame memory from ~63 MB (full CONUS) to ~0.8 MB.
 
 **Single-host alternative:** All services on one machine. Caddy proxies to local Docker network name `api:8765` for both `/api/v1/*` and `/sse`. API uses direct mode (Unix socket to weewx engine).
 
@@ -237,7 +239,7 @@ The OpenAPI spec lists 35+ data endpoints. Key groups for orientation:
 
 ### Setup endpoints (under `/setup`, NO `/api/v1` prefix)
 
-Used by the config UI wizard per ADR-038. Not proxied through Caddy — config UI connects directly to API.
+Used by the config UI wizard and admin per ADR-038. Not proxied through Caddy — config UI connects directly to API.
 
 | Path | Method | Purpose | Auth |
 |------|--------|---------|------|
@@ -247,7 +249,7 @@ Used by the config UI wizard per ADR-038. Not proxied through Caddy — config U
 | `/setup/schema` | GET | Column schema from DB | Session |
 | `/setup/station` | GET | Station identity from `weewx.conf` | Session |
 | `/setup/apply` | POST | Write final config, API restarts | Session |
-| `/setup/current-config` | GET | Full config for re-run | Proxy secret |
+| `/setup/current-config` | GET | Full config for re-run + admin provider reads | Proxy secret |
 | `/setup/restart` | POST | Trigger graceful service restart | Proxy secret |
 | `/setup/calibration-state` | GET | Per-month calibration data for admin UI | Proxy secret |
 | `/setup/calibration-reset` | POST | Clear calibration data (re-bootstrap on next restart) | Proxy secret |
@@ -424,6 +426,8 @@ Wizard steps are defined by `wizard/routes.py` and `templates/wizard/step_*.html
 | `/admin/config/column-mapping` | GET/POST | Column mapping editor |
 | `/admin/config/test-provider` | POST | Test provider connectivity |
 
+**Provider data source:** Provider sections (forecast, alerts, aqi, earthquakes, radar) read their current values from the API's `/setup/current-config` endpoint (on the weewx host), not from the local `api.conf`. This ensures the admin always shows the authoritative config. Falls back to the local `api.conf` if the API is unreachable. The radar section includes LibreWxR-specific fields (endpoint mode, self-hosted URL, geographic bounds) when LibreWxR is the configured provider.
+
 ## Dashboard pages (React Router v7)
 
 | Route | Page | Lazy-loaded |
@@ -571,6 +575,7 @@ Per-provider TTLs: forecast 30 min, alerts 5 min, AQI 15 min, radar metadata 5 m
 | weewx-clearskies-extension | `repos/weewx-clearskies-extension` | master | Python | No (installs into weewx via `weectl extension install`) |
 | weewx-clearskies-truesun | `repos/weewx-clearskies-truesun` | main | Python | No (installs into weewx via `weectl extension install`). Deps: pvlib, cdsapi, h5netcdf. |
 | weewx-clearskies-design-tokens | `repos/weewx-clearskies-design-tokens` | main | — | No (Phase 6+ placeholder) |
+| librewxr (fork) | `repos/librewxr` | main | Python 3.12+ | Yes — fork of `JoshuaKimsey/LibreWXR`. Adds `LIBREWXR_BBOX` env var for sub-region cropping (SoCal: `32.0,-120.5,35.5,-114.5`). AGPL-3.0, personal use only. Built as `librewxr-bbox:latest` on the `librewxr` LXD container. |
 | weather-belchertown (meta) | `.` (root) | master | — (ADRs, plans, rules, contracts) | — |
 
 ## Stack repo structure (verified)
