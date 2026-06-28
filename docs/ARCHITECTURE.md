@@ -120,7 +120,7 @@ weewx host                          front-end host
                                     +------------------------------------------+
 ```
 
-**Current LibreWxR deploy:** `librewxr` LXD container on Ratbert (192.168.7.22, VLAN 7). Runs a forked LibreWXR (`inguy24/LibreWXR`) with `LIBREWXR_BBOX=32.0,-120.5,35.5,-114.5` (SoCal crop). Docker image `librewxr-bbox:latest` built from the fork. Caddy on weather-dev proxies `/librewxr/*` to `http://192.168.7.22:8080`. BBOX reduces per-frame memory from ~63 MB (full CONUS) to ~0.8 MB.
+**Current LibreWxR deploy:** `librewxr` LXD container on Ratbert (192.168.7.22, VLAN 7). Runs a forked LibreWXR (`inguy24/LibreWXR`) with `LIBREWXR_BBOX=32.0,-120.5,35.5,-114.5` (SoCal crop). Docker image `librewxr-bbox:latest` built from the `deploy/shaneburkhardt` branch of the fork. Caddy on weather-dev proxies `/librewxr/*` to `http://192.168.7.22:8080`. BBOX reduces per-frame memory from ~63 MB (full CONUS) to ~0.8 MB. The `deploy/shaneburkhardt` branch is the production deployment branch — it carries site-specific customizations (BBOX crop, dual-stack bind) on top of upstream `main`. The `fix/dual-stack-bind-clean` branch is a clean single-fix PR branch for upstream; `main` tracks upstream.
 
 **Single-host alternative:** All services on one machine. Caddy proxies to local Docker network name `api:8765` for both `/api/v1/*` and `/sse`. API uses direct mode (Unix socket to weewx engine).
 
@@ -575,7 +575,7 @@ Per-provider TTLs: forecast 30 min, alerts 5 min, AQI 15 min, radar metadata 5 m
 | weewx-clearskies-extension | `repos/weewx-clearskies-extension` | master | Python | No (installs into weewx via `weectl extension install`) |
 | weewx-clearskies-truesun | `repos/weewx-clearskies-truesun` | main | Python | No (installs into weewx via `weectl extension install`). Deps: pvlib, cdsapi, h5netcdf. |
 | weewx-clearskies-design-tokens | `repos/weewx-clearskies-design-tokens` | main | — | No (Phase 6+ placeholder) |
-| librewxr (fork) | `repos/librewxr` | main | Python 3.12+ | Yes — fork of `JoshuaKimsey/LibreWXR`. Adds `LIBREWXR_BBOX` env var for sub-region cropping (SoCal: `32.0,-120.5,35.5,-114.5`). AGPL-3.0, personal use only. Built as `librewxr-bbox:latest` on the `librewxr` LXD container. |
+| librewxr (fork) | `repos/librewxr` | `deploy/shaneburkhardt` (deploy), `main` (tracks upstream) | Python 3.12+ | Yes — fork of `JoshuaKimsey/LibreWXR`. Deploy branch adds `LIBREWXR_BBOX` env var for sub-region cropping (SoCal: `32.0,-120.5,35.5,-114.5`) and dual-stack bind. AGPL-3.0, personal use only. Built as `librewxr-bbox:latest` on the `librewxr` LXD container. |
 | weather-belchertown (meta) | `.` (root) | master | — (ADRs, plans, rules, contracts) | — |
 
 ## Stack repo structure (verified)
