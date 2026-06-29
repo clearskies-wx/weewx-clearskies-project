@@ -76,6 +76,7 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | [ADR-039](../archive/decisions/ADR-039-distribution-installation-mechanism.md) | Distribution / installation | 2026-06-18 | 2026-05-04 |
 | [ADR-060](../archive/decisions/ADR-060-security-model-threat-boundaries.md) | Security model & threat boundaries | 2026-06-18 | 2026-06-14 |
 | [ADR-061](../archive/decisions/ADR-061-filesystem-permissions-model.md) | Filesystem permissions model | 2026-06-18 | 2026-06-14 |
+| [ADR-077](../archive/decisions/ADR-077-config-registry.md) | Unified config registry | 2026-06-28 | 2026-06-28 |
 
 ## Archived — consolidated into DASHBOARD-MANUAL.md
 

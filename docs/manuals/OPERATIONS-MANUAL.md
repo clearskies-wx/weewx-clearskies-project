@@ -9,7 +9,7 @@ Companion documents:
 - **[API-MANUAL.md](API-MANUAL.md)** — API implementation rules
 - **[PROVIDER-MANUAL.md](PROVIDER-MANUAL.md)** — provider module rules
 
-Last updated: 2026-06-23
+Last updated: 2026-06-28
 
 ---
 
@@ -19,6 +19,7 @@ Last updated: 2026-06-23
 2. [Authentication](#2-authentication)
 3. [Network Architecture](#3-network-architecture)
 4. [Configuration](#4-configuration)
+   - [§4.1 Config Registry](#41-config-registry)
 5. [Logging](#5-logging)
 6. [Health and Readiness](#6-health-and-readiness)
 7. [Observability](#7-observability)
@@ -688,6 +689,248 @@ Since January 2026, the free tier is degraded:
 
 The wizard displays a degradation note when RainViewer is selected so operators understand the limitations.
 
+### §4.1 Config Registry
+
+The config wizard and admin UI share a unified config registry: a set of Python frozen dataclasses registered at import time that drive field rendering, validation, and persistence in both UIs. An implementing agent reads this section — not ADR-077 (archived) — to build the registry.
+
+#### ConfigField schema
+
+Every configurable field is a `ConfigField` frozen dataclass:
+
+```python
+@dataclass(frozen=True)
+class ConfigField:
+    field_id: str           # Globally unique. e.g. "earthquakes.radius_km"
+    field_type: str         # One of: text, url, number, boolean, select, radio,
+                            #   password, file_or_url, radio_swatch, textarea,
+                            #   checkbox_group  (11 types — no others)
+    label: str
+    help_text: str = ""
+    wizard_help: str = ""   # Extra guidance shown only in wizard mode
+    placeholder: str = ""
+    default: Any = None
+    options: tuple[FieldOption, ...] = ()      # Required for select/radio types
+    validation: tuple[ValidationRule, ...] = ()
+    config_target: str = ""  # e.g. "stack.conf:earthquakes", "branding.json",
+                             #   "secrets.env"
+    config_key: str = ""
+    is_secret: bool = False
+    secret_env_key: str = ""  # env var name when is_secret=True
+    conditions: tuple[Condition, ...] = ()
+    wizard_visible: bool = True
+    admin_visible: bool = True
+    admin_landing_display: bool = False  # Show current value on admin landing card
+    grid_column: str = "full"            # "full" or "half" — no other values
+```
+
+`FieldOption`, `ValidationRule`, and `Condition` are also frozen dataclasses:
+
+```python
+@dataclass(frozen=True)
+class FieldOption:
+    value: str
+    label: str
+    description: str = ""
+
+@dataclass(frozen=True)
+class ValidationRule:
+    rule_type: str   # One of: required, min, max, step, pattern, one_of,
+                     #   max_length, max_file_size
+    value: Any       # The rule's parameter (e.g. min=1, pattern="G-[A-Za-z0-9]+")
+
+@dataclass(frozen=True)
+class Condition:
+    field_id: str    # The controlling field
+    operator: str    # Comparison operator — e.g. "eq", "ne", "in"
+    value: Any       # Value to compare against
+```
+
+All four dataclasses must be frozen. No mutable state is permitted in these objects.
+
+#### SectionDef schema
+
+A `SectionDef` groups fields for admin display:
+
+```python
+@dataclass(frozen=True)
+class SectionDef:
+    section_id: str
+    display_name: str
+    domain_group: str      # One of: station, providers, appearance, dashboard,
+                           #   advanced, cards
+    config_source: str     # Which file or API this section reads from
+    custom_template: str = ""   # Path to escape-hatch template (see §4.1 below)
+    custom_handler: str = ""    # Dotted Python path to custom handler function
+```
+
+#### WizardStepDef schema
+
+A `WizardStepDef` groups sections for the wizard's sequential flow:
+
+```python
+@dataclass(frozen=True)
+class WizardStepDef:
+    step_number: int
+    title: str
+    description: str
+    section_ids: tuple[str, ...] = ()
+    custom_template: str = ""   # Path to escape-hatch template
+```
+
+#### ConfigRegistry API
+
+`ConfigRegistry` is built at import time. All registration must happen before any request is handled.
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `register_section` | `(section: SectionDef, fields: tuple[ConfigField, ...]) -> None` | Register a section with its fields. Must be called once per section. Raises `DuplicateSectionError` if `section_id` is already registered. |
+| `register_wizard_step` | `(step: WizardStepDef) -> None` | Register a wizard step. Raises `DuplicateStepError` if `step_number` is already registered. |
+| `register_card_config` | `(card_type: str, fields: tuple[ConfigField, ...]) -> None` | Register fields from a card manifest. Creates a section with `section_id = f"card_{card_type}"` in the `cards` domain group. |
+| `get_sections_for_group` | `(domain_group: str) -> tuple[SectionDef, ...]` | Return all sections in the given domain group, in registration order. |
+| `get_fields_for_section` | `(section_id: str) -> tuple[ConfigField, ...]` | Return all fields for the section, in registration order. |
+| `get_wizard_steps` | `() -> tuple[WizardStepDef, ...]` | Return all wizard steps sorted by `step_number`. |
+| `get_all_domain_groups` | `() -> tuple[str, ...]` | Return all domain group names that have at least one registered section. |
+
+`ConfigRegistry` uses `dict`-based internal storage. All query methods return immutable tuples. O(1) lookups by `section_id` and `step_number`.
+
+#### render_field macro contract
+
+The `render_field` Jinja2 macro handles all 11 field types. It lives in `templates/macros/form_fields.html`.
+
+```jinja2
+{% macro render_field(field, value, mode) %}
+{# field: ConfigField object
+   value: current value (str, bool, or None)
+   mode: "wizard" or "admin" #}
+```
+
+Rules for every field type:
+
+- Every `<input>`, `<select>`, and `<textarea>` element must have `aria-describedby` linking to the field's help text element. The help text element id must be `help_{{ field.field_id | replace('.', '_') }}`.
+- Every field wrapper `<div>` must carry `data-condition-field`, `data-condition-op`, and `data-condition-value` attributes when `field.conditions` is non-empty. When multiple conditions exist, encode them as JSON arrays in those attributes.
+- `grid_column` must produce `class="field-full"` for `"full"` and `class="field-half"` for `"half"` on the wrapper div.
+- Password fields must include a show/hide toggle button.
+- `radio_swatch` fields render each option as a colored radio button using Pico CSS custom properties. Each swatch must have a visible focus indicator.
+- `checkbox_group` renders each option as a labelled checkbox. All checkboxes in the group share the same `name` attribute (the `config_key`).
+- `boolean` renders as a Pico CSS switch (`<input type="checkbox" role="switch">`).
+- `file_or_url` renders a URL text input. File upload handling is done by the route handler alongside the registry-rendered field — the macro renders only the URL input.
+- In wizard mode (`mode="wizard"`), the macro uses `field.wizard_help` when non-empty, falling back to `field.help_text`.
+- In admin mode (`mode="admin"`), the macro always uses `field.help_text`.
+
+The companion `render_section_fields` macro loops over a section's fields and calls `render_field` for each one, applying grid layout:
+
+```jinja2
+{% macro render_section_fields(fields, values, mode) %}
+{# fields: tuple[ConfigField, ...]
+   values: dict of {config_key: current_value}
+   mode: "wizard" or "admin" #}
+```
+
+#### Conditional visibility JS contract
+
+A single shared JS file (`static/js/conditional-visibility.js`) handles conditional show/hide for all field types. No per-section inline scripts.
+
+The handler must:
+
+1. On `DOMContentLoaded`, scan the document for all elements with `data-condition-field` attribute.
+2. For each such element, register a `change` listener on the controlling field (identified by `data-condition-field`).
+3. On each change event, evaluate the condition (`data-condition-op` and `data-condition-value`) against the controlling field's current value.
+4. Set `aria-hidden="true"` and `inert` on the wrapper when the condition is false. Remove both attributes when the condition is true. Do not use `display: none` alone — `inert` is required so that hidden fields are excluded from form submission and keyboard navigation.
+
+The JS handler is approximately 30 lines. It must not depend on any framework or library beyond the browser DOM API.
+
+#### Validation and save helper signatures
+
+Three functions in `registry/validation.py`:
+
+```python
+def validate_form_against_fields(
+    form_data: dict[str, str],
+    fields: tuple[ConfigField, ...],
+) -> list[str]:
+    """
+    Validate form_data against field ValidationRule tuples.
+    Returns a list of human-readable error strings.
+    Empty list means validation passed.
+
+    Checks per rule_type:
+    - required:       field absent or empty string
+    - min:            float(value) < float(rule.value)
+    - max:            float(value) > float(rule.value)
+    - step:           (float(value) - min) % float(rule.value) != 0 (if min rule present)
+    - pattern:        not re.fullmatch(rule.value, value)
+    - one_of:         value not in rule.value (rule.value is a tuple of allowed strings)
+    - max_length:     len(value) > int(rule.value)
+    - max_file_size:  (for file_or_url fields) content-length check deferred to handler
+    """
+
+def extract_field_values(
+    form_data: dict[str, str],
+    fields: tuple[ConfigField, ...],
+) -> dict[str, Any]:
+    """
+    Extract validated field values from form_data, keyed by config_key.
+    Only fields present in the registry for this section are extracted.
+    Unknown keys in form_data are silently dropped — equivalent to
+    _SECTION_ALLOWED_KEYS allowlist behavior.
+    Secret fields are excluded — secrets are handled by save_field_values.
+    """
+
+def save_field_values(
+    values: dict[str, Any],
+    section_def: SectionDef,
+    config_dir: str,
+) -> None:
+    """
+    Persist values to the correct backend, dispatching on config_target:
+    - "stack.conf:<section>"     → update_managed_region(config_dir, "stack.conf", section, values)
+    - "api.conf:<section>"       → update_managed_region(config_dir, "api.conf", section, values)
+    - "branding.json"            → update_branding(config_dir, values)
+    - "branding.json:<key>"      → update_branding(config_dir, {key: values})
+    - "pages.json"               → update_pages(config_dir, values)
+    - "secrets.env"              → update_secrets(config_dir, values, section_def)
+    Raises ValueError for any config_target not matching these patterns.
+    """
+```
+
+#### Escape hatch pattern for custom sections
+
+Four sections keep custom templates because they have interactive behavior beyond form-field rendering: Haze Calibration, Card Layout, Column Mapping, and API Connection. Set `custom_template` in their `SectionDef` to the path of the custom template.
+
+Rules for escape-hatch sections:
+
+- The registry still owns all `ConfigField` metadata for the section. Do not declare field metadata inside the custom template.
+- The custom template calls `render_field(field, value, mode)` for individual fields within its custom layout. It must not re-implement field HTML.
+- The generic admin section handler checks `section_def.custom_template` and renders the custom template when it is set, passing the same context variables as the generic template.
+- Custom sections appear in the admin landing page alongside generic sections — they get the same landing card treatment. The landing page does not distinguish custom from generic.
+
+#### Canonical values for resolved mismatches
+
+These values are locked. Code and templates must use exactly these values — no variations:
+
+| Field | Canonical value | Banned alternatives |
+|-------|----------------|---------------------|
+| Theme mode — auto sunrise/sunset | `auto-sunrise-sunset` | `auto-sunrise` is banned. It was a truncation bug in the admin UI. |
+| Earthquake radius default | `250` (km) | `100` (old wizard), `500` (old admin) |
+| Earthquake min magnitude default | `2.0` | `2.5` (old admin) |
+| Earthquake default days | `30` | `7` (old wizard) |
+| TLS mode — full set | `self-signed`, `acme_http01`, `acme_dns01`, `manual`, `behind_proxy` | Any subset presented as the complete set. The wizard may show a subset via `wizard_visible=False` on individual options, but the registry must declare all 5. |
+
+Phase 2 QC gate verifies: grep confirms no `auto-sunrise` (without `-sunset`) in any Python or template file; no `_EARTHQUAKE_DEFAULTS` in `admin/routes.py`; all 5 TLS modes present in registry declarations.
+
+#### Plugin card config integration
+
+Cards declare config fields in `card-manifest.json` under a `configFields` key. Each entry matches the `ConfigField` schema (subset: `fieldId`, `fieldType`, `label`, `helpText`, `default`, `options`, `validation`).
+
+The `load_card_config_fields(manifest_path: str) -> None` method on `ConfigRegistry`:
+
+1. Reads `card-manifest.json` from `manifest_path`.
+2. Iterates cards with non-empty `configFields`.
+3. Converts each entry to a `ConfigField` object with `config_target = f"stack.conf:card_{card_type}"`.
+4. Registers them under `section_id = f"card_{card_type}"` in the `cards` domain group via `register_card_config()`.
+
+Call `load_card_config_fields()` at admin startup, passing the path to `card-manifest.json` from the dashboard web root. Card config sections appear in the admin UI automatically via the registry-driven landing page under the `cards` domain group.
+
 ---
 
 ## §5 Logging
@@ -1280,6 +1523,7 @@ The controls in this manual trace to the following ADRs. When this manual and an
 | §2 Authentication | ADR-008, ADR-027 |
 | §3 Network Architecture | ADR-037, ADR-060 |
 | §4 Configuration | ADR-027, ADR-038a, ADR-066, ADR-068 |
+| §4.1 Config Registry | ADR-077 |
 | §5 Logging | ADR-029 |
 | §6 Health and Readiness | ADR-030 |
 | §7 Observability | ADR-031 |
