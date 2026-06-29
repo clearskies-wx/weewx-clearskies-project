@@ -748,7 +748,12 @@ Full-viewport overlay with enhanced controls. Pushed as a SPA route (`/radar`) f
 - Only shown when the API capability response reports `satelliteAvailable === true`.
 - Satellite TileLayers render BELOW radar tiles (zIndex 100) with independent animation sharing play/pause state.
 - Tile URL pattern: `{caddyPrefix}/{path}/{size}/{z}/{x}/{y}/0/0_0.webp` (from `satelliteTileUrlTemplate` on the capability response).
-- Source: NOAA GMGSI composite — daytime visible over longwave IR with natural terminator crossfade. Hourly cadence. Coverage: ±72.7° latitude.
+- **Primary sources:** GOES-18/19 ABI (Americas, 2 km, 5-min) and Himawari-9 AHI (Asia-Pacific, 2 km, 10-min). **Global fallback:** NOAA GMGSI composite (8 km, hourly, ±72.7° latitude).
+- **Rendering:** GOES/Himawari tiles are rendered opaque — white clouds on a dark ground, alpha=255 for all data pixels, alpha=0 for no-data only. GMGSI tiles use the legacy semi-transparent RGBA renderer (alpha ~172/255) designed for overlay on a basemap.
+- **Basemap swap:** When satellite is enabled, the basemap switches from OSM/CartoDB to CartoDB `light_only_labels` overlay (light text on transparent background) — showing state boundaries, city names, roads, and water labels over the satellite imagery. Light labels are used in both themes because satellite imagery is always dark. When satellite is disabled, the normal OSM/CartoDB basemap returns.
+- **Radar toggle:** Radar tiles can be toggled on/off independently via the `RadarLayerPanel`, allowing satellite-only or satellite+radar views. Default: on. State persisted to localStorage key `clearskies-radar-show`.
+- **512px tile optimization:** Satellite TileLayer uses `tileSize={512}` and `zoomOffset={-1}`, reducing tile requests 4x compared to default 256px tiles while maintaining the same pixel density.
+- **Pre-warming:** LibreWxR's tile warmer pre-renders satellite tiles after each ingest cycle, so browser requests hit the tile cache immediately instead of triggering cold Python renders.
 - Preload mechanism: static first frame is rendered initially until tiles are cached, preventing tile flickering during animation.
 - Staleness guard: frames older than 24 hours are filtered out (LibreWxR public API satellite pipeline sometimes goes stale).
 - State persisted to localStorage key `clearskies-radar-satellite`.
