@@ -891,6 +891,45 @@ The seismic faults overlay is not a provider module. It is served from a bundled
 
 ---
 
+## §9a Geographic Features (ADR-078)
+
+### Data source
+
+OpenStreetMap via the Overpass API. Keyless, rate-limited by design. Data license: ODbL (OpenStreetMap contributors). Attribution in every API response.
+
+| Property | Value |
+|---|---|
+| Provider | Overpass API (https://overpass-api.de/api/interpreter) |
+| Auth | None (keyless) |
+| License | ODbL — attribution required |
+| TTL | 90 days (configurable via `[geographic_features] refresh_days`) |
+| Queries/year | ~4 (at 90-day TTL) |
+| Override | `overpass_endpoint` in config for self-hosted instances |
+
+### What gets queried
+
+Overpass QL extracts three feature types within operator-configured bounds:
+
+| Feature type | Overpass selector | `type` property |
+|---|---|---|
+| Political boundaries | `relation["boundary"="administrative"]["admin_level"~"2\|4"]` | `"boundary"` |
+| Major roads | `way["highway"~"motorway\|trunk\|primary"]` | `"road"` |
+| Water features | `relation["natural"="water"]` + `way["waterway"="river"]` | `"water"` |
+
+### Service pattern
+
+`services/geographic_features.py` follows the `services/faults.py` pattern: cache-first via `get_cache()`, keyed on `"geo_features:" + sha256(bounds)`, TTL = `refresh_days * 86400`. On miss: resolve bounds (cascade: explicit > librewxr_bounds > station+radius), build Overpass QL, fetch via HTTP POST, convert to GeoJSON FeatureCollection with `type` property per feature, cache the result. On fetch failure: return empty FeatureCollection (graceful degradation — satellite view without geographic context rather than an error).
+
+### Endpoint
+
+`GET /api/v1/geographic-features` — returns `{"data": <FeatureCollection>, "attribution": "© OpenStreetMap contributors (ODbL)"}`. Empty FeatureCollection when `[geographic_features] enabled = false`.
+
+### Not a provider module
+
+Geographic features are NOT a provider module (no capability declaration, no dispatch registry entry, no `PROVIDER_MODULES` entry). The Overpass API is a utility data source, similar to the GEM Active Faults file — not a switchable provider. The service is wired directly in `__main__.py` like the faults service.
+
+---
+
 ## §10 Error Taxonomy
 
 ### Canonical error types

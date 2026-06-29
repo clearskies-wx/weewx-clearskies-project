@@ -758,6 +758,20 @@ Full-viewport overlay with enhanced controls. Pushed as a SPA route (`/radar`) f
 - Staleness guard: frames older than 24 hours are filtered out (LibreWxR public API satellite pipeline sometimes goes stale).
 - State persisted to localStorage key `clearskies-radar-satellite`.
 
+**Geographic features vector overlay (ADR-078):**
+- Rendered as a Leaflet `<GeoJSON>` component when satellite view is active. NOT shown on normal basemap view (basemap already has roads/boundaries).
+- Data source: `GET /api/v1/geographic-features` — GeoJSON FeatureCollection with `type` property per feature.
+- Hook: `useGeographicFeatures()` in `useWeatherData.ts` (pattern: `useEarthquakeFaults()`).
+- Client: `getGeographicFeatures()` in `client.ts` (pattern: `getEarthquakeFaults()`).
+- Per-type styling (static `PathOptions`, `fill: false` — unfilled lines only):
+  - Boundaries: `color: '#ffffff'`, `weight: 1.5`, `opacity: 0.7`
+  - Roads: `color: '#999999'`, `weight: 1`, `opacity: 0.5`
+  - Water: `color: '#4a90d9'`, `weight: 1`, `opacity: 0.6`
+- `interactive={false}` — no popups, no hover, just visual context.
+- zIndex 250 (above satellite tiles at 100, below labels at 300).
+- Replaces the CSS blend-mode hack (`SATELLITE_FEATURES_URL` + `dark_nolabels` TileLayer + `.satellite-features` class in `index.css`). The hack is removed entirely.
+- Attribution: "© OpenStreetMap contributors (ODbL)" — included in the API response.
+
 **Zoom bounds enforcement:**
 - Read geographic bounds from API capability response.
 - Set Leaflet `maxBounds` to prevent zooming out past provider coverage.

@@ -118,6 +118,12 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | [ADR-036](../archive/decisions/ADR-036-workspace-layout.md) | Workspace layout | 2026-06-18 | 2026-05-04 |
 | [ADR-072](../archive/decisions/ADR-072-solar-radiation-model-replacement.md) | Solar radiation model replacement (R-S → Solis) | 2026-06-23 | 2026-06-23 |
 
+## Proposed
+
+| ADR | Title | Date |
+|---|---|---|
+| [ADR-078](ADR-078-geographic-features-overlay.md) | Geographic features overlay (OSM via Overpass API) | 2026-06-29 |
+
 ## Pending archive
 
 | ADR | Title | Target | Date |
