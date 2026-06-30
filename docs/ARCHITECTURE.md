@@ -4,7 +4,7 @@ Single source of truth for what each service is, where it runs, what it exposes,
 
 Authoritative for current system state. ADRs are authoritative for *why* decisions were made. If this document conflicts with an ADR, investigate — one of them is stale.
 
-Last verified: 2026-06-29 (ADR-078 geographic features endpoint + config section added; ADR-079 multi-satellite compositing noted in LibreWxR deploy section). Previous: 2026-06-28 (admin provider sections read from API /setup/current-config instead of local api.conf; LibreWxR config fields added to admin radar section; CurrentConfigProviderSection extended with provider-specific fields).
+Last verified: 2026-06-29 (ADR-078 amended: geographic features changed from Overpass/GeoJSON to PMTiles/protomaps-leaflet — endpoints, config, and file updated). Previous: 2026-06-29 (ADR-078 geographic features endpoint + config section added; ADR-079 multi-satellite compositing noted in LibreWxR deploy section).
 
 ---
 
@@ -226,7 +226,7 @@ The OpenAPI spec lists 35+ data endpoints. Key groups for orientation:
 | Forecast & alerts | `/api/v1/forecast`, `/api/v1/alerts`, `/api/v1/aqi/current`, `/api/v1/aqi/history` | Provider-backed; single source per deploy per domain. |
 | Almanac | `/api/v1/almanac`, `/api/v1/almanac/sun-times`, `/api/v1/almanac/moon-phases`, `/api/v1/almanac/seeing-forecast`, `/api/v1/almanac/planets`, `/api/v1/almanac/moon-names`, `/api/v1/almanac/eclipses/lunar`, `/api/v1/almanac/eclipses/solar`, `/api/v1/almanac/meteor-showers`, `/api/v1/almanac/positions` | Skyfield-based; background cache warming for expensive computations. |
 | Earthquakes | `/api/v1/earthquakes`, `/api/v1/earthquakes/config`, `/api/v1/earthquakes/faults` | `/faults` serves GEM Active Faults GeoJSON radius-clipped. `/config` returns provider configuration. |
-| Geographic features | `/api/v1/geographic-features` | GeoJSON FeatureCollection of political boundaries, major roads, and water features within configured bounds. Sourced from OSM via Overpass API, cached 90 days (ADR-078). Dashboard renders as vector lines on satellite view only. |
+| Geographic features | `/api/v1/geographic-features/tiles`, `/api/v1/geographic-features/status` | `/tiles` serves PMTiles file with HTTP Range requests (206 Partial Content) — pre-processed OpenStreetMap vector tiles cropped to operator BBOX. `/status` returns `{available, size_bytes, updated_at}`. Dashboard renders lines-only via `protomaps-leaflet` on satellite view (ADR-078). `POST /setup/geographic-features/update` triggers download + extraction (see setup endpoints). |
 | Charts | `/api/v1/charts/config`, `/api/v1/charts/groups`, `/api/v1/charts/custom-query/{series_id}` | Config-driven; custom SQL from `charts.conf` only (disk-only trust model). |
 | Radar | `/api/v1/radar/providers/{id}/frames`, `/api/v1/radar/providers/{id}/tiles/{z}/{x}/{y}` | Frame metadata for all providers. **Satellite frames** (LibreWxR only) returned alongside radar frames when available. Tile proxy for keyed providers only (`openweathermap`). LibreWxR tiles go through Caddy (`/librewxr/*`), not the API. RainViewer tiles go direct to CDN. |
 | Content & nav | `/api/v1/pages`, `/api/v1/pages/{slug}/content`, `/api/v1/reports`, `/api/v1/content/about`, `/api/v1/content/legal` | `/pages` returns all 9 built-in pages unconditionally — page visibility filtering is the dashboard's responsibility via `pages.json` (ADR-024 amendment 2026-06-21). |
@@ -255,6 +255,7 @@ Used by the config UI wizard and admin per ADR-038. Not proxied through Caddy �
 | `/setup/calibration-state` | GET | Per-month calibration data for admin UI | Proxy secret |
 | `/setup/calibration-reset` | POST | Clear calibration data (re-bootstrap on next restart) | Proxy secret |
 | `/setup/openaq-sensors` | GET | List nearby reference PM2.5 sensors for admin UI | Proxy secret |
+| `/setup/geographic-features/update` | POST | Download latest Protomaps daily build PMTiles, extract to operator BBOX, store at `/etc/weewx-clearskies/geographic-features.pmtiles` (ADR-078) | Proxy secret |
 
 ### Health & metrics (separate loopback port 8081)
 
@@ -456,7 +457,7 @@ All config in `/etc/weewx-clearskies/` (search order: `CLEARSKIES_CONFIG` env va
 
 | File | Used by | Contains | Exists in examples? |
 |------|---------|----------|-------------------|
-| `api.conf` | API | Server bind, DB connection, providers, logging, TLS, input mode, socket path, SSE bind, unit conversion config (absorbs former `realtime.conf` settings per ADR-058), `[freshness]` per-domain refresh intervals and idle timeout config (ADR-075), `[geographic_features]` bounds/refresh/Overpass endpoint (ADR-078) | Yes (`config/api.conf.example`) |
+| `api.conf` | API | Server bind, DB connection, providers, logging, TLS, input mode, socket path, SSE bind, unit conversion config (absorbs former `realtime.conf` settings per ADR-058), `[freshness]` per-domain refresh intervals and idle timeout config (ADR-075), `[geographic_features]` enabled flag + bounds for PMTiles extraction (ADR-078) | Yes (`config/api.conf.example`) |
 | `realtime.conf` | **DEPRECATED** — realtime service merged into API per ADR-058 | Input mode, MQTT settings, socket path, SSE bind, health bind, upstream API URL, unit conversion config | Yes (`config/realtime.conf.example`) — deprecated |
 | `stack.conf` | Config UI | UI bind/port, TLS, `[ui] enabled` flag | **No — does not exist** |
 | `secrets.env` | All (mode 0600) | DB password, API keys, admin credentials, proxy secret | No (generated by wizard) |
@@ -465,6 +466,7 @@ All config in `/etc/weewx-clearskies/` (search order: `CLEARSKIES_CONFIG` env va
 | `webcam.json` | Dashboard (via Caddy) | Webcam enabled flag, image/video URLs, refresh interval. Served by Caddy `handle /webcam.json` route — **never in the web root** (rsync --delete would destroy it). | No (written by wizard step 7) |
 | `pages.json` | Dashboard (via Caddy) | Page visibility: `{ "hidden": ["seismic", "reports"] }`. Dashboard reads at boot to filter nav + routes. "Now" cannot be hidden. Served by Caddy `handle /pages.json` — **never in the web root.** Absent file = all pages visible. (ADR-024 amendment 2026-06-21) | No (written by admin UI) |
 | `now-layout.json` | Dashboard (via Caddy) | Now page card layout: `{ "version": 1, "cards": [{ "type", "footprint", "rowSpan" }] }`. Dashboard reads at boot; absent file = compiled-in default layout. Served by Caddy `handle /now-layout.json` — **never in the web root.** (ADR-065) | No (written by admin card layout editor) |
+| `geographic-features.pmtiles` | API (served via Range requests) | PMTiles v3 vector tile archive — OpenStreetMap boundaries, roads, water features cropped to operator BBOX. Served by API at `/api/v1/geographic-features/tiles`. Created by `POST /setup/geographic-features/update`. (ADR-078) | No (downloaded + extracted by admin action) |
 | `ui-cert.pem` | Config UI | Self-signed TLS cert (mode 0644) | No (auto-generated with `--tls`) |
 | `ui-key.pem` | Config UI | TLS private key (mode 0600) | No (auto-generated with `--tls`) |
 

@@ -758,19 +758,19 @@ Full-viewport overlay with enhanced controls. Pushed as a SPA route (`/radar`) f
 - Staleness guard: frames older than 24 hours are filtered out (LibreWxR public API satellite pipeline sometimes goes stale).
 - State persisted to localStorage key `clearskies-radar-satellite`.
 
-**Geographic features vector overlay (ADR-078):**
-- Rendered as a Leaflet `<GeoJSON>` component when satellite view is active. NOT shown on normal basemap view (basemap already has roads/boundaries).
-- Data source: `GET /api/v1/geographic-features` — GeoJSON FeatureCollection with `type` property per feature.
-- Hook: `useGeographicFeatures()` in `useWeatherData.ts` (pattern: `useEarthquakeFaults()`).
-- Client: `getGeographicFeatures()` in `client.ts` (pattern: `getEarthquakeFaults()`).
-- Per-type styling (static `PathOptions`, `fill: false` — unfilled lines only):
-  - Boundaries: `color: '#ffffff'`, `weight: 1.5`, `opacity: 0.7`
-  - Roads: `color: '#999999'`, `weight: 1`, `opacity: 0.5`
-  - Water: `color: '#4a90d9'`, `weight: 1`, `opacity: 0.6`
-- `interactive={false}` — no popups, no hover, just visual context.
-- zIndex 250 (above satellite tiles at 100, below labels at 300).
+**Geographic features vector tile overlay (ADR-078):**
+- Rendered as a `protomaps-leaflet` Canvas-based vector tile layer when satellite view is active. NOT shown on normal basemap view (basemap already has roads/boundaries).
+- Data source: `GET /api/v1/geographic-features/tiles` — PMTiles file served with HTTP Range requests. Browser loads only tiles visible in the current viewport (~20-50 KB per tile, on-demand).
+- npm packages: `protomaps-leaflet` (Canvas renderer) + `pmtiles` (Range-request tile reader).
+- Rendering: `protomapsL.leafletLayer()` with custom `paintRules` (lines only) and empty `labelRules` (no labels). No full basemap — only geographic feature lines.
+- Availability check: `GET /api/v1/geographic-features/status` — if `available` is false (PMTiles not yet downloaded), no overlay is added. Not an error state.
+- Per-type line styling (`LineSymbolizer`, no fill):
+  - Boundaries: `color: '#ffffff'`, `width: 1.5`, `opacity: 0.7`
+  - Roads: `color: '#999999'`, `width: 1`, `opacity: 0.5` (filtered to `pmap:kind` highway/trunk)
+  - Water: `color: '#4a90d9'`, `width: 1`, `opacity: 0.6`
+- Non-interactive — no popups, no hover, just visual context.
 - Replaces the CSS blend-mode hack (`SATELLITE_FEATURES_URL` + `dark_nolabels` TileLayer + `.satellite-features` class in `index.css`). The hack is removed entirely.
-- Attribution: "© OpenStreetMap contributors (ODbL)" — included in the API response.
+- Attribution: "© OpenStreetMap contributors (ODbL)".
 
 **Zoom bounds enforcement:**
 - Read geographic bounds from API capability response.
