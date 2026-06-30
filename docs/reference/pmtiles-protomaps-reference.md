@@ -103,7 +103,7 @@ layer.addTo(map);
   - `dataLayer`: source layer name in the PMTiles archive (e.g., `"boundaries"`, `"roads"`, `"water"`, `"earth"`, `"natural"`, `"landuse"`, `"buildings"`, `"places"`)
   - `symbolizer`: one of `LineSymbolizer`, `PolygonSymbolizer`, `CircleSymbolizer`, `IconSymbolizer`, `GroupSymbolizer`
   - `filter`: `(zoom: number, feature: Feature) => boolean` — filter features within a layer
-  - Feature properties accessed via `feature.props` (e.g., `feature.props["pmap:kind"]`)
+  - Feature properties accessed via `feature.props` (e.g., `feature.props["kind"]`). **Note: Protomaps basemap v4+ uses bare `kind`, NOT `pmap:kind` (that was the v2 schema).**
 - **`labelRules`**: Array of label rules. Pass `[]` for no labels.
 - **`LineSymbolizer` options**: `{ color, width, opacity, dash?, dashColor?, dashWidth? }`
 - **`PolygonSymbolizer` options**: `{ fill, opacity, stroke?, width? }`
@@ -112,11 +112,11 @@ layer.addTo(map);
 
 The Protomaps basemap uses these layer names (subset relevant to geographic features):
 
-| Layer | Contains | `pmap:kind` values |
-|-------|----------|-------------------|
-| `boundaries` | Administrative boundaries | `country`, `region`, `county` |
-| `roads` | Road network | `highway`, `major_road`, `medium_road`, `minor_road`, `path` |
-| `water` | Water bodies and waterways | `water`, `ocean`, `lake`, `river`, `stream` |
+| Layer | Contains | `kind` values | Notes |
+|-------|----------|--------------|-------|
+| `boundaries` | Administrative boundary lines | `country`, `region`, `county`, `locality` | Line geometry. `kind_detail` has admin level. |
+| `roads` | Road network lines | `highway`, `major_road`, `medium_road`, `minor_road`, `path`, `ferry` | Line geometry. |
+| `water` | Water bodies (polygons) + waterways (lines) | `water`, `lake`, `ocean`, `playa`, `other` | `kind_detail` distinguishes `river`, `riverbank`, `canal`. Rivers are LINE features; lakes/ocean are POLYGON. |
 | `transit` | Railways, ferries | `rail`, `ferry` |
 | `earth` | Land polygons | — |
 | `natural` | Parks, forests | `park`, `forest`, `wetland` |
