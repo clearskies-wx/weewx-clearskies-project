@@ -1537,8 +1537,9 @@ Nullable features use median imputation. Compute feature medians from the traini
 **Training data split:**
 - Training set: all pairs older than 30 days.
 - Validation set: pairs from the last 30 days.
+- **Bootstrap mode:** When all pairs are within the last 30 days (fresh deployment — training set empty) or all pairs are older than 30 days (validation set empty), use all available data for both training and validation. This allows the first model to be trained as soon as `min_samples` total pairs are collected, without waiting 30 days for the normal split to produce a non-empty training set.
 
-**Minimum samples gate:** Do not train unless `pair_count >= min_samples` (default 500, minimum configurable value 100). Return early with a status dict when the gate is not met.
+**Minimum samples gate:** Do not train unless `total_pair_count >= min_samples` (default 500, minimum configurable value 100). The gate checks total pairs across both training and validation sets, not just the training subset. Return early with a status dict when the gate is not met.
 
 **Data retention:** Purge records older than `retention_years` (default 3) at the start of each training run.
 
