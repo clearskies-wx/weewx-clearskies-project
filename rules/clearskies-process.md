@@ -85,6 +85,10 @@ Use the Nygard format. Template at `docs/decisions/_TEMPLATE.md`. Required: Stat
 
 **Plan all parts together before executing any.** When a request has additions AND removals, new features AND fixes, research AND implementation — design one coordinated plan that covers everything. Executing half the request and then asking "what about the other half?" wastes tokens and user patience.
 
+**The lead does not have authority to defer plan items.** When a plan lists a phase or task, the lead executes it. If the plan says "deferred," that is a scheduling note from the plan author, not permission for the lead to skip it when the user says "execute." When the user asks you to execute a plan, every phase that the current work enables is in scope. "The plan said deferred" is not a valid reason to stop short — only the user can decide what is deferred.
+
+**Why (2026-06-30):** Phase 6 audit completed, but the lead reported Phase 7 (Admin UI) as "deferred per plan" without building it. The plan's "deferred" annotation was a drafting-time scheduling note, not an opt-out. The user had to correct this: the lead does not have deferral authority.
+
 **Why (2026-05-26):** User asked to (1) analyze Belchertown records and carry them over to Clear Skies, and (2) eliminate inside-temp and custom records. The lead spent multiple agent cycles researching and executing only the removals while completely ignoring the additions — the primary ask. The user had to remind the lead twice. Tokens were burned on research that was never acted on.
 
 ## Agent orchestration

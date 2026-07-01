@@ -435,9 +435,9 @@ See ADR-079 for the decision record. When `[forecast_correction]` is absent from
 |-----|------|---------|-------------|
 | `enabled` | bool | `false` | Apply trained model corrections to forecast temperatures. No effect if no model is available. Enable only after a model has been trained via `/setup/forecast-correction/retrain`. |
 | `collection_enabled` | bool | `true` | Collect forecast-observation pairs to the correction SQLite DB. Independent of correction — pairs are collected even when correction is disabled, building data for future training. |
-| `retrain_schedule` | string | `weekly` | Model retraining schedule: `weekly`, `daily`, or `manual`. Weekly retrains on `retrain_day` at approximately 03:00 station time. Manual requires explicit `POST /setup/forecast-correction/retrain`. |
+| `retrain_schedule` | string | `daily` | Model retraining schedule: `daily`, `weekly`, or `manual`. Daily retrains at approximately 03:00 station time. Weekly retrains on `retrain_day` at 03:00. Manual requires explicit `POST /setup/forecast-correction/retrain`. |
 | `retrain_day` | int | `0` | Day of week for weekly retrain (0=Monday, 6=Sunday). Ignored when `retrain_schedule` is not `weekly`. |
-| `min_samples` | int | `500` | Minimum forecast-observation pairs before first model training. Validated ≥ 100. At a 5-minute archive_interval, 500 pairs ≈ 1.7 days of collection. |
+| `min_samples` | int | `500` | Minimum forecast-observation pairs before first model training. Validated ≥ 100. Collection rate depends on `archive_interval` (read from weewx.conf). |
 | `retention_years` | int | `3` | Rolling data retention window in years. Records older than this are purged at each training run. Validated ≥ 1. |
 | `db_path` | string | `/etc/weewx-clearskies/forecast_correction.db` | Path to the correction SQLite database. Must be within the filesystem write allowlist (`/etc/weewx-clearskies/`). |
 | `model_path` | string | `/etc/weewx-clearskies/forecast_correction_model.pkl` | Path to the serialized model file. Written atomically (temp file + `os.rename()`). |

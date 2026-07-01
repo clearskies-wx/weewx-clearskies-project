@@ -1544,7 +1544,7 @@ Nullable features use median imputation. Compute feature medians from the traini
 
 **Model serialization:** Serialize model + feature medians dict together using `joblib.dump()`. Write to a temp file in the same directory, then `os.rename()` to the target path. This is an atomic write — a concurrent forecast request never reads a partial model.
 
-**Retraining schedule:** Configured via `retrain_schedule` (`weekly` / `daily` / `manual`). Weekly retrains on `retrain_day` (0=Monday, 6=Sunday) at approximately 03:00 station time. Manual requires an explicit `POST /setup/forecast-correction/retrain` call. A background `BackgroundRetrainer` daemon thread manages scheduled retraining.
+**Retraining schedule:** Configured via `retrain_schedule` (`daily` / `weekly` / `manual`, default `daily`). Daily retrains at approximately 03:00 station time. Weekly retrains on `retrain_day` (0=Monday, 6=Sunday) at 03:00. Manual requires an explicit `POST /setup/forecast-correction/retrain` call. A background `BackgroundRetrainer` daemon thread manages scheduled retraining.
 
 ### TruScore metrics
 
