@@ -1554,7 +1554,7 @@ Computed during each training run using the 30-day validation window:
 | Metric | Formula | Meaning |
 |--------|---------|---------|
 | **Provider Score** | `100 − MAE_raw` | Forecast accuracy before correction. Higher = more accurate raw forecast. |
-| **Correction Score** | `max(0, (MAE_raw − MAE_corrected) / MAE_raw × 100)` | Percentage improvement from correction. Clamped to 0 when correction makes forecasts worse. |
+| **Correction Score** | `100 − MAE_corrected` | Forecast accuracy after correction. Same scale as Provider Score — higher = better. Directly comparable: a Provider Score of 97.8 becoming a Correction Score of 99.8 immediately shows the improvement. |
 
 `MAE_raw` = mean absolute error of raw forecasts vs observations over the validation window.
 `MAE_corrected` = mean absolute error of corrected forecasts vs observations over the same window.
