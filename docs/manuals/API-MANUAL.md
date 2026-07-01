@@ -1575,8 +1575,8 @@ Use `ConfigDict(extra="forbid")` on all request models. Setup endpoints omit `fr
 
 ### Correction behavior
 
-- Correction applies to **hourly forecast points only**. Daily points are untouched.
-- `correct_bundle(bundle)` iterates `bundle.hourly`. For each point: extract 7 features, impute None features using stored medians, predict bias, set `point.outTemp = round(point.outTemp + predicted_bias, 1)`.
+- **Hourly points:** `correct_bundle(bundle)` iterates `bundle.hourly`. For each point: extract 7 features, impute None features using stored medians, predict bias, set `point.outTemp = round(point.outTemp + predicted_bias, 1)`.
+- **Daily points:** For each `bundle.daily` point, predict bias for `tempMax` at hour=14 (typical afternoon high) and `tempMin` at hour=5 (typical early morning low). Weather features (wind, humidity, cloud cover, wind speed) use stored medians since daily points don't carry per-hour values.
 - `is_active()` returns `True` only when both `enabled = true` AND a model is loaded. The no-op path (`not is_active()`) returns the bundle unmodified.
 - After `os.rename()` completes a new model file, `corrector.reload_model()` loads it. There is a brief window where forecast requests use the prior model — this is acceptable.
 
