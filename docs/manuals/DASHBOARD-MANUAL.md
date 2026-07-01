@@ -746,6 +746,7 @@ Full-viewport overlay with enhanced controls. Pushed as a SPA route (`/radar`) f
 **Satellite imagery layer (LibreWxR only):**
 - Toggleable layer in the expanded radar view. Toggle labeled "Satellite imagery" in the `RadarLayerPanel`.
 - Only shown when the API capability response reports `satelliteAvailable === true`.
+- When satellite is active, nowcast (radar extrapolation) frames are excluded from the radar animation — only past/current radar frames animate alongside satellite. This ensures both layers have matching frame counts (24 each) and consistent animation cadence.
 - Satellite TileLayers render BELOW radar tiles (zIndex 100) with independent animation sharing play/pause state.
 - Tile URL pattern: `{caddyPrefix}/{path}/{size}/{z}/{x}/{y}/0/0_0.webp` (from `satelliteTileUrlTemplate` on the capability response).
 - **Primary sources:** GOES-18/19 ABI (Americas, 2 km, 5-min) and Himawari-9 AHI (Asia-Pacific, 2 km, 10-min). **Global fallback:** NOAA GMGSI composite (8 km, hourly, ±72.7° latitude).
@@ -753,9 +754,11 @@ Full-viewport overlay with enhanced controls. Pushed as a SPA route (`/radar`) f
 - **Basemap swap:** When satellite is enabled, the basemap switches from OSM/CartoDB to CartoDB `light_only_labels` overlay (light text on transparent background) — showing state boundaries, city names, roads, and water labels over the satellite imagery. Light labels are used in both themes because satellite imagery is always dark. When satellite is disabled, the normal OSM/CartoDB basemap returns.
 - **Radar toggle:** Radar tiles can be toggled on/off independently via the `RadarLayerPanel`, allowing satellite-only or satellite+radar views. Default: on. State persisted to localStorage key `clearskies-radar-show`.
 - **512px tile optimization:** Satellite TileLayer uses `tileSize={512}` and `zoomOffset={-1}`, reducing tile requests 4x compared to default 256px tiles while maintaining the same pixel density.
-- **Pre-warming:** LibreWxR's tile warmer pre-renders satellite tiles after each ingest cycle, so browser requests hit the tile cache immediately instead of triggering cold Python renders.
+- **Pre-warming:** LibreWxR's tile warmer pre-renders satellite tiles at zoom levels matching the dashboard viewport (configured via `warm_overview_zoom_regional`) after each ingest cycle. On cache miss, demand-driven warming pre-renders all timestamps at the same tile coordinate, so subsequent frames are immediate cache hits.
+- **Default configuration:** IR-only (VIS disabled via `LIBREWXR_GOES_VIS_ENABLED=false`). IR provides all-weather satellite imagery at 2 km resolution. VIS can be enabled for daytime cloud edge detail.
 - Preload mechanism: static first frame is rendered initially until tiles are cached, preventing tile flickering during animation.
 - Staleness guard: frames older than 24 hours are filtered out (LibreWxR public API satellite pipeline sometimes goes stale).
+- **Animation strategy:** All tile layers remain mounted during animation with `visibility: hidden` on inactive frames (no mount/unmount churn). Client-side tile prefetching via `new Image()` populates the browser HTTP cache before animation starts, ensuring smooth playback without mid-animation tile fetches.
 - State persisted to localStorage key `clearskies-radar-satellite`.
 
 **Geographic features vector tile overlay (ADR-078):**
