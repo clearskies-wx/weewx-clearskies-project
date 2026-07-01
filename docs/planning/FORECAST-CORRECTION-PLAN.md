@@ -18,11 +18,11 @@ This plan adds a **provider-agnostic forecast temperature correction engine** to
 | Layer | Answers | Controls | Lives in |
 |-------|---------|----------|----------|
 | **1. This plan** | what phases, in what order, with what agents | sequencing & QC gates | `docs/planning/FORECAST-CORRECTION-PLAN.md` |
-| **2. ADR-077** | what we decided & why + acceptance criteria | the decision record | `docs/decisions/ADR-077-forecast-correction-engine.md` |
+| **2. ADR-079** | what we decided & why + acceptance criteria | the decision record | `docs/decisions/ADR-079-forecast-correction-engine.md` |
 | **3. Manual updates** | prescriptive rules for the feature | API-MANUAL, OPS-MANUAL, ARCHITECTURE | the manuals (updated BEFORE code) |
 | **4. Code** | the implementation | — | `weewx-clearskies-api` repo |
 
-**Discipline:** ADR-077 must be **Accepted** and manuals updated BEFORE any code is written. Manuals define what the code should do; code implements what the manuals describe.
+**Discipline:** ADR-079 must be **Accepted** and manuals updated BEFORE any code is written. Manuals define what the code should do; code implements what the manuals describe.
 
 ---
 
@@ -171,14 +171,14 @@ Available on every hourly forecast point:
 
 ### Phase 0: ADR + Manual Updates (BLOCKS ALL CODE)
 
-No code is written until ADR-077 is Accepted and manuals are updated.
+No code is written until ADR-079 is Accepted and manuals are updated.
 
 | Task | Owner | Dep | Deliverable | Accept | QC |
 |------|-------|-----|-------------|--------|-----|
-| **0.1** Draft ADR-077 (Forecast Correction Engine) — Proposed | Lead | — | `docs/decisions/ADR-077-forecast-correction-engine.md` with Status: Proposed | ADR follows Nygard format per `rules/clearskies-process.md` L48-54; has Context, Options, Decision, Consequences, Implementation guidance, Acceptance criteria | User reviews + explicitly approves → Accepted |
-| **0.2** Update API-MANUAL.md | docs-author | 0.1 Accepted | New §14 "Forecast Correction Engine" covering: correction pipeline position (after cache, before response), data collection background task, TruScore metrics, model training lifecycle, admin endpoints contract | Section follows existing manual pattern (numbered, cross-refs ADR-077); prescriptive rules for implementers | Lead reviews for completeness + accuracy vs ADR-077 |
+| **0.1** Draft ADR-079 (Forecast Correction Engine) — Proposed | Lead | — | `docs/decisions/ADR-079-forecast-correction-engine.md` with Status: Proposed | ADR follows Nygard format per `rules/clearskies-process.md` L48-54; has Context, Options, Decision, Consequences, Implementation guidance, Acceptance criteria | User reviews + explicitly approves → Accepted |
+| **0.2** Update API-MANUAL.md | docs-author | 0.1 Accepted | New §14 "Forecast Correction Engine" covering: correction pipeline position (after cache, before response), data collection background task, TruScore metrics, model training lifecycle, admin endpoints contract | Section follows existing manual pattern (numbered, cross-refs ADR-079); prescriptive rules for implementers | Lead reviews for completeness + accuracy vs ADR-079 |
 | **0.3** Update OPERATIONS-MANUAL.md | docs-author | 0.1 Accepted | New subsection in §4 "Configuration" for `[forecast_correction]` INI section; new entry in §1 "Deployment" for DB + model file paths in `/etc/weewx-clearskies/` | Config format, defaults, every key documented; file paths + permissions documented | Lead reviews |
-| **0.4** Update ARCHITECTURE.md | docs-author | 0.1 Accepted | New row in vocabulary table (L11-29) for "Forecast correction engine"; new entry in services/data-stores section (L35-88) for SQLite correction DB | Follows existing table format; references ADR-077 | Lead reviews |
+| **0.4** Update ARCHITECTURE.md | docs-author | 0.1 Accepted | New row in vocabulary table (L11-29) for "Forecast correction engine"; new entry in services/data-stores section (L35-88) for SQLite correction DB | Follows existing table format; references ADR-079 | Lead reviews |
 
 **Tasks 0.2-0.4 can run in parallel** (single docs-author agent, one prompt covering all three manuals).
 
@@ -230,7 +230,7 @@ No code is written until ADR-077 is Accepted and manuals are updated.
 
 | Task | Owner | Dep | Files | Do | Accept | QC |
 |------|-------|-----|-------|-----|--------|-----|
-| **6.1** Source + ADR audit | auditor | Phases 1-5 | All new + modified files | Audit against: (a) ADR-077 acceptance criteria — walk every criterion; (b) `rules/coding.md` §1 security constraints (L145-166) — verify no weewx DB writes, no writes outside `/etc/weewx-clearskies/`, parameterized SQL, no untrusted pickle; (c) `rules/coding.md` §3 organization — single responsibility, no mega-files; (d) API-MANUAL.md §14 — implementation matches prescriptive rules; (e) OPERATIONS-MANUAL.md — config section matches settings class; (f) Settings pattern consistency — new class matches existing pattern. Per finding: severity + citation + file:line + failure mode + remediation. | Every ADR-077 acceptance criterion checked (PASS/FAIL); every coding.md §1 constraint verified; findings formatted F1/F2/..Fn | Lead synthesizes findings |
+| **6.1** Source + ADR audit | auditor | Phases 1-5 | All new + modified files | Audit against: (a) ADR-079 acceptance criteria — walk every criterion; (b) `rules/coding.md` §1 security constraints (L145-166) — verify no weewx DB writes, no writes outside `/etc/weewx-clearskies/`, parameterized SQL, no untrusted pickle; (c) `rules/coding.md` §3 organization — single responsibility, no mega-files; (d) API-MANUAL.md §14 — implementation matches prescriptive rules; (e) OPERATIONS-MANUAL.md — config section matches settings class; (f) Settings pattern consistency — new class matches existing pattern. Per finding: severity + citation + file:line + failure mode + remediation. | Every ADR-079 acceptance criterion checked (PASS/FAIL); every coding.md §1 constraint verified; findings formatted F1/F2/..Fn | Lead synthesizes findings |
 | **6.2** Address audit findings | api-dev | 6.1 | Per findings | Fix all MEDIUM+ findings from 6.1 | All MEDIUM+ findings resolved; re-audit confirms | auditor re-checks |
 
 ### Phase 7: Admin UI (separate brief — deferred)
@@ -341,7 +341,7 @@ All in `repos/weewx-clearskies-api/weewx_clearskies_api/correction/`:
 ## Dependency graph
 
 ```
-Phase 0: ADR-077 + Manual Updates
+Phase 0: ADR-079 + Manual Updates
     │
     ├──► Phase 1: Foundation (db + config + settings + dependency)
     │        │
@@ -370,11 +370,11 @@ Each phase is strictly sequential — no cross-phase parallelism. Within each ph
 | **2. Tests pass** | `pytest tests/test_correction_*.py -v` → 0 failures | test-author runs; lead verifies output |
 | **3. Type check** | No new type errors introduced (existing codebase does not enforce `mypy --strict` globally, but new module should have clean type hints) | api-dev self-check |
 | **4. Manual compliance** | Implementation matches API-MANUAL §14 prescriptive rules | auditor (Phase 6) |
-| **5. ADR acceptance criteria** | Every criterion in ADR-077 has a corresponding deliverable | auditor (Phase 6) |
+| **5. ADR acceptance criteria** | Every criterion in ADR-079 has a corresponding deliverable | auditor (Phase 6) |
 
 ---
 
-## ADR-077 acceptance criteria (draft — to be refined during ADR authoring)
+## ADR-079 acceptance criteria (draft — to be refined during ADR authoring)
 
 1. Forecast-observation pairs are logged to a separate SQLite database; the weewx archive database is never written to by the API
 2. A trained RandomForestRegressor corrects hourly forecast temperatures before serving responses

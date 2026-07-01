@@ -29,6 +29,7 @@ Last updated: 2026-06-27
 11. [SSE and Realtime](#11-sse-and-realtime)
 12. [Radar Endpoints and Capability Model](#12-radar-endpoints-and-capability-model)
 13. [Anti-Patterns](#13-anti-patterns)
+14. [Forecast Correction Engine](#14-forecast-correction-engine)
 
 ---
 
@@ -1475,3 +1476,109 @@ Never do any of the following.
 | **Omit `stationClock` from a response envelope.** | Every API response includes `stationClock`. It is computed at response time from the station's configured timezone — no DB query required (ADR-075). |
 | **Omit `freshness` from a cacheable response.** | Every cacheable REST response includes `freshness`. Only SSE events and setup endpoints omit it (ADR-075). |
 | **Hardcode refresh intervals that should come from weewx.conf.** | `current_observation` and `records` derive their `refreshInterval` from `archiveIntervalSeconds`. Do not use magic numbers like `300` for these domains — the actual archive interval is station-specific (ADR-075). |
+
+---
+
+## §14 Forecast Correction Engine
+
+Governs the `correction/` package in `weewx-clearskies-api`. See ADR-079 for the decision record.
+
+### Pipeline position
+
+The correction engine runs **after** cache lookup and sunrise/sunset injection, **before** the hours/days slice and response construction. Raw provider data stays in cache — correction is applied in-flight per request. If correction is disabled or no model is available, raw forecasts pass through unchanged (no-op).
+
+Sequence within `endpoints/forecast.py`:
+1. Provider dispatch (cache hit or upstream fetch)
+2. Cache storage (raw provider data)
+3. Sunrise/sunset injection
+4. **Correction applied here** (`correct_bundle(bundle)`) — hourly points only
+5. Hours/days slice
+6. Response construction
+
+### Data collection
+
+A background `ForecastCollector` daemon thread fires once per `archive_interval`. Per tick:
+
+1. Query the latest archive record for `outTemp` + `dateTime` from the weewx archive DB (read-only session).
+2. Read the current cached forecast bundle.
+3. Find the `HourlyForecastPoint` whose `validTime` is closest to the archive timestamp.
+4. Extract 7 features (all forecast-side — no observation-time features).
+5. Write the forecast-observation pair to `forecast_correction.db` via `correction/db.py:insert_pair()`.
+6. Skip (no error) if: archive record missing, cached forecast missing, pair for this timestamp already exists (UNIQUE constraint on `timestamp`).
+
+The collector runs when `collection_enabled = true` in `[forecast_correction]`. Collection is independent of correction — pairs are collected even when correction is disabled, building data toward the `min_samples` threshold for future training.
+
+The weewx archive DB is never written to. The correction engine uses a separate SQLite DB.
+
+### Model features
+
+Seven features, all from the forecast point (MOS methodology — no observation data exists for future forecast hours):
+
+| # | Feature | Source field | Notes |
+|---|---------|-------------|-------|
+| 1 | `month` | `validTime` (1–12) | Seasonal bias variation |
+| 2 | `hour` | `validTime` (0–23) | Diurnal bias cycle |
+| 3 | `fcst_temp` | `outTemp` | Bias may scale with predicted value |
+| 4 | `fcst_wind_dir` | `windDir` (degrees, nullable) | Offshore vs onshore thermal regime |
+| 5 | `fcst_humidity` | `outHumidity` (%, nullable) | Air mass type proxy |
+| 6 | `fcst_cloud_cover` | `cloudCover` (%, nullable) | Radiative heating modulator |
+| 7 | `fcst_wind_speed` | `windSpeed` (nullable) | Wind mixing affects microclimate |
+
+`day_of_year` is also stored in the DB for future experiments but is not used as a training feature — `month` provides cleaner seasonal bins for Random Forest splits.
+
+Nullable features use median imputation. Compute feature medians from the training set and store them alongside the model. Apply the same stored medians at prediction time — never recompute medians at prediction time.
+
+### Model training
+
+**Algorithm:** `RandomForestRegressor(n_estimators=150, max_depth=6, random_state=42)` from scikit-learn.
+
+**Target:** `actual_temp - fcst_temp` (bias). Apply as: `corrected = fcst_temp + predicted_bias`.
+
+**Training data split:**
+- Training set: all pairs older than 30 days.
+- Validation set: pairs from the last 30 days.
+
+**Minimum samples gate:** Do not train unless `pair_count >= min_samples` (default 500, minimum configurable value 100). Return early with a status dict when the gate is not met.
+
+**Data retention:** Purge records older than `retention_years` (default 3) at the start of each training run.
+
+**Model serialization:** Serialize model + feature medians dict together using `joblib.dump()`. Write to a temp file in the same directory, then `os.rename()` to the target path. This is an atomic write — a concurrent forecast request never reads a partial model.
+
+**Retraining schedule:** Configured via `retrain_schedule` (`weekly` / `daily` / `manual`). Weekly retrains on `retrain_day` (0=Monday, 6=Sunday) at approximately 03:00 station time. Manual requires an explicit `POST /setup/forecast-correction/retrain` call. A background `BackgroundRetrainer` daemon thread manages scheduled retraining.
+
+### TruScore metrics
+
+Computed during each training run using the 30-day validation window:
+
+| Metric | Formula | Meaning |
+|--------|---------|---------|
+| **Provider Score** | `100 − MAE_raw` | Forecast accuracy before correction. Higher = more accurate raw forecast. |
+| **Correction Score** | `max(0, (MAE_raw − MAE_corrected) / MAE_raw × 100)` | Percentage improvement from correction. Clamped to 0 when correction makes forecasts worse. |
+
+`MAE_raw` = mean absolute error of raw forecasts vs observations over the validation window.
+`MAE_corrected` = mean absolute error of corrected forecasts vs observations over the same window.
+
+Store both MAE values and both scores in `model_metadata` in the correction SQLite. The admin status endpoint exposes them.
+
+### Admin endpoints
+
+All three endpoints are on the `router` defined at `/setup` prefix in `endpoints/setup.py`, using the `require_setup_active` auth dependency (proxy auth).
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/setup/forecast-correction/status` | GET | Returns `CorrectionStatusResponse`: model availability, `is_active`, pair count, date range, last trained timestamp, sample count, MAE values, TruScore metrics, settings state (`enabled`, `collection_enabled`, `retrain_schedule`). |
+| `/setup/forecast-correction/toggle` | POST | Accepts `CorrectionToggleRequest` (`enabled`: bool, `collection_enabled`: bool). Updates runtime state via `corrector.set_enabled()` and collection flag. Returns `CorrectionToggleResponse` with new state. |
+| `/setup/forecast-correction/retrain` | POST | Triggers synchronous model training (training takes <5 s). Calls `trainer.train_model()` then `corrector.reload_model()`. Returns `RetrainResponse` with success flag, metrics, and sample count. Returns success=false (not HTTP error) when `min_samples` gate is not met. |
+
+Use `ConfigDict(extra="forbid")` on all request models. Setup endpoints omit `freshness` (per §13 anti-patterns — `freshness` applies to cacheable data responses, not admin actions).
+
+### Correction behavior
+
+- Correction applies to **hourly forecast points only**. Daily points are untouched.
+- `correct_bundle(bundle)` iterates `bundle.hourly`. For each point: extract 7 features, impute None features using stored medians, predict bias, set `point.outTemp = round(point.outTemp + predicted_bias, 1)`.
+- `is_active()` returns `True` only when both `enabled = true` AND a model is loaded. The no-op path (`not is_active()`) returns the bundle unmodified.
+- After `os.rename()` completes a new model file, `corrector.reload_model()` loads it. There is a brief window where forecast requests use the prior model — this is acceptable.
+
+### Provider-agnostic behavior
+
+The correction engine works with any configured forecast provider. `provider_id` is logged with each forecast-observation pair. Training uses all pairs regardless of `provider_id` — bias patterns are station-local. When an operator switches forecast providers, new pairs are logged with the new `provider_id`; existing pairs are retained; the next training run learns from mixed-provider data.

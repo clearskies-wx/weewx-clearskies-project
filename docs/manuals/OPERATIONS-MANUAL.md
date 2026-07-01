@@ -408,6 +408,7 @@ Hand-rolled Python settings classes, parsed from ConfigObj. Do not use Pydantic 
 | `[seeing]` | `SeeingSettings` |
 | `[radar]` | `RadarSettings` |
 | `[forecast]` | `ForecastSettings` |
+| `[forecast_correction]` | `ForecastCorrectionSettings` |
 | `[tls]` | `TlsSettings` |
 | `[branding]` | `BrandingSettings` |
 | `[social]` | `SocialSettings` |
@@ -425,6 +426,21 @@ Hand-rolled Python settings classes, parsed from ConfigObj. Do not use Pydantic 
 | `gamma` | float | `0.45` | Hygroscopic correction gamma parameter in the f(RH) correction factor. Controls how strongly relative humidity scales apparent extinction. Valid range: 0.1–1.0. Default 0.45 is appropriate for mixed continental aerosol. |
 | `haze_aqi_provider` | string | (inherits from `[aqi]`) | AQI provider used for haze PM data. Must be an observed-data provider (Aeris or IQAir). Falls back to the `[aqi]` section provider if not set. Model-based providers (Open-Meteo) are not accepted here — the haze engine will log an error and disable haze confirmation if a non-observed provider is configured. |
 | `openaq_sensor_id` | int (optional) | (automatic) | OpenAQ sensor ID override for bootstrap. When set, bypasses automatic reference sensor search. Accepts any valid sensor ID, including non-reference (PurpleAir, private). Set via admin UI or directly in api.conf. |
+
+#### ForecastCorrectionSettings keys
+
+See ADR-079 for the decision record. When `[forecast_correction]` is absent from `api.conf`, all defaults apply — the API does not fail to start.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `enabled` | bool | `false` | Apply trained model corrections to forecast temperatures. No effect if no model is available. Enable only after a model has been trained via `/setup/forecast-correction/retrain`. |
+| `collection_enabled` | bool | `true` | Collect forecast-observation pairs to the correction SQLite DB. Independent of correction — pairs are collected even when correction is disabled, building data for future training. |
+| `retrain_schedule` | string | `weekly` | Model retraining schedule: `weekly`, `daily`, or `manual`. Weekly retrains on `retrain_day` at approximately 03:00 station time. Manual requires explicit `POST /setup/forecast-correction/retrain`. |
+| `retrain_day` | int | `0` | Day of week for weekly retrain (0=Monday, 6=Sunday). Ignored when `retrain_schedule` is not `weekly`. |
+| `min_samples` | int | `500` | Minimum forecast-observation pairs before first model training. Validated ≥ 100. At a 5-minute archive_interval, 500 pairs ≈ 1.7 days of collection. |
+| `retention_years` | int | `3` | Rolling data retention window in years. Records older than this are purged at each training run. Validated ≥ 1. |
+| `db_path` | string | `/etc/weewx-clearskies/forecast_correction.db` | Path to the correction SQLite database. Must be within the filesystem write allowlist (`/etc/weewx-clearskies/`). |
+| `model_path` | string | `/etc/weewx-clearskies/forecast_correction_model.pkl` | Path to the serialized model file. Written atomically (temp file + `os.rename()`). |
 
 ### Config directory
 
@@ -449,6 +465,8 @@ The service refuses to start with no config file and no `--init` flag. A missing
 | `webcam.json` | Webcam config: enabled flag, image URL, video URL, refresh interval | No | 0644 |
 | `pages.json` | Page visibility: `{ "hidden": [...] }`. Dashboard reads at boot. Written by admin UI. | No | 0644 |
 | `now-layout.json` | Now page card layout: `{ "version": 1, "cards": [...] }`. Dashboard reads at boot. Written by admin card layout editor. | No | 0644 |
+| `forecast_correction.db` | Forecast correction SQLite DB — forecast-observation pairs + model metadata. Created by the correction engine on first pair collection. (ADR-079) | No | 0640 |
+| `forecast_correction_model.pkl` | Trained Random Forest model for forecast temperature correction. Written atomically by the trainer (temp file + `os.rename()`). (ADR-079) | No | 0640 |
 | `api-cert.pem` | API TLS certificate (Ed25519 self-signed, auto-generated) | No | 0644 |
 | `api-key.pem` | API TLS private key | **Yes** | **0600** |
 | `ui-cert.pem` | Config UI TLS certificate (auto-generated when `--tls` active) | No | 0644 |
