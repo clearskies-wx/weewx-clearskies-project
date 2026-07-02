@@ -138,12 +138,12 @@ These assignments are locked across themes:
 
 | Token | Stack | Role |
 |---|---|---|
-| `--font-sans` | Manrope, Inter Variable, system-ui, sans-serif | Body, labels, headings, card titles, station name |
-| `--font-display` | Outfit (self-hosted @fontsource woff2) | Large stat numerals only (temperature, wind speed, pressure values) |
-| `--font-chart` | Lexend (self-hosted @fontsource woff2) | Chart axis, tick, and data labels only |
+| `--font-sans` | Manrope, Inter Variable, Noto Sans JP, Noto Sans SC, Noto Sans TC, system-ui, sans-serif | Body, labels, headings, card titles, station name |
+| `--font-display` | Outfit, Noto Sans JP, Noto Sans SC, Noto Sans TC (self-hosted @fontsource woff2) | Large stat numerals only (temperature, wind speed, pressure values) |
+| `--font-chart` | Lexend, Noto Sans JP, Noto Sans SC, Noto Sans TC (self-hosted @fontsource woff2) | Chart axis, tick, and data labels only |
 | `--font-heading` | alias to `--font-sans` | Heading elements |
 
-All three typefaces are self-hosted via @fontsource woff2. No CDN loading.
+All typefaces are self-hosted via @fontsource woff2. No CDN loading. Noto Sans JP/SC/TC are loaded on demand (see "CJK fallback" under Typography Rules, below) — they are not part of the eagerly-loaded set.
 
 ### Type Scale
 
@@ -173,7 +173,7 @@ Weight ranges in the table (e.g. 400–600) indicate contextual flexibility for 
 - Allowed weights: 400, 600, 700 only. Do not use weight 500.
 - Apply `font-feature-settings: "tnum"` on every live-updating numeric element (temp, humidity, rain, wind, pressure, etc.) for tabular figures.
 - Card titles: Manrope 600 (semibold). Do not use 700 (bold).
-- CJK fallback: ja/zh-CN/zh-TW use system CJK fonts. Do not ship a Noto-CJK bundle.
+- CJK fallback (T4.1, 2026-07-02 — supersedes prior "system fonts only" guidance): ja/zh-CN/zh-TW use Noto Sans JP/SC/TC, loaded on demand only when the visitor's locale requires them (`src/i18n/font-loader.ts`, dynamic `import()`, code-split — zero byte cost for non-CJK locales). Weights 400/600/700 only, matching the allowed-weights rule above. See DASHBOARD-MANUAL.md §3 "CJK fonts" for the loading mechanism.
 - SVG `<text>` inside a `viewBox` coordinate system (sun arc, compass cardinals): use viewBox-unit font sizes, not CSS rem. Tokens do not apply. Recharts `tick={{ fontSize }}` props use pixel values mapped to `--text-chart-label` equivalent (14px ≈ 0.875rem).
 - **Tile-chart exception:** Charts inside tile-footprint (1-column) cards use `--text-chart-label-sm` (11px) for tick labels, `XAxis height={24}`, and tighter margins (`{ top: 2, right: 12, bottom: 0, left: 12 }`). This is a space constraint — tile content areas cannot accommodate 14px labels with standard margins. Standard-size cards (wide, panel, full) use the normal 14px / `--text-chart-label`.
 

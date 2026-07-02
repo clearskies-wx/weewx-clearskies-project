@@ -9,7 +9,7 @@ Companion documents:
 - **API-MANUAL.md** — API implementation rules (data model, units, enrichment)
 - **ARCHITECTURE.md** — system topology, dashboard pages, routes
 
-Last updated: 2026-06-30
+Last updated: 2026-07-02
 
 ---
 
@@ -251,7 +251,7 @@ Use Noto Sans JP / Noto Sans SC / Noto Sans TC for Japanese, Simplified Chinese,
 
 ### Cyrillic fonts
 
-Import Cyrillic subsets for Manrope, Outfit, and Lexend alongside the Latin subsets. These are small (~20–50 KB total) and can be loaded eagerly since Russian is a supported locale.
+Import the Cyrillic subset alongside the Latin subset for every font whose @fontsource distribution ships one, eagerly (not on demand) since Russian is a supported locale. As of T4.1 (2026-07-02): Manrope ships `cyrillic-{400,600,700}.css` and these are imported. Outfit and Lexend do **not** ship a Cyrillic subset upstream (Google Fonts only publishes `latin`/`latin-ext` for these two families, plus `vietnamese` for Lexend) — verified by inspecting `node_modules/@fontsource/{outfit,lexend}`. Cyrillic text rendered in `--font-display` (Outfit) or `--font-chart` (Lexend) falls through to the `system-ui` fallback already present in both stacks, which has full Cyrillic coverage on every supported OS (ADR-025 browser baseline). This is a font-coverage limitation, not an implementation gap — do not re-attempt adding `cyrillic-*.css` imports for Outfit or Lexend without first confirming upstream has added the subset.
 
 ---
 
