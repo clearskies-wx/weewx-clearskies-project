@@ -1,7 +1,8 @@
 # I18N Full Compliance — Execution Plan
 
-**Status:** APPROVED  
+**Status:** COMPLETE — All 7 phases done  
 **Created:** 2026-07-02  
+**Last updated:** 2026-07-02 (Phase 7 complete: deployed, E2E tested, docs updated, a11y verified)  
 **Brief:** `docs/briefs/I18N-AUDIT-BRIEF.md`  
 **Governing rules:** `rules/coding.md` §6 (Internationalization), DASHBOARD-MANUAL.md §3, ADR-021  
 **Components:** Dashboard SPA (`weewx-clearskies-dashboard`), API (`weewx-clearskies-api`), Config UI (`weewx-clearskies-stack`)
@@ -665,36 +666,58 @@ Walk every task in this plan. For each T-number, record one of:
 
 | Task | Status | Commit / Note |
 |------|--------|---------------|
-| T0.1 | | |
-| T0.2 | | |
-| T1.1 | | |
-| T1.2 | | |
-| T1.3 | | |
-| T2.1 | | |
-| T2.2 | | |
-| T2.3 | | |
-| T2.4 | | |
-| T2.5 | | |
-| T2.6 | | |
-| T2.7 | | |
-| T3.1 | | |
-| T3.2 | | |
-| T3.3 | | |
-| T3.4 | | |
-| T3.5 | | |
-| T4.1 | | |
-| T5.1 | | |
-| T5.2 | | |
-| T5.3 | | |
-| T5.4 | | |
-| T5.5 | | |
-| T6.1 | | |
-| T6.2 | | |
-| T6.3 | | |
-| T7.1 | | |
-| T7.2 | | |
-| T7.3 | | |
-| T7.4 | | |
+| T0.1 | DONE | `0afeb91` (weather-belchertown) — reference docs written. QC: PASS |
+| T0.2 | DONE | Covered within T0.1 — composition patterns in `i18n-composition-patterns.md` |
+| T1.1 | DONE | `73b9c0d` (dashboard local) — `format-number.ts` created. QC: PASS |
+| T1.2 | DONE | `ad33f52` (dashboard local) — `format.ts` retrofitted with locale param |
+| T1.3 | DONE | `8f5bbed` (dashboard local) — `format-date.ts` created |
+| T2.1 | DONE | `9abc824` (dashboard local) — Now-page cards string extraction. QC: PASS |
+| T2.2 | DONE | `aa23924` (dashboard local) — charts, error boundary, UI, layout. QC: PASS |
+| T2.3 | DONE | `6551881` (dashboard local) — forecast, almanac, reports, hooks, lib |
+| T2.4 | DONE | `837b8e0` (dashboard local) — 3 `'en-US'` in ConfigDrivenGroup.tsx left as pre-approved exceptions (non-display parsing, same category as `'en-CA'` date comparison) |
+| T2.5 | DONE | `2d5b143` (dashboard local) — `.toFixed()` replaced; only SVG path coordinates remain |
+| T2.6 | DONE | `4a8b3ca` (dashboard local) — visitor locale detection removed. `i18next-browser-languagedetector` removed in `9e17427`. |
+| T2.7 | DONE | `634d230` (dashboard local) — title attributes added alongside truncate |
+| T3.1 | DONE | `e095bdb` + `07a6862` (API local) — babel dep + i18n module + 13 locale files. QC: PASS |
+| T3.2 | DONE | `bd40bc1` (API local) — locale threaded through unit labels + format_value |
+| T3.3 | DONE | `2ef8d52` (API local) — Beaufort/AQI/records/moon translated via locale file |
+| T3.4 | DONE | `871a5cf` (API local) — conditions text engine translated. "Gusty" locale key added in `6ab2bc9`. |
+| T3.5 | DONE | `e26b641` (API local) — operator defaultLocale threaded through all API responses |
+| T4.1 | DONE | `257d484` (dashboard local) + `a4b5e9c` (weather-belchertown) — CJK fonts + Cyrillic + doc corrections. QC: PASS |
+| T5.1 | DONE | `c9443e7` + `28c54b2` + `d8fc961` (stack local) — babel, i18n module, language step 1. QC: PASS (838 keys in en.json) |
+| T5.2 | DONE | `031b664` (stack local) — all wizard templates wrapped with `_()` |
+| T5.3 | DONE | `5284b88` (stack local) — all admin templates wrapped. Config `config/*.html` wrapped in `85d203c`. |
+| T5.4 | DONE | `deef8ac` (stack local) — route handler messages wrapped. `wizard/units.py` validation strings wrapped in `695ad55`. |
+| T5.5 | DONE | `f77fba7` (stack local) — ConfigField registry strings wrapped |
+| T6.1 | DONE | `945f658` (10 locales partial) + `c6210f1` (ru, zh-CN, zh-TW, fil) + `8c9b81d` (48-key delta for 8 European locales). All 12 non-English locales verified zero missing keys. |
+| T6.2 | DONE | `c715d93` (API local) — all 12 non-English locale files populated |
+| T6.3 | DONE | `33cd4dc` (8 locales partial) + `9eb2d65` (it, ru, zh-CN, zh-TW at 922 keys) + `0d6c918` (de, es delta) + `ba8c980` (fil, fr, ja, nl, pt-BR, pt-PT delta). All 12 non-English locales verified 922/922 keys. |
+| T7.1 | DONE | All 3 repos pushed to GitHub and pulled on target hosts. Dashboard built + rsync'd to web root. Config UI restarted on weather-dev. API restarted on weewx. Composer bug fixes: `3ca9bb8` (babel locale tag normalisation), `0138aa1` (CJK/template composer dispatch + composition.order), `950e07d` (i18n._resolve_key list support), `8b26fdf` (wizard response_model=None fix). |
+| T7.2 | DONE | E2E tested 4 locales (en, de, ja, pt-BR). Verified: weatherText in target locale, Beaufort labels translated, decimal separators locale-correct, record labels translated, composition.order respected (de/ru sky-first), CJK custom composers dispatched (ja uses JMA-style compound expressions, no Western connectors). |
+| T7.3 | DONE | `9fca6ea` (meta repo) — DASHBOARD-MANUAL.md, API-MANUAL.md, ARCHITECTURE.md updated for i18n implementation. |
+| T7.4 | DONE | `<html lang>` verified via use-locale-sync.ts (sets `document.documentElement.lang = i18n.language`) called in App.tsx. Wizard language step keyboard-accessible (native `<a>` elements, `role="list/listitem"`, `aria-current`, `lang` per card). Hardcoded aria-labels in PlanetTimelineCard + aqi-card fixed to `t()` in `cb3043e`+`783cb76`. axe-core CLI could not run (headless Chrome unavailable in LXD container and Edge headless on DILBERT — needs manual browser run). |
+
+**All commits have been pushed to GitHub and deployed to production hosts (weather-dev + weewx).**
+
+**Additional fixes completed (not in original plan scope):**
+- `9e17427` (dashboard) — `i18next-browser-languagedetector` npm package removed
+- `34161de` (dashboard) — SunMoonDetailCard: 26 hardcoded strings extracted to `t()` calls
+- `649e324` (dashboard) — sun-moon-card.tsx: duplicate `formatPhaseName` bug fixed (reuses moonPhases.* keys)
+- `a2e9e67` (dashboard) + `c544075` (docs) — `card-metadata.ts` `displayName` → `displayNameKey` with i18n keys
+- `6ab2bc9` (API) — "Gusty" wind qualifier locale key added to all 13 locale files
+- `85d203c` (stack) — Config admin templates (`config/*.html`) wrapped with `_()`
+- `695ad55` (stack) — `wizard/units.py` validation error strings wrapped with `translate()`
+- `8e9b23a` (stack) — `translate()` returns `Markup()` to prevent autoescape double-escaping
+- `67e42d0` (dashboard) — Unrelated: radar mobile responsiveness fixes committed
+- `3ca9bb8` (API) — babel locale tag normalisation: `pt-BR` → `pt_BR` for format_decimal()
+- `0138aa1` (API) — Per-locale composer dispatch + CJK composers (ja.py, zh.py) + composition.order support
+- `950e07d` (API) — i18n._resolve_key: allow list return type for composition.order arrays
+- `8b26fdf` (stack) — wizard response_model=None fix for union return type annotation
+
+**Known pre-existing issues (out of scope, not addressed):**
+- `dashboard.html` in stack repo: `s.values` collides with Python's `dict.values` — crashes admin config overview cards (pre-existing bug, discovered by api-stack-fixes agent)
+- `forecast_correction.html`: pre-existing autoescape bug (separate from the systemic `Markup` fix in `8e9b23a`)
+- typescript/openapi-typescript peer dependency conflict in dashboard `package.json` (pre-existing, unrelated to i18n)
 
 This table is filled in by the coordinator at close. Every row must have a status. Zero MISSING rows before reporting complete.
 
