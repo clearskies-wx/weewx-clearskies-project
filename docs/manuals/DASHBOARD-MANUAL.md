@@ -9,7 +9,7 @@ Companion documents:
 - **API-MANUAL.md** — API implementation rules (data model, units, enrichment)
 - **ARCHITECTURE.md** — system topology, dashboard pages, routes
 
-Last updated: 2026-06-27
+Last updated: 2026-06-30
 
 ---
 
@@ -76,6 +76,10 @@ Year/month dropdowns populated from `NOAA-*.txt` files actually present. HTML-pa
 
 **About (`/about`):**
 Operator-authored markdown. Setup wizard pre-populates from collected station fields. Operator edits via configuration UI.
+
+The Data Providers card dynamically shows active providers by reading the capabilities API — only providers the operator has actually configured appear. Static providers with no operator-configurable equivalent (OpenStreetMap, CARTO, GEM Global Active Faults, Skyfield, IMO) are always shown regardless of configuration, since they are used unconditionally wherever their underlying feature (maps, seismic overlay, almanac, meteor showers) is active. Provider display names and links resolve through the `PROVIDER_INFO` lookup map; entries reflect the Aeris→Xweather rebrand (Vaisala's product name, not the retired "Aeris"/"AerisWeather" naming). Dead provider entries with no path to ever appearing (`wunderground`, `geonet`, `emsc`, `renass`, `msc_geomet`, `dwd_radolan`) have been removed from `PROVIDER_INFO`.
+
+**In-context provider attribution:** Beyond the About page's centralized index, forecast cards (Today's Forecast on Now, and the Forecast page) and the AQI card show a "Powered by [provider]" footer including the provider's logo when the active provider requires it. The alert banner shows text-only attribution in the expanded detail section — no logo. Radar and seismic pages continue to rely on Leaflet's built-in attribution controls; that mechanism is unchanged by this work.
 
 **Legal (`/legal`):**
 Legal/privacy text. Also linked from footer. Setup wizard requires acknowledgment checkboxes. Privacy Policy text auto-updates to match the configured analytics provider.
@@ -413,19 +417,39 @@ Stale-while-revalidate is the default behavior for all data fetching. `useApiQue
 
 **Refetch error:** Stale data stays visible. Do not blank the UI on a failed background refetch. The visitor sees last-known-good data.
 
+### Cold-start splash screen
+
+On a cold start (no prior data in memory — first visit, page reload, direct URL entry on any route), the dashboard shows a branded splash screen (Clear Skies logo, "Loading..." text, spinner) while it fetches `GET /api/v1/current` to resolve the scene. The splash covers the entire viewport at `z-index: 9999` and is defined as static HTML/CSS in `index.html` — no React required.
+
+Once the scene resolves (`sceneLoaded=true`), `AppLayout` calls `dismissSplash()` which fades the splash out over 0.5s and removes it from the DOM. The page behind the splash has the correct theme, correct background photo, and correct weather state — one transition, no corrections.
+
+For routes outside `AppLayout` (e.g., `/radar`), the route component calls `dismissSplash()` on mount.
+
+The `dismissSplash()` utility (`src/lib/dismiss-splash.ts`) is idempotent — multiple calls are safe.
+
+### Scene caching
+
+When the scene resolves, `AppLayout` writes the full scene descriptor (`sky`, `daytime`, `overlay`) to localStorage via `ThemeProvider.cacheScene()`. Three keys:
+
+- `clearskies.scene.daytime` — `"true"` or `"false"`
+- `clearskies.scene.sky` — `"clear"`, `"cloudy"`, or `"storm"`
+- `clearskies.scene.overlay` — `"rain"`, `"snow"`, or `""`
+
+`SCENE_DEFAULT` in both `useWeatherData.ts` and `useRealtimeObservation.ts` reads from this cache via `getCachedScene()` instead of using hardcoded values. On page reloads, the cached scene provides a plausible starting state (last-known sky, daytime, overlay) rather than always defaulting to clear-sky night. The splash screen still covers the page until real data arrives, but the cached scene also feeds the background behind the splash, so if the splash timing is tight the fallback is reasonable.
+
 ### Theme initialization
 
-Gate `setDaytime(scene.daytime)` on `sceneLoaded=true`. Before `sceneLoaded`, the theme stays as determined by the `index.html` inline script (localStorage preference or OS `prefers-color-scheme`). This eliminates the dark-flash-then-correct-theme sequence on page load.
+Gate `setDaytime(scene.daytime)` on `sceneLoaded=true`. Before `sceneLoaded`, the theme stays as determined by the `index.html` inline script (localStorage preference or OS `prefers-color-scheme`). The splash screen covers the page during this period.
 
 ```tsx
 useEffect(() => {
   if (sceneLoaded) {
     setDaytime(scene.daytime);
+    cacheScene({ daytime: scene.daytime, sky: scene.sky, overlay: scene.overlay });
+    dismissSplash();
   }
-}, [scene.daytime, sceneLoaded, setDaytime]);
+}, [scene.daytime, scene.sky, scene.overlay, sceneLoaded, setDaytime, cacheScene]);
 ```
-
-`SCENE_DEFAULT = { sky: 'clear', daytime: true, overlay: null }` — the default is only used as the background photo layer initial state. It must not propagate to the theme system before real API data arrives.
 
 ### Wall-display use case
 
@@ -815,7 +839,13 @@ Use the general-purpose `/archive` and `/archive/grouped` endpoints with config-
 Render the `label` field from the `ConvertedValue` shape the API returns. Never write `"°F"`, `"mph"`, `"inHg"`, or any other unit string directly in component code.
 
 **Never gate theme initialization on the default scene.**
-`SCENE_DEFAULT` is a placeholder. The theme system must wait for `sceneLoaded=true` before calling `setDaytime`. Gating on the default causes a dark-flash-then-correct-theme sequence on every page load.
+`SCENE_DEFAULT` reads from the localStorage scene cache. The theme system must wait for `sceneLoaded=true` before calling `setDaytime`. Gating on the default causes a flash-then-correct-theme sequence on every page load.
+
+**Never hardcode `SCENE_DEFAULT` values.**
+`SCENE_DEFAULT` must read from the localStorage scene cache via `getCachedScene()`. Hardcoding `{ sky: 'clear', daytime: false, overlay: null }` causes every cold start to flash the wrong scene before the API responds. The cache provides the last-known scene, which is almost always still correct on page reload.
+
+**Never render themed or weather-dependent content before the scene resolves on cold start.**
+The splash screen covers the page until `sceneLoaded=true`. Do not remove the splash early, bypass it, or render page content above it. The visitor must see one transition: splash → fully resolved page. Multiple visible corrections (wrong theme → right theme, wrong background → right background) look amateur.
 
 **Never use `onmessage` for SSE loop events.**
 The SSE stream uses a named event type `"loop"`. Use `addEventListener("loop", handler)`. `onmessage` only fires for unnamed events and will silently miss all weather data updates.
