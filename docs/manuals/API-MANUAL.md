@@ -10,7 +10,7 @@ Companion documents:
 - **PROVIDER-MANUAL.md** — provider module rules
 - **contracts/canonical-data-model.md** — per-field data catalog (the field inventory)
 
-Last updated: 2026-06-27
+Last updated: 2026-07-02
 
 ---
 
@@ -574,6 +574,52 @@ weewx_clearskies_api/
     └── derived.py       # API-computed derived fields: beaufort(), comfort_index()
 ```
 
+### Locale resolution and translated output (i18n)
+
+**Single operator-configured locale — no per-request resolution.** The API resolves one active locale at startup from `api.conf [station] default_locale` (validated against the 13 supported locale codes in ADR-021 by `StationSettings`) and uses it for every response — REST and SSE alike. There is **no** `Accept-Language` header parsing anywhere in the API. Changing the language means the operator changes `default_locale` (via the wizard/admin UI, which writes `api.conf`) and the API restarts.
+
+Startup wiring (`__main__.py`, immediately after settings load): `i18n.load_locales()` populates all 13 locale dictionaries from disk, then `i18n.set_active_locale(settings.station.default_locale)` sets the process-wide active locale. This runs once, early in startup, independent of which endpoints are later registered — there is zero per-request locale overhead.
+
+`GET /api/v1/station` exposes the resolved value as `defaultLocale` (`StationMetadata.defaultLocale`) so the dashboard knows which language the API is emitting and can switch its own UI chrome to match (see DASHBOARD-MANUAL.md §3).
+
+**`weewx_clearskies_api/i18n.py`** is the locale infrastructure module:
+
+| Function | Purpose |
+|----------|---------|
+| `load_locales(locale_dir=None)` | Loads every `*.json` file under `weewx_clearskies_api/locales/` into memory, keyed by filename stem (`"en"`, `"de"`, `"pt-BR"`, …). Defaults to the `locales/` directory bundled next to the module. |
+| `set_active_locale(locale)` / `get_active_locale()` | Process-wide active-locale state, set once at startup from `default_locale`. |
+| `t(key, locale=None)` | Dot-path string lookup (e.g. `"beaufort.0"`, `"aqi.good"`, `"records.high_temperature"`). Resolution: requested locale (or the active locale) → `"en"` fallback → the key itself. An empty string in a not-yet-fully-translated locale file is treated as untranslated and falls through the same chain — never rendered blank. |
+| `t_case(key, case="nominative", locale=None)` | Same resolution chain as `t()`, but when the locale value at *key* is a dict of grammatical-case → string (used for Russian inflected forms), returns the requested case, falling back to `"nominative"`. Returns a plain string unchanged regardless of `case`. |
+| `format_number(value, decimals, locale=None)` | Locale-correct decimal separator and digit grouping via `babel.numbers.format_decimal()`. Builds a Babel pattern from `decimals` (e.g. `"#,##0.0"`) rather than using `%` formatting. |
+
+`load_locales()` is also called defensively on first lookup if nothing has loaded yet (`_ensure_locales_loaded()`), so unit tests or any code path that resolves a string before `main()` runs still get correct behavior — but production startup's explicit call is the documented contract, not an implementation detail to rely on.
+
+Locale files live at `weewx_clearskies_api/locales/{locale}.json` — 13 files (`en`, `de`, `es`, `fil`, `fr`, `it`, `ja`, `nl`, `pt-PT`, `pt-BR`, `ru`, `zh-CN`, `zh-TW`), all populated (Phase 6 of the i18n compliance plan). `en.json` is the authoritative source; every other locale is spot-checked against it for key coverage.
+
+**`babel`** (PyPI package) is a runtime dependency of `weewx_clearskies_api`, added for `babel.numbers.format_decimal()`. It is the only new i18n dependency — no other translation framework (gettext, Django i18n, etc.) is used API-side.
+
+**Unit labels resolve through the locale file, with operator override still winning.** `units/labels.py`'s `get_label(unit, overrides=None, locale=None)` resolution order:
+
+1. `overrides` — the operator's `api.conf [units][[labels]]` config always wins, unchanged from pre-i18n behavior.
+2. `locale` — looks up `unit_labels.<unit>` in the active locale file (e.g. `unit_labels.hPa` → `"гПа"` for `ru`). Used only when *locale* is passed and a non-key-echo translation exists.
+3. `DEFAULT_LABELS` — the built-in English fallback table (unchanged).
+
+`format_value(value, unit, overrides=None, locale=None)` still resolves the *decimal-place count* from the resolved `%`-style format string (`DEFAULT_FORMATS` or the operator's `[[string_formats]]` override), but when `locale` is passed, rendering itself goes through `i18n.format_number()` (babel) instead of Python `%` formatting — so `1013.2` renders as `1 013,2` for `ru` or `22,5` for `de` rather than always using `.` as the decimal separator. When `locale` is `None` (the pre-i18n call shape), behavior is byte-for-byte unchanged: plain `%` formatting. Every call site that renders a display value for a station configured with a non-English `default_locale` passes the active locale through.
+
+**All API-computed display text resolves through the locale file** — this is not limited to unit labels:
+
+| Text | Resolves via | Locale key pattern |
+|------|--------------|---------------------|
+| Beaufort labels | `units/derived.py`'s `beaufort(wind_speed, source_unit, locale=None)` | `beaufort.<0-12>` |
+| AQI categories | `providers/aqi/_units.py`'s `epa_category(aqi, locale=None)` | `aqi.<category_key>` |
+| Record labels | `services/records.py`'s per-`_RecordSpec` label resolution | `records.<labelKey>` |
+| Moon traditional names | `services/almanac.py`'s `compute_special_moon_names(year, locale=None)` | `moon_names.<1-12>` |
+| Temperature comfort tiers | `sse/temperature_comfort.py` | (comfort tier keys) |
+| Sky condition labels | `sse/sky_condition.py` | `sky.<key>` (e.g. `sky.clear`, `sky.mostly_sunny`) |
+| Precipitation intensity labels | `sse/conditions_text.py`'s `_precip_label()` | `precipitation.<key>` (e.g. `precipitation.light_rain`, `precipitation.freezing_rain`) |
+
+Every function above accepts an optional `locale` parameter with the same contract: when omitted, it resolves via `i18n`'s active locale (which defaults to English until `set_active_locale()` runs); passing an explicit locale is how per-request or per-test overrides work. See §8 for the conditions-text composition engine that consumes these labels.
+
 ---
 
 ## §7 skin.conf Compliance
@@ -906,6 +952,37 @@ Assemble components in this order: **[temperature-comfort, sky, wind, precipitat
 | 3+ | `"{a}, {b}, with {last}"` |
 
 Examples: "Warm and Humid, Overcast, with Light Rain" / "Pleasant, Partly Cloudy, with Moderate Breeze" / "Chilly, with Light Rain".
+
+### Locale-aware composition (i18n)
+
+`sse/conditions_text.py`'s `build_weather_text()` / `_compose()` produce `weatherText` in the operator's `default_locale` (§6). All labels the composer assembles — temperature-comfort, sky condition (with the day/night vocabulary swap), Beaufort ("and Gusty" qualifier included), and precipitation intensity — resolve through `i18n.t()` against the active locale before composition, per the table in §6.
+
+**What is implemented:** a single generic template composer, used for all 13 locales including the three CJK locales (`ja`, `zh-CN`, `zh-TW`). Each locale file's `composition` block supplies three values that `_compose()` reads:
+
+```json
+{
+  "composition": {
+    "separator": "、",
+    "connector_and": "と",
+    "connector_with": "を伴う"
+  }
+}
+```
+
+- `separator` joins 3+ parts.
+- `connector_and` is used before the final part when it equals the locale's Beaufort-0 ("Calm") text (avoids the unnatural "with Calm").
+- `connector_with` is used before the final part otherwise (avoids a double "and" when the temperature-comfort label is itself compound, e.g. "Warm and Humid").
+
+**Component order is fixed in Python, not locale-driven.** `build_weather_text()` always assembles `[temperature-comfort, sky, wind, precipitation]` in that order for every locale — the order in which `parts.append(...)` calls occur in the function body.
+
+**Not implemented (deferred):** the i18n compliance plan's research phase (§1D of `docs/planning/I18N-COMPLIANCE-PLAN.md`) called for three additional pieces that are **not** present in the current code, even though every locale file carries JSON fields that look like wiring for them:
+
+- **Per-locale composer dispatch.** `ja.json`, `zh-CN.json`, and `zh-TW.json` each carry `"composition": {"pattern": "custom", "composer": "ja"}` (or `"zh"`) — but no code reads `composition.pattern` or `composition.composer`, and there is no `locales/composers/` module. The generic `_compose()` above runs unconditionally for every locale.
+- **CJK compound-expression composition.** JMA-style forms (時々/一時/のち operators producing e.g. 曇り時々晴れ) and CMA-style space-separated wind-grade forms were researched but not built. Japanese and Chinese `weatherText` at runtime uses the same English-derived word order and punctuation-joining pattern as every other locale, with Japanese/Chinese words and the locale's own separator/connector substituted in — this produces grammatically acceptable but not JMA/CMA-native phrasing.
+- **Locale-driven component order.** Locale files (e.g. `ru.json`, `de.json`) carry a `composition.order` array (`["sky", "temperature", "wind", "precipitation"]` for German and Russian, reflecting those languages' natural word order) — but `build_weather_text()` never reads it; the Python-side order is fixed for all locales.
+- **Case-inflected composition for Russian.** `i18n.t_case()` exists and correctly resolves grammatical-case dicts (nominative/instrumental/genitive), but `_compose()` calls only `t()` — the composition path does not invoke `t_case()`, so Russian `weatherText` uses the nominative form throughout rather than switching to instrumental/genitive forms for "with X" / "without X" constructions.
+
+None of this is a defect in what shipped — the template approach produces correct, readable `weatherText` in all 13 locales. It is a scope reduction from the plan's research relative to native-speaker phrasing for `ja`/`zh-CN`/`zh-TW`/`ru`. Tracked as a deferred item in `docs/planning/I18N-COMPLIANCE-PLAN.md`.
 
 ### Startup
 

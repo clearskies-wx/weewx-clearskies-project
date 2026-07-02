@@ -37,9 +37,9 @@ Previous (2026-06-08): sky condition thresholds corrected for sensor accuracy, d
 
 | Service | Repo | What it does | Technology | Main port | Health port |
 |---------|------|-------------|------------|-----------|-------------|
-| **API** | weewx-clearskies-api | REST API + SSE for real-time data, unit conversion, enrichment pipeline, derived values. Queries weewx archive, aggregates provider data, serves setup endpoints. (ADR-058) | FastAPI (Python 3.12+), sync handlers, SQLAlchemy 2.x sync, sse-starlette, uvicorn | 8765 | 8081 |
+| **API** | weewx-clearskies-api | REST API + SSE for real-time data, unit conversion, enrichment pipeline, derived values. Queries weewx archive, aggregates provider data, serves setup endpoints. (ADR-058) | FastAPI (Python 3.12+), sync handlers, SQLAlchemy 2.x sync, sse-starlette, uvicorn, babel (locale-aware number formatting) | 8765 | 8081 |
 | **Dashboard** | weewx-clearskies-dashboard | Weather UI (static SPA, 9 pages + custom pages) | React 19, Vite 8, Tailwind CSS v4, shadcn/ui, Recharts, Leaflet, **Phosphor** (utility/nav/alert) + **inline Material Symbols SVG** (hero weather, ADR-049/050); Lucide retained for deferred glyph families only, i18next | None (init container) | — |
-| **Config UI** | weewx-clearskies-stack | Setup wizard + ongoing config admin | FastAPI, Jinja2, HTMX, Pico CSS (Python-only, no Node build step) | 9876 | — |
+| **Config UI** | weewx-clearskies-stack | Setup wizard + ongoing config admin | FastAPI, Jinja2, HTMX, Pico CSS, babel (locale-aware wizard/admin i18n; Python-only, no Node build step) | 9876 | — |
 | **Caddy** | upstream (caddy:2-alpine) | Reverse proxy, TLS termination (auto Let's Encrypt), static file server | Caddy | 80, 443 | — |
 | **Redis** | upstream (redis:7-alpine) | Cache for provider API responses (TTLs: forecast 30 min, alerts 5 min, AQI 15 min) | Redis 7.0.15 | 6379 | — |
 | **Design Tokens** | weewx-clearskies-design-tokens | Tailwind config + design variables npm package | Phase 6+ placeholder — no code yet. Tokens currently live in dashboard repo. | — | — |
@@ -401,11 +401,14 @@ Config UI is a standalone FastAPI app, run via `weewx-clearskies-config` CLI on 
 
 Wizard steps are defined by `wizard/routes.py` and `templates/wizard/step_*.html` in the stack repo. The step inventory evolves as the wizard gains features — see the code for the current step list.
 
+**Two distinct locale concepts — do not conflate them.** The wizard added a language-selection entry point (`step_language.html`) ahead of the numbered steps, but it sets the **wizard/admin UI's own display language** only (a `LOCALE_COOKIE_NAME` cookie, guessed from `Accept-Language` on first visit, changeable at any time by revisiting `/wizard/step/language`) — it is unrelated to the station's dashboard-facing locale. The station's `default_locale` (what visitors see on the dashboard, and what the API uses for all computed text per API-MANUAL.md) is a separate field set later in the wizard's station step and persisted to `api.conf [station] default_locale`. An operator configuring a station in German can complete the wizard in German while still choosing English (or any of the 13 supported locales) as the station's public-facing default.
+
 **URL patterns:**
 
 | Pattern | Method | Purpose |
 |---------|--------|---------|
-| `/wizard` | GET | Full wizard page (starts at step 1) |
+| `/wizard` | GET | Full wizard page (starts at step 1); redirects to `/wizard/step/language` first if no wizard-UI-language cookie is set yet |
+| `/wizard/step/language` | GET | Wizard's own UI language selection (13 locales, native-script labels) — the wizard's entry point, independent of the station `default_locale` field below |
 | `/wizard/step/{N}` | GET/POST | Step-specific form render and submission |
 | `/wizard/step/{N}/test` | POST | Inline connectivity test for a step (DB, provider, etc.) |
 | `/wizard/step/{N}/key-fields/{domain}/{id}` | GET | HTMX fragment for provider key entry fields |
@@ -609,13 +612,15 @@ weewx-clearskies-stack/
 │   ├── docker-compose.yml      # MariaDB + seed + Redis for local dev
 │   └── .env.example
 ├── weewx_clearskies_config/    # Config UI Python package (pip-installable)
-│   ├── app.py                  # FastAPI app factory
+│   ├── app.py                  # FastAPI app factory; registers _() as a Jinja2 global
 │   ├── cli.py                  # CLI entry point (port 9876 default)
 │   ├── auth.py                 # Admin auth, sessions, rate limiting
 │   ├── tls.py                  # Self-signed cert generation
+│   ├── i18n.py                 # Locale loading, translate(), get_current_locale() (wizard UI locale — distinct from the station default_locale, see "Wizard" section below)
 │   ├── wizard/                 # Wizard routes, state, config writer
 │   ├── config/                 # Config reader/updater, admin routes
 │   ├── templates/              # Jinja2 templates (wizard steps, admin, login, bootstrap)
+│   ├── translations/           # Wizard + admin UI strings, one JSON file per locale (13)
 │   └── static/                 # CSS, JS
 └── tests/                      # Wizard tests
 ```

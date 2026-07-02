@@ -233,9 +233,32 @@ FAIL: Any "is it daytime?" check that doesn't use station timezone or stationClo
 
 ### Framework and file layout
 
-Use **react-i18next** for all user-facing string handling. All 13 locale directories are present under `public/locales/<lang>/<ns>.json`. Locale files are served as static assets via `i18next-http-backend` (loadPath: `/locales/{{lng}}/{{ns}}.json`). The `src/i18n/` directory contains only the i18next configuration and locale-sync hook — no locale JSON files under `src/`.
+Use **react-i18next** for all user-facing string handling. All 13 locale directories are present under `public/locales/<lang>/<ns>.json`. Locale files are served as static assets via `i18next-http-backend` (loadPath: `/locales/{{lng}}/{{ns}}.json`). The `src/i18n/` directory contains the i18next configuration (`index.ts`), the locale-sync hook (`use-locale-sync.ts`), and the CJK font loader (`font-loader.ts`) — no locale JSON files live under `src/`.
 
 Default fallback locale is `en`. Missing keys fall back to `en` silently. Numbers, dates, and units format per locale via `Intl.NumberFormat` / `Intl.DateTimeFormat`.
+
+### Locale source — operator-controlled, not visitor-detected
+
+The dashboard does **not** run browser/OS language detection and has no visitor-facing locale picker. `i18next-browser-languagedetector` was removed from the project entirely (package uninstalled; no `LanguageDetector` plugin registered in `src/i18n/index.ts`). There is no `?lang=` query-param override.
+
+Boot sequence:
+
+1. `src/i18n/index.ts` initializes i18next with `lng: "en"` — a safe cold-start default, not a detected value.
+2. `AppLayout` (`src/components/layout/app-layout.tsx`) fetches station metadata and reads `station.defaultLocale`. Once it differs from the current `i18n.language` and is one of the 13 `SUPPORTED_LOCALES`, it calls `i18n.changeLanguage(defaultLocale)`.
+3. Every visitor of a given station therefore sees the same language — the station's `default_locale`, which the operator sets in the wizard's station step (persisted to `api.conf [station] default_locale`; see API-MANUAL.md) — not a language inferred from the visitor's browser. This is a distinct setting from the wizard's own UI language (a separate, earlier step that only affects what language the operator sees while running the wizard itself — see ARCHITECTURE.md "Wizard" section).
+
+Changing the browser's language preference has no effect on the dashboard. This mirrors how units and timezone are already operator-configured rather than visitor-detected.
+
+### Locale-aware number and date formatting
+
+Two utility modules wrap the browser `Intl` APIs so no call site hardcodes a locale or falls back to `.toFixed()`:
+
+**`src/utils/format-number.ts`:**
+- `formatNumber(value, decimals, locale)` — wraps `Intl.NumberFormat(locale, { minimumFractionDigits, maximumFractionDigits })`.
+- `formatUnit(value, unit, locale)` — uses `Intl.NumberFormat(locale, { style: 'unit', unit })` for the 9 unit identifiers Intl supports natively across all 13 locales (`celsius`, `fahrenheit`, `kilometer-per-hour`, `mile-per-hour`, `meter-per-second`, `millimeter`, `inch`, `degree`, `percent`). For units Intl does not support (`hectopascal`, `knot`, `watt-per-square-meter`, `inch-of-mercury`), it falls back to `formatNumber()` plus a verified per-locale custom label baked into the module (falls back to the `en` label when a locale entry is absent).
+- `src/utils/format.ts`'s `formatValue()` accepts a `locale` parameter (default `'en'` for backward compatibility) and delegates to `formatNumber()`.
+
+**`src/utils/format-date.ts`:** thin wrappers around `Intl.DateTimeFormat` / `Intl.RelativeTimeFormat` that make `locale` and `tz` **required, non-defaulted** parameters — `formatDayOfWeek`, `formatShortDayOfWeek`, `formatMonthDay`, `formatTime`, `formatFullDate`, `formatRelativeTime`. Callers always pass `i18n.language` for locale and the station's IANA timezone for `tz` (see §2). No wrapper accepts `'en-US'`/`'default'` or omits `timeZone` — that class of bug is structurally prevented by the function signatures.
 
 ### RTL
 
@@ -248,6 +271,8 @@ Set `<html lang="...">` per active locale on every page render.
 ### CJK fonts
 
 Use Noto Sans JP / Noto Sans SC / Noto Sans TC for Japanese, Simplified Chinese, and Traditional Chinese respectively. Load CJK fonts **on demand** — only when the user selects a CJK locale — so Latin/European users pay zero download cost. Import only the weights the dashboard uses (400, 600, 700). CJK font files are cached by the browser after first load.
+
+**Implementation:** `src/i18n/font-loader.ts` exports `loadFontsForLocale(locale)`. It `import()`s the three `@fontsource/noto-sans-{jp,sc,tc}/{400,600,700}.css` files for `ja` / `zh-CN` / `zh-TW` respectively and no-ops for every other locale. Vite code-splits each dynamic import into its own chunk — none of the ~2–4 MB Noto Sans CJK weight files land in the main bundle. A module-level `Set<string>` tracks which locales have already been loaded so repeat calls within a session are free; the browser HTTP cache persists the fetch across sessions after the first load. `src/i18n/use-locale-sync.ts`'s `useLocaleSync()` hook (called once at the app root) calls `loadFontsForLocale(i18n.language)` inside the same `useEffect` that syncs `<html lang>` — so font loading fires automatically on every locale change, including the initial operator-locale switch described above.
 
 ### Cyrillic fonts
 
