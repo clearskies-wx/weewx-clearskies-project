@@ -309,6 +309,32 @@ All share: border-radius consistent with card scale, visible focus ring per acce
 - Cards self-hide when backing data has no non-null aggregate.
 - Page self-hides when all its cards hide (except Now — always present).
 
+### Provider Attribution Footer
+
+- **Component:** `ForecastAttribution` at `src/components/forecast/ForecastAttribution.tsx`.
+- **Purpose:** Credits the active forecast/AQI data provider ("Powered by [provider]") in a card footer.
+
+| Variant | Logo height | Footer padding | Footer height | Use |
+|---|---|---|---|---|
+| Standard | 32px | 10px (`0.625rem`) | 53px | Wide/full cards |
+| Compact | 16px | 3px (`0.1875rem`) | 23px | Tile cards |
+
+- **Structure:** Renders inside the existing `CardFooter` component; padding is overridden via inline `style` per variant (not a token — no `--footer-pad-*` exists yet).
+- **Logo assets:** `src/assets/providers/` — `xweather-dark.svg`, `xweather-light.svg`, `openweathermap-master.png`, `openweathermap-negative.png`, `nws.svg`, `open-meteo.png`.
+
+| Provider | Light-theme logo | Dark-theme logo | Theme switching |
+|---|---|---|---|
+| Xweather (aeris) | `xweather-dark.svg` | `xweather-light.svg` | `dark:hidden` / `hidden dark:block` swap |
+| OpenWeather (owm) | `openweathermap-master.png` | `openweathermap-negative.png` | `dark:hidden` / `hidden dark:block` swap |
+| NWS (nws) | `nws.svg` | `nws.svg` (same file) | No swap — works on both themes natively |
+| Open-Meteo (openmeteo) | `open-meteo.png` | `open-meteo.png` (same file) | No swap — works on both themes natively |
+| IQAir (iqair) | — | — | No logo asset — text-only fallback |
+
+- **Text-only fallback:** Providers without a logo (IQAir) render the provider name as bold text instead of an `<img>`.
+- **"Powered by" prefix:** `--text-micro`, `--muted-foreground`, `--font-sans` 400 weight, precedes the logo/text.
+- **Uniform logo height:** All logos render at the variant's fixed height (32px standard / 16px compact) with `width: auto` — aspect ratio preserved, height never varies by logo.
+- **Alert banner exception:** The expanded alert detail section uses inline text-only attribution ("Powered by Xweather" / "Powered by OpenWeather") — not `ForecastAttribution`, not a `CardFooter`. NWS-sourced alerts show no attribution line.
+
 ---
 
 ## 7. Iconography
@@ -488,6 +514,7 @@ Optional string, unobtrusive corner placement. Shipped scenes credit photographe
 - Legal/Privacy link: always present
 - Copyright: `© {year} {station-name}`
 - "Powered by Clear Skies" line: visible by default, hideable by operator
+- Provider attribution ("Powered by [provider]") appears in card footers, not the site footer.
 - No standalone settings page — theme toggle lives in the nav, not the footer
 
 ### Skip Link
@@ -749,6 +776,24 @@ Colors: `--gauge-fill` (filled arc), `--gauge-unfill` (unfilled arc), `--gauge-i
 - Storage: `localStorage('clearskies.theme.user-override')` — values `light`, `dark`, or `system`.
 - Tailwind v4 dark variant: `@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *))` in `index.css`.
 - No theme-transition animation — swap is instant (respects motion budget and avoids flash).
+
+### Cold-Start Splash Screen
+
+On any cold start (first visit, page reload, direct URL entry on any route), a branded splash screen covers the viewport while the dashboard resolves the correct theme and background scene from the API. The splash is static HTML/CSS in `index.html` — no React dependency.
+
+| Element | Spec |
+|---|---|
+| Background | `#f0f1f3` (neutral greyish-white, not themed) |
+| Logo | Clear Skies wordmark (`/clearskies-logo.svg`), blue (`#2568a3`), 280px width, `max-width: 60vw` |
+| Text | "Loading…", system-ui, `0.95rem`, `#6b7280` |
+| Spinner | 28×28px ring, `3px` border, `#d1d5db` track, `#2568a3` active segment, `0.8s` linear spin |
+| Z-index | `9999` (above all app content) |
+| Fade-out | `opacity 0.5s ease-out` on `.fade-out` class, then removed from DOM |
+| Accessibility | `aria-hidden="true"` (decorative loading state, not content) |
+
+The splash is deliberately not themed — it uses fixed neutral colors so it looks correct regardless of whether the visitor's theme preference is light, dark, or system. The page behind the splash renders with the correct theme and background; the splash fades out to reveal it.
+
+**Rule:** Never render themed or weather-dependent content visibly before the scene resolves. The visitor sees one transition (splash → page), not a sequence of corrections.
 
 ### Four Theme Modes
 
@@ -1043,16 +1088,14 @@ Full-viewport overlay. Not a new page layout — an overlay that takes over the 
 | [X Close]                 |
 |                           |
 |    Leaflet map            |
-|    (fills remaining)      |
+|    (fills viewport)       |
 |                           |
-+---------------------------+
-| Bottom sheet (drag handle)|
-| Layer/config panel        |
-| Half-height default       |
 +---------------------------+
 | Time slider + controls    |
 +---------------------------+
 ```
+
+Settings panel opens as a **full-screen overlay** (fixed, inset-0, z above the radar dialog) when the user taps the settings toggle. The visitor makes their changes and dismisses the panel to return to the map. There is not enough mobile screen space for a sidebar or half-sheet alongside the map.
 
 **Close button:**
 - Position: top-right, floating over the map.
@@ -1071,7 +1114,7 @@ Full-viewport overlay. Not a new page layout — an overlay that takes over the 
 
 **Layer/config panel:**
 - **Desktop:** Right sidebar, 320px width, collapsible (toggle button on left edge). Semi-transparent card glass background.
-- **Mobile:** Bottom sheet with drag handle. Half-height default, full-height on drag. ≥44px tap targets on all controls.
+- **Mobile:** Full-screen overlay (fixed inset-0, z above the radar dialog). Solid background, scrollable content. Opened via settings toggle in the header bar; dismissed via close button. ≥44px tap targets on all controls.
 - **Contents (in order):**
   1. Color scheme picker (LibreWxR only): grid of 13 swatches, 4 columns. Each swatch: 48×48px, rounded, shows gradient preview. Selected swatch has ring border (`var(--ring)`).
   2. Opacity slider: label "Radar opacity", range 0-100%, default 70%. Standard slider control.
@@ -1112,6 +1155,6 @@ Full-viewport overlay. Not a new page layout — an overlay that takes over the 
 | Breakpoint | Panel behavior | Time slider | Controls |
 |---|---|---|---|
 | ≥1024px (desktop) | Right sidebar, 320px | Full bottom bar | All visible |
-| <1024px (mobile) | Bottom sheet, drag handle | Simplified bottom bar | Stack vertically in bottom sheet |
+| <1024px (mobile) | Full-screen overlay | Simplified bottom bar | Full-screen settings panel, dismiss to return to map |
 
 All interactive elements: ≥44px tap targets on mobile (WCAG 2.5.8).
