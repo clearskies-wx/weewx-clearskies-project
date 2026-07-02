@@ -35,7 +35,7 @@ Last updated: 2026-07-01
 
 ### One module per provider; one module per domain
 
-Each provider lives in a self-contained module (single file or directory package) named after the provider. A provider that spans multiple data domains (e.g., Aeris supplies both forecast and AQI) gets one module per domain — a `providers/forecast/aeris.py` and a separate `providers/aqi/aeris.py`. These modules share nothing except any common auth constants they each independently define. Do not create modules that cross domain boundaries.
+Each provider lives in a self-contained module (single file or directory package) named after the provider. A provider that spans multiple data domains (e.g., Xweather supplies both forecast and AQI) gets one module per domain — a `providers/forecast/aeris.py` and a separate `providers/aqi/aeris.py`. These modules share nothing except any common auth constants they each independently define. Do not create modules that cross domain boundaries.
 
 Adding a provider means adding a new module. Removing a provider means deleting that module. Do not refactor existing modules to absorb a new provider.
 
@@ -358,32 +358,32 @@ Each AQI provider that supports multiple scales requires an operator-configurabl
 
 | Provider | Setting | Valid values | Default |
 |---|---|---|---|
-| Aeris | `aeris_aqi_filter` | `airnow`, `china`, `india`, `eaqi`, `caqi`, `uk`, `de`, `cai` | `airnow` |
+| Xweather (`aeris`) | `aeris_aqi_filter` | `airnow`, `china`, `india`, `eaqi`, `caqi`, `uk`, `de`, `cai` | `airnow` |
 
 | OpenMeteo | `openmeteo_aqi_index` | `us_aqi`, `european_aqi` | `us_aqi` |
 | IQAir | `iqair_aqi_scale` | `us`, `cn` | `us` |
 | OpenWeatherMap | (none) | — | Always returns OWM 1-5 ordinal — **DEPRECATED** |
 
-Pass the configured setting as the appropriate query parameter on each API call. Aeris: `filter=`. OpenMeteo: determines which variable name to request. IQAir: determines whether to read `aqius` or `aqicn`.
+Pass the configured setting as the appropriate query parameter on each API call. Xweather (`aeris`): `filter=`. OpenMeteo: determines which variable name to request. IQAir: determines whether to read `aqius` or `aqicn`.
 
 The setup wizard auto-suggests the regional setting based on the operator's station lat/lon → country lookup.
 
-### Aeris AQI provider
+### Xweather AQI provider
 
 **Module:** `providers/aqi/aeris.py`  
 **`is_observed_source`:** `True`
 
-**Endpoint:** Aeris conditions endpoint — `GET /conditions/{lat},{lon}` — returns current air quality with PM2.5, PM10, O3, NO2, SO2, and CO values alongside the composite AQI and scale.
+**Endpoint:** Xweather conditions endpoint — `GET /conditions/{lat},{lon}` — returns current air quality with PM2.5, PM10, O3, NO2, SO2, and CO values alongside the composite AQI and scale.
 
-**Auth:** Reuses existing Aeris (Xweather) credentials. The module reads `AERIS_CLIENT_ID` and `AERIS_CLIENT_SECRET` from `secrets.env` — the same credential pair used by the forecast module. No additional key registration is required if the operator already has an Aeris forecast subscription.
+**Auth:** Reuses existing Xweather credentials. The module reads `AERIS_CLIENT_ID` and `AERIS_CLIENT_SECRET` from `secrets.env` — the same credential pair used by the forecast module. No additional key registration is required if the operator already has a Xweather forecast subscription.
 
-**Rate limits:** Per Aeris subscription tier. PWSWeather Contributor Plan (free for PWS data contributors): 1,000 API accesses/day at 100/minute. Air quality endpoints count as standard API accesses (1x multiplier for current conditions; the archive endpoint carries a 5x multiplier — see §3 cache warming).
+**Rate limits:** Per Xweather subscription tier. PWSWeather Contributor Plan (free for PWS data contributors): 1,000 API accesses/day at 100/minute. Air quality endpoints count as standard API accesses (1x multiplier for current conditions; the archive endpoint carries a 5x multiplier — see §3 cache warming).
 
 **Regional configuration:** The `aeris_aqi_filter` setting in `[aqi]` selects the AQI scale (default: `airnow`). Valid values: `airnow`, `china`, `india`, `eaqi`, `caqi`, `uk`, `de`, `cai`. Passed as the `filter=` query parameter on each API call.
 
 **Canonical field mapping:**
 
-| Aeris wire field | Canonical field | Notes |
+| Xweather wire field | Canonical field | Notes |
 |---|---|---|
 | `periods[0].aqi` | `aqi` | Composite AQI for the selected scale |
 | `periods[0].category.p` | `aqiCategory` | Pass through as-is |
@@ -394,7 +394,7 @@ The setup wizard auto-suggests the regional setting based on the operator's stat
 | `periods[0].pollutants[N].valuePPB` → ppm where `type == "so2"` | `pollutantSO2` | Convert ppb to ppm |
 | `periods[0].pollutants[N].valuePPB` → ppm where `type == "co"` | `pollutantCO` | Convert ppb to ppm |
 
-**`is_observed_source = True`** — Aeris blends real-time data from monitoring networks. PM2.5 and PM10 values are observed concentrations eligible for haze confirmation.
+**`is_observed_source = True`** — Xweather blends real-time data from monitoring networks. PM2.5 and PM10 values are observed concentrations eligible for haze confirmation.
 
 **ToS:** https://www.xweather.com/legal/terms  
 **Key signup:** https://www.pwsweather.com/contributor-plan/ (free for PWS contributors) or https://www.xweather.com/
@@ -406,7 +406,7 @@ The setup wizard auto-suggests the regional setting based on the operator's stat
 
 **Deprecated.** OWM AQI uses the SILAM atmospheric dispersion model — it returns predicted PM concentrations, not observed measurements. PM2.5 and PM10 values from this provider are not eligible for haze confirmation. The module logs a deprecation warning at startup when configured and logs a warning on each `fetch()` call. The module continues to function for general AQI display.
 
-Operators should migrate to Aeris or IQAir for haze-eligible AQI data. OWM AQI will be removed in the next major version.
+Operators should migrate to Xweather or IQAir for haze-eligible AQI data. OWM AQI will be removed in the next major version.
 
 Existing operator behavior is unchanged: the AQI card renders normally. Only haze detection is affected — the haze engine ignores PM data from this provider.
 
@@ -442,7 +442,7 @@ Existing operator behavior is unchanged: the AQI card renders normally. Only haz
 
 **Bootstrap source:** OpenAQ is also used as the calibration bootstrap data source. The `clearskies-api bootstrap` CLI uses the OpenAQ API to pull historical PM2.5 records for seeding the auto-calibration baseline. See OPERATIONS-MANUAL §4 bootstrap procedure.
 
-**Not recommended as primary AQI provider** for operators who need a composite AQI index or gas-phase pollutant data. Aeris and IQAir return lower-latency data with full pollutant coverage. Use OpenAQ when neither Aeris nor IQAir is available, or when PM-concentration-only data is acceptable for the AQI card.
+**Not recommended as primary AQI provider** for operators who need a composite AQI index or gas-phase pollutant data. Xweather and IQAir return lower-latency data with full pollutant coverage. Use OpenAQ when neither Xweather nor IQAir is available, or when PM-concentration-only data is acceptable for the AQI card.
 
 **ToS:** https://openaq.org/about/licensing/  
 **Key signup:** https://explore.openaq.org/register
@@ -458,11 +458,11 @@ Existing operator behavior is unchanged: the AQI card renders normally. Only haz
 
 ### Per-pollutant sub-index pass-through
 
-All three active AQI providers (Aeris, Open-Meteo, IQAir Startup+) compute per-pollutant sub-AQI values server-side and return them on the wire. The `pollutantSubIndices` field on `AQIReading` passes these through as a dict keyed by canonical pollutant id (`"PM2.5"`, `"PM10"`, `"O3"`, `"NO2"`, `"SO2"`, `"CO"`). Values are numeric sub-AQI on the same scale as the main `aqi` field, capped at 500.
+All three active AQI providers (Xweather, Open-Meteo, IQAir Startup+) compute per-pollutant sub-AQI values server-side and return them on the wire. The `pollutantSubIndices` field on `AQIReading` passes these through as a dict keyed by canonical pollutant id (`"PM2.5"`, `"PM10"`, `"O3"`, `"NO2"`, `"SO2"`, `"CO"`). Values are numeric sub-AQI on the same scale as the main `aqi` field, capped at 500.
 
 | Provider | Source | Keys |
 |----------|--------|------|
-| Aeris | `pollutants[].aqi` per entry | 6 (all standard pollutants) |
+| Xweather (`aeris`) | `pollutants[].aqi` per entry | 6 (all standard pollutants) |
 | Open-Meteo (US) | `us_aqi_pm2_5`, `us_aqi_pm10`, etc. | 6 |
 | Open-Meteo (European) | `european_aqi_pm2_5`, `european_aqi_pm10`, etc. | 5 (no CO in EAQI formula) |
 | IQAir (Startup+) | `{p2,p1,o3,n2,s2,co}.aqius` or `.aqicn` | Variable (only pollutants with data at the station) |
@@ -626,7 +626,7 @@ Modules in `providers/radar/`:
 | `iem_nexrad` | WMS-T | No | US CONUS NEXRAD (Iowa Environmental Mesonet) | **Deprecated.** Logs migration warning. Raw imagery too noisy — use LibreWxR instead. |
 | `noaa_mrms` | WMS-T | No | US AK / HI / PR / Guam (NOAA MapServer) | **Deprecated.** Logs migration warning. Raw imagery too noisy — use LibreWxR instead. |
 
-**Removed from radar domain:** `aeris` — 3,000 map units/day is unviable for radar tiles. Aeris is retained for forecast, AQI, and alerts domains.
+**Removed from radar domain:** `aeris` — 3,000 map units/day is unviable for radar tiles. Xweather is retained for forecast, AQI, and alerts domains.
 
 ### Tile routing model
 
@@ -755,9 +755,9 @@ Map severity from the **event name tier** (Warning/Watch/Advisory/Statement suff
 - Advisory → `severityLevel=2`
 - Statement → `severityLevel=1`
 
-### Aeris alert enrichment
+### Xweather alert enrichment
 
-The Aeris provider must capture these additional fields from the wire response:
+The Xweather (`aeris`) provider must capture these additional fields from the wire response:
 
 | Wire field | Canonical field |
 |---|---|
@@ -766,7 +766,7 @@ The Aeris provider must capture these additional fields from the wire response:
 | `details.color` | `color` |
 | `details.cat` | `hazardType` |
 
-Map Aeris suffix codes to `severityLevel`: `.EX`→4, `.SV`→3, `.MD`→2, `.MN`→1.
+Map Xweather suffix codes to `severityLevel`: `.EX`→4, `.SV`→3, `.MD`→2, `.MN`→1.
 
 ### OWM default mode
 
@@ -778,14 +778,14 @@ Operator documentation must state this quality tradeoff explicitly: OWM alerts r
 
 | Field | Source |
 |---|---|
-| `alertSystem` | Aeris `dataSource`, NWS literal `"nws"`, OWM `sender_name` where recognizable |
-| `hazardType` | Aeris `details.cat`, OWM `tags[0]` |
-| `nativeName` | Aeris `localLanguages[0].name` |
-| `color` | Aeris `details.color` (provider-recommended hex; not the national system's official color) |
+| `alertSystem` | Xweather (`aeris`) `dataSource`, NWS literal `"nws"`, OWM `sender_name` where recognizable |
+| `hazardType` | Xweather (`aeris`) `details.cat`, OWM `tags[0]` |
+| `nativeName` | Xweather (`aeris`) `localLanguages[0].name` |
+| `color` | Xweather (`aeris`) `details.color` (provider-recommended hex; not the national system's official color) |
 
 ### Two rendering modes
 
-**Rich mode** (Aeris, NWS): `severityLevel` and `severityLabel` are populated. Dashboard renders severity-colored icon panel, native label in ARIA, hazard-specific icon.
+**Rich mode** (Xweather, NWS): `severityLevel` and `severityLabel` are populated. Dashboard renders severity-colored icon panel, native label in ARIA, hazard-specific icon.
 
 **OWM default mode**: `severityLevel=2`, `severityLabel="Alert"`. Dashboard renders level-2 (yellow/advisory) icon panel, `ph:warning` icon, `role="status"` ARIA.
 
@@ -1108,7 +1108,7 @@ The following patterns are forbidden. Any pull request introducing them must be 
 | Leaking upstream provider exception types past the module boundary | Breaks the canonical error taxonomy; callers must not handle provider-specific errors |
 | Live-network calls in CI tests | Makes CI non-deterministic and quota-burning; use fixtures and `respx` mocks |
 | Hardcoding EPA AQI lookup tables, Beaufort scale, or other domain-wide helpers inside a provider module | These belong in the canonical-model package; duplicating them in providers creates drift |
-| A single module spanning multiple data domains (e.g., one Aeris module that handles both forecast and AQI) | Violates "one module = one domain"; modules must be independently enable/disable per domain |
+| A single module spanning multiple data domains (e.g., one Xweather module that handles both forecast and AQI) | Violates "one module = one domain"; modules must be independently enable/disable per domain |
 | Subclassing a shared `ProviderBase` or any other abstract base class | Rejected pattern; the project uses flat modules with a documented contract, not a class hierarchy |
 | Storing credentials in `.conf` files | Credentials go in `secrets.env` as environment variables only; `.conf` files are world-readable on many deployments |
 | Bypassing `ProviderHTTPClient` with a direct `httpx` or `requests` call | The shared client provides retry, backoff, follow_redirects=False, and dual-stack — these must not be bypassed |
@@ -1121,4 +1121,4 @@ The following patterns are forbidden. Any pull request introducing them must be 
 | Labeling OpenWeatherMap radar as "Radar" | It is model precipitation data; must be labeled "Model precipitation" |
 | Adding a `mapbox_jma` module | Dropped from day-1 set — Mapbox JMA tilesets are raster-array / GL-JS-only, incompatible with Leaflet |
 | Routing LibreWxR tile traffic through the API | Caddy proxies LibreWxR tiles and alerts directly; the API provides metadata only. Routing tiles through the API wastes resources and adds latency. |
-| Adding `aeris` as a radar provider | Removed — 3,000 map units/day is unviable for radar tiles. Aeris is retained for forecast/AQI/alerts only. |
+| Adding `aeris` as a radar provider | Removed — 3,000 map units/day is unviable for radar tiles. Xweather is retained for forecast/AQI/alerts only. |

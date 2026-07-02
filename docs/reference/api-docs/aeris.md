@@ -1,4 +1,4 @@
-# Aeris (AerisWeather / Xweather) — API Reference
+# Xweather (Vaisala) — API Reference (module: aeris)
 
 **Source:**
 - https://www.xweather.com/docs/weather-api/getting-started/authentication

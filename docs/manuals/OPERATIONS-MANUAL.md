@@ -261,7 +261,7 @@ Docker's port-publishing (`ports:` directives) uses iptables DNAT rules that can
 
 ### External provider calls
 
-All outbound calls to external provider APIs (NWS, Open-Meteo, Aeris, OWM, IQAir, USGS, GeoNet, EMSC, RainViewer, etc.) originate from the API, not from the browser. Provider API keys are held in `secrets.env` on the API host. They are never exposed in HTTP responses, never included in JavaScript bundle build-time variables, and never logged (redaction filter enforces this — see §5).
+All outbound calls to external provider APIs (NWS, Open-Meteo, Xweather, OWM, IQAir, USGS, GeoNet, EMSC, RainViewer, etc.) originate from the API, not from the browser. Provider API keys are held in `secrets.env` on the API host. They are never exposed in HTTP responses, never included in JavaScript bundle build-time variables, and never logged (redaction filter enforces this — see §5).
 
 ### Security headers — all responses
 
@@ -424,7 +424,7 @@ Hand-rolled Python settings classes, parsed from ConfigObj. Do not use Pydantic 
 |-----|------|---------|-------------|
 | `haze_detection` | bool | `true` | Enable or disable the haze detection engine. When `false`, sky classification runs without haze confirmation and haze-related calibration is inactive. |
 | `gamma` | float | `0.45` | Hygroscopic correction gamma parameter in the f(RH) correction factor. Controls how strongly relative humidity scales apparent extinction. Valid range: 0.1–1.0. Default 0.45 is appropriate for mixed continental aerosol. |
-| `haze_aqi_provider` | string | (inherits from `[aqi]`) | AQI provider used for haze PM data. Must be an observed-data provider (Aeris or IQAir). Falls back to the `[aqi]` section provider if not set. Model-based providers (Open-Meteo) are not accepted here — the haze engine will log an error and disable haze confirmation if a non-observed provider is configured. |
+| `haze_aqi_provider` | string | (inherits from `[aqi]`) | AQI provider used for haze PM data. Must be an observed-data provider (Xweather or IQAir). Falls back to the `[aqi]` section provider if not set. Model-based providers (Open-Meteo) are not accepted here — the haze engine will log an error and disable haze confirmation if a non-observed provider is configured. |
 | `openaq_sensor_id` | int (optional) | (automatic) | OpenAQ sensor ID override for bootstrap. When set, bypasses automatic reference sensor search. Accepts any valid sensor ID, including non-reference (PurpleAir, private). Set via admin UI or directly in api.conf. |
 
 #### ForecastCorrectionSettings keys
@@ -591,7 +591,7 @@ The wizard presents the following AQI provider options. The wizard suggests obse
 
 | Provider | Data type | Coverage | API key required | Haze-eligible |
 |----------|-----------|----------|-----------------|---------------|
-| Aeris (Xweather) | Observed — blended real-time monitoring networks | Global | Yes (PWSWeather Contributor Plan provides free access) | Yes — recommended for haze detection |
+| Xweather (Vaisala) | Observed — blended real-time monitoring networks | Global | Yes (PWSWeather Contributor Plan provides free access) | Yes — recommended for haze detection |
 | IQAir | Observed — hybrid monitoring + crowd-sourced | Global | Yes | Yes |
 | Open-Meteo | Model-based — CAMS atmospheric composition model | Global | No | No |
 | OpenWeatherMap | Model-based — SILAM atmospheric dispersion model (deprecated) | Global | Yes | No |
@@ -600,7 +600,7 @@ Providers marked as "Observed" return measured PM2.5/PM10 concentrations from mo
 
 OpenWeatherMap AQI is deprecated. It continues to function with a deprecation warning logged at each call. It will be removed in the next major version.
 
-The wizard annotates each provider's option label to show observed vs. model-based and haze eligibility. When haze detection is enabled (`[conditions] haze_detection = true`), the wizard recommends Aeris and warns if the operator selects a model-based provider.
+The wizard annotates each provider's option label to show observed vs. model-based and haze eligibility. When haze detection is enabled (`[conditions] haze_detection = true`), the wizard recommends Xweather and warns if the operator selects a model-based provider.
 
 ### CLI wizard
 
