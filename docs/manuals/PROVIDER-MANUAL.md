@@ -1057,11 +1057,11 @@ Developer-local live tests are permitted and encouraged for initial fixture capt
 | Layer | Location | Format | Scope |
 |---|---|---|---|
 | **About page** | Centralized provider index | Plain text links, no logos, no marketing language | All dynamic providers (from capabilities API) + static providers always shown |
-| **In-context card footer** | Card displaying that provider's data | "Powered by [provider]" with logo | Only providers actually rendering data on that card |
+| **In-context card footer** | Card displaying that provider's data | Provider-specific ToS wording from capabilities API | Driven by capabilities API `attribution` block — host renders when `attributionRequired` is true |
 
-**About page:** Plain-text link list. No logos, no marketing copy. Provider lookup is via the `PROVIDER_INFO` map in `about.tsx`. Static entries (not tied to a configured provider) always appear: OpenStreetMap, CARTO, GEM Active Faults, Skyfield, IMO.
+**About page:** Plain-text link list. No logos, no marketing copy. Provider lookup is via the capabilities API's `attribution.displayName` and `attribution.url` fields. Static entries (infrastructure providers not in the capabilities API) are listed separately.
 
-**In-context card footers:** "Powered by [provider]" with logo, sized by card type:
+**In-context card footers:** Rendered by the host page using the `ProviderAttribution` component (`src/components/shared/ProviderAttribution.tsx`). Each provider's footer shows its ToS-mandated `attributionText` from the capabilities API. Sized by card type:
 
 | Card type | Logo variant | Size |
 |---|---|---|
@@ -1080,7 +1080,9 @@ Developer-local live tests are permitted and encouraged for initial fixture capt
 | IQAir | Do not use (ToS reserves rights) | N/A | Text-only: "Powered by IQAir" |
 | AstronomyAPI | Do not use (ToS §12.2) | N/A | N/A |
 
-Logo assets live at `src/assets/providers/` in the dashboard repo.
+Provider module authors populate attribution in their CAPABILITY declaration (`ProviderAttribution` dataclass in `providers/_common/capability.py`). The dashboard reads it from `GET /api/v1/capabilities`. See API-MANUAL §12 for the full schema.
+
+Logo assets live at `public/providers/` in the dashboard repo, named by `{provider_id}.{ext}` convention.
 
 ### Attribution not required
 

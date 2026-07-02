@@ -311,8 +311,8 @@ All share: border-radius consistent with card scale, visible focus ring per acce
 
 ### Provider Attribution Footer
 
-- **Component:** `ForecastAttribution` at `src/components/forecast/ForecastAttribution.tsx`.
-- **Purpose:** Credits the active forecast/AQI data provider ("Powered by [provider]") in a card footer.
+- **Component:** `ProviderAttribution` at `src/components/shared/ProviderAttribution.tsx`.
+- **Purpose:** Credits the active data provider with their ToS-mandated attribution text. Rendered by the host page, not by cards.
 
 | Variant | Logo height | Footer padding | Footer height | Use |
 |---|---|---|---|---|
@@ -320,20 +320,21 @@ All share: border-radius consistent with card scale, visible focus ring per acce
 | Compact | 16px | 3px (`0.1875rem`) | 23px | Tile cards |
 
 - **Structure:** Renders inside the existing `CardFooter` component; padding is overridden via inline `style` per variant (not a token — no `--footer-pad-*` exists yet).
-- **Logo assets:** `src/assets/providers/` — `xweather-dark.svg`, `xweather-light.svg`, `openweathermap-master.png`, `openweathermap-negative.png`, `nws.svg`, `open-meteo.png`.
+- **Logo assets:** `public/providers/` — `aeris.svg`, `aeris-dark.svg`, `owm.png`, `owm-dark.png`, `nws.svg`, `openmeteo.png`. Named by `{provider_id}.{ext}` convention; `-dark` suffix = dark theme variant.
 
 | Provider | Light-theme logo | Dark-theme logo | Theme switching |
 |---|---|---|---|
-| Xweather (aeris) | `xweather-dark.svg` | `xweather-light.svg` | `dark:hidden` / `hidden dark:block` swap |
-| OpenWeather (owm) | `openweathermap-master.png` | `openweathermap-negative.png` | `dark:hidden` / `hidden dark:block` swap |
+| Xweather (aeris) | `aeris.svg` | `aeris-dark.svg` | `dark:hidden` / `hidden dark:block` swap |
+| OpenWeather (owm) | `owm.png` | `owm-dark.png` | `dark:hidden` / `hidden dark:block` swap |
 | NWS (nws) | `nws.svg` | `nws.svg` (same file) | No swap — works on both themes natively |
-| Open-Meteo (openmeteo) | `open-meteo.png` | `open-meteo.png` (same file) | No swap — works on both themes natively |
+| Open-Meteo (openmeteo) | `openmeteo.png` | `openmeteo.png` (same file) | No swap — works on both themes natively |
 | IQAir (iqair) | — | — | No logo asset — text-only fallback |
 
 - **Text-only fallback:** Providers without a logo (IQAir) render the provider name as bold text instead of an `<img>`.
 - **"Powered by" prefix:** `--text-micro`, `--muted-foreground`, `--font-sans` 400 weight, precedes the logo/text.
 - **Uniform logo height:** All logos render at the variant's fixed height (32px standard / 16px compact) with `width: auto` — aspect ratio preserved, height never varies by logo.
-- **Alert banner exception:** The expanded alert detail section uses inline text-only attribution ("Powered by Xweather" / "Powered by OpenWeather") — not `ForecastAttribution`, not a `CardFooter`. NWS-sourced alerts show no attribution line.
+- **Host rendering:** Attribution is rendered by the host page (Now page, Forecast page), not by individual cards. Cards must not import the `ProviderAttribution` component. See DASHBOARD-MANUAL §8.
+- **Alert banner exception:** The expanded alert detail section uses inline text-only attribution ("Powered by Xweather" / "Powered by OpenWeather") — not `ProviderAttribution`, not a `CardFooter`. NWS-sourced alerts show no attribution line.
 
 ---
 
@@ -514,7 +515,7 @@ Optional string, unobtrusive corner placement. Shipped scenes credit photographe
 - Legal/Privacy link: always present
 - Copyright: `© {year} {station-name}`
 - "Powered by Clear Skies" line: visible by default, hideable by operator
-- Provider attribution ("Powered by [provider]") appears in card footers, not the site footer.
+- Provider attribution (`ProviderAttribution` component, ToS-mandated text) appears in card footers, not the site footer.
 - No standalone settings page — theme toggle lives in the nav, not the footer
 
 ### Skip Link

@@ -1451,6 +1451,41 @@ They continue to function as before — no breaking change for existing operator
 
 `aeris` is removed from radar. Aeris credentials remain wired for forecast/AQI/alerts.
 
+### Provider attribution metadata (ADR-080)
+
+The `/api/v1/capabilities` response includes a `ProviderAttributionResponse` block on each provider's `CapabilityDeclaration`. This tells the dashboard what attribution text, logo, and link to render for each provider.
+
+**Schema (`ProviderAttributionResponse`):**
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `attributionRequired` | `bool` | — | Whether the host must render a footer |
+| `displayName` | `str` | — | Human-readable provider name (about page, fallback text) |
+| `attributionText` | `str` | — | ToS-mandated wording, rendered verbatim |
+| `url` | `str` | — | Provider URL (linked from attribution text) |
+| `textTranslatable` | `bool` | `false` | False = render verbatim. True = pass through `t()` (future) |
+| `textLanguage` | `str` | `"en"` | BCP-47 language tag for the attribution text |
+| `logoRequired` | `bool` | `false` | Whether the provider's ToS mandates a logo |
+| `doNotUseLogo` | `bool` | `false` | Whether the provider's ToS forbids logo use |
+
+**Per-provider attribution values (v0.1):**
+
+| Provider ID | `attributionRequired` | `attributionText` | `logoRequired` | `doNotUseLogo` |
+|---|---|---|---|---|
+| `aeris` | true | "powered by Vaisala Xweather" | true | false |
+| `nws` | false | "Data courtesy of the National Weather Service" | false | false |
+| `openmeteo` | true | "Weather data by Open-Meteo.com" | false | false |
+| `owm` | true | "Weather data provided by OpenWeather" | true | false |
+| `iqair` | true | "Powered by IQAir" | false | true |
+| `usgs` | false | "Earthquake data courtesy of the U.S. Geological Survey" | false | false |
+| `rainviewer` | true | "RainViewer" | false | false |
+| `librewxr` | true | "LibreWxR — Data: CC-BY-4.0" | false | false |
+| `seven_timer` | false | "7Timer!" | false | false |
+
+`textTranslatable` is `false` for ALL providers in v0.1. ToS-mandated text must not be translated.
+
+The API-side dataclass (`ProviderAttribution`) lives in `providers/_common/capability.py`. Each provider module populates it on its `CAPABILITY` declaration. The Pydantic response model (`ProviderAttributionResponse`) lives in `models/responses.py`.
+
 ---
 
 ## §13 Anti-Patterns

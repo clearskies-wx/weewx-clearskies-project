@@ -77,9 +77,9 @@ Year/month dropdowns populated from `NOAA-*.txt` files actually present. HTML-pa
 **About (`/about`):**
 Operator-authored markdown. Setup wizard pre-populates from collected station fields. Operator edits via configuration UI.
 
-The Data Providers card dynamically shows active providers by reading the capabilities API — only providers the operator has actually configured appear. Static providers with no operator-configurable equivalent (OpenStreetMap, CARTO, GEM Global Active Faults, Skyfield, IMO) are always shown regardless of configuration, since they are used unconditionally wherever their underlying feature (maps, seismic overlay, almanac, meteor showers) is active. Provider display names and links resolve through the `PROVIDER_INFO` lookup map; entries reflect the Aeris→Xweather rebrand (Vaisala's product name, not the retired "Aeris"/"AerisWeather" naming). Dead provider entries with no path to ever appearing (`wunderground`, `geonet`, `emsc`, `renass`, `msc_geomet`, `dwd_radolan`) have been removed from `PROVIDER_INFO`.
+The Data Providers card dynamically shows active providers by reading the capabilities API — only providers the operator has actually configured appear. Static providers with no operator-configurable equivalent (OpenStreetMap, CARTO, GEM Global Active Faults, Skyfield, IMO) are always shown regardless of configuration, since they are used unconditionally wherever their underlying feature (maps, seismic overlay, almanac, meteor showers) is active. Provider display names and links resolve through the capabilities API's `attribution.displayName` and `attribution.url` fields; entries reflect the Aeris→Xweather rebrand (Vaisala's product name, not the retired "Aeris"/"AerisWeather" naming). Dead provider entries with no path to ever appearing (`wunderground`, `geonet`, `emsc`, `renass`, `msc_geomet`, `dwd_radolan`) do not appear, since they have no capabilities API entry.
 
-**In-context provider attribution:** Beyond the About page's centralized index, forecast cards (Today's Forecast on Now, and the Forecast page) and the AQI card show a "Powered by [provider]" footer including the provider's logo when the active provider requires it. The alert banner shows text-only attribution in the expanded detail section — no logo. Radar and seismic pages continue to rely on Leaflet's built-in attribution controls; that mechanism is unchanged by this work.
+**In-context provider attribution:** Beyond the About page's centralized index, forecast cards (Today's Forecast on Now, and the Forecast page) and the AQI card show a `ProviderAttribution` footer (see §8 "Attribution rendering") including the provider's logo when `logoRequired` is true. The alert banner shows text-only attribution in the expanded detail section — no logo. Radar and seismic pages continue to rely on Leaflet's built-in attribution controls; that mechanism is unchanged by this work.
 
 **Legal (`/legal`):**
 Legal/privacy text. Also linked from footer. Setup wizard requires acknowledgment checkboxes. Privacy Policy text auto-updates to match the configured analytics provider.
@@ -619,6 +619,23 @@ if (!aqiData) return <CardSkeleton />;
 ### 14 built-in cards
 
 All 14 Now page cards conform to the plugin contract. Their card types, endpoint declarations, and allowed layouts match the current hardcoded arrangement in `now.tsx`. The full inventory is defined in `card-metadata.ts`.
+
+### Attribution rendering
+
+Attribution is a host responsibility — cards must NOT import attribution components.
+
+The host page (Now page, Forecast page) reads `source` from the card's dataBag response, matches it against the capabilities API's `attribution` block, and renders a `ProviderAttribution` component when `attributionRequired` is true. The component lives at `src/components/shared/ProviderAttribution.tsx`.
+
+**Content area budget:** Card designers must account for the attribution footer consuming vertical space within the card:
+
+| Footprint | Footer height | Use |
+|---|---|---|
+| Standard (wide/full) | 53px | All non-tile cards |
+| Compact (tile) | 23px | Tile-sized cards |
+
+**Single-provider-per-card guidance:** Each card should source data from a single provider. Multi-provider cards create ambiguous attribution. If unavoidable, the host renders a combined single-line footer.
+
+**i18n:** When `textTranslatable` is false (all providers in v0.1), the component renders `attributionText` verbatim — never passed through `t()`.
 
 ---
 
