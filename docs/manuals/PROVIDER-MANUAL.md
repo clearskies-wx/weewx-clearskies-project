@@ -9,7 +9,7 @@ Companion documents:
 - **ARCHITECTURE.md** — system topology, provider module layout
 - **contracts/canonical-data-model.md** — per-field data catalog
 
-Last updated: 2026-06-27
+Last updated: 2026-07-01
 
 ---
 
@@ -26,7 +26,8 @@ Last updated: 2026-06-27
 9. [Earthquakes](#9-earthquakes)
 10. [Error Taxonomy](#10-error-taxonomy)
 11. [Testing Pattern](#11-testing-pattern)
-12. [Anti-Patterns](#12-anti-patterns)
+12. [Provider Attribution](#12-provider-attribution)
+13. [Anti-Patterns](#13-anti-patterns)
 
 ---
 
@@ -708,6 +709,8 @@ Render attribution per each source's terms on the radar map. Required attributio
 
 Both the in-map Leaflet attribution control and any below-map caption must agree.
 
+Radar and seismic page attribution is handled by Leaflet attribution controls on the map. No card footer is used.
+
 ---
 
 ## §8 Alerts
@@ -1047,7 +1050,51 @@ Developer-local live tests are permitted and encouraged for initial fixture capt
 
 ---
 
-## §12 Anti-Patterns
+## §12 Provider Attribution
+
+### Two-layer attribution model
+
+| Layer | Location | Format | Scope |
+|---|---|---|---|
+| **About page** | Centralized provider index | Plain text links, no logos, no marketing language | All dynamic providers (from capabilities API) + static providers always shown |
+| **In-context card footer** | Card displaying that provider's data | "Powered by [provider]" with logo | Only providers actually rendering data on that card |
+
+**About page:** Plain-text link list. No logos, no marketing copy. Provider lookup is via the `PROVIDER_INFO` map in `about.tsx`. Static entries (not tied to a configured provider) always appear: OpenStreetMap, CARTO, GEM Active Faults, Skyfield, IMO.
+
+**In-context card footers:** "Powered by [provider]" with logo, sized by card type:
+
+| Card type | Logo variant | Size |
+|---|---|---|
+| Wide / full cards | Standard | 32px |
+| Tiles | Compact | 16px |
+| Alert banner (expanded detail) | Text-only | N/A |
+
+### Provider logo requirements
+
+| Provider | Logo required by ToS | Logo available | Theme variants |
+|---|---|---|---|
+| Xweather | Yes (mandatory) | SVG dark + light | Swapped via `dark:` classes |
+| OpenWeatherMap | Yes (Free–Professional tiers) | PNG master + negative | Swapped via `dark:` classes |
+| NWS | No | SVG (circular seal) | Same both themes |
+| Open-Meteo | No | PNG (app icon) | Same both themes |
+| IQAir | Do not use (ToS reserves rights) | N/A | Text-only: "Powered by IQAir" |
+| AstronomyAPI | Do not use (ToS §12.2) | N/A | N/A |
+
+Logo assets live at `src/assets/providers/` in the dashboard repo.
+
+### Attribution not required
+
+| Source | Reason |
+|---|---|
+| Station data | Operator's own sensors |
+| Skyfield | MIT license |
+| NASA JPL (DE421 ephemerides) | Public domain |
+| 7Timer | No formal ToS |
+| USGS | Public domain; credit recommended but not required |
+
+---
+
+## §13 Anti-Patterns
 
 The following patterns are forbidden. Any pull request introducing them must be rejected.
 
