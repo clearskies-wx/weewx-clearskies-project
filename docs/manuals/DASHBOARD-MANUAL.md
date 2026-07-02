@@ -569,7 +569,7 @@ Setting `idleTimeout` to `0` disables idle detection entirely. Use this for wall
 Every card — built-in and future third-party — declares metadata in a plain data file with no React imports:
 
 - **`type`** — unique string identifier (e.g., `"aqi"`, `"wind-compass"`). The `CardType` is a string literal union of all registered card types.
-- **`displayName`** — human-readable name for the admin layout editor (e.g., `"Air Quality Index"`).
+- **`displayNameKey`** — i18n key (dashboard's `common` namespace, `cards.*`) for the human-readable card name (e.g., `"cards.airQualityIndex"` → `"Air Quality Index"` in English). Metadata carries the key, never a raw English string, per rules/coding.md §6. `card-metadata.ts` has no React imports, so it cannot call `t()` itself — consumers resolve the key through their own translation mechanism (the React admin UI via `useTranslation('common')`; the Python/HTMX admin layout editor via its own i18n layer reading the same key).
 - **`apiEndpoints`** — array of API endpoint paths the card needs (e.g., `["/api/v1/aqi/current"]`). Card authors determine these by reading the published OpenAPI spec at `/api/v1/openapi.json`. The container deduplicates across all active cards and fetches each endpoint once.
 - **`allowedLayouts`** — array of `{ footprint, rowSpan }` configurations the card supports. A card may render differently for each. The operator selects from this list in the layout editor. Example: `[{ footprint: "tile", rowSpan: 1 }, { footprint: "wide", rowSpan: 1 }]`.
 - **`thumbnail`** — path to a static preview image for the admin layout editor (relative to the build output root, e.g., `"/card-thumbnails/aqi.png"`).
@@ -607,7 +607,7 @@ The card registry (`card-registry.ts`) combines metadata with lazy React compone
 
 ### Build-time card manifest
 
-A prebuild script reads only the metadata file (no React) and writes `card-manifest.json` to the build output (`dist/`). This JSON artifact contains all card metadata (type, displayName, apiEndpoints, allowedLayouts, thumbnail path) and is consumed by the admin card layout editor (Python/HTMX) — no React required. The script runs as a `"prebuild"` entry in `package.json`, before `tsc -b && vite build`.
+A prebuild script reads only the metadata file (no React) and writes `card-manifest.json` to the build output (`dist/`). This JSON artifact contains all card metadata (type, displayNameKey, apiEndpoints, allowedLayouts, thumbnail path) and is consumed by the admin card layout editor (Python/HTMX) — no React required. The script runs as a `"prebuild"` entry in `package.json`, before `tsc -b && vite build`.
 
 ### Self-extraction pattern
 
