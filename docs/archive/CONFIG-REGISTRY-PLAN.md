@@ -1,6 +1,6 @@
 # Unified Config Registry — Config UI Refactor Plan
 
-**Status:** Draft — pending user review
+**Status:** COMPLETE
 **Created:** 2026-06-28
 **Components:** Config Wizard + Admin UI (`weewx-clearskies-stack`), Dashboard (`weewx-clearskies-dashboard` for Phase 6 only)
 

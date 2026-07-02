@@ -1,6 +1,6 @@
 # Geographic Features Overlay: Overpass GeoJSON → PMTiles Vector Tiles — Execution Plan
 
-**Status:** APPROVED — Ready for implementation
+**Status:** COMPLETE — implemented and deployed 2026-06-29
 **Created:** 2026-06-29
 **Components:** API (`weewx-clearskies-api`), Dashboard SPA (`weewx-clearskies-dashboard`), Config UI (`weewx-clearskies-stack`)
 

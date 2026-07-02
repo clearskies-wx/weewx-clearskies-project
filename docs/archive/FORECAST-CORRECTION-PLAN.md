@@ -1,6 +1,6 @@
 # Forecast Correction Engine — Execution Plan
 
-**Status:** Draft — pending user approval
+**Status:** COMPLETE — ADR-079 accepted, implemented 2026-06-30
 **Date:** 2026-06-28
 
 ## Context

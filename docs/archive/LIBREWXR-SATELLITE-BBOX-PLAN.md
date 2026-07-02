@@ -1,6 +1,6 @@
 # LibreWXR High-Resolution Satellite + BBOX Geographic Crop — Execution Plan
 
-**Status:** APPROVED — ready for implementation
+**Status:** COMPLETE — implemented and deployed 2026-06-28
 **Created:** 2026-06-28
 **Components:** LibreWXR fork (`repos/librewxr`), branch `deploy/shaneburkhardt`
 **Target:** Upstream PR to `JoshuaKimsey/LibreWXR` (AGPL-3.0)

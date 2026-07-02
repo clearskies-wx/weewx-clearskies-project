@@ -1,6 +1,6 @@
 # Geographic Features Overlay + Multi-Satellite Compositing — Execution Plan
 
-**Status:** PROPOSED — Pending user review
+**Status:** COMPLETE — implemented and deployed 2026-06-29
 **Created:** 2026-06-29
 **Components:** API (`weewx-clearskies-api`), Dashboard SPA (`weewx-clearskies-dashboard`), LibreWXR fork (`repos/librewxr`, branch `deploy/shaneburkhardt`)
 
