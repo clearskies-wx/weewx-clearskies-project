@@ -247,7 +247,11 @@ Set `<html lang="...">` per active locale on every page render.
 
 ### CJK fonts
 
-Use system CJK fonts for Japanese, Simplified Chinese, and Traditional Chinese. Do not bundle Noto-CJK or any other CJK web font — the bundle size cost is prohibitive.
+Use Noto Sans JP / Noto Sans SC / Noto Sans TC for Japanese, Simplified Chinese, and Traditional Chinese respectively. Load CJK fonts **on demand** — only when the user selects a CJK locale — so Latin/European users pay zero download cost. Import only the weights the dashboard uses (400, 600, 700). CJK font files are cached by the browser after first load.
+
+### Cyrillic fonts
+
+Import Cyrillic subsets for Manrope, Outfit, and Lexend alongside the Latin subsets. These are small (~20–50 KB total) and can be loaded eagerly since Russian is a supported locale.
 
 ---
 

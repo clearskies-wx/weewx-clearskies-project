@@ -385,6 +385,8 @@ Run this before declaring any UI change done. Check each item explicitly — don
 - [ ] If the change adds dynamic content, `aria-live` is set appropriately.
 - [ ] If the change is to a chart, the data-table fallback is updated to match.
 - [ ] `npx @axe-core/cli` (or equivalent) run against the modified page; zero violations OR a documented reason for any remaining warnings.
+- [ ] Every new user-visible string uses `t()` (dashboard) or `_()` (wizard/admin) — see §6.
+- [ ] Every new date/number formatting call uses the active locale, not a hardcoded locale — see §6.
 
 ### 5.8 Pre-ship full audit
 
@@ -405,7 +407,81 @@ Before tagging any release (v0.1.0, v0.2.0, etc.):
 
 ---
 
-## 6. Charts — Recharts reference discipline
+## 6. Internationalization — every string, every number, every label
+
+Clear Skies supports 13 locales. Internationalization is a **load-bearing constraint** with the same severity as accessibility and security — not a polish pass, not deferred to "after launch." An i18n violation is a defect.
+
+**Why (2026-07-02):** The i18n infrastructure (react-i18next, 13 locale files, locale sync hook) was built correctly at the start. Then virtually every feature after that was implemented as if i18n didn't exist — hardcoded `'en-US'` in 15+ files, English strings in 16+ components, `.toFixed()` everywhere, the entire wizard in English, the API composing English sentences, unit labels assumed universal. The ADR and manual rules were there; the code ignored them. This section exists so that never happens again.
+
+### 6.1 Dashboard — user-visible strings
+
+- **Every user-visible string must use `t()` from `useTranslation()`.** Hardcoded English text in JSX is a defect — headings, labels, button text, empty states, error messages, tooltips, aria-labels, sr-only text. No exceptions.
+- **Never pass `'en-US'`, `'en-CA'`, or `'default'` as a locale argument.** Every `Intl.DateTimeFormat`, `toLocaleDateString`, `toLocaleString`, and `Intl.NumberFormat` call must use `i18n.language` from react-i18next. The browser's system locale is not the user's chosen locale.
+- **Never use `.toFixed()` for display text.** `.toFixed()` always produces `.` as the decimal separator. German, French, Russian, and Portuguese users expect `,`. Use `Intl.NumberFormat` with the active locale. `.toFixed()` is only acceptable for non-display contexts (SVG path coordinates, data attributes).
+- **Never concatenate translated and untranslated parts with template literals.** Word order varies across languages. Use i18next interpolation: `t('key', { value, unit })`, not `` `${value} ${unit}` ``.
+- **Pluralization uses i18next plural rules**, not ternary operators. `count === 1 ? "item" : "items"` is wrong — many languages have more than two plural forms.
+
+### 6.2 API — computed text and labels
+
+- **Every text string the API computes must resolve through a locale file.** Weather condition labels, Beaufort scale names, AQI categories, record labels, moon phase names, moon traditional names, temperature comfort tiers, precipitation intensity labels, sky condition labels — all of these are API-generated from numeric data and must be translated per the active locale.
+- **Every unit label must resolve through the locale file.** Unit display formats vary across cultures — do not assume any symbol is universal without verifying it for the target locale. Resolution order: operator override → locale-specific → English default.
+- **Never use Python `%` formatting for display numbers.** `"%.1f" % value` always produces `.` as the decimal separator. Use `babel.numbers.format_decimal()` or equivalent with the active locale.
+- **Sentence composition must be locale-aware.** The conditions text engine ("Warm and Humid, Partly Cloudy, with Light Rain") has grammar, word order, and connector rules that differ across languages. Locale files carry composition templates, not just word lists.
+
+### 6.3 Wizard & Admin — operator-facing UI
+
+- **Every string in Jinja2 templates must use `_()` (gettext).** The wizard and admin UI are the operator's first contact with the system. An operator in Japan, Germany, or Brazil should not need to read English to configure their weather station.
+- **Language selection is wizard step 1.** Before import, before EULA, before anything. The 13 locales are shown in their native script (e.g., "日本語", "Deutsch", "Français") so no English comprehension is required.
+
+### 6.4 Grep-checkable FAIL conditions
+
+These are mechanical checks — auditors run them, no judgment required:
+
+```
+DASHBOARD:
+  FAIL: Any .tsx file under src/components/ or src/routes/ that contains
+        user-visible English text without a t() call
+  FAIL: 'en-US' or 'en-CA' or "'default'" as a locale argument in any
+        Intl.DateTimeFormat / toLocaleDateString / toLocaleString call
+  FAIL: .toFixed() used in JSX content or any string rendered to the DOM
+        (OK in SVG path d= attributes and non-display contexts)
+  FAIL: Template literal in JSX that concatenates translated + untranslated
+        parts (e.g. `${t('label')}: ${value}`)
+  FAIL: count === 1 ? "singular" : "plural" pattern
+
+API:
+  FAIL: Hardcoded English string returned in any response field that
+        reaches the visitor (weatherText, beaufort.label, category,
+        record label, moon names, unit labels)
+  FAIL: Python % formatting ("%.1f" % value) used for display output
+        without locale-aware decimal separator
+
+WIZARD/ADMIN:
+  FAIL: Any user-visible string in a Jinja2 template without _() wrapping
+```
+
+### 6.5 Per-change audit checklist (i18n items)
+
+Add to the existing §5.7 accessibility checklist — run before declaring any UI change done:
+
+- [ ] Every new user-visible string uses `t()` (dashboard) or `_()` (wizard/admin)
+- [ ] Every new `Intl.DateTimeFormat` / `toLocaleDateString` / `toLocaleString` uses `i18n.language`, not a hardcoded locale
+- [ ] Every new number formatted for display uses `Intl.NumberFormat` with locale, not `.toFixed()`
+- [ ] No new template-literal string concatenation for display text — use i18n interpolation
+- [ ] Any new API response field carrying human-readable text resolves through the locale file
+- [ ] Any new unit label resolves through the locale file
+
+### 6.6 What does NOT need translation
+
+- Code identifiers (column names, canonical field names, provider IDs, config keys)
+- Console log messages and stack traces
+- SVG path coordinates and data attributes
+- Provider-sourced prose the API passes through verbatim (alert headlines, forecast discussions, earthquake place names) — these are translated by adding locale-native provider modules, not by translating English text
+- EULA/license text (GPL v3 is a legal document; official translations exist but are not legally binding)
+
+---
+
+## 7. Charts — Recharts reference discipline
 
 The Clear Skies dashboard uses Recharts v3.x for all chart components. Recharts has non-obvious layout behavior (additive margins, zero-guards, axis space allocation) that causes silent rendering failures when props are guessed at.
 
@@ -424,7 +500,7 @@ The Clear Skies dashboard uses Recharts v3.x for all chart components. Recharts 
 7. **Chart wrapper divs need explicit sizing** — `minWidth: 0, minHeight: 0, width: '100%', height: '100%'` prevents flex containers from reporting 0 to ResizeObserver. Use `ResponsiveContainer width="99%"` (not 100%) to force recalculation.
 8. **`buildTicks` must use LOCAL time boundaries** — `getHours()` returns local hours; ticks computed in UTC won't match the formatter's expected hours (0/6/12/18).
 
-## 7. Documentation — save locally, read before fetching
+## 8. Documentation — save locally, read before fetching
 
 **All third-party documentation for libraries used in this project MUST be saved in `docs/reference/` and read from there before any web fetch.** Do not use WebFetch or WebSearch for documentation that should already be local. If a reference doc doesn't exist yet, fetch it ONCE, save it to `docs/reference/<library>-reference.md`, and read from the local copy going forward.
 
@@ -436,7 +512,7 @@ The Clear Skies dashboard uses Recharts v3.x for all chart components. Recharts 
 3. If it doesn't exist, fetch it, save it, THEN read the local copy.
 4. Never WebFetch documentation that already has a local copy.
 
-## 8. Build verification — zero TS errors before deploy
+## 9. Build verification — zero TS errors before deploy
 
 **The dashboard build script is `tsc -b && vite build`.** If `tsc` fails, `vite build` never runs and `dist/` stays stale. rsync then deploys the OLD files. This means TS errors cause SILENT deployment failures — the deploy looks successful but nothing changes on the site.
 
@@ -444,7 +520,7 @@ The Clear Skies dashboard uses Recharts v3.x for all chart components. Recharts 
 
 **Why (2026-06-02):** Multiple commits over ~2 hours were deployed but never reached the site because removing a YAxis import left unused variables. The TS6133 errors appeared in every deploy output and were ignored. The site served stale JS while the developer repeatedly changed code and asked the user to check — wasting hours of the user's time.
 
-## 9. Design system compliance
+## 10. Design system compliance
 
 1. Before any UI change, read `docs/manuals/DESIGN-MANUAL.md`. It is the single authority for all UI design rules — tokens, typography, colors, card anatomy, component patterns, backgrounds, icons, accessibility, and anti-patterns. Use existing components and tokens — no ad-hoc one-offs.
 2. If the user's prompt conflicts with the design manual, stop and ask before writing code.
@@ -452,7 +528,7 @@ The Clear Skies dashboard uses Recharts v3.x for all chart components. Recharts 
 4. If the design manual doesn't cover the case, flag it — don't invent.
 5. Archived ADRs (in `docs/archive/decisions/`) explain *why* decisions were made. Manuals say *what to do*. When the two conflict, the manual wins — the ADR is historical context.
 
-## 10. Manual compliance
+## 11. Manual compliance
 
 Before modifying code in any Clear Skies repo, read the governing manual for that domain:
 
