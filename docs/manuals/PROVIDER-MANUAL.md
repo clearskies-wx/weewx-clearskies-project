@@ -262,7 +262,7 @@ Five forecast provider modules ship at v0.1:
 | `nws` | `providers/forecast/nws.py` | No (User-Agent header required) | USA only | USA-only geographic gate |
 | `openmeteo` | `providers/forecast/openmeteo.py` | No (free, non-commercial) | Global | No alerts endpoint |
 | `openweathermap` | `providers/forecast/openweathermap.py` | Yes | Global | Hourly/daily/alerts require One Call 3.0 subscription |
-| `wunderground` | `providers/forecast/wunderground.py` | Yes (PWS contributor only) | PWS network | No hourly; no alerts; requires registered PWS station ID |
+| `wunderground` | `providers/forecast/wunderground.py` | Yes (PWS contributor only) | PWS network | No hourly; no alerts; requires registered PWS station ID. Not offered in wizard — insufficient data for full site operation. |
 
 Each module is independently enable/disable. A missing key disables that provider's module only — other providers start normally.
 
@@ -313,7 +313,7 @@ The two paths do not coordinate. An operator can use both simultaneously.
 |---|---|---|---|---|---|
 | `aeris` | `providers/aqi/aeris.py` | Yes | Global; 8 regional AQI scales | Observed (monitoring networks) | Yes |
 | `iqair` | `providers/aqi/iqair.py` | Yes | Global; US EPA and China MEP scales | Observed (monitors + crowd-sourced) | Yes |
-| `openaq` | `providers/aqi/openaq.py` | Yes (free) | 141 countries, ~2016–present | Observed (government reference monitors) | Yes |
+| `openaq` | `providers/aqi/openaq.py` | Yes (free) | 141 countries, ~2016–present | Observed (government reference monitors) | Yes — module exists but not wired into dispatch registry; not offered in wizard |
 | `openmeteo` | `providers/aqi/openmeteo.py` | No | Global; US EPA and European AQI | Model-based (CAMS forecast) | No |
 | `openweathermap` | `providers/aqi/openweathermap.py` | Yes | Global; OWM 1-5 ordinal scale | Model-based (SILAM forecast) — **DEPRECATED** | No |
 
@@ -413,7 +413,8 @@ Existing operator behavior is unchanged: the AQI card renders normally. Only haz
 ### OpenAQ AQI provider
 
 **Module:** `providers/aqi/openaq.py`  
-**`is_observed_source`:** `True`
+**`is_observed_source`:** `True`  
+**Status:** Module exists but not wired into dispatch registry; not offered in wizard.
 
 **Coverage:** 141 countries, approximately 2016–present. Data comes from government reference PM2.5 monitors only — the same regulatory-grade instruments used for official air quality reporting. PM2.5 and PM10 only; no composite AQI index and no gas-phase pollutants (O3, NO2, SO2, CO) are returned.
 
@@ -811,7 +812,7 @@ Four earthquake provider modules ship at v0.1 in `providers/earthquakes/`. All f
 | Module | Coverage | License |
 |---|---|---|
 | `usgs` | Global (M2.5+ globally; US-comprehensive) | Public domain |
-| `geonet` | New Zealand | CC BY 4.0 |
+| `geonet` | New Zealand | CC BY 3.0 NZ |
 | `emsc` | Europe + Mediterranean + global | CC BY 4.0 |
 | `renass` | Mainland France + neighboring countries | CC BY 4.0 |
 
