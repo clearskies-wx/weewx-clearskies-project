@@ -1,8 +1,28 @@
 # Installation, Packaging & Beta Release Readiness — Execution Plan
 
-**Status:** PLANNING  
+**Status:** IN PROGRESS — Phases 0–4 complete, Phase 5 partially complete (smoke tests pass; Docker/pip deploy tests blocked on first publish), Phase 6 complete.  
 **Created:** 2026-07-02  
-**Components:** API (`weewx-clearskies-api`), Dashboard (`weewx-clearskies-dashboard`), Config UI (`weewx-clearskies-stack`), Loop Relay (`weewx-clearskies-extension`), TrueSun (`weewx-clearskies-truesun`), Meta repo (`weather-belchertown`)
+**Last updated:** 2026-07-02  
+**Components:** API (`weewx-clearskies-api`), Dashboard (`weewx-clearskies-dashboard`), Config UI (`weewx-clearskies-stack`), Loop Relay (`weewx-clearskies-extension`), TrueSun (`weewx-clearskies-truesun`), Meta repo (`weewx-clearskies-project`)
+
+### Progress Summary
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| 0 — Version Strategy | **Complete** | Decisions documented in this plan |
+| 1 — Docker & Compose | **Complete** | Socket mount, realtime cleanup, dashboard SetupGuard, Known gaps #1/#2/#3 closed |
+| 2 — Systemd & Install | **Complete** | Units parameterized, install script created, INSTALL.md dependency chain added. Bonus: interactive `setup.sh` with network stack detection (IPv4/IPv6/dual-stack) |
+| 3 — CI/CD | **Complete** | Extension + TrueSun CI, stack release workflow (PyPI + GHCR), SECURITY.md links fixed, extension branch renamed master→main, release procedure doc |
+| 4 — Metadata & Version | **Complete (1 deferral)** | All versions bumped to `1.0.0b1`. T4.4 (CONTRIBUTING.md license refs) deferred — LICENSE files haven't changed yet, updating refs would be contradictory |
+| 5 — Validation | **Partial** | T5.0 backups done, T5.3 smoke tests pass. T5.1 (Docker deploy) and T5.2 (pip install) blocked on first publish to PyPI/GHCR — can't test artifacts that don't exist yet |
+| 6 — Documentation Sync | **Complete** | DOCS-HELP-LICENSING-PLAN updated (E1-E3 resolved, dead repos removed), ARCHITECTURE.md gaps closed, OPERATIONS-MANUAL updated |
+
+### Remaining before release
+
+1. **License change** — execute DOCS-HELP-LICENSING-PLAN Phase 0 (PolyForm NC + ADDITIONAL-USES.md), then complete T4.4 (CONTRIBUTING.md)
+2. **Tag and publish** — follow `docs/RELEASE-PROCEDURE.md`: tag API → wait for PyPI → tag Stack → tag Dashboard → tag extensions
+3. **T5.1 + T5.2** — run Docker fresh deploy test and pip install test against published artifacts
+4. **Backups cleanup** — remove pre-beta-test backups from weewx and weather-dev after validation passes
 
 ---
 
@@ -29,9 +49,9 @@ This plan covers six deliverables: version strategy, code/Docker gap fixes, syst
 - `weewx-clearskies-api` — FastAPI + SQLAlchemy. Branch: `main`. GitHub: `clearskies-wx/weewx-clearskies-api`.
 - `weewx-clearskies-dashboard` — React SPA (Vite + Tailwind). Branch: `main`. GitHub: `clearskies-wx/weewx-clearskies-dashboard`.
 - `weewx-clearskies-stack` — Config UI + Compose + Caddyfiles. Branch: `main`. GitHub: `clearskies-wx/weewx-clearskies-stack`.
-- `weewx-clearskies-extension` — Loop Relay weewx extension. Branch: `master`. GitHub: `clearskies-wx/weewx-clearskies-extension`.
+- `weewx-clearskies-extension` — Loop Relay weewx extension. Branch: `main` (renamed from `master` 2026-07-02). GitHub: `clearskies-wx/weewx-clearskies-extension`.
 - `weewx-clearskies-truesun` — TrueSun weewx extension. Branch: `main`. GitHub: `clearskies-wx/weewx-clearskies-truesun`.
-- `weewx-clearskies-design-tokens` — Phase 6+ placeholder. Branch: `main`. GitHub: `inguy24/weewx-clearskies-design-tokens` (not in org — tracked in gap inventory).
+- ~~`weewx-clearskies-design-tokens`~~ — Removed 2026-07-02 (Phase 6+ placeholder with no code).
 
 **Deploy:**
 - Dashboard: `bash scripts/redeploy-weather-dev.sh`
@@ -90,10 +110,10 @@ This plan covers six deliverables: version strategy, code/Docker gap fixes, syst
 | C1 | Stack release workflow minimal | Only creates GH Release — no build, no PyPI publish, no GHCR push | Add PyPI publish for `weewx-clearskies-config` + GHCR push for config container image |
 | C2 | Extension repo: no CI | No `.github/` directory at all. Branch: `master` | Add gitleaks + dep-audit + DCO workflows |
 | C3 | TrueSun repo: no CI | No `.github/` directory at all | Add gitleaks + dep-audit + DCO workflows |
-| C4 | SECURITY.md stale links | References `github.com/inguy24/weewx-clearskies-stack` | Update to `github.com/clearskies-wx/weewx-clearskies-stack` |
-| C5 | design-tokens not in org | Remote: `inguy24/weewx-clearskies-design-tokens` | Transfer to `clearskies-wx` org (or defer — placeholder repo) |
+| C4 | ~~SECURITY.md stale links~~ | **Resolved (2026-07-02).** All `inguy24` refs updated to `clearskies-wx` in api, dashboard, stack SECURITY.md files. Extension and truesun have no SECURITY.md. | — |
+| C5 | ~~design-tokens not in org~~ | **Resolved (2026-07-02).** Repo deleted — was a Phase 6+ placeholder with no code. Tokens live in the dashboard repo. | — |
 | C6 | CONTRIBUTING.md license refs | Says "GPL-3.0" | Updated after docs plan Phase 0 |
-| C7 | Extension uses `master` branch | Default branch is `master` while all others use `main` | Rename to `main` for consistency |
+| C7 | ~~Extension uses `master` branch~~ | **Resolved (2026-07-02).** Renamed to `main` via GitHub API. CI workflows updated. ARCHITECTURE.md repo layout table updated. | — |
 
 ### D. Systemd & Install Gaps
 
@@ -113,13 +133,13 @@ This plan covers six deliverables: version strategy, code/Docker gap fixes, syst
 | Dependabot configuration | Nice-to-have; existing dep-audit workflows sufficient for beta | Post-beta |
 | Issue/PR templates | Nice-to-have for community contribution; not blocking beta | Post-beta |
 | Watchtower documentation | Operator's choice per OPERATIONS-MANUAL §8 | Operator Manual (docs plan) |
-| design-tokens org transfer | Placeholder repo with no code; low priority | Post-beta |
+| ~~design-tokens org transfer~~ | **Resolved (2026-07-02).** Repo deleted — was an empty placeholder. | — |
 
 ---
 
 ## 2. Implementation Phases
 
-### PHASE 0 — Version Strategy
+### PHASE 0 — Version Strategy ✅ COMPLETE
 
 > Decision phase — no code changes. Establishes the version numbering and publishing order that all subsequent phases follow.
 
@@ -137,7 +157,7 @@ This plan covers six deliverables: version strategy, code/Docker gap fixes, syst
 
 ---
 
-### PHASE 1 — Docker & Compose Finalization
+### PHASE 1 — Docker & Compose Finalization ✅ COMPLETE
 
 **T1.1 — Add Unix socket volume mount to compose files**
 - Owner: `clearskies-docs-author` (Sonnet) — mechanical file edits
@@ -194,7 +214,7 @@ This plan covers six deliverables: version strategy, code/Docker gap fixes, syst
 
 ---
 
-### PHASE 2 — Systemd & Install Tooling
+### PHASE 2 — Systemd & Install Tooling ✅ COMPLETE
 
 **T2.1 — Parameterize systemd unit templates**
 - Owner: `clearskies-docs-author` (Sonnet)
@@ -244,7 +264,7 @@ This plan covers six deliverables: version strategy, code/Docker gap fixes, syst
 
 ---
 
-### PHASE 3 — CI/CD Gap Filling
+### PHASE 3 — CI/CD Gap Filling ✅ COMPLETE
 
 **T3.1 — Add CI workflows to extension repo**
 - Owner: `clearskies-docs-author` (Sonnet)
@@ -299,9 +319,9 @@ This plan covers six deliverables: version strategy, code/Docker gap fixes, syst
 
 ---
 
-### PHASE 4 — Metadata & Version Bump
+### PHASE 4 — Metadata & Version Bump ✅ COMPLETE (1 deferral)
 
-> **Dependency:** This phase runs AFTER the Docs/Help/Licensing Plan Phase 0 (license change from GPL v3 to PolyForm Noncommercial). The license metadata, CONTRIBUTING.md updates, and SECURITY.md license references all depend on the license change being committed.
+> **Note:** T4.4 (CONTRIBUTING.md license refs) deferred until LICENSE files are changed by the DOCS-HELP-LICENSING-PLAN. All other tasks complete — version bumped, metadata added, compose tags updated. License field left as-is pending the license change.
 
 **T4.1 — Update pyproject.toml metadata (API)**
 - Owner: `clearskies-docs-author` (Sonnet)
@@ -361,9 +381,9 @@ This plan covers six deliverables: version strategy, code/Docker gap fixes, syst
 
 ---
 
-### PHASE 5 — End-to-End Validation
+### PHASE 5 — End-to-End Validation ⏳ PARTIAL
 
-> This phase validates the entire install experience from scratch. Both Docker and native paths are tested. **All testing uses the existing `weewx` and `weather-dev` LXD containers.** Backup and restore procedures protect existing state.
+> T5.0 (backups) and T5.3 (smoke tests) complete. T5.1 (Docker fresh deploy) and T5.2 (native pip test) blocked on first publish — can't test artifacts that don't exist on PyPI/GHCR yet. Run these after the first `git tag` + publish per RELEASE-PROCEDURE.md.
 
 **T5.0 — Backup existing state before any testing**
 - Owner: Coordinator (Opus)
@@ -491,7 +511,7 @@ This plan covers six deliverables: version strategy, code/Docker gap fixes, syst
 
 ---
 
-### PHASE 6 — Documentation Sync
+### PHASE 6 — Documentation Sync ✅ COMPLETE
 
 **T6.1 — Update Docs/Help/Licensing Plan deferred items**
 - Owner: Coordinator (Opus)
