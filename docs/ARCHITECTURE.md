@@ -581,7 +581,7 @@ Per-provider TTLs: forecast 30 min, alerts 5 min, AQI 15 min, radar metadata 5 m
 | weewx-clearskies-realtime | `repos/weewx-clearskies-realtime` | main | Python | Yes — **DEPRECATED — merged into API per ADR-058. Repo archived.** |
 | weewx-clearskies-dashboard | `repos/weewx-clearskies-dashboard` | main | TypeScript/React | Yes (init container) |
 | weewx-clearskies-stack | `repos/weewx-clearskies-stack` | main | Python (config UI) + YAML/Caddyfile (orchestration) | **No** |
-| weewx-clearskies-extension | `repos/weewx-clearskies-extension` | master | Python | No (installs into weewx via `weectl extension install`) |
+| weewx-clearskies-extension | `repos/weewx-clearskies-extension` | main | Python | No (installs into weewx via `weectl extension install`) |
 | weewx-clearskies-truesun | `repos/weewx-clearskies-truesun` | main | Python | No (installs into weewx via `weectl extension install`). Deps: pvlib, cdsapi, h5netcdf. |
 | weewx-clearskies-design-tokens | `repos/weewx-clearskies-design-tokens` | main | — | No (Phase 6+ placeholder) |
 | librewxr (fork) | `repos/librewxr` | `deploy/shaneburkhardt` (deploy), `main` (tracks upstream) | Python 3.12+ | Yes — fork of `JoshuaKimsey/LibreWXR`. Deploy branch adds `LIBREWXR_BBOX` env var for sub-region cropping (SoCal: `32.0,-120.5,35.5,-114.5`) and dual-stack bind. AGPL-3.0, personal use only. Built as `librewxr-bbox:latest` on the `librewxr` LXD container. |
