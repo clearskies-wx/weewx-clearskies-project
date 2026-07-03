@@ -2,7 +2,7 @@
 
 **Status:** PLANNING  
 **Created:** 2026-07-02  
-**Components:** Config UI (`weewx-clearskies-stack`), Dashboard SPA (`weewx-clearskies-dashboard`), API (`weewx-clearskies-api`), Meta repo (`weather-belchertown`)
+**Components:** Config UI (`weewx-clearskies-stack`), Dashboard SPA (`weewx-clearskies-dashboard`), API (`weewx-clearskies-api`), Meta repo (`weewx-clearskies-project`)
 
 ---
 
@@ -59,7 +59,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 | A1 | LICENSE files (api, dashboard, stack, design-tokens) | GPL v3 verbatim (675 lines each) | PolyForm Noncommercial 1.0.0 full text |
 | A2 | LICENSE files (extension, truesun) | GPL v3 | No change (legally required — weewx derivative works) |
 | A3 | ADDITIONAL-USES.md | Does not exist | New file in 4 repos: permitted uses + commercial requirements |
-| A4 | LICENSE-RATIONALE.md (api, dashboard, stack, realtime) | GPL v3 rationale | Updated for PolyForm Noncommercial, explains weewx split |
+| A4 | LICENSE-RATIONALE.md (api, dashboard, stack) | GPL v3 rationale | Updated for PolyForm Noncommercial, explains weewx split. Note: realtime repo archived per ADR-058 — no longer applicable. |
 | A5 | ADR-003 (license decision) | Accepted, GPL v3, archived | Superseded by new ADR documenting license change |
 | A6 | EULA.txt + 12 locale translations | GPL v3 focused (§1 supplements GPL, §2 reaffirms GPL rights, §6 IP under GPL, §7 extends GPL §15-16, §16 GPL rights survive) | PolyForm Noncommercial focused — update §1-2 license grant, §6 IP, §7-8 warranty/liability, §16 termination |
 | A7 | EULA wizard step template | References "GPL v3" in checkbox label and version text | Updated references |
@@ -96,7 +96,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 | C1 | Quick Start | Not started |
 | C2 | System Requirements | Not started — need to measure on running containers |
 | C3 | Installation — Native path | Not started (content exists in OPERATIONS-MANUAL.md §1 but developer-oriented) |
-| C4 | Installation — Docker compose | ⚠️ DEFERRED — containers/compose not finalized |
+| C4 | Installation — Docker compose | Unblocked — compose files finalized by BETA-RELEASE-PLAN Phase 1 (2026-07-02). Content ready to write. |
 | C5 | Installation — weewx extensions | Not started (content exists in OPERATIONS-MANUAL.md §1 but developer-oriented) |
 | C6 | First-Run Wizard guide | Not started — cross-references help system content |
 | C7 | Admin Guide | Not started — cross-references help system content |
@@ -120,9 +120,9 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 
 | # | Item | Why deferred | Track where |
 |---|------|-------------|-------------|
-| E1 | Docker container finalization | Containers and compose files not finalized | CLEAR-SKIES-PLAN.md |
-| E2 | Install scripts | Depends on Docker finalization | CLEAR-SKIES-PLAN.md |
-| E3 | Docker compose installation docs | Depends on Docker finalization | Manual §3 stub |
+| E1 | ~~Docker container finalization~~ | **Resolved by BETA-RELEASE-PLAN Phases 1+4 (2026-07-02).** Socket mount added to compose files, stale realtime artifacts removed, image tag defaults bumped to `1.0.0b1`, Config UI verified in compose. | BETA-RELEASE-PLAN.md |
+| E2 | ~~Install scripts~~ | **Resolved by BETA-RELEASE-PLAN Phase 2 (2026-07-02).** `scripts/install-prerequisites.sh` created, systemd units parameterized with `User=clearskies` and pip-installed binary paths. | BETA-RELEASE-PLAN.md |
+| E3 | ~~Docker compose installation docs~~ | **Resolved by BETA-RELEASE-PLAN Phase 2 T2.3 (2026-07-02).** Stack INSTALL.md updated with numbered dependency chain covering both Docker and native paths. | BETA-RELEASE-PLAN.md |
 | E4 | CheckMK monitoring plugin | Future deliverable, not v1 | CLEAR-SKIES-PLAN.md |
 | E5 | Home Assistant integration | Future deliverable, not v1. Goal: eliminate duplicate HA provider calls | CLEAR-SKIES-PLAN.md |
 | E6 | Operator Manual i18n | Manual is English-only for v1 | CLEAR-SKIES-PLAN.md |
