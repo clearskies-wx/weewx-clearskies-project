@@ -49,9 +49,9 @@ Each repo builds its own container image independently. A dashboard CSS change d
 
 There are exactly two supported install paths:
 
-**Container path (docker-compose + Caddy).** Pull the stack repo. Configure `secrets.env`. Run `docker compose up -d`. Caddy handles TLS automatically via Let's Encrypt (ACME HTTP-01) or DNS-01 challenge for NAT-behind installs. The dashboard is an init container: a multi-stage Node 22 build copies `dist/` to a shared volume, then exits. Caddy serves that volume as static files.
+**Container path (docker-compose + Caddy).** Pull the stack repo. Run `./scripts/setup.sh` — it asks deployment questions (topology, network stack, domain, weewx paths) and writes `.env`, `secrets.env`, and a minimal `api.conf`. Then `docker compose up -d`. Caddy handles TLS automatically via Let's Encrypt (ACME HTTP-01) or DNS-01 challenge for NAT-behind installs. The dashboard is an init container: a multi-stage Node 22 build copies `dist/` to a shared volume, then exits. Caddy serves that volume as static files.
 
-**Native path (pip + systemd + operator web server).** Install each component with `pip install weewx-clearskies-api` into a Python 3.12+ virtual environment. Configure systemd units. Configure an existing web server (Apache, Caddy, or nginx) as the reverse proxy. Example configs for all three web servers are in each component's `INSTALL.md`. TLS via the operator's existing certificate pipeline (certbot, internal CA, or existing wildcard cert).
+**Native path (pip + systemd + Caddy).** Run `sudo ./scripts/setup.sh` — it creates the `clearskies` system user, groups, directories, and network configuration, then guides you through the same deployment questions. Install each component with `pip install --pre weewx-clearskies-api` into a Python 3.12+ virtual environment. Copy systemd units from `examples/systemd/` and enable. Configure Caddy as the reverse proxy using the provided example Caddyfile. TLS via the operator's existing certificate pipeline (certbot, internal CA, or existing wildcard cert).
 
 Do not mix install paths for a single component. If the API is native, its config lives in `/etc/weewx-clearskies/api.conf`; if it is a container, the same path is bind-mounted into the container. The configuration format is identical in both cases.
 
@@ -60,7 +60,7 @@ Do not mix install paths for a single component. If the API is native, its confi
 | Channel | What ships there | Who should use it |
 |---------|-----------------|------------------|
 | PyPI | `weewx-clearskies-api`, `weewx-clearskies-config` Python packages | Native-path Linux/macOS operators |
-| Container registry (GHCR) | `weewx-clearskies-api`, `weewx-clearskies-dashboard` images | Docker-path operators |
+| Container registry (GHCR) | `weewx-clearskies-api`, `weewx-clearskies-dashboard`, `weewx-clearskies-config` images | Docker-path operators |
 | GitHub Releases | Tagged source archives, pre-built dashboard bundles, signed checksums | Build-from-source operators |
 
 ### Platform support matrix
@@ -117,7 +117,7 @@ After running this script, install the Python package, run the wizard to generat
 
 ### Config UI distribution
 
-The config UI is distributed separately as `weewx-clearskies-config` on PyPI. It is not containerized. Install it with `pip install weewx-clearskies-config` on the host where it will be accessed from the LAN, then launch with `weewx-clearskies-config`. It is not a daemon — start it to make configuration changes, stop it when done.
+The config UI is distributed as `weewx-clearskies-config` on PyPI and as a container image on GHCR (`ghcr.io/clearskies-wx/weewx-clearskies-config`). Docker-path operators get it automatically via the compose file (`config` service in `frontend-host/` and `single-host/`). Native-path operators install with `pip install --pre weewx-clearskies-config` and manage via the provided systemd unit.
 
 ### weewx extensions
 
@@ -510,7 +510,7 @@ Setup endpoints use the prefix `/setup/*` (not `/api/v1/*`). These endpoints req
 
 ### Config UI
 
-The config UI is a standalone FastAPI application on port 9876. It is distributed as `weewx-clearskies-config` on PyPI. It has no Dockerfile — it is not containerized. Start it for configuration changes, stop it when done.
+The config UI is a standalone FastAPI application on port 9876. It is distributed as `weewx-clearskies-config` on PyPI and as a container image on GHCR. Docker-path operators get it via the `config` service in the compose file. Native-path operators run it as a systemd service (`weewx-clearskies-config.service`).
 
 During normal operation, access it at `https://your-site.example.com/admin` via the reverse proxy, which routes `/wizard*`, `/bootstrap*`, `/login*`, `/admin*`, and `/static/*` to `localhost:9876`. This means the config UI benefits from the site's real TLS certificate and does not require a separate browser certificate exception.
 
