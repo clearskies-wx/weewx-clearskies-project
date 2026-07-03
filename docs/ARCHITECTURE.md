@@ -4,7 +4,7 @@ Single source of truth for what each service is, where it runs, what it exposes,
 
 Authoritative for current system state. ADRs are authoritative for *why* decisions were made. If this document conflicts with an ADR, investigate — one of them is stale.
 
-Last verified: 2026-06-30 (ADR-079 Accepted: forecast correction engine added — vocabulary entry, configuration files table updated). Previous: 2026-06-29 (ADR-078 amended: geographic features changed from Overpass/GeoJSON to PMTiles/protomaps-leaflet — endpoints, config, and file updated).
+Last verified: 2026-07-02 (Known gaps #1, #2, #3 closed — Config UI in compose verified, API life-support mode verified, dashboard SetupGuard renders NotConfigured instead of auto-redirect). Previous: 2026-06-30 (ADR-079 Accepted: forecast correction engine added — vocabulary entry, configuration files table updated).
 
 ---
 
@@ -87,7 +87,7 @@ Each repo builds its own container image independently (ADR-034). A dashboard CS
 >
 > **ClearSkiesTruesunXType weewx extension** (`weewx-clearskies-truesun`) is NOT a container. It is a weewx XType extension that runs inside the weewx process, installed via `weectl extension install`. It overrides `maxSolarRad` with pvlib's Simplified Solis model using CAMS AOD satellite data and station humidity-derived precipitable water. A background thread fetches CAMS AOD once daily; the main loop does only pure math with cached values. When this extension is not installed, weewx falls back to its built-in Ryan-Stolzenbach model (no regression). See [ADR-072](decisions/ADR-072-solar-radiation-model-replacement.md). Dependencies: `pvlib`, `cdsapi`, `h5netcdf` (installed into the weewx Python environment).
 
-> **Config UI is NOT containerized.** It has no Dockerfile and is not in any compose file. It is distributed as a pip package (`weewx-clearskies-config`) and run manually by the operator. ADR-027 says "bundled compose adds a `config` service" — this is an unimplemented requirement. See Known gaps.
+> **Config UI containerization (resolved 2026-07-02).** The Config UI has a Dockerfile (multi-stage, two-repo build context) and is included as the `config` service in `frontend-host/` and `single-host/` compose files. Caddy proxies `/wizard*`, `/bootstrap*`, `/login*`, `/admin*`, `/static/*` to the config service on port 9876. It is also distributed as a pip package (`weewx-clearskies-config`) for native installs.
 
 > **API native install (2026-05-24):** The API is currently installed natively on the `weewx` LXD container (not in Docker) via pip into a Python 3.12 venv at `/home/ubuntu/repos/weewx-clearskies-api/.venv`, managed by systemd unit `weewx-clearskies-api.service`. Config at `/etc/weewx-clearskies/api.conf`. Health port (8081) also serves TLS. This is the production deployment path on bare-metal / LXD; the Dockerfile exists for Docker compose deployments.
 >
@@ -648,9 +648,9 @@ Historical note: meta ADRs (component breakdown ADR-001, tech stack ADR-002, lic
 
 | # | Gap | Intended | Current state | Decision (2026-05-23) | Blocking |
 |---|-----|----------|---------------|----------------------|----------|
-| 1 | Config UI not in compose/Caddy | ADR-027: "bundled compose adds a `config` service", "accessible at `/admin` through the reverse proxy" | No Dockerfile, not in any compose file, not proxied by Caddy | **Fix required.** Config UI is part of the site UI (like WordPress `/wp-admin`), not a standalone service. Add to compose, add Caddy proxy rules for `/wizard`, `/bootstrap`, `/login`, `/admin`. Operator should never think about it as separate. | First-run UX |
-| 2 | API crashes without api.conf | API must be running for wizard (ADR-038a: wizard calls `/setup/*`) | `FileNotFoundError` at startup | **Fix required.** API needs a "life-support mode" — start without config, serve health port with `{"configured": false}` status, serve `/setup/*` endpoints. Dashboard and wizard use health port to detect unconfigured state. | Wizard flow |
-| 3 | Dashboard shows error wall when unconfigured | Should detect unconfigured state and redirect to `/wizard` | Shows "Unable to load" on every tile; first-run redirect still missing | **Partially fixed.** Global `ErrorBoundary` added (`src/components/error-boundary.tsx`) — blank-page crash on render errors resolved. Remaining: dashboard checks API health port on load; if `configured: false`, redirect to `/wizard`. | First-run UX |
+| 1 | ~~Config UI not in compose/Caddy~~ | **Resolved (2026-07-02).** Config service is in `frontend-host/` and `single-host/` compose files. Caddy routes for `/wizard*`, `/bootstrap*`, `/login*`, `/admin*`, `/static/*` present in both Caddyfiles. | — | — | — |
+| 2 | ~~API crashes without api.conf~~ | **Resolved (2026-07-02).** `load_settings()` returns `Settings(configured=False)` when `api.conf` absent. API starts in life-support mode serving `/setup/*` endpoints and `/health/ready` returning `{"status": "not_configured", "configured": false}`. | — | — | — |
+| 3 | ~~Dashboard shows error wall when unconfigured~~ | **Resolved (2026-07-02).** `SetupGuard` checks `GET /api/v1/status` once per session. If `configured: false`, renders a `NotConfigured` component (centered card with wizard link) instead of the app routes. No auto-redirect — the wizard may be on a different port before Caddy is configured. Global `ErrorBoundary` handles API-down separately. | — | — | — |
 | 4 | ~~Realtime crashes without realtime.conf~~ | **Resolved by ADR-058 (2026-06-14).** The realtime service is eliminated — there is no `realtime.conf` and no realtime process. Gap #4 no longer applies. | — | — | — |
 | 5 | No stack.conf example | ADR-027 references `stack.conf` | Does not exist | Deferred — CLI flags sufficient for v0.1. | Low |
 | 6 | ADR-034 container table incomplete | ADR-027 adds config service | ADR-034 lists only 4 containers | Amend ADR-034 to add config UI row after gap #1 is implemented. | ADR consistency |
@@ -659,10 +659,13 @@ Historical note: meta ADRs (component breakdown ADR-001, tech stack ADR-002, lic
 | 10 | Card-glass opacity too translucent | Cards must be readable over the global background; B3 made opacity an operator-configurable default | The B3 shipped defaults (light `rgba(255,255,255,0.72)`, dark `rgba(30,35,55,0.55)`) are too translucent against the global background — text is hard to read and contrast likely fails WCAG AA. (Surfaced during C1 mockup review, 2026-05-31.) | **Fix required** (cross-cutting, not C1-specific). Revisit the B3 default opacity (increase) and verify body-text contrast over the card-blended-over-background meets AA in both themes. Reopens the B3 opacity default. | A11y / WCAG |
 | 11 | Global background does not change with day/night | ADR-047 background is condition- AND day/night-keyed (`scene.daytime`); the background should visibly change between day and night | Observed in the C1 mockup: the background did not change when toggling light/dark (day/night). Needs end-to-end verification that the ADR-047 day/night scene keying actually swaps the rendered background in the real dashboard. (Surfaced 2026-05-31.) | **Verify, then fix if broken** (cross-cutting, not C1). Confirm the dashboard maps `scene.daytime` to day vs night assets and the background updates; if the mockup-observed staleness reflects a real wiring gap, repair it. | ADR-047 / background |
 
-### Resolved gaps (2026-05-23)
+### Resolved gaps (2026-07-02)
 
 | # | Was | Resolution |
 |---|-----|-----------|
+| 1 | Config UI not in compose/Caddy | Config service in `frontend-host/` and `single-host/` compose files; Caddy routes for wizard/admin/login/bootstrap/static verified (2026-07-02) |
+| 2 | API crashes without api.conf | `load_settings()` returns `Settings(configured=False)`, API starts in life-support mode (2026-07-02) |
+| 3 | Dashboard shows error wall when unconfigured | `SetupGuard` checks `/api/v1/status`, renders `NotConfigured` component with wizard link instead of auto-redirect (2026-07-02) |
 | 7 | ADR-038 index entry incomplete | Renumbered to ADR-038a; added to INDEX.md |
 | 8 (current) | Conditions text: night-sky fallback not wired | `provider_sky` IS passed to `build_weather_text()` via `compose_weather_text()`; `_cloud_pct_to_sky()` now day/night-aware (2026-06-08) |
 | 8 (original) | Security baseline port numbers stale (8000/8001) | Fixed to 8765/8766 at time; port 8766 subsequently removed per ADR-058 (2026-06-14) |
