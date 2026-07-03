@@ -37,7 +37,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 **Key existing state:**
 - EULA exists as wizard step 3 (`step_eula.html`), 18 sections, GPL v3 focused. `static/EULA.txt` + 12 locale translations.
 - Dashboard Legal page (`legal.tsx`): 4 collapsible cards — Terms of Use, Privacy Policy, Accessibility Statement, Open-Source Licenses. Content in `public/locales/{lang}/legal.json`.
-- GPL v3 references exist in: EULA.txt (§1, §2, §6, §7, §16), legal.json (4 locations), LICENSE (all repos), LICENSE-RATIONALE.md (4 repos), ADR-003.
+- GPL v3 references exist in: EULA.txt (§1, §2, §6, §7, §16), legal.json (4 locations), LICENSE (3 core repos + 2 extension repos), LICENSE-RATIONALE.md (3 core repos), ADR-003. Note: design-tokens repo removed, realtime repo archived — no longer applicable.
 - Config UI translations: flat JSON, 923 keys, identity mapping in en.json. No markdown rendering — `translate()` returns `Markup()` for HTML safety.
 - Wizard layout: `layout.html` extends `base.html`. Steps swap into `<section id="wizard-content">`. Header at lines 514-517. Pico CSS v2 has native `<dialog>` support (unused currently).
 - Admin layout: `landing.html` has grid with sidebar nav + section cards.
@@ -56,7 +56,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 
 | # | Item | Current state | Target state |
 |---|------|--------------|-------------|
-| A1 | LICENSE files (api, dashboard, stack, design-tokens) | GPL v3 verbatim (675 lines each) | PolyForm Noncommercial 1.0.0 full text |
+| A1 | LICENSE files (api, dashboard, stack) | GPL v3 verbatim (675 lines each) | PolyForm Noncommercial 1.0.0 full text. Note: design-tokens repo deleted (Phase 6+ placeholder with no code, removed 2026-07-02). |
 | A2 | LICENSE files (extension, truesun) | GPL v3 | No change (legally required — weewx derivative works) |
 | A3 | ADDITIONAL-USES.md | Does not exist | New file in 4 repos: permitted uses + commercial requirements |
 | A4 | LICENSE-RATIONALE.md (api, dashboard, stack) | GPL v3 rationale | Updated for PolyForm Noncommercial, explains weewx split. Note: realtime repo archived per ADR-058 — no longer applicable. |
@@ -95,8 +95,8 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 |---|------|--------|
 | C1 | Quick Start | Not started |
 | C2 | System Requirements | Not started — need to measure on running containers |
-| C3 | Installation — Native path | Not started (content exists in OPERATIONS-MANUAL.md §1 but developer-oriented) |
-| C4 | Installation — Docker compose | Unblocked — compose files finalized by BETA-RELEASE-PLAN Phase 1 (2026-07-02). Content ready to write. |
+| C3 | Installation — Native path | Unblocked — `scripts/setup.sh` (interactive, handles network stack selection) + `scripts/install-prerequisites.sh` + parameterized systemd units all created by BETA-RELEASE-PLAN (2026-07-02). INSTALL.md has numbered dependency chain. Content ready to write as operator-facing guide. |
+| C4 | Installation — Docker compose | Unblocked — compose files finalized, `scripts/setup.sh` handles Docker setup interactively (asks topology, network stack, domain, generates .env + secrets.env + api.conf). Content ready to write. |
 | C5 | Installation — weewx extensions | Not started (content exists in OPERATIONS-MANUAL.md §1 but developer-oriented) |
 | C6 | First-Run Wizard guide | Not started — cross-references help system content |
 | C7 | Admin Guide | Not started — cross-references help system content |
@@ -164,31 +164,31 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 - Accept: Complete document with all categories from dialog. Clear, readable, plain English.
 - **QC (Opus):** Review against dialog decisions. Verify all scenarios from the discussion are correctly categorized.
 
-**T0.3 — Replace LICENSE files in 4 core repos**
+**T0.3 — Replace LICENSE files in 3 core repos**
 - Owner: `clearskies-docs-author` (Sonnet) — mechanical file replacement
 - Files:
   - `repos/weewx-clearskies-api/LICENSE`
   - `repos/weewx-clearskies-dashboard/LICENSE`
   - `repos/weewx-clearskies-stack/LICENSE`
-  - `repos/weewx-clearskies-design-tokens/LICENSE`
 - Do: Replace GPL v3 text with PolyForm Noncommercial 1.0.0 full text.
-- Accept: All 4 files contain PolyForm NC 1.0.0. Extension and truesun repos unchanged (GPL v3).
+- Accept: All 3 files contain PolyForm NC 1.0.0. Extension and truesun repos unchanged (GPL v3).
+- Note: design-tokens repo removed (2026-07-02) — was a Phase 6+ placeholder with no code.
 
-**T0.4 — Copy ADDITIONAL-USES.md to 4 core repos**
+**T0.4 — Copy ADDITIONAL-USES.md to 3 core repos**
 - Owner: `clearskies-docs-author` (Sonnet) — mechanical file copy
-- Files: `ADDITIONAL-USES.md` in api, dashboard, stack, design-tokens repos
+- Files: `ADDITIONAL-USES.md` in api, dashboard, stack repos
 - Do: Copy the authored document from T0.2 to each repo root.
-- Accept: Identical `ADDITIONAL-USES.md` in all 4 repos.
+- Accept: Identical `ADDITIONAL-USES.md` in all 3 repos.
 
-**T0.5 — Update LICENSE-RATIONALE.md in 4 repos**
+**T0.5 — Update LICENSE-RATIONALE.md in 3 repos**
 - Owner: Coordinator (Opus)
 - Files:
   - `repos/weewx-clearskies-api/LICENSE-RATIONALE.md`
   - `repos/weewx-clearskies-dashboard/LICENSE-RATIONALE.md`
   - `repos/weewx-clearskies-stack/LICENSE-RATIONALE.md`
-  - `repos/weewx-clearskies-realtime/LICENSE-RATIONALE.md` (archived repo — update for record)
-- Do: Explain license change from GPL v3 to PolyForm NC 1.0.0. Explain weewx extension repos remain GPL v3 (derivative works of GPL v3 weewx). Reference new ADR. Remove paho-mqtt election note (no longer relevant).
-- Accept: All 4 files updated. Rationale clearly explains the change and the split.
+- Do: Explain license change from GPL v3 to PolyForm NC 1.0.0. Explain weewx extension repos remain GPL v3 (derivative works of GPL v3 weewx). Reference new ADR.
+- Accept: All 3 files updated. Rationale clearly explains the change and the split.
+- Note: realtime repo archived per ADR-058, design-tokens repo removed — neither needs updating.
 
 **T0.6 — Author ADR superseding ADR-003**
 - Owner: Coordinator (Opus)
@@ -262,7 +262,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 - Do: Change "GPL v3" to "PolyForm Noncommercial 1.0.0 (core repos); GPL v3 (weewx extensions only)".
 - Accept: CLAUDE.md reflects new license.
 
-**QC (Opus) — after Phase 0:** Grep all 4 core repos for "GPL", "GNU", "General Public License" — verify zero remaining references except in git history. Verify extension/truesun repos unchanged. EULA renders in wizard with version 2.0. Dashboard Legal page renders updated license section. ADR-003 marked superseded. New ADR exists as Proposed.
+**QC (Opus) — after Phase 0:** Grep all 3 core repos (api, dashboard, stack) for "GPL", "GNU", "General Public License" — verify zero remaining references except in git history. Verify extension/truesun repos unchanged (GPL v3). EULA renders in wizard with version 2.0. Dashboard Legal page renders updated license section. ADR-003 marked superseded. New ADR exists as Proposed.
 
 ---
 
@@ -271,7 +271,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 > Build the help panel component and wiring before adding content.
 
 **T1.1 — Create help panel CSS**
-- Owner: `clearskies-stack-dev` (Sonnet)
+- Owner: `general-purpose` (Sonnet)
 - File: New `repos/weewx-clearskies-stack/weewx_clearskies_config/static/css/help-panel.css`
 - Do: Style a slide-out side panel:
   - Desktop: fixed right, width 24rem, full height, z-index 100, glass-morphism matching the wizard container style
@@ -284,7 +284,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 - Accept: Panel slides in/out smoothly. Renders correctly in light/dark. Mobile overlay covers viewport. No Pico CSS conflicts.
 
 **T1.2 — Create help panel JS**
-- Owner: `clearskies-stack-dev` (Sonnet)
+- Owner: `general-purpose` (Sonnet)
 - File: New `repos/weewx-clearskies-stack/weewx_clearskies_config/static/js/help-panel.js`
 - Do: Vanilla JS (~50-80 lines), no framework:
   - Toggle panel open/close on `?` button click
@@ -297,7 +297,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 - Accept: Panel opens/closes. Keyboard accessible. Focus managed correctly. Content loads via HTMX on first open.
 
 **T1.3 — Create help panel Jinja2 macro**
-- Owner: `clearskies-stack-dev` (Sonnet)
+- Owner: `general-purpose` (Sonnet)
 - File: New `repos/weewx-clearskies-stack/weewx_clearskies_config/templates/macros/help_panel.html`
 - Do: Reusable macro `{% macro help_trigger(help_url, label="Help") %}` that emits:
   - A `?` button with `aria-label="{{ label }}"`, `aria-expanded="false"`, `aria-controls="help-panel"`
@@ -305,7 +305,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 - Accept: Macro renders valid HTML. `aria-*` attributes correct. HTMX attributes present.
 
 **T1.4 — Add markdown rendering to i18n pipeline**
-- Owner: `clearskies-stack-dev` (Sonnet)
+- Owner: `general-purpose` (Sonnet)
 - Files:
   - `repos/weewx-clearskies-stack/pyproject.toml` — add `markdown>=3.6` dependency
   - `repos/weewx-clearskies-stack/weewx_clearskies_config/i18n.py` — add `translate_md(key, locale)` function that calls `translate()` then pipes through `markdown.markdown()` with `extensions=['tables', 'fenced_code']`, returns `Markup()`
@@ -313,7 +313,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 - Accept: `translate_md("help.wizard.step_db.body")` returns rendered HTML `Markup`. Existing `_()` behavior unchanged.
 
 **T1.5 — Add help route handlers to wizard routes**
-- Owner: `clearskies-stack-dev` (Sonnet)
+- Owner: `general-purpose` (Sonnet)
 - File: `repos/weewx-clearskies-stack/weewx_clearskies_config/wizard/routes.py`
 - Do: Add `GET /wizard/help/{step_id}` route that:
   1. Reads help translation keys: `help.wizard.{step_id}.title`, `help.wizard.{step_id}.body`, `help.wizard.{step_id}.tip` (optional)
@@ -323,13 +323,13 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 - Accept: `GET /wizard/help/step_db` returns HTML fragment with rendered help content. 404 for unknown step_id.
 
 **T1.6 — Add help route handlers to admin routes**
-- Owner: `clearskies-stack-dev` (Sonnet)
+- Owner: `general-purpose` (Sonnet)
 - File: `repos/weewx-clearskies-stack/weewx_clearskies_config/config/routes.py` (or `admin/routes.py` — verify correct file)
 - Do: Add `GET /admin/help/{section_id}` route, same pattern as T1.5.
 - Accept: `GET /admin/help/providers` returns HTML fragment.
 
 **T1.7 — Integrate help trigger into wizard layout**
-- Owner: `clearskies-stack-dev` (Sonnet)
+- Owner: `general-purpose` (Sonnet)
 - Files:
   - `repos/weewx-clearskies-stack/weewx_clearskies_config/templates/wizard/layout.html` — add `<link>` to `help-panel.css` in `<style>` block (or as external `<link>`), add `<script src>` for `help-panel.js`
   - Each of the 17 `step_*.html` templates — add `{% from "macros/help_panel.html" import help_trigger %}` and `{{ help_trigger("/wizard/help/{step_id}") }}` in the `<header>` section of each step, next to the `<h2>`
@@ -337,7 +337,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 - Accept: Every wizard step shows `?` icon. Clicking opens side panel. Content loads for each step.
 
 **T1.8 — Integrate help trigger into admin templates**
-- Owner: `clearskies-stack-dev` (Sonnet)
+- Owner: `general-purpose` (Sonnet)
 - Files:
   - `repos/weewx-clearskies-stack/weewx_clearskies_config/templates/admin/landing.html` — add CSS/JS links
   - `repos/weewx-clearskies-stack/weewx_clearskies_config/templates/admin/generic_section.html` — add help trigger in section header
@@ -412,7 +412,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 - Accept: All admin sections have help keys in en.json. Content is accurate and helpful.
 
 **T2.3 — Populate ConfigField help_text and wizard_help**
-- Owner: `clearskies-stack-dev` (Sonnet) — mechanical: populate fields from Opus-authored content
+- Owner: `general-purpose` (Sonnet) — mechanical: populate fields from Opus-authored content
 - File: `repos/weewx-clearskies-stack/weewx_clearskies_config/registry/declarations.py`
 - Do: For all ~40 `ConfigField` declarations, populate:
   - `help_text` — what this field does, valid values, impact of changes (shown in admin)
@@ -424,7 +424,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 - Accept: All ~40 fields have non-empty `help_text`. `wizard_help` populated where it differs. All strings passed through `_()` in templates.
 
 **T2.4 — Add inline help to hand-built wizard step templates**
-- Owner: `clearskies-stack-dev` (Sonnet) — template edits from Opus-authored hint text
+- Owner: `general-purpose` (Sonnet) — template edits from Opus-authored hint text
 - Files: All hand-built step templates (~11 files: step_api, step_import, step_eula, step_db, step_schema, step_station, step_units, step_providers, step_review, step_complete, step_language)
 - Do: For every `<input>`, `<select>`, and `<textarea>` that lacks a `<small>` hint, add a `<small id="help_...">{{ _("...") }}</small>` with `aria-describedby` on the input.
 - Accept: Every form input in every wizard step has an associated help hint. All hints translatable via `_()`.
@@ -623,11 +623,11 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 | 0 | T0.10 Update dashboard legal.json (English) | Coordinator | Opus | Audience-facing legal content |
 | 0 | T0.11 Translate legal.json (12 locales) | `clearskies-docs-author` | Sonnet | Mechanical translation |
 | 0 | T0.12 Update CLAUDE.md | Coordinator | Opus | — |
-| 1 | T1.1-T1.8 Help infrastructure (CSS/JS/macro/routes/templates) | `clearskies-stack-dev` | Sonnet | Code, not prose |
+| 1 | T1.1-T1.8 Help infrastructure (CSS/JS/macro/routes/templates) | `general-purpose` | Sonnet | Code, not prose |
 | 2 | T2.1 Author wizard help content (English) | Coordinator | Opus | Core user-facing content; must be clear for non-technical operators |
 | 2 | T2.2 Author admin help content (English) | Coordinator | Opus | Same — audience-facing prose |
-| 2 | T2.3 Populate ConfigField help_text/wizard_help | `clearskies-stack-dev` | Sonnet | Mechanical: populate fields from Opus-authored content outlines |
-| 2 | T2.4 Add inline help to hand-built templates | `clearskies-stack-dev` | Sonnet | Template edits from Opus-authored hint text |
+| 2 | T2.3 Populate ConfigField help_text/wizard_help | `general-purpose` | Sonnet | Mechanical: populate fields from Opus-authored content outlines |
+| 2 | T2.4 Add inline help to hand-built templates | `general-purpose` | Sonnet | Template edits from Opus-authored hint text |
 | 2 | T2.5 Translate help content (12 locales) | `clearskies-docs-author` | Sonnet | Mechanical translation |
 | 3 | T3.1 Scaffold manual structure | Coordinator | Opus | Establishes the voice and structure |
 | 3 | T3.2 System Requirements (measurement) | Coordinator | Opus | Requires SSH to containers + judgment |
@@ -653,11 +653,11 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 ## 4. QC Gates
 
 ### Gate 1 — License Correctness (after Phase 0)
-- Grep all 4 core repos for "GPL", "GNU", "General Public License" — zero hits in non-git-history files
+- Grep all 3 core repos (api, dashboard, stack) for "GPL", "GNU", "General Public License" — zero hits in non-git-history files
 - Extension/truesun repos unchanged (still GPL v3)
 - EULA version 2.0 renders in wizard
 - Dashboard Legal page shows PolyForm Noncommercial language
-- ADDITIONAL-USES.md present in all 4 core repos
+- ADDITIONAL-USES.md present in all 3 core repos
 - New ADR exists with status `Proposed`
 - ADR-003 marked `Superseded`
 
