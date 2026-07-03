@@ -192,7 +192,7 @@ Never hardcode credentials — always load from reference files or .env.
 
 ## Project scope
 
-**Active project: Clear Skies** — building a from-scratch modern weather UI to replace the Belchertown skin. Five-component breakdown (api / realtime / dashboard / stack / design-tokens [deferred]) under the `weewx-clearskies-*` repo prefix. GPL v3.
+**Active project: Clear Skies** — building a from-scratch modern weather UI to replace the Belchertown skin. Five-component breakdown (api / realtime / dashboard / stack / design-tokens [deferred]) under the `weewx-clearskies-*` repo prefix. PolyForm Noncommercial 1.0.0 (core repos); GPL v3 (weewx extensions only).
 
 - **Plan:** [docs/planning/CLEAR-SKIES-PLAN.md](docs/planning/CLEAR-SKIES-PLAN.md) — phase tracker, current state, task tables.
 - **Decisions:** [docs/decisions/INDEX.md](docs/decisions/INDEX.md) — 40 ADRs, all Accepted as of 2026-05-05.
