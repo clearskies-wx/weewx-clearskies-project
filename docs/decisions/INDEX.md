@@ -111,7 +111,6 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 |---|---|---|---|
 | [ADR-001](../archive/decisions/ADR-001-component-breakdown.md) | 5-component breakdown | 2026-06-18 | 2026-04-30 |
 | [ADR-002](../archive/decisions/ADR-002-tech-stack.md) | Tech stack | 2026-06-18 | 2026-04-30 |
-| [ADR-003](../archive/decisions/ADR-003-license.md) | License = GPL v3 | 2026-06-18 | 2026-04-30 |
 | [ADR-004](../archive/decisions/ADR-004-repo-naming.md) | Repo naming convention | 2026-06-18 | 2026-04-30 |
 | [ADR-011](../archive/decisions/ADR-011-multi-station-scope.md) | Multi-station scope | 2026-06-18 | 2026-05-04 |
 | [ADR-032](../archive/decisions/ADR-032-versioning-across-repos.md) | Versioning across repos | 2026-06-18 | 2026-05-02 |
@@ -124,6 +123,7 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 |---|---|---|
 | [ADR-078](ADR-078-geographic-features-overlay.md) | Geographic features overlay (OSM via Overpass API) | 2026-06-29 |
 | [ADR-080](ADR-080-provider-attribution-architecture.md) | Provider attribution architecture | 2026-07-01 |
+| [ADR-081](ADR-081-license-change-polyform.md) | License change — PolyForm Noncommercial 1.0.0 (supersedes ADR-003) | 2026-07-02 |
 
 ## Pending archive
 
@@ -138,6 +138,7 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | [ADR-005](../archive/decisions/ADR-005-realtime-architecture.md) | Realtime architecture | ADR-058 | 2026-04-30 |
 | [ADR-019](../archive/decisions/ADR-019-units-handling.md) | Units handling (original) | ADR-041, ADR-042 | 2026-05-02 |
 | [ADR-044](../archive/decisions/ADR-044-sky-condition-classification.md) | Current conditions text / sky condition classification | ADR-073 | 2026-05-26 |
+| [ADR-003](../archive/decisions/ADR-003-license.md) | License = GPL v3 | ADR-081 | 2026-04-30 |
 | [ADR-074](../archive/decisions/ADR-074-wms-t-rendering-strategy.md) | WMS-T rendering strategy | LibreWxR (XYZ tiles) | 2026-06-26 |
 
 ## Amendments (2026-06-21)

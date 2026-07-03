@@ -1,7 +1,8 @@
 ---
-status: Accepted
+status: Superseded by ADR-081
 date: 2026-04-30
 deciders: shane
+superseded-by: ADR-081
 ---
 
 # ADR-003: License = GPL v3
