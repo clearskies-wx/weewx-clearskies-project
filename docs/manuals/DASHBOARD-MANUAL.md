@@ -870,6 +870,8 @@ Full-viewport overlay with enhanced controls. Pushed as a SPA route (`/radar`) f
 - All interactive elements: visible focus indicator, ≥44px tap targets on mobile.
 - axe-core: 0 violations on both card and expanded view.
 
+**Background content must be inert while radar is open (Phase 5 T5.1):** `/radar` is a child route of `AppLayout` (§1, §7), so `NavRail`, `Footer`, the alert banner, and `SkipLink` stay mounted in the DOM while the radar overlay covers them via z-index. z-index stacking alone does not remove background content from the keyboard tab order or the accessibility tree, which would let a keyboard or screen-reader user reach navigation "behind" the open `aria-modal="true"` dialog — a real gap, not a theoretical one, since `aria-modal` support for auto-hiding background content is inconsistent across assistive technology. `AppLayout` derives `isRadarOpen` from the route and passes a `hidden` prop to `NavRail`, `Footer`, and `SkipLink` (and applies `aria-hidden`/`inert` directly to the alert-banner wrapper div) so all four are marked `inert` + `aria-hidden` whenever `/radar` is the active route. This mirrors the `inert={!visible}` pattern `NavRail` already used for its own auto-hide state.
+
 ---
 
 ## §11 Anti-Patterns
