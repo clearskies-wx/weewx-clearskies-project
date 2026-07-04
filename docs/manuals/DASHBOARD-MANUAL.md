@@ -452,7 +452,7 @@ On a cold start (no prior data in memory — first visit, page reload, direct UR
 
 Once the scene resolves (`sceneLoaded=true`), `AppLayout` calls `dismissSplash()` which fades the splash out over 0.5s and removes it from the DOM. The page behind the splash has the correct theme, correct background photo, and correct weather state — one transition, no corrections.
 
-For routes outside `AppLayout` (e.g., `/radar`), the route component calls `dismissSplash()` on mount.
+`/radar` is a child route of `AppLayout` (Phase 5 T5.1 — moved from a top-level sibling route so radar navigation no longer unmounts the shared app shell), so `AppLayout`'s own `dismissSplash()` call covers it. The route component also calls `dismissSplash()` defensively on mount, since `dismissSplash()` is idempotent and this keeps the route resilient to future changes in route nesting.
 
 The `dismissSplash()` utility (`src/lib/dismiss-splash.ts`) is idempotent — multiple calls are safe.
 
@@ -497,6 +497,10 @@ Do not create a blanking cycle on any interval. Unattended wall-mounted displays
 - Use `AbortController` and clean up on component unmount.
 - Use a `refetchCounter` for manual refetch triggering.
 - Spread the `deps` array into the `useEffect` dependency array.
+
+**Module-level cache (Phase 5 T5.1):** A plain `Map<string, CacheEntry>` at module scope — not React state — persists across component mount/unmount. Callers pass an inline fetcher closure rather than an explicit endpoint string, so the cache key is derived from the closure's stable source text (`fetcher.toString()`) plus `JSON.stringify(deps)`, which uniquely identifies the endpoint and its parameters without requiring every call site in `useWeatherData.ts` to declare an explicit key. On mount, a lazy `useState` initializer reads the cache synchronously so a remounted component (route change, `/radar` navigation, etc.) shows last-known data immediately instead of a loading skeleton, then the effect always fetches (or joins an in-flight fetch) in the background — this is the mechanism that eliminates the full-reload-on-remount problem described in this section's "Stale-while-revalidate" rule. There is no separate "is this cache entry within its freshness TTL" branch: every cache hit is followed by a fetch in the same effect run, so expired data is never served without a refetch already in flight.
+
+**Single-flight request dedup:** A ref-counted `pendingRequests` map (also module-level) shares one in-flight fetch across every simultaneously-mounted hook instance requesting the same key — e.g. `useStation()` called from 6+ components on first Now-page load previously fired 6 identical `GET /station` requests; they now share one. Ref-counting (not a plain boolean) is required because an early unmount from one of several simultaneous callers must not abort the fetch for the others still awaiting it — only the last remaining subscriber's unmount aborts the underlying request.
 
 ### `useSSE` hook
 
