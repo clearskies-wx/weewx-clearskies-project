@@ -816,8 +816,8 @@ The splash is deliberately not themed — it uses fixed neutral colors so it loo
 | Site title | `branding.json` | Set as `document.title` |
 | Favicon | `branding.json` | Applied to `<link rel="icon">` |
 | Custom CSS | URL in `branding.json` | Linked last in `<head>`; operator owns override. CSS variable names are NOT promised stable across releases. |
-| GA ID | `branding.json` | Shows cookie consent banner when set; GA blocked until visitor opts in |
-| Privacy regions | `branding.json` | Controls jurisdiction filtering on Legal page |
+| GA ID | `branding.json` | Shows cookie consent banner when set; GA blocked until visitor opts in. Exception: if privacy regions is `"none"`, GA loads immediately with no banner. |
+| Privacy regions | `branding.json` | Controls jurisdiction filtering on Legal page. Value `"none"` disables privacy handling entirely — consent banner is skipped and no jurisdiction disclosures render on the Legal page. |
 | Default theme mode | `branding.json` | Applied on first load when no user override is stored |
 
 ### What Is NOT Customizable
