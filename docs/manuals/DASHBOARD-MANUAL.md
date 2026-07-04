@@ -464,7 +464,13 @@ When the scene resolves, `AppLayout` writes the full scene descriptor (`sky`, `d
 - `clearskies.scene.sky` — `"clear"`, `"cloudy"`, or `"storm"`
 - `clearskies.scene.overlay` — `"rain"`, `"snow"`, or `""`
 
-`SCENE_DEFAULT` in both `useWeatherData.ts` and `useRealtimeObservation.ts` reads from this cache via `getCachedScene()` instead of using hardcoded values. On page reloads, the cached scene provides a plausible starting state (last-known sky, daytime, overlay) rather than always defaulting to clear-sky night. The splash screen still covers the page until real data arrives, but the cached scene also feeds the background behind the splash, so if the splash timing is tight the fallback is reasonable.
+`getCachedScene()` lives in **one place**: `src/lib/scene-cache.ts`. `useWeatherData.ts` and `useRealtimeObservation.ts` both import it — neither defines its own copy. On page reloads, the cached scene provides a plausible starting state (last-known sky, daytime, overlay) rather than always defaulting to clear-sky night. The splash screen still covers the page until real data arrives, but the cached scene also feeds the background behind the splash, so if the splash timing is tight the fallback is reasonable.
+
+`getCachedScene()` defaults `daytime` to `false` (night) when the `clearskies.scene.daytime` key is absent (first-ever visit) — consistent with `ThemeProvider`'s SSR/cold-start fallback, which also defaults to dark mode.
+
+Each hook reads the cache **lazily, at mount time**, via `useState(() => getCachedScene())` — never as a module-level `const` computed at import time. A module-level constant is frozen the instant the JS bundle loads and never re-reads `cacheScene()`'s later writes, which reintroduces the background-flash bug this pattern exists to prevent (T5.2).
+
+`SceneBackground`'s `visible` prop (default `true`) must be wired to `sceneLoaded` at every call site (`<SceneBackground scene={resolvedScene} visible={sceneLoaded} />` in `AppLayout`). Without it, the background renders at full opacity using the cached/default scene before the first `/current` response arrives, then cross-fades to the real scene — a visible flash on every cold start and route transition, independent of how accurate the cached fallback is.
 
 ### Theme initialization
 
@@ -884,11 +890,17 @@ Use the general-purpose `/archive` and `/archive/grouped` endpoints with config-
 **Never hardcode unit strings.**
 Render the `label` field from the `ConvertedValue` shape the API returns. Never write `"°F"`, `"mph"`, `"inHg"`, or any other unit string directly in component code.
 
-**Never gate theme initialization on the default scene.**
-`SCENE_DEFAULT` reads from the localStorage scene cache. The theme system must wait for `sceneLoaded=true` before calling `setDaytime`. Gating on the default causes a flash-then-correct-theme sequence on every page load.
+**Never gate theme initialization on the cached/default scene.**
+The theme system must wait for `sceneLoaded=true` before calling `setDaytime`. Gating on the cached fallback causes a flash-then-correct-theme sequence on every page load.
 
-**Never hardcode `SCENE_DEFAULT` values.**
-`SCENE_DEFAULT` must read from the localStorage scene cache via `getCachedScene()`. Hardcoding `{ sky: 'clear', daytime: false, overlay: null }` causes every cold start to flash the wrong scene before the API responds. The cache provides the last-known scene, which is almost always still correct on page reload.
+**Never hardcode a fallback `SceneDescriptor` inline, and never define a second `getCachedScene()`.**
+The one and only `getCachedScene()` lives in `src/lib/scene-cache.ts` and must read from the localStorage scene cache. Hardcoding `{ sky: 'clear', daytime: false, overlay: null }` at a call site, or writing a second local copy of `getCachedScene()`, reintroduces the T5.2 background-flash bug (two independently-drifted implementations disagreed on the daytime default). The cache provides the last-known scene, which is almost always still correct on page reload.
+
+**Never compute the cached scene fallback as a module-level constant.**
+A `const SCENE_DEFAULT = getCachedScene()` computed at module import time is frozen forever — it never re-reads later `cacheScene()` writes. Call `getCachedScene()` lazily, at mount time, via `useState(() => getCachedScene())` inside the consuming hook.
+
+**Never leave `SceneBackground`'s `visible` prop unwired.**
+`visible` defaults to `true`. Every call site must pass `visible={sceneLoaded}` (or equivalent) — otherwise the background renders at full opacity using the default/cached scene before the first `/current` response arrives, then cross-fades to the real scene, producing a visible flash.
 
 **Never render themed or weather-dependent content before the scene resolves on cold start.**
 The splash screen covers the page until `sceneLoaded=true`. Do not remove the splash early, bypass it, or render page content above it. The visitor must see one transition: splash → fully resolved page. Multiple visible corrections (wrong theme → right theme, wrong background → right background) look amateur.
