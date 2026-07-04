@@ -9,7 +9,7 @@ Companion documents:
 - **ARCHITECTURE.md** — system topology, provider module layout
 - **contracts/canonical-data-model.md** — per-field data catalog
 
-Last updated: 2026-07-01
+Last updated: 2026-07-04
 
 ---
 
@@ -750,8 +750,10 @@ For operators whose region is not covered by any configured provider, return an 
 | Operator region | Suggested module |
 |---|---|
 | US | `nws` |
-| Canada, Europe | `aeris` |
+| Canada, Europe/UK, Mexico, Brazil, South Africa, India, Japan, South Korea, Australia | `aeris` |
 | Elsewhere | `openweathermap` (with note on paid One Call 3.0 tier) |
+
+The wizard's region check (`weewx_clearskies_config/wizard/providers.py`, `recommend_providers()`) uses coarse lat/lon bounding boxes per region — the code is the source of truth for the exact boundaries; the table above lists the covered regions, not the boxes themselves.
 
 ---
 
