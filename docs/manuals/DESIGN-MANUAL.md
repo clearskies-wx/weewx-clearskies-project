@@ -452,6 +452,15 @@ ADR-050 accepted 2026-06-16. Icon assignments above and in the utility/alert tab
 
 Haze backgrounds are desaturated versions of the clear-sky backgrounds with a warm-toned overlay filter (`sepia(0.15) brightness(0.92) contrast(0.95)`). The haze condition always pairs with a clear/mostly-clear sky classification — never with cloudy/overcast (ADR-067: haze is a clear-sky modifier only). Mist uses the same background as Foggy (cloudy mapping). If dedicated haze photo assets are not available, fall back to clear-sky backgrounds with the CSS overlay filter applied.
 
+### Custom Background Override (T4.3)
+
+An operator may upload a single custom background image via the setup wizard, written to `branding.json` as `customBackgroundUrl`. When set (non-empty string), the dashboard replaces the entire 6-scene sky background system with this one image for every sky condition — the day/night and condition-keyed lookup above is bypassed entirely, not blended with it.
+
+- Empty string or absent → falls back to the 6 built-in scene-keyed backgrounds (no behavior change).
+- No precipitation overlay when a custom background is active — the on-glass rain/snow assets are designed for the built-in photos, not arbitrary operator images.
+- No photographer attribution — the corner-credit attribution described below does not apply to operator-uploaded images.
+- The cross-fade transition (§14 Motion & Transitions) still applies: switching a custom background on/off, or changing it to a different URL, cross-fades the same as a scene change would.
+
 On-glass overlays layer on top of the base condition background:
 
 | Trigger | Overlay Asset | Blend Mode | Day Opacity | Night Opacity |
@@ -813,6 +822,7 @@ The splash is deliberately not themed — it uses fixed neutral colors so it loo
 | Logo (light) | Upload via wizard | Rendered in hero card and nav rail |
 | Logo (dark) | Optional upload via wizard | Used in dark theme; if absent, light logo is CSS-inverted with a console warning |
 | Logo alt | Wizard input | Required for accessibility. Fallback: `"<siteTitle> logo"` |
+| Custom background | Upload via wizard, `branding.json` → `customBackgroundUrl` | Replaces all 6 scene-keyed backgrounds with the operator's image for every sky condition. No precipitation overlay, no photographer attribution. Empty/absent → falls back to the scene system. See §8 "Custom Background Override." |
 | Site title | `branding.json` | Set as `document.title` |
 | Favicon | `branding.json` | Applied to `<link rel="icon">` |
 | Custom CSS | URL in `branding.json` | Linked last in `<head>`; operator owns override. CSS variable names are NOT promised stable across releases. |
