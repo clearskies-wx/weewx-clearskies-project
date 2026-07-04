@@ -1051,7 +1051,7 @@ Default γ = 0.45 (moderate, composition-unknown). γ is a composition property 
 3. **Clear-sky-only constraint:** Haze is a clear-sky modifier. Do NOT apply haze when sky is classified as Mostly Cloudy, Cloudy, Overcast, or Heavy Overcast. "Hazy and Overcast" is invalid.
 4. **Stale PM data:** If last PM reading is > 2 hours old, treat as unavailable. Do not conclude "no haze" from stale data — absence of fresh evidence is not evidence of absence.
 
-**Haze-eligible providers:** Only AQI providers where `ProviderCapability.is_observed_source = True` (ADR-066). Open-Meteo (CAMS model) and OWM (SILAM model) are not observed-data sources and their PM readings are never used for haze confirmation.
+**Haze-eligible providers:** Only AQI providers where `ProviderCapability.is_observed_source = True` (ADR-066). Open-Meteo (CAMS model) is not an observed-data source and its PM readings are never used for haze confirmation. (OpenWeatherMap AQI and OpenAQ AQI were removed entirely from the AQI domain in Phase 2 API removals — OWM AQI returned SILAM model predictions, not observed data; OpenAQ AQI was an orphaned module never wired into dispatch.)
 
 **Graceful degradation:** When no observed PM data is available, the haze channel is absent. The existing sky classifier continues operating unchanged. No haze label is emitted.
 

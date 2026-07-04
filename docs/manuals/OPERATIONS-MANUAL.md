@@ -591,14 +591,13 @@ The wizard presents the following AQI provider options. The wizard suggests obse
 
 | Provider | Data type | Coverage | API key required | Haze-eligible |
 |----------|-----------|----------|-----------------|---------------|
-| Xweather (Vaisala) | Observed — blended real-time monitoring networks | Global | Yes (PWSWeather Contributor Plan provides free access) | Yes — recommended for haze detection |
+| Vaisala Xweather | Observed — blended real-time monitoring networks | Global | Yes (PWSWeather Contributor Plan provides free access) | Yes — recommended for haze detection |
 | IQAir | Observed — hybrid monitoring + crowd-sourced | Global | Yes | Yes |
 | Open-Meteo | Model-based — CAMS atmospheric composition model | Global | No | No |
-| OpenWeatherMap | Model-based — SILAM atmospheric dispersion model (deprecated) | Global | Yes | No |
 
 Providers marked as "Observed" return measured PM2.5/PM10 concentrations from monitoring stations. Providers marked as "Model-based" return atmospheric model predictions. Only observed-data providers are eligible for haze confirmation — the haze detection engine checks the `is_observed_source` capability flag on the configured provider and disables haze confirmation if the provider is model-based.
 
-OpenWeatherMap AQI is deprecated. It continues to function with a deprecation warning logged at each call. It will be removed in the next major version.
+OpenWeatherMap AQI was removed entirely (Phase 2 API removals) — it returned SILAM model predictions, not observed PM data, and is no longer offered as an AQI provider option. OpenWeatherMap remains available for the forecast, alerts, and radar domains.
 
 The wizard annotates each provider's option label to show observed vs. model-based and haze eligibility. When haze detection is enabled (`[conditions] haze_detection = true`), the wizard recommends Xweather and warns if the operator selects a model-based provider.
 
