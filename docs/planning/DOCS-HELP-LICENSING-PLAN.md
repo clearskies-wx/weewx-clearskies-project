@@ -1,6 +1,6 @@
 # Operator Documentation, Help System & Licensing — Execution Plan
 
-**Status:** PLANNING  
+**Status:** IN PROGRESS  
 **Created:** 2026-07-02  
 **Components:** Config UI (`weewx-clearskies-stack`), Dashboard SPA (`weewx-clearskies-dashboard`), API (`weewx-clearskies-api`), Meta repo (`weewx-clearskies-project`)
 
@@ -132,7 +132,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 
 ## 2. Implementation Phases
 
-### PHASE 0 — License Change
+### PHASE 0 — License Change ✅ COMPLETE (2026-07-02)
 
 > All other phases reference the license. This phase must complete first.
 
@@ -266,7 +266,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 
 ---
 
-### PHASE 1 — Help System Infrastructure
+### PHASE 1 — Help System Infrastructure ✅ COMPLETE (2026-07-03)
 
 > Build the help panel component and wiring before adding content.
 
@@ -348,11 +348,11 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 
 ---
 
-### PHASE 2 — Help Content
+### PHASE 2 — Help Content 🔄 IN PROGRESS (2026-07-03, updated 2026-07-04)
 
-> ⚠️ NEEDS DETAIL: The actual help text for each wizard step and admin section has not been authored. This phase requires content authoring for all 17 wizard steps and all admin sections. The structure and key naming convention are defined; the content itself needs to be written per-step.
+> Content authoring for all wizard steps and admin sections.
 
-**T2.1 — Author wizard help content (English)**
+**T2.1 — Author wizard help content (English)** ✅ COMPLETE (2026-07-03)
 - Owner: Coordinator (Opus) — original content authoring for non-technical audience
 - File: `repos/weewx-clearskies-stack/weewx_clearskies_config/translations/en.json`
 - Do: Add structured help keys for all 17 wizard steps. Each step gets 2-3 keys:
@@ -384,7 +384,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 
 - Accept: All 17 steps have help keys in en.json. Markdown renders correctly via `translate_md()`. Content is helpful and accurate.
 
-**T2.2 — Author admin help content (English)**
+**T2.2 — Author admin help content (English)** ⚠️ REQUIRES RE-EXECUTION
 - Owner: Coordinator (Opus) — original content authoring
 - File: `repos/weewx-clearskies-stack/weewx_clearskies_config/translations/en.json`
 - Do: Add structured help keys for all admin sections:
@@ -410,8 +410,47 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
   ⚠️ NEEDS DETAIL: Same as T2.1 — content needs to be authored per section.
 
 - Accept: All admin sections have help keys in en.json. Content is accurate and helpful.
+- **⚠️ RE-EXECUTION REQUIRED (2026-07-04):** Initial content was committed 2026-07-03 but shares the same issues found during the wizard help review. Must be re-executed AFTER all wizard pin items (PINNED-ITEMS.md) are resolved so admin help matches the finalized wizard help. See PINNED-ITEMS.md #22.
 
-**T2.3 — Populate ConfigField help_text and wizard_help**
+  **Granular change list — apply to each admin help section (`help.admin.*` keys in en.json):**
+
+  **Global rules (apply to ALL admin help keys):**
+  - Replace every instance of "dashboard" with "your weather site" or "weather site"
+  - British → US English spelling: "customise" → "customize", "customisation" → "customization", "colour" → "color", "colours" → "colors", "organisation" → "organization", "metres" → "meters", "kilometres" → "kilometers", "centimetres" → "centimeters", "millimetres" → "millimeters", "recognised" → "recognized", "standardised" → "standardized"
+  - Define technical terms on first use — do not assume the reader knows jargon
+  - Every field that accepts a path/URL should include examples of both formats (e.g. `/images/logo.svg` and `https://example.com/logo.png`)
+
+  **Per-section changes:**
+
+  | Admin section | Wizard step it mirrors | Specific changes required |
+  |---|---|---|
+  | `station` | Step 6 | (1) Add "Pre-filled values" section noting fields come from weewx.conf. (2) Add warning: "Clear Skies does not write changes back to weewx.conf — update it manually to keep in sync." (3) Add decimal degrees example: `40.7128` / `-74.0060`. (4) Explain default language: "what your visitors see by default, not what you see in the admin." (5) Split photo/description into separate subsections. (6) Explain alt text with example ("Davis Vantage Pro2 mounted on a rooftop pole"). (7) Station description: explain purpose, appears on About page, keep to 2–3 sentences. |
+  | `database` | Step 4 | **DEFERRED** — do not update until PINNED-ITEMS.md #2 (SQLite support) is resolved. Current content is MySQL-only; rewrite must cover both SQLite and MySQL paths, remind operator which type was detected, and explain how to recover credentials. |
+  | `column_mapping` | Step 5 | (1) Replace "canonical name" with "tell Clear Skies what the column measures." (2) Lead with consequence: "If a column is not mapped, Clear Skies cannot read it — that measurement will not appear anywhere on your weather site." (3) Replace tip: "If you skip a custom column, you can always map it later — no data is lost from your weewx database." |
+  | `providers` | Step 9 | **DEFERRED** — do not update until PINNED-ITEMS.md #6–12 are resolved (auto-selection removal, OWM/OpenAQ removal, haze bootstrap removal, comprehensive per-provider details). When re-executing: (1) Remove any "Selected for your location" language. (2) Remove all OpenAQ bootstrap references. (3) Remove OWM from AQI references. (4) Replace "keyless" with "no key needed." (5) Add per-provider collapsible details with registration links. |
+  | `appearance` | Step 11 | (1) US spelling throughout. (2) Logo file requirements: SVG preferred, PNG with transparent background, max 500 KB, recommended ~200–400 × 40–80 px horizontal layout, warn vertical logos look oversized. (3) Explain upload OR path/URL with examples. (4) Favicon: ICO or PNG, 32×32 or 64×64 px, max 100 KB. (5) Remove Custom CSS section (per PINNED-ITEMS.md #14). (6) Remove Social Media section (per PINNED-ITEMS.md #23). |
+  | `social` | Step 11 | **REMOVE ENTIRELY** — per PINNED-ITEMS.md #23, social media links are being removed from both wizard and admin. Delete the admin help keys for this section when the code removal happens. |
+  | `analytics` | Step 12 | (1) Explain what visitor analytics is (track visits, page views, where visitors come from). (2) State we support Google Analytics. (3) Explain why privacy regions matter — laws require consent before tracking. (4) Bold disclaimer: operator is responsible for compliance. (5) Legal templates: "not legal advice, we are not lawyers, verify in your jurisdiction." (6) State built-in templates are translated to 13 languages. (7) Uploaded replacements are shown as-is — operator must provide own translations. |
+  | `webcam` | Step 10 | (1) List supported formats: JPEG/PNG/GIF/WebP for still images, MP4 (H.264) for video. (2) Add path/URL format examples for both fields. (3) Explain refresh interval with example ("60 = once a minute"). |
+  | `tls` | Step 14 | (1) Add "What is TLS?" section explaining encryption for laypersons (padlock icon, HTTPS, why it matters). (2) Self-signed: operator must provide own cert, we do not generate one; if cert is on a proxy, select Behind Proxy. (3) ACME: only when server is directly exposed to internet; if running ACME on NPM/Traefik, select Behind Proxy. (4) Behind Proxy: list examples (NPM, Traefik, Cloudflare/CDN, corporate load balancer). (5) Manual: PEM format — server cert + intermediates in one file, private key separate. (6) Tip: recommend public certificate since self-signed causes browser warnings. |
+  | `pages` | N/A | Review for jargon and "dashboard" references. No wizard-specific changes to port. |
+  | `card_layout` | N/A | Review for jargon and "dashboard" references. No wizard-specific changes to port. |
+  | `sky_classification` | N/A | Review for jargon. No wizard-specific changes to port. |
+  | `haze_calibration` | N/A | Review for jargon. Verify haze bootstrap references are removed (per PINNED-ITEMS.md #8). |
+  | `forecast_correction` | N/A | Review for jargon and "dashboard" references. No wizard-specific changes to port. |
+  | `geographic_features` | N/A | Review for jargon and "dashboard" references. No wizard-specific changes to port. |
+
+  **Also update registry field `help_text` values (declarations.py) that were fixed during wizard review:**
+  - `earthquakes.radius_km` — "kilometers" not "kilometres"
+  - `earthquakes.min_magnitude` — "Moment Magnitude scale (Mw)" not "Richter scale"
+  - `earthquakes.default_days` — "How many days of earthquake history to show by default"
+  - `webcam.image_url` — "Path or URL" not just "URL"
+  - `webcam.video_url` — "Path or URL", note "MP4 format"
+  - `branding.favicon_url` — "Path or URL", note "ICO or PNG, 32×32 or 64×64"
+  - `branding.logo_light_url` / `branding.logo_dark_url` — "Upload a file or enter a path/URL"
+  - `branding.copyright_entity` — "organization" not "organisation"
+
+**T2.3 — Populate ConfigField help_text and wizard_help** ✅ COMPLETE (2026-07-03)
 - Owner: `general-purpose` (Sonnet) — mechanical: populate fields from Opus-authored content
 - File: `repos/weewx-clearskies-stack/weewx_clearskies_config/registry/declarations.py`
 - Do: For all ~40 `ConfigField` declarations, populate:
@@ -423,7 +462,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 
 - Accept: All ~40 fields have non-empty `help_text`. `wizard_help` populated where it differs. All strings passed through `_()` in templates.
 
-**T2.4 — Add inline help to hand-built wizard step templates**
+**T2.4 — Add inline help to hand-built wizard step templates** ✅ COMPLETE (2026-07-03)
 - Owner: `general-purpose` (Sonnet) — template edits from Opus-authored hint text
 - Files: All hand-built step templates (~11 files: step_api, step_import, step_eula, step_db, step_schema, step_station, step_units, step_providers, step_review, step_complete, step_language)
 - Do: For every `<input>`, `<select>`, and `<textarea>` that lacks a `<small>` hint, add a `<small id="help_...">{{ _("...") }}</small>` with `aria-describedby` on the input.
@@ -439,91 +478,100 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 
 ---
 
-### PHASE 3 — Operator Manual
+### PHASE 3 — Operator Manual ⚠️ REQUIRES REVISION (2026-07-03, review 2026-07-04)
 
-> ⚠️ NEEDS DETAIL: The manual content itself has not been written. This phase defines the structure, file locations, and acceptance criteria. Actual content is authored during execution.
+> Operator-facing manual with 13 sections, measured system requirements, and 5 SVG diagrams.
 
-**T3.1 — Scaffold manual structure**
+**T3.1 — Scaffold manual structure** ✅ COMPLETE (2026-07-03)
 - Owner: Coordinator (Opus) — establishes voice and structure
 - File: New `repos/weewx-clearskies-stack/docs/OPERATOR-MANUAL.md`
 - Do: Create the file with the full section outline (11 sections + table of contents), placeholder text in each section noting what content goes there, and a "Support Scope" section with the boundaries we defined (supported, acknowledged-not-supported, not-documented).
 - Accept: File exists with complete structure. Each section has a clear description of what it will contain.
 
-**T3.2 — System Requirements section**
-- Owner: Coordinator (Opus) + `clearskies-docs-author` (Sonnet)
-- Coordinator measures actual resource usage on running containers:
-  - SSH to `weewx` container: measure API process RSS, disk usage of venv + deps, disk usage of skyfield ephemeris
-  - SSH to `weather-dev` container: measure dashboard build peak memory, built `dist/` size, Caddy RSS, config UI RSS
-  - Catalog heavy transitive deps with approximate installed sizes:
-    - API: numpy (~30 MB), scipy (~120 MB), pandas (~50 MB), scikit-learn (~25 MB), pvlib (~10 MB), skyfield (~5 MB code + ~30 MB ephemeris), cryptography (~15 MB), SQLAlchemy (~15 MB)
-    - Dashboard build: Node 22 + npm deps. CJK fonts (Noto Sans JP/SC/TC: ~5-15 MB each)
-    - Stack: timezonefinder (~40 MB timezone boundary data)
-    - TrueSun: pvlib + pandas + numpy (shared with API if co-located) + optional netCDF4/cdsapi
-  - Per-component table: CPU, RAM idle, RAM peak, storage (code + deps + data)
-  - Minimum specs for single-host and two-host topologies
-  - Raspberry Pi 4 feasibility assessment
-- Sonnet writes the section from coordinator's measurements.
+**T3.2 — System Requirements section** ✅ COMPLETE (2026-07-03)
+- Owner: Coordinator (Opus)
+- Measured on running containers 2026-07-03:
+  - API RSS: ~600 MB idle, venv: 602 MB, skyfield ephemeris: 17 MB
+  - Caddy RSS: ~43 MB, Config UI RSS: ~61 MB (venv: 286 MB)
+  - Dashboard dist: 62 MB (node_modules 783 MB build-only)
+  - Redis: 1.4 MB idle, 241 MB peak
+  - Key deps: scipy 109 MB, pandas 73 MB, sklearn 49 MB, numpy 34 MB, babel 33 MB, pvlib 32 MB, timezonefinder 64 MB
+  - Pi 4 (4 GB): feasible. Pi 4 (2 GB): marginal. Pi 3: not recommended.
 - Accept: Table with measured values, not estimates. Pi 4 yes/no clearly stated.
 
-**T3.3 — Installation — Native path**
+**T3.3 — Installation — Native path** ✅ COMPLETE (2026-07-03)
 - Owner: Coordinator (Opus)
 - Do: Operator-facing step-by-step guide. Adapts OPERATIONS-MANUAL.md §1 from developer-oriented to operator-oriented. Covers: prerequisites, Python 3.12+ venv creation, pip install, systemd unit setup, Caddy configuration, first-run wizard, verification.
 - Accept: A non-technical operator can follow the guide from a fresh Debian/Ubuntu install to a running dashboard.
 
-**T3.4 — Installation — weewx extensions**
+**T3.4 — Installation — weewx extensions** ✅ COMPLETE (2026-07-03)
 - Owner: Coordinator (Opus)
 - Do: Separate sections for ClearSkiesLoopRelay (required) and ClearSkiesTruesun (optional).
   - Loop Relay: `weectl extension install`, verify socket creation, troubleshooting
-  - TrueSun: dependencies (pvlib, cdsapi, h5netcdf/netCDF4), CAMS API key registration, weewx.conf stanza, verification (check `maxSolarRad` values at sunrise)
+  - TrueSun: dependencies (pvlib, cdsapi, h5netcdf), CAMS API key registration, weewx.conf stanza, verification (check `maxSolarRad` values at sunrise)
 - Accept: Each extension has prerequisites, install command, config, verification.
 
-**T3.5 — Under the Hood**
+**T3.5 — Under the Hood** ✅ COMPLETE (2026-07-03)
 - Owner: Coordinator (Opus) — educational writing explaining complex systems accessibly
-- Do: Educational content (no support obligation) covering:
-  - Sky conditions engine: Duchon-O'Malley architecture, CAELUS indices, ring buffer, dynamic thresholds, seven labels, night fallback
-  - Enrichment pipeline: Beaufort scale, comfort index, barometer trend, wind averages, weather text composition
-  - Forecast correction: Random Forest, pair collection, training cycle, enabling
-  - Unit conversion pipeline: source → group → display unit → label
-  - Data flow: weewx → Loop Relay → Unix socket → API → SSE/REST → Dashboard
-  - Haze detection: two-channel, RH-graduated PM, solar elevation gate, monthly calibration
-- Accept: Technically accurate. Explains concepts without requiring meteorology background. Cross-references API-MANUAL.md for implementation details.
+- Covers: data flow (station → weewx → Loop Relay → API → Caddy → browser), unit conversion pipeline, sky conditions engine (Duchon-O'Malley / CAELUS indices, Kv/Km variability-first decision tree, 7 labels, dynamic thresholds, night fallback), enrichment pipeline (Beaufort, comfort, barometer trend, wind averages, weather text), forecast correction (Random Forest, pair collection, training), haze detection (two-channel: Kcs deficit + RH-graduated PM, solar elevation gate).
+- Accept: Technically accurate. Explains concepts without requiring meteorology background.
 
-  ⚠️ NEEDS DETAIL: Each sub-section needs to be authored. The list above defines scope.
-
-**T3.6 — Charts Configuration deep dive**
+**T3.6 — Charts Configuration deep dive** ✅ COMPLETE (2026-07-03)
 - Owner: Coordinator (Opus)
-- Do: Operator-facing guide to `charts.conf`. Covers: INI syntax, three-level nesting (group → chart → series), special series types (windRose, weatherRange, haysChart), custom SQL queries, migration from Belchertown (`clearskies-migrate-charts`), common operator customizations.
+- Covers: INI syntax, three-level nesting (group → chart → series), all settings tables, special series types (windRose, weatherRange, haysChart) with code examples, cumulative rain example, grouped charts (xAxis_groupby), custom SQL queries, migration from Belchertown.
 - Accept: Operator can add a new chart group, customize colors, add a custom SQL series by following the guide.
 
-  ⚠️ NEEDS DETAIL: Specific examples and code samples need to be authored.
-
-**T3.7 — Remaining manual sections**
+**T3.7 — Remaining manual sections** ✅ COMPLETE (2026-07-03)
 - Owner: Coordinator (Opus)
-- Sections: Quick Start, First-Run Wizard guide, Admin Guide, Troubleshooting, Getting Help, Support Scope, Legal
-- Do: Author each section per the outline in the Context section above.
+- Sections completed:
+  - §1 Quick Start: 15-minute path from weewx + Docker to running dashboard
+  - §6 First-Run Wizard guide: overview of every step, cross-references in-app help
+  - §7 Admin Guide: all admin sections (station, providers, appearance, pages, layout, column mapping, TLS, sky classification, haze calibration, forecast correction, geographic features)
+  - §10 Troubleshooting: common issues (no data, API won't start, no SSE, provider errors, wizard connection, stale data, TLS errors, high memory, collecting bug report info)
+  - §11 Getting Help: GitHub issues, what to include, what not to include
+  - §12 Support Scope: supported / acknowledged-not-supported / not-documented categories
+  - §13 Legal: license summary (PolyForm NC + GPL v3 for extensions), permitted uses, commercial requirements, provider compliance, translation policy with disclaimer requirements
+- Accept: All 13 manual sections written. Support scope clearly delineated. Legal section matches license documents. Translation policy documented.
 
-  ⚠️ NEEDS DETAIL: All content needs to be written. Key constraints:
-  - Quick Start: 15-minute path, minimal config
-  - Wizard/Admin guides: cross-reference in-app help, don't duplicate
-  - Troubleshooting: common issues (API won't start, dashboard errors, provider key rejected, connection refused)
-  - Getting Help: GitHub issue template, what to include (logs, config redacted, browser console)
-  - Support Scope: exact boundaries from dialog (supported / acknowledged-not-supported / not-documented)
-  - Legal: license summary, permitted uses, commercial requirements, provider compliance, legal translation policy (what's translated, what's not, why, disclaimer requirements). Depends on Phase 0.
-
-- Accept: All 11 manual sections written. Support scope clearly delineated. Legal section matches license documents. Translation policy documented.
-
-**T3.8 — Graphics and diagrams**
+**T3.8 — Graphics and diagrams** ✅ COMPLETE (2026-07-03)
 - Owner: Coordinator (Opus)
-- Do: Create SVG diagrams for inclusion in the manual:
-  - Two-host vs single-host topology
-  - Data flow: weewx → API → Dashboard
-  - Sky classification decision tree
-  - Enrichment pipeline flow
-  - Wizard step flow overview
-
-  ⚠️ NEEDS DETAIL: Exact diagrams identified during content authoring (T3.5-T3.7). This task executes after content is written.
-
+- Created 5 SVG diagrams in `repos/weewx-clearskies-stack/docs/diagrams/`:
+  - `data-flow.svg` — station → weewx → Loop Relay → API → Caddy → browser
+  - `topology-two-host.svg` — weewx host (API + Redis) / front-end host (Caddy + dashboard + Config UI)
+  - `topology-single-host.svg` — all services on one machine
+  - `sky-classification.svg` — decision tree: SZA guard → Kv variability → Km clearness → 7 labels
+  - `enrichment-pipeline.svg` — raw data → unit conversion → derived values → labels → sky classification → weather text
+  - `wizard-flow.svg` — 16-step wizard flow from Language to Complete
 - Accept: Diagrams are clear, readable, and accurate. SVG format for quality at any size.
+
+**T3.9 — Revise manual to match wizard review findings** ⚠️ REQUIRES EXECUTION
+- Owner: Coordinator (Opus)
+- File: `repos/weewx-clearskies-stack/docs/OPERATOR-MANUAL.md`
+- Do: Apply all findings from the 2026-07-04 wizard help review to the operator manual. Execute AFTER T2.2 re-execution and AFTER all blocking pin items are resolved, so the manual matches the final in-app help.
+
+  **Global changes (apply throughout the entire manual):**
+  - Replace "dashboard" with "weather site" or "your weather site" consistently
+  - British → US English: "customise/customisation/colour/colours/organisation/metres/kilometres/centimetres/millimetres" → US equivalents
+  - Define technical terms on first use for non-technical operators
+
+  **Per-section changes:**
+
+  | Manual section | Changes required |
+  |---|---|
+  | §1 Quick Start | Replace "dashboard" throughout. Verify no jargon. |
+  | §3 Installation — Native | Replace "dashboard" throughout. |
+  | §4 Installation — Docker | Replace "dashboard" throughout. |
+  | §5 Installation — Extensions | Replace "dashboard" throughout. |
+  | §6 First-Run Wizard guide | **Major revision.** This section overviews every wizard step and must match the finalized in-app help: (1) Step 1 API — explain what the API is in plain terms, where to find trust token/fingerprint. (2) Step 2 Import — charts "not transferred automatically," point to migration tool. (3) Step 3 EULA — note English version is legally governing, translation notice exists. (4) Step 4 Database — DEFERRED until SQLite support resolved (pin #2). (5) Step 5 Columns — no "canonical name," explain consequences of unmapped columns. (6) Step 6 Station — pre-filled from weewx.conf, weewx.conf sync warning, decimal degrees example, alt text explained, description guidance. (7) Step 7 Units — US spelling, no "dashboard." (8) Step 9 Providers — remove auto-selection language, remove OWM AQI/OpenAQ/haze bootstrap references, "no key needed" not "keyless." DEFERRED sections per pin items. (9) Step 10 Webcam — supported formats (JPEG/PNG/GIF/WebP still, MP4 video), path/URL examples. (10) Step 11 Appearance — logo specs (SVG preferred, transparent bg, horizontal ~200-400×40-80 px), favicon specs, upload OR path/URL, remove Custom CSS and Social Media references. (11) Step 12 Privacy/Legal — explain analytics, compliance disclaimers, legal template disclaimers, translation status of built-in documents. (12) Step 13 Features — Moment Magnitude (Mw) not Richter, reworded time range. (13) Step 14 TLS — explain TLS for layperson, self-signed = operator provides cert, ACME = direct internet only, Behind Proxy for NPM/Traefik/Cloudflare, PEM format for manual certs. |
+  | §7 Admin Guide | Must match T2.2 admin help content after its re-execution. Same per-section changes as the T2.2 granular list above. DEFER sections that depend on unresolved pin items (database, providers, social). |
+  | §8 Under the Hood | Check for "Richter scale" → "Moment Magnitude (Mw)." Check for British spellings. |
+  | §9 Charts Configuration | Check for "dashboard" and British spellings. |
+  | §10 Troubleshooting | Replace "dashboard" throughout. Check for jargon. |
+  | §11 Getting Help | Replace "dashboard." No other changes expected. |
+  | §12 Support Scope | Review if features being removed (social media links, custom CSS from wizard) affect the scope categories. |
+  | §13 Legal | Verify compliance disclaimer language matches the in-app step 12 help: "not legal advice, we are not lawyers." Verify translation policy section matches reality (which documents translated, which English-only, upload-your-own guidance). |
+
+- Accept: Manual content matches finalized in-app help. No jargon mismatch between manual and wizard/admin. Zero British spellings. All deferred sections clearly noted as pending pin item resolution.
 
 **QC (Opus) — after Phase 3:** Read full manual end-to-end. Verify system requirements match measured values. Walk native install guide mentally against OPERATIONS-MANUAL.md for accuracy. Verify support scope matches dialog. Verify legal section matches Phase 0 license documents. Verify no content duplicates in-app help verbatim (cross-references instead).
 
