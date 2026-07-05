@@ -308,7 +308,14 @@ The `/archive` endpoint serves all columns present in the archive schema with no
 
 ### Earthquake fields
 
-Earthquake fields are unit-system-invariant: depth in km, magnitude as a dimensionless number, coordinates as WGS84 decimal degrees. These fields do not appear in the `units` block and do not pass through the unit conversion layer.
+Magnitude (a dimensionless number) and coordinates (WGS84 decimal degrees) are unit-system-invariant — they never appear in the `units` block and never pass through the unit conversion layer.
+
+`depth` and `distance`, however, participate in the `group_distance` unit system (mile/km) like any other distance field:
+
+- The endpoint computes `distance` (haversine distance from the operator's station to the epicenter, via `services/station.py` `StationInfo` lat/lon) for every `EarthquakeRecord`.
+- Both `depth` and `distance` are converted to the operator's configured `group_distance` display unit using the canonical conversion registry (`units/conversion.py`) — never a hand-rolled factor, per the conversion-factor-accuracy rule below.
+- The `units` block reflects the unit actually used: `{"depth": "mi"|"km", "distance": "mi"|"km", "magnitude": ""}`.
+- The operator's `group_distance` preference is resolved by reading the units block populated at startup (`services/units.py` `get_units_block()`), keyed off a `group_distance` member field (`windrun`) rather than inferring from the temperature-based US/METRIC/METRICWX system check — this correctly reflects a `[StdReport][[Units]][[Groups]]` override applied specifically to `group_distance`, independent of other groups.
 
 ### Prose layers
 

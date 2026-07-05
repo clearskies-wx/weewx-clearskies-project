@@ -1572,7 +1572,10 @@ components:
         depth:
           type: number
           nullable: true
-          description: Kilometers below surface.
+          description: >-
+            Depth below surface, in the operator's configured group_distance
+            unit (mile or km — see the response's `units.depth`). Converted
+            from the provider's native km value; not a fixed unit.
         place:
           type: string
           nullable: true
@@ -1598,6 +1601,13 @@ components:
           description: Review status (provider-dependent vocabulary).
         extras: { $ref: '#/components/schemas/Observation/properties/extras' }
         source: { type: string }
+        distance:
+          type: number
+          nullable: true
+          description: >-
+            Haversine distance from the operator's station to the epicenter,
+            in the operator's configured group_distance unit (mile or km —
+            see the response's `units.distance`).
       required: [id, time, latitude, longitude, magnitude, source]
 
     AQIReading:
@@ -2586,6 +2596,14 @@ components:
         data:
           type: array
           items: { $ref: '#/components/schemas/EarthquakeRecord' }
+        units:
+          type: object
+          nullable: true
+          description: >-
+            {"depth": "mi"|"km", "distance": "mi"|"km", "magnitude": ""} —
+            reflects the operator's configured group_distance unit. Magnitude
+            has no unit (dimensionless).
+          additionalProperties: { type: string }
         source: { type: string }
         generatedAt: { type: string, format: date-time }
       required: [data, source, generatedAt]

@@ -814,6 +814,8 @@ Optional canonical fields:
 
 Provider-specific data not listed above goes into the `extras` dict. Do not add provider-specific fields to the canonical schema — use `extras`.
 
+**`distance` (float or null) is endpoint-computed, not provider-supplied.** The `/earthquakes` endpoint computes it as the haversine distance from the operator's station to each event's epicenter — no provider module populates it. Provider modules supply `depth` in km as usual; the endpoint converts both `depth` and `distance` to the operator's configured `group_distance` unit (mile/km) before the response is built. See API-MANUAL.md §2 "Earthquake fields".
+
 ### Provider-specific canonical mappings
 
 These wire fields map to canonical fields directly — do not put them in `extras`:
