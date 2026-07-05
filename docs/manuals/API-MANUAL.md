@@ -308,7 +308,7 @@ The `/archive` endpoint serves all columns present in the archive schema with no
 
 ### Earthquake fields
 
-Magnitude (a dimensionless number) and coordinates (WGS84 decimal degrees) are unit-system-invariant — they never appear in the `units` block and never pass through the unit conversion layer.
+Magnitude (a dimensionless number) and coordinates (WGS84 decimal degrees) are not converted — they never appear in the `units` block. However, `depth` and `distance` participate in `group_distance` unit conversion (see below).
 
 `depth` and `distance`, however, participate in the `group_distance` unit system (mile/km) like any other distance field:
 
@@ -1533,7 +1533,7 @@ WARNING: Radar provider 'noaa_mrms' is deprecated. Consider migrating to 'librew
 ```
 They continue to function as before — no breaking change for existing operators.
 
-`aeris` is removed from radar. Aeris credentials remain wired for forecast/AQI/alerts.
+`aeris` is removed from radar. Vaisala Xweather credentials remain wired for forecast/AQI/alerts.
 
 ### Provider attribution metadata (ADR-080)
 

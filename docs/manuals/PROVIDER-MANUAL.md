@@ -93,7 +93,7 @@ Every module exports a static `CAPABILITY` structure at module-load time. For mo
 | `domain` | string | One of `"forecast"`, `"aqi"`, `"alerts"`, `"earthquakes"`, `"radar"`. One module = one domain. |
 | `supplied_canonical_fields` | list[str] | Enumerated canonical fields this module can supply. Reference the field catalog in `contracts/canonical-data-model.md`. |
 | `geographic_coverage` | string or list[str] | `"global"` or enumerated regions. Used by the setup wizard to warn when operator's lat/lon is outside coverage. |
-| `auth_required` | list[str] | Operator-config keys required (e.g., `["AERIS_CLIENT_ID", "AERIS_CLIENT_SECRET"]`). Empty list for keyless providers. |
+| `auth_required` | list[str] | Operator-config keys required (e.g., `["AERIS_CLIENT_ID", "AERIS_CLIENT_SECRET"]`). Empty list for providers that need no key. |
 | `default_poll_interval_seconds` | int | Recommended polling cadence. |
 | `operator_notes` | string | Free text surfaced in the configuration UI for provider-specific quirks and ToS reminders. |
 | `is_observed_source` | bool | Whether the provider returns observed (measured) data from monitoring stations vs. model/forecast data. Default `True`. Only model-based AQI providers (Open-Meteo AQI) set `False`. Used by the haze detection engine (ADR-067) to determine which PM2.5/PM10 data is eligible for haze confirmation. Non-AQI modules omit this field or leave it at the default. |
@@ -753,15 +753,13 @@ For operators whose region is not covered by any configured provider, return an 
 | Canada, Europe/UK, Mexico, Brazil, South Africa, India, Japan, South Korea, Australia | `aeris` |
 | Elsewhere | `openweathermap` (with note on paid One Call 3.0 tier) |
 
-The wizard's region check (`weewx_clearskies_config/wizard/providers.py`, `recommend_providers()`) uses coarse lat/lon bounding boxes per region — the code is the source of truth for the exact boundaries; the table above lists the covered regions, not the boxes themselves.
-
 ---
 
 ## §9 Earthquakes
 
 ### Day-1 provider set
 
-Four earthquake provider modules ship at v0.1 in `providers/earthquakes/`. All four are keyless. One source per deploy.
+Four earthquake provider modules ship at v0.1 in `providers/earthquakes/`. All four need no key. One source per deploy.
 
 | Module | Coverage | License |
 |---|---|---|

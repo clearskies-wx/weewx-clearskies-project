@@ -91,7 +91,7 @@ Each repo builds its own container image independently (ADR-034). A dashboard CS
 
 > **API native install (2026-05-24):** The API is currently installed natively on the `weewx` LXD container (not in Docker) via pip into a Python 3.12 venv at `/home/ubuntu/repos/weewx-clearskies-api/.venv`, managed by systemd unit `weewx-clearskies-api.service`. Config at `/etc/weewx-clearskies/api.conf`. Health port (8081) also serves TLS. This is the production deployment path on bare-metal / LXD; the Dockerfile exists for Docker compose deployments.
 >
-> **API startup time: ~2 minutes.** After `systemctl restart weewx-clearskies-api`, the service runs a cache warmer that makes outbound API calls to configured providers (Aeris, NWS, etc.) before uvicorn binds to port 8765. The service is not ready to serve requests until the cache warm completes. When scripting restarts, wait at least 120 seconds before hitting endpoints — `sleep 10` is not enough.
+> **API startup time: ~2 minutes.** After `systemctl restart weewx-clearskies-api`, the service runs a cache warmer that makes outbound API calls to configured providers (Vaisala Xweather, NWS, etc.) before uvicorn binds to port 8765. The service is not ready to serve requests until the cache warm completes. When scripting restarts, wait at least 120 seconds before hitting endpoints — `sleep 10` is not enough.
 
 > **Native dashboard / dev deploy (2026-05-29):** On the `weather-dev` LXD container the dashboard is NOT run as a Docker init container. Instead the source is pulled to `/home/ubuntu/repos/weewx-clearskies-dashboard`, built natively with `npm run build` (Vite → `dist/`), and the built `dist/` is rsync'd into the Caddy web root `/var/www/clearskies/` (excluding the read-only `webcam/` bind-mount and the `cards/` directory). API and Config UI run as systemd units (`weewx-clearskies-{api,config}.service`). The full redeploy is automated by `scripts/redeploy-weather-dev.sh`; source-only refresh by `scripts/sync-to-weather-dev.sh`. Procedure: [procedures/deploy-clearskies.md](procedures/deploy-clearskies.md). The Docker init-container model above is the compose deployment path.
 >
@@ -226,7 +226,7 @@ The OpenAPI spec lists 35+ data endpoints. Key groups for orientation:
 | Core observation | `/api/v1/current`, `/api/v1/archive`, `/api/v1/archive/grouped`, `/api/v1/station` | `/current` includes enrichment pipeline output (`weatherText`, `beaufort`, `comfortIndex`). `/archive` supports `aggregate_interval`, `agg_map`, `sumcumulative`. `/archive/grouped` replaces the former `/climatology/monthly` endpoint. |
 | Forecast & alerts | `/api/v1/forecast`, `/api/v1/alerts`, `/api/v1/aqi/current`, `/api/v1/aqi/history` | Provider-backed; single source per deploy per domain. |
 | Almanac | `/api/v1/almanac`, `/api/v1/almanac/sun-times`, `/api/v1/almanac/moon-phases`, `/api/v1/almanac/seeing-forecast`, `/api/v1/almanac/planets`, `/api/v1/almanac/moon-names`, `/api/v1/almanac/eclipses/lunar`, `/api/v1/almanac/eclipses/solar`, `/api/v1/almanac/meteor-showers`, `/api/v1/almanac/positions` | Skyfield-based; background cache warming for expensive computations. |
-| Earthquakes | `/api/v1/earthquakes`, `/api/v1/earthquakes/config`, `/api/v1/earthquakes/faults` | `/faults` serves GEM Active Faults GeoJSON radius-clipped. `/config` returns provider configuration. `/earthquakes` computes each event's haversine distance from the station and converts `depth`/`distance` to the operator's configured `group_distance` unit (mile/km) — magnitude and coordinates remain unit-system-invariant. |
+| Earthquakes | `/api/v1/earthquakes`, `/api/v1/earthquakes/config`, `/api/v1/earthquakes/faults` | `/faults` serves GEM Active Faults GeoJSON radius-clipped. `/config` returns provider configuration. `/earthquakes` computes each event's haversine distance from the station. Magnitude (dimensionless) and coordinates (WGS84 degrees) are never converted; `depth` and `distance` are converted to the operator's `group_distance` unit (mile/km). |
 | Geographic features | `/api/v1/geographic-features/tiles`, `/api/v1/geographic-features/status` | `/tiles` serves PMTiles file with HTTP Range requests (206 Partial Content) — pre-processed OpenStreetMap vector tiles cropped to operator BBOX. `/status` returns `{available, size_bytes, updated_at}`. Dashboard renders lines-only via `protomaps-leaflet` on satellite view (ADR-078). `POST /setup/geographic-features/update` triggers download + extraction (see setup endpoints). |
 | Charts | `/api/v1/charts/config`, `/api/v1/charts/groups`, `/api/v1/charts/custom-query/{series_id}` | Config-driven; custom SQL from `charts.conf` only (disk-only trust model). |
 | Radar | `/api/v1/radar/providers/{id}/frames`, `/api/v1/radar/providers/{id}/tiles/{z}/{x}/{y}` | Frame metadata for all providers. **Satellite frames** (LibreWxR only) returned alongside radar frames when available. Tile proxy for keyed providers only (`openweathermap`). LibreWxR tiles go through Caddy (`/librewxr/*`), not the API. RainViewer tiles go direct to CDN. |
@@ -343,7 +343,7 @@ The API hosts a multi-module, stateful conditions-text engine that produces the 
 | `weewx_clearskies_api/sse/text_generation.py` | NWS-style text engine — terse/standard/verbose verbosity, GFE threshold tables |
 | `weewx_clearskies_api/sse/observation_model.py` | Structured local observation model — METAR-like field mapping |
 
-**AQI data flow:** PM2.5/PM10 from observed-data AQI providers (Aeris, IQAir) flow through the enrichment pipeline via new 60-minute smoothing buffers in `input_smoother.py`. Smoothed PM values feed the haze detection module and fog/mist disambiguation. Model-based AQI providers (Open-Meteo) are excluded from haze confirmation. At night (solar elevation at or below the 15° detection gate), haze/smoke defers to provider current conditions observations; fog/mist remains local.
+**AQI data flow:** PM2.5/PM10 from observed-data AQI providers (Vaisala Xweather, IQAir) flow through the enrichment pipeline via new 60-minute smoothing buffers in `input_smoother.py`. Smoothed PM values feed the haze detection module and fog/mist disambiguation. Model-based AQI providers (Open-Meteo) are excluded from haze confirmation. At night (solar elevation at or below the 15° detection gate), haze/smoke defers to provider current conditions observations; fog/mist remains local.
 
 **New response fields on `/api/v1/current`:** `weatherTextStandard` (NWS one-sentence format) and `weatherTextVerbose` (full narrative). `weatherText` continues to carry terse format (backward compatible).
 
@@ -418,10 +418,6 @@ Wizard steps are defined by `wizard/routes.py` and `templates/wizard/step_*.html
 | `/wizard/restart-status` | GET | Service restart status |
 
 **Step categories** (not exhaustive — see code for full list): API connection, skin import, EULA, database, schema/column mapping, station identity, display units, provider selection + API keys, webcam, appearance/branding, privacy/legal, feature settings, TLS configuration, review + apply.
-
-### CLI wizard
-
-`weewx_clearskies_config/cli_wizard.py` provides an interactive terminal wizard and a headless (non-interactive, flag-driven) configuration path for SSH-only or automated installs. Both paths reuse the same wizard backend modules as the web UI (WizardState, apply_wizard). The CLI wizard covers a subset of the web wizard's steps: database, schema, station, providers, API keys, topology, bind addresses, review + apply. Headless mode accepts all settings as CLI flags for unattended deploys.
 
 ### Admin (ongoing config)
 
@@ -558,7 +554,7 @@ weewx_clearskies_api/providers/
 ├── aqi/              # aeris, iqair, openmeteo
 ├── alerts/           # nws, aeris, openweathermap
 ├── earthquakes/      # usgs, geonet, emsc, renass
-├── seeing/           # seven_timer (keyless, 7Timer ASTRO product)
+├── seeing/           # seven_timer (no key needed, 7Timer ASTRO product)
 └── radar/            # rainviewer, librewxr, openweathermap, iem_nexrad (deprecated), noaa_mrms (deprecated), msc_geomet, dwd_radolan, iframe
 ```
 

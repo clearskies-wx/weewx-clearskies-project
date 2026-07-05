@@ -825,7 +825,6 @@ The splash is deliberately not themed — it uses fixed neutral colors so it loo
 | Custom background | Upload via wizard, `branding.json` → `customBackgroundUrl` | Replaces all 6 scene-keyed backgrounds with the operator's image for every sky condition. No precipitation overlay, no photographer attribution. Empty/absent → falls back to the scene system. See §8 "Custom Background Override." |
 | Site title | `branding.json` | Set as `document.title` |
 | Favicon | `branding.json` | Applied to `<link rel="icon">` |
-| Custom CSS | URL in `branding.json` | Linked last in `<head>`; operator owns override. CSS variable names are NOT promised stable across releases. |
 | GA ID | `branding.json` | Shows cookie consent banner when set; GA blocked until visitor opts in. Exception: if privacy regions is `"none"`, GA loads immediately with no banner. |
 | Privacy regions | `branding.json` | Controls jurisdiction filtering on Legal page. Value `"none"` disables privacy handling entirely — consent banner is skipped and no jurisdiction disclosures render on the Legal page. |
 | Default theme mode | `branding.json` | Applied on first load when no user override is stored |
@@ -918,14 +917,14 @@ Run before declaring any UI change done:
 
 The setup wizard (`weewx-clearskies-stack`) uses Pico CSS + HTMX + Jinja2. It intentionally diverges from the dashboard's Tailwind/React stack, but shares design language in these areas: typography rhythm, form field patterns, accessibility scaffold, and color accent.
 
-### Step Structure (all 15 steps)
+### Step Structure (all 14 steps)
 
 Every wizard step uses this exact HTML structure:
 
 ```html
 <article>
   <header>
-    <h2>Step N of 15 — Title</h2>
+    <h2>Step N of 14 — Title</h2>
     <p>Description</p>
   </header>
   {% if error %}

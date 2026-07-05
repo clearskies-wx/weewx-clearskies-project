@@ -529,8 +529,7 @@ The config UI serves an admin landing page at `/admin`. This is the default post
 | Station Identity | `stack.conf [ui]` | Station name, location, altitude |
 | Database | `api.conf [database]` | DB type, connection |
 | Providers | API `/setup/current-config` (authoritative); local `api.conf` fallback | Provider selection + API keys. Radar section includes LibreWxR endpoint mode, self-hosted URL, and geographic bounds when LibreWxR is configured. |
-| Appearance | `branding.json` | Accent color, logos, site title, favicon, theme mode, custom CSS |
-| Social | `branding.json` | Facebook, Twitter/X, Instagram, YouTube URLs |
+| Appearance | `branding.json` | Accent color, logos, site title, favicon, theme mode |
 | Analytics & Privacy | `branding.json` | GA ID, privacy region toggles |
 | Webcam | `stack.conf [webcam]` | Enabled, image/video URLs, refresh interval |
 | Pages | `pages.json` | Per-page visibility checkboxes |
@@ -599,13 +598,7 @@ Providers marked as "Observed" return measured PM2.5/PM10 concentrations from mo
 
 OpenWeatherMap AQI was removed entirely (Phase 2 API removals) — it returned SILAM model predictions, not observed PM data, and is no longer offered as an AQI provider option. OpenWeatherMap remains available for the forecast, alerts, and radar domains.
 
-The wizard annotates each provider's option label to show observed vs. model-based and haze eligibility. When haze detection is enabled (`[conditions] haze_detection = true`), the wizard recommends Xweather and warns if the operator selects a model-based provider.
-
-### CLI wizard
-
-`cli_wizard.py` provides an interactive terminal wizard (for operators who cannot open a browser) and a headless flag-driven mode (for scripted provisioning). Both share the `WizardState` backend with the web wizard — they produce the same config output.
-
-Use the CLI wizard for SSH-only installs where opening a browser on the LAN is not feasible.
+The wizard annotates each provider's option label to show observed vs. model-based and haze eligibility. When haze detection is enabled (`[conditions] haze_detection = true`), the wizard warns if the operator selects a model-based AQI provider (only observed-data providers are eligible for haze confirmation).
 
 ### Haze calibration bootstrap
 
