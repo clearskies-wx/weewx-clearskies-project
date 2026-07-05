@@ -929,7 +929,7 @@ Apply three stability mechanisms before any threshold comparison:
 | Input | Window |
 |-------|--------|
 | Solar radiation (GHI → 1-min bins) | 30 min |
-| UV | 10 min |
+| UV | Directional hysteresis (see below) |
 | appTemp, dewpoint, outTemp | 10 min |
 | windSpeed, windGust | 5 min |
 | rainRate | 2 min |
@@ -947,6 +947,8 @@ Apply three stability mechanisms before any threshold comparison:
 **Minimum hold time:** 5 minutes. After composition, hold the conditions text string for 5 minutes before allowing any change, even when smoothed + hysteresis inputs produce a different result.
 
 **Sky condition stability:** The sky classifier uses a temporal coherence filter instead of hysteresis — a raw classification must persist for 15 consecutive minutes before replacing the stable label. This is independent of the 5-minute conditions text hold time, which still applies to the composed `weatherText` string.
+
+**UV directional hysteresis:** The UV field on `/current` uses asymmetric hysteresis instead of a rolling mean. Rises require 3 consecutive samples above the current displayed value (~15 seconds) before the displayed value updates upward. Falls require 60 consecutive samples below the current displayed value (~5 minutes) before stepping down to the current reading. This prevents transient cloud-shadow dips from showing a misleadingly low UV while allowing genuine increases to surface quickly. The dashboard excludes UV from the SSE overlay merge — the card reads the REST-enriched value only. Raw UV continues to flow through SSE for charts and other consumers that need instantaneous readings.
 
 ### Composition order
 
