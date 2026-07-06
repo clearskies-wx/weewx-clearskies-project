@@ -1819,7 +1819,7 @@ The composed narrative is exposed on `DailyForecastPoint.forecastText` (see [can
 | Module | Purpose |
 |---|---|
 | `sse/gfe/__init__.py` | Package init + public API: `generate_forecast_text(period, locale)`, `generate_current_text(obs, verbosity, locale)` (placeholder — raises `NotImplementedError`), `aggregate_periods(hourly_data, sunrise, sunset, current_time, timezone, locale)`, plus re-exports `compose_forecast_text` and `compose_nws_passthrough` |
-| `sse/gfe/thresholds.py` | All threshold tables (sky, temp, wind, weather, PoP, snow/ice, marine, fire) |
+| `sse/gfe/thresholds.py` | All threshold tables (sky, temp, wind, weather, PoP, snow/ice, marine, fire, sub-period time descriptors) |
 | `sse/gfe/sky_phrases.py` | Sky coverage (6-bucket for forecast; SkyPyEye stays for current) |
 | `sse/gfe/temp_phrases.py` | Temperature decade phrasing, exceptions, trends, extremes |
 | `sse/gfe/wind_phrases.py` | Hybrid Beaufort/GFE wind scale, gusts, marine wind |
@@ -1827,7 +1827,6 @@ The composed narrative is exposed on `DailyForecastPoint.forecastText` (see [can
 | `sse/gfe/snow_ice_phrases.py` | Snow/ice accumulation phrasing |
 | `sse/gfe/marine_phrases.py` | Marine phrase templates (tables only, no provider) |
 | `sse/gfe/fire_phrases.py` | Fire weather (tiered — Tier 1 active, Tier 2/3 dormant) |
-| `sse/gfe/time_descriptors.py` | Period labels + 42-entry sub-period table |
 | `sse/gfe/connectors.py` | Scalar/vector/weather connector strategies |
 | `sse/gfe/composer.py` | Single-pass composition engine (`compose_forecast_text`, `compose_nws_passthrough`) |
 | `sse/forecast_model.py` | `ForecastPeriod` dataclass |
