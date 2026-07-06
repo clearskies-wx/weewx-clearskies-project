@@ -329,12 +329,10 @@ The GFE text engine (API-MANUAL §15) generates forecast narratives from provide
 
 ### Fields available from provider APIs but not yet mapped
 
-These fields exist in provider API responses and are relevant to the text engine, but `HourlyForecastPoint` had no canonical field for them until ADR-082 added `feelsLike` and `iceAccumulation`. The provider modules that already parse these fields into their Pydantic wire models but discard them during canonical translation must be updated to map them.
+ADR-082 added canonical `HourlyForecastPoint`/`DailyForecastPoint` fields for `feelsLike` and `iceAccumulation`. Both are mapped in the provider modules as of commit eb64bf3 — see the tables above for provider coverage. `dewpoint` remains the one relevant field with no canonical mapping:
 
 | Field | Xweather | Open-Meteo | OWM | Status |
 |---|---|---|---|---|
-| `feelsLike` (hourly) | Wire model parses `feelslikeF/C` | Available as `apparent_temperature` (not yet requested) | Wire model parses `feels_like` | Added to canonical by ADR-082 — mapping needed |
-| `iceAccumulation` (daily) | Available as `iceaccumMM/IN` (not yet parsed) | — | — | Added to canonical by ADR-082 — parsing needed |
 | `dewpoint` (hourly) | Wire model parses, discards | Available as `dew_point_2m` (not yet requested) | Wire model parses, discards | No canonical field yet — future work |
 
 ### Fire weather data availability

@@ -490,8 +490,8 @@ Per [ADR-082](../../decisions/ADR-082-unified-text-generation-engine.md) (NWS GF
 | precipType | Yes | derived from WMO `weather_code` | — |
 | cloudCover | Yes | `cloud_cover` | % |
 | weatherCode | Yes | `weather_code` | WMO integer code |
-| feelsLike | Available | `apparent_temperature` | ADR-082: needs adding to `_HOURLY_VARS` and mapping — variable exists on the wire but is not yet requested/parsed |
+| feelsLike | Yes | `apparent_temperature` | Mapped per ADR-082 (commit eb64bf3) |
 | snowAmount (daily) | Yes | `snowfall_sum` | cm |
 | humidityMax/Min (daily) | Yes | `relative_humidity_2m_max`/`relative_humidity_2m_min` | — |
 
-Open-Meteo is a strong provider for text-generation inputs — every hourly field the engine needs is available except `feelsLike`, which is present on the wire (`apparent_temperature`) but requires a code change to add it to the hourly variable request list and map it into `HourlyForecastPoint`.
+Open-Meteo is a strong provider for text-generation inputs — every hourly field the engine needs, including `feelsLike` (`apparent_temperature`), is requested and mapped.

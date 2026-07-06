@@ -498,8 +498,8 @@ Per [ADR-082](../../decisions/ADR-082-unified-text-generation-engine.md) (NWS GF
 | precipType | Yes | derived from `weather[0].id` | WMO-style mapping |
 | cloudCover | Yes | `clouds` | % |
 | weatherCode | Yes | `weather[0].id` | OWM condition ID |
-| feelsLike | Available | `feels_like` | ADR-082: wire model parses but currently discards; needs mapping into `HourlyForecastPoint`/`DailyForecastPoint` |
+| feelsLike | Yes | `feels_like` | Mapped per ADR-082 (commit eb64bf3) |
 | snowAmount (daily) | Yes | `daily[].snow` | mm |
 | humidityMax (daily) | Partial | `humidity` | Single value mapped to humidityMax only; no humidityMin field exists on the wire |
 
-OWM covers every hourly field the engine needs. Gaps: `feelsLike` is parsed but discarded (needs mapping), and daily humidity is a single value so only `humidityMax` is populated — `humidityMin` has no OWM wire source.
+OWM covers every hourly field the engine needs, including `feelsLike`. Remaining gap: daily humidity is a single value so only `humidityMax` is populated — `humidityMin` has no OWM wire source.

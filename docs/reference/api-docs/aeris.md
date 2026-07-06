@@ -769,10 +769,10 @@ Per [ADR-082](../../decisions/ADR-082-unified-text-generation-engine.md) (NWS GF
 | precipType | Yes | `weatherPrimaryCoded` | Decoded from coded string |
 | cloudCover | Yes | `sky` | 0–100% |
 | weatherCode | Yes | `weatherPrimaryCoded` | Coded weather string |
-| feelsLike | Yes | `feelslikeF`/`feelslikeC` | ADR-082: mapping needed — wire model parses but currently discards |
-| iceAccumulation (daily) | Yes | `iceaccumMM`/`iceaccumIN` | ADR-082: parsing needed — not yet in wire model |
+| feelsLike | Yes | `feelslikeF`/`feelslikeC` | Mapped per ADR-082 (commit eb64bf3) |
+| iceAccumulation (daily) | Yes | `iceaccumMM`/`iceaccumIN` | Mapped per ADR-082 (commit eb64bf3) |
 | snowAmount (daily) | Yes | `snowIN`/`snowCM` | — |
 | narrative (daily) | Yes | `weather` | — |
 | thunderRisk | Yes | `thunderstormRisk` | Xweather is the only provider with this field |
 
-Xweather is the strongest provider for text-generation inputs among the four — it is the only provider supplying `thunderRisk` and daily ice accumulation, though both currently require wire-model or mapping work per ADR-082 before the engine can consume them.
+Xweather is the strongest provider for text-generation inputs among the four — it is the only provider supplying `thunderRisk` and daily ice accumulation.
