@@ -1808,6 +1808,10 @@ Single-pass sequential assembly: sky phrase (suppressed when PoP ≥ 55%), tempe
 
 One level per forecast period, matching GFE's single narrative product. Current observations retain three tiers (terse/standard/verbose) per §8.
 
+### Response field: forecastText
+
+The composed narrative is exposed on `DailyForecastPoint.forecastText` (see [canonical-data-model.md §3.4](../contracts/canonical-data-model.md)) — an NWS-style forecast narrative for that period. `sse/forecast_text_enrichment.py` populates it on the `/api/v1/forecast` response: for non-NWS providers it is the GFE engine's `compose_forecast_text()` output; for the NWS provider it is the pass-through `detailedForecast` value (see NWS pass-through, above). It is `null` when hourly data is insufficient for generation.
+
 ### Module inventory
 
 | Module | Purpose |
