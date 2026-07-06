@@ -348,7 +348,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 
 ---
 
-### PHASE 2 — Help Content 🔄 IN PROGRESS (2026-07-03, updated 2026-07-04)
+### PHASE 2 — Help Content ✅ COMPLETE (2026-07-04)
 
 > Content authoring for all wizard steps and admin sections.
 
@@ -384,7 +384,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 
 - Accept: All 17 steps have help keys in en.json. Markdown renders correctly via `translate_md()`. Content is helpful and accurate.
 
-**T2.2 — Author admin help content (English)** ⚠️ REQUIRES RE-EXECUTION
+**T2.2 — Author admin help content (English)** ✅ COMPLETE (2026-07-04)
 - Owner: Coordinator (Opus) — original content authoring
 - File: `repos/weewx-clearskies-stack/weewx_clearskies_config/translations/en.json`
 - Do: Add structured help keys for all admin sections:
@@ -410,7 +410,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
   ⚠️ NEEDS DETAIL: Same as T2.1 — content needs to be authored per section.
 
 - Accept: All admin sections have help keys in en.json. Content is accurate and helpful.
-- **⚠️ RE-EXECUTION REQUIRED (2026-07-04):** Initial content was committed 2026-07-03 but shares the same issues found during the wizard help review. Must be re-executed AFTER all wizard pin items (PINNED-ITEMS.md) are resolved so admin help matches the finalized wizard help. See PINNED-ITEMS.md #22.
+- **COMPLETED (2026-07-04):** Re-execution done across commits 626486a, af59c7f, 9d2bb08 (British→US spelling, "dashboard"→"weather site", orphaned keys removed, provider names fixed). Final pass added missing help content for station, database, and per-provider config editor sections (provider_forecast, provider_alerts, provider_aqi, provider_earthquakes, provider_radar) with help triggers added to config/section.html, config/provider_section.html, and config/column_mapping.html.
 
   **Granular change list — apply to each admin help section (`help.admin.*` keys in en.json):**
 
@@ -468,17 +468,18 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
 - Do: For every `<input>`, `<select>`, and `<textarea>` that lacks a `<small>` hint, add a `<small id="help_...">{{ _("...") }}</small>` with `aria-describedby` on the input.
 - Accept: Every form input in every wizard step has an associated help hint. All hints translatable via `_()`.
 
-**T2.5 — Translate all help content to 12 non-English locales**
+**T2.5 — Translate all help content to 12 non-English locales** ✅ COMPLETE (2026-07-05)
 - Owner: `clearskies-docs-author` (Sonnet) — mechanical translation from Opus-authored English
 - Files: 12 files in `repos/weewx-clearskies-stack/weewx_clearskies_config/translations/{locale}.json`
 - Do: Translate all new help keys (wizard step help, admin section help, field help_text, field wizard_help, inline hints) to all 12 non-English locales.
 - Accept: All 12 locale files have complete translations for all new keys. `JSON.parse` succeeds on each.
+- **COMPLETED (2026-07-05):** 95 missing help keys translated across all 12 locales (de, es, fil, fr, it, ja, nl, pt-BR, pt-PT, ru, zh-CN, zh-TW). Delegated to 4 parallel `clearskies-docs-author` agents (3 locales each). All 12 files validated: 107/107 help keys present, JSON.parse succeeds, 1064 total keys each. zh-TW used Taiwan-specific terminology (伺服器, 資料庫, 規模/震度). pt-PT used European Portuguese (ficheiro, palavra-passe). Scratchpad intermediates preserved at session scratchpad path.
 
 **QC (Opus) — after Phase 2:** Walk wizard with help panel open for 5 representative steps (step_api, step_db, step_providers, step_appearance, step_tls). Verify content is helpful, accurate, and renders correctly. Switch to German locale — verify help renders in German. Check admin help for 3 sections (providers, sky_classification, haze_calibration). Spot-check 5 registry fields for populated `help_text`.
 
 ---
 
-### PHASE 3 — Operator Manual ⚠️ REQUIRES REVISION (2026-07-03, review 2026-07-04)
+### PHASE 3 — Operator Manual ✅ COMPLETE (2026-07-04)
 
 > Operator-facing manual with 13 sections, measured system requirements, and 5 SVG diagrams.
 
@@ -544,7 +545,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
   - `wizard-flow.svg` — 16-step wizard flow from Language to Complete
 - Accept: Diagrams are clear, readable, and accurate. SVG format for quality at any size.
 
-**T3.9 — Revise manual to match wizard review findings** ⚠️ REQUIRES EXECUTION
+**T3.9 — Revise manual to match wizard review findings** ✅ COMPLETE (2026-07-04)
 - Owner: Coordinator (Opus)
 - File: `repos/weewx-clearskies-stack/docs/OPERATOR-MANUAL.md`
 - Do: Apply all findings from the 2026-07-04 wizard help review to the operator manual. Execute AFTER T2.2 re-execution and AFTER all blocking pin items are resolved, so the manual matches the final in-app help.
@@ -572,6 +573,7 @@ This plan covers four deliverables: a licensing change, an in-app help system, a
   | §13 Legal | Verify compliance disclaimer language matches the in-app step 12 help: "not legal advice, we are not lawyers." Verify translation policy section matches reality (which documents translated, which English-only, upload-your-own guidance). |
 
 - Accept: Manual content matches finalized in-app help. No jargon mismatch between manual and wizard/admin. Zero British spellings. All deferred sections clearly noted as pending pin item resolution.
+- **COMPLETED (2026-07-04):** Global "dashboard"→"weather site" applied in commit af59c7f (39 replacements). Final pass revised §6 (wizard guide — corrected provider lists, added column mapping consequences, station pre-fill/sync warning, decimal degrees, alt text, appearance logo/favicon specs, custom backgrounds, webcam formats, privacy "None/Disabled" option + compliance disclaimers, Moment Magnitude, full TLS mode descriptions) and §7 (admin guide — added database section, corrected provider section structure, fixed TLS to say "filesystem paths" not "upload", fixed geographic features to remove stale bounds reference). Zero British spellings confirmed via grep.
 
 **QC (Opus) — after Phase 3:** Read full manual end-to-end. Verify system requirements match measured values. Walk native install guide mentally against OPERATIONS-MANUAL.md for accuracy. Verify support scope matches dialog. Verify legal section matches Phase 0 license documents. Verify no content duplicates in-app help verbatim (cross-references instead).
 
