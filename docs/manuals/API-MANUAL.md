@@ -1832,9 +1832,13 @@ The composed narrative is exposed on `DailyForecastPoint.forecastText` (see [can
 | `sse/period_aggregator.py` | Aggregate hourly provider data into day/night periods |
 | `sse/forecast_text_enrichment.py` | Enrichment adapter for `/api/v1/forecast` |
 
-### Known limitation — i18n inflection not wired into forecast composition
+### i18n inflection in forecast composition
 
-`t_inflected()` (Romance gender/number agreement) and `t_case()` (Russian grammatical case) exist in `i18n.py` but are not yet wired into the forecast composition path. Romance coverage/intensity terms and Russian weather type nouns currently resolve to nominative/plain string forms. This matches the same limitation documented for the current-conditions composition path (§8). Wiring these into the forecast path is a follow-up task.
+`sse/gfe/wx_phrases.py` wires `t_inflected()` (Romance gender/number agreement) and `t_case()` (Russian grammatical case) into forecast composition. Coverage and intensity words for Romance locales (French, Spanish, Italian, Portuguese) resolve through `t_inflected()` against a per-locale, per-GFE-type gender/number code (`WEATHER_TYPE_GENDER` in `wx_phrases.py`) so they agree with the weather type they modify (e.g. French "dispersée" for feminine-singular "pluie" vs. "dispersés" for masculine-plural "orages"). Weather type words resolve through `t_case()`, defaulting to the nominative case — Russian carries case-inflected `wx.type.*` dicts (nominative/instrumental/genitive); other locales carry plain strings, which both functions return unchanged regardless of the gender/case argument passed. This differs from the current-conditions composition path (§8), which still resolves these terms as plain strings — that limitation remains open there.
+
+All GFE phrase generators (`wx_phrases.py`, `wind_phrases.py`, `temp_phrases.py`, `snow_ice_phrases.py`) render numeric values via `i18n.format_number()`, not `str()`, so decimal separators follow locale convention (e.g. `10,5` in French vs. `10.5` in English).
+
+Locale JSON files carry `wind.*` keys (the hybrid Beaufort/GFE wind-scale labels, magnitude/gust templates, and marine wind descriptors) for all 13 supported locales.
 
 ### GFE code reuse directive
 
