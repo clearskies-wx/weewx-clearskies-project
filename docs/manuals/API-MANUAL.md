@@ -963,7 +963,7 @@ Examples: "Warm and Humid, Overcast, with Light Rain" / "Pleasant, Partly Cloudy
 
 ### Locale-aware composition (i18n)
 
-`sse/conditions_text.py`'s `build_weather_text()` / `_compose()` produce `weatherText` in the operator's `default_locale` (§6). All labels the composer assembles — temperature-comfort, sky condition (with the day/night vocabulary swap), Beaufort ("and Gusty" qualifier included), and precipitation intensity — resolve through `i18n.t()` against the active locale before composition, per the table in §6.
+`sse/conditions_text.py`'s `build_weather_text()` / `_compose()` produce `weatherText` in the operator's `default_locale` (§6). All labels the composer assembles — temperature-comfort, sky condition (with the day/night vocabulary swap), wind (hybrid Beaufort/GFE, with the "with gusts to around X mph" qualifier — see §15 for the hybrid wind treatment), and precipitation intensity — resolve through `i18n.t()` against the active locale before composition, per the table in §6.
 
 **What is implemented:** a single generic template composer, used for all 13 locales including the three CJK locales (`ja`, `zh-CN`, `zh-TW`). Each locale file's `composition` block supplies three values that `_compose()` reads:
 
