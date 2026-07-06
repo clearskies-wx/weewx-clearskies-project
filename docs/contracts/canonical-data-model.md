@@ -233,6 +233,7 @@ One hour of provider forecast.
 | `cloudCover` | number | Yes | group_percent | 0–100. |
 | `weatherCode` | string | Yes | — | Provider-defined code (e.g. WMO, NWS icon path, OWM `id`). Opaque to api; dashboard maps to icon. |
 | `weatherText` | string | Yes | — | Short label, "Mostly sunny", "Light rain". |
+| `feelsLike` | number | Yes | group_temperature | Apparent temperature (heat index or wind chill depending on conditions). Unit: same as `outTemp` (°F or °C per operator unit system). |
 | `extras` | object | No | — | Provider-specific fields not in canonical model. |
 | `source` | string | No | — | Provider id. |
 
@@ -257,6 +258,7 @@ One day of provider forecast.
 | `weatherCode` | string | Yes | — | |
 | `weatherText` | string | Yes | — | Short label. |
 | `narrative` | string | Yes | — | Multi-sentence summary (NWS, some Aeris plans). |
+| `iceAccumulation` | number | Yes | group_rain | Ice accumulation forecast. Unit: inches (US) or millimeters (metric). Currently supplied by Xweather only. |
 | `extras` | object | No | — | |
 | `source` | string | No | — | |
 
