@@ -377,7 +377,7 @@ Container shape `/forecast` returns.
 |---|---|---|---|
 | `hourly` | array<HourlyForecastPoint> | No | May be empty if provider omits hourly. |
 | `daily` | array<DailyForecastPoint> | No | May be empty if provider omits daily. |
-| `discussion` | ForecastDiscussion or `null` | Yes | `null` for providers without one (Open-Meteo, OWM, Wunderground PWS). |
+| `discussion` | ForecastDiscussion or `null` | Yes | `null` for providers without one (Open-Meteo, OWM). |
 | `source` | string | No | Provider id. |
 | `generatedAt` | string (date-time UTC) | No | When the api assembled this bundle. |
 
@@ -407,22 +407,22 @@ Sources for every table: the provider's own API documentation captured in [`docs
 
 ### 4.1 Forecast providers (per [ADR-007](../decisions/ADR-007-forecast-providers.md))
 
-Day-1 set: `aeris`, `nws`, `openmeteo`, `openweathermap`, `wunderground`.
+Day-1 set: `aeris`, `nws`, `openmeteo`, `openweathermap`.
 
 #### 4.1.1 Current observation (HourlyForecastPoint shape — used as latest-hour fallback when archive is empty / forecast endpoint serves "current")
 
-| Canonical | aeris (`/observations`) | nws (`/stations/{id}/observations/latest`) | openmeteo (`/v1/forecast?current=`) | openweathermap (`/data/2.5/weather`) | wunderground (`/v2/pws/observations/current`) |
-|---|---|---|---|---|---|
-| `validTime` | `ob.dateTimeISO` | `properties.timestamp` | `current.time` | `dt` (epoch s, convert) | `observations[0].obsTimeUtc` |
-| `outTemp` | `ob.tempF`/`ob.tempC` (pick by target_unit) | `properties.temperature.value` (always °C) | `current.temperature_2m` | `main.temp` | `observations[0].imperial.temp`/`metric.temp` |
-| `outHumidity` | `ob.humidity` | `properties.relativeHumidity.value` | `current.relative_humidity_2m` | `main.humidity` | `observations[0].humidity` |
-| `windSpeed` | `ob.windSpeedMPH`/`KPH`/`MPS` | `properties.windSpeed.value` (always km/h) | `current.wind_speed_10m` | `wind.speed` | `observations[0].imperial.windSpeed`/`metric.windSpeed` |
-| `windDir` | `ob.windDirDEG` | `properties.windDirection.value` | `current.wind_direction_10m` | `wind.deg` | `observations[0].winddir` |
-| `windGust` | `ob.windGustMPH`/`KPH`/`MPS` | — | `current.wind_gusts_10m` | `wind.gust` | `observations[0].imperial.windGust` |
-| `barometer` | `ob.pressureIN`/`MB` | `properties.barometricPressure.value` (always Pa) | — | `main.pressure` (always hPa) | `observations[0].imperial.pressure` |
-| `dewpoint` | `ob.dewpointF`/`C` | `properties.dewpoint.value` (always °C) | `current.dew_point_2m` (One Call) / — (Forecast 3.0) | — (current free) / `current.dew_point` (One Call 3.0) | `observations[0].imperial.dewpt` |
-| `weatherCode` | `ob.weatherPrimaryCoded` | derived from `properties.icon` | `current.weather_code` (WMO) | `weather[0].id` | — |
-| `weatherText` | `ob.weatherShort` | `properties.textDescription` | (decode from WMO code) | `weather[0].description` | — |
+| Canonical | aeris (`/observations`) | nws (`/stations/{id}/observations/latest`) | openmeteo (`/v1/forecast?current=`) | openweathermap (`/data/2.5/weather`) |
+|---|---|---|---|---|
+| `validTime` | `ob.dateTimeISO` | `properties.timestamp` | `current.time` | `dt` (epoch s, convert) |
+| `outTemp` | `ob.tempF`/`ob.tempC` (pick by target_unit) | `properties.temperature.value` (always °C) | `current.temperature_2m` | `main.temp` |
+| `outHumidity` | `ob.humidity` | `properties.relativeHumidity.value` | `current.relative_humidity_2m` | `main.humidity` |
+| `windSpeed` | `ob.windSpeedMPH`/`KPH`/`MPS` | `properties.windSpeed.value` (always km/h) | `current.wind_speed_10m` | `wind.speed` |
+| `windDir` | `ob.windDirDEG` | `properties.windDirection.value` | `current.wind_direction_10m` | `wind.deg` |
+| `windGust` | `ob.windGustMPH`/`KPH`/`MPS` | — | `current.wind_gusts_10m` | `wind.gust` |
+| `barometer` | `ob.pressureIN`/`MB` | `properties.barometricPressure.value` (always Pa) | — | `main.pressure` (always hPa) |
+| `dewpoint` | `ob.dewpointF`/`C` | `properties.dewpoint.value` (always °C) | `current.dew_point_2m` (One Call) / — (Forecast 3.0) | — (current free) / `current.dew_point` (One Call 3.0) |
+| `weatherCode` | `ob.weatherPrimaryCoded` | derived from `properties.icon` | `current.weather_code` (WMO) | `weather[0].id` |
+| `weatherText` | `ob.weatherShort` | `properties.textDescription` | (decode from WMO code) | `weather[0].description` |
 
 Notes:
 
@@ -430,24 +430,23 @@ Notes:
 - **NWS forecast `windSpeed` is a string range** (`"5 to 10 mph"`) — the normalizer parses to numeric, taking the upper bound (matches "windSpeedMax" semantics where one number is needed).
 - **OWM `wind.speed` unit varies with `units=` param**: `m/s` for `standard`/`metric`, `mph` for `imperial`. The normalizer requests with the unit matching target_unit.
 - **OWM precipitation probability `pop`** is `0..1`, not `0..100` — multiply by 100 in the normalizer.
-- **Wunderground PWS `observations[0]`** has `imperial` and `metric` sub-objects; the normalizer picks the one matching target_unit. Wunderground does not supply hourly forecast, alerts, or discussion.
 
 #### 4.1.2 Hourly forecast (HourlyForecastPoint)
 
-| Canonical | aeris (`/forecasts` hourly interval) | nws (`/gridpoints/.../forecast/hourly`) | openmeteo (`/v1/forecast?hourly=`) | openweathermap (`/data/3.0/onecall` hourly) | wunderground |
-|---|---|---|---|---|---|
-| `validTime` | `periods[].dateTimeISO` | `properties.periods[].startTime` | `hourly.time[i]` | `hourly[].dt` (epoch s, convert) | not supplied |
-| `outTemp` | `periods[].tempF`/`C` | `periods[].temperature` (with `temperatureUnit`) | `hourly.temperature_2m[i]` | `hourly[].temp` | — |
-| `outHumidity` | `periods[].humidity` | (not in default response; see grid-data raw) | `hourly.relative_humidity_2m[i]` | `hourly[].humidity` | — |
-| `windSpeed` | `periods[].windSpeedMPH`/`KPH`/`MPS` | `periods[].windSpeed` (parse range string) | `hourly.wind_speed_10m[i]` | `hourly[].wind_speed` | — |
-| `windDir` | `periods[].windDirDEG` | `periods[].windDirection` (compass abbrev — convert to degrees) | `hourly.wind_direction_10m[i]` | `hourly[].wind_deg` | — |
-| `windGust` | `periods[].windGustMPH`/`KPH`/`MPS` | (not in default; grid-data raw has it) | `hourly.wind_gusts_10m[i]` | `hourly[].wind_gust` | — |
-| `precipProbability` | `periods[].pop` | `periods[].probabilityOfPrecipitation.value` | `hourly.precipitation_probability[i]` | `hourly[].pop * 100` | — |
-| `precipAmount` | `periods[].precipMM`/`IN` | (not in default; grid-data raw has it) | `hourly.precipitation[i]` | `hourly[].rain.1h` + `hourly[].snow.1h` | — |
-| `precipType` | derived from `periods[].weatherPrimaryCoded` | (heuristic from `shortForecast`) | derived from `weather_code` (WMO) | derived from `weather[0].main` | — |
-| `cloudCover` | `periods[].sky` | (not in default; grid-data raw has it) | `hourly.cloud_cover[i]` | `hourly[].clouds` | — |
-| `weatherCode` | `periods[].weatherPrimaryCoded` | extract from `periods[].icon` URL | `hourly.weather_code[i]` (WMO) | `hourly[].weather[0].id` | — |
-| `weatherText` | `periods[].weatherShort` | `periods[].shortForecast` | (decode from WMO) | `hourly[].weather[0].description` | — |
+| Canonical | aeris (`/forecasts` hourly interval) | nws (`/gridpoints/.../forecast/hourly`) | openmeteo (`/v1/forecast?hourly=`) | openweathermap (`/data/3.0/onecall` hourly) |
+|---|---|---|---|---|
+| `validTime` | `periods[].dateTimeISO` | `properties.periods[].startTime` | `hourly.time[i]` | `hourly[].dt` (epoch s, convert) |
+| `outTemp` | `periods[].tempF`/`C` | `periods[].temperature` (with `temperatureUnit`) | `hourly.temperature_2m[i]` | `hourly[].temp` |
+| `outHumidity` | `periods[].humidity` | (not in default response; see grid-data raw) | `hourly.relative_humidity_2m[i]` | `hourly[].humidity` |
+| `windSpeed` | `periods[].windSpeedMPH`/`KPH`/`MPS` | `periods[].windSpeed` (parse range string) | `hourly.wind_speed_10m[i]` | `hourly[].wind_speed` |
+| `windDir` | `periods[].windDirDEG` | `periods[].windDirection` (compass abbrev — convert to degrees) | `hourly.wind_direction_10m[i]` | `hourly[].wind_deg` |
+| `windGust` | `periods[].windGustMPH`/`KPH`/`MPS` | (not in default; grid-data raw has it) | `hourly.wind_gusts_10m[i]` | `hourly[].wind_gust` |
+| `precipProbability` | `periods[].pop` | `periods[].probabilityOfPrecipitation.value` | `hourly.precipitation_probability[i]` | `hourly[].pop * 100` |
+| `precipAmount` | `periods[].precipMM`/`IN` | (not in default; grid-data raw has it) | `hourly.precipitation[i]` | `hourly[].rain.1h` + `hourly[].snow.1h` |
+| `precipType` | derived from `periods[].weatherPrimaryCoded` | (heuristic from `shortForecast`) | derived from `weather_code` (WMO) | derived from `weather[0].main` |
+| `cloudCover` | `periods[].sky` | (not in default; grid-data raw has it) | `hourly.cloud_cover[i]` | `hourly[].clouds` |
+| `weatherCode` | `periods[].weatherPrimaryCoded` | extract from `periods[].icon` URL | `hourly.weather_code[i]` (WMO) | `hourly[].weather[0].id` |
+| `weatherText` | `periods[].weatherShort` | `periods[].shortForecast` | (decode from WMO) | `hourly[].weather[0].description` |
 
 Notes:
 
@@ -459,44 +458,43 @@ Notes:
 
 #### 4.1.3 Daily forecast (DailyForecastPoint)
 
-| Canonical | aeris (`/forecasts` daily interval) | nws (`/gridpoints/.../forecast`) | openmeteo (`/v1/forecast?daily=`) | openweathermap (`/data/3.0/onecall` daily) | wunderground (`/v3/wx/forecast/daily/5day`) |
-|---|---|---|---|---|---|
-| `validDate` | `periods[].dateTimeISO` (date part) | `periods[].startTime` (date part; periods alternate day/night — pair them) | `daily.time[i]` | `daily[].dt` (epoch s → date) | `validTimeLocal` (date part) |
-| `tempMax` | `periods[].maxTempF`/`C` | day-period `temperature` | `daily.temperature_2m_max[i]` | `daily[].temp.max` | `temperatureMax` |
-| `tempMin` | `periods[].minTempF`/`C` | night-period `temperature` | `daily.temperature_2m_min[i]` | `daily[].temp.min` | `temperatureMin` |
-| `precipAmount` | `periods[].precipMM`/`IN` | (parse from `detailedForecast`) | `daily.precipitation_sum[i]` | `daily[].rain` + `daily[].snow` | `qpf` |
-| `precipProbabilityMax` | `periods[].pop` | `periods[].probabilityOfPrecipitation.value` (max of day+night) | `daily.precipitation_probability_max[i]` | `daily[].pop * 100` | `daypart[0].precipChance` |
-| `windSpeedMax` | `periods[].windSpeedMaxMPH`/`KPH`/`MPS` | `periods[].windSpeed` (parse upper bound) | `daily.wind_speed_10m_max[i]` | `daily[].wind_speed` | `daypart[0].windSpeed` |
-| `windGustMax` | `periods[].windGustMaxMPH`/`KPH`/`MPS` | — | `daily.wind_gusts_10m_max[i]` | `daily[].wind_gust` | — |
-| `sunrise` | `periods[].sunriseISO` | — | `daily.sunrise[i]` | `daily[].sunrise` (epoch s) | `sunriseTimeUtc` |
-| `sunset` | `periods[].sunsetISO` | — | `daily.sunset[i]` | `daily[].sunset` (epoch s) | `sunsetTimeUtc` |
-| `uvIndexMax` | `periods[].uvi` | — | `daily.uv_index_max[i]` | `daily[].uvi` | `daypart[0].uvIndex` |
-| `weatherCode` | `periods[].weatherPrimaryCoded` | extract from `periods[].icon` | `daily.weather_code[i]` | `daily[].weather[0].id` | `daypart[0].iconCode` |
-| `weatherText` | `periods[].weatherShort` | day-period `shortForecast` | (decode from WMO) | `daily[].summary` (preferred) or `weather[0].description` | `daypart[0].wxPhraseShort` |
-| `narrative` | `periods[].text` (paid-tier on some plans) | day-period `detailedForecast` | — | `daily[].summary` | `narrative` |
+| Canonical | aeris (`/forecasts` daily interval) | nws (`/gridpoints/.../forecast`) | openmeteo (`/v1/forecast?daily=`) | openweathermap (`/data/3.0/onecall` daily) |
+|---|---|---|---|---|
+| `validDate` | `periods[].dateTimeISO` (date part) | `periods[].startTime` (date part; periods alternate day/night — pair them) | `daily.time[i]` | `daily[].dt` (epoch s → date) |
+| `tempMax` | `periods[].maxTempF`/`C` | day-period `temperature` | `daily.temperature_2m_max[i]` | `daily[].temp.max` |
+| `tempMin` | `periods[].minTempF`/`C` | night-period `temperature` | `daily.temperature_2m_min[i]` | `daily[].temp.min` |
+| `precipAmount` | `periods[].precipMM`/`IN` | (parse from `detailedForecast`) | `daily.precipitation_sum[i]` | `daily[].rain` + `daily[].snow` |
+| `precipProbabilityMax` | `periods[].pop` | `periods[].probabilityOfPrecipitation.value` (max of day+night) | `daily.precipitation_probability_max[i]` | `daily[].pop * 100` |
+| `windSpeedMax` | `periods[].windSpeedMaxMPH`/`KPH`/`MPS` | `periods[].windSpeed` (parse upper bound) | `daily.wind_speed_10m_max[i]` | `daily[].wind_speed` |
+| `windGustMax` | `periods[].windGustMaxMPH`/`KPH`/`MPS` | — | `daily.wind_gusts_10m_max[i]` | `daily[].wind_gust` |
+| `sunrise` | `periods[].sunriseISO` | — | `daily.sunrise[i]` | `daily[].sunrise` (epoch s) |
+| `sunset` | `periods[].sunsetISO` | — | `daily.sunset[i]` | `daily[].sunset` (epoch s) |
+| `uvIndexMax` | `periods[].uvi` | — | `daily.uv_index_max[i]` | `daily[].uvi` |
+| `weatherCode` | `periods[].weatherPrimaryCoded` | extract from `periods[].icon` | `daily.weather_code[i]` | `daily[].weather[0].id` |
+| `weatherText` | `periods[].weatherShort` | day-period `shortForecast` | (decode from WMO) | `daily[].summary` (preferred) or `weather[0].description` |
+| `narrative` | `periods[].text` (paid-tier on some plans) | day-period `detailedForecast` | — | `daily[].summary` |
 
 Notes:
 
 - **NWS `/forecast` periods alternate day/night.** The normalizer pairs them: day's `temperature` → `tempMax`, night's `temperature` → `tempMin`. `probabilityOfPrecipitation` takes the max across the pair.
 - **OWM `daily.summary`** (One Call 3.0) is a one-sentence summary suitable for `weatherText`; the longer narrative path is provider-side only on Aeris paid plans, not free.
-- **Wunderground daily forecast** has a `daypart` array with separate day/night entries; the normalizer takes `daypart[0]` (day) for daytime fields, `daypart[1]` (night) for night-only.
 
 #### 4.1.4 Forecast discussion (ForecastDiscussion)
 
-| Canonical | aeris | nws | openmeteo | openweathermap | wunderground |
-|---|---|---|---|---|---|
-| `headline` | `response.forecasts[0].periods[0].weatherPrimary` (first period) | `productText` first line | — | — | — |
-| `body` | (not directly; some plans expose summary) | `productText` (full AFD body) | — | — | — |
-| `issuedAt` | — | `issuanceTime` | — | — | — |
-| `validFrom` | — | (parse from `productText` if present) | — | — | — |
-| `validUntil` | — | (parse from `productText` if present) | — | — | — |
-| `senderName` | — | `wmoCollectiveId` + `issuingOffice` (e.g. "NWS Seattle WA") | — | — | — |
-| `source` | `aeris` | `nws` | (set to `null` upstream) | (set to `null` upstream) | (set to `null` upstream) |
+| Canonical | aeris | nws | openmeteo | openweathermap |
+|---|---|---|---|---|
+| `headline` | `response.forecasts[0].periods[0].weatherPrimary` (first period) | `productText` first line | — | — |
+| `body` | (not directly; some plans expose summary) | `productText` (full AFD body) | — | — |
+| `issuedAt` | — | `issuanceTime` | — | — |
+| `validFrom` | — | (parse from `productText` if present) | — | — |
+| `validUntil` | — | (parse from `productText` if present) | — | — |
+| `senderName` | — | `wmoCollectiveId` + `issuingOffice` (e.g. "NWS Seattle WA") | — | — |
+| `source` | `aeris` | `nws` | (set to `null` upstream) | (set to `null` upstream) |
 
 Notes:
 
 - **NWS AFD endpoint:** `/products?type=AFD&location={CWA}`, then `/products/{id}` to fetch the body. NWS AFD is plain ASCII fixed-width; surface as-is in `body`.
-- Open-Meteo, OWM, Wunderground PWS expose **no equivalent**; `discussion: null` on those bundles.
+- Open-Meteo, OWM expose **no equivalent**; `discussion: null` on those bundles.
 
 ### 4.2 AQI providers (per [ADR-013](../decisions/ADR-013-aqi-handling.md))
 

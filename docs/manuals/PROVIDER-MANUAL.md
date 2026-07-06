@@ -254,7 +254,7 @@ eclipses_interval_minutes = 1440
 
 ### Day-1 provider set
 
-Five forecast provider modules ship at v0.1:
+Four forecast provider modules ship at v0.1:
 
 | Module | Location | Key required | Coverage | Constraints |
 |---|---|---|---|---|
@@ -262,7 +262,6 @@ Five forecast provider modules ship at v0.1:
 | `nws` | `providers/forecast/nws.py` | No (User-Agent header required) | USA only | USA-only geographic gate |
 | `openmeteo` | `providers/forecast/openmeteo.py` | No (free, non-commercial) | Global | No alerts endpoint |
 | `openweathermap` | `providers/forecast/openweathermap.py` | Yes | Global | Hourly/daily/alerts require One Call 3.0 subscription |
-| `wunderground` | `providers/forecast/wunderground.py` | Yes (PWS contributor only) | PWS network | No hourly; no alerts; requires registered PWS station ID. Not offered in wizard — insufficient data for full site operation. |
 
 Each module is independently enable/disable. A missing key disables that provider's module only — other providers start normally.
 
@@ -272,7 +271,6 @@ These limitations are enforced at the module level, not the endpoint level:
 
 - **NWS:** Disable at config time if operator's lat/lon is outside the USA. Report `GeographicallyUnsupported`.
 - **OpenMeteo:** Report `FieldUnsupported` when alerts are queried. Current, hourly, and daily forecasts work normally.
-- **Weather Underground:** Require both `WUNDERGROUND_API_KEY` and `WUNDERGROUND_PWS_STATION_ID`. If either is unset, log a clear message pointing to the PWS registration requirement.
 - **OpenWeatherMap:** Distinguish basic-tier vs. One Call 3.0 at runtime. When the operator's key has only basic-tier access, return `FieldUnsupported` for hourly, daily, and alerts.
 
 ### Hidden data behavior

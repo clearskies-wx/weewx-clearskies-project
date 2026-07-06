@@ -550,7 +550,7 @@ Read-only enforcement (defense-in-depth): DB user with `SELECT`-only grants + st
 ```
 weewx_clearskies_api/providers/
 ├── _common/          # HTTP client, retry/backoff, error taxonomy, capability registry
-├── forecast/         # aeris, nws, openmeteo, openweathermap, wunderground
+├── forecast/         # aeris, nws, openmeteo, openweathermap
 ├── aqi/              # aeris, iqair, openmeteo
 ├── alerts/           # nws, aeris, openweathermap
 ├── earthquakes/      # usgs, geonet, emsc, renass

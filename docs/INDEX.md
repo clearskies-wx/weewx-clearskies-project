@@ -40,7 +40,7 @@ All three Phase 1 contracts committed; co-authoritative with the source ADRs.
 - [reference/SPIKE-FINDINGS.md](reference/SPIKE-FINDINGS.md) — Phase 1 task 1 (tech-stack spike) findings; bundle measurement vs. ADR-033, footguns documented for the dashboard scaffold.
 - [reference/PLAN-VS-ADR-AUDIT-2026-05-04.md](reference/PLAN-VS-ADR-AUDIT-2026-05-04.md) — every drift between plan body and ADRs found and fixed on 2026-05-04.
 - [reference/FORECAST-PROVIDER-RESEARCH.md](reference/FORECAST-PROVIDER-RESEARCH.md) — provider comparison feeding [ADR-007](decisions/ADR-007-forecast-providers.md).
-- [reference/api-docs/](reference/api-docs/) — captured per-provider API docs (NWS, Aeris, OpenWeather, OpenMeteo, Tomorrow.io, AccuWeather, Visual Crossing, Weather Underground).
+- [reference/api-docs/](reference/api-docs/) — captured per-provider API docs (NWS, Aeris, OpenWeather, OpenMeteo, Tomorrow.io, AccuWeather, Visual Crossing).
 - [reference/CLEAR-SKIES-CONTENT-DECISIONS.md](reference/CLEAR-SKIES-CONTENT-DECISIONS.md) — 12-category content walk; cross-cutting threads identified.
 - [reference/BELCHERTOWN-CONTENT-INVENTORY.md](reference/BELCHERTOWN-CONTENT-INVENTORY.md) — what the existing site shows; informs [ADR-024](decisions/ADR-024-page-taxonomy.md).
 - [reference/DESIGN-INSPIRATION-NOTES.md](reference/DESIGN-INSPIRATION-NOTES.md) — visual references feeding [ADR-009](decisions/ADR-009-design-direction.md).
