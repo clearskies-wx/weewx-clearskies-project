@@ -10,15 +10,15 @@
 | Phase | Status | Notes |
 |-------|--------|-------|
 | Phase 0 — Prerequisites | **Complete** | WU removed (API `31627cf`, meta `e69ce0d`), SkyPyEye rebrand (API `2a05961`, meta `fe182ef`). QC Gate 0 passed 2026-07-05. |
-| Phase 1 — ADR + Docs | **In Progress** | ADR-082 Accepted 2026-07-05. T1.2–T1.4 (governing doc updates) in progress. |
-| Phase 2 — Threshold tables | Pending | Depends on Phase 1 |
-| Phase 3 — Period aggregation | Pending | Depends on Phase 2 |
-| Phase 4 — Phrase generators | Pending | Depends on Phase 2 |
-| Phase 5 — Composition engine | Pending | Depends on Phases 4, 6 |
-| Phase 6 — WorldCast i18n | Pending | Depends on Phase 4 |
-| Phase 7 — Integration | Pending | Depends on Phases 5, 6 |
-| Phase 8 — Verification | Pending | Depends on Phase 7 |
-| Phase 9 — QA audit | Pending | Depends on Phase 8 |
+| Phase 1 — ADR + Docs | **Complete** | ADR-082 Accepted 2026-07-05. All governing docs updated (API `8b4716f`, meta `8b4716f`). QC Gate 1 passed 2026-07-05. |
+| Phase 2 — Threshold tables | **Complete** | All tables ported (API `349e4d3`), ForecastPeriod model (`9bec46d`), feelsLike+iceAccum fields (`8c2d246`), provider mapping (`eb64bf3`), 81 tests pass (`f6cb5c1`). QC Gate 2 passed 2026-07-05. |
+| Phase 3 — Period aggregation | **Complete** | Aggregator (`97914f7`), 29 tests pass (`90d508b`). QC Gate 3 passed 2026-07-05. |
+| Phase 4 — Phrase generators | **Complete** | Sky+temp (`358eb18`), wind+wx (`1460f9d`), snow/time/conn (`92540b9`), marine+fire (`b3c06d2`). QC Gate 4 passed 2026-07-05. |
+| Phase 5 — Composition engine | **Complete** | Composer (`2d6f7ce`), public API, 25 tests pass (`cbf8ceb`). QC Gate 5 passed 2026-07-05. |
+| Phase 6 — WorldCast i18n | **Complete** | EN keys (`4a635b0`), t_inflected(), 12 locales (`30bc81c`), Romance gender dicts, Russian case dicts. QC Gate 6 passed 2026-07-05. |
+| Phase 7 — Integration | **Complete** | Forecast enrichment (`3159802`), conditions_text hybrid wind, forecastText field, 9 integration tests. 144 total tests pass. QC Gate 7 passed 2026-07-05. |
+| Phase 8 — Verification | **Complete** | Cross-locale verified 13 locales, decade duplication fixed (`3c44960`), Highs/Lows localized, API-MANUAL §15 synced (`abb9200`), i18n limitation documented. 144 tests pass. QC Gate 8 passed 2026-07-05. |
+| Phase 9 — QA audit | **Complete** | Full audit found 29 findings (7H/14M/7L/1I). All remediated: compose_current_text implemented, t_inflected wired, wind/snow/ice unit-aware, 8 per-generator test files + test_gfe_i18n.py added, text_generator.py deleted, docs synced. 679 GFE tests pass. QA Gate passed 2026-07-06. |
 
 ---
 
