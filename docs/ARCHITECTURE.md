@@ -336,13 +336,19 @@ The API hosts a multi-module, stateful conditions-text engine that produces the 
 
 | Module | Role |
 |--------|------|
-| `weewx_clearskies_api/sse/conditions_text.py` | Stateless composer — assembles the `weatherText` string from per-component labels |
 | `weewx_clearskies_api/sse/sky_condition.py` | Stateful classifier — Kv-first (Duchon-O'Malley architecture with SkyPyEye Technology indices), 30-min ring buffer of 1-min GHI averages, mean-of-ratios Km, elevation-dependent dynamic thresholds, produces the sky label |
 | `weewx_clearskies_api/sse/temperature_comfort.py` | Stateless 2D matrix — maps (appTemp, dewpoint) to comfort label |
 | `weewx_clearskies_api/sse/enrichment/weather_text.py` | Enrichment adapter — reads smoothed inputs + sky class, calls `build_weather_text()`, injects result into the `/current` response dict. Provider cross-check for fog/mist confirmation. |
 | `weewx_clearskies_api/sse/haze_condition.py` | Haze detection — two-channel (Kcs deficit below dynamic clear threshold from `sky_condition.get_dynamic_clear_threshold()` + RH-graduated PM confirmation: PM2.5 50/35/25, PM10 100/75/50 µg/m³ at dry/moderate/humid RH), solar elevation gate (el > 15°), f(RH) correction, 5-min coherence |
-| `weewx_clearskies_api/sse/text_generation.py` | NWS-style text engine — terse/standard/verbose verbosity, GFE threshold tables |
 | `weewx_clearskies_api/sse/observation_model.py` | Structured local observation model — METAR-like field mapping |
+| `weewx_clearskies_api/sse/conditions_text.py` | Current-conditions composer — assembles the `weatherText` string from per-component labels. **Known limitation:** wind labels/gust phrasing now delegate to the GFE hybrid wind scale (ADR-082); sky, comfort, and precipitation composition are unchanged pending the current-conditions upgrade — see §15 preservation directive in API-MANUAL.md |
+| `weewx_clearskies_api/sse/text_generation.py` | NWS-style text engine — terse/standard/verbose verbosity for current conditions, GFE threshold tables. **Known limitation:** superseded by `sse/gfe/` for forecast-period text (ADR-082); still active for current-conditions verbosity tiers pending the current-conditions upgrade |
+| `weewx_clearskies_api/sse/gfe/composer.py` | GFE forecast text composition — single-pass sequential assembly of period narratives (ADR-082) |
+| `weewx_clearskies_api/sse/gfe/thresholds.py` | GFE threshold tables — sky, temperature, wind, weather, PoP, snow/ice, marine, fire (ADR-082) |
+| `weewx_clearskies_api/sse/gfe/*.py` | GFE phrase generators — sky, temperature, wind, weather/precip, snow/ice, marine, fire, time descriptors, connectors (ADR-082); see API-MANUAL.md §15 Module inventory for the full file list |
+| `weewx_clearskies_api/sse/forecast_model.py` | `ForecastPeriod` dataclass — aggregated per-period input consumed by the GFE composer (ADR-082) |
+| `weewx_clearskies_api/sse/period_aggregator.py` | Aggregates 72 hourly forecast points into 6 day/night `ForecastPeriod` instances (ADR-082) |
+| `weewx_clearskies_api/sse/forecast_text_enrichment.py` | Enrichment adapter for `/api/v1/forecast` — populates `DailyForecastPoint.forecastText` (ADR-082) |
 
 **AQI data flow:** PM2.5/PM10 from observed-data AQI providers (Vaisala Xweather, IQAir) flow through the enrichment pipeline via new 60-minute smoothing buffers in `input_smoother.py`. Smoothed PM values feed the haze detection module and fog/mist disambiguation. Model-based AQI providers (Open-Meteo) are excluded from haze confirmation. At night (solar elevation at or below the 15° detection gate), haze/smoke defers to provider current conditions observations; fog/mist remains local.
 
