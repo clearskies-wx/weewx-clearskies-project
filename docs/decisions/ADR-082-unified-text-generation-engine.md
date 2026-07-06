@@ -622,7 +622,7 @@ GFE uses a "generate English, then replace" multi-pass engine for French and Spa
 }
 ```
 
-The engine calls `t_inflected("forecast.coverage.scattered", weather_type_gender_code, locale)` to resolve the correct form.
+The engine calls `t_inflected("wx.coverage.scattered", weather_type_gender_code, locale)` to resolve the correct form. (Implementation note: the i18n key namespace is `wx.coverage.*`, not `forecast.coverage.*` — amended post-implementation.)
 
 **Russian:** Case inflection (nominative/instrumental/genitive) for the "with" construction, already in the existing locale system.
 
@@ -700,7 +700,7 @@ The engine calls `t_inflected("forecast.coverage.scattered", weather_type_gender
 - [ ] Wind descriptors at each threshold boundary (24/25/29/30/39/40/49/50/73/74 mph) produce the correct descriptor. Gust suppression fires when gust - sustained ≤ 10.
 - [ ] All 16 coverage levels resolve to correct English terms. Conjunctions produce natural text. Serial comma applies for 3+ items.
 - [ ] All 13 locales resolve every forecast i18n key with no raw-key fallback in output.
-- [ ] Romance language gender/number: `t_inflected("forecast.coverage.scattered", "FS", "fr")` returns the feminine singular French form.
+- [ ] Romance language gender/number: `t_inflected("wx.coverage.scattered", "FS", "fr")` returns the feminine singular French form. (Amended: key namespace is `wx.coverage.*`, not `forecast.coverage.*` as originally drafted.)
 - [ ] NWS-provider forecasts return `detailedForecast` text unchanged; the engine is not invoked.
 - [ ] `/api/v1/current` fields (`weatherText`, `weatherTextStandard`, `weatherTextVerbose`) are present; existing tests pass (adjusted assertions for improved phrasing are acceptable).
 - [ ] `/api/v1/forecast` `DailyForecastPoint` includes a populated `forecastText` field for non-NWS providers.
