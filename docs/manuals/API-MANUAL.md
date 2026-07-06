@@ -690,7 +690,7 @@ The conditions text engine is a multi-module stateful system that produces the `
 
 ### Sky condition
 
-**Primary source (daytime):** Kv-first decision tree in the Duchon & O'Malley (1999) tradition, using CAELUS-derived indices (Ruiz-Arias & Gueymard 2023). See ADR-073 for full scientific reasoning.
+**Primary source (daytime):** Kv-first decision tree in the Duchon & O'Malley (1999) tradition, using SkyPyEye Technology indices (adapted from CAELUS research library; Ruiz-Arias & Gueymard 2023). See ADR-073 for full scientific reasoning.
 
 - Measure GHI (radiation from weewx) and clear-sky reference (maxSolarRad from weewx).
 - Bin 5-second LOOP packets into 1-minute averages. Maintain a 30-minute ring buffer of MinuteRecord entries.
@@ -805,7 +805,7 @@ K_min (0.35) and b (0.1) are shared across all branches.
 
 **Startup backfill:** On API restart, `backfill()` seeds the ring buffer from archive records (last 30 minutes) for immediate classification. Full accuracy after ~30 minutes of live LOOP data.
 
-**GHI mirroring across sunrise/sunset:** At sunrise, the trailing 30-minute window has only a few minutes of data. Under overcast, this inflates Km (diffuse radiation at low angles is a high fraction of the small clear-sky reference), producing incorrect sunny/scattered labels. The mirroring algorithm (adapted from CAELUS `sky_indices.py:mirror_ghi_with_pandas()`) generates synthetic pre-sunrise data points using cos(zenith) interpolation from post-sunrise measurements, stabilizing the rolling statistics. Station coordinates (lat/lon/altitude from `services/station.py`) and Skyfield ephemeris (from `services/almanac.py`) are used to compute cos(zenith) for both real and mirrored entries. Full scientific description in `docs/reference/sky-classification-science.md` §3. See ADR-073 §4.
+**GHI mirroring across sunrise/sunset:** At sunrise, the trailing 30-minute window has only a few minutes of data. Under overcast, this inflates Km (diffuse radiation at low angles is a high fraction of the small clear-sky reference), producing incorrect sunny/scattered labels. The mirroring algorithm (adapted from CAELUS library's `sky_indices.py:mirror_ghi_with_pandas()`) generates synthetic pre-sunrise data points using cos(zenith) interpolation from post-sunrise measurements, stabilizing the rolling statistics. Station coordinates (lat/lon/altitude from `services/station.py`) and Skyfield ephemeris (from `services/almanac.py`) are used to compute cos(zenith) for both real and mirrored entries. Full scientific description in `docs/reference/sky-classification-science.md` §3. See ADR-073 §4.
 
 **SZA < 75° classification guard:** When solar elevation < 15° (SZA > 75°), `classify()` returns None. The downstream consumer (`enrichment/weather_text.py`) falls back to provider cloud cover. Below 15° elevation, pyranometer readings are dominated by diffuse radiation and cosine error — the clear-sky index loses discriminatory power. Solar elevation is computed via Skyfield from station coordinates (same ephemeris used by the almanac service). The `_MIN_SOLAR_RAD = 20 W/m²` proxy is retained for ring buffer data acceptance — data still accumulates below the SZA threshold to be available when elevation crosses 15°. See ADR-073 §5.
 
@@ -1200,15 +1200,15 @@ A METAR-like structured intermediate representation is populated from the enrich
 | `outTemp` | Temperature |
 | `dewpoint` | Dewpoint |
 | `windSpeed` + `windDir` + `windGust` | Wind group |
-| CAELUS sky class | Sky condition (CLR / FEW / SCT / BKN / OVC) |
+| SkyPyEye sky class | Sky condition (CLR / FEW / SCT / BKN / OVC) |
 | Haze detection (ADR-067) | Present weather HZ |
 | Fog/mist detection (ADR-069) | Present weather FG / BR |
 | Precipitation type + rate | Present weather RA / SN / FZRA / etc. |
 | `barometer` + trend | Pressure group |
 
-**CAELUS-to-okta mapping:**
+**SkyPyEye-to-okta mapping:**
 
-| CAELUS class | METAR sky code | Oktas |
+| SkyPyEye class | METAR sky code | Oktas |
 |-------------|---------------|-------|
 | CLOUDLESS | CLR | 0 |
 | THIN_CLOUDS | FEW / SCT | 1–4 |
@@ -1216,7 +1216,7 @@ A METAR-like structured intermediate representation is populated from the enrich
 | MOSTLY_CLOUDY | BKN | 5–7 |
 | OVERCAST | OVC | 8 |
 
-Specific okta assignment within each CAELUS class uses the Km thresholds defined in §8 Sky condition (Kv-first threshold constants table).
+Specific okta assignment within each SkyPyEye class uses the Km thresholds defined in §8 Sky condition (Kv-first threshold constants table).
 
 ---
 
