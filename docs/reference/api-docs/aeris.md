@@ -752,3 +752,27 @@ Match to DailyForecastPoint by comparing `details.day` to the forecast day index
 - `/alerts` returns latest alerts only. For history use the (separate) archive endpoints.
 - `/conditions` with `filter=minutelyprecip` covers max 60 minutes ahead.
 - The same physical product is sold under both "AerisWeather" and "Xweather" branding; account dashboards may use either name.
+
+## Forecast Fields Supplied for Text Generation
+
+Per [ADR-082](../../decisions/ADR-082-unified-text-generation-engine.md) (NWS GFE Text Generation System with WorldCast Technology), the table below documents which canonical forecast fields the Xweather provider module populates for the text generation engine, and the wire field each is sourced from.
+
+| Field | Supplied? | Wire source | Notes |
+|---|---|---|---|
+| outTemp | Yes | `tempF`/`tempC` | — |
+| outHumidity | Yes | `humidity` | — |
+| windSpeed | Yes | `windSpeedMPH`/`windSpeedKPH` | — |
+| windDir | Yes | `windDir` | Degrees |
+| windGust | Yes | `windGustMPH`/`windGustKPH` | — |
+| precipProbability | Yes | `pop` | — |
+| precipAmount | Yes | `precipMM`/`precipIN` | — |
+| precipType | Yes | `weatherPrimaryCoded` | Decoded from coded string |
+| cloudCover | Yes | `sky` | 0–100% |
+| weatherCode | Yes | `weatherPrimaryCoded` | Coded weather string |
+| feelsLike | Yes | `feelslikeF`/`feelslikeC` | ADR-082: mapping needed — wire model parses but currently discards |
+| iceAccumulation (daily) | Yes | `iceaccumMM`/`iceaccumIN` | ADR-082: parsing needed — not yet in wire model |
+| snowAmount (daily) | Yes | `snowIN`/`snowCM` | — |
+| narrative (daily) | Yes | `weather` | — |
+| thunderRisk | Yes | `thunderstormRisk` | Xweather is the only provider with this field |
+
+Xweather is the strongest provider for text-generation inputs among the four — it is the only provider supplying `thunderRisk` and daily ice accumulation, though both currently require wire-model or mapping work per ADR-082 before the engine can consume them.

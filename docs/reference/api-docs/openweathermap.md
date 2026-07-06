@@ -481,3 +481,25 @@ Per ADR-017, the tile proxy honors upstream `Cache-Control: max-age=...` if pres
 - **Free-tier daily-forecast endpoints (`/forecast/daily`, `/forecast/hourly`, `/forecast/climate`) require a paid plan**, despite living under `/data/2.5/`.
 - **Rain/snow keys may be absent.** Always check before reading `rain.1h` or `snow.3h`.
 - **Alerts** in One Call cover a region's official issuing agency and are localized strings — do not assume English.
+
+## Forecast Fields Supplied for Text Generation
+
+Per [ADR-082](../../decisions/ADR-082-unified-text-generation-engine.md) (NWS GFE Text Generation System with WorldCast Technology), the table below documents which canonical forecast fields the OpenWeatherMap provider module populates for the text generation engine.
+
+| Field | Supplied? | Wire source | Notes |
+|---|---|---|---|
+| outTemp | Yes | `temp` | K, converted |
+| outHumidity | Yes | `humidity` | % |
+| windSpeed | Yes | `wind_speed` | m/s |
+| windDir | Yes | `wind_deg` | Degrees |
+| windGust | Yes | `wind_gust` | m/s |
+| precipProbability | Yes | `pop` | 0–1 scale, ×100 |
+| precipAmount | Yes | `rain.1h` + `snow.1h` | mm |
+| precipType | Yes | derived from `weather[0].id` | WMO-style mapping |
+| cloudCover | Yes | `clouds` | % |
+| weatherCode | Yes | `weather[0].id` | OWM condition ID |
+| feelsLike | Available | `feels_like` | ADR-082: wire model parses but currently discards; needs mapping into `HourlyForecastPoint`/`DailyForecastPoint` |
+| snowAmount (daily) | Yes | `daily[].snow` | mm |
+| humidityMax (daily) | Partial | `humidity` | Single value mapped to humidityMax only; no humidityMin field exists on the wire |
+
+OWM covers every hourly field the engine needs. Gaps: `feelsLike` is parsed but discarded (needs mapping), and daily humidity is a single value so only `humidityMax` is populated — `humidityMin` has no OWM wire source.

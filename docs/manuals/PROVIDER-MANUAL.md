@@ -291,6 +291,74 @@ Every forecast provider module must implement these five callables:
 
 Return types reference the canonical model in `contracts/canonical-data-model.md`. Do not add callables beyond this set without updating this manual.
 
+### NWS forecast text pass-through
+
+When the operator selects NWS as the forecast provider, the `detailedForecast` field from the NWS response is passed through directly to the API response. The GFE text generation engine is NOT invoked. English only. NWS does not provide granular hourly forecast data through its public API — the `/gridpoints/{office}/{x},{y}/forecast` endpoint returns pre-composed period narratives, not the gridded data the text engine needs. (ADR-082, settled decision #7)
+
+### Forecast text generation — cross-provider field matrix
+
+The GFE text engine (API-MANUAL §15) generates forecast narratives from provider hourly data. This matrix documents which hourly and daily fields each provider supplies for text generation. When a provider does not supply a field, the text engine omits the corresponding phrase — it does not fabricate data.
+
+**Hourly forecast fields for text generation:**
+
+| Field | Xweather | NWS | Open-Meteo | OWM | Text engine use |
+|---|---|---|---|---|---|
+| `outTemp` | Y | Y | Y | Y | Temperature phrases |
+| `outHumidity` | Y | — | Y | Y | Fire weather (humidity recovery) |
+| `windSpeed` | Y | Y | Y | Y | Wind phrases |
+| `windDir` | Y | Y | Y | Y | Wind direction |
+| `windGust` | Y | — | Y | Y | Gust phrases (> sustained + 10 mph) |
+| `precipProbability` | Y | Y | Y | Y | PoP qualification + coverage derivation |
+| `precipAmount` | Y | — | Y | Y | Coverage language, snow accumulation |
+| `precipType` | Y | Y | Y | Y | Weather type phrases |
+| `cloudCover` | Y | — | Y | Y | Sky phrases (6-bucket table) |
+| `weatherCode` | Y | Y | Y | Y | Weather type hierarchy, LAL heuristic |
+| `feelsLike` | Y | — | Y | Y | Extreme temperature descriptors (heat index / wind chill) |
+
+**Daily forecast fields for text generation:**
+
+| Field | Xweather | NWS | Open-Meteo | OWM | Text engine use |
+|---|---|---|---|---|---|
+| `tempMax` / `tempMin` | Y | Y | Y | Y | Temperature decade phrasing |
+| `snowAmount` | Y | — | Y | Y | Snow accumulation phrases |
+| `iceAccumulation` | Y | — | — | — | Ice accumulation phrases |
+| `humidityMax` / `humidityMin` | Y | — | Y | Y/— | Fire: humidity recovery |
+| `narrative` | Y | Y (`detailedForecast`) | — | Y | NWS pass-through |
+
+**NWS is the thinnest provider** for text engine fields. Its default `/forecast/hourly` endpoint provides only temperature, wind (as string), precip probability, weather icon/text. It does not supply humidity, wind gust, precip amount, cloud cover, visibility, UV, dewpoint, or feels-like without using the raw `/gridpoints` endpoint (out of scope). This is why NWS uses pass-through instead of the text engine.
+
+### Fields available from provider APIs but not yet mapped
+
+These fields exist in provider API responses and are relevant to the text engine, but `HourlyForecastPoint` had no canonical field for them until ADR-082 added `feelsLike` and `iceAccumulation`. The provider modules that already parse these fields into their Pydantic wire models but discard them during canonical translation must be updated to map them.
+
+| Field | Xweather | Open-Meteo | OWM | Status |
+|---|---|---|---|---|
+| `feelsLike` (hourly) | Wire model parses `feelslikeF/C` | Available as `apparent_temperature` (not yet requested) | Wire model parses `feels_like` | Added to canonical by ADR-082 — mapping needed |
+| `iceAccumulation` (daily) | Available as `iceaccumMM/IN` (not yet parsed) | — | — | Added to canonical by ADR-082 — parsing needed |
+| `dewpoint` (hourly) | Wire model parses, discards | Available as `dew_point_2m` (not yet requested) | Wire model parses, discards | No canonical field yet — future work |
+
+### Fire weather data availability
+
+Fire weather text phrases (ADR-082) are tiered by data availability:
+
+| Tier | Data needed | Xweather | Open-Meteo | OWM | NWS | Status |
+|---|---|---|---|---|---|---|
+| 1 (active) | `outHumidity` (hourly) | Y | Y | Y | — | Humidity recovery phrases active for 3 of 4 providers |
+| 1 (active) | Thunderstorm weather codes | Y | Y | Y | Y | LAL heuristic active for all providers |
+| 2 (dormant) | 850mb/700mb temp + dewpoint | — | Available (`pressure_level` API) but not yet fetched | — | — | Haines Index — requires Open-Meteo pressure-level vars to be added to `_HOURLY_VARS` |
+| 3 (dormant) | Boundary layer height, transport wind | — | Available (`boundary_layer_height`, pressure-level winds) but not yet fetched | — | — | Smoke Dispersal / VentRate — future provider expansion |
+
+### Marine data availability
+
+No current provider module fetches marine forecast data. The following provider endpoints exist for future work:
+
+| Provider | Endpoint | Data available | Status |
+|---|---|---|---|
+| Xweather | `/maritime` | Marine forecasts, wave data, sea temp | Endpoint exists; no module built. Xweather also has `/tides` for tidal data. |
+| Open-Meteo | Marine Weather API (`marine-weather-api`) | Wave height, wave direction, wave period, swell height, ocean current | Separate API base URL; no module built. |
+
+Marine phrase tables (wave height, chop, marine wind) are built in `sse/gfe/marine_phrases.py` and dormant until a provider module supplies the data.
+
 ---
 
 ## §5 Air Quality

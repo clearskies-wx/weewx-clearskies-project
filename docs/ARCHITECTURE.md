@@ -28,6 +28,7 @@ One name per component. Code class names (`DirectAdapter`, `UnitTransformer`, `C
 | **Operator** | Person who installs, configures, and maintains Clear Skies. | — | ~~site owner~~ |
 | **Visitor** | Person viewing the weather dashboard in a browser. | — | ~~user~~ alone (ambiguous), ~~end user~~ when meaning visitor |
 | **Forecast correction engine** | Component inside the API that learns and corrects systematic forecast temperature bias using Random Forest regression on forecast-observation pairs. Collects pairs via a background daemon thread, trains models, applies corrections in-flight after cache and before response. (ADR-079) | (part of API) | — |
+| **NWS GFE Text Generation System** | GFE-derived text engine that generates forecast period narratives and upgrades current-conditions wind phrasing. Ports NWS GFE threshold tables and phrase logic. "WorldCast Technology" refers to the i18n extension to 13 locales. Package: `sse/gfe/`. (ADR-082) | (part of API) | ~~forecast text engine~~, ~~text generation engine~~ (use full canonical name or "GFE text engine" for brevity) |
 
 Previous (2026-06-08): sky condition thresholds corrected for sensor accuracy, day/night display vocabulary added, Known gap #8 resolved.
 

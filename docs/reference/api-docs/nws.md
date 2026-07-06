@@ -292,3 +292,24 @@ Captured for reference; full schemas live in `https://api.weather.gov/openapi.js
 - **Radar endpoints expose status only,** not display-ready imagery.
 - **No API key.** Identify yourself via `User-Agent`. Including contact info reduces the risk of getting blocked during an abuse incident.
 - **OpenAPI spec is large** (multi-MB). Don't embed; reference it from code as `https://api.weather.gov/openapi.json`.
+
+## Forecast Fields Supplied for Text Generation
+
+Per [ADR-082](../../decisions/ADR-082-unified-text-generation-engine.md) (NWS GFE Text Generation System with WorldCast Technology), NWS is the thinnest provider for text-generation inputs — most fields require the raw `/gridpoints/{office}/{gridX},{gridY}` endpoint, which is out of scope (settled decision #7). The table below documents which canonical forecast fields the NWS provider module populates for the text generation engine.
+
+| Field | Supplied? | Wire source | Notes |
+|---|---|---|---|
+| outTemp | Yes | `temperature.value` | °C, converted |
+| outHumidity | No | — | Requires raw /gridpoints endpoint (out of scope) |
+| windSpeed | Yes | `windSpeed` | Parsed from string like "5 to 10 mph" |
+| windDir | Yes | `windDirection` | Parsed from string like "S" |
+| windGust | No | — | Not in default forecast response |
+| precipProbability | Yes | `probabilityOfPrecipitation.value` | — |
+| precipAmount | No | — | Requires raw /gridpoints endpoint |
+| precipType | Yes | derived from `icon` | Shortname from icon URL |
+| cloudCover | No | — | Requires raw /gridpoints endpoint |
+| weatherCode | Yes | derived from `icon` | Shortname from icon URL |
+| feelsLike | No | — | Not available in forecast endpoints |
+| narrative (daily) | Yes | `detailedForecast` | Pass-through — engine not invoked for NWS |
+
+**NWS pass-through (settled decision #7):** When the operator selects NWS as the forecast provider, `detailedForecast` is passed through directly to `/api/v1/forecast` and the GFE text engine is NOT invoked. English only. Reason: the public `/gridpoints/{office}/{x},{y}/forecast` endpoint returns pre-composed period narratives, not the gridded data (cloud cover, gust, precip amount, humidity, feels-like) the engine needs to generate text itself.

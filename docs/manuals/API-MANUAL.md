@@ -30,6 +30,7 @@ Last updated: 2026-07-02
 12. [Radar Endpoints and Capability Model](#12-radar-endpoints-and-capability-model)
 13. [Anti-Patterns](#13-anti-patterns)
 14. [Forecast Correction Engine](#14-forecast-correction-engine)
+15. [Forecast Text Generation](#15-forecast-text-generation)
 
 ---
 
@@ -856,27 +857,25 @@ Tw = T × atan(0.151977 × (RH + 8.313659)^0.5) + atan(T + RH)
 
 ### Wind
 
-Beaufort scale thresholds (WMO standard; all comparisons use m/s internally — convert from station unit before comparing):
+**Hybrid Beaufort/GFE wind scale** (ADR-082, settled decision #11). Below 30 mph: Beaufort labels provide fine-grained descriptors. At 30 mph and above: GFE/NWS descriptors replace Beaufort to avoid misleading labels (Beaufort 12 "Hurricane" implies a tropical system — wrong for straight-line thunderstorm winds or derechos; "Hurricane Force Winds" describes speed without implying storm type). All comparisons use m/s internally — convert from station unit before comparing.
 
-| Beaufort | m/s range | Label |
-|----------|-----------|-------|
-| 0 | < 0.5 | Calm |
-| 1 | 0.5–1.5 | Very Light Breeze |
-| 2 | 1.6–3.3 | Light breeze |
-| 3 | 3.4–5.4 | Gentle breeze |
-| 4 | 5.5–7.9 | Moderate breeze |
-| 5 | 8.0–10.7 | Fresh breeze |
-| 6 | 10.8–13.8 | Strong breeze |
-| 7 | 13.9–17.1 | Near gale |
-| 8 | 17.2–20.7 | Gale |
-| 9 | 20.8–24.4 | Strong gale |
-| 10 | 24.5–28.4 | Storm |
-| 11 | 28.5–32.6 | Violent storm |
-| 12 | ≥ 32.7 | Hurricane |
+| Speed (mph) | m/s range | Label | Source |
+|---|---|---|---|
+| < 1 | < 0.5 | Calm | Beaufort 0 |
+| 1–3 | 0.5–1.5 | Very Light Breeze | Beaufort 1 |
+| 4–7 | 1.6–3.3 | Light Breeze | Beaufort 2 |
+| 8–12 | 3.4–5.4 | Gentle Breeze | Beaufort 3 |
+| 13–17 | 5.5–7.9 | Moderate Breeze | Beaufort 4 |
+| 18–24 | 8.0–10.7 | Fresh Breeze | Beaufort 5 |
+| 25–29 | 10.8–12.9 | Strong Breeze | Beaufort 6 (partial) |
+| 30–39 | 13.0–17.4 | Windy | GFE/NWS |
+| 40–49 | 17.5–21.9 | Very Windy | GFE/NWS |
+| 50–73 | 22.0–32.6 | Strong Winds | GFE/NWS |
+| ≥ 74 | ≥ 33.0 | Hurricane Force Winds | GFE/NWS |
 
 Labels use sentence case. Beaufort 0 ("Calm") appears in the composed text — calm is a real atmospheric state, not the absence of data.
 
-**Gusty qualifier:** Append "and Gusty" when `windGust ≥ windSpeed + 12 mph` AND `windGust ≥ 18 mph`. Convert both speeds to mph before comparison regardless of station unit. The qualifier only fires when wind is not Calm (Beaufort > 0).
+**Gusty qualifier:** Report gusts only when `windGust - windSpeed > 10 mph`. Phrase: "with gusts to around {gust speed} mph" (GFE phrasing — replaces the previous "and Gusty" qualifier). Convert speeds to mph before comparison regardless of station unit. The qualifier only fires when wind is not Calm.
 
 ### Temperature-comfort (2D matrix)
 
@@ -1704,3 +1703,131 @@ Use `ConfigDict(extra="forbid")` on all request models. Setup endpoints omit `fr
 ### Provider-agnostic behavior
 
 The correction engine works with any configured forecast provider. `provider_id` is logged with each forecast-observation pair. Training uses all pairs regardless of `provider_id` — bias patterns are station-local. When an operator switches forecast providers, new pairs are logged with the new `provider_id`; existing pairs are retained; the next training run learns from mixed-provider data.
+
+---
+
+## §15 Forecast Text Generation
+
+Governs the `sse/gfe/` package — the NWS GFE Text Generation System with WorldCast Technology. See ADR-082 for the decision record. GFE = Graphical Forecast Editor, the NWS tool that generates Zone Forecast Products. WorldCast = the i18n extension to 13 locales.
+
+### Engine scope
+
+One engine serves two data paths with different input sources:
+
+| Path | Input | Output | Example |
+|---|---|---|---|
+| **Forecast** | Provider hourly data → period aggregation → `ForecastPeriod` | NWS-style period narrative | "Today: Mostly sunny. High in the mid 80s. South winds 10 to 15 mph." |
+| **Current conditions** | weewx sensor data → `Observation` (enrichment pipeline) | Single-instant summary | "Warm and Humid, Overcast, with Light Rain" |
+
+These paths share the hybrid wind scale, gust phrasing, and GFE threshold tables. They differ in sky classification, temperature phrasing, precipitation detection, and composition pattern. The differences are by design — see the preservation directive below.
+
+### NWS pass-through
+
+When the operator selects NWS as the forecast provider, the `detailedForecast` field from the NWS `/gridpoints/{office}/{x},{y}/forecast` endpoint is returned unchanged. The text engine is NOT invoked. English only. NWS does not provide granular hourly forecast data through its public API — the endpoint returns pre-composed period narratives, not the gridded data the engine needs.
+
+### Current-conditions preservation directive
+
+The following current-conditions systems are preserved intact. The GFE engine does NOT replace them. Any agent modifying `sse/enrichment/weather_text.py`, `sse/sky_condition.py`, `sse/conditions_text.py`, or `sse/text_generator.py` MUST read this directive first. Deleting or replacing preserved systems is a blocking defect.
+
+| System | What it does | Why it stays |
+|---|---|---|
+| **SkyPyEye 7-level classification** | Pyranometer-based sky (Clear, Mostly Clear, Partly Cloudy, Mostly Cloudy, Cloudy, Overcast, Heavy Overcast) with cloud enhancement detection, temporal coherence, startup backfill, SZA guard, provider fallback | Physical measurement is more accurate than percentage lookup. 7 levels (including Overcast/Heavy Overcast distinction) provide finer granularity than the GFE 6-bucket table. The 6-bucket table is used for forecast periods only, where we have provider cloud cover percentages but no pyranometer data. |
+| **Temperature-comfort 2D matrix** | 12 appTemp tiers × 7 dewpoint tiers → "Warm and Humid", "Pleasant", "Chilly" + NWS HI/WC danger escalation + near-saturation "and Foggy" override (§8) | Describes how it FEELS, not the numeric value. GFE decade phrasing ("in the mid 80s") tells the number — different purpose. Comfort matrix stays for the terse tier; decade phrasing used for forecast periods. |
+| **Sensor-based precipitation** | Local rain gauge with WMO/AMS thresholds (Light/Moderate/Heavy Rain) + Stull wet-bulb frozen precipitation cross-check (§8) | Sensor is authoritative for "is it raining NOW." Coverage language ("scattered showers") doesn't apply to a single station point observation. GFE coverage system used for forecast periods only. |
+| **Haze detection** | Kcs + PM2.5/PM10 two-channel confirmation (§8) | No GFE equivalent. Station-specific sensor detection. |
+| **Fog/mist detection** | Hygrometer + dewpoint depression (§8) | No GFE equivalent. Station-specific sensor detection. |
+| **Input stability** | Smoothing windows, hysteresis bands, 5-minute hold time, temporal coherence filter (§8) | No GFE equivalent. Required for real-time display — prevents label flickering from noisy sensor data. |
+| **Current-conditions composition** | `[comfort, sky, wind, precip]` with ", with" connectors → "Warm and Humid, Overcast, with Light Rain" (§8) | Designed for single-instant snapshots. GFE's period-based composition is for forecast. |
+| **Provider weather text deferral** | Nighttime haze/smoke deferral, missing pyranometer deferral, missing hygrometer fog/mist deferral (§8) | Graceful degradation when sensors unavailable. |
+
+**What the GFE engine DOES change for current conditions:**
+- Wind labels at ≥ 30 mph switch from Beaufort (Near Gale / Gale / Storm / Violent Storm / Hurricane) to GFE/NWS (Windy / Very Windy / Strong Winds / Hurricane Force Winds). Below 30 mph, Beaufort labels stay. See §8 Wind for the hybrid table.
+- Gust phrasing upgrades from "and Gusty" to GFE's "with gusts to around X mph" (states the gust speed).
+- Standard and verbose verbosity tiers gain GFE decade phrasing, extreme temperature descriptors, and improved wind connectors. The terse tier composition pattern is unchanged.
+
+### Forecast period convention
+
+NWS 6am/6pm fixed periods in the operator's local time. "Today" = 6am–6pm, "Tonight" = 6pm–6am. Sunrise/sunset are used for day/night VOCABULARY selection only (e.g., cloud cover < 25% produces "Sunny" during daytime and "Mostly Clear" at nighttime). Sunrise/sunset do NOT define period boundaries.
+
+72 hourly forecast points aggregate into 6 `ForecastPeriod` instances: Today, Tonight, Tomorrow, Tomorrow Night, weekday, weekday Night.
+
+### Forecast input traceability
+
+Each phrase generator consumes specific fields from the `ForecastPeriod` dataclass. The `ForecastPeriod` is populated by the period aggregator from `HourlyForecastPoint` data. This table traces from phrase generator → period field → aggregation method → hourly provider field → which providers supply it.
+
+| Phrase generator | ForecastPeriod field | Aggregation | Hourly source | Xweather | NWS | Open-Meteo | OWM |
+|---|---|---|---|---|---|---|---|
+| Sky | `sky_percent`, `is_daytime` | mean(cloudCover) | `cloudCover` | Y | — | Y | Y |
+| Temperature (decade) | `temp_high` / `temp_low` | max/min(outTemp) | `outTemp` | Y | Y | Y | Y |
+| Temperature (extreme) | `feels_like_max` / `feels_like_min` | max/min(feelsLike) | `feelsLike` | Y | — | Y | Y |
+| Temperature (trend) | `temp_trend` | compare latter-half outTemp vs extreme | `outTemp` | Y | Y | Y | Y |
+| Wind | `wind_speed_min/max`, `wind_gust`, `wind_direction` | min/max, max, mode | `windSpeed`, `windGust`, `windDir` | Y | Y (no gust) | Y | Y |
+| Weather/precip | `weather_codes`, `precip_type`, `pop`, `precip_coverage` | union, mode, max, derived from pop | `weatherCode`, `precipType`, `precipProbability` | Y | Y | Y | Y |
+| Snow accumulation | `snow_amount` | sum(precipAmount) where type=snow | `precipAmount` | Y | — | Y | Y |
+| Ice accumulation | `ice_accumulation` | from daily `iceAccumulation` | daily field | Y | — | — | — |
+| Fire: humidity | `humidity_max/min` | max/min(outHumidity) | `outHumidity` | Y | — | Y | Y |
+| Fire: LAL | `weather_codes` + `precip_coverage` | derived | `weatherCode` + PoP | Y | Y | Y | Y |
+
+When a provider does not supply a field (marked "—"), the engine omits the corresponding phrase. It does not fabricate data.
+
+### Current-conditions input traceability
+
+For current conditions, all inputs come from the weewx archive and the API enrichment pipeline — not from providers (except for nighttime/fallback sky via provider `cloudcover`).
+
+| Phrase component | weewx field | Available on `/current`? | Notes |
+|---|---|---|---|
+| Temperature-comfort | `appTemp` (apparent temp), `dewpoint` | Yes | Calculated by `StdWXCalculate` from outTemp + outHumidity + windSpeed |
+| HI/WC danger escalation | `heatindex`, `windchill` | Yes | Calculated by `StdWXCalculate` |
+| Sky | `radiation`, `maxSolarRad` | Yes | SkyPyEye classification from pyranometer data |
+| Sky (night fallback) | provider `cloudcover` | Yes | Blended from provider current conditions |
+| Wind | `windSpeed`, `windGust`, `windDir` | Yes | Direct sensor or calculated |
+| Precipitation | `rainRate` | Yes | Rain gauge |
+| Frozen precip type | provider `precipType` | Yes | Cross-checked with Stull wet-bulb from outTemp + outHumidity |
+| Haze | `radiation`, `maxSolarRad` + provider PM2.5/PM10 | Yes | Two-channel: Kcs deficit + PM confirmation |
+| Fog/mist | `outTemp`, `dewpoint`, `windSpeed`, `rainRate` | Yes | Dewpoint depression ≤ threshold |
+
+### PoP-to-coverage derivation
+
+Providers supply probability of precipitation (PoP) as a percentage, not NWS-style coverage codes. The engine derives the coverage term from PoP. Which term applies depends on whether the weather type is PoP-related (rain, snow, thunderstorms) or areal (fog, haze, smoke):
+
+| PoP range | PoP-related types (R, RW, S, SW, T, IP, ZR) | Areal types (F, ZF, IF, H, K, BS, BN, BD) |
+|---|---|---|
+| < 15% (first 24h) / < 25% (extended) | (suppressed — no weather mention) | (suppressed) |
+| 15–24% | Slight chance (SChc) | Isolated (Iso) |
+| 25–54% | Chance (Chc) | Scattered (Sct) |
+| 55–74% | Likely (Lkly) | Numerous (Num) |
+| 75–100% | (coverage omitted, PoP separated into own phrase) | Widespread (Wide) / Definite (Def) |
+
+### Forecast composition
+
+Single-pass sequential assembly per period. Assembly order: period label + colon, sky, temperature, wind, precipitation/weather. This is the GFE `assembleSubPhrases` pattern, simplified for single-station use (no GFE tree traversal with fixed-point iteration).
+
+The `skyPopWx` combined phrase produces NWS-style sentences: "Partly cloudy with a 20 percent chance of showers and thunderstorms." When PoP ≥ 60%, PoP is separated into its own phrase. Non-precipitation weather (fog, haze, smoke) is always pulled into a separate phrase.
+
+### Forecast verbosity
+
+One level per forecast period, matching GFE's single narrative product. Current observations retain three tiers (terse/standard/verbose) per §8.
+
+### Module inventory
+
+| Module | Purpose |
+|---|---|
+| `sse/gfe/__init__.py` | Package init + public API: `generate_forecast_text()`, `generate_current_text()`, `aggregate_periods()`, `configure()` |
+| `sse/gfe/thresholds.py` | All threshold tables (sky, temp, wind, weather, PoP, snow/ice, marine, fire) |
+| `sse/gfe/sky_phrases.py` | Sky coverage (6-bucket for forecast; SkyPyEye stays for current) |
+| `sse/gfe/temp_phrases.py` | Temperature decade phrasing, exceptions, trends, extremes |
+| `sse/gfe/wind_phrases.py` | Hybrid Beaufort/GFE wind scale, gusts, marine wind |
+| `sse/gfe/wx_phrases.py` | Weather/precip: 24 types, 16 coverages, intensity, conjunctions, PoP |
+| `sse/gfe/snow_ice_phrases.py` | Snow/ice accumulation phrasing |
+| `sse/gfe/marine_phrases.py` | Marine phrase templates (tables only, no provider) |
+| `sse/gfe/fire_phrases.py` | Fire weather (tiered — Tier 1 active, Tier 2/3 dormant) |
+| `sse/gfe/time_descriptors.py` | Period labels + 42-entry sub-period table |
+| `sse/gfe/connectors.py` | Scalar/vector/weather connector strategies |
+| `sse/gfe/composer.py` | Single-pass composition engine, skyPopWx |
+| `sse/forecast_model.py` | `ForecastPeriod` dataclass |
+| `sse/period_aggregator.py` | Aggregate hourly provider data into day/night periods |
+| `sse/forecast_text_enrichment.py` | Enrichment adapter for `/api/v1/forecast` |
+
+### GFE code reuse directive
+
+Agents building or modifying `sse/gfe/` modules MUST study the GFE source code analysis at `docs/reference/nws-text-system/gfe-source-code-analysis.md` and port algorithms faithfully. The GFE source is public domain (17 USC §105 — US government work). Do not reinvent what NWS already wrote and tested. Replicate threshold values and decision logic. Adapt for single-station use and 13-locale i18n, but keep core algorithms faithful to the original.

@@ -473,3 +473,25 @@ WMO code values used in `current.weather_code`, `hourly.weather_code`, and `dail
 - **Multiple locations:** `latitude=47.6,40.7&longitude=-122.3,-74.0` returns an array of forecast objects rather than a single one — code must handle both.
 - **Historical data on this endpoint is limited** to `past_days=92`. Deeper history requires the separate `https://archive-api.open-meteo.com/v1/archive` endpoint.
 - On invalid params the API returns `HTTP 400` with `{"error": true, "reason": "..."}`.
+
+## Forecast Fields Supplied for Text Generation
+
+Per [ADR-082](../../decisions/ADR-082-unified-text-generation-engine.md) (NWS GFE Text Generation System with WorldCast Technology), the table below documents which canonical forecast fields the Open-Meteo provider module populates for the text generation engine.
+
+| Field | Supplied? | Wire source | Notes |
+|---|---|---|---|
+| outTemp | Yes | `temperature_2m` | °C |
+| outHumidity | Yes | `relative_humidity_2m` | % |
+| windSpeed | Yes | `wind_speed_10m` | km/h |
+| windDir | Yes | `wind_direction_10m` | Degrees |
+| windGust | Yes | `wind_gusts_10m` | km/h |
+| precipProbability | Yes | `precipitation_probability` | % |
+| precipAmount | Yes | `precipitation` | mm |
+| precipType | Yes | derived from WMO `weather_code` | — |
+| cloudCover | Yes | `cloud_cover` | % |
+| weatherCode | Yes | `weather_code` | WMO integer code |
+| feelsLike | Available | `apparent_temperature` | ADR-082: needs adding to `_HOURLY_VARS` and mapping — variable exists on the wire but is not yet requested/parsed |
+| snowAmount (daily) | Yes | `snowfall_sum` | cm |
+| humidityMax/Min (daily) | Yes | `relative_humidity_2m_max`/`relative_humidity_2m_min` | — |
+
+Open-Meteo is a strong provider for text-generation inputs — every hourly field the engine needs is available except `feelsLike`, which is present on the wire (`apparent_temperature`) but requires a code change to add it to the hourly variable request list and map it into `HourlyForecastPoint`.
