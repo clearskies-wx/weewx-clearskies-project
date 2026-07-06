@@ -1800,9 +1800,7 @@ Providers supply probability of precipitation (PoP) as a percentage, not NWS-sty
 
 ### Forecast composition
 
-Single-pass sequential assembly per period. Assembly order: period label + colon, sky, temperature, wind, precipitation/weather. This is the GFE `assembleSubPhrases` pattern, simplified for single-station use (no GFE tree traversal with fixed-point iteration).
-
-The `skyPopWx` combined phrase produces NWS-style sentences: "Partly cloudy with a 20 percent chance of showers and thunderstorms." When PoP ≥ 60%, PoP is separated into its own phrase. Non-precipitation weather (fog, haze, smoke) is always pulled into a separate phrase.
+Single-pass sequential assembly: sky phrase (suppressed when PoP ≥ 55%), temperature with localized Highs/Lows prefix, wind (with optional gust), weather/precipitation (PoP-gated), snow/ice accumulation, temperature trend, extreme temperature descriptor. Non-empty phrases joined with ". " (period + space). Each sentence capitalized. This is a simplified version of the GFE `assembleSubPhrases` pattern — no GFE tree traversal with fixed-point iteration, and no combined sky+PoP+weather phrase; sky and precipitation are always composed as separate sentences.
 
 ### Forecast verbosity
 
@@ -1812,7 +1810,7 @@ One level per forecast period, matching GFE's single narrative product. Current 
 
 | Module | Purpose |
 |---|---|
-| `sse/gfe/__init__.py` | Package init + public API: `generate_forecast_text()`, `generate_current_text()`, `aggregate_periods()`, `configure()` |
+| `sse/gfe/__init__.py` | Package init + public API: `generate_forecast_text(period, locale)`, `generate_current_text(obs, verbosity, locale)` (placeholder — raises `NotImplementedError`), `aggregate_periods(hourly_data, sunrise, sunset, current_time, timezone, locale)`, plus re-exports `compose_forecast_text` and `compose_nws_passthrough` |
 | `sse/gfe/thresholds.py` | All threshold tables (sky, temp, wind, weather, PoP, snow/ice, marine, fire) |
 | `sse/gfe/sky_phrases.py` | Sky coverage (6-bucket for forecast; SkyPyEye stays for current) |
 | `sse/gfe/temp_phrases.py` | Temperature decade phrasing, exceptions, trends, extremes |
@@ -1823,10 +1821,14 @@ One level per forecast period, matching GFE's single narrative product. Current 
 | `sse/gfe/fire_phrases.py` | Fire weather (tiered — Tier 1 active, Tier 2/3 dormant) |
 | `sse/gfe/time_descriptors.py` | Period labels + 42-entry sub-period table |
 | `sse/gfe/connectors.py` | Scalar/vector/weather connector strategies |
-| `sse/gfe/composer.py` | Single-pass composition engine, skyPopWx |
+| `sse/gfe/composer.py` | Single-pass composition engine (`compose_forecast_text`, `compose_nws_passthrough`) |
 | `sse/forecast_model.py` | `ForecastPeriod` dataclass |
 | `sse/period_aggregator.py` | Aggregate hourly provider data into day/night periods |
 | `sse/forecast_text_enrichment.py` | Enrichment adapter for `/api/v1/forecast` |
+
+### Known limitation — i18n inflection not wired into forecast composition
+
+`t_inflected()` (Romance gender/number agreement) and `t_case()` (Russian grammatical case) exist in `i18n.py` but are not yet wired into the forecast composition path. Romance coverage/intensity terms and Russian weather type nouns currently resolve to nominative/plain string forms. This matches the same limitation documented for the current-conditions composition path (§8). Wiring these into the forecast path is a follow-up task.
 
 ### GFE code reuse directive
 
