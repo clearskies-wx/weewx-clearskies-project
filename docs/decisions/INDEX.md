@@ -34,6 +34,7 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | [ADR-070](../archive/decisions/ADR-070-nws-text-generation-system.md) | NWS-style text generation system | 2026-06-27 | 2026-06-21 |
 | [ADR-073](../archive/decisions/ADR-073-sky-condition-kv-first-classification.md) | Sky condition Kv-first classification (supersedes ADR-044) | 2026-06-27 | 2026-06-23 |
 | [ADR-075](../archive/decisions/ADR-075-temporal-consistency-model.md) | Temporal consistency model (supersedes ADR-020) | 2026-06-27 | 2026-06-27 |
+| [ADR-082](../archive/decisions/ADR-082-unified-text-generation-engine.md) | NWS GFE Text Generation System with WorldCast Technology | 2026-07-06 | 2026-07-05 |
 
 ## Archived — consolidated into PROVIDER-MANUAL.md
 

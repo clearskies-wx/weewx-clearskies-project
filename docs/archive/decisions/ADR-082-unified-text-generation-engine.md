@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Archived — consolidated into API-MANUAL.md
 date: 2026-07-05
 deciders: shane
 supersedes:
