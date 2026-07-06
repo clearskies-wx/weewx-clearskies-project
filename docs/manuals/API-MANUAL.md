@@ -1261,16 +1261,18 @@ Three verbosity levels are available. `weatherText` carries the terse level (bac
 
 **GFE threshold tables** (ported from AWIPS-II GFE text formatter, public domain):
 
-Sky coverage buckets (6):
+Sky coverage buckets (6), used for FORECAST periods (ADR-082 GFE text engine):
 
-| Coverage | Label |
-|----------|-------|
-| 0–5% | Clear / Sunny |
-| 5–25% | Mostly Clear / Mostly Sunny |
-| 26–50% | Partly Cloudy / Partly Sunny |
-| 50–69% | Mostly Cloudy |
-| 70–87% | Cloudy |
-| 87–100% | Overcast |
+| Upper threshold (%) | Daytime phrase | Nighttime phrase |
+|---|---|---|
+| 5 | Sunny | Clear |
+| 25 | Sunny | Mostly Clear |
+| 50 | Mostly Sunny | Partly Cloudy |
+| 69 | Partly Sunny | Mostly Cloudy |
+| 87 | Mostly Cloudy | Mostly Cloudy |
+| 100 | Cloudy | Cloudy |
+
+Note: this is the GFE 6-bucket table, ported from the AWIPS-II GFE text formatter and used only for forecast-period text composition. Current conditions use the separate SkyPyEye 7-level classification (which includes Overcast/Heavy Overcast), documented elsewhere in this manual.
 
 Wind descriptor thresholds (natively in mph; convert to operator unit system before rendering):
 
