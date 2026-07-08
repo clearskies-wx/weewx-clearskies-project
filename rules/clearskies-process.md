@@ -129,7 +129,14 @@ Use the Nygard format. Template at `docs/decisions/_TEMPLATE.md`. Required: Stat
 
 **Foreground for fast tasks.** If an agent's task takes <2 min (verify git state, extract git stats, run one command), use foreground mode. Background is for tasks >5 min where parallel work is possible.
 
-**Agents commit locally, never on production containers.** Code is edited and committed on the local machine (DILBERT/CATBERT), pushed to GitHub, then pulled onto weewx/weather-dev. Agents must never commit directly on a production container. If an agent needs to run tests on weewx, it reads results — it does not edit source or commit there. The deploy flow is always: local commit → push to GitHub → `git pull --ff-only` on the target host → restart service.
+**Agents commit locally, never on production containers.** Code is edited and committed on the local machine (DILBERT/CATBERT), pushed to GitHub, then deployed via the deploy scripts. Agents must never commit directly on a production container. If an agent needs to run tests on weewx, it reads results — it does not edit source or commit there. The deploy flow is always: local commit → push to GitHub → deploy script.
+
+**Deploy scripts (use these, not manual commands):**
+- `scripts/deploy-api.sh` — API changes → weewx container (pull + restart + wait + verify)
+- `scripts/redeploy-weather-dev.sh` — Dashboard/config changes → weather-dev (pull + restart + build + publish)
+- `scripts/sync-to-weather-dev.sh` — Source-only refresh on weather-dev (no build/restart)
+
+The scripts handle user-switching (`sudo -u ubuntu` for git/build, `sudo` for systemctl). Never run manual `git pull`, `systemctl restart`, `chown`, or `chmod` on containers — see CLAUDE.md "Filesystem permissions on containers" and `rules/coding.md` §1 rule 12.
 
 **Why (2026-06-22):** An agent committed directly on the weewx container (production API host). The commit couldn't be pushed to GitHub because weewx has no GitHub credentials. The automated Nextcloud sync nearly destroyed it. Recovery required extracting the commit as a git bundle and replaying it locally. Commits on production bypass the local-review-then-deploy workflow and create orphaned state that's one sync cron away from data loss.
 

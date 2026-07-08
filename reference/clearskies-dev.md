@@ -137,18 +137,37 @@ ssh -F .local/ssh/config ratbert "<command>"
 
 Keys and config live in `.local/ssh/` (project directory, replicates via Nextcloud). NOT in `~/.ssh/`.
 
-## Sync: DILBERT to weather-dev
+## Deploy scripts
 
-1. Commit and push to GitHub from DILBERT.
-2. Run the sync script (pulls all five repos on weather-dev via `git pull --ff-only`):
+All three scripts live in `scripts/`. Always use them — never run manual `git pull`, `npm build`, `rsync`, `systemctl restart`, or `chown`/`chmod` on containers. See CLAUDE.md "Filesystem permissions on containers" for why.
+
+### Dashboard + config UI → weather-dev
 
 ```bash
-# From the meta repo on DILBERT (bash tool):
+# Full redeploy: pull + restart config UI + build dashboard + publish dist/
+scripts/redeploy-weather-dev.sh
+
+# Source-only refresh (no build, no restart):
 scripts/sync-to-weather-dev.sh
 
-# Or pull a single repo:
-scripts/sync-to-weather-dev.sh weewx-clearskies-api
+# Pull one repo only:
+scripts/sync-to-weather-dev.sh weewx-clearskies-dashboard
 ```
+
+### API → weewx
+
+```bash
+# Full deploy: pull + restart API + wait for cache warmer + health verify
+scripts/deploy-api.sh
+
+# Pull only (no restart — e.g., docstring-only change):
+scripts/deploy-api.sh --no-restart
+
+# Restart only (already pulled):
+scripts/deploy-api.sh --skip-pull
+```
+
+The API cache warmer takes ~2 minutes. `deploy-api.sh` waits 130 seconds after restart before checking the health endpoint. Do not hit API endpoints during the warm-up — you will get connection refused.
 
 ## Toolchain on weather-dev
 

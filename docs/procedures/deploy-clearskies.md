@@ -4,12 +4,13 @@ How to redeploy the Clear Skies stack onto the **weather-dev** LXD container aft
 commits to GitHub. This is the modern Clear Skies path; the legacy Belchertown skin promotion
 lives in [DEPLOYMENT.md](DEPLOYMENT.md) and is unrelated.
 
-Two scripts in `scripts/`:
+Three scripts in `scripts/`:
 
-| Script | What it does | When |
-|--------|--------------|------|
-| `sync-to-weather-dev.sh` | `git pull --ff-only` only (all repos or one) | Source-only refresh, no rebuild/restart |
-| `redeploy-weather-dev.sh` | Full redeploy: pull → restart services → dashboard build → publish `dist/` | After any change that affects running services or the dashboard UI |
+| Script | Target host | What it does | When |
+|--------|-------------|--------------|------|
+| `sync-to-weather-dev.sh` | weather-dev | `git pull --ff-only` only (all repos or one) | Source-only refresh, no rebuild/restart |
+| `redeploy-weather-dev.sh` | weather-dev | Full redeploy: pull → restart services → dashboard build → publish `dist/` | After any change that affects running services or the dashboard UI |
+| `deploy-api.sh` | weewx | Pull → restart API → wait for cache warmer → verify health | After any change to the `weewx-clearskies-api` repo |
 
 ---
 
@@ -96,21 +97,17 @@ What it does, in order (each step aborts on failure — `set -euo pipefail`):
 
 **The API runs on the `weewx` LXD container only** (see [ARCHITECTURE.md](../ARCHITECTURE.md) §Services, §Container inventory). weather-dev does NOT run the API — it only runs Caddy, the dashboard static files, and the config UI. Caddy proxies `/api/v1/*` and `/sse` to the API on the weewx container at `https://weewx.shaneburkhardt.com:8765`.
 
-When you change code in `weewx-clearskies-api`, deploy to the weewx container:
+When you change code in `weewx-clearskies-api`, use the deploy script:
 
 ```bash
-# 1. Pull the latest code on the weewx container
-ssh -F .local/ssh/config weewx "sudo -u ubuntu bash -lc 'cd /home/ubuntu/repos/weewx-clearskies-api && git pull --ff-only'"
-
-# 2. Restart the API service
-ssh -F .local/ssh/config weewx "systemctl restart weewx-clearskies-api"
-
-# 3. Verify it started correctly (should NOT say "setup mode")
-ssh -F .local/ssh/config weewx "journalctl -u weewx-clearskies-api --since '10 sec ago' --no-pager | head -5"
-
-# 4. Verify the API responds through Caddy on weather-dev
-ssh -F .local/ssh/config weather-dev "curl -s -o /dev/null -w '%{http_code}\n' http://localhost/api/v1/current"
+./scripts/deploy-api.sh                # full: pull + restart + wait + verify
+./scripts/deploy-api.sh --skip-pull    # restart + wait + verify (already pulled)
+./scripts/deploy-api.sh --no-restart   # pull only (e.g., docstring-only change)
 ```
+
+The script handles user-switching (`sudo -u ubuntu` for git, `sudo` for systemctl), waits ~130 seconds for the API cache warmer to complete before verifying the health endpoint, and aborts on any failure.
+
+**Do NOT run manual `git pull` or `systemctl restart` commands.** Use the script. Manual commands bypass user-switching and can cause file ownership drift (see "Filesystem permissions — agent rules" below).
 
 **Cache note:** The API uses Redis (or in-memory fallback) for caching (30-min TTL for forecast, 5-min for AQI). Restarting the API service clears the in-memory cache. The first request after restart will fetch fresh data from the upstream provider (Aeris, OWM, etc.).
 

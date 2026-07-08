@@ -58,6 +58,20 @@ These apply regardless of domain.
 
 **Why (2026-06-18):** Agents repeatedly used the old `lxc exec` pattern from stale docs, failing to connect or running commands on the wrong host. Direct SSH was set up specifically so agents don't need to traverse ratbert.
 
+### Filesystem permissions on containers — HARD RULES
+
+**NEVER run `chown`, `chmod`, or any command that changes file ownership or permissions on weewx or weather-dev.** File ownership is set up once at container standup per the OPERATIONS-MANUAL.md §11 filesystem permissions model. Changing ownership at deploy time means the previous deploy or setup was wrong — fix the root cause, don't paper over it with `chown`.
+
+**Use deploy scripts, not manual commands.** The deploy scripts handle user-switching correctly (`sudo -u ubuntu` for git/build, `sudo` for systemctl). Running commands as the wrong user (e.g., bare `git pull` as the `claude` SSH user instead of `sudo -u ubuntu`) creates ownership drift that then "requires" `chown` to fix — but the real fix is to have used the script.
+
+| Task | Script | Never do this instead |
+|------|--------|-----------------------|
+| Deploy dashboard | `scripts/redeploy-weather-dev.sh` | Manual `git pull`, `npm build`, `rsync` |
+| Deploy API | `scripts/deploy-api.sh` | Manual `git pull` or `systemctl restart` on weewx |
+| Pull source only (weather-dev) | `scripts/sync-to-weather-dev.sh` | `ssh weather-dev "git pull"` as claude |
+
+**Why (2026-07-08):** An agent ran bare `git pull` as the `claude` user on weewx (instead of `sudo -u ubuntu`), got a permissions error on `.git/FETCH_HEAD`, then ran `sudo chown -R ubuntu:ubuntu` on the entire repo to "fix" it. On weather-dev, the same session ran `sudo chown -R ubuntu:ubuntu /var/www/clearskies` which hit the read-only webcam bind-mount and produced hundreds of errors. Both problems were caused by not using the deploy scripts, and both `chown` commands were wrong — the scripts handle user-switching correctly and never need ownership changes.
+
 ### Git safety — agents and coordinator
 
 These rules apply to ALL repos, ALL domains. No exceptions.
