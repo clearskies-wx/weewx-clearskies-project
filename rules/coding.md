@@ -477,7 +477,16 @@ Add to the existing §5.7 accessibility checklist — run before declaring any U
 - Console log messages and stack traces
 - SVG path coordinates and data attributes
 - Provider-sourced prose the API passes through verbatim (alert headlines, forecast discussions, earthquake place names) — these are translated by adding locale-native provider modules, not by translating English text
-- EULA/license text (GPL v3 is a legal document; official translations exist but are not legally binding)
+- LICENSE and ADDITIONAL-USES.md (PolyForm Noncommercial 1.0.0 is the legally binding document; English only — see legal translation policy in [clearskies-process.md](clearskies-process.md))
+
+### 6.7 Legal translation policy
+
+Legal documents have translation rules that differ from UI strings — see [clearskies-process.md](clearskies-process.md) for the full policy. Key distinctions:
+
+- **Never translated:** `LICENSE`, `ADDITIONAL-USES.md` (legally binding, English only)
+- **Translated with disclaimer:** `EULA.txt` (non-English files start with bilingual disclaimer that English governs), `legal.json` (non-English locales include `legalDisclaimer` banner)
+- **Fully translated, no disclaimer:** UI chrome (`_()` wrapped), help panel content, field hints
+- **English only for v1:** Operator Manual
 
 ---
 

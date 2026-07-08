@@ -83,6 +83,9 @@ These rules apply to ALL repos, ALL domains. No exceptions.
 - Changing unit conversion, enrichment pipeline, or data model → update API-MANUAL.md
 - Changing dashboard hooks, data flow, or technical behavior → update DASHBOARD-MANUAL.md
 - Changing UI design patterns, tokens, or components → update DESIGN-MANUAL.md
+- Changing wizard step behavior or fields → update help content keys (`help.wizard.{step_id}.*`) + Operator Manual
+- Changing admin section behavior → update admin help content keys (`help.admin.{section_id}.*`) + Operator Manual
+- Changing licensing terms → update LICENSE, ADDITIONAL-USES.md, EULA, Legal page
 
 **What does NOT require a doc update:** Internal refactoring that doesn't change external behavior. Bug fixes that restore documented behavior. Test-only changes.
 

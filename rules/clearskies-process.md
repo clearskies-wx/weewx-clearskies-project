@@ -45,6 +45,22 @@ Incident history and rationale at [reference/process-rule-history.md](../referen
 
 **Manual-update discipline:** Any code change that affects manual rules must update the manual in the same commit. A code change that adds behavior not covered by any manual must either (a) update the manual or (b) draft an ADR for user approval first if the behavior is a new architectural decision.
 
+**Help content sync.** When a wizard step's behavior, fields, or options change, the step-level help content (`help.wizard.{step_id}.*` translation keys) and affected field-level help text (`ConfigField.help_text` / `wizard_help`) must be updated in the same commit. Same applies to admin sections: when an admin section's behavior changes, `help.admin.{section_id}.*` keys must be updated.
+
+**Operator Manual sync.** When a feature, configuration option, or operational behavior documented in the Operator Manual changes, the manual must be updated in the same commit or PR. The Operator Manual (`repos/weewx-clearskies-stack/docs/OPERATOR-MANUAL.md`) is a governing document subject to the same doc-code sync rules as ARCHITECTURE.md and the component manuals.
+
+**License document sync.** Changes to licensing terms require updates to LICENSE, ADDITIONAL-USES.md, the EULA wizard step (EULA.txt + 12 locale translations + step template), and the dashboard Legal page (legal.json + legal.tsx + 12 locale translations) in the same commit.
+
+**Legal translation policy.** Legal documents have specific translation rules that differ from UI strings:
+- `LICENSE` and `ADDITIONAL-USES.md` — English only, never translated. These are the legally binding documents.
+- `EULA.txt` — English is the authoritative version. Translations provided for operator convenience. Every non-English EULA file must begin with a bilingual disclaimer (English + target language) stating the English version is the sole legally binding document.
+- Dashboard Legal page content (`legal.json`) — Translated for visitor convenience. Every non-English locale must include a `legalDisclaimer` key rendered as a prominent non-dismissible banner at the top of the Legal page.
+- Wizard/admin UI chrome (step titles, labels, buttons, field hints) — Fully translated, no disclaimer needed.
+- Help panel content — Fully translated, no disclaimer needed. Educational/guidance content.
+- Operator Manual — English only for v1.
+
+**Why:** Translated legal text can alter legal meaning. Industry standard (Stripe, Apple, FSF/GPL) is to translate for understanding but disclaim for legal authority. The English version under California governing law is always authoritative.
+
 ## ADR content standards
 
 Use the Nygard format. Template at `docs/decisions/_TEMPLATE.md`. Required: Status, Context, Options considered, Decision, Consequences, Implementation guidance, References.
