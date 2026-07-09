@@ -142,7 +142,10 @@ Define response models, config structures, and unit groups. No provider calls, n
 
 **T0C.2 — Marine location config schema** (`clearskies-api-dev`)
 - New file: `.../services/marine_config.py`
-- Dataclasses: `MarineLocation` (coordinates, name, activities, station IDs, WFO code), `SurfSpotConfig` (beach facing, bottom type, slope, structures, bathymetric profile), `FishingSpotConfig` (target category, species), `MarineConfig`
+- Dataclasses: `MarineLocation` (coordinates, name, activities, station IDs, WFO code), `SurfSpotConfig` (beach facing, bottom type, slope, structures, bathymetric profile, topographic feature, directional exposure), `FishingSpotConfig` (target category, species, biogeographic region), `MarineConfig`
+- `SurfSpotConfig.topographic_feature`: point_break / bay_break / headland / straight_beach — affects wave focusing/sheltering coefficients
+- `SurfSpotConfig.directional_exposure`: 8 compass directions (N/NE/E/SE/S/SW/W/NW) with boolean swell reception — determines which swell directions can reach the spot
+- `FishingSpotConfig.biogeographic_region`: auto-classified from coordinates against 11 US regions (Atlantic NE/SE, Gulf, Pacific SW/Central/NW, Alaska, Hawaii, Great Lakes, Caribbean, Pacific Territories) — determines species lists
 
 **T0C.3 — Marine unit groups** (`clearskies-api-dev`)
 - Add `group_wave_height`, `group_wave_period`, `group_water_level`, `group_ocean_speed` to UnitTransformer
@@ -175,10 +178,11 @@ Four provider modules following the existing contract: `ProviderHTTPClient`, `CA
 - Metadata API for station discovery by lat/lon
 - Cache TTLs: predictions 6 hr, observations 10 min
 
-**T1.3 — WaveWatch III wave forecasts** (`clearskies-api-dev`)
+**T1.3 — GFS Wave (WaveWatch III coupled) forecasts** (`clearskies-api-dev`)
 - New: `providers/marine/wavewatch.py`
 - Fetch via ERDDAP JSON (NOT GRIB): `erddap.aoml.noaa.gov/hdb/erddap/griddap/WaveWatch_2026.json?` with lat/lon/time subsetting
-- Port Phase II grid selection logic for ERDDAP coordinates
+- Port Phase II grid selection logic for ERDDAP coordinates (7 grids including gsouth.0p25 for future international)
+- Note: GFS Wave uses WaveWatch III coupled with GFS atmospheric model (30-min wind forcing vs 3-hr standalone). Model provides up to 384h (hourly 0–120h, 3-hourly 120–384h); v1 uses 72h at 3-hour steps. Data available ~4.5h after model run.
 - 72-hour forecast at 3-hour steps. Cache TTL: 30 min
 
 **T1.4 — NWS marine zone text forecasts** (`clearskies-api-dev`)
@@ -235,6 +239,10 @@ Enrichment processors (not provider modules). Take NWPS/WaveWatch III data → p
 - Port Phase II (1,370+ lines): GEBCO via OpenTopoData, adaptive refinement, deep-water point finding
 - One-time per-spot computation, stored in `api.conf`
 - Fix: replace `eval()`, use UnitTransformer
+- OpenTopoData API constraints: 1 call/sec, 1000 calls/day, 100 locations/request
+- Regional depth profile adaptations: Pacific Coast uses more aggressive refinement (steep shelf), Gulf Coast more conservative (gradual shelf), Hawaii maximum sensitivity (volcanic)
+- Fallback depth profiles when GEBCO unavailable: West Coast [50,40,30,20,12,6,3], East Coast [35,28,22,16,10,5,2.5], Gulf [25,20,15,12,8,4,2], Hawaii [60,45,30,18,10,5,3.5]
+- Attribution requirement: "GEBCO Compilation Group (2025) GEBCO 2025 Grid" + "Not for navigation" disclaimer
 
 **T3.2 — Port wave transformation physics** (`clearskies-api-dev`)
 - New: `enrichment/wave_transform.py`
@@ -246,6 +254,8 @@ Enrichment processors (not provider modules). Take NWPS/WaveWatch III data → p
 - New: `enrichment/surf_scorer.py`
 - Port Phase II scoring: wave height 0.35, period 0.35, wind 0.20, swell dominance 0.10
 - **Fix critical Phase II bug:** wire transformation INTO scoring (Phase II bypassed physics)
+- Apply multi-swell integration: if primary swell > 75% energy, use primary only; if secondary > 50% of primary, apply energy superposition H_combined = √(H₁² + H₂²) with energy-weighted period
+- Apply expanded quality coefficients from original research: period multipliers (18+s=1.5, 12-14s=1.0, <8s=0.1), wind direction factors (offshore light=1.2, onshore moderate=0.5), beach angle alignment (±15°=1.0, ±45°=0.6, >60°=0.1), time-of-day adjustments (dawn +10%, afternoon -10%)
 - Generate conditions text via existing GFE marine vocabulary
 - Register as enrichment processor
 
@@ -267,7 +277,11 @@ Parallel with Phases 1–3. Only depends on Phase 0 models.
 
 **T4.2 — Fishing scoring processor** (`clearskies-api-dev`)
 - New: `enrichment/fishing_scorer.py`
-- Port Phase II: pressure 0.4, tide 0.3, time 0.2, species 0.1
+- Base environmental scoring: pressure 0.4, tide 0.3, time 0.2, species 0.1
+- **Species behavioral profiles**: per-species pressure sensitivity (tied to swim bladder size — tuna has none, redfish has large), water temperature preferences (optimal/good/poor/inactive ranges), tide preference, time-of-day multipliers
+- **Seasonal behavior**: spawning season multipliers (e.g., Redfish Oct: 2.5×, Striped Bass May: 3.0×), pre-spawn feeding boosts, migration patterns by month, closed seasons (e.g., Snook Jun-Aug: 0.0×)
+- **Dynamic scoring**: base environmental score × water temperature multiplier × seasonal multiplier → active / less_active / inactive species classification per period
+- **Biogeographic species lists**: 11 US regions auto-classified from coordinates, each with region-specific species by category (saltwater inshore, saltwater offshore, bottom fish, freshwater sport, salmonids)
 - Integrate solunar periods. GEBCO for habitat structure identification.
 - 3-day forecast, 5–6 periods per day.
 
@@ -305,9 +319,12 @@ All endpoints return correct data. Unit conversion works. Freshness block presen
 
 **T6.1 — Marine wizard step** (`clearskies-docs-author`)
 - Per location: name, coordinates (map picker), activities (checkboxes)
-- Per surf spot: beach facing, bottom type, slope, structures
-- Per fishing spot: target category, species
-- Station auto-discovery (NDBC + CO-OPS + NWS zone + NWPS WFO)
+- Per surf spot: beach facing, bottom type, slope, structures, topographic feature, directional exposure (8 compass dirs)
+- Per fishing spot: target category, species (auto-populated from biogeographic region)
+- **Land/sea validation**: GEBCO depth query to verify all spot coordinates are in water before accepting
+- Station auto-discovery (NDBC + CO-OPS + NWS zone + NWPS WFO) with distance-based quality scoring (wave: 0–25 mi excellent, 25–50 good; atmospheric: 0–50 excellent, 50–100 good; tide: 0–20 excellent)
+- Multi-location station optimization: identify stations that serve multiple configured spots, recommend shared stations first
+- Differentiate NDBC buoy capabilities (wave-only vs. atmospheric-only vs. full) in station selection UI
 - Bathymetry trigger on surf spot save (async with progress)
 
 **T6.2 — Marine admin section** (`clearskies-docs-author`)
@@ -352,6 +369,7 @@ All pages render with real data. Responsive at 375px. i18n keys for 13 locales. 
 ### Tasks
 
 **T8.1 — Integration test suite** (`clearskies-api-dev`)
+- Validate against NDBC buoy observations and CDIP (Coastal Data Information Program, ~180 stations, primarily US West Coast) spectral wave data where available
 **T8.2 — Deploy + smoke test** (Coordinator)
 - Configure test location, deploy to weewx + weather-dev, run full smoke checklist
 **T8.3 — Documentation sync** (Coordinator + `clearskies-docs-author`)

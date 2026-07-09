@@ -852,3 +852,106 @@ Single daemon thread `SurfFishingForecast`. Uses `threading.Event` (`shutdown_ev
 
     [[station_integration]]        # noaa_only | station_supplement
 ```
+
+---
+
+## Appendix C: Supplementary Findings from Original Development Documents
+
+Seven original development documents from the pre-Clear-Skies extension work were reviewed. This appendix records implementation-relevant details not captured in the main audit sections.
+
+### C.1 GEBCO / OpenTopoData API Details
+
+**Rate limits** (not in main audit): 1 call/second, 1000 calls/day, 100 locations/request. A typical installation (3 surf spots) uses <1% of the daily limit.
+
+**Interpolation parameter**: `?interpolation=bilinear` available for smoother depth values between grid points.
+
+**Regional fallback depth profiles** when GEBCO API is unavailable:
+- US West Coast: [50.0, 40.0, 30.0, 20.0, 12.0, 6.0, 3.0] (steep shelf)
+- US East Coast: [35.0, 28.0, 22.0, 16.0, 10.0, 5.0, 2.5] (gradual shelf)
+- Gulf of Mexico: [25.0, 20.0, 15.0, 12.0, 8.0, 4.0, 2.0] (shallow shelf)
+- Hawaii: [60.0, 45.0, 30.0, 18.0, 10.0, 5.0, 3.5] (volcanic shelf)
+
+**Attribution requirements**: "GEBCO Compilation Group (2025) GEBCO 2025 Grid" required. Disclaimer: "Not for navigation or safety at sea." Commercial use permitted, free for any purpose.
+
+**Terms of use**: Cannot be used for navigation. Cannot suggest official GEBCO endorsement.
+
+### C.2 GFS Wave Grid Inventory Updates
+
+The main audit (Section 2) lists 6 regional grids. The original GFS Wave documentation adds:
+
+- **Southern Ocean grid** (`gsouth.0p25`): 25 km resolution, 10.5°S to 79.5°S. Covers Southern Hemisphere surf destinations (Australia, Indonesia, South Africa). Relevant for future international expansion.
+- **Computational vs. post-processed distinction**: 3 native computational grids (arctic.9km, global.0p16, gsouth.0p25) vs. post-processed regional subsets (atlocn.0p16, epacif.0p16, wcoast.0p16, global.0p25).
+- **Data availability delay**: ~4.5 hours after model run time. Affects cache warmer scheduling.
+- **GRIB file sizes**: Regional grids ~10–15 MB, global ~20–30 MB per file. A 72-hour forecast totals ~500 MB–1 GB.
+- **GRIB Filter access**: `nomads.ncep.noaa.gov/cgi-bin/filter_gfs_wave.pl` can subset by parameters and region without downloading entire files.
+
+### C.3 NDBC Station Capability Differentiation
+
+Not all NDBC buoys report all parameters. The audit describes NDBC data types (Section 1, A.3) but does not note the capability split observed in real station configs:
+
+- **Wave-only buoys**: Measure wave height, period, direction. Cannot measure wind, pressure, air temperature. Example: Station 46253 "San Pedro South."
+- **Atmospheric-only stations**: Some C-MAN coastal stations measure wind/pressure/temp but not waves.
+- **Full-capability buoys**: Both wave and atmospheric data. Example: Station 46275 "Red Beach Nearshore."
+
+This affects station auto-discovery (T6.1): the wizard must select different "nearest" stations for wave data vs. atmospheric data, and surface the capability distinction in the selection UI.
+
+**Average wave period (APD)**: Collected alongside dominant wave period (DPD) from NDBC `.txt` files. The difference between DPD and APD indicates spectral bandwidth — a narrow spread (DPD ≈ APD) means clean swell, a wide spread means mixed seas. A cheap wave quality indicator without needing full spectral data.
+
+### C.4 Topographic Feature Classification
+
+The Phase II design research introduced topographic features as a surf spot config parameter separate from seafloor composition and coastal structures:
+
+| Feature | Wave effect | Physics coefficient |
+|---------|-----------|-------------------|
+| Point break | Wave focusing around headland, longer rides | Focusing factor 1.1 |
+| Bay break | Wave height reduction from sheltering (>20%) | Reduction factor 0.9 |
+| Headland | Wave shadowing, refraction enhancement | Refraction 1.2 |
+| Straight beach | Minimal topographic wave modification | 1.0 (baseline) |
+
+User identification tests were developed for the original extension installer:
+- Bay: "Can you see clear wave height differences between center and edges?"
+- Point: "Do waves wrap around a rocky point creating longer rides?"
+- Straight: "Is the shoreline relatively straight for 1+ miles?"
+
+### C.5 Structure Coefficient Tables (Research-Validated)
+
+The main audit (Section 2, B.4) describes the Phase II code's 5 structure types with fixed coefficients. The original research produced research-validated coefficient tables with uncertainty ranges:
+
+| Material category | Reflection (Kr) | Transmission (Kt) | Dissipation (Kd) |
+|------------------|----------------|-------------------|------------------|
+| Impermeable | 0.80 ± 0.10 | 0.10 ± 0.05 | 0.20 ± 0.10 |
+| Semi-Permeable | 0.45 ± 0.15 | 0.35 ± 0.15 | 0.45 ± 0.15 |
+| Permeable | 0.20 ± 0.10 | 0.75 ± 0.10 | 0.25 ± 0.10 |
+
+Energy conservation constraint: Kr² + Kt² + Kd² = 1.
+
+**Structure influence zone multipliers**: Jetty 3–5× length, pier 1–2× length, breakwater 2–4× length, seawall height×20, groin 2–3× length. Effects diminish as 1/r² with distance.
+
+**Multi-structure dominance**: Dominance = Material weight (0.4) + Distance weight (0.4) + Size weight (0.2). Linear superposition valid when structures separated by >5 wavelengths.
+
+Sources: Zanuttigh & Van der Meer (2006), Goda (2000), CERC (1984), Holthuijsen (2007), Isaacson (1991).
+
+### C.6 CoastWatch Satellite SST
+
+Not discussed in the main audit. NOAA CoastWatch provides free, global satellite-derived SST via ERDDAP:
+
+- **JPL MUR SST** (`jplMURSST41`): ~1 km resolution, global, daily
+- **NOAA Geo-polar Blended** (`noaacwBLENDEDsstDaily`): ~5 km resolution, global, daily
+- **Access**: `coastwatch.pfeg.noaa.gov/erddap/griddap/{datasetId}.json?analysed_sst[(TIME)][(LAT)][(LON)]`
+- **Limitations**: 1–3 day latency, cloud interference (~20% ocean coverage), not real-time
+- **Value**: Fills SST coverage gap where NDBC buoys are sparse. Supplements buoy point measurements with spatial coverage.
+
+### C.7 Multi-Location Station Optimization
+
+The original station selection guidance developed an algorithm for operators configuring multiple marine locations:
+
+- Calculate distance from each configured location to every available station
+- Score station quality per location using distance-based decay (wave: 0–25 mi excellent, atmospheric: 0–50 mi excellent)
+- Identify stations that serve multiple locations efficiently (shared stations)
+- Recommend shared stations first (highest total benefit), then location-specific additions
+
+This informs the wizard design (T6.1): when an operator configures 3 locations, the station discovery should present shared-benefit stations before location-specific ones.
+
+Atmospheric patterns show stronger coherence alongshore (0.7× factor) than cross-shore (1.3× factor), affecting multi-station interpolation accuracy.
+
+Research basis: García-Reyes & Largier (2012) on coastal wind coherence, Bourassa et al. (2019) on buoy distance decay relationships.

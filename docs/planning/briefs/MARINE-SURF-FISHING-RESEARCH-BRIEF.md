@@ -676,6 +676,169 @@ NWPS v1.5 provides rip current probability for select WFOs (LOX, MTR, EKA, MFR, 
 
 ---
 
+## 11. Supplementary Findings from Original Development Documents
+
+Seven original development documents from the pre-Clear-Skies extension work were reviewed for content not already captured in this brief or the companion Data Audit Brief. This section records the additive findings.
+
+### 11.1 CoastWatch Satellite SST via ERDDAP
+
+NOAA CoastWatch provides satellite-derived sea surface temperature through ERDDAP servers, offering a data source not discussed elsewhere in this brief:
+
+- **JPL MUR SST** (`jplMURSST41`): 0.01° (~1 km) resolution, global, daily. Access via `coastwatch.pfeg.noaa.gov/erddap/griddap/jplMURSST41.json`
+- **NOAA Geo-polar Blended Analysis** (`noaacwBLENDEDsstDaily`): 0.05° (~5 km) resolution, global, daily
+- **Limitations**: 1–3 day latency, cloud interference gaps (~20% ocean coverage), IR sensors cannot see through clouds
+- **Value**: Fills SST gap where NDBC buoys are sparse (Southern Hemisphere, international waters). Spatial coverage that point buoy measurements cannot match. Free.
+
+For v1 (US, NOAA-only), satellite SST supplements NDBC buoy point measurements. For future international expansion, it may be the only SST source in regions without buoy coverage.
+
+### 11.2 GFS-Wave Model Clarifications
+
+The brief refers to "WaveWatch III" throughout, but the operational model is more precisely **GFS Wave** — WaveWatch III one-way coupled with the GFS atmospheric model. Key differences from standalone WaveWatch III:
+
+- **Wind forcing**: 30-minute intervals (vs. 3-hour for standalone WW3), improving accuracy
+- **Forecast range**: 384 hours total — hourly for 0–120h, 3-hourly for 120–384h. The plan's 72h scope is a design choice, not a model limitation.
+- **Data availability delay**: ~4.5 hours after model run time (00Z available ~04:30 UTC, etc.)
+- **Southern Ocean grid** (`gsouth.0p25`): 25 km, 10.5°S to 79.5°S — relevant for future international (Australia, Indonesia, South Africa). Not mentioned in Section 5.1.
+- **GRIB file sizes**: Regional grids ~10–15 MB per file, global ~20–30 MB. A 72-hour forecast is ~500 MB–1 GB total storage.
+- **GRIB Filter endpoint**: `nomads.ncep.noaa.gov/cgi-bin/filter_gfs_wave.pl` can subset by parameters and region without downloading entire files — a potential complement to ERDDAP access.
+
+### 11.3 Multi-Swell Integration Methodology
+
+The original research produced detailed decision rules for combining multiple swell trains that go beyond the "swell dominance" factor (0.10 weight) described in Section 7.3:
+
+**Energy superposition** (when applicable — similar periods ±3s, compatible directions ±45°):
+- Convert heights to energy: E = (ρ × g × H²) / 8
+- Sum energies: E_total = E₁ + E₂
+- Combined height: H_combined = √(H₁² + H₂²)
+- Combined period: T_combined = (T₁ × E₁ + T₂ × E₂) / (E₁ + E₂)
+
+**Dominant swell selection** (the decision rules):
+- If primary swell energy > 75% of total → use primary swell only
+- If secondary swell energy > 50% of primary → apply energy superposition
+- Otherwise → use dominant swell component only
+
+**Directional filtering**: Before combining, check each swell component against the spot's 8-direction directional exposure. Swell from blocked directions is eliminated before scoring. This is the purpose of the directional exposure config added to T0C.2 in the plan.
+
+Research basis: WaveWatch III spectral partitioning (Chawla et al. 2013), WaveSEP algorithm (Hanson & Phillips 2001), Australian BoM AUSWAVE operational practice.
+
+### 11.4 Expanded Wave Quality Assessment Framework
+
+The Phase II scoring (4 components, Section 7.3) was informed by a richer quality assessment framework from the original research:
+
+**Period quality multipliers** (more granular than the binary "groundswell vs wind swell"):
+| Period | Multiplier | Classification |
+|--------|-----------|----------------|
+| 18+ s | 1.5 | Exceptional long-period groundswell |
+| 15–17 s | 1.3 | Excellent groundswell |
+| 12–14 s | 1.0 | Good groundswell (baseline) |
+| 10–11 s | 0.7 | Marginal — weak groundswell |
+| 8–9 s | 0.4 | Poor — short period |
+| <8 s | 0.1 | Very poor — wind swell only |
+
+**Wind direction quality coefficients**:
+| Wind condition | Factor |
+|---------------|--------|
+| Offshore light (0–10 mph) | 1.2 |
+| Offshore moderate (10–20 mph) | 1.0 |
+| Offshore strong (20–30 mph) | 0.8 |
+| Onshore light (0–10 mph) | 0.8 |
+| Onshore moderate (10–20 mph) | 0.5 |
+| Onshore strong (20+ mph) | 0.2 |
+| Cross-shore light (0–15 mph) | 0.7 |
+| Cross-shore strong (15+ mph) | 0.3 |
+
+**Beach angle alignment factors** (swell direction vs. beach perpendicular):
+| Angle from perpendicular | Factor |
+|-------------------------|--------|
+| ±15° | 1.0 |
+| ±30° | 0.8 |
+| ±45° | 0.6 |
+| ±60° | 0.3 |
+| >60° | 0.1 |
+
+**Time-of-day adjustments**: Dawn +10%, morning +5%, midday standard, afternoon -10%, evening +5%. Based on typical diurnal wind patterns (calm mornings, onshore afternoons).
+
+**Tidal stage factors**: Optimal stage 1.2, good 1.0, marginal 0.7, poor 0.3 (spot-specific — some breaks work best at low tide, others at high).
+
+### 11.5 Coastal Structure Wave Physics
+
+The original research produced material-based coefficient tables with uncertainty ranges and research citations, extending beyond the Phase II code's fixed values:
+
+**Material category coefficients** (research-validated):
+| Category | Reflection (Kr) | Transmission (Kt) | Dissipation (Kd) | Structures |
+|----------|----------------|-------------------|------------------|------------|
+| Impermeable | 0.80 ± 0.10 | 0.10 ± 0.05 | 0.20 ± 0.10 | Concrete seawalls, solid jetties |
+| Semi-Permeable | 0.45 ± 0.15 | 0.35 ± 0.15 | 0.45 ± 0.15 | Rock revetments, rubble breakwaters |
+| Permeable | 0.20 ± 0.10 | 0.75 ± 0.10 | 0.25 ± 0.10 | Pile piers, open structures |
+
+Energy conservation constraint: Kr² + Kt² + Kd² = 1
+
+**Spatial influence zones** (from Goda 2000, CERC 1984):
+- Reflection effects extend 2–5 wavelengths from structure
+- Shadow zone extends 1–2 structure lengths behind breakwaters, 3–5 lengths partial shadow
+- Effects diminish approximately as 1/r² with distance
+
+**Structure influence zone multipliers**:
+| Type | Influence zone | Shadow zone |
+|------|---------------|-------------|
+| Jetty | 3–5 × length | 2–3 × length |
+| Pier | 1–2 × length | Minimal |
+| Breakwater | 2–4 × length | 1–2 × length |
+| Seawall | Height × 20 | Minimal |
+| Groin | 2–3 × length | 1–2 × length |
+
+**Multi-structure dominance**: Dominance = Material weight (0.4) + Distance weight (0.4) + Size weight (0.2). Linear superposition is valid when structures are separated by >5 wavelengths.
+
+Sources: Zanuttigh & Van der Meer (2006), Goda (2000), Isaacson (1991), CERC (1984), Chakrabarti (2005).
+
+### 11.6 Regional Fishing Forecast Model
+
+The original development research envisioned a significantly richer fishing scoring model than the 4-component system described in Section 4. Key additions:
+
+**Biogeographic region classification** — 11 US regions auto-determined from coordinates, each with distinct species lists by fishing category. Regions: Atlantic Northeast, Atlantic Southeast, Gulf Coast, Pacific Southwest (SoCal), Pacific Central, Pacific Northwest, Alaska, Hawaii, Great Lakes, Caribbean, Pacific Territories. Based on NOAA Large Marine Ecosystem boundaries and Costello et al. (2017) marine biogeographic realms.
+
+**Species behavioral profiles** — per-species parameters that modulate the base environmental score:
+- **Pressure sensitivity** correlated with swim bladder size: tuna (absent → very low sensitivity), mahi-mahi (small → low), flounder (adapted → moderate), redfish/striped bass/walleye (large → high)
+- **Water temperature preferences** with 5 ranges per species: optimal (1.2× multiplier), good (1.0×), poor (0.6×), inactive_below (0.1×), inactive_above (0.1×). Example: Redfish optimal 65–75°F, Striped Bass optimal 55–68°F, Snook inactive below 60°F.
+- **Spawning season multipliers**: Redfish Aug-Nov (2.5× peak Sep-Oct "bull redfish run"), Striped Bass Apr-Jun (3.0× peak May "spawning run"), Snook May-Sep (2.2× but 0.0× during Jun-Aug closed season)
+- **Migration patterns** by month affecting location preference
+- **Time-of-day multipliers** per species (dawn, morning, midday, dusk, night)
+
+**Dynamic scoring formula**: Final score = base environmental score × water temperature multiplier × seasonal behavior multiplier. Species classified as active / less_active / inactive per forecast period.
+
+### 11.7 Distance-Based Data Quality Thresholds
+
+Research from García-Reyes & Largier (2012) and Bourassa et al. (2019) established distance-based quality decay for marine data:
+
+| Distance | Wave quality | Atmospheric quality | Tide quality |
+|----------|-------------|-------------------|-------------|
+| 0–25 mi | 1.0 (excellent) | 1.0 | 1.0 |
+| 25–50 mi | 0.8 (good) | 1.0 | 0.8 |
+| 50–100 mi | 0.6 (fair) | 0.8 | 0.6 |
+| 100–200 mi | 0.3 (poor) | 0.6 | 0.3 |
+| 200+ mi | — | 0.4 | — |
+
+Atmospheric patterns show stronger coherence alongshore (0.7× decay factor) than cross-shore (1.3× decay factor). These thresholds inform station auto-discovery in the wizard (T6.1): stations farther than "good" quality distance should trigger a recommendation for additional coverage.
+
+### 11.8 Additional Scientific Citations
+
+Not already in this brief's Sources section:
+
+- Komar, P.D. (1998). *Beach Processes and Sedimentation*, 2nd Edition. Prentice Hall.
+- Holthuijsen, L.H. (2007). *Waves in Oceanic and Coastal Waters*. Cambridge University Press.
+- Wiegel, R.L. (1964). *Oceanographical Engineering*. Prentice-Hall.
+- CERC (1984). *Shore Protection Manual*, 4th Edition. U.S. Army Corps of Engineers.
+- McCowan, J. (1894). On the highest wave of permanent type. *Philosophical Magazine*, 38, 351-358.
+- Chawla, A., et al. (2013). A Multigrid Wave Forecasting Model. *Weather and Forecasting*, 28(4), 1057-1078.
+- Hanson, J.L. & Phillips, O.M. (2001). Wind Sea and Swell Delineation. *Proceedings 7th International Workshop on Wave Hindcasting and Forecasting*.
+- Zanuttigh, B. & Van der Meer, J.W. (2006). Wave reflection from coastal structures. *Coastal Engineering*, 55(4), 357-372.
+- Goda, Y. (2000). *Random Seas and Design of Maritime Structures*. World Scientific.
+- Isaacson, M. (1991). Measurement of Regular Wave Reflection. *JWPCOE*, 117(6), 553-569.
+- Chakrabarti, S.K. (2005). *Handbook of Offshore Engineering, Volume 1*. Elsevier.
+- Costello, M.J., et al. (2017). Marine biogeographic realms and species endemicity. *Nature Communications*, 8(1), 1057.
+- García-Reyes, M. & Largier, J. (2012). Seasonality of coastal upwelling. *JGR: Oceans*, 117(C3).
+- Bourassa, M.A., et al. (2019). Remotely Sensed Winds for Marine Forecasting. *Frontiers in Marine Science*, 6, 443.
+
 ## Sources
 
 - [NDBC Wave Measurement FAQ](https://www.ndbc.noaa.gov/faq/wavecalc.shtml)
