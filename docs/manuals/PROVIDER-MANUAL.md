@@ -1226,14 +1226,14 @@ NDBC serves flat files over HTTP (not a REST API). Three file types per station:
 | File | URL pattern | Format | Content |
 |---|---|---|---|
 | Standard met (`.txt`) | `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.txt` | Fixed-width text columns | Wind, waves, pressure, temp, visibility |
-| Spectral density (`.swden`) | `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.swden` | Fixed-width, 46 frequency columns | Wave energy density (m²/Hz) at 0.02–0.485 Hz |
-| Spectral direction (`.swdir`) | `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.swdir` | Fixed-width, 46 frequency columns | Mean wave direction (degrees) at each frequency |
+| Spectral density (`.data_spec`) | `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.data_spec` | `VALUE(FREQ)` token pairs (46 bands) | Wave energy density (m²/Hz) at 0.02–0.485 Hz |
+| Spectral direction (`.swdir`) | `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.swdir` | `VALUE(FREQ)` token pairs (46 bands) | Mean wave direction (degrees) at each frequency |
 
 **Standard met parsing:** First two rows are headers (column names + units). Data rows follow, most recent first. Parse the most recent row. Columns: WDIR, WSPD, GST, WVHT, DPD, APD, MWD, PRES, ATMP, WTMP, DEWP, VIS, PTDY, TIDE. Handle `MM` markers as `None` (missing data — not an error). NDBC reports in metric (m, m/s, °C, hPa) — convert via `UnitTransformer` to canonical types.
 
-**Spectral decomposition (when `.swden`/`.swdir` available):**
+**Spectral decomposition (when `.data_spec`/`.swdir` available):**
 
-1. Parse energy density at each of 46 frequency bands from `.swden` (most recent row).
+1. Parse energy density at each of 46 frequency bands from `.data_spec` (most recent row).
 2. Parse mean direction at each band from `.swdir`.
 3. Identify spectral peaks: local maxima where energy(f) > energy(f-1) and energy(f) > energy(f+1).
 4. Discard peaks below 5% of the dominant peak's energy (noise threshold).
@@ -1250,7 +1250,7 @@ No scipy dependency — 46 values, not a signal processing problem.
 
 **Station discovery:** Fetch `https://www.ndbc.noaa.gov/activestations.xml`. Parse XML for station ID, coordinates, sensor types. Differentiate station capabilities:
 - **Full capability:** wave sensors + atmospheric sensors + spectral (3 file types)
-- **Wave + atmospheric, no spectral:** `.txt` only (2 file types, no `.swden`/`.swdir`)
+- **Wave + atmospheric, no spectral:** `.txt` only (2 file types, no `.data_spec`/`.swdir`)
 - **Atmospheric only (C-MAN stations):** wind, pressure, temp — no wave data
 
 Return stations sorted by haversine distance from the target coordinates, with capabilities and distances.
