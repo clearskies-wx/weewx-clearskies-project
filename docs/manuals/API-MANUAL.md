@@ -1875,6 +1875,8 @@ Agents building or modifying `sse/gfe/` modules MUST study the GFE source code a
 
 All marine models follow the §2 naming convention (weewx-aligned camelCase, identical in Python and JSON). Pydantic models in `models/responses.py`.
 
+**Locale-resolved fields:** Several marine model fields carry human-readable strings that must resolve through `i18n.t()` at enrichment time — not hardcoded English. These are marked with "(locale)" in the Description column below. See §17 "Marine i18n" for the full locale key inventory and implementation requirements. Fields NOT marked "(locale)" carry raw values, enum identifiers, or provider-sourced prose passed through verbatim.
+
 #### MarineObservation
 
 Single buoy observation snapshot from NDBC standard met data.
@@ -1910,7 +1912,7 @@ Single swell system from NDBC spectral decomposition.
 | `direction` | float | — | No | Mean wave direction (energy-weighted circular mean, degrees true north) |
 | `energy` | float | — | No | Zeroth spectral moment m₀ (m²) |
 | `frequencyRange` | list[float] | — | No | [min_hz, max_hz] bounds of this spectral partition |
-| `classification` | str | — | No | `"groundswell"` (period ≥ 12s), `"swell"` (8–12s), `"wind_swell"` (< 8s) |
+| `classification` | str | — | No | (locale) `"groundswell"` (period ≥ 12s), `"swell"` (8–12s), `"wind_swell"` (< 8s) |
 
 #### TidePrediction
 
@@ -1950,6 +1952,7 @@ Single timestep from WaveWatch III wave forecast.
 | `swellDirection` | float | — | Yes | Primary swell direction |
 | `windWaveHeight` | float | `group_wave_height` | Yes | Wind wave height |
 | `windWavePeriod` | float | `group_wave_period` | Yes | Wind wave period |
+| `windWaveDirection` | float | — | Yes | Wind wave direction (degrees true north) |
 
 #### MarineTextForecast
 
@@ -1975,9 +1978,9 @@ Surf quality forecast for one spot at one timestep.
 | `period` | float | `group_wave_period` | No | Dominant period |
 | `direction` | float | — | No | Dominant swell direction (degrees true north) |
 | `qualityStars` | int | — | No | 1–5 star rating |
-| `qualityLabel` | str | — | No | Text label (e.g., "Poor", "Fair", "Good", "Very Good", "Epic") |
-| `conditionsText` | str | — | No | Natural-language conditions summary |
-| `windQuality` | str | — | No | `"offshore"`, `"cross_offshore"`, `"cross"`, `"cross_onshore"`, `"onshore"` |
+| `qualityLabel` | str | — | No | (locale) Text label: "Poor", "Fair", "Good", "Very Good", "Epic" |
+| `conditionsText` | str | — | No | (locale) Natural-language conditions summary |
+| `windQuality` | str | — | No | (locale) "offshore", "cross_offshore", "cross", "cross_onshore", "onshore" |
 | `swellDominance` | float | — | No | Ratio of primary swell energy to total energy (0.0–1.0) |
 | `multiSwell` | list[SpectralWaveComponent] | — | Yes | Individual swell systems (when spectral data available) |
 
@@ -1989,15 +1992,15 @@ Fishing conditions forecast for one spot for one period.
 |---|---|---|---|---|
 | `periodStart` | str | — | No | Period start time (UTC ISO-8601) |
 | `periodEnd` | str | — | No | Period end time (UTC ISO-8601) |
-| `periodLabel` | str | — | No | Human-readable period (e.g., "Early Morning", "Late Afternoon") |
+| `periodLabel` | str | — | No | (locale) Human-readable period: "Early Morning", "Late Afternoon", etc. |
 | `overallScore` | int | — | No | Composite score 0–100 |
 | `pressureScore` | int | — | No | Pressure component sub-score 0–100 |
 | `tideScore` | int | — | No | Tide component sub-score 0–100 |
 | `solunarScore` | int | — | No | Solunar component sub-score 0–100 |
 | `waterTempScore` | int | — | No | Water temperature component sub-score 0–100 |
 | `timeofdayScore` | int | — | No | Time-of-day component sub-score 0–100 |
-| `speciesScores` | list[object] | — | Yes | Per-species score adjustments |
-| `conditionsText` | str | — | No | Natural-language conditions summary |
+| `speciesScores` | list[object] | — | Yes | Per-species score adjustments; each entry's `status` field is (locale) |
+| `conditionsText` | str | — | No | (locale) Natural-language conditions summary |
 | `windSpeed` | float | `group_ocean_speed` | Yes | Wind speed (informational, not scored) |
 | `windDirection` | float | — | Yes | Wind direction (informational) |
 | `windGust` | float | `group_ocean_speed` | Yes | Wind gust (informational) |
@@ -2011,7 +2014,7 @@ Solunar major/minor feeding periods for one date at one location. Computed via S
 | Field | Type | Unit group | Nullable | Description |
 |---|---|---|---|---|
 | `date` | str | — | No | Date (YYYY-MM-DD) |
-| `moonPhase` | str | — | No | `"new"`, `"waxing_crescent"`, `"first_quarter"`, `"waxing_gibbous"`, `"full"`, `"waning_gibbous"`, `"last_quarter"`, `"waning_crescent"` |
+| `moonPhase` | str | — | No | (locale — reuse existing `moon_phases.*` keys) `"new"`, `"waxing_crescent"`, `"first_quarter"`, `"waxing_gibbous"`, `"full"`, `"waning_gibbous"`, `"last_quarter"`, `"waning_crescent"` |
 | `moonIllumination` | float | — | No | 0.0–1.0 |
 | `moonrise` | str | — | Yes | Moonrise time (UTC ISO-8601, null if moon doesn't rise) |
 | `moonset` | str | — | Yes | Moonset time (UTC ISO-8601, null if moon doesn't set) |
@@ -2029,7 +2032,7 @@ NWS Surf Zone Forecast per county zone per day.
 |---|---|---|---|---|
 | `date` | str | — | No | Forecast date (YYYY-MM-DD) |
 | `countyZone` | str | — | No | NWS county zone identifier |
-| `ripCurrentRisk` | str | — | No | `"low"`, `"moderate"`, or `"high"` |
+| `ripCurrentRisk` | str | — | No | (locale) `"low"`, `"moderate"`, or `"high"` |
 | `surfHeightMin` | float | `group_wave_height` | Yes | Minimum breaking surf height |
 | `surfHeightMax` | float | `group_wave_height` | Yes | Maximum breaking surf height |
 | `uvIndex` | int | — | Yes | UV index (1–11+) |
@@ -2043,12 +2046,12 @@ Composite beach safety assessment per location.
 
 | Field | Type | Unit group | Nullable | Description |
 |---|---|---|---|---|
-| `safetyLevel` | str | — | No | `"safe"`, `"caution"`, or `"dangerous"` |
+| `safetyLevel` | str | — | No | (locale) `"safe"`, `"caution"`, or `"dangerous"` |
 | `waveHeight` | float | `group_wave_height` | Yes | Current/forecast wave height |
 | `wavePeriod` | float | `group_wave_period` | Yes | Current/forecast wave period |
-| `ripCurrentRisk` | str | — | Yes | `"low"`, `"moderate"`, `"high"` (from SRF or NWPS v1.5) |
+| `ripCurrentRisk` | str | — | Yes | (locale) `"low"`, `"moderate"`, `"high"` (from SRF or NWPS v1.5) |
 | `waterTemp` | float | `group_temperature` | Yes | Water temperature |
-| `comfortLevel` | str | — | Yes | `"comfortable"`, `"cool"`, `"cold"`, `"dangerous"` |
+| `comfortLevel` | str | — | Yes | (locale) `"comfortable"`, `"cool"`, `"cold"`, `"dangerous"` |
 | `uvIndex` | int | — | Yes | UV index |
 | `visibility` | float | `group_visibility` | Yes | Visibility |
 | `windSpeed` | float | `group_ocean_speed` | Yes | Wind speed |
@@ -2255,6 +2258,44 @@ Computed locally via Skyfield — no external API call. Skyfield is already a pr
 **Period duration modulation:** New/full moon → wider windows (major: ± 2 hr, minor: ± 1.5 hr). Quarter moon → standard windows.
 
 **Solunar endpoint availability:** `GET /api/v1/almanac/solunar` is NOT gated by the marine feature. Solunar times are useful for hunting, wildlife photography, and general outdoor planning. Available to all operators.
+
+### Marine i18n — locale-resolved fields
+
+**All marine enrichment output that carries human-readable text must resolve through `i18n.t()` (§6).** This is not optional — it is the same requirement that applies to Beaufort labels, AQI categories, moon names, and conditions text. An enrichment processor that returns hardcoded English strings violates `rules/coding.md` §6 and will fail the QA gate.
+
+**Locale key inventory for marine features:**
+
+| Response field | Example English value | Locale key pattern | Resolution |
+|---|---|---|---|
+| `SurfForecast.qualityLabel` | "Epic" | `surf.quality.<1-5>` | `i18n.t("surf.quality.5")` → "Epic" (en), "Épique" (fr), "エピック" (ja) |
+| `SurfForecast.windQuality` | "offshore" | `surf.wind_quality.<value>` | `i18n.t("surf.wind_quality.offshore")` |
+| `SurfForecast.conditionsText` | "3-4 ft at 12s from SSW. Offshore winds 5-10 mph." | `surf.conditions.*` composition templates | Compose via locale-aware templates per §6 composition pattern. Direction abbreviations, unit labels, connectors all locale-resolved. |
+| `SpectralWaveComponent.classification` | "groundswell" | `marine.swell_class.<value>` | `i18n.t("marine.swell_class.groundswell")` |
+| `FishingForecast.periodLabel` | "Early Morning" | `fishing.period.<value>` | `i18n.t("fishing.period.early_morning")` |
+| `FishingForecast.conditionsText` | "Falling pressure with incoming tide..." | `fishing.conditions.*` composition templates | Compose via locale-aware templates |
+| `FishingForecast.speciesScores[].status` | "active" | `fishing.species_status.<value>` | `i18n.t("fishing.species_status.active")` |
+| `BeachSafetyAssessment.safetyLevel` | "caution" | `beach_safety.level.<value>` | `i18n.t("beach_safety.level.caution")` |
+| `BeachSafetyAssessment.comfortLevel` | "cool" | `beach_safety.comfort.<value>` | `i18n.t("beach_safety.comfort.cool")` |
+| `SurfZoneForecast.ripCurrentRisk` | "moderate" | `beach_safety.rip_risk.<value>` | `i18n.t("beach_safety.rip_risk.moderate")` |
+| `SolunarTimes.moonPhase` | "waxing_crescent" | `moon_phases.<value>` | Already exists in locale files (reuse existing moon phase keys from almanac feature) |
+| Habitat feature labels | "Drop-off at 200m offshore" | `fishing.habitat.<feature_type>` | `i18n.t("fishing.habitat.dropoff")` — the distance/depth numbers use `format_number()` |
+| Solunar evidence caveat | "Solunar theory suggests..." | `fishing.solunar_caveat` | Single key, full-text per locale |
+
+**What does NOT need i18n in marine responses:**
+- Canonical field names (camelCase identifiers in JSON keys)
+- NWS-sourced prose passed through verbatim (`MarineTextForecast.text`, `SurfZoneForecast.windText`, `SurfZoneForecast.hazardsText`) — these are English from the NWS; translating them is a provider-level concern (non-US locale providers would supply locale-native text)
+- Station IDs, zone IDs, location slugs, coordinates, timestamps
+- Numeric values (these are locale-formatted by `format_number()` at serialization, not by the enrichment processor)
+
+**Implementation requirement:** Each enrichment processor's output function must accept a `locale` parameter (defaulting to `i18n.get_active_locale()`). All label lookups use `i18n.t(key, locale=locale)`. All number formatting in composed text uses `i18n.format_number(value, decimals, locale=locale)`. This is the same pattern used by `enrichment/conditions_text.py` — read that module for the reference implementation.
+
+**Locale file additions:** Each locale file (`locales/{locale}.json`) must gain the following top-level sections:
+- `"surf"` — quality labels (5), wind quality labels (5), swell classifications (3), conditions composition templates
+- `"fishing"` — period labels (6), species status labels (3), habitat feature labels (5), conditions composition templates, solunar caveat text
+- `"beach_safety"` — safety level labels (3), comfort level labels (4), rip current risk labels (3)
+- `"marine"` — swell classification labels (3, shared with surf)
+
+English (`en.json`) is the authoritative source. All 12 other locale files must have the same key structure — placeholder English values are acceptable for v1, to be replaced with proper translations before release.
 
 ---
 
