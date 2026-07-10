@@ -1,8 +1,8 @@
 # Marine, Surf & Fishing Forecast — Implementation Plan
 
-**Status:** Phase 1 in progress (5 of 7 tasks committed)  
+**Status:** Phase 1 implementation complete, QC Gate 1 pending (requires push + deploy)  
 **Created:** 2026-07-08  
-**Last updated:** 2026-07-09 (Phase 0 outcomes applied to all phases — GEBCO→CUDEM, section refs, file paths, wire format corrections)  
+**Last updated:** 2026-07-09 (all 7 Phase 1 tasks committed; grid overlap + manual corrections applied)  
 **Components:** API (`weewx-clearskies-api`), Dashboard (`weewx-clearskies-dashboard`), Config UI (`weewx-clearskies-stack`)
 
 ## Context
@@ -493,24 +493,32 @@ Define response models, config structures, and unit groups. No provider calls, n
 
 ---
 
-## PHASE 1 — NOAA Provider Modules + Marine Zone Alerts — IN PROGRESS
+## PHASE 1 — NOAA Provider Modules + Marine Zone Alerts — IMPLEMENTATION COMPLETE, QC PENDING
 
 Five provider modules following the existing contract (PROVIDER-MANUAL §1–§7: module identity, `CAPABILITY` constant, wire-shape Pydantic models, normalization to canonical types, cache layer, error handling via `ProviderHTTPClient`, `fetch()` entrypoint). Plus marine zone alerts extension to the existing alert system.
 
-**Progress (2026-07-09):**
-- T1.2 CO-OPS tides: DONE (commit 4bc648f, 713 lines)
-- T1.3 WaveWatch III: DONE (commit 858a791, 572 lines) — grid overlap for Hawaii noted, fix pending
-- T1.4 NWS marine + zones: DONE (commit cfc58e2, 2 files: nws_zones.py + nws_marine.py)
-- T1.7 Marine zone alerts: DONE (commit b864ec4, modified settings.py + nws.py + alerts endpoint)
-- T1.1 NDBC: IN PROGRESS — agent implementing against live-verified format (`.data_spec` not `.swden`, `VALUE(FREQ)` pairs)
-- T1.5 NWS SRF: IN PROGRESS — agent implementing SRF text parser
-- T1.6 Dispatch wiring: BLOCKED on T1.1 + T1.5 completion
+**All tasks committed (2026-07-09). QC Gate 1 not yet run (requires push + deploy).**
 
-**Known issues to fix at QC gate:**
-1. WaveWatch grid overlap: Hawaii matches both wcoast and epacif (both priority 1). Fix: narrow wcoast lon to -130.
-2. PROVIDER-MANUAL §14.1: NDBC wire format documented as `.swden` with simple columns; reality is `.data_spec` with `VALUE(FREQ)` pairs. Update after T1.1 commits.
+| Task | Commit | Lines | Status |
+|------|--------|-------|--------|
+| T1.1 NDBC buoy observations | 31d5e63 | 939 | Done |
+| T1.2 CO-OPS tides & water levels | 4bc648f | 713 | Done |
+| T1.3 WaveWatch III forecasts | 858a791 | 562 | Done |
+| T1.4 NWS marine + nws_zones.py | cfc58e2 | 361+618 | Done |
+| T1.5 NWS Surf Zone Forecast | ef571ff | 931 | Done |
+| T1.6 Dispatch wiring (5 providers) | 37424ea | — | Done |
+| T1.7 Marine zone alerts | b864ec4 | — | Done |
+
+**Resolved issues:**
+1. ~~WaveWatch grid overlap~~: wcoast.0p16 lon narrowed from -165..-100 to -130..-100 (commit 6f71451). Hawaii routes to epacif.0p16.
+2. ~~PROVIDER-MANUAL §14.1~~: corrected .swden → .data_spec with VALUE(FREQ) token pairs (meta repo commit 0cc25b5).
 3. ERDDAP dataset names: not live-verified; documented in wavewatch.py for integration testing.
-4. MarineForecastPoint: `windWaveDirection` field added mid-phase (commit 351e516) — was missing from Phase 0C model.
+4. ~~MarineForecastPoint windWaveDirection~~: added mid-phase (commit 351e516), API-MANUAL §16 already updated.
+
+**Local QC (pre-deploy):**
+- All 5 providers import cleanly with correct CAPABILITY declarations
+- Dispatch registry: 28 total entries (5 new marine)
+- NWS alerts `marine_zone_ids` defaults to None — zero regression when unconfigured
 
 ### Tasks
 
