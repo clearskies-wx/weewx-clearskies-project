@@ -31,6 +31,9 @@ Last updated: 2026-07-02
 13. [Anti-Patterns](#13-anti-patterns)
 14. [Forecast Correction Engine](#14-forecast-correction-engine)
 15. [Forecast Text Generation](#15-forecast-text-generation)
+16. [Marine Data Model](#16-marine-data-model)
+17. [Marine Enrichment](#17-marine-enrichment)
+18. [Marine Endpoints](#18-marine-endpoints)
 
 ---
 
@@ -130,8 +133,25 @@ The canonical data model defines 9 core entity types and 2 container types:
 | `EarthquakeRecord` | Single earthquake event |
 | `AQIReading` | Air quality index reading from a provider module |
 | `StationMetadata` | Station identity (name, lat, lon, alt, timezone, archiveIntervalSeconds, weekStartDay) |
+| `MarineObservation` | Buoy observation snapshot (NDBC standard met) |
+| `SpectralWaveComponent` | Single swell system from spectral decomposition (NDBC) |
+| `TidePrediction` | Predicted high/low tide event (CO-OPS) |
+| `WaterLevel` | Observed water level reading (CO-OPS) |
+| `MarineForecastPoint` | Single timestep of marine wave forecast (WaveWatch III) |
+| `MarineTextForecast` | NWS marine zone text forecast period |
+| `SurfForecast` | Surf quality forecast per spot per timestep |
+| `FishingForecast` | Fishing conditions forecast per spot per period |
+| `SolunarTimes` | Solunar major/minor feeding periods for a date |
+| `SurfZoneForecast` | NWS Surf Zone Forecast per county per day |
+| `BeachSafetyAssessment` | Beach safety composite assessment per location |
+| `MarineLocationSummary` | Summary snapshot for one marine location |
 | `ForecastBundle` | Container: hourly + daily + discussion in one response |
 | `AlertList` | Container: list of active alerts |
+| `MarineBundle` | Container: marine conditions + forecast per location |
+| `TideBundle` | Container: predictions + observations per location |
+| `SurfBundle` | Container: surf forecast + rating per location |
+| `FishingBundle` | Container: fishing forecast + scoring per location |
+| `BeachSafetyBundle` | Container: beach safety assessment per location |
 
 ### Response shapes
 
@@ -1846,3 +1866,447 @@ Locale JSON files carry `wind.*` keys (the hybrid Beaufort/GFE wind-scale labels
 ### GFE code reuse directive
 
 Agents building or modifying `sse/gfe/` modules MUST study the GFE source code analysis at `docs/reference/nws-text-system/gfe-source-code-analysis.md` and port algorithms faithfully. The GFE source is public domain (17 USC §105 — US government work). Do not reinvent what NWS already wrote and tested. Replicate threshold values and decision logic. Adapt for single-station use and 13-locale i18n, but keep core algorithms faithful to the original.
+
+---
+
+## §16 Marine Data Model
+
+### Marine canonical models
+
+All marine models follow the §2 naming convention (weewx-aligned camelCase, identical in Python and JSON). Pydantic models in `models/responses.py`.
+
+#### MarineObservation
+
+Single buoy observation snapshot from NDBC standard met data.
+
+| Field | Type | Unit group | Nullable | Description |
+|---|---|---|---|---|
+| `windSpeed` | float | `group_ocean_speed` | Yes | Sustained wind speed |
+| `windDirection` | float | — | Yes | Wind direction (degrees true north, meteorological convention) |
+| `windGust` | float | `group_ocean_speed` | Yes | Wind gust speed |
+| `waveHeight` | float | `group_wave_height` | Yes | Significant wave height (Hs) |
+| `dominantPeriod` | float | `group_wave_period` | Yes | Dominant wave period |
+| `averagePeriod` | float | `group_wave_period` | Yes | Average wave period |
+| `meanWaveDirection` | float | — | Yes | Mean wave direction (degrees true north) |
+| `pressure` | float | `group_pressure` | Yes | Sea-level pressure |
+| `airTemp` | float | `group_temperature` | Yes | Air temperature |
+| `waterTemp` | float | `group_temperature` | Yes | Sea surface temperature |
+| `dewpoint` | float | `group_temperature` | Yes | Dewpoint temperature |
+| `visibility` | float | `group_visibility` | Yes | Visibility |
+| `pressureTendency` | float | `group_pressure` | Yes | 3-hour pressure tendency |
+| `tideLevel` | float | `group_water_level` | Yes | Tide level (where reported) |
+| `stationId` | str | — | No | NDBC station identifier |
+| `time` | str | — | No | Observation time (UTC ISO-8601) |
+| `spectralComponents` | list[SpectralWaveComponent] | — | Yes | Decomposed swell systems (when spectral data available) |
+
+#### SpectralWaveComponent
+
+Single swell system from NDBC spectral decomposition.
+
+| Field | Type | Unit group | Nullable | Description |
+|---|---|---|---|---|
+| `height` | float | `group_wave_height` | No | Significant wave height for this swell system (Hs = 4√m₀) |
+| `period` | float | `group_wave_period` | No | Peak period (Tp = 1/fp) |
+| `direction` | float | — | No | Mean wave direction (energy-weighted circular mean, degrees true north) |
+| `energy` | float | — | No | Zeroth spectral moment m₀ (m²) |
+| `frequencyRange` | list[float] | — | No | [min_hz, max_hz] bounds of this spectral partition |
+| `classification` | str | — | No | `"groundswell"` (period ≥ 12s), `"swell"` (8–12s), `"wind_swell"` (< 8s) |
+
+#### TidePrediction
+
+Predicted tide event from CO-OPS harmonic predictions.
+
+| Field | Type | Unit group | Nullable | Description |
+|---|---|---|---|---|
+| `time` | str | — | No | Prediction time (UTC ISO-8601) |
+| `height` | float | `group_water_level` | No | Predicted water level relative to datum |
+| `type` | str | — | Yes | `"high"`, `"low"`, or null for interpolated points |
+
+#### WaterLevel
+
+Observed water level from CO-OPS gauges.
+
+| Field | Type | Unit group | Nullable | Description |
+|---|---|---|---|---|
+| `time` | str | — | No | Observation time (UTC ISO-8601) |
+| `height` | float | `group_water_level` | No | Observed water level relative to datum |
+| `datum` | str | — | No | Reference datum (e.g., `"MLLW"`, `"MSL"`, `"NAVD88"`) |
+| `quality` | str | — | Yes | Quality flag from CO-OPS (e.g., `"v"` verified, `"p"` preliminary) |
+
+#### MarineForecastPoint
+
+Single timestep from WaveWatch III wave forecast.
+
+| Field | Type | Unit group | Nullable | Description |
+|---|---|---|---|---|
+| `time` | str | — | No | Forecast valid time (UTC ISO-8601) |
+| `waveHeight` | float | `group_wave_height` | Yes | Significant wave height |
+| `wavePeriod` | float | `group_wave_period` | Yes | Peak wave period |
+| `waveDirection` | float | — | Yes | Peak wave direction (degrees true north) |
+| `windSpeed` | float | `group_ocean_speed` | Yes | 10m wind speed |
+| `windDirection` | float | — | Yes | Wind direction |
+| `swellHeight` | float | `group_wave_height` | Yes | Primary swell height |
+| `swellPeriod` | float | `group_wave_period` | Yes | Primary swell period |
+| `swellDirection` | float | — | Yes | Primary swell direction |
+| `windWaveHeight` | float | `group_wave_height` | Yes | Wind wave height |
+| `windWavePeriod` | float | `group_wave_period` | Yes | Wind wave period |
+
+#### MarineTextForecast
+
+Single period from NWS marine zone text forecast.
+
+| Field | Type | Unit group | Nullable | Description |
+|---|---|---|---|---|
+| `periodName` | str | — | No | Period label (e.g., "Tonight", "Thursday") |
+| `text` | str | — | No | Full forecast narrative |
+| `wind` | str | — | Yes | Wind description extracted from narrative |
+| `seas` | str | — | Yes | Seas description |
+| `visibility` | str | — | Yes | Visibility description |
+| `weather` | str | — | Yes | Weather description |
+
+#### SurfForecast
+
+Surf quality forecast for one spot at one timestep.
+
+| Field | Type | Unit group | Nullable | Description |
+|---|---|---|---|---|
+| `time` | str | — | No | Forecast valid time (UTC ISO-8601) |
+| `waveHeightAtBreak` | float | `group_wave_height` | No | Wave height at breaking (after NWPS supplements) |
+| `period` | float | `group_wave_period` | No | Dominant period |
+| `direction` | float | — | No | Dominant swell direction (degrees true north) |
+| `qualityStars` | int | — | No | 1–5 star rating |
+| `qualityLabel` | str | — | No | Text label (e.g., "Poor", "Fair", "Good", "Very Good", "Epic") |
+| `conditionsText` | str | — | No | Natural-language conditions summary |
+| `windQuality` | str | — | No | `"offshore"`, `"cross_offshore"`, `"cross"`, `"cross_onshore"`, `"onshore"` |
+| `swellDominance` | float | — | No | Ratio of primary swell energy to total energy (0.0–1.0) |
+| `multiSwell` | list[SpectralWaveComponent] | — | Yes | Individual swell systems (when spectral data available) |
+
+#### FishingForecast
+
+Fishing conditions forecast for one spot for one period.
+
+| Field | Type | Unit group | Nullable | Description |
+|---|---|---|---|---|
+| `periodStart` | str | — | No | Period start time (UTC ISO-8601) |
+| `periodEnd` | str | — | No | Period end time (UTC ISO-8601) |
+| `periodLabel` | str | — | No | Human-readable period (e.g., "Early Morning", "Late Afternoon") |
+| `overallScore` | int | — | No | Composite score 0–100 |
+| `pressureScore` | int | — | No | Pressure component sub-score 0–100 |
+| `tideScore` | int | — | No | Tide component sub-score 0–100 |
+| `solunarScore` | int | — | No | Solunar component sub-score 0–100 |
+| `waterTempScore` | int | — | No | Water temperature component sub-score 0–100 |
+| `timeofdayScore` | int | — | No | Time-of-day component sub-score 0–100 |
+| `speciesScores` | list[object] | — | Yes | Per-species score adjustments |
+| `conditionsText` | str | — | No | Natural-language conditions summary |
+| `windSpeed` | float | `group_ocean_speed` | Yes | Wind speed (informational, not scored) |
+| `windDirection` | float | — | Yes | Wind direction (informational) |
+| `windGust` | float | `group_ocean_speed` | Yes | Wind gust (informational) |
+| `swellHeight` | float | `group_wave_height` | Yes | Swell height (informational, not scored) |
+| `swellPeriod` | float | `group_wave_period` | Yes | Swell period (informational) |
+
+#### SolunarTimes
+
+Solunar major/minor feeding periods for one date at one location. Computed via Skyfield — no external API.
+
+| Field | Type | Unit group | Nullable | Description |
+|---|---|---|---|---|
+| `date` | str | — | No | Date (YYYY-MM-DD) |
+| `moonPhase` | str | — | No | `"new"`, `"waxing_crescent"`, `"first_quarter"`, `"waxing_gibbous"`, `"full"`, `"waning_gibbous"`, `"last_quarter"`, `"waning_crescent"` |
+| `moonIllumination` | float | — | No | 0.0–1.0 |
+| `moonrise` | str | — | Yes | Moonrise time (UTC ISO-8601, null if moon doesn't rise) |
+| `moonset` | str | — | Yes | Moonset time (UTC ISO-8601, null if moon doesn't set) |
+| `moonTransit` | str | — | No | Moon transit (highest point) time (UTC ISO-8601) |
+| `moonUnderfoot` | str | — | No | Moon underfoot (opposite transit) time (UTC ISO-8601) |
+| `majorPeriods` | list[object] | — | No | Two per day, centered on transit and underfoot. Each: `{start, end}` (UTC ISO-8601) |
+| `minorPeriods` | list[object] | — | No | Two per day, centered on moonrise and moonset. Each: `{start, end}` (UTC ISO-8601) |
+| `intensity` | float | — | No | 0.0–1.0, driven by moon phase (new/full = 1.0, quarter = 0.7, between = 0.5) |
+
+#### SurfZoneForecast
+
+NWS Surf Zone Forecast per county zone per day.
+
+| Field | Type | Unit group | Nullable | Description |
+|---|---|---|---|---|
+| `date` | str | — | No | Forecast date (YYYY-MM-DD) |
+| `countyZone` | str | — | No | NWS county zone identifier |
+| `ripCurrentRisk` | str | — | No | `"low"`, `"moderate"`, or `"high"` |
+| `surfHeightMin` | float | `group_wave_height` | Yes | Minimum breaking surf height |
+| `surfHeightMax` | float | `group_wave_height` | Yes | Maximum breaking surf height |
+| `uvIndex` | int | — | Yes | UV index (1–11+) |
+| `waterTemp` | float | `group_temperature` | Yes | Water temperature |
+| `windText` | str | — | Yes | Wind description |
+| `hazardsText` | str | — | Yes | Hazard statements |
+
+#### BeachSafetyAssessment
+
+Composite beach safety assessment per location.
+
+| Field | Type | Unit group | Nullable | Description |
+|---|---|---|---|---|
+| `safetyLevel` | str | — | No | `"safe"`, `"caution"`, or `"dangerous"` |
+| `waveHeight` | float | `group_wave_height` | Yes | Current/forecast wave height |
+| `wavePeriod` | float | `group_wave_period` | Yes | Current/forecast wave period |
+| `ripCurrentRisk` | str | — | Yes | `"low"`, `"moderate"`, `"high"` (from SRF or NWPS v1.5) |
+| `waterTemp` | float | `group_temperature` | Yes | Water temperature |
+| `comfortLevel` | str | — | Yes | `"comfortable"`, `"cool"`, `"cold"`, `"dangerous"` |
+| `uvIndex` | int | — | Yes | UV index |
+| `visibility` | float | `group_visibility` | Yes | Visibility |
+| `windSpeed` | float | `group_ocean_speed` | Yes | Wind speed |
+| `windDirection` | float | — | Yes | Wind direction |
+| `activeAlerts` | list[str] | — | No | Alert headlines relevant to beach safety |
+
+#### MarineLocationSummary
+
+Summary snapshot for one marine location (used by Now page summary card).
+
+| Field | Type | Unit group | Nullable | Description |
+|---|---|---|---|---|
+| `locationId` | str | — | No | Location slug from config |
+| `name` | str | — | No | Display name |
+| `coordinates` | object | — | No | `{lat, lon}` |
+| `activities` | list[str] | — | No | Enabled activities for this location |
+| `currentConditions` | MarineObservation | — | Yes | Latest buoy observation (if buoy activity enabled) |
+| `currentTide` | object | — | Yes | Next high/low tide `{type, time, height}` |
+| `activeAlerts` | list[str] | — | Yes | Active marine alert headlines |
+| `surfRating` | int | — | Yes | Current surf quality stars (1–5, if surf enabled) |
+| `beachSafetyLevel` | str | — | Yes | Current safety level (if beach_safety enabled) |
+
+#### Bundle types
+
+Bundles wrap domain-specific models with location metadata, freshness block (§2), and stationClock (§2). Follow the existing `ForecastBundle` pattern.
+
+| Bundle | Contains | Response for |
+|---|---|---|
+| `MarineBundle` | `MarineObservation`, `list[MarineForecastPoint]`, `list[MarineTextForecast]` | `GET /api/v1/marine[/{locationId}]` |
+| `TideBundle` | `list[TidePrediction]`, `list[WaterLevel]` | `GET /api/v1/tides[/{locationId}]` |
+| `SurfBundle` | `list[SurfForecast]`, `SurfZoneForecast`, `SpectralWaveComponent` list | `GET /api/v1/surf[/{locationId}]` |
+| `FishingBundle` | `list[FishingForecast]`, `SolunarTimes` | `GET /api/v1/fishing[/{locationId}]` |
+| `BeachSafetyBundle` | `BeachSafetyAssessment`, `SurfZoneForecast` | `GET /api/v1/beach-safety[/{locationId}]` |
+
+Each bundle also carries: `locationId`, `locationName`, `coordinates`, `freshness` block, `stationClock`, `units`.
+
+### Marine unit groups
+
+Five new unit groups for marine data. Registered in `units/groups.py` and `services/units.py`.
+
+| Group | Base unit | Conversions |
+|---|---|---|
+| `group_wave_height` | meter | meter ↔ foot (× 3.28084) |
+| `group_wave_period` | second | Single unit — no conversion. Group exists for canonical consistency. |
+| `group_water_level` | meter | meter ↔ foot (× 3.28084) |
+| `group_ocean_speed` | meter_per_second | m/s ↔ knot (× 1.94384), m/s ↔ mph (× 2.23694), m/s ↔ km/h (× 3.6) |
+| `group_visibility` | nautical_mile | nm ↔ statute_mile (× 1.15078), nm ↔ kilometer (× 1.852) |
+
+**Preset defaults:**
+
+| Marine group | US | METRIC | METRICWX |
+|---|---|---|---|
+| `group_wave_height` | foot | meter | meter |
+| `group_wave_period` | second | second | second |
+| `group_water_level` | foot | meter | meter |
+| `group_ocean_speed` | **knot** | **knot** | **knot** |
+| `group_visibility` | nautical_mile | nautical_mile | nautical_mile |
+
+**`group_ocean_speed` defaults to knots in ALL three presets.** Maritime convention overrides land convention. WMO, IMO, and every national maritime service uses knots for wind speed and current speed over water. Even countries that use m/s on land use knots at sea. Similarly, `group_visibility` defaults to nautical miles universally.
+
+**`group_ocean_speed` vs `group_speed`:** These are separate groups. The existing `group_speed` (land wind) remains unchanged — it maps to mph / km·h⁻¹ / m·s⁻¹ per the existing presets. An operator using METRICWX sees land wind in m/s and marine wind in knots by default — which is correct practice (weather services do exactly this). If they want both in m/s, they override `group_ocean_speed = meter_per_second` in `api.conf [units][[groups]]`.
+
+Display labels: `"kt"` (knot), `"ft"` (foot), `"m"` (meter), `"s"` (second), `"nm"` (nautical mile), `"mi"` (statute mile), `"km"` (kilometer).
+
+---
+
+## §17 Marine Enrichment
+
+Four enrichment processors for marine data. Each follows the existing enrichment pipeline pattern (register against an endpoint key, run after provider fetch and before response serialization).
+
+### NWPS supplement processor
+
+**File:** `enrichment/wave_transform.py`
+**Registration:** Against the surf scoring pipeline — runs after NWPS fetch, before `surf_scorer.py`.
+**Inputs:** NWPS wave data (height, period, direction), spot config (bottom type, slope, structures, topographic feature, coordinates), CUDEM bathymetric profile.
+**Outputs:** Corrected wave height, period, direction at the spot location.
+
+Applies four targeted supplements to correct documented NWPS/SWAN limitations. No-op when NWPS data is unavailable (WaveWatch III data passes through unmodified).
+
+**Supplement 1 — Breaker index correction (γ tuning):**
+
+SWAN uses a constant γ = 0.73. The actual γ varies from ~0.6 (spilling breakers on gentle sand) to ~1.2 (plunging breakers on steep reef).
+
+Formula: **γ = 1.06 + 0.14 ln ξ** (Battjes 1974)
+
+Where ξ = tan α / √(H₀/L₀) is the Iribarren number:
+- tan α = average nearshore bottom slope (from CUDEM bathymetric profile)
+- H₀ = NWPS-provided significant wave height
+- L₀ = deep-water wavelength = g × T² / (2π), where T = NWPS-provided peak period, g = 9.81 m/s²
+
+Application: H_max = γ_corrected × depth (recompute maximum wave height at breaking using site-specific γ instead of SWAN's constant 0.73).
+
+**Validation:** γ output clamped to [0.5, 1.4] (physical bounds from literature). Values outside this range logged as warnings — indicate bad slope or wave data.
+
+Operator inputs: `bottom_type` (sand/rock/coral_reef/mixed), `beach_slope` (computed from CUDEM).
+
+**Supplement 2 — Coastal structure effects (transmission/reflection):**
+
+H_transmitted = Kt × H_incident
+
+| Material | Kt | Examples |
+|---|---|---|
+| Impermeable | 0.10 ± 0.05 | Concrete seawall, solid breakwater |
+| Semi-permeable | 0.35 ± 0.15 | Rubble mound, rock jetty |
+| Permeable | 0.75 ± 0.10 | Timber pier, open groin |
+
+Influence zone: effects apply within structure-type-specific distance (jetty: 3–5× length, breakwater: 2–4× length) and diminish as 1/r² with distance from the structure.
+
+All output labeled: "estimated — structure effects are approximate."
+
+Operator inputs: structure type, material, dimensions, position relative to spot.
+
+**Supplement 3 — Sub-grid spatial interpolation:**
+
+Bilinear interpolation using the four surrounding NWPS grid nodes. No operator input required — coordinates already configured.
+
+**Supplement 4 — Topographic wave focusing/sheltering:**
+
+Multiplicative adjustment based on operator-classified feature:
+
+| Feature | Multiplier | Effect |
+|---|---|---|
+| Point break | × 1.1 | Wave focusing around headland |
+| Headland | × 1.2 | Refraction enhancement |
+| Bay break | × 0.9 | Sheltering, height reduction |
+| Straight beach | × 1.0 | No modification |
+
+Operator inputs: topographic feature classification from spot config.
+
+**What is NOT supplemented:** Shoaling, refraction, bottom friction, wave-current interaction. NWPS/SWAN computes these with its own bathymetry and RTOFS currents. Re-running them would duplicate NWPS's work without improving it.
+
+All physics constants (γ bounds, Kt values, topographic multipliers) defined as module-level constants with source citations.
+
+### Surf quality scorer
+
+**File:** `enrichment/surf_scorer.py`
+**Registration:** Against the surf endpoint — runs after wave_transform.
+**Inputs:** Corrected wave data (from wave_transform or raw WaveWatch III), spectral components (from NDBC), spot config (beach facing, directional exposure), wind data.
+**Outputs:** `SurfForecast` with quality_stars (1–5), quality_label, conditions_text.
+
+Scoring factors:
+- **Wave height:** Larger = better (within rideable range for the spot)
+- **Period:** Longer = better (cleaner, more powerful waves)
+- **Swell dominance:** Higher ratio of primary swell energy to total energy = cleaner conditions
+- **Wind quality:** Offshore (blowing from land to sea) = best (holds wave face up); onshore = worst. Classification: offshore → cross_offshore → cross → cross_onshore → onshore, based on angle between wind direction and beach-facing direction.
+- **Beach angle alignment:** Per-component directional filter — a swell from a direction blocked by the beach's `directional_exposure` config scores zero for that component.
+- **Multi-swell interference:** Compatible swells (similar direction) combine constructively; opposing swells create confused seas and score lower.
+
+Quality labels: 1 = "Poor", 2 = "Fair", 3 = "Good", 4 = "Very Good", 5 = "Epic".
+
+### Fishing scorer
+
+**File:** `enrichment/fishing_scorer.py`
+**Registration:** Against the fishing endpoint.
+**Inputs:** Pressure trend (from weewx archive or NDBC buoy), tide state (from CO-OPS), water temperature (from NDBC/CO-OPS), solunar intensity (from solunar processor), current time.
+**Outputs:** `FishingForecast` with overall_score (0–100) and per-component sub-scores.
+
+**Five-component weighted scoring:**
+
+| Component | Weight | Scoring method |
+|---|---|---|
+| Barometric pressure trend | 0.30 | 3-hour pressure delta. Rapid drop (> 3 hPa/3hr) = 100 (peak). Falling = 80. Stable = 50. Rising = 30 initially, improving to 60 over 12–24 hr. |
+| Tide state | 0.25 | Position in tidal cycle from CO-OPS predictions. Outgoing (ebb) = 100 (flushes bait). Incoming (flood) = 80. Slack high = 30. Slack low = 20. |
+| Water temperature | 0.20 | Compared to species-specific optimal ranges. Within optimal = 100. Good range = 80. Marginal = 50. Outside active range = 10. |
+| Solunar intensity | 0.15 | From solunar processor. During major period + new/full moon = 100. During minor period = 60. Outside any period = 30. |
+| Time of day | 0.10 | Dawn/dusk = 100 (low-light feeding peaks). Morning = 70. Night = 50 (species-dependent). Midday = 30. |
+
+**Final score** = Σ(component_score × weight) × species_modifier × seasonal_multiplier, scaled to 0–100 integer.
+
+**Species profiles:** Four target categories, each with species auto-populated from 11 US biogeographic regions:
+
+| Category | Example species | Pressure sensitivity | Typical temp range (°F) |
+|---|---|---|---|
+| Saltwater inshore | Redfish, Speckled Trout, Flounder, Snook | High | 55–85 |
+| Bottom fish | Grouper, Snapper, Sheepshead, Tautog | Moderate | Species-specific, varies widely |
+| Freshwater sport | Bass, Walleye, Pike, Catfish | High | 55–75 |
+| Salmonids | Salmon, Steelhead, Trout | Moderate | 45–65 |
+
+Each species has: optimal temp range (1.0×), good range (0.8×), marginal range (0.5×), inactive below/above (0.1×). Spawning season multipliers (2.0–3.0× during peak runs).
+
+Species data is hardcoded lookup tables in `enrichment/fishing_species.py`, keyed by biogeographic region and target category. No external API.
+
+**Solunar evidence caveat:** Presented as one factor with appropriate context — "Solunar theory suggests feeding activity correlates with moon position. Scientific evidence is mixed; environmental conditions (pressure, temperature, tides) have stronger research support."
+
+### Solunar computation
+
+**File:** `enrichment/solunar.py`
+**Registration:** Against the solunar and fishing endpoints.
+**Inputs:** Date, location coordinates.
+**Outputs:** `SolunarTimes` model.
+
+Computed locally via Skyfield — no external API call. Skyfield is already a project dependency (almanac feature).
+
+**Major periods:** Centered on moon transit (highest point) and moon underfoot (opposite side). Duration: ± 1.5 hours from event time. Two per day.
+
+**Minor periods:** Centered on moonrise and moonset. Duration: ± 1 hour from event time. Two per day (when moon rises/sets — at high latitudes one or both may be absent).
+
+**Moon phase intensity:**
+- New moon = 1.0 (strongest gravitational pull, combined with sun)
+- Full moon = 1.0 (strongest gravitational pull, opposed to sun)
+- First/last quarter = 0.7
+- Waxing/waning crescents and gibbous = 0.5
+
+**Period duration modulation:** New/full moon → wider windows (major: ± 2 hr, minor: ± 1.5 hr). Quarter moon → standard windows.
+
+**Solunar endpoint availability:** `GET /api/v1/almanac/solunar` is NOT gated by the marine feature. Solunar times are useful for hunting, wildlife photography, and general outdoor planning. Available to all operators.
+
+---
+
+## §18 Marine Endpoints
+
+Marine endpoints follow existing patterns: capability gating, unit conversion, freshness block, stationClock. Each endpoint is location-aware — when multiple marine locations are configured, the `locationId` path parameter selects a specific location. Without `locationId`, the endpoint returns data for the first configured location.
+
+### Endpoint inventory
+
+| Endpoint | Response model | Capability gate |
+|---|---|---|
+| `GET /api/v1/marine[/{locationId}]` | `MarineBundle` | At least one location with `marine` activity enabled |
+| `GET /api/v1/tides[/{locationId}]` | `TideBundle` | At least one location with any activity requiring tides (marine, surf, fishing, or beach_safety) |
+| `GET /api/v1/surf[/{locationId}]` | `SurfBundle` | At least one location with `surf` activity enabled |
+| `GET /api/v1/fishing[/{locationId}]` | `FishingBundle` | At least one location with `fishing` activity enabled |
+| `GET /api/v1/beach-safety[/{locationId}]` | `BeachSafetyBundle` | At least one location with `beach_safety` activity enabled |
+| `GET /api/v1/almanac/solunar` | `SolunarTimes` | Always available (not gated by marine feature) |
+
+### Request parameters
+
+**Location endpoints** (`/marine`, `/tides`, `/surf`, `/fishing`, `/beach-safety`):
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `locationId` | str (path) | No | Location slug from config. Default: first configured location. |
+
+**Solunar endpoint** (`/almanac/solunar`):
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `date` | str (query) | No | Date in YYYY-MM-DD. Default: station-local today. |
+| `lat` | float (query) | No | Latitude. Default: station latitude. |
+| `lon` | float (query) | No | Longitude. Default: station longitude. |
+| `days` | int (query) | No | Number of days (1–30). Default: 1. |
+
+### Response shape
+
+All marine endpoints return the standard response envelope (§2): `data`, `stationClock`, `freshness`, `units`, `generatedAt`. The `data` field contains the domain-specific bundle.
+
+### Freshness defaults
+
+| Endpoint | `refreshInterval` (seconds) | Rationale |
+|---|---|---|
+| `/marine` | 1800 | Matches WaveWatch III / NWPS cache TTL |
+| `/tides` | 600 | Observed water levels update every 6–10 min |
+| `/surf` | 1800 | Matches wave forecast cache TTL |
+| `/fishing` | 3600 | Scoring inputs change slowly |
+| `/beach-safety` | 1800 | Matches wave forecast cache TTL |
+| `/almanac/solunar` | 86400 | Celestial mechanics — changes daily |
+
+### Capability gating and the activity matrix
+
+Which provider modules and enrichment processors are activated depends on the union of enabled activities across all configured locations. The activity capability matrix (consolidated from ADR-090) defines which capabilities each activity enables. The API activates only the provider modules required by the union of activities. See PROVIDER-MANUAL §14 for per-provider details.
+
+When no marine locations are configured (no `[marine]` section in `api.conf`), no marine provider modules register, no marine endpoints are available, and the API behaves identically to a non-marine installation.

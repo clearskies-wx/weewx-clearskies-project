@@ -257,14 +257,13 @@ NOAA operates a **separate nearshore wave model** called the Nearshore Wave Pred
 | Regular grid (1.8 km CG1, nested CG2–CG5 at 500m–50m) | Remaining 14 WFOs |
 | v1.5 products (rip current, runup, total water level, erosion) | ~12 WFOs (LOX, MTR, EKA, MFR, PQR, BRO, LCH, LIX, AJK, AER, AFG, LWX) — rolling out |
 
-**Temporal availability note:** NWPS runs are on-demand — triggered when a WFO submits new forecast wind grids. Data may be stale if a WFO hasn't submitted recently, but the domain exists and runs regularly.
+**Operational availability (verified July 2026):** Despite being described as "on-demand," all 36 coastal WFOs produce NWPS runs on a regular schedule — typically 2–3 cycles per day (00z, 06z, 12z). Data is available on NOMADS within hours of each cycle. NWPS data is never more than ~8–12 hours old under normal operations.
 
 | Scenario | NWPS available? | Our physics code | GEBCO bathymetry |
 |----------|----------------|-----------------|-----------------|
-| **Any US coastal spot** | **Yes** — all 36 WFOs have domains | **Supplements NWPS** (breaker index correction, structure effects) + **fallback** when NWPS data is stale. Also drives the scoring algorithm. | Needed for fishing habitat structure, surf spot setup, and as fallback transformation if NWPS is stale. |
-| **International spot** | No (NWPS is US-only) | **Primary path for nearshore wave transformation.** | Needed for everything — wave transformation AND fishing habitat. |
+| **Any US coastal spot** | **Yes** — all 36 WFOs have domains, 2–3 runs/day | **Supplements NWPS** with four corrections (breaker index, structure effects, sub-grid interpolation, topographic focusing). Also drives the scoring algorithm. | Needed for fishing habitat structure and surf spot setup (slope computation for Battjes formula). |
 
-GEBCO is always needed for fishing habitat identification everywhere. For US, NWPS is the primary nearshore source, with our code supplementing NWPS output for site-specific corrections. For international, our physics code is the primary nearshore transformation path.
+GEBCO is always needed for fishing habitat identification. For US, NWPS is the primary nearshore source, with our code supplementing NWPS output for the four specific corrections defined in ADR-084.
 
 ### 5.2.1 Supplementing NWPS with Site-Specific Corrections — Research Basis
 
@@ -392,7 +391,7 @@ The DWD EWAM at 5 km is the highest-resolution model for European waters specifi
 
 **Conclusion:** US = NOAA only. WaveWatch III (via ERDDAP JSON) for offshore/coastal wave forecasts + NWPS (via GRIB2) for nearshore refinement where available + NDBC for observations + CO-OPS for tides/water levels + NWS for marine text forecasts and alerts. No third-party providers needed for US operations.
 
-International (future) = Xweather maritime (already keyed, already paid, global coverage). Xweather's data source attribution cites NOAA WaveWatch and NOAA CoastWatch SST — they're wrapping the same models. Open-Meteo is dropped — it adds a dependency on a single-person project and repackages the same NOAA data Xweather already provides. If international demand materializes, Xweather is the path.
+International coverage is out of scope for v1. When the need arises, provider selection for international marine data will be evaluated at that time — no decisions have been made yet.
 
 ### 6.4 NWPS Data Value Across Activities
 
@@ -499,7 +498,7 @@ Stars = `max(1, min(5, int(overall × 5)))`
 | Aspect | Phase II Status | What to Do |
 |--------|----------------|------------|
 | Bathymetry processor | Complete, working | Port as-is to enrichment processor; GEBCO API is unchanged |
-| Shoaling/refraction/breaking physics | Complete but unwired | Wire into scoring pipeline; this is a bug fix, not new development. For US spots: supplements NWPS output (breaker index correction, structure effects). For international spots: primary transformation path. |
+| Shoaling/refraction/breaking physics | Complete but unwired | Port only the breaker index correction (Battjes 1974) and structure effects as NWPS supplements per ADR-084. Full shoaling/refraction/bottom friction pipeline is NOT ported — NWPS already computes these. |
 | Breaking limit (γ) | Fixed values per bottom type (sand=0.78, rock=1.0, coral=1.2) | **Strengthen:** Replace lookup table with Battjes 1974 empirical formula: γ = 1.06 + 0.14 ln ξ, which accounts for both bottom slope AND bottom type. Our current values are in range but a formula is more physically correct. |
 | Scoring algorithm | Complete, well-researched weights | Port as-is; weights came from research and discussion |
 | Coastal structure effects | 5 structure types with reflection/transmission coefficients | Keep as qualitative adjustment. SWAN/NWPS cannot model diffraction behind structures — our crude parameterization addresses a real gap (research-confirmed). Present with appropriate caveats. |
@@ -507,7 +506,7 @@ Stars = `max(1, min(5, int(overall × 5)))`
 | Copy-paste forecast loop bug | `_generate_surf_forecast_for_spot` calls fishing generator | Fix: call the correct method |
 | `eval()` for unit conversion | Security risk | Replace with safe lookup table |
 | Hardcoded US unit conversions | Ignores weewx target_unit | Port to Clear Skies unit converter (UnitTransformer handles this) |
-| GFS Wave data input | Direct GRIB download | US: NWPS (GRIB2, primary nearshore) + WaveWatch III (ERDDAP JSON, offshore/fallback). International: WaveWatch III (ERDDAP JSON) + our transformation. |
+| GFS Wave data input | Direct GRIB download | NWPS (GRIB2, primary nearshore) + WaveWatch III (ERDDAP JSON, offshore wave forecasts). No fallback transformation pipeline. |
 | DB storage pattern | REPLACE INTO weewx archive | Replace with Redis cache (ephemeral forecast data) |
 | Statistical calibration | Not implemented | **Future (v2+):** Accumulate forecast-vs-observation pairs over time. Build per-spot bias correction transfer functions. Research validates this approach achieves 30–70% error reduction (Surfline). Follows the same pattern as the forecast correction engine (ADR-079). |
 
@@ -634,8 +633,8 @@ No third-party providers for v1. No Open-Meteo. No Xweather marine endpoints.
 | # | Decision | Rationale |
 |---|----------|-----------|
 | D1 | **NOAA is the primary US data source.** No fallback from Open-Meteo/Xweather needed for US operations. | NOAA provides equal or better resolution than Open-Meteo for US waters (they wrap the same NOAA data). NOAA also provides observations and tides that no third-party can replicate. |
-| D2 | **Open-Meteo is dropped entirely.** Xweather maritime (already keyed, already paid) is the sole international provider path when demand materializes. | Open-Meteo repackages the same NOAA data. Adding a dependency on a single-person project with no SLA provides no value. Xweather cites the same NOAA sources and has commercial reliability. |
-| D3 | **US-first strategy.** Architecture is country-agnostic, but v1 provider modules are NOAA-centric. International expansion via Xweather maritime when demand materializes. | NOAA provides a complete free ecosystem (models, observations, tides, text forecasts). International has real gaps (no observations, no free tides outside US). |
+| D2 | **v1 is US-only, NOAA-only.** No international provider decisions are in scope. | NOAA provides a complete free ecosystem for US waters (models, observations, tides, text forecasts). International provider selection will be evaluated when that need arises. |
+| D3 | **Architecture accommodates future providers.** The dispatch registry pattern supports adding non-NOAA provider modules without architectural changes. | Country-agnostic design, but no premature decisions about which providers would serve international coverage. |
 | D4 | **Use ERDDAP for WaveWatch III JSON access.** No GRIB processing needed for deep-water wave data. | ERDDAP serves the same WaveWatch III data as NOMADS GRIB, but in JSON format with lat/lon/time subsetting. Eliminates eccodes dependency for the primary wave forecast source. |
 | D5 | **Port the Phase II surf physics code.** Shoaling, refraction, breaking, bathymetry — wire the transformation into the scoring pipeline (fixing the Phase II bug where it was bypassed). | Extensive research and iteration produced this code. The bug is that it wasn't wired in, not that the approach was wrong. |
 | D6 | **Spectral data from NDBC is in scope for v1.** Parse `.swden` and `.swdir` files, not just standard met. | Spectral data reveals multi-swell breakdowns critical for accurate surf assessment. Standard met Hs alone doesn't distinguish clean swell from wind chop. |
@@ -649,8 +648,8 @@ No third-party providers for v1. No Open-Meteo. No Xweather marine endpoints.
 
 NWPS data is GRIB2-only (no ERDDAP/JSON endpoint). Consuming it requires eccodes or pygrib. The Phase II extension already used pygrib and has a `GRIBProcessor` class (42+ lines with eccodes/pygrib dual backend) that ports cleanly.
 
-Since NWPS covers ALL 36 US coastal WFOs with no geographic gaps, and since the user has accepted the GRIB dependency, the question is implementation approach:
-- **Always fetch NWPS for configured US spots.** Fall back to WaveWatch III (ERDDAP JSON) + our transformation physics only when NWPS data is stale (on-demand runs mean data freshness varies by WFO).
+Since NWPS covers ALL 36 US coastal WFOs with no geographic gaps (verified: all WFOs run 2–3 cycles/day, July 2026), and since the user has accepted the GRIB dependency, the implementation approach is:
+- **Always fetch NWPS for configured US spots.** No fallback transformation pipeline — NWPS availability is operationally reliable.
 - **Determine which WFO domain covers each configured spot** at setup time (wizard/admin). Store the WFO code and CG grid identifier in spot config so the API knows which GRIB2 files to fetch.
 - **eccodes vs pygrib:** eccodes is the ECMWF C library (more actively maintained, used by operational weather centers). pygrib depends on eccodes under the hood. The Phase II `GRIBProcessor` supports both — keep both backends.
 

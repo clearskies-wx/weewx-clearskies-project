@@ -28,6 +28,7 @@ Last updated: 2026-07-04
 11. [Testing Pattern](#11-testing-pattern)
 12. [Provider Attribution](#12-provider-attribution)
 13. [Anti-Patterns](#13-anti-patterns)
+14. [Marine & Coastal Providers](#14-marine--coastal-providers)
 
 ---
 
@@ -74,13 +75,16 @@ Anything outside these five — caching, logging format, persistence, dashboard 
 
 ```
 weewx_clearskies_api/providers/
-├── _common/         # HTTP client, retry, errors, capability, rate-limiter
+├── _common/         # HTTP client, retry, errors, capability, rate-limiter, nws_zones.py
 ├── forecast/        # Forecast domain modules (§4)
 ├── aqi/             # AQI domain modules (§5)
 ├── alerts/          # Alerts domain modules (§8)
 ├── earthquakes/     # Earthquakes domain modules (§9)
 ├── radar/           # Radar domain modules (§7)
-└── seeing/          # 7Timer seeing forecast (§6 exception — see below)
+├── seeing/          # 7Timer seeing forecast (§6 exception — see below)
+├── marine/          # Marine domain modules (§14): wavewatch, nwps, nws_marine, nws_srf
+├── tides/           # Tides domain modules (§14): coops
+└── buoy/            # Buoy domain modules (§14): ndbc
 ```
 
 ### Capability declaration fields
@@ -90,7 +94,7 @@ Every module exports a static `CAPABILITY` structure at module-load time. For mo
 | Field | Type | Description |
 |---|---|---|
 | `provider_id` | string | Stable identifier, lowercase, no spaces. Examples: `"aeris"`, `"openmeteo"`, `"usgs"`. |
-| `domain` | string | One of `"forecast"`, `"aqi"`, `"alerts"`, `"earthquakes"`, `"radar"`. One module = one domain. |
+| `domain` | string | One of `"forecast"`, `"aqi"`, `"alerts"`, `"earthquakes"`, `"radar"`, `"marine"`, `"tides"`, `"buoy"`. One module = one domain. |
 | `supplied_canonical_fields` | list[str] | Enumerated canonical fields this module can supply. Reference the field catalog in `contracts/canonical-data-model.md`. |
 | `geographic_coverage` | string or list[str] | `"global"` or enumerated regions. Used by the setup wizard to warn when operator's lat/lon is outside coverage. |
 | `auth_required` | list[str] | Operator-config keys required (e.g., `["AERIS_CLIENT_ID", "AERIS_CLIENT_SECRET"]`). Empty list for providers that need no key. |
@@ -817,6 +821,50 @@ For operators whose region is not covered by any configured provider, return an 
 | Canada, Europe/UK, Mexico, Brazil, South Africa, India, Japan, South Korea, Australia | `aeris` |
 | Elsewhere | `openweathermap` (with note on paid One Call 3.0 tier) |
 
+### Marine zone alert extension
+
+**Problem:** All three alerts providers query by lat/lon point. NWS marine alerts (Small Craft Advisory, Gale Warning, Storm Warning, Hurricane Force Wind Warning, Hazardous Seas, Dense Fog, Special Marine Warning, Low Water Advisory) are issued against **coastal marine zones** — water polygons with ocean-prefixed codes (AMZ, GMZ, PZZ, ANZ, PKZ, PHZ). A lat/lon point on land does not fall inside a water polygon unless it is on a narrow barrier island or pier. Any coastal station whose weewx installation is not directly on the waterline misses marine alerts — regardless of which alerts provider the operator uses.
+
+**This is a general alerts improvement, NOT gated by the marine feature.** The marine alert radius is configured in the alerts section of the wizard/admin, not inside marine location setup. An operator who never enables marine pages still sees marine zone alerts in the standard alert banner if their station is near the coast.
+
+**Configuration (in `api.conf [alerts]`):**
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `marine_alert_radius_miles` | float | 0.0 (disabled) | Radius for marine zone discovery. 0 = no zone queries = identical to current behavior. |
+| `marine_alert_zone_ids` | list[str] | [] | Discovered zone IDs, stored after setup-time discovery. |
+
+The wizard auto-suggests 25 miles when the station is within 50 miles of a marine zone.
+
+**Zone discovery algorithm (setup time only, not per-request):**
+
+1. Station lat/lon → `GET /points/{lat},{lon}` → extract `cwa` (WFO office ID)
+2. `GET /zones/coastal` filtered by CWA → typically 6–16 zones per WFO
+3. For each zone: `GET /zones/coastal/{zoneId}` → extract polygon geometry
+4. Compute minimum haversine distance from station to each polygon's nearest vertex
+5. Select zones within the operator's configured radius
+6. Present discovered zones with names and distances to the operator for confirmation
+7. Store confirmed zone IDs in `api.conf`
+
+Uses the shared NWS zone discovery utility at `providers/_common/nws_zones.py` (also used by NWS marine text forecast and NWS SRF providers — see §14).
+
+**NWS zone taxonomy:**
+
+| Zone type | Prefix examples | What it covers | How captured |
+|---|---|---|---|
+| Public zones | NCZ, CAZ, FLZ | Land-based coastal areas. Beach Hazards Statement, Coastal Flood Advisory/Warning, Storm Surge Warning/Watch. | Existing `?point=` query (when station is in a coastal county) |
+| Coastal marine zones | AMZ, GMZ, PZZ, ANZ, PKZ, PHZ | Nearshore waters out to 20–60 NM. SCA, Gale, Storm, Hurricane Force, Hazardous Seas, Dense Fog (marine), Special Marine Warning, Low Water Advisory. | Zone queries from this extension (required for any station not directly on the waterline) |
+
+**Alert query changes — all three providers:**
+
+**NWS (`providers/alerts/nws.py`):** After the existing `?point=` query, check if `marine_alert_zone_ids` is non-empty. For each configured zone: `GET /alerts/active?zone={zoneId}`. Merge results with point-based results. De-duplicate by alert `id` field. Use the same `ProviderHTTPClient`, rate limiter (5 req/s shared), and cache infrastructure. Cache key: `(provider_id, "zone", zone_id)` — distinct from point cache key. Same TTL (5 min).
+
+**Xweather (`providers/alerts/aeris.py`):** Test whether Xweather returns marine alerts for the station's point. If not (expected for stations >1 km from water): add supplemental NWS `?zone=` queries for each configured marine zone. NWS marine zone alerts are free — this is a supplemental data source, not a provider switch. Merge and de-duplicate by alert ID.
+
+**OWM (`providers/alerts/openweathermap.py`):** Same test-and-supplement approach. If no One Call 3.0 key available for testing, implement the NWS supplemental query unconditionally (free, no harm if OWM already returns the alerts).
+
+**Zero-config preservation:** When `marine_alert_radius_miles = 0` (the default), no zone queries execute. The alerts provider behaves identically to the current implementation — zero regression.
+
 ---
 
 ## §9 Earthquakes
@@ -1140,3 +1188,292 @@ The following patterns are forbidden. Any pull request introducing them must be 
 | Adding a `mapbox_jma` module | Dropped from day-1 set — Mapbox JMA tilesets are raster-array / GL-JS-only, incompatible with Leaflet |
 | Routing LibreWxR tile traffic through the API | Caddy proxies LibreWxR tiles and alerts directly; the API provides metadata only. Routing tiles through the API wastes resources and adds latency. |
 | Adding `aeris` as a radar provider | Removed — 3,000 map units/day is unviable for radar tiles. Xweather is retained for forecast/AQI/alerts only. |
+
+---
+
+## §14 Marine & Coastal Providers
+
+Six provider modules across three new domains (`"marine"`, `"tides"`, `"buoy"`) plus one data-access component (bathymetry) and one shared utility (NWS zone discovery). All v1 marine providers are NOAA sources — free, keyless, US-only. Each module follows the §1 Module Contract.
+
+### Provider set
+
+| Module | File | `PROVIDER_ID` | `DOMAIN` | Source | Key required |
+|---|---|---|---|---|---|
+| NDBC buoy observations | `providers/buoy/ndbc.py` | `ndbc` | `buoy` | NOAA NDBC | No |
+| CO-OPS tides & water levels | `providers/tides/coops.py` | `coops` | `tides` | NOAA CO-OPS | No |
+| WaveWatch III forecasts | `providers/marine/wavewatch.py` | `wavewatch` | `marine` | NOAA WaveWatch III via ERDDAP | No |
+| NWS marine zone text | `providers/marine/nws_marine.py` | `nws_marine` | `marine` | NWS API | No |
+| NWS Surf Zone Forecast | `providers/marine/nws_srf.py` | `nws_srf` | `marine` | NWS API (SRF text product) | No |
+| NWPS nearshore wave data | `providers/marine/nwps.py` | `nwps` | `marine` | NOAA NWPS GRIB2 | No |
+
+Supporting components (not dispatch-registered provider modules):
+
+| Component | File | Purpose |
+|---|---|---|
+| NOAA CUDEM bathymetry | `enrichment/bathymetry.py` | One-time per-spot bathymetric profile download |
+| NWS zone discovery | `providers/_common/nws_zones.py` | Shared utility: station → CWA → marine zones → distance filtering |
+
+### §14.1 NDBC buoy observations
+
+**Module identity:** `providers/buoy/ndbc.py`, `PROVIDER_ID = "ndbc"`, `DOMAIN = "buoy"`.
+
+**CAPABILITY:** `geographic_coverage = "us_coastal"`, `auth_required = []`. `supplied_canonical_fields` includes wind speed, wind direction, wind gust, wave height, dominant period, average period, mean wave direction, pressure, air temp, water temp (SST), dewpoint, visibility, pressure tendency, tide level. Spectral fields (per-swell-system height, period, direction, energy, classification) when station has spectral sensors.
+
+**Wire format and parsing:**
+
+NDBC serves flat files over HTTP (not a REST API). Three file types per station:
+
+| File | URL pattern | Format | Content |
+|---|---|---|---|
+| Standard met (`.txt`) | `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.txt` | Fixed-width text columns | Wind, waves, pressure, temp, visibility |
+| Spectral density (`.swden`) | `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.swden` | Fixed-width, 46 frequency columns | Wave energy density (m²/Hz) at 0.02–0.485 Hz |
+| Spectral direction (`.swdir`) | `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.swdir` | Fixed-width, 46 frequency columns | Mean wave direction (degrees) at each frequency |
+
+**Standard met parsing:** First two rows are headers (column names + units). Data rows follow, most recent first. Parse the most recent row. Columns: WDIR, WSPD, GST, WVHT, DPD, APD, MWD, PRES, ATMP, WTMP, DEWP, VIS, PTDY, TIDE. Handle `MM` markers as `None` (missing data — not an error). NDBC reports in metric (m, m/s, °C, hPa) — convert via `UnitTransformer` to canonical types.
+
+**Spectral decomposition (when `.swden`/`.swdir` available):**
+
+1. Parse energy density at each of 46 frequency bands from `.swden` (most recent row).
+2. Parse mean direction at each band from `.swdir`.
+3. Identify spectral peaks: local maxima where energy(f) > energy(f-1) and energy(f) > energy(f+1).
+4. Discard peaks below 5% of the dominant peak's energy (noise threshold).
+5. Partition frequencies: assign each band to the nearest peak. Boundary = frequency with minimum energy between adjacent peaks.
+6. Per partition, compute:
+   - Significant wave height: Hs = 4√m₀, where m₀ = Σ(S(f) × Δf) over the partition (trapezoidal integration)
+   - Peak period: Tp = 1/fp (frequency of peak energy in this partition)
+   - Mean direction: energy-weighted circular mean = atan2(Σ(S(f)×sin(dir(f))×Δf), Σ(S(f)×cos(dir(f))×Δf))
+   - Classification: ≥ 12s = `"groundswell"`, 8–12s = `"swell"`, < 8s = `"wind_swell"` (standard NWS thresholds)
+7. Cap at 4 swell systems. If more peaks detected, merge weakest into adjacent partitions.
+8. Map each partition to a `SpectralWaveComponent` canonical model.
+
+No scipy dependency — 46 values, not a signal processing problem.
+
+**Station discovery:** Fetch `https://www.ndbc.noaa.gov/activestations.xml`. Parse XML for station ID, coordinates, sensor types. Differentiate station capabilities:
+- **Full capability:** wave sensors + atmospheric sensors + spectral (3 file types)
+- **Wave + atmospheric, no spectral:** `.txt` only (2 file types, no `.swden`/`.swdir`)
+- **Atmospheric only (C-MAN stations):** wind, pressure, temp — no wave data
+
+Return stations sorted by haversine distance from the target coordinates, with capabilities and distances.
+
+**Cache:** Key = `(provider_id, station_id, file_type)`. TTL = 60 min for all three file types. Station discovery (`activestations.xml`) cached 24 hr.
+
+**Error handling:** HTTP 404 for non-existent station → `ProviderProtocolError`. Empty file body → log WARNING, return empty observation (not error). Network errors → canonical taxonomy via `ProviderHTTPClient`.
+
+**Rate limiting:** 1 req/s per module instance. NDBC has no documented rate limit, but the server is a flat-file host with modest capacity — be polite.
+
+### §14.2 CO-OPS tides & water levels
+
+**Module identity:** `providers/tides/coops.py`, `PROVIDER_ID = "coops"`, `DOMAIN = "tides"`.
+
+**CAPABILITY:** `geographic_coverage = "us_coastal"`, `auth_required = []`. `supplied_canonical_fields` includes tide prediction times and heights, observed water levels, water temperature, currents.
+
+**Wire format and parsing:**
+
+CO-OPS Data API returns JSON. Base URL: `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter`. All requests must include `application=clearskies` (CO-OPS requires application identification).
+
+| Product | Key parameters | Response array | Canonical model |
+|---|---|---|---|
+| `predictions` | `product=predictions&datum=MLLW&range=72&units=metric&time_zone=gmt&format=json` | `predictions[]` | `TidePrediction` |
+| `water_level` | `product=water_level&datum=MLLW&range=24&units=metric&time_zone=gmt&format=json` | `data[]` | `WaterLevel` |
+| `water_temperature` | `product=water_temperature&range=24&units=metric&time_zone=gmt&format=json` | `data[]` | water temp values |
+
+**Tide prediction high/low classification:** CO-OPS prediction responses return water level at regular intervals (typically 6-minute). Classify each point by comparing to neighbors: height > both neighbors → high tide, height < both neighbors → low tide, otherwise → interpolated point. The `TidePrediction` canonical model carries the `type` field (`"high"` or `"low"` for extremes, `null` for interpolated points).
+
+**Datum handling:** All requests use `datum=MLLW` (Mean Lower Low Water) as the reference. The `WaterLevel` canonical model carries the datum string. CO-OPS supports MLLW, MSL, NAVD88 — MLLW is the standard tidal datum for navigation and the default for marine weather.
+
+**Station discovery:** `GET https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=waterlevels&units=metric`. Filter by distance from target coordinates. Return station ID, name, distance, available products (predictions, water_level, water_temperature, currents). Some stations report only predictions (subordinate stations); some report observations but not predictions.
+
+**Cache:** Predictions TTL = 6 hr (harmonic predictions don't change within a tidal epoch). Observations TTL = 10 min. Water temperature TTL = 30 min. Station metadata TTL = 24 hr. Key = `(provider_id, station_id, product)`.
+
+**Error handling:** Station with no data for requested product → empty list (not error). Invalid station ID → `ProviderProtocolError`. Rate limit or server error → canonical taxonomy via `ProviderHTTPClient`.
+
+**Rate limiting:** No documented rate limit from CO-OPS, but use 2 req/s as courtesy limit.
+
+### §14.3 WaveWatch III forecasts
+
+**Module identity:** `providers/marine/wavewatch.py`, `PROVIDER_ID = "wavewatch"`, `DOMAIN = "marine"`.
+
+**CAPABILITY:** `geographic_coverage = "global"`, `auth_required = []`. `supplied_canonical_fields` includes wave height, peak period, peak direction, wind wave height/period/direction, swell height/period/direction, wind speed, wind direction.
+
+**Wire format and parsing:**
+
+ERDDAP JSON access (NOT GRIB). Construct griddap URL:
+
+```
+https://erddap.aoml.noaa.gov/hdb/erddap/griddap/{grid_dataset}.json?{variables}[({time_start}):1:({time_end})][({lat_nearest})][({lon_nearest})]
+```
+
+Variables: `Thgt` (significant wave height), `Tper` (peak period), `Tdir` (peak direction), `shww` (wind wave height), `mpww` (wind wave period), `wvdir` (wind wave direction), `shts` (swell height), `mpts` (swell period), `swdir` (swell direction), `ws` (wind speed), `wdir` (wind direction).
+
+**Grid selection logic:** 7 grids with geographic bounds and priority. For a given lat/lon, check bounds and select the highest-priority match:
+
+| Grid dataset | Coverage | Resolution | Priority |
+|---|---|---|---|
+| `atlocn.0p16` | US East Coast | 0.16° | 1 |
+| `wcoast.0p16` | US West Coast | 0.16° | 1 |
+| `epacif.0p16` | Hawaii / Pacific | 0.16° | 1 |
+| `arctic.9km` | Alaska / Arctic | 9 km | 1 |
+| `global.0p16` | Global primary | 0.16° | 2 |
+| `gsouth.0p25` | Southern Hemisphere | 0.25° | 2 |
+| `global.0p25` | Global fallback | 0.25° | 3 |
+
+Regional grids (priority 1) provide higher resolution for US coastal areas. Global grids serve as fallback for coordinates outside regional coverage.
+
+**Forecast extraction:** 72-hour forecast at 3-hour steps (25 timesteps). Each timestep maps to a `MarineForecastPoint` canonical model. Model run cycle determination: current UTC hour minus 4.5-hour data availability delay → most recent cycle from {00, 06, 12, 18}. Fall back to 3 previous cycles if the current cycle is unavailable.
+
+**Cache:** TTL = 30 min. Key = `(provider_id, grid_id, lat_rounded, lon_rounded)` where lat/lon are rounded to grid resolution.
+
+**Error handling:** ERDDAP returns HTTP 404 for invalid grid/variable combinations, 500 for backend failures. Both → canonical taxonomy. Empty response (no data for time range) → log WARNING, return empty forecast.
+
+**Rate limiting:** 2 req/s (ERDDAP is a shared resource).
+
+### §14.4 NWS marine zone text forecasts
+
+**Module identity:** `providers/marine/nws_marine.py`, `PROVIDER_ID = "nws_marine"`, `DOMAIN = "marine"`.
+
+**CAPABILITY:** `geographic_coverage = "us_coastal"`, `auth_required = []`. `supplied_canonical_fields` includes period name, forecast text, wind, seas, visibility, weather.
+
+**Wire format and parsing:**
+
+`GET https://api.weather.gov/zones/coastal/{zoneId}/forecast` with `User-Agent: weewx-clearskies-api/{version} (contact email)`. Response is JSON-LD/GeoJSON. Parse `properties.periods[]` → list of `MarineTextForecast` canonical models.
+
+Each period contains:
+- `name` → `period_name` (e.g., "Tonight", "Thursday")
+- `detailedForecast` → `text` (full narrative)
+- Extract wind, seas, visibility, weather from the narrative text or structured fields when available
+
+**Zone ID source:** The zone ID comes from the operator's marine location configuration (`nws_marine_zone_id` field). Zone IDs are shared with the marine zone alerts extension (§8). The NWS zone discovery utility (§14.8) discovers zones at setup time.
+
+**Cache:** TTL = 30 min. Key = `(provider_id, zone_id)`.
+
+**Error handling:** Zone ID not found (404) → `ProviderProtocolError`. Rate limit (503) → retry with backoff per `ProviderHTTPClient`.
+
+**Rate limiting:** 5 req/s to `api.weather.gov` — shared rate limiter with the existing NWS alerts provider. Use the same `RateLimiter` instance or a shared pool keyed by hostname.
+
+### §14.5 NWS Surf Zone Forecast (SRF)
+
+**Module identity:** `providers/marine/nws_srf.py`, `PROVIDER_ID = "nws_srf"`, `DOMAIN = "marine"`.
+
+**CAPABILITY:** `geographic_coverage = "us_coastal"`, `auth_required = []`. `supplied_canonical_fields` includes rip current risk, surf height range, UV index, water temperature, wind text, hazards text.
+
+**Wire format and parsing:**
+
+`GET https://api.weather.gov/products/types/SRF/locations/{wfo}` to get the latest SRF text product for the WFO covering the spot. The SRF (Surf Zone Forecast) is a free-text product issued 1–2 times per day. It contains per-county-zone forecasts for 2 days.
+
+Parse the text product to extract per-county-zone:
+- Rip current risk: `low`, `moderate`, or `high`
+- Surf height: breaking wave height range (min/max in feet)
+- UV index: integer 1–11+
+- Water temperature: degrees
+- Wind: text description
+- Hazards: text statement
+
+Map to `SurfZoneForecast` canonical model. The SRF is per coastal county — match the spot's coordinates to the appropriate county zone using the NWS `/zones/forecast` endpoint to determine the spot's public forecast zone.
+
+**WFO determination:** Reuse the NWS `/points` → CWA lookup from the shared zone discovery utility (§14.8).
+
+**Cache:** TTL = 60 min (SRF is issued 1–2 times/day). Key = `(provider_id, wfo, county_zone)`.
+
+**Error handling:** WFO with no SRF product (not all WFOs issue SRF) → empty result (not error). Text parsing failure → log WARNING with the raw text, return partial result for successfully parsed fields.
+
+**Rate limiting:** Shared 5 req/s to `api.weather.gov` (same as §14.4 and NWS alerts).
+
+### §14.6 NWPS nearshore wave data
+
+**Module identity:** `providers/marine/nwps.py`, `PROVIDER_ID = "nwps"`, `DOMAIN = "marine"`.
+
+**CAPABILITY:** `geographic_coverage = "us_coastal"`, `auth_required = []`. `supplied_canonical_fields` includes nearshore wave height, period, direction, currents, bottom orbital velocity. Conditional fields (show-when-available, ~12 WFOs): rip current probability, total water level, wave runup.
+
+**Native dependency:** Requires eccodes (ECMWF GRIB processing library). See OPERATIONS-MANUAL §1 for install instructions. At module registration time, attempt `import eccodes` (fallback: `import pygrib`). If both fail, raise `MissingDependencyError` with platform-specific install instructions. The rest of the API continues functioning — only the marine feature is blocked.
+
+**Wire format and parsing:**
+
+GRIB2 files from NOMADS: `https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwps/prod/`. Directory structure: `SR{wfo}.{yyyymmdd}/CG{n}/` containing GRIB2 files per forecast hour.
+
+**WFO domain determination:** From the spot's coordinates, determine which of the 36 US coastal WFOs (+ Great Lakes) covers the location. Use the NWS `/points` → CWA mapping.
+
+**CG grid selection:**
+- CG1: baseline grid, ~1.8 km resolution, covers the full WFO nearshore domain
+- CG2–CG5: nested grids at higher resolution for specific areas (harbors, inlets)
+- Default to CG1. Use higher-resolution CG grids when the spot falls within their domain.
+
+**Extracted fields:**
+
+| GRIB2 parameter | Canonical field | Available |
+|---|---|---|
+| Significant wave height | wave_height | All WFOs |
+| Peak wave period | wave_period | All WFOs |
+| Mean wave direction | wave_direction | All WFOs |
+| Surface current speed/direction | current_speed, current_direction | All WFOs |
+| Bottom orbital velocity | bottom_orbital_velocity | All WFOs |
+| Rip current probability | rip_current_probability | ~12 WFOs (NWPS v1.5) |
+| Total water level | total_water_level | ~12 WFOs (NWPS v1.5) |
+| Wave runup | wave_runup | ~12 WFOs (NWPS v1.5) |
+
+NWPS v1.5 fields are show-when-available: display when the WFO provides them, absent without error when they don't.
+
+**Update cadence:** 2–3 cycles per day per WFO (typically 00z, 06z, 12z). Data is never more than ~8–12 hours old under normal NOAA operations.
+
+**No fallback transformation pipeline.** When NWPS data is temporarily unavailable (NOAA outage, WFO maintenance), the marine page shows WaveWatch III offshore data without nearshore supplementation. No separate code path.
+
+**Cache:** Key = `(provider_id, wfo, cg_grid, cycle_time)`. TTL = derived from cycle cadence (cache until next expected cycle).
+
+**Error handling:** GRIB2 file not found (NOMADS returns 404) → log WARNING, fall back to WaveWatch III offshore data. eccodes parse error → `ProviderProtocolError` with the GRIB message details. Network errors → canonical taxonomy.
+
+**Rate limiting:** 2 req/s to NOMADS (shared NOAA infrastructure).
+
+### §14.7 NOAA CUDEM bathymetry
+
+**Not a dispatch-registered provider module.** The bathymetry component (`enrichment/bathymetry.py`) is a data-access layer that downloads and stores depth profiles. It runs once per surf/fishing spot at setup time, not per-request.
+
+**Data source:** NOAA Continuously Updated Digital Elevation Model (CUDEM) at 1/9 arc-second resolution (~3.4m). Accessed via NCEI THREDDS/OPeNDAP. CUDEM covers all US coastal areas including territories (Hawaii, PR, USVI, Guam, CNMI, American Samoa).
+
+At 3.4m resolution, individual reef structures, sandbars, ledges, and channel edges are visible — producing accurate slope computations for the Battjes γ formula (ADR-084 supplement 1) and rich habitat profiles for fishing (drop-offs, reefs, ledges, channels, pinnacles).
+
+**Profile extraction:** For a surf or fishing spot:
+1. Request a transect of depth points from shore to offshore along the beach-facing direction
+2. Adaptive refinement: denser sampling near shore (where slope matters most for breaking), sparser offshore
+3. Store the profile as a list of `(distance_m, depth_m)` points in the spot's configuration
+4. Compute `beach_slope` from the nearshore portion of the profile (used by the Battjes γ formula)
+
+**Habitat annotation (fishing):** The depth profile is scanned for:
+- Drop-offs: rapid depth change over short distance
+- Ledges: flat areas adjacent to steep changes
+- Reef structures: irregular depth patterns at shallow depths
+- Channels: linear depressions
+- Pinnacles: isolated shallow spots in deeper water
+
+These are displayed as habitat annotations on the fishing page depth profile.
+
+**Attribution:** NOAA CUDEM data requires attribution: "NOAA National Centers for Environmental Information." Display on any page showing bathymetric data.
+
+### §14.8 Shared NWS marine zone discovery utility
+
+**File:** `providers/_common/nws_zones.py`
+
+**Not a provider module.** Shared utility used by:
+- NWS marine zone text forecast provider (§14.4) — to determine zone ID from coordinates
+- NWS Surf Zone Forecast provider (§14.5) — to determine WFO from coordinates
+- Marine zone alerts extension (§8) — to discover marine zones within the operator's alert radius
+
+**Function:** `discover_marine_zones(lat, lon, radius_miles) -> list[MarineZone]`
+
+Each `MarineZone` has: `zone_id` (str), `name` (str), `distance_miles` (float).
+
+**Algorithm:**
+
+1. `GET /points/{lat},{lon}` → extract `cwa` (WFO office ID, e.g., `"ILM"`)
+2. `GET /zones/coastal` filtered by CWA → list of coastal marine zone IDs for this WFO (typically 6–16)
+3. For each zone: `GET /zones/coastal/{zoneId}` → extract polygon geometry (GeoJSON coordinates)
+4. Compute minimum haversine distance from the input coordinates to each polygon's nearest vertex
+5. Return zones within `radius_miles`, sorted by distance ascending
+
+**Haversine accuracy:** ~0.1 miles is sufficient. Use the standard haversine formula or the existing project utility if one exists.
+
+**Rate limiting:** Uses the shared 5 req/s rate limiter for `api.weather.gov`.
+
+**Invocation context:** Called at setup/wizard time, not per-request. Results are stored in configuration.
+
+### Source ADRs
+
+§14 consolidates prescriptive rules from: ADR-083 (marine domain architecture), ADR-084 (NWPS supplementation), ADR-085 (eccodes dependency), ADR-087 (NDBC spectral data), ADR-088 (fishing scoring — bathymetry for habitat), ADR-089 (marine zone alerts). ADRs are archived in `docs/archive/decisions/` and explain the *why* behind these rules.

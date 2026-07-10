@@ -158,6 +158,40 @@ The `[ClearSkiesTruesun]` config stanza in `weewx.conf`:
 
 Verification: after weewx restarts, check that `maxSolarRad` values at sunrise are > 10 W/m² at 6:00 AM (vs R-S's ~1.4 W/m²). Check the weewx log for `clearskies_truesun: CAMS AOD fetch` messages.
 
+### eccodes native dependency (marine feature)
+
+eccodes is ECMWF's C library for GRIB/BUFR encoding and decoding. It is required for the marine feature (NWPS nearshore wave data is distributed as GRIB2 only). This is the first native (non-pure-Python) dependency in Clear Skies API.
+
+**How it's provided depends on the deployment method:**
+
+| Deployment | How eccodes is provided | Operator action |
+|---|---|---|
+| Docker compose | Baked into the API Dockerfile (`apt install libeccodes-dev` in build stage) | None — marine-capable by default |
+| Native pip install | Operator installs the system library, then `pip install weewx-clearskies-api[marine]` | Install system library + pip extra |
+
+**Platform-specific system library install (native path only):**
+
+| Platform | Command |
+|---|---|
+| Debian / Ubuntu | `sudo apt install libeccodes-dev` |
+| RHEL / Fedora | `sudo dnf install eccodes-devel` |
+| macOS | `brew install eccodes` |
+| Alpine | `apk add eccodes-dev` |
+
+After the system library is installed: `pip install weewx-clearskies-api[marine]`
+
+**Detection and error handling:**
+
+When an operator enables marine features (adds a `[marine]` section to `api.conf` or completes the marine wizard step) but eccodes is not installed:
+
+1. At API startup, the marine provider module attempts `import eccodes` (fallback: `import pygrib`).
+2. If both fail, the API logs a clear error with platform-specific install instructions and raises a startup error for the marine feature only — the rest of the API continues to function normally.
+3. The wizard's marine step checks eccodes availability before allowing marine configuration. If absent, it displays install instructions and blocks the marine setup step (not the entire wizard).
+
+Operators who never enable marine features never encounter this dependency. `pip install weewx-clearskies-api` (without `[marine]`) does not require or install eccodes.
+
+**Precedent:** This establishes the pattern for future native dependencies: pip extras for opt-in features, Docker always includes them, clear detection with actionable error messages at feature-enable time.
+
 ---
 
 ## §2 Authentication
@@ -698,6 +732,134 @@ Since January 2026, the free tier is degraded:
 - PNG only (no WebP)
 
 The wizard displays a degradation note when RainViewer is selected so operators understand the limitations.
+
+### Marine alert radius (alerts configuration)
+
+**This is a general alerts improvement — NOT part of the marine feature.** The marine alert radius lives in the alerts section of the wizard/admin, not inside marine location setup. An operator who never enables marine pages still sees marine zone alerts in the dashboard's standard alert banner if their station is near the coast.
+
+**Config keys (in `api.conf [alerts]`):**
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `marine_alert_radius_miles` | float | 0.0 | Radius in miles for marine zone discovery. 0 = disabled = no zone queries = identical to current behavior. |
+| `marine_alert_zone_ids` | list[str] | [] | NWS coastal marine zone IDs discovered at setup time. Stored after operator confirms. |
+
+**Wizard behavior:** When the wizard's alerts step detects the station is within 50 miles of a marine zone (via NWS `/points` → CWA → `/zones/coastal` lookup), it auto-suggests a radius of 25 miles. For inland stations (no marine zones within 50 miles), the radius is left at 0.
+
+**Zone discovery algorithm (setup time, not per-request):**
+
+1. Station lat/lon → `GET /points/{lat},{lon}` → extract `cwa` (WFO office ID)
+2. `GET /zones/coastal` filtered by CWA → typically 6–16 coastal marine zones per WFO
+3. For each zone: `GET /zones/coastal/{zoneId}` → extract polygon geometry
+4. Compute minimum haversine distance from station to each polygon's nearest vertex
+5. Select zones within the operator's configured radius
+6. Present discovered zones with names and distances to the operator for confirmation
+7. Store confirmed zone IDs in `api.conf [alerts] marine_alert_zone_ids`
+
+**Help text guidance for operators:** "NOAA Weather Radio transmitters are positioned so marine forecasts and warnings reach approximately 40 miles inland from the coast. If your station is within that range, you're in the audience NWS considers close enough to need marine alerts. The default suggestion of 25 miles captures most coastal communities; increase it if your station is further inland but still serves a coastal audience."
+
+### Marine location configuration
+
+Marine locations are configured in the `[marine]` section of `api.conf`. This section is additive and optional — its absence has zero impact on the rest of the API.
+
+**Config schema:**
+
+```ini
+[marine]
+  [[locations]]
+    [[[wrightsville_beach]]]
+      name = Wrightsville Beach
+      lat = 34.2085
+      lon = -77.7964
+      activities = surf, beach_safety, fishing
+      ndbc_station_ids = 41110, 41037
+      coops_station_ids = 8658163
+      nws_marine_zone_id = AMZ250
+      nwps_wfo = ILM
+      nwps_cg_grid = CG1
+
+      [[[[surf]]]]
+        beach_facing_degrees = 135
+        bottom_type = sand
+        topographic_feature = straight_beach
+        directional_exposure = N:false, NE:false, E:true, SE:true, S:true, SW:true, W:false, NW:false
+
+      [[[[fishing]]]]
+        target_category = saltwater_inshore
+
+      [[[[beach_safety]]]]
+        [[[[[external_links]]]]]
+          [[[[[[water_quality]]]]]]
+            label = NC Beach Water Quality
+            url = https://ncdeq.gov/beach-water-quality
+```
+
+**Location fields:**
+
+| Field | Type | Required | Valid values | Description |
+|---|---|---|---|---|
+| `name` | str | Yes | — | Display name for this location |
+| `lat` | float | Yes | [-90, 90] | Latitude |
+| `lon` | float | Yes | [-180, 180] | Longitude |
+| `activities` | list[str] | Yes | `marine`, `surf`, `fishing`, `beach_safety` (1–4) | Enabled activities |
+| `ndbc_station_ids` | list[str] | No | — | NDBC buoy station IDs (auto-discovered or operator-selected) |
+| `coops_station_ids` | list[str] | No | — | CO-OPS tide/water-level station IDs |
+| `nws_marine_zone_id` | str | No | AMZ/GMZ/PZZ/ANZ/PKZ/PHZ prefix | NWS coastal marine zone |
+| `nwps_wfo` | str | No | 3-letter WFO code | NWPS WFO domain (auto-determined from coordinates) |
+| `nwps_cg_grid` | str | No | CG1–CG5 | NWPS computational grid |
+| `station_distance_km` | float | — | — | Computed at config time (haversine from weewx station to this location) |
+
+**Surf configuration (`[[surf]]` sub-block):**
+
+| Field | Type | Valid values | Description |
+|---|---|---|---|
+| `beach_facing_degrees` | float | [0, 360) | Compass direction the beach faces |
+| `bottom_type` | str | `sand`, `rock`, `coral_reef`, `mixed` | Seabed composition |
+| `beach_slope` | float | — | Computed from CUDEM bathymetric profile at setup |
+| `topographic_feature` | str | `point_break`, `bay_break`, `headland`, `straight_beach` | Coastal morphology classification |
+| `directional_exposure` | dict | 8 compass directions → bool | Which swell directions reach this spot |
+| `bathymetric_profile` | list | — | Stored after CUDEM download: `[(distance_m, depth_m), ...]` |
+| `structures` | list | — | Optional coastal structures (see below) |
+
+**Structure configuration (within `[[surf]]`):**
+
+| Field | Type | Valid values | Description |
+|---|---|---|---|
+| `type` | str | `jetty`, `pier`, `breakwater`, `seawall`, `groin` | Structure type |
+| `material` | str | `impermeable`, `semi_permeable`, `permeable` | Material permeability |
+| `length_m` | float | > 0 | Approximate structure length |
+| `bearing_degrees` | float | [0, 360) | Structure orientation |
+| `distance_m` | float | > 0 | Distance from the surf spot |
+
+**Fishing configuration (`[[fishing]]` sub-block):**
+
+| Field | Type | Valid values | Description |
+|---|---|---|---|
+| `target_category` | str | `saltwater_inshore`, `bottom_fish`, `freshwater_sport`, `salmonids` | Primary fishing target category |
+| `species` | list[str] | — | Auto-populated from biogeographic region based on coordinates |
+| `biogeographic_region` | str | — | Auto-classified from coordinates (11 US regions) |
+
+**Beach safety configuration (`[[beach_safety]]` sub-block):**
+
+| Field | Type | Description |
+|---|---|---|
+| `external_links` | list | Operator-provided links to local water quality reports, lifeguard schedules, wildlife alert services. Displayed as informational resources on the beach safety page. Each link: `label` (str) + `url` (str). |
+
+**Validation:** Missing `[marine]` section → `load_marine_config()` returns `None` (no error, no marine features). Empty `[marine]` section → empty `MarineConfig`. Invalid values (out-of-range coordinates, unknown bottom type, unknown activity) → clear error naming the offending field and location.
+
+### Marine location setup procedure
+
+Step-by-step wizard flow for adding a marine location:
+
+1. **Enter location identity:** Operator provides a name and coordinates (manual entry or map pin).
+2. **Select activities:** Choose one or more of: marine/boating, surf, fishing, beach safety.
+3. **NDBC station discovery:** System queries `activestations.xml`, finds nearest buoys with distances and sensor capabilities (full, wave-only, atmospheric-only). Operator confirms or overrides.
+4. **CO-OPS station discovery:** System queries CO-OPS metadata API, finds nearest tide/water-level stations with distances and available products. Operator confirms or overrides.
+5. **NWS zone discovery:** System queries NWS `/points` → CWA, determines NWPS WFO domain and CG grid. Discovers marine zones within the configured alert radius (shared with the marine alert radius feature). Operator confirms.
+6. **Surf spot configuration** (if surf activity selected): Operator selects bottom type, topographic feature, directional exposure. System downloads CUDEM bathymetric profile and computes beach slope. Operator optionally adds coastal structures.
+7. **Fishing spot configuration** (if fishing activity selected): System auto-classifies biogeographic region from coordinates and populates species list. Operator selects target category.
+8. **Beach safety configuration** (if beach safety selected): Operator optionally adds external links (water quality, lifeguard reports, wildlife alerts).
+9. **Review and save:** System presents a summary of the configured location with all discovered stations, zones, and settings. Operator confirms. Configuration saved to `api.conf [marine]`.
 
 ### §4.1 Config Registry
 

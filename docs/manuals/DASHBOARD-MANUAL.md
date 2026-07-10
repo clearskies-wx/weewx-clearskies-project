@@ -26,6 +26,7 @@ Last updated: 2026-07-02
 9. [Dynamic Now Page & Page Visibility](#9-dynamic-now-page--page-visibility)
 10. [Radar Card & Expanded View](#10-radar-card--expanded-view)
 11. [Anti-Patterns](#11-anti-patterns)
+12. [Marine Pages](#12-marine-pages)
 
 ---
 
@@ -943,3 +944,88 @@ Each API response carries `freshness.validUntil` (when to refetch) and `freshnes
 
 **Never use `Date.now()` for "is it daytime?" checks outside station-clock utilities.**
 Daytime status comes from the scene descriptor or `stationClock`, not browser-local time. Any daytime determination that does not use the station timezone or `stationClock` is a banned pattern.
+
+---
+
+## §12 Marine Pages
+
+Four marine pages — marine/boating, surf, fishing, and beach safety. Each is location-aware: when multiple marine locations are configured, a location picker selects the active spot. Page visibility is gated by the API capabilities endpoint — pages appear in navigation only when the corresponding activity is enabled on at least one location.
+
+### Routes
+
+| Route | Page | Lazy-loaded |
+|---|---|---|
+| `/marine` | Marine/Boating (first configured location) | Yes |
+| `/marine/:locationId` | Marine/Boating (specific location) | Yes |
+| `/surf` | Surf Forecast (first configured location) | Yes |
+| `/surf/:locationId` | Surf Forecast (specific location) | Yes |
+| `/fishing` | Fishing Forecast (first configured location) | Yes |
+| `/fishing/:locationId` | Fishing Forecast (specific location) | Yes |
+| `/beach-safety` | Beach Safety (first configured location) | Yes |
+| `/beach-safety/:locationId` | Beach Safety (specific location) | Yes |
+
+### Location-centric navigation
+
+- Marine pages display a location picker (dropdown or tabs) when multiple locations are configured for that activity.
+- The default route (e.g., `/marine`) shows the first configured location.
+- The `locationId` route (e.g., `/marine/wrightsville_beach`) shows a specific location.
+- Location selection is persisted in the URL path (not session storage) for shareability — a visitor can bookmark or share a link to a specific location.
+- When only one location is configured for an activity, no picker is shown. Route params still work.
+
+### Page visibility
+
+- Marine pages are added to `pages.json` by the wizard when the operator enables activities.
+- The dashboard reads the API capabilities endpoint at boot to determine which marine pages to show in navigation.
+- If no marine locations are configured, no marine pages appear — the dashboard behaves identically to a non-marine installation.
+- Follows the existing `pages.json` visibility pattern (§9): pages not in `pages.json` are hidden from navigation and routes.
+
+### Activity-relevant alert filtering
+
+Marine pages show activity-relevant alerts from the general alert feed, filtered by alert event type. This is display-side filtering, not a separate data source — the API's `/alerts` endpoint returns all alerts (including marine zone alerts per the marine zone alert extension in PROVIDER-MANUAL §8).
+
+| Page | Alert types shown |
+|---|---|
+| Marine/Boating | Marine zone alerts (SCA, Gale, Storm, Hurricane Force, Hazardous Seas, Dense Fog, Special Marine Warning) + coastal flood alerts (Coastal Flood Advisory/Warning, Storm Surge Warning/Watch) |
+| Surf | Marine zone alerts + coastal/beach alerts (Beach Hazards Statement, High Surf Advisory/Warning, Rip Current Statement) |
+| Fishing | Marine zone alerts |
+| Beach Safety | Coastal/beach alerts + coastal flood alerts + NWS SRF rip current risk |
+
+**Marine zone alerts are NOT gated by the marine feature.** They appear in the dashboard's standard `AlertBanner` for all visitors when an operator configures a marine alert radius. The filtering above applies to the marine pages only — activity-relevant subsets of what the general alert banner already shows.
+
+### Data refresh intervals
+
+| Data type | `refreshInterval` (seconds) | Source |
+|---|---|---|
+| Marine forecast (WaveWatch III / NWPS) | 1800 | Provider cache TTL |
+| Buoy observations (NDBC) | 3600 | Provider cache TTL |
+| Tide predictions (CO-OPS) | 21600 | Predictions don't change within tidal epoch |
+| Tide observations (CO-OPS water levels) | 600 | 6–10 min update cadence |
+| NWS marine zone text | 1800 | Provider cache TTL |
+| NWS Surf Zone Forecast | 3600 | Issued 1–2×/day |
+| Solunar times | 86400 | Celestial mechanics, changes daily |
+| Surf quality scoring | 1800 | Tied to wave forecast refresh |
+| Fishing scoring | 3600 | Inputs change slowly |
+
+Dashboard uses `freshness.validUntil` from each API response to schedule refetches (per §7). These intervals match the API-side cache TTLs documented in PROVIDER-MANUAL §14.
+
+### Now page marine summary card
+
+When marine activities are enabled, a `MarineLocationSummary` card can appear on the Now page via `now-layout.json` (per §9 card plugin contract). The card shows:
+- Current conditions snapshot (wave height, wind, water temp)
+- Surf quality rating (stars, if surf enabled)
+- Beach safety level (if beach_safety enabled)
+- Active marine alert count
+- Next high/low tide time and height
+
+The card links to the full marine page for the displayed location.
+
+### i18n
+
+Marine pages use these i18n key prefixes: `marine.*`, `surf.*`, `fishing.*`, `beachSafety.*`. All user-visible strings must use `t()` from `useTranslation()` — no hardcoded English. Unit labels resolve through the locale file. Number formatting uses `Intl.NumberFormat` with `i18n.language`. Same rules as §3.
+
+### Responsive behavior
+
+- Location picker collapses to a dropdown on mobile viewports.
+- Data tables (tide tables, forecast grids) use `overflow-x: auto` containers on narrow viewports — the page body never scrolls horizontally.
+- Chart components follow existing responsive patterns (§6).
+- Depth profile visualizations scale to container width.

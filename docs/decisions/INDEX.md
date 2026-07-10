@@ -120,11 +120,44 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 
 ## Proposed
 
-| ADR | Title | Date |
+(none)
+
+## Accepted — pending manual consolidation
+
+| ADR | Title | Accepted |
 |---|---|---|
 | [ADR-078](ADR-078-geographic-features-overlay.md) | Geographic features overlay (OSM via Overpass API) | 2026-06-29 |
 | [ADR-080](ADR-080-provider-attribution-architecture.md) | Provider attribution architecture | 2026-07-01 |
-| [ADR-081](ADR-081-license-change-polyform.md) | License change — PolyForm Noncommercial 1.0.0 (supersedes ADR-003) | 2026-07-02 |
+| [ADR-081](ADR-081-license-change-polyform.md) | License change — PolyForm Noncommercial 1.0.0 (supersedes ADR-003) | 2026-07-09 |
+
+## Archived — consolidated into PROVIDER-MANUAL.md (marine)
+
+| ADR | Title | Archived | Original Date |
+|---|---|---|---|
+| [ADR-083](../archive/decisions/ADR-083-marine-provider-domain-architecture.md) | Marine provider domain architecture | 2026-07-09 | 2026-07-09 |
+| [ADR-087](../archive/decisions/ADR-087-ndbc-spectral-wave-data.md) | NDBC spectral wave data consumption | 2026-07-09 | 2026-07-09 |
+
+## Archived — consolidated into API-MANUAL.md (marine)
+
+| ADR | Title | Archived | Original Date |
+|---|---|---|---|
+| [ADR-084](../archive/decisions/ADR-084-nwps-primary-nearshore-with-supplementation.md) | NWPS as primary nearshore source with site-specific supplementation | 2026-07-09 | 2026-07-09 |
+| [ADR-088](../archive/decisions/ADR-088-fishing-forecast-scoring-model.md) | Fishing forecast scoring model | 2026-07-09 | 2026-07-09 |
+| [ADR-090](../archive/decisions/ADR-090-activity-capability-matrix.md) | Activity capability matrix | 2026-07-09 | 2026-07-09 |
+
+## Archived — consolidated into OPERATIONS-MANUAL.md (marine)
+
+| ADR | Title | Archived | Original Date |
+|---|---|---|---|
+| [ADR-085](../archive/decisions/ADR-085-eccodes-native-dependency.md) | eccodes native dependency for marine feature | 2026-07-09 | 2026-07-09 |
+| [ADR-086](../archive/decisions/ADR-086-multi-spot-marine-location-model.md) | Multi-spot marine location model | 2026-07-09 | 2026-07-09 |
+| [ADR-089](../archive/decisions/ADR-089-marine-zone-alerts.md) | Marine zone alerts in the existing alert system | 2026-07-09 | 2026-07-09 |
+
+## Archived — consolidated into DASHBOARD-MANUAL.md (marine)
+
+| ADR | Title | Archived | Original Date |
+|---|---|---|---|
+| [ADR-090](../archive/decisions/ADR-090-activity-capability-matrix.md) | Activity capability matrix | 2026-07-09 | 2026-07-09 |
 
 ## Pending archive
 

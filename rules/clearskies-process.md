@@ -77,6 +77,10 @@ Use the Nygard format. Template at `docs/decisions/_TEMPLATE.md`. Required: Stat
 
 **Scope the API to the dashboard.** Don't add fields/endpoints for hypothetical consumers (HA, mobile). The only justification is "the dashboard needs this."
 
+**No premature provider decisions.** Don't declare providers "dropped" or anoint future providers for coverage areas that aren't in scope yet. If v1 is US-only with NOAA, that's what it is — full stop. Which providers would serve international coverage (or any other future expansion) is a decision for when that need arises, not something to pre-decide in current plans or briefs. State what's in scope; leave what's out of scope alone.
+
+**Why (2026-07-09):** Plan and research brief declared "Open-Meteo is dropped" and "Xweather maritime is the future path" for international marine data — decisions about providers that aren't in scope and haven't been evaluated. This creates false constraints that bind future decisions.
+
 **Use weewx terminology where possible.** Prefer weewx ecosystem terms (observations, archive, loop packet, station) over industry alternatives.
 
 ## Brief-draft quality

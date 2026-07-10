@@ -39,7 +39,7 @@ Previous (2026-06-08): sky condition thresholds corrected for sensor accuracy, d
 
 | Service | Repo | What it does | Technology | Main port | Health port |
 |---------|------|-------------|------------|-----------|-------------|
-| **API** | weewx-clearskies-api | REST API + SSE for real-time data, unit conversion, enrichment pipeline, derived values. Queries weewx archive, aggregates provider data, serves setup endpoints. (ADR-058) | FastAPI (Python 3.12+), sync handlers, SQLAlchemy 2.x sync, sse-starlette, uvicorn, babel (locale-aware number formatting) | 8765 | 8081 |
+| **API** | weewx-clearskies-api | REST API + SSE for real-time data, unit conversion, enrichment pipeline, derived values. Queries weewx archive, aggregates provider data, serves setup endpoints. Marine/surf/fishing/beach-safety endpoints when configured. (ADR-058) | FastAPI (Python 3.12+), sync handlers, SQLAlchemy 2.x sync, sse-starlette, uvicorn, babel (locale-aware number formatting), eccodes (optional — marine GRIB2, via `[marine]` pip extra) | 8765 | 8081 |
 | **Dashboard** | weewx-clearskies-dashboard | Weather UI (static SPA, 9 pages + custom pages) | React 19, Vite 8, Tailwind CSS v4, shadcn/ui, Recharts, Leaflet, **Phosphor** (utility/nav/alert) + **inline Material Symbols SVG** (hero weather, ADR-049/050); Lucide retained for deferred glyph families only, i18next | None (init container) | — |
 | **Config UI** | weewx-clearskies-stack | Setup wizard + ongoing config admin | FastAPI, Jinja2, HTMX, Pico CSS, babel (locale-aware wizard/admin i18n; Python-only, no Node build step) | 9876 | — |
 | **Caddy** | upstream (caddy:2-alpine) | Reverse proxy, TLS termination (auto Let's Encrypt), static file server | Caddy | 80, 443 | — |
@@ -235,6 +235,7 @@ The OpenAPI spec lists 35+ data endpoints. Key groups for orientation:
 | Charts | `/api/v1/charts/config`, `/api/v1/charts/groups`, `/api/v1/charts/custom-query/{series_id}` | Config-driven; custom SQL from `charts.conf` only (disk-only trust model). |
 | Radar | `/api/v1/radar/providers/{id}/frames`, `/api/v1/radar/providers/{id}/tiles/{z}/{x}/{y}` | Frame metadata for all providers. **Satellite frames** (LibreWxR only) returned alongside radar frames when available. Tile proxy for keyed providers only (`openweathermap`). LibreWxR tiles go through Caddy (`/librewxr/*`), not the API. RainViewer tiles go direct to CDN. |
 | Content & nav | `/api/v1/pages`, `/api/v1/pages/{slug}/content`, `/api/v1/reports`, `/api/v1/content/about`, `/api/v1/content/legal` | `/pages` returns all 9 built-in pages unconditionally — page visibility filtering is the dashboard's responsibility via `pages.json` (ADR-024 amendment 2026-06-21). |
+| Marine & coastal | `/api/v1/marine[/{locationId}]`, `/api/v1/tides[/{locationId}]`, `/api/v1/surf[/{locationId}]`, `/api/v1/fishing[/{locationId}]`, `/api/v1/beach-safety[/{locationId}]`, `/api/v1/almanac/solunar` | Location-aware; capability-gated by activity matrix. Solunar endpoint available without marine feature enabled. See API-MANUAL §18. |
 | Infrastructure | `/api/v1/status`, `/api/v1/capabilities`, `/api/v1/records` | `/status` returns `{configured: bool}` — works in both setup and configured modes. |
 
 ### SSE endpoint (merged from realtime service per ADR-058)
@@ -454,6 +455,10 @@ Wizard steps are defined by `wizard/routes.py` and `templates/wizard/step_*.html
 | `/about` | About | Yes |
 | `/legal` | Legal/Privacy | Yes |
 | `/radar` | Expanded Radar View (full-viewport overlay) | Yes |
+| `/marine[/:locationId]` | Marine/Boating | Yes |
+| `/surf[/:locationId]` | Surf Forecast | Yes |
+| `/fishing[/:locationId]` | Fishing Forecast | Yes |
+| `/beach-safety[/:locationId]` | Beach Safety | Yes |
 | `/:slug` | Custom pages | Yes |
 | `/*` | 404 Not Found | Yes |
 
@@ -467,7 +472,7 @@ All config in `/etc/weewx-clearskies/` (search order: `CLEARSKIES_CONFIG` env va
 
 | File | Used by | Contains | Exists in examples? |
 |------|---------|----------|-------------------|
-| `api.conf` | API | Server bind, DB connection, providers, logging, TLS, input mode, socket path, SSE bind, unit conversion config (absorbs former `realtime.conf` settings per ADR-058), `[freshness]` per-domain refresh intervals and idle timeout config (ADR-075), `[geographic_features]` enabled flag + bounds for PMTiles extraction (ADR-078) | Yes (`config/api.conf.example`) |
+| `api.conf` | API | Server bind, DB connection, providers, logging, TLS, input mode, socket path, SSE bind, unit conversion config (absorbs former `realtime.conf` settings per ADR-058), `[freshness]` per-domain refresh intervals and idle timeout config (ADR-075), `[geographic_features]` enabled flag + bounds for PMTiles extraction (ADR-078), `[marine]` multi-spot marine location configuration (ADR-086), `[alerts] marine_alert_radius_miles` and `marine_alert_zone_ids` (ADR-089) | Yes (`config/api.conf.example`) |
 | `realtime.conf` | **DEPRECATED** — realtime service merged into API per ADR-058 | Input mode, MQTT settings, socket path, SSE bind, health bind, upstream API URL, unit conversion config | Yes (`config/realtime.conf.example`) — deprecated |
 | `stack.conf` | Config UI | UI bind/port, TLS, `[ui] enabled` flag | **No — does not exist** |
 | `secrets.env` | All (mode 0600) | DB password, API keys, admin credentials, proxy secret | No (generated by wizard) |
@@ -559,16 +564,25 @@ Read-only enforcement (defense-in-depth): DB user with `SELECT`-only grants + st
 
 ```
 weewx_clearskies_api/providers/
-├── _common/          # HTTP client, retry/backoff, error taxonomy, capability registry
+├── _common/          # HTTP client, retry/backoff, error taxonomy, capability registry, nws_zones.py
 ├── forecast/         # aeris, nws, openmeteo, openweathermap
 ├── aqi/              # aeris, iqair, openmeteo
 ├── alerts/           # nws, aeris, openweathermap
 ├── earthquakes/      # usgs, geonet, emsc, renass
 ├── seeing/           # seven_timer (no key needed, 7Timer ASTRO product)
-└── radar/            # rainviewer, librewxr, openweathermap, iem_nexrad (deprecated), noaa_mrms (deprecated), msc_geomet, dwd_radolan, iframe
+├── radar/            # rainviewer, librewxr, openweathermap, iem_nexrad (deprecated), noaa_mrms (deprecated), msc_geomet, dwd_radolan, iframe
+├── marine/           # wavewatch, nwps, nws_marine, nws_srf (NOAA, keyless, US-only)
+├── tides/            # coops (NOAA CO-OPS, keyless, US-only)
+└── buoy/             # ndbc (NOAA NDBC, keyless, US-only)
 ```
 
 Each module: outbound API call → response parsing → canonical field translation → capability declaration → error handling. Keyed providers proxied server-side (keys never reach browser).
+
+Three new provider domains for marine data: `"marine"` (wave forecasts and text), `"tides"` (predictions and water levels), `"buoy"` (point observations). All v1 marine providers are NOAA sources — free, keyless, US-only. See PROVIDER-MANUAL §14.
+
+Shared utility: `_common/nws_zones.py` — marine zone discovery (station → CWA → zone list → polygon proximity). Used by NWS marine text, NWS SRF, and the marine zone alerts extension.
+
+> **eccodes native dependency (marine feature):** The NWPS nearshore provider requires eccodes (ECMWF's GRIB processing C library) — the first native dependency in the API. Docker images bake it in; native pip installs use `pip install weewx-clearskies-api[marine]` after installing the system library. See OPERATIONS-MANUAL §1.
 
 ## Caching (ADR-017)
 
@@ -577,7 +591,7 @@ Each module: outbound API call → response parsing → canonical field translat
 | `memory` (default) | No config needed | Single worker (v0.1 default) |
 | `redis` (**active on weewx host**) | `CLEARSKIES_CACHE_URL=redis://localhost:6379/0` (set in `/etc/weewx-clearskies/secrets.env`) | Multi-worker deploys |
 
-Per-provider TTLs: forecast 30 min, alerts 5 min, AQI 15 min, radar metadata 5 min, seeing forecast 3 hours.
+Per-provider TTLs: forecast 30 min, alerts 5 min, AQI 15 min, radar metadata 5 min, seeing forecast 3 hours, marine forecasts 30 min, tide predictions 6 hr, tide observations 10 min, buoy observations 60 min, NWS marine text 30 min, NWS SRF 60 min.
 
 ## Repo layout
 

@@ -1,6 +1,6 @@
 ---
-status: Proposed
-date: 2026-07-02
+status: Accepted
+date: 2026-07-09
 deciders: shane
 supersedes: ADR-003
 superseded-by:
