@@ -1388,7 +1388,7 @@ Map to `SurfZoneForecast` canonical model. The SRF is per coastal county — mat
 
 **Wire format and parsing:**
 
-GRIB2 files from NOMADS: `https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwps/prod/`. Directory structure: `SR{wfo}.{yyyymmdd}/CG{n}/` containing GRIB2 files per forecast hour.
+GRIB2 files from NOMADS: `https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwps/prod/`. Directory structure (live-verified 2026-07-10): `{region}.{YYYYMMDD}/{wfo}/{HH}/CG{n}/` — e.g. `er.20260710/ilm/06/CG1/ilm_nwps_CG1_20260710_0600.grib2`. Region prefixes: er (Eastern), sr (Southern), wr (Western), ar (Alaska), pr (Pacific). WFO codes are lowercase. One consolidated GRIB2 file per CG grid per cycle (~27 MB) contains all forecast hours and fields.
 
 **WFO domain determination:** From the spot's coordinates, determine which of the 36 US coastal WFOs (+ Great Lakes) covers the location. Use the NWS `/points` → CWA mapping.
 
