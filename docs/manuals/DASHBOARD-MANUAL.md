@@ -812,17 +812,19 @@ Full-viewport overlay with enhanced controls. Pushed as a SPA route (`/radar`) f
 
 **Alert polygon overlays (LibreWxR only):**
 - Fetched from LibreWxR `/v2/alerts` via Caddy (URL from capability response).
-- Query by map viewport bounding box (`?bbox=`).
+- Query by map viewport bounding box (`?bbox=west,south,east,north`) derived from the provider's bounds.
 - Rendered as Leaflet GeoJSON polygons — severity-colored (stroke + fill per WMO CAP severity).
 - Auto-refresh every 5 minutes.
 - Toggle on/off in layer panel (default: on).
 - Only available when provider is LibreWxR. Hidden for RainViewer.
+- **Popup positioning:** Uses `leaflet-responsive-popup` (npm dependency) instead of the native `L.Popup`. The plugin automatically opens the popup in whichever direction has the most available space — below when near the top edge, shifted left/right when near side edges — without scrolling or panning the map. `autoPan: false` is set explicitly.
+- **Popup content:** Title (bold headline) shown by default. A `▼` toggle button expands to reveal severity, full NWS description, affected regions, and expiry timestamp. The detail section has `max-height: 250px` with `overflow-y: auto` for long descriptions. The `▲` button collapses back to title-only. Toggle symbols are unicode (no i18n needed).
 
-**Wind arrows overlay (LibreWxR only):**
-- LibreWxR provides wind arrow tiles as a separate layer.
-- Rendered as an overlay on the radar map, z-order above radar tiles.
+**Wind arrows (LibreWxR only):**
+- Rendered via `?arrows=light` or `?arrows=dark` query parameter appended to radar tile URLs by `buildTileUrl()`. LibreWxR composites directional wind barbs onto each radar frame at render time. Not a separate tile layer.
+- Arrow style adapts to background visibility: `light` (white arrows) when satellite is active or dark theme is active; `dark` (dark arrows) when using a light-theme basemap.
 - Toggle on/off in layer panel (default: off).
-- Only available when provider is LibreWxR.
+- Only available when provider is LibreWxR (detected via `capability.caddyPrefix`).
 
 **Satellite imagery layer (LibreWxR only):**
 - Toggleable layer in the expanded radar view. Toggle labeled "Satellite imagery" in the `RadarLayerPanel`.
