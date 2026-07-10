@@ -1,8 +1,8 @@
 # Marine, Surf & Fishing Forecast — Implementation Plan
 
-**Status:** Phase 0C complete — Phase 1 next  
+**Status:** Phase 1 in progress (5 of 7 tasks committed)  
 **Created:** 2026-07-08  
-**Last updated:** 2026-07-09  
+**Last updated:** 2026-07-09 (Phase 0 outcomes applied to all phases — GEBCO→CUDEM, section refs, file paths, wire format corrections)  
 **Components:** API (`weewx-clearskies-api`), Dashboard (`weewx-clearskies-dashboard`), Config UI (`weewx-clearskies-stack`)
 
 ## Context
@@ -61,7 +61,7 @@ Clear Skies needs marine, surf, and fishing forecast capabilities. Two pre-Clear
 - Response models: `models/responses.py` (Pydantic models — existing EarthquakeRecord, AlertRecord patterns)
 - Endpoint router: `routes/earthquakes.py` (capability check, provider fetch, unit conversion, freshness attachment)
 - Unit groups: `services/unit_transformer.py` (existing group registration pattern)
-- Config schema: `services/settings.py` (existing Settings dataclass, config loading)
+- Config schema: `config/settings.py` (existing Settings dataclass, config loading)
 - Wizard step: `weewx_clearskies_config/templates/wizard/` (existing HTMX step pattern)
 - Admin section: `weewx_clearskies_config/templates/admin/` (existing admin section pattern)
 - Dashboard page: `src/pages/` (existing page component pattern, lazy loading, VisibilityGuard)
@@ -106,7 +106,7 @@ Phase 0A (ADRs — Architectural Decisions)
                 │       │
                 │       ├──► Phase 2 (NWPS GRIB Provider)
                 │       │       │
-                │       │       └──► Phase 3 (GEBCO Bathymetry + Surf Physics Enrichment)
+                │       │       └──► Phase 3 (CUDEM Bathymetry + Surf Physics Enrichment)
                 │       │
                 │       └──────────► Phase 5 (API Endpoints) ◄── Phase 4
                 │
@@ -158,9 +158,9 @@ All 8 ADRs drafted, reviewed, and Accepted (2026-07-09). Key changes during revi
 
   **Supplement 1 — Breaker index correction (γ tuning)**
   SWAN uses a single constant γ = 0.73 (Battjes & Stive 1985 average) for depth-induced breaking across its entire domain. The actual γ varies from ~0.6 (spilling breakers on gentle sand slopes) to ~1.2 (plunging breakers on steep reef). This is well-documented: Battjes & Stive found 0.6–0.83 in their dataset; Carini et al. 2021 found the range extends further on steep bottoms.
-  - **Formula:** γ = 1.06 + 0.14 ln ξ (Battjes 1974), where ξ = tan α / √(H₀/L₀) is the Iribarren number (surf similarity parameter), tan α = average nearshore bottom slope (from GEBCO bathymetric profile), H₀ = NWPS-provided significant wave height, L₀ = deep-water wavelength from NWPS period
+  - **Formula:** γ = 1.06 + 0.14 ln ξ (Battjes 1974), where ξ = tan α / √(H₀/L₀) is the Iribarren number (surf similarity parameter), tan α = average nearshore bottom slope (from NOAA CUDEM bathymetric profile), H₀ = NWPS-provided significant wave height, L₀ = deep-water wavelength from NWPS period
   - **Application:** Recompute maximum wave height at breaking as H_max = γ_corrected × depth, using the spot-specific γ instead of SWAN's constant 0.73. This adjusts the NWPS breaking height, not the full wave field.
-  - **Operator inputs required:** bottom type (sand/rock/coral_reef/mixed — determines slope characteristics), beach slope (computed from GEBCO bathymetric profile at setup)
+  - **Operator inputs required:** bottom type (sand/rock/coral_reef/mixed — determines slope characteristics), beach slope (computed from NOAA CUDEM bathymetric profile at setup)
   - **Validation:** γ output clamped to [0.5, 1.4] (physical bounds from literature). Values outside this range indicate bad slope/wave data.
 
   **Supplement 2 — Coastal structure effects (transmission/reflection)**
@@ -189,7 +189,7 @@ All 8 ADRs drafted, reviewed, and Accepted (2026-07-09). Key changes during revi
   - **Operator inputs required:** topographic feature classification (from spot config)
   - **Caveat:** these are coarse adjustments. They capture the direction of the effect (focusing vs. sheltering) but not the magnitude with precision.
 
-- **What we do NOT supplement:** shoaling, refraction, bottom friction, wave-current interaction. NWPS/SWAN already computes these using the full spectral model with its bathymetry and current fields. Re-running them with our coarser GEBCO bathymetry (~450m) would be worse than NWPS's own computation (50m–1.8 km grids with higher-resolution bathymetry).
+- **What we do NOT supplement:** shoaling, refraction, bottom friction, wave-current interaction. NWPS/SWAN already computes these using the full spectral model with its bathymetry and current fields. Re-running them with coarser bathymetry would be worse than NWPS's own computation (50m–1.8 km grids with higher-resolution bathymetry).
 
 - **No fallback transformation pipeline.** NWPS data availability was verified against the NOMADS production archive (July 2026): all 36 coastal WFOs produce NWPS runs daily — typically 2–3 cycles per day (00z, 06z, 12z). Data is never more than ~8–12 hours old under normal operations. Maintaining an entire separate transformation codebase (shoaling + refraction + breaking + bottom friction on WaveWatch III deep-water data) for a hypothetical staleness scenario that doesn't occur in practice is unjustified complexity. If NWPS data is temporarily unavailable for a spot (NOAA outage, WFO maintenance), the marine page shows WaveWatch III offshore data without nearshore supplementation — the same data quality the system would have without NWPS at all. No separate code path needed.
 
@@ -221,11 +221,11 @@ All 8 ADRs drafted, reviewed, and Accepted (2026-07-09). Key changes during revi
 - Nearest NDBC/CO-OPS/NWS stations auto-discovered or operator-selected per location
 - NWS marine zone(s) auto-discovered per location (see ADR-089)
 - NWPS WFO domain auto-determined from coordinates
-- Bathymetric profile computed once per surf spot from GEBCO, stored in `api.conf`
+- Bathymetric profile computed once per surf spot from NOAA CUDEM, stored in `api.conf`
 - This differs from the single-station model used by the rest of Clear Skies
 
 **ADR-087 — NDBC spectral wave data consumption**
-- Parse `.swden` (spectral wave density) and `.swdir` (spectral wave direction) in addition to standard meteorological `.txt`
+- Parse `.data_spec` (spectral wave density — **live-verified; `.swden` returns 404**) and `.swdir` (spectral wave direction) in addition to standard meteorological `.txt`
 - Spectral data reveals multi-swell breakdowns (separate swell systems from different directions)
 - Standard met Hs alone doesn't distinguish clean swell from wind chop — spectral data is required for accurate surf assessment
 - New canonical model: `SpectralWaveComponent` (height, period, direction, energy per swell system)
@@ -233,7 +233,7 @@ All 8 ADRs drafted, reviewed, and Accepted (2026-07-09). Key changes during revi
 **ADR-088 — Fishing forecast scoring model**
 - Solunar computation via Skyfield (moon transit/underfoot/rise/set + phase intensity)
 - Conditions scoring: pressure trend 0.4, tide state 0.3, time of day 0.2, species modifier 0.1
-- GEBCO bathymetry for fishing habitat structure identification (drop-offs, reefs, ledges)
+- NOAA CUDEM bathymetry for fishing habitat structure identification (drop-offs, reefs, ledges)
 - Research basis: barometric pressure + tide state have strongest evidence; solunar is widely used but scientifically mixed — presented as one factor among several, not the primary predictor
 
 **ADR-089 — Marine zone alerts in the existing alert system**
@@ -272,7 +272,7 @@ All 8 ADRs drafted, reviewed, and Accepted (2026-07-09). Key changes during revi
   | Offshore wave forecast (Hs, period, direction) | WaveWatch III (ERDDAP) | Yes | Yes | — | — |
   | Nearshore wave data + ADR-084 supplements | NWPS (GRIB2) | Yes | Yes | — | Yes |
   | Surf quality scoring (1–5 stars) | Enrichment: surf_scorer | — | Yes | — | — |
-  | Multi-swell spectral breakdown | NDBC .swden/.swdir | — | Yes | — | — |
+  | Multi-swell spectral breakdown | NDBC .data_spec/.swdir | — | Yes | — | — |
   | **Tides & water levels** | | | | | |
   | Tide predictions (high/low times + heights) | CO-OPS API | Yes | Yes | Yes | Yes |
   | Observed water levels | CO-OPS API | Yes | — | — | Yes |
@@ -289,7 +289,7 @@ All 8 ADRs drafted, reviewed, and Accepted (2026-07-09). Key changes during revi
   | **Enrichment** | | | | | |
   | Solunar times (major/minor periods) | Skyfield (computed) | — | — | Yes | — |
   | Fishing scoring (pressure, tide, species, solunar) | Enrichment: fishing_scorer | — | — | Yes | — |
-  | Bathymetric habitat features (drop-offs, reefs, ledges) | GEBCO | — | — | Yes | — |
+  | Bathymetric habitat features (drop-offs, reefs, ledges) | NOAA CUDEM | — | — | Yes | — |
   | **NWPS v1.5 (show-when-available)** | | | | | |
   | Rip current probability | NWPS v1.5 (~12 WFOs) | — | — | — | Yes |
   | Total water level | NWPS v1.5 | Yes | — | — | Yes |
@@ -338,14 +338,14 @@ Per ADR lifecycle: after acceptance, extract prescriptive rules into target manu
 - Owner: Coordinator (Opus)
 - File: `docs/manuals/PROVIDER-MANUAL.md`
 - Do: Add new sections for each marine provider module. Each section follows the existing provider contract pattern (§1–§7 of the manual: module identity, capability declaration, wire model, normalization, cache, error handling, testing). Specific additions:
-  - **§X.1 NDBC buoy observations** (`providers/buoy/ndbc.py`): flat-file HTTP access pattern (not REST API), `.txt` standard met parsing (handle `MM` missing markers), `.swden`/`.swdir` spectral parsing (46 frequency bands), `activestations.xml` station discovery, cache TTL 60 min. Wire format: fixed-width text columns, not JSON. Station capability differentiation (wave-only vs. atmospheric-only vs. full).
-  - **§X.2 CO-OPS tides & water levels** (`providers/tides/coops.py`): CO-OPS Data API (JSON), tide predictions endpoint, water levels endpoint, water temp, currents. Metadata API for station discovery by lat/lon. Cache TTLs: predictions 6 hr, observations 10 min. Datum handling (MLLW, MSL, NAVD88).
-  - **§X.3 WaveWatch III forecasts** (`providers/marine/wavewatch.py`): ERDDAP JSON access (NOT GRIB), griddap URL construction with lat/lon/time subsetting, grid selection logic (7 grids with geographic bounds and priority), 72h forecast at 3h steps, cache TTL 30 min. Note: GFS Wave coupled model, ~4.5h data availability delay.
-  - **§X.4 NWS marine zone text forecasts** (`providers/marine/nws_marine.py`): `api.weather.gov/zones/coastal/{zoneId}/forecast` (JSON-LD/GeoJSON), marine zone discovery algorithm (station → CWA → zone list → polygon proximity within operator radius), cache TTL 30 min. Zone IDs shared with ADR-089 alerts extension.
-  - **§X.5 NWPS nearshore wave data** (`providers/marine/nwps.py`): GRIB2 from NOMADS (`nomads.ncep.noaa.gov/pub/data/nccf/com/nwps/prod/`), eccodes dependency (ADR-085), WFO domain determination, CG grid selection (CG1 baseline, CG2–CG5 nested), extracted fields (wave height, period, direction, currents, bottom orbital velocity, rip current probability, total water level, wave runup). 2–3 cycles/day per WFO, no fallback pipeline.
-  - **§X.6 GEBCO bathymetry** (`enrichment/bathymetry.py`): OpenTopoData API, one-time per-spot operation, adaptive refinement, rate limits (1/sec, 1000/day, 100 locations/request), regional depth profile adaptations, fallback profiles, attribution requirements.
-  - **§X.7 NWS Surf Zone Forecast** (`providers/marine/nws_srf.py`): text product access via `api.weather.gov/products/types/SRF/locations/{wfo}`, parsing rip current risk, surf height, UV index, water temp from free-text format. Cache TTL 60 min (issued 1–2x/day). Shared rate limiter with NWS alerts. County zone matching from spot coordinates.
-  - **§X.8 NWS alerts marine zone extension** (modification to existing `providers/alerts/nws.py`): marine zone discovery algorithm, `?zone={id}` supplemental query, de-duplication, all-provider coverage (NWS confirmed gap, Xweather/OWM test-and-supplement). This section goes in the existing alerts provider chapter, not the marine chapter.
+  - **§14.1 NDBC buoy observations** (`providers/buoy/ndbc.py`): flat-file HTTP access pattern (not REST API), `.txt` standard met parsing (handle `MM` missing markers), `.data_spec`/`.swdir` spectral parsing (46 frequency bands, `VALUE(FREQ)` token-pair format — **live-verified 2026-07-09; `.swden` returns 404**), `activestations.xml` station discovery, cache TTL 60 min. Wire format: fixed-width text columns, not JSON. Station capability differentiation best-effort via XML type attributes.
+  - **§14.2 CO-OPS tides & water levels** (`providers/tides/coops.py`): CO-OPS Data API (JSON), tide predictions endpoint, water levels endpoint, water temp, currents. Metadata API for station discovery by lat/lon. Cache TTLs: predictions 6 hr, observations 10 min. Datum handling (MLLW, MSL, NAVD88).
+  - **§14.3 WaveWatch III forecasts** (`providers/marine/wavewatch.py`): ERDDAP JSON access (NOT GRIB), griddap URL construction with lat/lon/time subsetting, grid selection logic (7 grids with geographic bounds and priority), 72h forecast at 3h steps, cache TTL 30 min. Note: GFS Wave coupled model, ~4.5h data availability delay.
+  - **§14.4 NWS marine zone text forecasts** (`providers/marine/nws_marine.py`): `api.weather.gov/zones/coastal/{zoneId}/forecast` (JSON-LD/GeoJSON), marine zone discovery algorithm (station → CWA → zone list → polygon proximity within operator radius), cache TTL 30 min. Zone IDs shared with ADR-089 alerts extension.
+  - **§14.6 NWPS nearshore wave data** (`providers/marine/nwps.py`): GRIB2 from NOMADS (`nomads.ncep.noaa.gov/pub/data/nccf/com/nwps/prod/`), eccodes dependency (ADR-085), WFO domain determination, CG grid selection (CG1 baseline, CG2–CG5 nested), extracted fields (wave height, period, direction, currents, bottom orbital velocity, rip current probability, total water level, wave runup). 2–3 cycles/day per WFO, no fallback pipeline.
+  - **§14.7 NOAA CUDEM bathymetry** (`enrichment/bathymetry.py`): NCEI THREDDS/OPeNDAP access, one-time per-spot operation, adaptive refinement, 1/9 arc-second (~3.4m) resolution, regional depth profile adaptations, fallback profiles, attribution requirements.
+  - **§14.5 NWS Surf Zone Forecast** (`providers/marine/nws_srf.py`): text product access via `api.weather.gov/products/types/SRF/locations/{wfo}`, parsing rip current risk, surf height, UV index, water temp from free-text format. Cache TTL 60 min (issued 1–2x/day). Shared rate limiter with NWS alerts. County zone matching from spot coordinates.
+  - **§14.8 NWS alerts marine zone extension (shared zone discovery utility)** (modification to existing `providers/alerts/nws.py`): marine zone discovery algorithm, `?zone={id}` supplemental query, de-duplication, all-provider coverage (NWS confirmed gap, Xweather/OWM test-and-supplement). This section goes in the existing alerts provider chapter, not the marine chapter.
 - Accept: Each provider section follows the manual's existing §1–§7 contract pattern. An implementation agent reading only the manual section can build the provider module without referencing ADRs or briefs. grep for "TODO" or "TBD" returns zero hits in new sections.
 
 **T0B.3 — Update API-MANUAL.md**
@@ -365,7 +365,7 @@ Per ADR lifecycle: after acceptance, extract prescriptive rules into target manu
   - **Marine alert radius** (in the existing alerts configuration section, NOT a marine section): config key, default value, wizard behavior (auto-suggest 25 miles when within 50 miles of marine zone), zone discovery algorithm, operator confirmation UI.
   - **eccodes native dependency**: platform-specific install instructions (Debian/Ubuntu: `apt install libeccodes-dev`, RHEL: `dnf install eccodes-devel`, macOS: `brew install eccodes`), pip install with `[marine]` extra, Docker (baked in), detection behavior (clear error with install instructions when marine enabled without eccodes).
   - **Marine config section in `api.conf`**: `[marine]` section schema, `[[locations]]` subsections, activity configuration, station IDs, NWPS WFO code, bathymetric profile storage.
-  - **Marine location setup procedure**: step-by-step wizard flow, station auto-discovery, GEBCO bathymetry download, configuration verification.
+  - **Marine location setup procedure**: step-by-step wizard flow, station auto-discovery, NOAA CUDEM bathymetry download, configuration verification.
 - Accept: An operator can configure marine features by reading only the OPERATIONS-MANUAL. No reference to ADRs, briefs, or this plan needed.
 
 **T0B.5 — Update DASHBOARD-MANUAL.md**
@@ -430,14 +430,14 @@ Define response models, config structures, and unit groups. No provider calls, n
 
 **T0C.2 — Marine location config schema**
 - Owner: `clearskies-api-dev` (Sonnet)
-- File: New `repos/weewx-clearskies-api/weewx_clearskies_api/services/marine_config.py`
-- Reference: OPERATIONS-MANUAL marine config section (written in T0B.4), existing `services/settings.py` pattern
+- File: New `repos/weewx-clearskies-api/weewx_clearskies_api/config/marine_config.py`
+- Reference: OPERATIONS-MANUAL marine config section (written in T0B.4), existing `config/settings.py` pattern
 - Do: Add dataclasses for marine configuration parsed from `api.conf`:
   - `MarineLocation` — `id: str`, `name: str`, `lat: float`, `lon: float`, `activities: list[str]` (from: "marine", "surf", "fishing", "beach_safety"), `ndbc_station_ids: list[str]`, `coops_station_ids: list[str]`, `nws_marine_zone_id: str | None`, `nwps_wfo: str | None`, `nwps_cg_grid: str | None`, `station_distance_km: float` (computed at config time — haversine distance from station to this location; used to determine weather source automatically)
-  - `SurfSpotConfig` — `beach_facing_degrees: float` (0–360), `bottom_type: Literal["sand","rock","coral_reef","mixed"]`, `beach_slope: float | None` (computed from GEBCO), `structures: list[StructureConfig]`, `bathymetric_profile: list[BathymetryPoint] | None` (stored after GEBCO download), `topographic_feature: Literal["point_break","bay_break","headland","straight_beach"]`, `directional_exposure: dict[str, bool]` (8 compass dirs → bool)
+  - `SurfSpotConfig` — `beach_facing_degrees: float` (0–360), `bottom_type: Literal["sand","rock","coral_reef","mixed"]`, `beach_slope: float | None` (computed from NOAA CUDEM), `structures: list[StructureConfig]`, `bathymetric_profile: list[BathymetryPoint] | None` (stored after CUDEM download), `topographic_feature: Literal["point_break","bay_break","headland","straight_beach"]`, `directional_exposure: dict[str, bool]` (8 compass dirs → bool)
   - `StructureConfig` — `type: Literal["jetty","pier","breakwater","seawall","groin"]`, `material: Literal["impermeable","semi_permeable","permeable"]`, `length_m: float`, `bearing_degrees: float`, `distance_m: float` (from spot)
   - `BathymetryPoint` — `distance_m: float`, `depth_m: float`
-  - `FishingSpotConfig` — `target_category: Literal["saltwater_inshore","saltwater_offshore","bottom_fish","freshwater_sport","salmonids"]`, `species: list[str]` (auto-populated from biogeographic region), `biogeographic_region: str` (auto-classified from coordinates)
+  - `FishingSpotConfig` — `target_category: Literal["saltwater_inshore","bottom_fish","freshwater_sport","salmonids"]` (`saltwater_offshore` removed in Phase 0A — fishing scoped to nearshore/freshwater recreational per ADR-088), `species: list[str]` (auto-populated from biogeographic region), `biogeographic_region: str` (auto-classified from coordinates)
   - `BeachSafetyConfig` — `external_links: list[ExternalLink]` (operator-provided links to local water quality, lifeguard reports, wildlife alert services — displayed on the beach safety page as informational resources)
   - `ExternalLink` — `label: str`, `url: str`
   - `MarineWeatherConfig` — `forecast_ttl_hours: Literal[1, 3, 6] = 3`, `observation_ttl_minutes: Literal[15, 30, 60] = 30`, `dedup_radius_km: float = 2.5` (locations within this distance share forecast/observation calls)
@@ -493,26 +493,41 @@ Define response models, config structures, and unit groups. No provider calls, n
 
 ---
 
-## PHASE 1 — NOAA Provider Modules + Marine Zone Alerts
+## PHASE 1 — NOAA Provider Modules + Marine Zone Alerts — IN PROGRESS
 
 Five provider modules following the existing contract (PROVIDER-MANUAL §1–§7: module identity, `CAPABILITY` constant, wire-shape Pydantic models, normalization to canonical types, cache layer, error handling via `ProviderHTTPClient`, `fetch()` entrypoint). Plus marine zone alerts extension to the existing alert system.
+
+**Progress (2026-07-09):**
+- T1.2 CO-OPS tides: DONE (commit 4bc648f, 713 lines)
+- T1.3 WaveWatch III: DONE (commit 858a791, 572 lines) — grid overlap for Hawaii noted, fix pending
+- T1.4 NWS marine + zones: DONE (commit cfc58e2, 2 files: nws_zones.py + nws_marine.py)
+- T1.7 Marine zone alerts: DONE (commit b864ec4, modified settings.py + nws.py + alerts endpoint)
+- T1.1 NDBC: IN PROGRESS — agent implementing against live-verified format (`.data_spec` not `.swden`, `VALUE(FREQ)` pairs)
+- T1.5 NWS SRF: IN PROGRESS — agent implementing SRF text parser
+- T1.6 Dispatch wiring: BLOCKED on T1.1 + T1.5 completion
+
+**Known issues to fix at QC gate:**
+1. WaveWatch grid overlap: Hawaii matches both wcoast and epacif (both priority 1). Fix: narrow wcoast lon to -130.
+2. PROVIDER-MANUAL §14.1: NDBC wire format documented as `.swden` with simple columns; reality is `.data_spec` with `VALUE(FREQ)` pairs. Update after T1.1 commits.
+3. ERDDAP dataset names: not live-verified; documented in wavewatch.py for integration testing.
+4. MarineForecastPoint: `windWaveDirection` field added mid-phase (commit 351e516) — was missing from Phase 0C model.
 
 ### Tasks
 
 **T1.1 — NDBC buoy observations**
 - Owner: `clearskies-api-dev` (Sonnet)
 - File: New `repos/weewx-clearskies-api/weewx_clearskies_api/providers/buoy/ndbc.py`
-- Reference: PROVIDER-MANUAL §X.1 NDBC (written in T0B.2), existing `providers/alerts/nws.py` as pattern, `docs/reference/api-docs/` for NDBC wire format, MARINE-DATA-AUDIT-BRIEF §A.3 for field inventory
+- Reference: PROVIDER-MANUAL §14.1 NDBC, existing `providers/alerts/nws.py` as pattern, `docs/reference/api-docs/` for NDBC wire format, MARINE-DATA-AUDIT-BRIEF §A.3 for field inventory
 - Do:
   - Module structure: `PROVIDER_ID = "ndbc"`, `DOMAIN = "buoy"`, `CAPABILITY` declaration with supplied fields, rate limiter (1 req/s — NDBC is a flat-file server, no documented rate limit but be polite), module-level `ProviderHTTPClient` singleton, cache key builder, `fetch()` entrypoint.
   - **Standard met (`.txt`) parsing:** Fetch `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.txt`. Fixed-width text columns (NOT JSON). First two rows are headers (column names + units). Handle `MM` markers as None (missing data). Columns: WDIR, WSPD, GST, WVHT, DPD, APD, MWD, PRES, ATMP, WTMP, DEWP, VIS, PTDY, TIDE. Parse most recent observation row. Map to canonical `MarineObservation` via UnitTransformer (NDBC reports in metric — m, m/s, °C, hPa — but verify per column).
-  - **Spectral density (`.swden`) parsing:** Fetch `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.swden`. 46 frequency bands (0.02–0.485 Hz). Parse energy density at each frequency. Decompose into swell systems: identify spectral peaks (local maxima in energy density), partition energy around each peak, compute Hs = 4√m₀, Tp = 1/fp, direction from `.swdir` for each partition. Map each partition to `SpectralWaveComponent`.
-  - **Spectral direction (`.swdir`) parsing:** Fetch `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.swdir`. Mean wave direction at each of the 46 spectral frequencies. Used alongside `.swden` to assign direction to each swell system.
+  - **Spectral density (`.data_spec`) parsing:** Fetch `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.data_spec`. **Live-verified (2026-07-09): `.swden` returns 404; `.data_spec` is the correct extension.** Wire format: each data row contains `VALUE (FREQ)` token pairs (not simple columns) — parse via regex. Skip the `Sep_Freq` column (separation frequency between wind waves and swell; appears after the 5-column timestamp, before spectral pairs). Decompose into swell systems: identify spectral peaks (local maxima in energy density), partition energy around each peak, compute Hs = 4√m₀, Tp = 1/fp, direction from `.swdir` for each partition. Map each partition to `SpectralWaveComponent`.
+  - **Spectral direction (`.swdir`) parsing:** Fetch `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.swdir`. Uses the same `VALUE (FREQ)` token-pair format as `.data_spec`. Mean wave direction at each spectral frequency. Used alongside `.data_spec` to assign direction to each swell system.
   - **Station discovery:** Fetch `https://www.ndbc.noaa.gov/activestations.xml`. Parse XML for station IDs, coordinates, sensor types. Differentiate wave-only vs. atmospheric-only vs. full-capability buoys (per MARINE-DATA-AUDIT-BRIEF §C.3). Return list of nearby stations with capabilities and distances.
   - Cache: keyed by (provider_id, station_id). TTL 60 min for standard met, 60 min for spectral.
   - Error handling: 404 for non-existent station → `ProviderProtocolError`. Empty file → log WARNING, return empty observation. Network errors → canonical taxonomy via `ProviderHTTPClient`.
 - Tests (`clearskies-test-author`):
-  - Capture real `.txt`, `.swden`, `.swdir` files as test fixtures (from a known station like 41025 or 46225).
+  - Capture real `.txt`, `.data_spec`, `.swdir` files as test fixtures (from a known station like 41025 or 46225).
   - Unit tests: parse fixture → verify canonical field values against hand-checked data.
   - Unit tests: `MM` markers → None fields.
   - Unit tests: spectral decomposition → verify peak detection against known multi-swell case.
@@ -522,7 +537,7 @@ Five provider modules following the existing contract (PROVIDER-MANUAL §1–§7
 **T1.2 — CO-OPS tides & water levels**
 - Owner: `clearskies-api-dev` (Sonnet)
 - File: New `repos/weewx-clearskies-api/weewx_clearskies_api/providers/tides/coops.py`
-- Reference: PROVIDER-MANUAL §X.2 CO-OPS (written in T0B.2), CO-OPS Data API docs at `docs/reference/api-docs/`, existing provider patterns
+- Reference: PROVIDER-MANUAL §14.2 CO-OPS, CO-OPS Data API docs at `docs/reference/api-docs/`, existing provider patterns
 - Do:
   - Module structure: `PROVIDER_ID = "coops"`, `DOMAIN = "tides"`, standard provider contract.
   - **Tide predictions:** `GET https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&datum=MLLW&station={id}&begin_date={today}&range=72&units=metric&time_zone=gmt&application=clearskies&format=json`. Parse `predictions[]` array → list of `TidePrediction` (time, height, high/low classification). High/low classification: compare each prediction to neighbors — if height > both neighbors, it's high; if height < both neighbors, it's low; otherwise interpolated.
@@ -541,7 +556,7 @@ Five provider modules following the existing contract (PROVIDER-MANUAL §1–§7
 **T1.3 — GFS Wave (WaveWatch III coupled) forecasts**
 - Owner: `clearskies-api-dev` (Sonnet)
 - File: New `repos/weewx-clearskies-api/weewx_clearskies_api/providers/marine/wavewatch.py`
-- Reference: PROVIDER-MANUAL §X.3 WaveWatch III (written in T0B.2), MARINE-DATA-AUDIT-BRIEF §B.5 for grid inventory, MARINE-SURF-FISHING-RESEARCH-BRIEF §5.1 for ERDDAP access
+- Reference: PROVIDER-MANUAL §14.3 WaveWatch III, MARINE-DATA-AUDIT-BRIEF §B.5 for grid inventory, MARINE-SURF-FISHING-RESEARCH-BRIEF §5.1 for ERDDAP access
 - Do:
   - Module structure: `PROVIDER_ID = "wavewatch"`, `DOMAIN = "marine"`, standard provider contract.
   - **ERDDAP JSON fetch:** Construct griddap URL: `https://erddap.aoml.noaa.gov/hdb/erddap/griddap/{grid_dataset}.json?{variables}[({time_start}):1:({time_end})][({lat_nearest})][({lon_nearest})]`. Variables: `Thgt` (wave height), `Tper` (peak period), `Tdir` (peak direction), `shww` (wind wave height), `mpww` (wind wave period), `wvdir` (wind wave direction), `shts` (swell height), `mpts` (swell period), `swdir` (swell direction), `ws` (wind speed), `wdir` (wind direction).
@@ -558,7 +573,7 @@ Five provider modules following the existing contract (PROVIDER-MANUAL §1–§7
 **T1.4 — NWS marine zone text forecasts**
 - Owner: `clearskies-api-dev` (Sonnet)
 - File: New `repos/weewx-clearskies-api/weewx_clearskies_api/providers/marine/nws_marine.py`
-- Reference: PROVIDER-MANUAL §X.4 NWS marine (written in T0B.2), existing `providers/alerts/nws.py` for NWS API patterns (User-Agent, rate limiting)
+- Reference: PROVIDER-MANUAL §14.4 NWS marine zone text, existing `providers/alerts/nws.py` for NWS API patterns (User-Agent, rate limiting)
 - Do:
   - Module structure: `PROVIDER_ID = "nws_marine"`, `DOMAIN = "marine"`, standard provider contract.
   - **Zone forecast fetch:** `GET https://api.weather.gov/zones/coastal/{zoneId}/forecast` with `User-Agent: weewx-clearskies-api/{version} (contact email)`. Parse JSON-LD/GeoJSON response → `properties.periods[]` → list of `MarineTextForecast` (period name, text, wind, seas, visibility, weather).
@@ -581,11 +596,11 @@ Five provider modules following the existing contract (PROVIDER-MANUAL §1–§7
 **T1.5 — NWS Surf Zone Forecast (SRF) text product**
 - Owner: `clearskies-api-dev` (Sonnet)
 - File: New `repos/weewx-clearskies-api/weewx_clearskies_api/providers/marine/nws_srf.py`
-- Reference: PROVIDER-MANUAL (add §X.8 in T0B.2), existing `providers/marine/nws_marine.py` (T1.4) for NWS API patterns
+- Reference: PROVIDER-MANUAL §14.5 NWS Surf Zone Forecast, existing `providers/marine/nws_marine.py` (T1.4) for NWS API patterns
 - Do:
   - Module structure: `PROVIDER_ID = "nws_srf"`, `DOMAIN = "marine"`, standard provider contract.
   - **SRF fetch:** `GET https://api.weather.gov/products/types/SRF/locations/{wfo}` to get latest SRF product for the WFO covering the spot. Parse the text product to extract per-county-zone forecasts for: rip current risk (low/moderate/high), surf height (breaking wave height range), UV index, water temperature, wind, and hazard statements. The SRF is a 2-day text forecast with one value per day per coastal county.
-  - **New canonical model:** `SurfZoneForecast` — date, county_zone, rip_current_risk (low/moderate/high), surf_height_min, surf_height_max, uv_index, water_temp, wind_text, hazards_text. Add to `models/responses.py` (T0C.1 addition).
+  - **Canonical model:** `SurfZoneForecast` already exists in `models/responses.py` (created in Phase 0C T0C.1). Fields: date, countyZone, ripCurrentRisk, surfHeightMin, surfHeightMax, uvIndex, waterTemp, windText, hazardsText. Do NOT modify the model — only import and populate it.
   - **WFO determination:** Reuse the NWS `/points` → CWA lookup from T1.4's shared zone discovery utility.
   - **County zone matching:** The SRF is issued per coastal county. Match the spot's coordinates to the appropriate county zone in the SRF text. Use the NWS `/zones/forecast` endpoint to determine the spot's public forecast zone.
   - Cache: TTL 60 min (SRF is issued 1–2 times/day). Key by WFO + county zone.
@@ -612,10 +627,10 @@ Five provider modules following the existing contract (PROVIDER-MANUAL §1–§7
   - `repos/weewx-clearskies-api/weewx_clearskies_api/providers/alerts/nws.py` (modify existing)
   - `repos/weewx-clearskies-api/weewx_clearskies_api/providers/alerts/aeris.py` (modify if needed)
   - `repos/weewx-clearskies-api/weewx_clearskies_api/providers/alerts/openweathermap.py` (modify if needed)
-  - `repos/weewx-clearskies-api/weewx_clearskies_api/services/settings.py` (add `marine_alert_radius_miles` and `marine_alert_zone_ids` to station config)
-- Reference: ADR-089, PROVIDER-MANUAL §X.7 NWS alerts marine zone extension (written in T0B.2), OPERATIONS-MANUAL alerts config section (written in T0B.4)
+  - `repos/weewx-clearskies-api/weewx_clearskies_api/config/settings.py` (add `marine_alert_radius_miles` and `marine_alert_zone_ids` to `AlertsSettings`)
+- Reference: ADR-089, PROVIDER-MANUAL §8 alerts + §14.8 shared zone discovery, OPERATIONS-MANUAL alerts config section (written in T0B.4)
 - Do:
-  - **Settings change:** Add `marine_alert_radius_miles: float = 0.0` and `marine_alert_zone_ids: list[str] = []` to the station configuration in `settings.py`. These are general alerts config, not marine-feature config. Loaded from `api.conf` `[station]` or `[alerts]` section (coordinator decides exact location during T0B.4).
+  - **Settings change:** Add `marine_alert_radius_miles: float = 0.0` and `marine_alert_zone_ids: list[str] = []` to `AlertsSettings` in `config/settings.py`. These are general alerts config, not marine-feature config. Loaded from `api.conf` `[alerts]` section. Also wire through `endpoints/alerts.py` (`wire_alerts_settings()` → module-level variable → pass to `nws.fetch()`).
   - **NWS alerts provider modification:** In `fetch()`, after the existing `?point=` query, check if `marine_alert_zone_ids` is non-empty. If so, make additional `GET /alerts/active?zone={zoneId}` queries for each configured marine zone. Merge results with point-based results. De-duplicate by alert `id` field. Use the same `ProviderHTTPClient`, rate limiter, and cache infrastructure. Cache key must distinguish zone-based queries from point-based queries.
   - **Xweather provider:** During implementation, test Xweather with a station at ~15km from coast (Wilmington NC: 34.23, -77.94 — verified in this session to miss SCAs). If Xweather returns marine alerts for this point: no change needed. If not (expected based on session testing): add a supplemental NWS `?zone=` query for the configured marine zones. This is a supplemental data source, not a provider switch — NWS marine zone alerts are free. Merge + de-duplicate by alert ID.
   - **OWM provider:** Same test-and-supplement approach. If no One Call 3.0 key available for testing, implement the NWS supplemental query unconditionally (it's free and adds no harm if OWM already returns the alerts).
@@ -648,11 +663,52 @@ Primary nearshore data source for US. Requires eccodes (native dependency per AD
 **T2.1 — Port GRIBProcessor**
 - Owner: `clearskies-api-dev` (Sonnet)
 - File: New `repos/weewx-clearskies-api/weewx_clearskies_api/providers/marine/grib_processor.py`
-- Reference: PROVIDER-MANUAL §X.5 NWPS (written in T0B.2), MARINE-DATA-AUDIT-BRIEF §B.5 for Phase II GRIBProcessor source, §B.6 for thread architecture
+- Reference: PROVIDER-MANUAL §14.6 NWPS nearshore wave data, MARINE-DATA-AUDIT-BRIEF §B.5 for Phase II GRIBProcessor source, §B.6 for thread architecture
 - Do:
   - Port Phase II `GRIBProcessor` class (~42 lines) with eccodes/pygrib dual backend. Try `import eccodes` first; if `ImportError`, try `import pygrib`; if both fail, set `GRIB_AVAILABLE = False`.
   - At module level, check `GRIB_AVAILABLE`. If False and marine config is present, raise `RuntimeError` with platform-specific install instructions: Debian/Ubuntu: `apt install libeccodes-dev && pip install eccodes`, RHEL: `dnf install eccodes-devel && pip install eccodes`, macOS: `brew install eccodes && pip install eccodes`, Docker: included by default.
-  - Provide a `read_grib_fields(file_path, field_names) -> dict[str, ndarray]` function that opens a GRIB2 file and extracts named fields into numpy arrays. Handle missing fields gracefully (log WARNING, return None for that field).
+  - **eccodes API pattern** (the agent must use these function calls):
+    ```python
+    # Open file and iterate GRIB messages:
+    with open(file_path, 'rb') as f:
+        while True:
+            msgid = eccodes.codes_grib_new_from_file(f)
+            if msgid is None:
+                break
+            try:
+                short_name = eccodes.codes_get(msgid, 'shortName')
+                if short_name in requested_fields:
+                    values = eccodes.codes_get_values(msgid)  # 1D array
+                    ni = eccodes.codes_get(msgid, 'Ni')       # grid columns
+                    nj = eccodes.codes_get(msgid, 'Nj')       # grid rows
+                    data_2d = values.reshape((nj, ni))
+                    # Extract lat/lon bounds for geo-referencing:
+                    lat_first = eccodes.codes_get(msgid, 'latitudeOfFirstGridPointInDegrees')
+                    lon_first = eccodes.codes_get(msgid, 'longitudeOfFirstGridPointInDegrees')
+                    lat_last = eccodes.codes_get(msgid, 'latitudeOfLastGridPointInDegrees')
+                    lon_last = eccodes.codes_get(msgid, 'longitudeOfLastGridPointInDegrees')
+            finally:
+                eccodes.codes_release(msgid)
+    ```
+    A GRIB2 file contains multiple messages. Each message is one parameter at one forecast hour. Iterate all messages, match `shortName` against requested fields, extract the 2D grid.
+  - **NWPS GRIB2 shortName mappings** (verify live against real files — these are the expected shortNames for NWPS CG grids):
+    - `HTSGW` → significant wave height (m)
+    - `PERPW` → peak wave period (s)
+    - `DIRPW` → peak wave direction (degrees)
+    - `UCUR` → surface current U-component (m/s, east-positive)
+    - `VCUR` → surface current V-component (m/s, north-positive)
+    - Current speed = √(UCUR² + VCUR²), direction = atan2(UCUR, VCUR) converted to oceanographic convention
+    - `BODO` → bottom orbital velocity (m/s) — may appear as a different shortName; verify live
+    - v1.5 fields (show-when-available): `RIPCUR`, `TWL`, `RUNUP` — may not exist in all files
+  - Provide a `read_grib_fields(file_path, field_names) -> dict[str, ndarray]` function that opens a GRIB2 file and extracts named fields into numpy arrays. Handle missing fields gracefully (log WARNING, return None for that field). No numpy dependency — use Python lists; the grids are small (~100×100 for CG1).
+  - **pygrib fallback pattern:** If eccodes unavailable but pygrib is:
+    ```python
+    grbs = pygrib.open(file_path)
+    for grb in grbs:
+        if grb.shortName in requested_fields:
+            data_2d = grb.values  # numpy 2D array
+            lats, lons = grb.latlons()
+    ```
   - Fix: Phase II has duplicate `apply_breaking_limit` definitions (lines 4160 and 4581 per audit). Merge into single implementation — keep the enhanced version that accepts bottom-type-specific γ.
 - Tests (`clearskies-test-author`):
   - Unit tests with a captured NWPS GRIB2 fixture file (small, single-timestep).
@@ -663,12 +719,26 @@ Primary nearshore data source for US. Requires eccodes (native dependency per AD
 **T2.2 — NWPS provider module**
 - Owner: `clearskies-api-dev` (Sonnet)
 - File: New `repos/weewx-clearskies-api/weewx_clearskies_api/providers/marine/nwps.py`
-- Reference: PROVIDER-MANUAL §X.5 NWPS (written in T0B.2), MARINE-DATA-AUDIT-BRIEF §B.5 for grid selection, MARINE-SURF-FISHING-RESEARCH-BRIEF §5.2 for WFO domains and data fields
+- Reference: PROVIDER-MANUAL §14.6 NWPS nearshore wave data, MARINE-DATA-AUDIT-BRIEF §B.5 for grid selection, MARINE-SURF-FISHING-RESEARCH-BRIEF §5.2 for WFO domains and data fields
 - Do:
-  - Module structure: `PROVIDER_ID = "nwps"`, `DOMAIN = "marine"`, standard provider contract. CAPABILITY depends on `GRIB_AVAILABLE` from grib_processor — if not available, CAPABILITY is None (provider not registered at startup).
-  - **GRIB2 fetch:** Download from NOMADS: `https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwps/prod/{region}.{YYYYMMDD}/{wfo}/{cycle}/`. Region determined from WFO (er=Eastern, sr=Southern, wr=Western, ar=Alaska, pr=Pacific). Download CG1 (baseline) GRIB2 files for configured forecast hours. Use `ProviderHTTPClient` for downloads with retry/backoff.
-  - **WFO domain determination:** Given spot lat/lon, determine which WFO covers that area. Use a lookup table of all 36 coastal WFO domains with approximate bounding boxes (from MARINE-SURF-FISHING-RESEARCH-BRIEF §5.2). Alternatively, use the NWS `/points` API to get the CWA, but note that offshore points may not resolve — prefer the bounding box lookup.
-  - **CG grid selection:** CG1 is always available (~1.8 km). CG2–CG5 are nested higher-resolution grids that may or may not be available for a given WFO. Check for CG2–CG5 files → if present, extract from the highest-resolution grid covering the spot's coordinates. Fall back to CG1 if nested grids don't cover the spot.
+  - Module structure: `PROVIDER_ID = "nwps"`, `DOMAIN = "marine"`, standard provider contract per PROVIDER-MANUAL §1. CAPABILITY depends on `GRIB_AVAILABLE` from grib_processor — if not available, CAPABILITY is None (provider not registered at startup). Config read from `MarineConfig` in `config/marine_config.py` (created in Phase 0C).
+  - **GRIB2 fetch:** Download from NOMADS. **Live-verify the exact URL structure before implementing** — the documented pattern below is from NOAA NWPS docs but must be confirmed against the live NOMADS directory listing.
+    - Base: `https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwps/prod/`
+    - Directory structure: `{region}.{YYYYMMDD}/{wfo}/CG{n}/` (e.g., `er.20260709/ilm/CG1/`)
+    - Region prefix mapping (WFO → region):
+      - `er` (Eastern Region): BOX, GYX, PHI, OKX, CAR, ALY, BUF, ILN, CLE, PBZ, RLX, AKQ, LWX, MHX, ILM, CHS, JAX, MLB, MFL, KEY, TBW
+      - `sr` (Southern Region): MOB, LIX, HGX, CRP, BRO, LCH, SHV, JAN, BMX, FFC, TAE
+      - `wr` (Western Region): SEW, PQR, MFR, EKA, MTR, LOX, SGX, HFO
+      - `ar` (Alaska Region): AFC, AJK, AFG
+      - `pr` (Pacific Region): GUM (Guam), HFO (Hawaii — may appear in both wr and pr; verify)
+    - File naming within CG directory: verify live. Expected pattern: `{wfo}_nwps_CG{n}_{YYYYMMDD}_{cycle}.grib2` or individual field files. The agent MUST fetch the NOMADS directory listing first to discover actual file names.
+    - Download CG1 (baseline) GRIB2 files for configured forecast hours. Use `ProviderHTTPClient` for downloads with retry/backoff.
+    - **NOTE:** NOMADS serves plain files over HTTP, not a REST API. Use `ProviderHTTPClient.get()` and check `Content-Type` — GRIB2 files are binary (`application/octet-stream`). Save to a temp file, then pass to `grib_processor.read_grib_fields()`.
+  - **WFO domain determination:** Use `get_cwa()` from `providers/_common/nws_zones.py` (created in T1.4) for land/coastal points. For offshore points where `/points` returns 404, fall back to a WFO bounding box lookup table. The bounding box table should be a module-level constant, not a runtime API call. Seed the table from MARINE-SURF-FISHING-RESEARCH-BRIEF §5.2 WFO domain list, but note the table only needs approximate bounds — the CG1 grid itself defines the exact coverage.
+  - **CG grid selection:** CG1 is always available (~1.8 km resolution, covers the full WFO nearshore domain). CG2–CG5 are nested higher-resolution grids (~200–500m) for specific areas (harbors, inlets, high-traffic waterways). They are NOT always present — availability varies by WFO.
+    - **Algorithm:** At fetch time, check the NOMADS directory for CG2–CG5 subdirectories. For each present CG grid, read the GRIB2 file header to determine the grid's lat/lon bounds (`latitudeOfFirstGridPointInDegrees`, etc. from eccodes). If the spot's coordinates fall within a nested grid's bounds, prefer that grid (higher resolution). If the spot falls outside all nested grids (or none exist), use CG1.
+    - **Fallback chain:** CG5 → CG4 → CG3 → CG2 → CG1 (highest available resolution first).
+    - **v1 simplification:** Start with CG1 only. CG2–CG5 support can be added as a follow-up if operators request it for specific harbor areas. This avoids the complexity of grid-within-grid resolution at the cost of slightly lower resolution in nested grid areas (1.8 km vs. 200m). Flag this as a simplification in the module docstring.
   - **Field extraction:** Use `grib_processor.read_grib_fields()` to extract: `HTSGW` (significant wave height), `PERPW` (peak period), `DIRPW` (peak direction), `UCUR`/`VCUR` (current components), `BODO` (bottom orbital velocity), `RIPCUR` (rip current probability — v1.5 WFOs only), `TWL` (total water level — v1.5), `RUNUP` (wave runup — v1.5). Missing v1.5 fields → None (show-when-available).
   - **Freshness metadata:** Include the NWPS cycle timestamp in the response. The provider does NOT implement a fallback pipeline — if NWPS data is temporarily unavailable, the provider returns an empty/stale result with the timestamp indicating age. Consumers decide how to handle.
   - Cache: TTL 30 min. Key by WFO + CG grid + nearest lat/lon.
@@ -705,29 +775,35 @@ Primary nearshore data source for US. Requires eccodes (native dependency per AD
 
 ---
 
-## PHASE 3 — GEBCO Bathymetry + Surf Physics Enrichment
+## PHASE 3 — NOAA CUDEM Bathymetry + Surf Physics Enrichment
 
-Enrichment processors (not provider modules). Take NWPS data → apply site-specific supplements → produce surf quality forecasts. These are registered as enrichment processors in the API's enrichment pipeline, following the pattern of `enrichment/conditions_text.py`.
+Enrichment processors (not provider modules). Take NWPS data → apply site-specific supplements → produce surf quality forecasts. These are registered as enrichment processors in the API's enrichment pipeline, following the pattern of `enrichment/conditions_text.py`. Bathymetry uses NOAA CUDEM (~3.4m resolution, covers all US coastal areas including territories) via NCEI THREDDS/OPeNDAP — replaces the originally planned GEBCO/OpenTopoData access (ADR-084, Phase 0A decision).
 
 ### Tasks
 
 **T3.1 — Port BathymetryProcessor**
 - Owner: `clearskies-api-dev` (Sonnet)
 - File: New `repos/weewx-clearskies-api/weewx_clearskies_api/enrichment/bathymetry.py`
-- Reference: API-MANUAL marine enrichment section (written in T0B.3), PROVIDER-MANUAL §X.6 GEBCO (written in T0B.2), MARINE-DATA-AUDIT-BRIEF §B.3 for Phase II source (1,370+ lines), §C.1 for OpenTopoData API details
+- Reference: API-MANUAL §17 marine enrichment section, PROVIDER-MANUAL §14.7 NOAA CUDEM bathymetry, MARINE-DATA-AUDIT-BRIEF §B.3 for Phase II source (1,370+ lines)
 - Do:
   - Port Phase II `BathymetryProcessor` as a one-time setup operation (NOT a per-request enrichment). Called during wizard/admin spot configuration, result stored in `api.conf`.
-  - **Deep-water point finding:** Starting from the surf spot coordinates, search outward along the beach-facing bearing in 1 km increments (up to 75 km) until a point with depth ≥ the region's deep-water threshold is found. Use GEBCO via OpenTopoData to query depth at each candidate point.
+  - **Deep-water point finding:** Starting from the surf spot coordinates, search outward along the beach-facing bearing in 1 km increments (up to 75 km) until a point with depth ≥ the region's deep-water threshold is found. Use NOAA CUDEM via NCEI THREDDS/OPeNDAP to query depth at each candidate point.
   - **Path creation:** Create a 16-point linear interpolation path between the break point and the deep-water point.
-  - **GEBCO API queries:** `GET https://api.opentopodata.org/v1/gebco2020?locations={lat},{lon}|{lat},{lon}|...&interpolation=bilinear`. Rate limit: 1 call/sec, max 100 locations/request, 1000 calls/day. For 16 points → 1 API call per spot. Adaptive refinement (gradient-based, up to 3 iterations with IQR anomaly smoothing) may require 2–4 additional calls.
+  - **NOAA CUDEM data access:** CUDEM 1/9 arc-second (~3.4m) tiles are available via multiple access methods. The agent MUST verify the actual working endpoint before implementing — NOAA endpoint availability changes. Access options in priority order:
+    1. **NCEI THREDDS OPeNDAP** (preferred): `https://www.ngdc.noaa.gov/thredds/dodsC/regional/` hosts CUDEM tiles as OPeNDAP datasets. OPeNDAP subsetting syntax: append `?Band1[{lat_start}:{lat_step}:{lat_end}][{lon_start}:{lon_step}:{lon_end}]` to request a spatial subset. Response is a DAP2 binary or ASCII array. The agent needs to discover which tile covers the target coordinates — tiles are regional (e.g., `crm_vol1.nc` for the East Coast, specific tiles for each region). Check the THREDDS catalog at `https://www.ngdc.noaa.gov/thredds/catalog/regional/catalog.html` to find tile names.
+    2. **NCEI point query** (simpler, slower): NCEI may offer a point-query REST API. Check `https://www.ngdc.noaa.gov/mgg/bathymetry/relief.html` for current API endpoints.
+    3. **OpenTopoData with CUDEM dataset** (fallback): OpenTopoData hosts a CUDEM 1/3 arc-second dataset at `https://api.opentopodata.org/v1/cudem?locations={lat},{lon}`. Lower resolution (1/3 vs 1/9 arc-second, ~10m vs ~3.4m) but simpler REST API. Rate limit: 1 call/sec, max 100 locations/request, 1000 calls/day. This is the **fallback** if THREDDS is unavailable or too complex to implement in the time available.
+    - The agent should attempt THREDDS first. If the endpoint structure is unclear or non-functional during implementation, fall back to OpenTopoData with CUDEM and document the limitation (lower resolution). Either way, the attribution is "NOAA National Centers for Environmental Information" and the data is CUDEM, just at different resolutions.
+    - CUDEM covers all US coastal areas including territories (Hawaii, PR, USVI, Guam, CNMI, American Samoa). At 1/9 arc-second (~3.4m), individual reef structures, sandbars, ledges, and channel edges are visible. At 1/3 arc-second (~10m), large features are still visible but fine structure is smoothed.
+    - Adaptive refinement (gradient-based, up to 3 iterations with IQR anomaly smoothing) may require 2–4 additional calls.
   - **Regional adaptations:** Pacific Coast: aggressive refinement (steep continental shelf). Gulf Coast: conservative (gradual shelf). Hawaii: maximum sensitivity (volcanic shelf). Great Lakes: adapt for freshwater lake bathymetry (shallower overall).
-  - **Fallback profiles** when GEBCO/OpenTopoData is unavailable: West Coast `[50,40,30,20,12,6,3]`, East Coast `[35,28,22,16,10,5,2.5]`, Gulf `[25,20,15,12,8,4,2]`, Hawaii `[60,45,30,18,10,5,3.5]`. Log WARNING when using fallback.
-  - **Output:** List of `BathymetryPoint(distance_m, depth_m)` stored in `SurfSpotConfig.bathymetric_profile`.
+  - **Fallback profiles** when CUDEM/NCEI is unavailable: West Coast `[50,40,30,20,12,6,3]`, East Coast `[35,28,22,16,10,5,2.5]`, Gulf `[25,20,15,12,8,4,2]`, Hawaii `[60,45,30,18,10,5,3.5]`. Log WARNING when using fallback.
+  - **Output:** List of `BathymetryPoint(distance_m, depth_m)` stored in `SurfSpotConfig.bathymetric_profile` (dataclass in `config/marine_config.py`, created in Phase 0C).
   - **Fix:** Replace `eval()` usage from Phase II with safe literal parsing. Use UnitTransformer for any unit conversions (Phase II had hardcoded US conversions).
-  - **Attribution:** Every API response that includes bathymetry-derived data must include "GEBCO Compilation Group (2025) GEBCO 2025 Grid" in the attribution block + "Not for navigation" disclaimer.
+  - **Attribution:** Every API response that includes bathymetry-derived data must include "NOAA National Centers for Environmental Information" in the attribution block + "Not for navigation" disclaimer.
 - Tests (`clearskies-test-author`):
-  - Unit tests: mock OpenTopoData responses → verify path creation, depth extraction, adaptive refinement.
-  - Unit tests: fallback profiles → verify each region returns expected default profile when API unavailable.
+  - Unit tests: mock NCEI THREDDS/OPeNDAP responses → verify path creation, depth extraction, adaptive refinement.
+  - Unit tests: fallback profiles → verify each region returns expected default profile when CUDEM unavailable.
   - Unit tests: verify no `eval()` anywhere in the module.
   - Integration test: download bathymetry for Wrightsville Beach (34.21, -77.79, facing 135°) → verify realistic depth profile (starts shallow, deepens to ~30–40m at ~20km offshore).
 - Accept: Bathymetry download produces a 16+ point depth profile for a real coastal location. Fallback profiles work. No `eval()`. Rate limits respected. Attribution included. Existing tests unchanged.
@@ -735,10 +811,10 @@ Enrichment processors (not provider modules). Take NWPS data → apply site-spec
 **T3.2 — NWPS supplement processor**
 - Owner: `clearskies-api-dev` (Sonnet)
 - File: New `repos/weewx-clearskies-api/weewx_clearskies_api/enrichment/wave_transform.py`
-- Reference: API-MANUAL marine enrichment section (written in T0B.3), ADR-084 (all four supplements with formulas and coefficients), MARINE-DATA-AUDIT-BRIEF §B.4 for Phase II physics methods, §C.5 for structure coefficient tables
-- Do: Implement the four ADR-084 supplements as a registered enrichment processor. Input: NWPS data for a spot + spot config (from `MarineConfig`). Output: supplemented wave data.
+- Reference: API-MANUAL §17 marine enrichment section, ADR-084 (all four supplements with formulas and coefficients — archived at `docs/archive/decisions/ADR-084-*`), MARINE-DATA-AUDIT-BRIEF §B.4 for Phase II physics methods, §C.5 for structure coefficient tables
+- Do: Implement the four ADR-084 supplements as a registered enrichment processor. Input: NWPS data for a spot + spot config (from `MarineConfig` in `config/marine_config.py`). Output: supplemented wave data.
   - **Supplement 1 — Breaker index correction:**
-    - Compute beach slope `tan α` from the GEBCO bathymetric profile (linear regression over the nearshore portion, 0–500m from break).
+    - Compute beach slope `tan α` from the CUDEM bathymetric profile (linear regression over the nearshore portion, 0–500m from break).
     - Compute Iribarren number: `ξ = tan α / √(H₀/L₀)` where H₀ = NWPS significant wave height, L₀ = `g * T² / (2π)` (deep-water wavelength from NWPS peak period T).
     - Compute corrected γ: `γ = 1.06 + 0.14 * ln(ξ)`. Clamp to `[0.5, 1.4]`.
     - Compute maximum wave height at breaking: `H_max = γ * depth_at_break`. The `depth_at_break` comes from the bathymetric profile at the break point.
@@ -767,7 +843,7 @@ Enrichment processors (not provider modules). Take NWPS data → apply site-spec
 **T3.3 — Surf quality scoring processor**
 - Owner: `clearskies-api-dev` (Sonnet)
 - File: New `repos/weewx-clearskies-api/weewx_clearskies_api/enrichment/surf_scorer.py`
-- Reference: API-MANUAL marine enrichment section (written in T0B.3), MARINE-SURF-FISHING-RESEARCH-BRIEF §7.3 for scoring algorithm, §7.4 for what to strengthen
+- Reference: API-MANUAL §17 marine enrichment section, MARINE-SURF-FISHING-RESEARCH-BRIEF §7.3 for scoring algorithm, §7.4 for what to strengthen
 - Do:
   - **Input:** Post-supplement NWPS wave data (from T3.2), wind data (from NDBC or WaveWatch III), tide state (from CO-OPS), spectral swell components (from NDBC), spot config (beach facing, directional exposure).
   - **Scoring weights:** wave_height 0.35, wave_period 0.35, wind_quality 0.20, swell_dominance 0.10.
@@ -798,9 +874,10 @@ Enrichment processors (not provider modules). Take NWPS data → apply site-spec
 - Coordinator verifies: structure effects reduce wave height (never increase). Sub-grid interpolation exact at grid nodes.
 - Coordinator verifies: GFE conditions text is readable English (not template artifacts or raw numbers).
 - Coordinator verifies: no `eval()` anywhere in bathymetry or wave_transform modules.
+- Coordinator verifies: bathymetry uses NOAA CUDEM via NCEI THREDDS (NOT GEBCO/OpenTopoData — that was the pre-ADR plan; ADR-084 selected CUDEM).
 
 ### QA Gate 3
-- `clearskies-auditor`: reads ADR-084 supplements specification. Verifies each supplement is implemented as specified (formula, coefficients, clamping, influence zone, processing order). Reports any deviation from ADR-084. Verifies the Phase II shoaling/refraction/bottom friction code was NOT ported (grep for `calculate_shoaling_coefficient`, `calculate_refraction_coefficient` — zero hits in new code).
+- `clearskies-auditor`: reads API-MANUAL §17 supplements specification (authoritative) and ADR-084 (archived, for decision context). Verifies each supplement is implemented as specified (formula, coefficients, clamping, influence zone, processing order). Reports any deviation from the manual spec. Verifies the Phase II shoaling/refraction/bottom friction code was NOT ported (grep for `calculate_shoaling_coefficient`, `calculate_refraction_coefficient` — zero hits in new code).
 
 ---
 
@@ -833,7 +910,7 @@ Parallel with Phases 1–3. Only depends on Phase 0C models. Can be dispatched a
 **T4.2 — Fishing scoring processor**
 - Owner: `clearskies-api-dev` (Sonnet)
 - File: New `repos/weewx-clearskies-api/weewx_clearskies_api/enrichment/fishing_scorer.py`
-- Reference: API-MANUAL marine enrichment section (written in T0B.3), ADR-088 scoring model, MARINE-SURF-FISHING-RESEARCH-BRIEF §8 for species data and scoring weights, §C.4 for topographic features
+- Reference: API-MANUAL §17 marine enrichment section, ADR-088 scoring model (archived at `docs/archive/decisions/ADR-088-*`), MARINE-SURF-FISHING-RESEARCH-BRIEF §8 for species data and scoring weights, §C.4 for topographic features
 - Do:
   - **Base environmental scoring weights:** pressure_trend 0.4, tide_state 0.3, time_of_day 0.2, species_modifier 0.1.
   - **Pressure trend scoring:** Falling rapidly (>3 hPa/3hr) = 1.0 (feeding frenzy). Falling slowly (1–3) = 0.8. Stable (±1) = 0.5. Rising slowly = 0.3. Rising rapidly = 0.2. Source: NDBC buoy pressure or station barometer.
@@ -850,8 +927,20 @@ Parallel with Phases 1–3. Only depends on Phase 0C models. Can be dispatched a
     - Closed seasons: snook Jun–Aug = 0.0× (regulatory closure, don't recommend).
     - Migration patterns: king mackerel southward Oct–Nov, northward Apr–May = 1.5× in transit zones.
   - **Dynamic scoring per period:** `base_env_score × water_temp_multiplier × seasonal_multiplier × solunar_intensity` → classify species as `active` (≥0.6), `less_active` (0.3–0.6), `inactive` (<0.3).
-  - **Biogeographic species lists:** Auto-classify station coordinates into one of 11 US regions: Atlantic_NE (Maine–Connecticut), Atlantic_SE (New York–Florida), Gulf (Florida Panhandle–Texas), Pacific_SW (SoCal–Baja), Pacific_Central (Central CA), Pacific_NW (NorCal–Washington), Alaska, Hawaii, Great_Lakes, Caribbean, Pacific_Territories. Each region has a default species list by category (saltwater inshore, saltwater offshore, bottom fish, freshwater sport, salmonids). Classification by lat/lon bounding boxes.
-  - **GEBCO habitat features:** From the bathymetric profile (stored in config), identify drop-offs (depth change >5m in <200m horizontal), reefs (consistent depth plateau surrounded by deeper water), ledges (sharp depth discontinuity). Report as `habitat_features` in the fishing forecast — informational, not scored.
+  - **Biogeographic species lists:** Auto-classify station coordinates into one of 11 US regions by lat/lon bounding boxes. The agent defines approximate bounding boxes from the state/geographic ranges — exact boundaries aren't critical since operators can add/remove species manually. Regions:
+    - `atlantic_ne` (Maine–Connecticut, ~40–47°N, coastline)
+    - `atlantic_se` (New York–Florida east coast, ~25–41°N, Atlantic side)
+    - `gulf` (Florida Panhandle–Texas, ~25–31°N, Gulf side)
+    - `pacific_sw` (SoCal, ~32–34°N, Pacific side)
+    - `pacific_central` (Central CA, ~34–38°N)
+    - `pacific_nw` (NorCal–Washington, ~38–49°N)
+    - `alaska` (>55°N, or AK bounding box)
+    - `hawaii` (~18–23°N, ~154–161°W)
+    - `great_lakes` (interior US, near Great Lakes coordinates)
+    - `caribbean` (PR, USVI, ~17–19°N)
+    - `pacific_territories` (Guam, CNMI, American Samoa)
+    Each region has a default species list by category (saltwater inshore, bottom fish, freshwater sport, salmonids — `saltwater_offshore` removed per ADR-088). The species lists are data tables keyed by region → category → species names. Seed from the research brief §8 species data; the agent should populate 5–10 species per category per region as a starting default. Operators customize via the wizard.
+  - **CUDEM habitat features:** From the NOAA CUDEM bathymetric profile (stored in config by T3.1), identify drop-offs (depth change >5m in <200m horizontal), reefs (consistent depth plateau surrounded by deeper water), ledges (sharp depth discontinuity). Report as `habitat_features` in the fishing forecast — informational, not scored.
   - **Score scale:** The internal scorer computes 0.0–1.0, then multiplies by 100 for the API response (0–100 integer). This matches the convention fishermen expect from fishing forecast apps (0–100 "fishiness" scale). Classification thresholds on the 0–100 scale: `active` (≥60), `less_active` (30–59), `inactive` (<30).
   - **Wind and swell as scoring factors — DEFERRED pending research.** Practitioner evidence suggests wind speed/direction affects catch rates (a 40,000+ catch database showed doubled rates for >15 mph winds; south/southwest winds correlate with +10–12% improvement). However, the strongest wind effects are tightly correlated with falling barometric pressure from low-pressure systems — which is already the heaviest scorer weight (0.4). Adding wind as a separate factor risks double-counting the same weather event. Swell effects on surf fishing are documented anecdotally but lack peer-reviewed evidence. **Before implementation:** research whether wind can be separated from the pressure signal (e.g., does wind speed improve prediction accuracy when pressure trend is already accounted for?). If yes, add wind as a fifth scoring factor and rebalance weights. Until then, wind and swell data are displayed as informational on the fishing page (providers already supply them) but do not feed the scoring algorithm.
   - **Output:** 3-day forecast, 5–6 periods per day (dawn, morning, midday, afternoon, dusk, night). Each period: overall_score (0–100), component scores (0–100 each), species classifications (active/less_active/inactive with scores), conditions text.
@@ -869,7 +958,7 @@ Parallel with Phases 1–3. Only depends on Phase 0C models. Can be dispatched a
 **T4.3 — Solunar almanac endpoint**
 - Owner: `clearskies-api-dev` (Sonnet)
 - File: `repos/weewx-clearskies-api/weewx_clearskies_api/routes/almanac.py` (modify existing)
-- Reference: API-MANUAL marine endpoint section (written in T0B.3), existing `/api/v1/almanac/sun` and `/api/v1/almanac/moon` endpoint patterns
+- Reference: API-MANUAL §18 marine endpoint section, existing `/api/v1/almanac/sun` and `/api/v1/almanac/moon` endpoint patterns
 - Do: Add `GET /api/v1/almanac/solunar` to the existing almanac router. Request params: `date` (optional, defaults to today), `days` (optional, defaults to 3). Response: list of `SolunarTimes` for the requested date range. No capability gating — solunar is available to all stations (it's pure math from Skyfield, no provider dependency). Include freshness block (computed, not fetched).
 - Accept: Endpoint returns solunar data for the station's location. Response matches `SolunarTimes` schema. Existing almanac endpoints unaffected.
 
@@ -894,7 +983,7 @@ Wire provider data + enrichment output to REST endpoints. All follow existing en
 **T5.1 — `GET /api/v1/marine[/{locationId}]`**
 - Owner: `clearskies-api-dev` (Sonnet)
 - File: New `repos/weewx-clearskies-api/weewx_clearskies_api/routes/marine.py`
-- Reference: API-MANUAL marine endpoint section (written in T0B.3), existing `routes/earthquakes.py` pattern
+- Reference: API-MANUAL §18 marine endpoint section, existing `routes/earthquakes.py` pattern
 - Do:
   - **No locationId:** Return `MarineLocationSummary` for all configured marine locations (list of location cards with current conditions snapshot). Capabilities-gated: returns 404 if marine not configured.
   - **With locationId:** Return `MarineBundle` for the specified location: NDBC buoy observation (latest), WaveWatch III forecast (72h), NWPS nearshore data (with supplements applied if surf activity enabled), NWS marine text forecast, activity-relevant alerts (filtered from general alert feed per ADR-090 — marine zone alerts for marine/boating), CO-OPS tide chart data, water temperature. Each sub-section is optional based on which activities are enabled for this location (ADR-090 capability matrix).
@@ -935,13 +1024,41 @@ Wire provider data + enrichment output to REST endpoints. All follow existing en
   - `repos/weewx-clearskies-api/weewx_clearskies_api/routes/__init__.py` or router registration module
   - `repos/weewx-clearskies-api/weewx_clearskies_api/services/cache_warmer.py` (modify existing)
   - `repos/weewx-clearskies-api/weewx_clearskies_api/services/marine_weather_cache.py` (new — on-demand cache for marine location weather)
+  - `repos/weewx-clearskies-api/weewx_clearskies_api/services/marine_location_resolver.py` (new — config-time spatial dedup + station substitution)
 - Do:
-  - Register all five new routers (marine, tides, surf, fishing, beach-safety) in the API's router registration.
-  - **Marine-specific data (proactive cache warmer):** Add marine provider data to the cache warmer's warm-on-startup list with appropriate intervals (NDBC 60 min, CO-OPS predictions 6 hr, WaveWatch III 30 min, NWPS 30 min, NWS marine 30 min, NWS SRF 60 min). These are the core marine data sources — always fresh when the page loads.
-  - **General weather at marine locations (on-demand cache):** Implement a lazy-fetch cache for forecast and current-observation calls to the configured forecast provider at marine location coordinates. The cache fetches data only when a marine endpoint is hit and the cached entry is expired or absent. TTLs are operator-configurable via `MarineWeatherConfig` (defaults: forecast 3 hr, observations 30 min).
-  - **Spatial deduplication:** At config load time, group marine locations by grid proximity (2.5 km default, configurable via `dedup_radius_km`). Locations in the same group share a single forecast call and a single observation call. Cache key includes the rounded grid-point coordinates, not the exact location coordinates.
-  - **Station substitution (automatic):** At config load, compute the distance from the weewx station to each marine location. If within 2.5 km (`dedup_radius_km`), flag the location as station-served — skip all forecast provider calls for that location and use the station's own data (real-time via SSE for observations, main site's cached forecast for forecast). This eliminates API calls entirely for co-located marine locations with no operator configuration needed.
-  - Add freshness defaults to the freshness configuration for the new domains. General weather freshness uses the on-demand cache timestamps.
+  - **Sub-task A — Router registration:** Register all five new routers (marine, tides, surf, fishing, beach-safety) in the API's router registration. Follow the existing pattern in `__main__.py` where forecast/alerts/earthquakes routers are registered. Marine routers are conditional — only registered when `MarineConfig` is non-None (marine section present in `api.conf`).
+  - **Sub-task B — Marine-specific data (proactive cache warmer):** Add marine provider data to the cache warmer's warm-on-startup list. Read the existing `cache_warmer.py` to understand the warm pattern (it pre-fetches provider data at startup and on a timer). Add entries for each configured marine location:
+    - NDBC standard met: every 60 min per station
+    - NDBC spectral: every 60 min per station (same call as standard met — one station, two file types)
+    - CO-OPS predictions: every 6 hr per station
+    - CO-OPS water level: every 10 min per station
+    - WaveWatch III: every 30 min per grid point
+    - NWS marine text: every 30 min per zone
+    - NWS SRF: every 60 min per WFO
+    - NWPS: every 30 min per WFO
+    Use the spatial dedup groups (Sub-task D) to avoid duplicate calls for nearby locations that share the same NDBC station or grid point.
+  - **Sub-task C — General weather on-demand cache:** New `marine_weather_cache.py` module. This is NOT part of the proactive cache warmer — it fetches on first request and caches with TTL.
+    - **Architecture:** A simple dict-based cache keyed by rounded grid-point coordinates (same rounding as Sub-task D). Each entry stores `{forecast_data, observation_data, forecast_fetched_at, observation_fetched_at}`.
+    - **Fetch logic:** When a marine endpoint needs general weather for a location: (1) compute the rounded grid point, (2) check cache for that grid point, (3) if expired or absent, call the configured forecast provider's `fetch()` with the grid-point coordinates, (4) store result with timestamp, (5) return data.
+    - **TTLs:** Configurable via `MarineWeatherConfig` from `config/marine_config.py` (created in Phase 0C). Defaults: `forecast_ttl_hours=3` (3 hr), `observation_ttl_minutes=30` (30 min).
+    - **Provider call:** Use the same forecast provider module that the main site uses (from `settings.forecast.provider`). Call its `fetch()` with the marine location's coordinates. This is the ONLY new provider call — everything else reuses existing infrastructure.
+    - **Thread safety:** The cache is read/written from sync FastAPI handlers. Use a simple `threading.Lock` around the dict (same model as the existing memory cache).
+  - **Sub-task D — Spatial deduplication (config-time):** New `marine_location_resolver.py` module. Called once at startup (during config load), not per-request.
+    - **Algorithm:** Round each marine location's coordinates to the nearest 0.025° (~2.5 km). Locations with the same rounded coordinates share a single "grid group." Store the mapping: `{location_id → grid_group_key}`.
+    - **Effect:** When the cache warmer or on-demand cache fetches data for a grid group, all locations in that group get the same data. The cache key uses the rounded coordinates, not the exact location coordinates.
+    - **Config source:** `dedup_radius_km` from `MarineWeatherConfig` in `config/marine_config.py`. Default 2.5 km. Convert to degrees: `radius_deg = dedup_radius_km / 111.0` (approximate). Round to nearest `radius_deg`.
+  - **Sub-task E — Station substitution (config-time):** Also in `marine_location_resolver.py`.
+    - At config load, compute haversine distance from the station coordinates (from `StationSettings` in `config/settings.py`) to each marine location.
+    - If distance ≤ `dedup_radius_km` (default 2.5 km): flag location as `station_served = True`. The marine endpoints for this location will use the station's own `/api/v1/current` data for observations and the station's cached forecast for forecast data — zero additional forecast provider API calls.
+    - If distance > `dedup_radius_km`: flag as `station_served = False`. The on-demand cache (Sub-task C) handles weather data for this location.
+    - Store the `station_served` flag per location. The marine endpoint routers check this flag to decide data source.
+  - **Sub-task F — Freshness defaults:** Add marine freshness domains to `config/settings.py` `FreshnessSettings`. Follow the existing pattern for forecast/alerts/aqi. New domains:
+    - `marine`: 1800s (30 min)
+    - `tides`: 600s (10 min for observations, 21600s for predictions — use the shorter)
+    - `buoy`: 3600s (60 min)
+    - `surf`: 1800s (30 min)
+    - `fishing`: 3600s (60 min)
+    - `beach_safety`: 1800s (30 min)
 - Accept: API starts with marine config → all five endpoints respond. Cache warmer pre-fetches marine-specific data on startup. General weather data is fetched on-demand with correct TTLs. Two marine locations within 2.5 km share forecast/observation calls (verified by cache key inspection). Marine location within 2.5 km of station uses station data with zero forecast provider calls. Marine location beyond 2.5 km uses forecast provider on-demand. Freshness block shows realistic data ages for both marine and general weather sources.
 
 **T5.7 — Update capabilities + pages endpoints**
@@ -979,12 +1096,12 @@ Marine location configuration in the wizard and admin UI. The marine alert radiu
 - Do:
   - **Location configuration** (repeatable per location): name (text input), coordinates (map picker — use existing Leaflet map component from radar setup), activities (checkboxes: marine/boating, surf, fishing, beach safety — per ADR-090 capability matrix).
   - **Per surf spot** (shown when surf activity checked): beach facing (compass selector or degree input), bottom type (dropdown: sand/rock/coral_reef/mixed), structures (repeatable: type/material/length/bearing/distance), topographic feature (dropdown: point_break/bay_break/headland/straight_beach with identification hints per MARINE-DATA-AUDIT-BRIEF §C.4), directional exposure (8 compass direction checkboxes — which directions can swell reach this spot from?).
-  - **Per fishing spot** (shown when fishing activity checked): target category (dropdown: saltwater_inshore/saltwater_offshore/bottom_fish/freshwater_sport/salmonids), species list (auto-populated from biogeographic region classification, operator can add/remove).
+  - **Per fishing spot** (shown when fishing activity checked): target category (dropdown: saltwater_inshore/bottom_fish/freshwater_sport/salmonids — `saltwater_offshore` removed per ADR-088), species list (auto-populated from biogeographic region classification, operator can add/remove).
   - **Per beach safety location** (shown when beach safety activity checked): optional external links for local water quality monitoring, lifeguard reports, or wildlife alert services (repeatable: label + URL). These are informational links displayed on the beach safety page — water quality and wildlife alert APIs are not available in v1, so operators provide their own local resource links. No other beach-safety-specific config needed — the page derives its data from the same NWPS/NDBC/CO-OPS/NWS providers configured for the location.
   - **Station auto-discovery:** On save, call `/setup/marine/discover-stations` (T6.3) → display nearby NDBC buoys and CO-OPS stations with distances and capabilities. Distance-based quality scoring: wave buoys 0–25 mi=excellent, 25–50=good, >50=fair; tide stations 0–20 mi=excellent, 20–40=good. Differentiate NDBC capabilities (wave-only vs. atmospheric-only vs. full — per MARINE-DATA-AUDIT-BRIEF §C.3). Operator selects or accepts auto-selected stations.
   - **Multi-location station optimization:** When multiple locations are configured, identify NDBC/CO-OPS stations that serve multiple spots. Recommend shared stations first to reduce API calls.
-  - **Bathymetry trigger** (surf spots only): On surf spot save, trigger async GEBCO bathymetry download via `/setup/marine/bathymetry` (T6.3). Show progress indicator. Bathymetry result stored in `api.conf` `SurfSpotConfig.bathymetric_profile`.
-  - **Land/sea validation** (surf spots only): Query GEBCO depth for the spot coordinates. If depth is positive (on land), show warning — surf spots should be at or near the waterline.
+  - **Bathymetry trigger** (surf spots only): On surf spot save, trigger async NOAA CUDEM bathymetry download via `/setup/marine/bathymetry` (T6.3). Show progress indicator. Bathymetry result stored in `api.conf` `SurfSpotConfig.bathymetric_profile`.
+  - **Land/sea validation** (surf spots only): Query CUDEM depth for the spot coordinates. If depth is positive (on land), show warning — surf spots should be at or near the waterline.
   - **Weather source display per location (automatic, not configurable):** For each location, show the computed distance from the operator's weewx station and which weather source will be used. Within 2.5 km: "Your station is {X} km from this location — station weather data will be used (no additional API calls)." Beyond 2.5 km: "Your station is {X} km from this location — weather data will be fetched from your forecast provider ({provider name})." No operator choice needed — the 2.5 km threshold handles it automatically.
   - **Refresh intervals** (global, not per-location): forecast TTL dropdown (1 hr / 3 hr / 6 hr, default 3 hr), observation TTL dropdown (15 min / 30 min / 60 min, default 30 min). Show estimated API call impact: "{N} additional forecast provider calls per hour based on {M} distinct grid points." NWS operators see a note that NWS API is free with a 5 req/s rate limit.
   - HTMX progressive disclosure: activity checkboxes show/hide the per-activity config sections.
@@ -994,18 +1111,33 @@ Marine location configuration in the wizard and admin UI. The marine alert radiu
 **T6.2 — Marine admin section**
 - Owner: `clearskies-docs-author` (Sonnet)
 - Files: New templates in `repos/weewx-clearskies-stack/weewx_clearskies_config/templates/admin/marine/`
-- Reference: OPERATIONS-MANUAL marine section (written in T0B.4), existing admin section patterns
-- Do: Add/edit/remove marine locations. Re-run bathymetry for individual spots. Test connectivity to configured NDBC/CO-OPS/NWPS/NWS endpoints. Show current data freshness per source. Help content keys: `help.admin.marine.*` (per DASHBOARD-MANUAL help content sync rule).
-- Accept: Admin section loads configured locations. Edit/save round-trips. Connectivity test shows green/red per source. Help content renders.
+- Reference: OPERATIONS-MANUAL marine config section (written in T0B.4), existing admin section patterns in `templates/admin/` (read `providers.html` and `earthquakes.html` for the established pattern), DASHBOARD-MANUAL help content sync rule
+- Do:
+  - **Admin route:** `GET /admin/config/api/marine` → renders the marine admin section. Follow the existing `admin/config/{component}/{section}` pattern in `config/routes.py`.
+  - **Location list view:** Table of configured marine locations with columns: name, coordinates, enabled activities (badges), station count (NDBC + CO-OPS), data freshness (color-coded: green = <1 TTL old, yellow = 1–2× TTL, red = >2× TTL or unavailable). Each row has Edit and Delete buttons.
+  - **Location edit form (HTMX partial):** Reuse the same fields as T6.1 wizard step (location name, coordinates, activity checkboxes, per-activity config sections with HTMX progressive disclosure). The admin form POST updates `api.conf` via `/setup/apply` (same as wizard). Validation errors display inline per field.
+  - **Add location:** Button opens a blank location form (same as edit but empty).
+  - **Delete location:** Confirmation dialog ("Remove {name}? This will delete all associated configuration including bathymetric profiles."). POST to a delete handler that removes the location from `api.conf`.
+  - **Re-run bathymetry** (per surf spot): Button triggers `POST /setup/marine/bathymetry` (T6.3) for the selected spot. Shows progress indicator (HTMX polling). On completion, displays the updated profile summary (point count, max depth, computed beach slope).
+  - **Test connectivity:** Button tests each configured data source for a location:
+    - NDBC: fetch latest `.txt` from configured station → green (data <2 hr old) / yellow (data present but old) / red (404 or error)
+    - CO-OPS: fetch predictions for configured station → green/red
+    - NWS marine: fetch zone forecast for configured zone → green/red
+    - NWPS: check NOMADS for latest CG1 file for WFO → green/red
+    Results displayed inline via HTMX replacement.
+  - **Refresh interval controls** (global, not per-location): same as wizard — forecast TTL dropdown, observation TTL dropdown, with API call estimate.
+  - **Weather source display:** Per location, show computed distance from station and whether it uses station data (< 2.5 km) or forecast provider.
+  - **Help content keys:** `help.admin.marine.overview`, `help.admin.marine.location`, `help.admin.marine.bathymetry`, `help.admin.marine.connectivity`, `help.admin.marine.refresh`. All wrapped in `_()` for i18n. Add keys to all 13 locale translation files (English content, placeholder translations acceptable for v1).
+- Accept: Admin section loads configured locations. Add/edit/delete round-trips through `api.conf`. Connectivity test shows green/red per source. Bathymetry re-run completes and updates profile. Help content renders in all 13 locales. Existing admin sections unaffected.
 
 **T6.3 — Setup API endpoints**
 - Owner: `clearskies-api-dev` (Sonnet)
 - File: `repos/weewx-clearskies-api/weewx_clearskies_api/routes/setup.py` (modify existing)
 - Do:
   - **`/setup/apply` extension:** Handle `[marine]` config section in the apply payload. Write marine locations, surf spots, fishing spots to `api.conf`. Trigger NWPS WFO domain determination for each location. Validate station IDs (NDBC/CO-OPS exist and respond). Return validation errors for invalid config.
-  - **`POST /setup/marine/bathymetry`:** Async endpoint. Accepts location_id + surf spot config (coordinates, beach facing). Calls `enrichment/bathymetry.py` to download GEBCO profile. Returns job ID. Poll via `GET /setup/marine/bathymetry/{jobId}` for status + result.
+  - **`POST /setup/marine/bathymetry`:** Async endpoint. Accepts location_id + surf spot config (coordinates, beach facing). Calls `enrichment/bathymetry.py` to download NOAA CUDEM profile via NCEI THREDDS. Returns job ID. Poll via `GET /setup/marine/bathymetry/{jobId}` for status + result.
   - **`GET /setup/marine/discover-stations`:** Accepts lat/lon + radius. Queries NDBC `activestations.xml` and CO-OPS metadata API. Returns list of nearby stations with IDs, names, distances, capabilities, quality scores.
-- Accept: `/setup/apply` with marine config creates valid `api.conf` marine section. Bathymetry endpoint downloads a real GEBCO profile. Station discovery returns results for coastal US coordinates. All setup endpoints follow existing security model (auth required).
+- Accept: `/setup/apply` with marine config creates valid `api.conf` marine section. Bathymetry endpoint downloads a real CUDEM profile. Station discovery returns results for coastal US coordinates. All setup endpoints follow existing security model (auth required).
 
 **T6.4 — Marine alert radius in general alerts config**
 - Owner: `clearskies-docs-author` (Sonnet)
@@ -1139,7 +1271,7 @@ All pages follow existing dashboard patterns: lazy-loaded routes, `VisibilityGua
     - Species activity table (species name, activity status with color, individual component scores on 0–100 scale, water temperature suitability indicator).
     - Conditions breakdown (pressure trend, tide state, time of day, water temp — each with score bar on 0–100 scale).
     - Wind & swell panel (informational — current wind speed/direction/gust, swell height/period. Labeled as conditions data, not scored).
-    - GEBCO habitat features (informational: "Drop-off at 200m offshore", "Reef structure at 15m depth").
+    - CUDEM habitat features (informational: "Drop-off at 200m offshore", "Reef structure at 15m depth").
     - Activity-relevant alerts (marine zone alerts per ADR-090).
   - i18n: fishing-specific keys in `fishing.json`.
 - Accept: Period grid renders 3 days × 5–6 periods with 0–100 scores and color coding. Solunar timeline shows major/minor periods with sunrise/sunset. Tide chart is a standalone readable element. Barometric pressure shows trend with sparkline. Species classifications show active/less_active/inactive with 0–100 scores. Wind and swell display as informational (not scored). Responsive at 375px. Build clean.
@@ -1302,7 +1434,7 @@ Full-stack validation against real NOAA data for a configured test location. Doc
   - [ ] All config keys documented in OPERATIONS-MANUAL
   - [ ] All canonical models documented in API-MANUAL
   - [ ] No Phase II shoaling/refraction/bottom friction code was ported (grep verification)
-  - [ ] Attribution text present for GEBCO and NOAA data sources
+  - [ ] Attribution text present for NOAA CUDEM and NOAA data sources
   - [ ] Marine alert radius is in general alerts config, not marine config
 
 ---
@@ -1315,7 +1447,7 @@ Full-stack validation against real NOAA data for a configured test location. Doc
 | eccodes build complexity | Operators struggle to install native C library | Docker: baked into image, no operator action. Native: OPERATIONS-MANUAL documents platform-specific prerequisites (e.g., `apt install libeccodes-dev`), then `pip install weewx-clearskies-api[marine]`. Wizard detects missing eccodes and shows install instructions before allowing marine config. |
 | ERDDAP availability | WaveWatch III unavailable | ProviderHTTPClient retry/backoff; all other marine data (NDBC, CO-OPS, NWS) independent |
 | Surf quality accuracy expectations | Users expect Surfline quality | Label as "estimated quality." Provide raw data so experienced surfers can judge. Statistical calibration deferred to v2+. |
-| GEBCO/OpenTopoData availability | Bathymetry download fails at setup | One-time operation; stored in config. Operator retries later. System self-sufficient after setup. |
+| NOAA CUDEM/NCEI availability | Bathymetry download fails at setup | One-time operation; stored in config. Operator retries later. System self-sufficient after setup. Regional fallback profiles available when CUDEM unavailable. |
 | Great Lakes wave dynamics differ | No swell, no tides (seiche/seasonal levels) | Scoring works on wave height/period/wind regardless of generation mechanism. Tide-dependent scoring handles absent tidal signal gracefully. |
 | Wizard complexity | Most complex wizard step yet | HTMX progressive disclosure. Auto-populated stations with override. Async bathymetry with progress indicator. |
 | Scope size (~20 new files, 3 repos, 9 phases) | Long timeline | Each phase has independent QC gates. Feature degrades gracefully at every boundary. Each phase adds standalone value. |
