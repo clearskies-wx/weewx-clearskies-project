@@ -1141,7 +1141,8 @@ Settings panel opens as a **full-screen overlay** (fixed, inset-0, z above the r
   - Minor: green stroke (`#16a34a`), green fill at 10% opacity.
   - Unknown: gray stroke (`#6b7280`), gray fill at 10% opacity.
 - Stroke width: 2px.
-- On hover/focus: popup with alert headline and event type.
+- On click: popup opens at the click point with the alert's details — severity-color accent bar, title, and an expandable detail section (severity, description, regions, expiry).
+- When multiple alert polygons overlap at the click point: the popup adds a navigator row — prev/next arrows, severity-colored pips indicating position among the overlapping alerts, and a "1 of N" label. The most severe alert is displayed first; prev/next navigation wraps circularly.
 
 **Z-order (bottom to top):**
 1. Base map tiles (OpenStreetMap)
