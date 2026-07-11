@@ -1329,22 +1329,36 @@ Variables (all 9 are `[time][depth][latitude][longitude]`): `Thgt` (significant 
 
 **CAPABILITY:** `geographic_coverage = "us_coastal"`, `auth_required = []`. `supplied_canonical_fields` includes period name, forecast text, wind, seas, visibility, weather.
 
-**Wire format and parsing:**
+**Wire format and parsing (corrected 2026-07-11):** `GET https://api.weather.gov/zones/coastal/{zoneId}/forecast` does **not exist** on the live NWS API — it returns 404 "Forecasts for marine areas are not yet supported by this API." Marine zone forecasts are published only as CWF (Coastal Waters Forecast) free-text products, keyed by WFO (not by zone), the same product-list/product-detail resource shape §14.5 uses for SRF:
 
-`GET https://api.weather.gov/zones/coastal/{zoneId}/forecast` with `User-Agent: weewx-clearskies-api/{version} (contact email)`. Response is JSON-LD/GeoJSON. Parse `properties.periods[]` → list of `MarineTextForecast` canonical models.
+1. `GET https://api.weather.gov/products/types/CWF/locations/{wfo}` with `User-Agent: weewx-clearskies-api/{version} (contact email)` — a JSON-LD envelope with an `@graph` array of product stubs, most recent first in practice. Take `@graph[0]`; use its `@id` URL, or fall back to `{base}/products/{id}` from its `id` (UUID).
+2. `GET` that product URL → `productText`, the raw CWF text.
 
-Each period contains:
-- `name` → `period_name` (e.g., "Tonight", "Thursday")
-- `detailedForecast` → `text` (full narrative)
-- Extract wind, seas, visibility, weather from the narrative text or structured fields when available
+**WFO determination:** `fetch()` takes `zone_id` only (no lat/lon required) — the WFO is resolved via `providers/_common/nws_zones.py::get_wfo_for_zone(zone_id)` (§14.8), which reuses the already-cached (24h) `type=coastal` zone list's `cwa` property. An optional `wfo_override` kwarg (naming matches §14.6 NWPS's `wfo_override` pattern) lets a caller that already knows the WFO skip this lookup.
+
+**CWF text parsing:** A CWF product concatenates one UGC (Universal Geographic Code) header segment per zone-group, e.g. `AMZ250-121115-` (zone id + 6-digit expiration), each terminated by a `$$` line. A header may abbreviate additional zones sharing identical text to their 3-digit suffix (e.g. `AMZ250-256-262-121115-` → `AMZ250`, `AMZ256`, `AMZ262`). Locate the segment for the operator's configured `zone_id`, then split it into forecast periods on `.PERIOD...` markers (e.g. `.TONIGHT...`, `.SUN...`, `.SUN NIGHT...` — the narrative follows immediately on the same line, unlike SRF's standalone day-period header lines). Per period:
+
+- `period_name` — the marker text, title-cased (e.g. "Tonight", "Sun Night").
+- `text` — the full, whitespace-normalized period narrative.
+- `wind` — first sentence matching `<compass> winds...` (e.g. "W winds 10 to 15 kt with gusts up to 20 kt.").
+- `seas` — first sentence starting with "Seas" (e.g. "Seas 2 to 4 ft."); a "Wave Detail..." sentence immediately following is folded into `seas`.
+- `visibility` — first sentence starting with "Visibility" (rare in CWF coastal-waters text; usually absent).
+- `weather` — remaining, unclassified sentences (e.g. "A chance of showers and tstms, mainly this evening.").
+
+`text` always carries the full narrative even when wind/seas/visibility/weather extraction misses.
 
 **Zone ID source:** The zone ID comes from the operator's marine location configuration (`nws_marine_zone_id` field). Zone IDs are shared with the marine zone alerts extension (§8). The NWS zone discovery utility (§14.8) discovers zones at setup time.
 
-**Cache:** TTL = 30 min. Key = `(provider_id, zone_id)`.
+**Cache:** TTL = 30 min. Key = `(provider_id, zone_id)` — unchanged by the wire-format fix; WFO is not part of the cache key since a zone_id maps to a stable WFO and the WFO lookup itself is independently cached by `nws_zones.py`.
 
-**Error handling:** Zone ID not found (404) → `ProviderProtocolError`. Rate limit (503) → retry with backoff per `ProviderHTTPClient`.
+**Error handling:**
+- `zone_id` not present in the NWS `type=coastal` zone list (no WFO determinable) → `ProviderProtocolError`, raised by `get_wfo_for_zone()`.
+- WFO has no CWF product registered (empty `@graph`, or 404 on the products-list/product-detail call) → empty result, **not** an error (mirrors §14.5 SRF's "WFO issues no product" handling).
+- CWF product fetched successfully but contains no section for `zone_id` (misconfigured/stale zone_id) → `ProviderProtocolError` (the direct analog of the old "zone ID not found (404)" case).
+- CWF product's zone section has no parseable `.PERIOD...` markers → empty result, not an error (logged at WARNING).
+- Rate limit / 5xx → retried by `ProviderHTTPClient`, surfaces as `QuotaExhausted` / `TransientNetworkError`.
 
-**Rate limiting:** 5 req/s to `api.weather.gov` — shared rate limiter with the existing NWS alerts provider. Use the same `RateLimiter` instance or a shared pool keyed by hostname.
+**Rate limiting:** 5 req/s to `api.weather.gov` — shared rate limiter with the existing NWS alerts provider. Use the same `RateLimiter` instance or a shared pool keyed by hostname. The `zone_id → WFO` lookup uses `nws_zones.py`'s own `"nws-zones"` limiter instance, not this module's.
 
 ### §14.5 NWS Surf Zone Forecast (SRF)
 
@@ -1452,18 +1466,21 @@ These are displayed as habitat annotations on the fishing page depth profile.
 **File:** `providers/_common/nws_zones.py`
 
 **Not a provider module.** Shared utility used by:
-- NWS marine zone text forecast provider (§14.4) — to determine zone ID from coordinates
-- NWS Surf Zone Forecast provider (§14.5) — to determine WFO from coordinates
-- Marine zone alerts extension (§8) — to discover marine zones within the operator's alert radius
+- NWS marine zone text forecast provider (§14.4) — `get_wfo_for_zone(zone_id)` to determine the WFO whose CWF product covers a known zone_id (no coordinates needed)
+- NWS Surf Zone Forecast provider (§14.5) — `get_cwa(lat, lon)` to determine WFO from coordinates
+- NWPS nearshore wave data provider (§14.6) — `get_cwa(lat, lon)` as first attempt at WFO determination, falling back to a bounding-box lookup
+- Marine zone alerts extension (§8) — `discover_marine_zones(lat, lon, radius_miles)` to discover marine zones within the operator's alert radius
 
-**Function:** `discover_marine_zones(lat, lon, radius_miles) -> list[MarineZone]`
+**Functions:**
 
-Each `MarineZone` has: `zone_id` (str), `name` (str), `distance_miles` (float).
+- `get_cwa(lat, lon) -> str` — `GET /points/{lat},{lon}` → the `cwa` (WFO office ID, e.g., `"ILM"`). Cached 24h, keyed by rounded coordinates.
+- `get_wfo_for_zone(zone_id) -> str` — looks up `zone_id` in the cached `type=coastal` zone list (below) and returns the first entry of its `cwa` array. Raises `ProviderProtocolError` if `zone_id` isn't a known NWS coastal zone.
+- `discover_marine_zones(lat, lon, radius_miles) -> list[MarineZone]` — see algorithm below. Each `MarineZone` has: `zone_id` (str), `name` (str), `distance_miles` (float).
 
-**Algorithm:**
+**`discover_marine_zones` algorithm:**
 
 1. `GET /points/{lat},{lon}` → extract `cwa` (WFO office ID, e.g., `"ILM"`)
-2. `GET /zones/coastal` filtered by CWA → list of coastal marine zone IDs for this WFO (typically 6–16)
+2. `GET /zones/coastal` filtered by CWA → list of coastal marine zone IDs for this WFO (typically 6–16); this same cached zone list (24h TTL) backs `get_wfo_for_zone`'s lookup
 3. For each zone: `GET /zones/coastal/{zoneId}` → extract polygon geometry (GeoJSON coordinates)
 4. Compute minimum haversine distance from the input coordinates to each polygon's nearest vertex
 5. Return zones within `radius_miles`, sorted by distance ascending
@@ -1472,7 +1489,7 @@ Each `MarineZone` has: `zone_id` (str), `name` (str), `distance_miles` (float).
 
 **Rate limiting:** Uses the shared 5 req/s rate limiter for `api.weather.gov`.
 
-**Invocation context:** Called at setup/wizard time, not per-request. Results are stored in configuration.
+**Invocation context:** `discover_marine_zones` is called at setup/wizard time, not per-request; results are stored in configuration. `get_cwa` and `get_wfo_for_zone` are called per-request by their respective providers (each independently cached — 24h for `get_cwa`, and `get_wfo_for_zone` rides the 24h-cached zone list).
 
 ### Source ADRs
 
