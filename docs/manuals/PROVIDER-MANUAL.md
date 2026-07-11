@@ -1293,35 +1293,31 @@ CO-OPS Data API returns JSON. Base URL: `https://api.tidesandcurrents.noaa.gov/a
 
 **Module identity:** `providers/marine/wavewatch.py`, `PROVIDER_ID = "wavewatch"`, `DOMAIN = "marine"`.
 
-**CAPABILITY:** `geographic_coverage = "global"`, `auth_required = []`. `supplied_canonical_fields` includes wave height, peak period, peak direction, wind wave height/period/direction, swell height/period/direction, wind speed, wind direction.
+**CAPABILITY:** `geographic_coverage = "global"` (excludes waters south of -77.5°S), `auth_required = []`. `supplied_canonical_fields` includes wave height, peak period, peak direction, wind wave height/period/direction, swell height/period/direction. Does **not** supply true 10m wind speed/direction — see below.
 
 **Wire format and parsing:**
 
-ERDDAP JSON access (NOT GRIB). Construct griddap URL:
+ERDDAP JSON access (NOT GRIB). Construct griddap URL (live-verified 2026-07-11):
 
 ```
-https://erddap.aoml.noaa.gov/hdb/erddap/griddap/{grid_dataset}.json?{variables}[({time_start}):1:({time_end})][({lat_nearest})][({lon_nearest})]
+https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ww3_global.json?{var1}[({time_start}):3:({time_end})][(0.0)][({lat_nearest})][({lon_nearest})],{var2}[...]...
 ```
 
-Variables: `Thgt` (significant wave height), `Tper` (peak period), `Tdir` (peak direction), `shww` (wind wave height), `mpww` (wind wave period), `wvdir` (wind wave direction), `shts` (swell height), `mpts` (swell period), `swdir` (swell direction), `ws` (wind speed), `wdir` (wind direction).
+Each requested variable needs its own `[time][depth][lat][lon]` bracket-subset suffix — a bare comma-separated variable list sharing one trailing subset returns an ERDDAP 500 error. The dataset has a `depth` dimension fixed at a single surface value; `[(0.0)]` selects it. Native time resolution is hourly; a stride of `3` in the time bracket (`[(t0):3:(t1)]`) recovers 3-hour forecast steps. Longitude on this server is 0..360, not -180..180 — convert (`lon + 360` when `lon < 0`) before building the URL; the response echoes back the converted value.
 
-**Grid selection logic:** 7 grids with geographic bounds and priority. For a given lat/lon, check bounds and select the highest-priority match:
+**Server note:** NOAA CoastWatch's ERDDAP (`coastwatch.pfeg.noaa.gov`) also lists this dataset (as `NWW3_Global_Best`), but it is a mirror alias that 302-redirects to the origin above — `ProviderHTTPClient` disables redirect-following by default (security-baseline), so the module queries the origin server directly. Do not switch back to the CoastWatch alias without adding redirect support.
+
+Variables (all 9 are `[time][depth][latitude][longitude]`): `Thgt` (significant wave height), `Tper` (peak period), `Tdir` (peak direction), `whgt` (wind wave height), `wper` (wind wave period), `wdir` (wind wave direction — this server's `wdir` is the wind-driven-wave direction, not true 10m wind direction), `shgt` (swell height), `sper` (swell period), `sdir` (swell direction).
+
+**Grid selection logic:** Single global grid — the reachable ERDDAP servers (CoastWatch and its PacIOOS origin) host only one WaveWatch III dataset; no regional US-coast/Alaska/Pacific subsets exist (the originally documented `erddap.aoml.noaa.gov` 7-grid table was never live-verified and was found completely unreachable):
 
 | Grid dataset | Coverage | Resolution | Priority |
 |---|---|---|---|
-| `atlocn.0p16` | US East Coast | 0.16° | 1 |
-| `wcoast.0p16` | US West Coast | 0.16° | 1 |
-| `epacif.0p16` | Hawaii / Pacific | 0.16° | 1 |
-| `arctic.9km` | Alaska / Arctic | 9 km | 1 |
-| `global.0p16` | Global primary | 0.16° | 2 |
-| `gsouth.0p25` | Southern Hemisphere | 0.25° | 2 |
-| `global.0p25` | Global fallback | 0.25° | 3 |
-
-Regional grids (priority 1) provide higher resolution for US coastal areas. Global grids serve as fallback for coordinates outside regional coverage.
+| `ww3_global` | Global (lat -77.5..77.5) | 0.5° | 1 |
 
 **Forecast extraction:** 72-hour forecast at 3-hour steps (25 timesteps). Each timestep maps to a `MarineForecastPoint` canonical model. Model run cycle determination: current UTC hour minus 4.5-hour data availability delay → most recent cycle from {00, 06, 12, 18}. Fall back to 3 previous cycles if the current cycle is unavailable.
 
-**Cache:** TTL = 30 min. Key = `(provider_id, grid_id, lat_rounded, lon_rounded)` where lat/lon are rounded to grid resolution.
+**Cache:** TTL = 30 min. Key = `(provider_id, grid_id, lat_rounded, lon_rounded)` where lat/lon are rounded to grid resolution (0.5°, pre-conversion to the 0..360 wire convention).
 
 **Error handling:** ERDDAP returns HTTP 404 for invalid grid/variable combinations, 500 for backend failures. Both → canonical taxonomy. Empty response (no data for time range) → log WARNING, return empty forecast.
 
