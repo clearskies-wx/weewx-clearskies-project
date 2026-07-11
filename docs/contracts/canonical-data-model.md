@@ -120,6 +120,11 @@ Containers:
 10. [`ForecastBundle`](#310-forecastbundle) — `hourly` + `daily` + `discussion`.
 11. [`AlertList`](#311-alertlist) — list of `AlertRecord`.
 
+Marine entities (added Phase 5, T8.3 sync — pointer only, see [§3.12](#312-marine-entities-pointer)):
+
+12. `MarineObservation`, `SpectralWaveComponent`, `TidePrediction`, `WaterLevel`, `MarineForecastPoint`, `MarineTextForecast`, `SurfForecast`, `FishingForecast`, `SolunarTimes`, `SurfZoneForecast`, `BeachSafetyAssessment`, `MarineLocationSummary` — one buoy/tide/wave/forecast entity each, full field tables in API-MANUAL §16.
+13. `MarineBundle`, `TideBundle` — containers, field tables in API-MANUAL §16 (implemented as declared).
+
 Plus almanac/records/page/chart/capability entities native to the OpenAPI; those are not weewx-data-bearing and are documented inline in the OpenAPI spec, not duplicated here.
 
 ### 3.1 Observation
@@ -398,6 +403,31 @@ Container shape `/alerts` returns.
 
 **OpenAPI mapping:** [`#/components/schemas/AlertList`](openapi-v1.yaml).
 
+### 3.12 Marine entities (pointer)
+
+Added Phase 5 (ADR-083 marine domain architecture, archived to PROVIDER-MANUAL §14 and API-MANUAL §16-18). Not enumerated field-by-field here to avoid a second copy that drifts from the primary source — **API-MANUAL §16 "Marine Data Model" is authoritative for every marine entity's full field list, unit group, and nullability.** This subsection exists only so this catalog's own entity list (§3, above) isn't silently missing an entire feature area.
+
+| Entity | One-line description | Full field table |
+|---|---|---|
+| `MarineObservation` | Single NDBC buoy observation snapshot | API-MANUAL §16 |
+| `SpectralWaveComponent` | One decomposed swell system (height/period/direction/energy/classification) | API-MANUAL §16 |
+| `TidePrediction` | One CO-OPS harmonic tide prediction event | API-MANUAL §16 |
+| `WaterLevel` | One CO-OPS observed water level reading | API-MANUAL §16 |
+| `MarineForecastPoint` | One WaveWatch III forecast timestep | API-MANUAL §16 |
+| `MarineTextForecast` | One NWS marine zone text forecast period | API-MANUAL §16 |
+| `SurfForecast` | Surf quality forecast for one spot/timestep (post wave_transform + surf_scorer) | API-MANUAL §16 |
+| `FishingForecast` | Fishing conditions forecast for one spot/period (fishing_scorer output) | API-MANUAL §16 |
+| `SolunarTimes` | Solunar major/minor feeding periods for one date/location | API-MANUAL §16 |
+| `SurfZoneForecast` | NWS Surf Zone Forecast (SRF) per county zone per day | API-MANUAL §16 |
+| `BeachSafetyAssessment` | Composite beach safety assessment (sea state, rip risk, comfort) | API-MANUAL §16 |
+| `MarineLocationSummary` | Per-location summary card (Now page + marine/tides list routes) | API-MANUAL §16 |
+| `MarineBundle` | Container: `GET /api/v1/marine[/{locationId}]` — matches `models/responses.py` | API-MANUAL §16 |
+| `TideBundle` | Container: `GET /api/v1/tides[/{locationId}]` — matches `models/responses.py` | API-MANUAL §16 |
+
+**Surf/Fishing/BeachSafety bundle caveat:** `SurfBundle`/`FishingBundle`/`BeachSafetyBundle` exist as Pydantic classes in `models/responses.py` but do not match the actual dict shapes `endpoints/surf.py`/`fishing.py`/`beach_safety.py` return — see API-MANUAL §16 for the ground-truth shapes and the tracked cleanup item.
+
+**Marine unit groups:** Five groups added — `group_wave_height`, `group_wave_period`, `group_water_level`, `group_ocean_speed`, `group_visibility`. These are **not** weewx-archive groups and do not follow the §2 `target_unit`/`[StdConvert]`-override mechanism — they default to a fixed maritime-convention unit set (knots, nautical miles, feet/meters) regardless of the station's land unit system. Full base-unit/conversion/preset-default table: API-MANUAL §16 "Marine unit groups".
+
 ---
 
 ## 4. Provider → canonical mapping tables
@@ -610,6 +640,21 @@ What the canonical layer carries for radar:
 Provider set per ADR-015 (amended 2026-06-26): `rainviewer` (default, degraded), `librewxr` (optional, Caddy-proxied), `openweathermap`, `msc_geomet`, `dwd_radolan`, plus `iframe` config slot. `iem_nexrad` and `noaa_mrms` are deprecated (log migration warning). `aeris` removed from radar domain (retained for forecast/AQI/alerts).
 
 URL templates and tile content types live inside each provider module at `weewx_clearskies_api/providers/radar/{provider}.py` capability declaration; not re-stated here.
+
+### 4.6 Marine & coastal providers (per ADR-083, ADR-084, ADR-087 — archived to PROVIDER-MANUAL §14)
+
+Added Phase 5. Six modules across three domains (`marine`, `tides`, `buoy`), all NOAA sources, free, keyless, US-only. **Not given a full wire-field mapping table here** — unlike the forecast/AQI/alerts/earthquake providers above (all uniform REST JSON), the marine providers' wire formats are heterogeneous (NDBC flat-text files, CO-OPS JSON, WaveWatch III ERDDAP JSON, NWPS raw GRIB2 binary, NWS marine zone JSON-LD, NWS SRF free-text products) — a field-mapping table would just restate PROVIDER-MANUAL §14's per-provider parsing sections in a different format without adding information. **PROVIDER-MANUAL §14 is authoritative** for wire format, parsing rules, cache TTLs, and rate limits.
+
+| Canonical field(s) supplied | Provider module | `PROVIDER_ID` | Domain | PROVIDER-MANUAL section |
+|---|---|---|---|---|
+| Wind/wave/pressure/temp/visibility observation + spectral swell decomposition | `providers/buoy/ndbc.py` | `ndbc` | `buoy` | §14.1 |
+| Tide predictions + observed water levels + water temperature | `providers/tides/coops.py` | `coops` | `tides` | §14.2 |
+| Offshore wave forecast (height/period/direction, wind wave, swell) | `providers/marine/wavewatch.py` | `wavewatch` | `marine` | §14.3 |
+| Marine zone text forecast (periods, wind/seas/visibility/weather narrative) | `providers/marine/nws_marine.py` | `nws_marine` | `marine` | §14.4 |
+| Surf Zone Forecast (rip current risk, surf height range, UV, water temp) | `providers/marine/nws_srf.py` | `nws_srf` | `marine` | §14.5 |
+| Nearshore wave height/period/direction, currents, bottom orbital velocity (+ v1.5 show-when-available: rip current probability, total water level, wave runup) | `providers/marine/nwps.py` | `nwps` | `marine` | §14.6 |
+
+Non-dispatch-registered data-access component: `enrichment/bathymetry.py` (CUDEM depth profiles, PROVIDER-MANUAL §14.7 — runs once per spot at setup time, not a per-request provider). Shared utility: `providers/_common/nws_zones.py` (marine zone discovery, PROVIDER-MANUAL §14.8).
 
 ---
 

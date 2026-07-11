@@ -40,7 +40,7 @@ Previous (2026-06-08): sky condition thresholds corrected for sensor accuracy, d
 | Service | Repo | What it does | Technology | Main port | Health port |
 |---------|------|-------------|------------|-----------|-------------|
 | **API** | weewx-clearskies-api | REST API + SSE for real-time data, unit conversion, enrichment pipeline, derived values. Queries weewx archive, aggregates provider data, serves setup endpoints. Marine/surf/fishing/beach-safety endpoints when configured. (ADR-058) | FastAPI (Python 3.12+), sync handlers, SQLAlchemy 2.x sync, sse-starlette, uvicorn, babel (locale-aware number formatting), eccodes (optional — marine GRIB2, via `[marine]` pip extra) | 8765 | 8081 |
-| **Dashboard** | weewx-clearskies-dashboard | Weather UI (static SPA, 9 pages + custom pages) | React 19, Vite 8, Tailwind CSS v4, shadcn/ui, Recharts, Leaflet, **Phosphor** (utility/nav/alert) + **inline Material Symbols SVG** (hero weather, ADR-049/050); Lucide retained for deferred glyph families only, i18next | None (init container) | — |
+| **Dashboard** | weewx-clearskies-dashboard | Weather UI (static SPA, 10 pages + custom pages) | React 19, Vite 8, Tailwind CSS v4, shadcn/ui, Recharts, Leaflet, **Phosphor** (utility/nav/alert) + **inline Material Symbols SVG** (hero weather, ADR-049/050); Lucide retained for deferred glyph families only, i18next | None (init container) | — |
 | **Config UI** | weewx-clearskies-stack | Setup wizard + ongoing config admin | FastAPI, Jinja2, HTMX, Pico CSS, babel (locale-aware wizard/admin i18n; Python-only, no Node build step) | 9876 | — |
 | **Caddy** | upstream (caddy:2-alpine) | Reverse proxy, TLS termination (auto Let's Encrypt), static file server | Caddy | 80, 443 | — |
 | **Redis** | upstream (redis:7-alpine) | Cache for provider API responses (TTLs: forecast 30 min, alerts 5 min, AQI 15 min) | Redis 7.0.15 | 6379 | — |
@@ -457,10 +457,7 @@ Wizard steps are defined by `wizard/routes.py` and `templates/wizard/step_*.html
 | `/about` | About | Yes |
 | `/legal` | Legal/Privacy | Yes |
 | `/radar` | Expanded Radar View (full-viewport overlay) | Yes |
-| `/marine[/:locationId]` | Marine/Boating | Yes |
-| `/surf[/:locationId]` | Surf Forecast | Yes |
-| `/fishing[/:locationId]` | Fishing Forecast | Yes |
-| `/beach-safety[/:locationId]` | Beach Safety | Yes |
+| `/marine` | Marine Activities (map landing + activity tabs/accordions) | Yes |
 | `/:slug` | Custom pages | Yes |
 | `/*` | 404 Not Found | Yes |
 
@@ -593,7 +590,7 @@ Shared utility: `_common/nws_zones.py` — marine zone discovery (station → CW
 | `memory` (default) | No config needed | Single worker (v0.1 default) |
 | `redis` (**active on weewx host**) | `CLEARSKIES_CACHE_URL=redis://localhost:6379/0` (set in `/etc/weewx-clearskies/secrets.env`) | Multi-worker deploys |
 
-Per-provider TTLs: forecast 30 min, alerts 5 min, AQI 15 min, radar metadata 5 min, seeing forecast 3 hours, marine forecasts 30 min, tide predictions 6 hr, tide observations 10 min, buoy observations 60 min, NWS marine text 30 min, NWS SRF 60 min.
+Per-provider TTLs: forecast 30 min, alerts 5 min, AQI 15 min, radar metadata 5 min, seeing forecast 3 hours, marine forecasts (WaveWatch III + NWPS) 30 min, tide predictions 6 hr, tide observations 10 min, tide water temperature 30 min, buoy observations 60 min, NWS marine text 30 min, NWS SRF 60 min.
 
 ## Repo layout
 

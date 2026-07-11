@@ -2078,15 +2078,68 @@ Summary snapshot for one marine location (used by Now page summary card).
 
 Bundles wrap domain-specific models with location metadata, freshness block (§2), and stationClock (§2). Follow the existing `ForecastBundle` pattern.
 
+**`MarineBundle` and `TideBundle` are implemented as declared** — `endpoints/marine.py` and `endpoints/tides.py` construct and `model_dump()` these exact Pydantic models from `models/responses.py`.
+
 | Bundle | Contains | Response for |
 |---|---|---|
 | `MarineBundle` | `MarineObservation`, `list[MarineForecastPoint]`, `list[MarineTextForecast]` | `GET /api/v1/marine[/{locationId}]` |
 | `TideBundle` | `list[TidePrediction]`, `list[WaterLevel]` | `GET /api/v1/tides[/{locationId}]` |
-| `SurfBundle` | `list[SurfForecast]`, `SurfZoneForecast`, `SpectralWaveComponent` list | `GET /api/v1/surf[/{locationId}]` |
-| `FishingBundle` | `list[FishingForecast]`, `SolunarTimes` | `GET /api/v1/fishing[/{locationId}]` |
-| `BeachSafetyBundle` | `BeachSafetyAssessment`, `SurfZoneForecast` | `GET /api/v1/beach-safety[/{locationId}]` |
 
 Each bundle also carries: `locationId`, `locationName`, `coordinates`, `freshness` block, `stationClock`, `units`.
+
+**`SurfBundle`, `FishingBundle`, and `BeachSafetyBundle` in `models/responses.py` do NOT match what their endpoints return.** Those three Pydantic classes were written in Phase 0C, ahead of the Phase 5 endpoint implementations; `endpoints/surf.py`, `endpoints/fishing.py`, and `endpoints/beach_safety.py` each build and return a plain dict directly (the standard envelope, §2) and never import or construct the corresponding Bundle class. **Cleanup finding (not a Phase 8 blocker):** `models/responses.py`'s `SurfBundle`/`FishingBundle`/`BeachSafetyBundle` need to be updated to match the shapes below, or removed if they stay unused. The tables below are the actual, ground-truth shapes — sourced by reading the endpoint code directly — and are what `docs/contracts/openapi-v1.yaml` documents.
+
+##### Surf bundle (actual shape) — `GET /api/v1/surf[/{locationId}]`
+
+Source: `endpoints/surf.py`.
+
+| Field | Type | Nullable | Description |
+|---|---|---|---|
+| `locationId` | str | No | Location slug from config |
+| `locationName` | str | No | Display name |
+| `coordinates` | object | No | `{lat, lon}` |
+| `forecast` | list[SurfForecast] | No | 0 or 1 entries. Populated only when NWPS (preferred) or WaveWatch III (fallback) supplied a wave height; empty list if both providers failed |
+| `zoneForecast` | SurfZoneForecast | Yes | NWS SRF forecast for the covering county zone; `null` if unavailable |
+| `spectralComponents` | list[SpectralWaveComponent] | No | Current NDBC spectral swell decomposition; empty list if no spectral-capable buoy configured or NDBC fetch failed |
+| `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions for the surf page's tide overlay (informational, not scored). **Not a field on `SurfBundle` in models/responses.py.** |
+| `source` | str | No | Fixed string `"nwps+wavewatch+ndbc+coops+nws_srf"` |
+| `generatedAt` | str | No | UTC ISO-8601 with Z |
+
+##### Fishing bundle (actual shape) — `GET /api/v1/fishing[/{locationId}]`
+
+Source: `endpoints/fishing.py`. Structurally different from `FishingBundle` in models/responses.py — there is no flat top-level `forecast` list or singular top-level `solunar` field.
+
+| Field | Type | Nullable | Description |
+|---|---|---|---|
+| `locationId` | str | No | Location slug from config |
+| `locationName` | str | No | Display name |
+| `coordinates` | object | No | `{lat, lon}` |
+| `days` | list[object] | No | One entry per forecast day (3 days). Each entry: `{"date": "YYYY-MM-DD", "periods": list[FishingForecast], "solunar": SolunarTimes}` |
+| `species` | list[str] | No | From the location's `FishingSpotConfig.species` |
+| `targetCategory` | str | No | From the location's `FishingSpotConfig.target_category` |
+| `habitatFeatures` | object \| null | Yes | CUDEM-derived habitat annotations (drop-offs, reefs, ledges, channels, pinnacles); `null` when the location has no bathymetric profile (i.e., no `surf` sub-block configured) |
+| `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions, also used server-side to derive each period's `tide_state` input to the fishing scorer |
+| `source` | str | No | Fixed string `"ndbc+coops+solunar"` |
+| `generatedAt` | str | No | UTC ISO-8601 with Z |
+
+`days`, `species`, `targetCategory`, and `habitatFeatures` do not exist on `FishingBundle` in models/responses.py.
+
+##### Beach-safety bundle (actual shape) — `GET /api/v1/beach-safety[/{locationId}]`
+
+Source: `endpoints/beach_safety.py`. There is no `zoneForecast` field in the actual response — SRF-sourced rip current risk and UV index are folded directly into `assessment` instead.
+
+| Field | Type | Nullable | Description |
+|---|---|---|---|
+| `locationId` | str | No | Location slug from config |
+| `locationName` | str | No | Display name |
+| `coordinates` | object | No | `{lat, lon}` |
+| `assessment` | object (`BeachSafetyAssessment` shape) | No | `safetyLevel`, `waveHeight`, `wavePeriod`, `ripCurrentRisk`, `waterTemp`, `comfortLevel`, `uvIndex`, `visibility`, `windSpeed`, `windDirection`, `activeAlerts` |
+| `nwpsV15` | object \| null | Yes | `{ripCurrentProbability, totalWaterLevel, waveRunup}` when the covering WFO supplies NWPS v1.5 fields; `null` otherwise. **Not on `BeachSafetyBundle`.** |
+| `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions. **Not on `BeachSafetyBundle`.** |
+| `waterLevels` | list[WaterLevel] | No | CO-OPS observed water levels. **Not on `BeachSafetyBundle`.** |
+| `externalLinks` | list[object] | No | `{label, url}` from the location's `BeachSafetyConfig.external_links`. **Not on `BeachSafetyBundle`.** |
+| `source` | str | No | Fixed string `"nwps+ndbc+nws_srf+coops+nws_alerts"` |
+| `generatedAt` | str | No | UTC ISO-8601 with Z |
 
 ### Marine unit groups
 
@@ -2301,18 +2354,23 @@ English (`en.json`) is the authoritative source. All 12 other locale files must 
 
 ## §18 Marine Endpoints
 
-Marine endpoints follow existing patterns: capability gating, unit conversion, freshness block, stationClock. Each endpoint is location-aware — when multiple marine locations are configured, the `locationId` path parameter selects a specific location. Without `locationId`, the endpoint returns data for the first configured location.
+Marine endpoints follow existing patterns: capability gating, unit conversion, freshness block, stationClock. Each of the five activity endpoints (`/marine`, `/tides`, `/surf`, `/fishing`, `/beach-safety`) is actually **two routes**:
+
+- `GET /api/v1/{endpoint}` (no `locationId`) — returns a list: one summary/card entry per configured location that qualifies for that endpoint's capability gate. This is what the dashboard's location-card grid (§12) renders. 404 (`"<Feature> not configured"` / `"No <activity> locations configured"`) when zero locations qualify.
+- `GET /api/v1/{endpoint}/{locationId}` — returns the full bundle for one location. 404 when `locationId` does not match a configured, capability-qualifying location.
+
+**There is no "first configured location" fallback.** An earlier draft of this manual said the no-`locationId` route returns data for the first configured location; the implemented behavior is the list above (confirmed against `endpoints/marine.py`, `endpoints/tides.py`, `endpoints/surf.py`, `endpoints/fishing.py`, `endpoints/beach_safety.py` — each has an explicit list-vs-detail route pair).
 
 ### Endpoint inventory
 
-| Endpoint | Response model | Capability gate |
-|---|---|---|
-| `GET /api/v1/marine[/{locationId}]` | `MarineBundle` | At least one location with `marine` activity enabled |
-| `GET /api/v1/tides[/{locationId}]` | `TideBundle` | At least one location with any activity requiring tides (marine, surf, fishing, or beach_safety) |
-| `GET /api/v1/surf[/{locationId}]` | `SurfBundle` | At least one location with `surf` activity enabled |
-| `GET /api/v1/fishing[/{locationId}]` | `FishingBundle` | At least one location with `fishing` activity enabled |
-| `GET /api/v1/beach-safety[/{locationId}]` | `BeachSafetyBundle` | At least one location with `beach_safety` activity enabled |
-| `GET /api/v1/almanac/solunar` | `SolunarTimes` | Always available (not gated by marine feature) |
+| Endpoint | List-route response | Detail-route response | Capability gate |
+|---|---|---|---|
+| `GET /api/v1/marine[/{locationId}]` | `list[MarineLocationSummary]` | `MarineBundle` | At least one location with `marine` activity enabled |
+| `GET /api/v1/tides[/{locationId}]` | `list[MarineLocationSummary]` | `TideBundle` | At least one location with a `coops_station_ids` entry configured. Per ADR-090, all four activities (marine, surf, fishing, beach_safety) use tide data, so "tide-capable" means "has a CO-OPS station configured," not a specific activity value. |
+| `GET /api/v1/surf[/{locationId}]` | `list[object]` (`locationId`, `name`, `lat`, `lon`, `qualityStars`, `conditionsText` — metadata only, no live fetch) | Surf bundle, actual shape (§16) | At least one location with `surf` activity enabled |
+| `GET /api/v1/fishing[/{locationId}]` | `list[object]` (`locationId`, `name`, `lat`, `lon`) | Fishing bundle, actual shape (§16) | At least one location with `fishing` activity enabled |
+| `GET /api/v1/beach-safety[/{locationId}]` | `list[object]` (`locationId`, `name`, `lat`, `lon`, `safetyLevel`, `ripCurrentRisk`, `waterTemp` — live-fetched per card) | Beach-safety bundle, actual shape (§16) | At least one location with `beach_safety` activity enabled |
+| `GET /api/v1/almanac/solunar` | — (single route, no location list) | `SolunarTimes` (or `list[SolunarTimes]` when `days` > 1) | Always available (not gated by marine feature) |
 
 ### Request parameters
 
@@ -2320,7 +2378,7 @@ Marine endpoints follow existing patterns: capability gating, unit conversion, f
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `locationId` | str (path) | No | Location slug from config. Default: first configured location. |
+| `locationId` | str (path) | No | Location slug from config. Omit to get the list-of-locations response (see "Endpoint inventory" above); a 404 is returned if the given `locationId` does not exist or does not qualify for the endpoint's capability gate — there is no fallback to any other location. |
 
 **Solunar endpoint** (`/almanac/solunar`):
 

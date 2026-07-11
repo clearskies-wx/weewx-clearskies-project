@@ -1416,7 +1416,7 @@ NWPS v1.5 fields are show-when-available: display when the WFO provides them, ab
 
 **No fallback transformation pipeline.** When NWPS data is temporarily unavailable (NOAA outage, WFO maintenance), the marine page shows WaveWatch III offshore data without nearshore supplementation. No separate code path.
 
-**Cache:** Key = `(provider_id, wfo, cg_grid, cycle_time)`. TTL = derived from cycle cadence (cache until next expected cycle).
+**Cache:** Key = `(provider_id, wfo, cg_grid, cycle_time)`. TTL = 1800s (30 min) — a fixed interval, not derived from cycle cadence (implementation: `providers/marine/nwps.py` `_CACHE_TTL_SECONDS`).
 
 **Error handling:** GRIB2 file not found (NOMADS returns 404) → log WARNING, fall back to WaveWatch III offshore data. eccodes parse error → `ProviderProtocolError` with the GRIB message details. Network errors → canonical taxonomy.
 
