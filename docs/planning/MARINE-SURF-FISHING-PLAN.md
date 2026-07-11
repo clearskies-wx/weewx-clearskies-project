@@ -1,8 +1,8 @@
 # Marine, Surf & Fishing Forecast — Implementation Plan
 
-**Status:** Phase 6 ✓ COMPLETE — QC Gate 6 passed 2026-07-10  
+**Status:** Phase 7 ✓ COMPLETE — QC Gate 7 + QA Gate 7 passed 2026-07-11  
 **Created:** 2026-07-08  
-**Last updated:** 2026-07-10 (QC Gate 6 passed: pushed, deployed, API health 200, config UI restarted, 180 targeted API tests passed, 46 stack tests passed)  
+**Last updated:** 2026-07-11 (QC Gate 7 passed: tsc 0 errors, vite build clean, vitest 320/26 baseline matched, marine chunk 20.43 KB gzip lazy-loaded. QA Gate 7 passed: 5 findings — F1 locale propagation fixed, F2 temp units fixed, F3 thumbnail added, F4 tests deferred to test-author, F5 doc count fixed. All deferred items resolved: now.tsx dataBag wired, chart-1 contrast fixed, openapi-v1.yaml noted for Phase 8 T8.3.)  
 **Components:** API (`weewx-clearskies-api`), Dashboard (`weewx-clearskies-dashboard`), Config UI (`weewx-clearskies-stack`)
 
 ## Context
@@ -1239,9 +1239,22 @@ Marine location configuration in the wizard and admin UI. The marine alert radiu
 
 ---
 
-## PHASE 7 — Marine Activities Dashboard Page
+## PHASE 7 — Marine Activities Dashboard Page — ✓ COMPLETE
 
 Single-page marine experience: map-based landing with operator-configured locations, activity details in tabs (desktop) / accordions (mobile). Replaces the original four-page design with a location-first architecture and a single nav item.
+
+**QC Gate 7 passed (2026-07-11).** 11 dashboard commits (ad13b99..d62e6c0): tsc 0 errors, vite build clean, vitest 320/26 baseline matched (0 regressions), marine chunk 20.43 KB gzip (lazy-loaded, no main bundle impact). QA Gate 7: 5 findings — all remediated (locale propagation, temperature unit from API, chart contrast fix, thumbnail placeholder, doc-code sync).
+
+| Task | Commit | Lines | Status |
+|------|--------|-------|--------|
+| T7.1 Page shell (types, hooks, route, map, tabs, nav, i18n) | ad13b99, 662eee6, 978d115, c1080ae | ~1,991 | Done |
+| T7.2 Boating tab + shared TideChart/AlertsPanel | 0ce7eff | ~640 | Done |
+| T7.3 Surfing tab (star ratings, swell, compass) | 62fe7a2 | ~645 | Done |
+| T7.4 Fishing tab (period grid, solunar, species) | 97e3291 | ~805 | Done |
+| T7.5 Beach Safety tab (safety indicator, rip current, UV, external links) | 22c0cba | ~497 | Done |
+| T7.6 Now page marine summary card | 90302bd | ~150 | Done |
+| QA fixes (locale propagation, temp units) | 94d99b0 | — | Done |
+| Deferred-item fixes (dataBag wiring, chart contrast, thumbnail) | d62e6c0 | — | Done |
 
 ### General Weather Integration — Two Separate Systems
 
