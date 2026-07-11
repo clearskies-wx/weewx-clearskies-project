@@ -1,8 +1,8 @@
 # Marine, Surf & Fishing Forecast — Implementation Plan
 
-**Status:** Phase 5 ✓ COMPLETE — QC Gate 5 passed 2026-07-10  
+**Status:** Phase 6 ✓ COMPLETE — QC Gate 6 passed 2026-07-10  
 **Created:** 2026-07-08  
-**Last updated:** 2026-07-10 (QC Gate 5 passed: pushed, deployed, 131 targeted tests passed, API health 200)  
+**Last updated:** 2026-07-10 (QC Gate 6 passed: pushed, deployed, API health 200, config UI restarted)  
 **Components:** API (`weewx-clearskies-api`), Dashboard (`weewx-clearskies-dashboard`), Config UI (`weewx-clearskies-stack`)
 
 ## Context
@@ -1148,9 +1148,26 @@ Wire provider data + enrichment output to REST endpoints. All follow existing en
 
 ---
 
-## PHASE 6 — Location Config (Wizard/Admin)
+## PHASE 6 — Location Config (Wizard/Admin) — ✓ COMPLETE
 
 Marine location configuration in the wizard and admin UI. The marine alert radius (ADR-089) is NOT here — it's in the general alerts configuration (already specified in T1.7). This phase covers only the marine feature location setup.
+
+**QC Gate 6 passed (2026-07-10).** Pushed to GitHub (API: 337f71e, stack: e8ad003), deployed to weewx (health 200) and weather-dev (config UI restarted, dashboard built). 15-step wizard with marine step 13, marine admin section with CRUD + connectivity test + bathymetry re-run, marine alert radius in alerts config, 138 new i18n keys across 13 locales, 3 setup API endpoints, shape-mismatch fix between wizard and API apply schemas.
+
+| Task | Commit(s) | Lines | Status |
+|------|-----------|-------|--------|
+| T6.1 Marine wizard step | 7653bd4, f4c3524, ddc9366, d63cca7, db8d0dd | ~2210 (stack) | Done |
+| T6.2 Marine admin section | 08a487a, 39909f7 | ~1669 (stack) | Done |
+| T6.3 Setup API endpoints | f29eb63, 337f71e | ~571 (API) | Done |
+| T6.4 Marine alert radius | ddc9366 (in T6.1 batch) | ~22 (template) | Done |
+| Shape-mismatch fix | e8ad003 | ~47 (stack) | Done |
+
+**Resolved issues:**
+1. Agent role mismatch: plan assigned `clearskies-docs-author` to wizard/admin work; re-dispatched with `clearskies-api-dev` (config UI is Python FastAPI + Jinja2).
+2. `bathymetric_profile` wire format: brief showed flat CSV, but `marine_config.py` loader parses nested configobj subsections — used loader-authoritative format.
+3. `[[weather]]` section: not parsed by `MarineConfig` loader, omitted from config writer (defaults used).
+4. `CurrentConfigResponse` missing `marine` field: admin UI couldn't read marine config — added `marine` dict to the response.
+5. Wizard → API shape mismatch: `build_marine_payload()` sent dict (keyed by location id) but API expects list (with id field); `directional_exposure` sent as list but API expects dict[str, bool]; `weather` key rejected by API's `extra="forbid"`. Fixed in e8ad003.
 
 ### Tasks
 
