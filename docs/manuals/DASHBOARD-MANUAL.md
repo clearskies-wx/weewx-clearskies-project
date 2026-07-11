@@ -9,7 +9,7 @@ Companion documents:
 - **API-MANUAL.md** — API implementation rules (data model, units, enrichment)
 - **ARCHITECTURE.md** — system topology, dashboard pages, routes
 
-Last updated: 2026-07-02
+Last updated: 2026-07-10
 
 ---
 
@@ -26,7 +26,7 @@ Last updated: 2026-07-02
 9. [Dynamic Now Page & Page Visibility](#9-dynamic-now-page--page-visibility)
 10. [Radar Card & Expanded View](#10-radar-card--expanded-view)
 11. [Anti-Patterns](#11-anti-patterns)
-12. [Marine Pages](#12-marine-pages)
+12. [Marine Activities Page](#12-marine-activities-page)
 
 ---
 
@@ -656,9 +656,9 @@ if (!aqiData) return <CardSkeleton />;
 // ... render using aqiData
 ```
 
-### 14 built-in cards
+### 15 built-in cards
 
-All 14 Now page cards conform to the plugin contract. Their card types, endpoint declarations, and allowed layouts match the current hardcoded arrangement in `now.tsx`. The full inventory is defined in `card-metadata.ts`.
+All 15 Now page cards conform to the plugin contract. Their card types, endpoint declarations, and allowed layouts match the current hardcoded arrangement in `now.tsx`. The full inventory is defined in `card-metadata.ts`. The marine-summary card (added in Phase 7) self-hides when no marine locations are configured.
 
 ### Attribution rendering
 
@@ -698,7 +698,7 @@ The Now page is a generic container that renders cards from a layout configurati
 
 - `NowLayoutEntry` — `{ type: CardType; footprint: CardFootprint; rowSpan: 1 | 2 | 2.5 }`.
 - `NowLayoutConfig` — `{ version: 1; cards: NowLayoutEntry[] }`.
-- `DEFAULT_NOW_LAYOUT` — compiled-in constant matching the current hardcoded card arrangement (14 cards, current sizes and order). Used when `/now-layout.json` is absent or unparseable.
+- `DEFAULT_NOW_LAYOUT` — compiled-in constant matching the current hardcoded card arrangement (15 cards, current sizes and order). Used when `/now-layout.json` is absent or unparseable.
 
 ### Layout config fetch
 
@@ -951,50 +951,83 @@ Daytime status comes from the scene descriptor or `stationClock`, not browser-lo
 
 ---
 
-## §12 Marine Pages
+## §12 Marine Activities Page
 
-Four marine pages — marine/boating, surf, fishing, and beach safety. Each is location-aware: when multiple marine locations are configured, a location picker selects the active spot. Page visibility is gated by the API capabilities endpoint — pages appear in navigation only when the corresponding activity is enabled on at least one location.
+Single page at `/marine` — map-based landing with operator-configured locations, activity details in tabs (desktop ≥768px) or accordions (mobile <768px). Location selection is client-side state, not a URL path parameter.
 
-### Routes
+### Route
 
 | Route | Page | Lazy-loaded |
 |---|---|---|
-| `/marine` | Marine/Boating (first configured location) | Yes |
-| `/marine/:locationId` | Marine/Boating (specific location) | Yes |
-| `/surf` | Surf Forecast (first configured location) | Yes |
-| `/surf/:locationId` | Surf Forecast (specific location) | Yes |
-| `/fishing` | Fishing Forecast (first configured location) | Yes |
-| `/fishing/:locationId` | Fishing Forecast (specific location) | Yes |
-| `/beach-safety` | Beach Safety (first configured location) | Yes |
-| `/beach-safety/:locationId` | Beach Safety (specific location) | Yes |
+| `/marine` | Marine Activities | Yes |
 
-### Location-centric navigation
+### Page states
 
-- Marine pages display a location picker (dropdown or tabs) when multiple locations are configured for that activity.
-- The default route (e.g., `/marine`) shows the first configured location.
-- The `locationId` route (e.g., `/marine/wrightsville_beach`) shows a specific location.
-- Location selection is persisted in the URL path (not session storage) for shareability — a visitor can bookmark or share a link to a specific location.
-- When only one location is configured for an activity, no picker is shown. Route params still work.
+**Landing state (no location selected):**
+- Interactive map (Leaflet/OpenStreetMap, same library as seismic page) with markers for each configured marine location
+- Per-location summary: location name, air temperature, hero weather icon for current overall condition, significant wave height, wind speed (knots), water temperature, active alert indicator (color-coded: red for warnings, yellow for advisories), last updated timestamp
+- "Use my location" button — browser geolocation to auto-select nearest configured location
+- No numeric scores on the landing page — conditions snapshot only
+
+**Selected state (location chosen):**
+- Map compresses to hero strip (~120px, selected marker highlighted)
+- Activity tabs (≥768px viewport) or accordions (<768px viewport) for each enabled activity at that location
+- Tab/accordion headers: activity icon + name + qualitative label
+- Tab content is the full data ensemble for each activity — not condensed
+
+### Activity icons
+
+| Activity | Icon source | Icon |
+|---|---|---|
+| Boating | Phosphor | `Sailboat` |
+| Surfing | Material Symbols (inline SVG) | `surfing` |
+| Fishing | Phosphor | `FishSimple` |
+| Beach Safety | Phosphor | `PersonSimpleSwim` |
+
+Follows existing icon convention: Phosphor for utility/nav/alert, inline Material Symbols SVG for domain-specific glyphs (per ADR-049/050). Main nav item: Phosphor `Compass`, label "Marine".
+
+### Activity qualitative labels
+
+Tab/accordion headers show activity-appropriate qualitative labels — not forced into a common scale:
+
+| Activity | Label source | Scale |
+|---|---|---|
+| Boating | Wind/wave/visibility thresholds | Excellent / Good / Fair / Poor / Dangerous |
+| Surfing | Surf quality scorer (1–5 stars) | Star display (★★★☆☆) |
+| Fishing | Fishing scorer (0–100) | Excellent (80+) / Good (60–79) / Fair (40–59) / Poor (<40) |
+| Beach Safety | Sea state + rip current + alerts | Safe / Use caution / Dangerous |
+
+### Tab content per activity
+
+Each tab contains the full data ensemble for its activity. Not condensed.
+
+**Boating:** Active advisories (top, prominent), wind panel (knots, 72h forecast), wave forecast (height + period together), live buoy observations (station ID + distance), barometric pressure (trend + sparkline), visibility (NDBC + NWS text), tide chart (standalone, 72h), NWS marine text forecast (sub-accordion), general weather panel ("Weather at {location}"), rip current probability (show-when-available), total water level (show-when-available).
+
+**Surfing:** 72h forecast timeline (star ratings), wave face height chart (post-supplement breaking height, not offshore Hs), swell breakdown (spectral components), wind quality (offshore/cross/onshore relative to beach facing), tide chart (standalone, 72h), beach alignment diagram, general weather, activity-relevant alerts. Material Symbols `surfing` inline SVG as icon.
+
+**Fishing:** 3-day period grid (0–100 scores, color-coded), solunar calendar (24h timeline), tide chart (standalone, 72h), barometric pressure (trend + sparkline), species activity table, conditions breakdown (score bars), wind & swell (informational, not scored), habitat features (CUDEM), activity-relevant alerts.
+
+**Beach Safety:** Safety alerts banner (top), sea state indicator (green/yellow/red), rip current risk (NWS SRF), tide chart (standalone, 72h), water temperature (comfort thresholds: >75°F comfortable, 65–75°F cool, 55–65°F cold, <55°F dangerous), wind (offshore/onshore context), UV index (with guidance), visibility (atmospheric), wave runup (show-when-available), general weather, external links (operator-configurable). **Not in v1:** water quality, wildlife alerts, underwater visibility.
 
 ### Page visibility
 
-- Marine pages are added to `pages.json` by the wizard when the operator enables activities.
-- The dashboard reads the API capabilities endpoint at boot to determine which marine pages to show in navigation.
-- If no marine locations are configured, no marine pages appear — the dashboard behaves identically to a non-marine installation.
-- Follows the existing `pages.json` visibility pattern (§9): pages not in `pages.json` are hidden from navigation and routes.
+- Single `"marine"` entry in `pages.json` controls the Marine Activities page
+- Dashboard reads API capabilities at boot to determine whether the marine nav item appears
+- If no marine locations are configured, no marine page appears — dashboard behaves identically to a non-marine installation
+- Follows existing `pages.json` visibility pattern (§9)
 
 ### Activity-relevant alert filtering
 
-Marine pages show activity-relevant alerts from the general alert feed, filtered by alert event type. This is display-side filtering, not a separate data source — the API's `/alerts` endpoint returns all alerts (including marine zone alerts per the marine zone alert extension in PROVIDER-MANUAL §8).
+Alert filtering applies within each activity tab, sourced from the general alert feed. This is display-side filtering, not a separate data source.
 
-| Page | Alert types shown |
+| Tab | Alert types shown |
 |---|---|
-| Marine/Boating | Marine zone alerts (SCA, Gale, Storm, Hurricane Force, Hazardous Seas, Dense Fog, Special Marine Warning) + coastal flood alerts (Coastal Flood Advisory/Warning, Storm Surge Warning/Watch) |
-| Surf | Marine zone alerts + coastal/beach alerts (Beach Hazards Statement, High Surf Advisory/Warning, Rip Current Statement) |
+| Boating | Marine zone alerts (SCA, Gale, Storm, Hurricane Force, Hazardous Seas, Dense Fog, Special Marine Warning) + coastal flood alerts (Coastal Flood Advisory/Warning, Storm Surge Warning/Watch) |
+| Surfing | Marine zone alerts + coastal/beach alerts (Beach Hazards Statement, High Surf Advisory/Warning, Rip Current Statement) |
 | Fishing | Marine zone alerts |
 | Beach Safety | Coastal/beach alerts + coastal flood alerts + NWS SRF rip current risk |
 
-**Marine zone alerts are NOT gated by the marine feature.** They appear in the dashboard's standard `AlertBanner` for all visitors when an operator configures a marine alert radius. The filtering above applies to the marine pages only — activity-relevant subsets of what the general alert banner already shows.
+**Marine zone alerts are NOT gated by the marine feature.** They appear in the dashboard's standard `AlertBanner` for all visitors when an operator configures a marine alert radius. The filtering above applies to the marine activity tabs only — activity-relevant subsets of what the general alert banner already shows.
 
 ### Data refresh intervals
 
@@ -1021,15 +1054,16 @@ When marine activities are enabled, a `MarineLocationSummary` card can appear on
 - Active marine alert count
 - Next high/low tide time and height
 
-The card links to the full marine page for the displayed location.
+The card links to `/marine`.
 
 ### i18n
 
-Marine pages use these i18n key prefixes: `marine.*`, `surf.*`, `fishing.*`, `beachSafety.*`. All user-visible strings must use `t()` from `useTranslation()` — no hardcoded English. Unit labels resolve through the locale file. Number formatting uses `Intl.NumberFormat` with `i18n.language`. Same rules as §3.
+Marine page uses `marine.*` key prefix for shared elements. Activity-specific keys: `marine.boating.*`, `marine.surfing.*`, `marine.fishing.*`, `marine.beachSafety.*`. All user-visible strings must use `t()` from `useTranslation()` — no hardcoded English. Unit labels resolve through the locale file. Number formatting uses `Intl.NumberFormat` with `i18n.language`. Same rules as §3.
 
 ### Responsive behavior
 
-- Location picker collapses to a dropdown on mobile viewports.
-- Data tables (tide tables, forecast grids) use `overflow-x: auto` containers on narrow viewports — the page body never scrolls horizontally.
-- Chart components follow existing responsive patterns (§6).
-- Depth profile visualizations scale to container width.
+- Map: full-width all viewports
+- Location cards: 1-column at 375px, 2-column at 768px, 3-column at 1024px
+- Tabs → accordions at <768px breakpoint
+- Data tables use `overflow-x: auto` containers on narrow viewports — page body never scrolls horizontally
+- Chart components follow existing responsive patterns (§6)

@@ -115,12 +115,12 @@ Phase 0A (ADRs — Architectural Decisions)
                 │
                 Phase 5 ──► Phase 6 (Location Config: Wizard/Admin)
                               │
-                              └──► Phase 7 (Dashboard Pages)
+                              └──► Phase 7 (Marine Activities Page)
                                      │
                                      └──► Phase 8 (End-to-End Validation + Docs)
 ```
 
-**Parallelism:** Phases 1 and 4 are independent. Within Phase 1, the six provider modules and marine zone alerts task (T1.1–T1.7) can run as separate agent dispatches, though T1.4, T1.5, and T1.7 share the marine zone discovery utility. Phase 7 dashboard pages (T7.1–T7.4) can run concurrently.
+**Parallelism:** Phases 1 and 4 are independent. Within Phase 1, the six provider modules and marine zone alerts task (T1.1–T1.7) can run as separate agent dispatches, though T1.4, T1.5, and T1.7 share the marine zone discovery utility. Phase 7: T7.1 (page shell) first, then T7.2–T7.5 (tab contents) can run concurrently.
 
 ---
 
@@ -1239,21 +1239,21 @@ Marine location configuration in the wizard and admin UI. The marine alert radiu
 
 ---
 
-## PHASE 7 — Dashboard Pages
+## PHASE 7 — Marine Activities Dashboard Page
 
-Four new pages + now-page summary card + routing/navigation.
+Single-page marine experience: map-based landing with operator-configured locations, activity details in tabs (desktop) / accordions (mobile). Replaces the original four-page design with a location-first architecture and a single nav item.
 
 ### General Weather Integration — Two Separate Systems
 
-Marine pages display data from **two independent systems** that must remain cleanly separated:
+The Marine Activities page displays data from **two independent systems** that must remain cleanly separated:
 
 1. **Marine-specific data** (waves, tides, currents, buoy readings, swell, marine text forecasts, marine alerts) — from the NOAA marine providers built in Phases 1–3. Fetched proactively by the cache warmer. This entire system gets replaced when expanding outside the US.
 
 2. **General weather data** (air temperature, wind, precipitation, sky cover, humidity, UV) — from the **operator's already-configured forecast provider** (NWS, OWM, Xweather, etc.), queried for each marine location's coordinates. This uses the same provider system that powers the main site — no new provider integration needed.
 
-**Why both:** Someone on the fishing page or beach safety page shouldn't have to navigate back to the main weather page to check if it's going to rain. Each marine page is self-contained with weather context relevant to that activity. Coastal weather can differ dramatically from the operator's station location over short distances — sea breeze effects, marine layer fog, convective patterns along sea breeze convergence zones can create 10–20°F temperature differences within a few miles of the shoreline.
+**Why both:** Someone checking the fishing tab or beach safety tab shouldn't have to navigate back to the main weather page to check if it's going to rain. Each activity tab is self-contained with weather context relevant to that activity. Coastal weather can differ dramatically from the operator's station location over short distances — sea breeze effects, marine layer fog, convective patterns along sea breeze convergence zones can create 10–20°F temperature differences within a few miles of the shoreline.
 
-**On-demand caching (lazy fetch):** Unlike the main site's forecast (proactively polled by the cache warmer), general weather data for marine locations is fetched **on-demand** — only when a marine page is requested. The response is cached with a configurable TTL. If nobody visits the marine page for 3 hours, zero forecast provider calls are made for that location. This minimizes API costs, especially for metered providers (OWM, Xweather).
+**On-demand caching (lazy fetch):** Unlike the main site's forecast (proactively polled by the cache warmer), general weather data for marine locations is fetched **on-demand** — only when the Marine Activities page is requested. The response is cached with a configurable TTL. If nobody visits the marine page for 3 hours, zero forecast provider calls are made for that location. This minimizes API costs, especially for metered providers (OWM, Xweather).
 
 **Spatial deduplication:** Marine locations within 2.5 km of each other share a single forecast and observation call (they map to the same forecast grid point — NWS grids are ~2.5 km resolution). Locations farther apart (e.g., a beach vs. an offshore zone 25 miles away) get separate calls. Deduplication is automatic based on grid-point rounding at config time.
 
@@ -1272,160 +1272,160 @@ These are set in the marine section of the wizard/admin. The wizard explains tha
 
 The wizard displays the computed distance and which source will be used ("Your station is 0.8 km from this location — station data will be used" or "Your station is 14.2 km from this location — forecast provider will be used, adding ~2 calls per refresh cycle").
 
-**NDBC buoy data is always separate.** Buoy observations (SST, wave height, ocean wind, pressure) are marine-specific at-water data. They complement but do not substitute for land-side weather, and land-side weather does not substitute for them. Both are displayed on marine pages.
+**NDBC buoy data is always separate.** Buoy observations (SST, wave height, ocean wind, pressure) are marine-specific at-water data. They complement but do not substitute for land-side weather, and land-side weather does not substitute for them. Both are displayed on the Marine Activities page.
 
-All pages follow existing dashboard patterns: lazy-loaded routes, `VisibilityGuard` for `pages.json` visibility control, i18n via `useTranslation()`, responsive design (375px minimum), light/dark mode, data refresh via existing polling/SSE infrastructure.
+The page follows existing dashboard patterns: lazy-loaded route, `VisibilityGuard` for `pages.json` visibility control, i18n via `useTranslation()`, responsive design (375px minimum), light/dark mode, data refresh via existing polling/SSE infrastructure.
+
+### Page Architecture
+
+**Landing state (no location selected):**
+- Full-height interactive map (Leaflet, same library as seismic page) with markers for each operator-configured marine location
+- Location list alongside or below map (responsive)
+- Per-location summary: location name, air temperature, hero weather icon for current overall condition, significant wave height, wind speed (knots), water temperature, active alert indicator (color-coded badge: red for warnings, yellow for advisories), last updated timestamp
+- "Use my location" button to auto-select nearest configured location via browser geolocation
+- No numeric scores on the landing page — conditions snapshot only
+
+**Selected state (location chosen via map marker tap or list selection):**
+- Map compresses to a hero strip (~120px height, selected marker highlighted, location name + last updated)
+- Below the hero: activity tabs (desktop ≥768px) or accordions (mobile <768px) for each activity enabled at that location
+- Each tab/accordion header: activity icon + activity name + qualitative label
+- Tab/accordion content is the full data ensemble for each activity — not condensed
+- Location selection is client-side state (React state), not a URL path parameter. Route stays `/marine`.
+
+**Activity icons (tab/accordion headers):**
+
+| Activity | Icon source | Icon name |
+|---|---|---|
+| Boating | Phosphor | `Sailboat` |
+| Surfing | Material Symbols (inline SVG) | `surfing` |
+| Fishing | Phosphor | `FishSimple` |
+| Beach Safety | Phosphor | `PersonSimpleSwim` |
+
+Follows existing icon convention: Phosphor for utility/nav/alert icons, inline Material Symbols SVG for domain-specific glyphs (per ADR-049/050).
+
+**Activity qualitative labels (tab/accordion headers):**
+
+| Activity | Label source | Scale |
+|---|---|---|
+| Boating | Wind/wave/visibility thresholds | Excellent / Good / Fair / Poor / Dangerous |
+| Surfing | Surf quality scorer (1–5 stars) | Star display (★★★☆☆) |
+| Fishing | Fishing scorer (0–100) | Excellent (80+) / Good (60–79) / Fair (40–59) / Poor (<40) |
+| Beach Safety | Sea state + rip current + alerts | Safe / Use caution / Dangerous |
+
+**Navigation:** Single nav item in main menu. Icon: Phosphor `Compass`. Label: "Marine" (i18n key `nav.marine`). Only visible when marine activities are configured (capability-gated via API).
 
 ### Tasks
 
-**T7.1 — Marine conditions page**
+**T7.1 — Marine Activities page shell**
 - Owner: `clearskies-dashboard-dev` (Sonnet)
-- Files: New `repos/weewx-clearskies-dashboard/src/pages/Marine.tsx` + supporting components in `src/components/marine/`
-- Reference: DASHBOARD-MANUAL marine pages section (written in T0B.5), DESIGN-MANUAL for card patterns and tokens, existing `src/pages/Earthquakes.tsx` for page structure pattern
+- Files: New `repos/weewx-clearskies-dashboard/src/pages/Marine.tsx`, new `src/components/marine/LocationMap.tsx`, `src/components/marine/LocationCard.tsx`, `src/components/marine/ActivityTabs.tsx`, `src/components/marine/ActivityAccordion.tsx`
+- Reference: DASHBOARD-MANUAL §12, DESIGN-MANUAL for card patterns and tokens, existing `src/pages/Earthquakes.tsx` for Leaflet map pattern
 - Do:
-  - Route: `/marine`. Location cards → detail view.
-  - **Design priority:** Boaters need a hyper-specific, localized, and easily scannable marine conditions page. Conditions over water are radically different from land. The page must lead with these essentials:
-    1. **Wind speed & direction** — the primary driver of sea chop. Display in knots (the marine standard — use `group_ocean_speed` with knot conversion). Show current speed, gusts, and direction with a wind arrow. In the forecast view, show shifting direction throughout the day so boaters can plan around wind changes. Source: NDBC buoy (real-time) + WaveWatch III (forecast).
-    2. **Wave height & period** — height alone isn't enough. The period (seconds between crests) dictates ride quality: short period (~3s) means a rough "washing machine" ride, long period (~10s) means a gentle roll. Both must be displayed together prominently, not period buried in a details table. Source: NDBC (observed) + WaveWatch III (forecast) + NWPS (nearshore).
-    3. **Tides & currents** — essential for preventing grounding in shallow bays or safely navigating narrow inlets. Show tide predictions (high/low times + heights), observed water levels, and current speed/direction where available. Source: CO-OPS predictions + observations, NWPS current components (UCUR/VCUR).
-    4. **Active advisories** — a dedicated, visually prominent section (not just a badge count) displaying Small Craft Advisories, Gale Warnings, Special Marine Warnings, and other marine zone alerts. These are safety-critical — boaters check this first. Source: NWS marine zone alerts (ADR-089) + coastal flood alerts.
-    5. **Visibility forecast** — fog, heavy rain, or haze that drops visibility impacts safe navigation. Display current visibility from NDBC buoy (VIS column) and visibility mentions from NWS marine text forecast. Source: NDBC `.txt` VIS field + NWS marine zone forecast text.
-    6. **Live buoy reports** — real-time NDBC buoy observations displayed as a cross-reference panel alongside the forecast, so boaters can compare "what's forecast" vs. "what's actually happening right now." Show: wind, waves, pressure, air/water temp, visibility — all from the nearest NDBC buoy with station ID and distance. Source: NDBC standard met (T1.1).
-    7. **Barometric pressure** — a rapid pressure drop is a key warning sign for approaching thunderstorms and squalls. Show current reading, trend arrow (falling/stable/rising), and recent history (6–12h sparkline). Source: NDBC buoy PRES + PTDY (pressure tendency) fields.
-  - **Location cards** (no locationId): grid of cards, one per configured marine location. Each card shows: location name, current wind speed/direction (in knots), combined wave height + period, next tide (high/low + time), water temp, active marine alert indicator (color-coded badge: red for warnings, yellow for advisories, count). Click → detail view.
-  - **Detail view** (with locationId):
-    - Active advisories section (top of page, visually prominent — dedicated panel listing all active marine zone alerts with severity, headline, and expiry time. Not just a count badge).
-    - Wind panel: current speed/gust/direction (in knots) from NDBC buoy, plus 72h wind forecast chart showing speed and direction shifts over time (WaveWatch III).
-    - Wave forecast chart (72h, Recharts area chart with wave height AND period displayed together — dual-axis or overlaid so the relationship between height and period is visible at a glance).
-    - Live buoy observations panel: real-time NDBC data (wind, waves, pressure, air temp, water temp, visibility) with station ID, distance from location, and last-update timestamp. Positioned alongside forecast data for easy cross-reference.
-    - Barometric pressure panel: current reading, trend arrow, 6–12h sparkline from NDBC PRES/PTDY.
-    - Visibility indicator: current visibility from NDBC (distance in nautical miles), visibility forecast from NWS marine text.
-    - Tide chart (standalone, 72h, CO-OPS predictions with high/low markers + observed water level overlay). Current speed/direction where available from CO-OPS or NWPS.
-    - NWS marine text forecast (accordion, one period per section — includes wind, seas, visibility, weather text).
-    - General weather panel: air temperature, precipitation forecast, sky cover, humidity — from the configured forecast provider (on-demand cached) or weewx station (if operator elected station substitution). Clearly labeled as "Weather at {location name}" to distinguish from buoy/marine data.
-    - Rip current probability (when available from NWPS v1.5 — show-when-available pattern).
-    - Total water level (NWPS v1.5, show-when-available).
-  - Responsive: cards stack single-column at 375px, 2-column at 768px, 3-column at 1024px.
-  - i18n: all text via translation keys. Marine-specific keys in `marine.json` per locale.
-- Accept: Page renders with real data from the API. Wind displayed in knots. Wave height and period displayed together (not period buried in details). Active advisories are a dedicated prominent section at the top. Live buoy observations panel shows real-time data with station ID and distance. Barometric pressure shows trend with sparkline. Visibility displayed from NDBC. Tide chart is a standalone readable element. Charts display correctly. Responsive at 375px. `tsc --noEmit` clean. `vite build` clean. Bundle size within budget.
+  - Route: `/marine` (single route, no `:locationId` param). Add lazy-loaded route to router. Add single nav item with Phosphor `Compass` icon, label "Marine" (i18n). `VisibilityGuard` wraps route — hidden when `"marine"` not in `pages.json`.
+  - **Landing state:** Leaflet map (OpenStreetMap tiles, same tile layer as seismic page) centered on the operator's configured marine locations. Markers for each location. Location list/cards below or beside map (responsive). Per-location card shows: location name, air temperature, hero weather icon for current overall condition, significant wave height, wind speed (knots), water temperature, active alert indicator (color-coded badge: red for warnings, yellow for advisories), last updated timestamp. Data from `GET /api/v1/marine` (location summaries). No numeric scores on the landing page.
+  - **"Use my location" button:** Browser geolocation → find nearest configured location → select it. Graceful fallback if geolocation denied (just don't auto-select).
+  - **Selected state:** Map compresses to hero strip (~120px height, selected marker centered). Activity tabs (viewport ≥768px) or accordions (viewport <768px) rendered below. Each tab/accordion has: activity icon + name + qualitative label in the header. Tab content areas are mounting points for T7.2–T7.5 components. Only tabs for activities enabled at the selected location are shown.
+  - Responsive: map full-width all viewports. Location cards stack single-column at 375px, 2-column at 768px, 3-column at 1024px. Tabs → accordions at <768px breakpoint.
+  - i18n: all text via translation keys. Marine page keys in `marine.json` per locale.
+- Accept: Page loads at `/marine` with map and location markers. Location cards show conditions snapshots (no scores). Selecting a location compresses map and reveals tabs/accordions. Tabs shown on desktop, accordions on mobile. Only activities enabled for the selected location have tabs. `VisibilityGuard` hides the page when not configured. Single nav item appears with Compass icon. `tsc --noEmit` clean. `vite build` clean. Bundle size within budget.
 
-**T7.2 — Surf conditions page**
+**T7.2 — Boating tab content**
 - Owner: `clearskies-dashboard-dev` (Sonnet)
-- Files: New `repos/weewx-clearskies-dashboard/src/pages/Surf.tsx` + `src/components/surf/`
-- Do:
-  - Route: `/surf`. Per-spot cards → detail view.
-  - **Design priority:** Surfers look for high-resolution, localized data on wave height, wind direction, and swell period to determine wave quality and safety. The page must lead with these four essentials:
-    1. **Wave face height** — expected height at the break in feet or meters (this is the post-supplement breaking height from the surf scorer, NOT raw offshore Hs). Displayed prominently on both cards and detail view. The face height is what surfers actually experience; offshore significant wave height is a different, less useful number.
-    2. **Swell period & direction** — time in seconds between waves and the compass angle from which the swell hits the coast. Show both numerically and contextually (e.g., "12s from NW" with a visual indicator of how that angle meets the beach facing). This tells surfers whether they're getting long-period groundswell (clean, powerful) or short-period wind swell (choppy, weak).
-    3. **Wind direction & speed** — critical for spotting clean conditions. Surfers want light offshore winds (blowing from land to sea). The display must make it instantly clear whether wind is offshore (good), cross-shore (mixed), or onshore (poor) relative to the beach facing, not just raw compass direction.
-    4. **Tide chart** — standalone prominent element (not just an overlay on the wave chart). Hourly highs and lows with times, because many breaks only work well during specific tidal phases (e.g., mid-tide incoming, or only at low tide). The tide chart should be large enough to read tide height at any hour and correlate with the wave forecast timeline.
-  - **Spot cards:** Star rating (1–5, visual stars), current wave face height at break, primary swell period, wind direction indicator (arrow with offshore/cross/onshore label), quality label (Poor–Epic), conditions text snippet.
-  - **Detail view:**
-    - 72-hour forecast timeline (horizontal scrollable strip with star ratings at each timestep).
-    - Wave face height chart (72h, showing post-supplement breaking height — the number surfers care about).
-    - Swell breakdown (spectral components as stacked colored bands showing individual swell systems — height, period, and direction per system). This reveals whether conditions are clean groundswell or mixed wind chop.
-    - Wind quality panel: direction relative to beach facing (offshore/cross/onshore label), speed, and trend over the forecast period. Offshore light winds highlighted as ideal conditions.
-    - Tide chart (standalone, 72h, CO-OPS predictions with high/low markers + observed water level overlay). Sized to be independently readable — not squeezed as a secondary overlay.
-    - Beach alignment diagram (simple compass showing swell direction vs beach facing — helps surfers see at a glance whether the swell angle is favorable for their break).
-    - General weather panel: air temperature, precipitation forecast, sky cover — from the configured forecast provider or weewx station. Surfers check this for rain/storms that affect sessions.
-    - Activity-relevant alerts (Beach Hazards Statement, High Surf Advisory/Warning, Rip Current Statement — filtered per ADR-090).
-  - i18n: surf-specific keys in `surf.json`.
-- Accept: Star ratings render visually. Wave face height (not offshore Hs) is the primary displayed height. Swell breakdown shows individual components with period and direction. Wind quality clearly labels offshore/cross/onshore relative to beach facing. Tide chart is a standalone readable element with hourly resolution. Forecast timeline scrollable. Responsive at 375px. Build clean.
+- Files: New `src/components/marine/tabs/BoatingTab.tsx` + supporting components
+- Reference: DASHBOARD-MANUAL §12, DESIGN-MANUAL for card patterns, API-MANUAL §18 marine endpoints
+- Do: Full boating content rendered inside the Boating tab/accordion panel. This is the complete boating data ensemble — not condensed.
+  - Active advisories section (top of tab, visually prominent — dedicated panel listing all active marine zone alerts with severity, headline, and expiry time. Not just a count badge).
+  - Wind panel: current speed/gust/direction (in knots) from NDBC buoy, plus 72h wind forecast chart showing speed and direction shifts (WaveWatch III). Wind displayed in knots (the marine standard — use `group_ocean_speed`).
+  - Wave forecast chart (72h, Recharts area chart with wave height AND period displayed together — dual-axis or overlaid so the relationship between height and period is visible at a glance).
+  - Live buoy observations panel: real-time NDBC data (wind, waves, pressure, air temp, water temp, visibility) with station ID, distance from location, last-update timestamp. Positioned alongside forecast data for easy cross-reference.
+  - Barometric pressure panel: current reading, trend arrow, 6–12h sparkline from NDBC PRES/PTDY.
+  - Visibility indicator: current visibility from NDBC (nautical miles), visibility forecast from NWS marine text.
+  - Tide chart (standalone, 72h, CO-OPS predictions with high/low markers + observed water level overlay). Current speed/direction where available from CO-OPS or NWPS.
+  - NWS marine text forecast (sub-accordion within the tab, one period per section — wind, seas, visibility, weather text).
+  - General weather panel: air temperature, precipitation forecast, sky cover, humidity — from configured forecast provider or weewx station. Labeled "Weather at {location name}" to distinguish from buoy/marine data.
+  - Rip current probability (NWPS v1.5, show-when-available).
+  - Total water level (NWPS v1.5, show-when-available).
+- Accept: All panels render with real data. Wind in knots. Wave height and period displayed together. Active advisories prominent at top. Buoy panel shows station ID and distance. Pressure sparkline renders. Tide chart standalone and readable. Charts display correctly. Responsive within tab container.
 
-**T7.3 — Fishing forecast page**
+**T7.3 — Surfing tab content**
 - Owner: `clearskies-dashboard-dev` (Sonnet)
-- Files: New `repos/weewx-clearskies-dashboard/src/pages/Fishing.tsx` + `src/components/fishing/`
-- Do:
-  - Route: `/fishing`. Per-location → detail view.
-  - **Design priority:** Fishermen use a forecast page to quickly identify peak feeding windows and gauge on-the-water safety. The page must lead with these essentials:
-    1. **"Fishiness" score (0–100)** — the aggregate score from the fishing scorer, displayed as a prominent number per period. Color-coded: 70–100 green (good), 40–69 yellow (fair), 0–39 red (poor). This is the at-a-glance indicator fishermen scan first.
-    2. **Tides & currents** — crucial for both saltwater and tidal river anglers. Show tide stages (high/low times + heights), peak flow times, and tidal movement direction. Many species feed actively during specific tide phases; the tide chart must be prominent and independently readable (not a small sidebar).
-    3. **Solunar tables** — lunar phases, sun/moon rise and set times, and major/minor feeding windows calculated for the specific location. Major periods (moon transit/underfoot) and minor periods (moonrise/moonset) displayed on a visual timeline so fishermen can plan trips around peak windows.
-    4. **Barometric pressure** — the most closely watched weather metric among fishermen. Show current reading, trend arrow (falling/stable/rising), and recent history (6–12h sparkline). Sudden pressure drops often trigger feeding frenzies — this should be visually prominent, not buried in a data table.
-    5. **Water temperature** — impacts fish metabolism and seasonal movements. Show current SST from NDBC/CO-OPS. Species temperature preferences from the scorer provide context (e.g., "Redfish: optimal range" or "Striped bass: water too warm").
-    6. **Wind & swell (informational)** — wind speed, direction, and gusts impact boat control, water clarity, and safety. Swell height and period are vital for surfcasting. Displayed as current conditions, NOT as part of the fishing score (wind/swell scoring deferred pending research — see T4.2). Wind data from NDBC buoy, swell from WaveWatch III/NWPS.
-    7. **Sunrise/sunset** — displayed alongside the solunar timeline. The classic "morning and evening bites" are prime times — dawn and dusk periods should be visually highlighted on the forecast timeline.
-  - **General weather at this location:** Air temperature, precipitation forecast, sky cover, and humidity from the configured forecast provider (on-demand cached) or the weewx station (if operator elected station substitution). Displayed as a compact weather summary panel — fishermen planning a trip need to know if it's going to rain or storm, not just the marine-specific metrics.
-  - **Overview:** 3-day grid with 5–6 periods per day. Each cell shows: overall score (0–100, color-coded), top active species icons/names, solunar indicator (major/minor period marker), sunrise/sunset markers on dawn/dusk periods.
-  - **Detail view:**
-    - Solunar calendar (moon phase, major/minor periods visualized on a 24h timeline with sunrise/sunset markers).
-    - Tide chart (standalone, 72h, CO-OPS predictions with high/low markers + observed water level overlay + current tide stage label). Sized for independent readability.
-    - Barometric pressure panel (current reading, trend arrow, 6–12h sparkline from NDBC buoy or station barometer).
-    - Species activity table (species name, activity status with color, individual component scores on 0–100 scale, water temperature suitability indicator).
-    - Conditions breakdown (pressure trend, tide state, time of day, water temp — each with score bar on 0–100 scale).
-    - Wind & swell panel (informational — current wind speed/direction/gust, swell height/period. Labeled as conditions data, not scored).
-    - CUDEM habitat features (informational: "Drop-off at 200m offshore", "Reef structure at 15m depth").
-    - Activity-relevant alerts (marine zone alerts per ADR-090).
-  - i18n: fishing-specific keys in `fishing.json`.
-- Accept: Period grid renders 3 days × 5–6 periods with 0–100 scores and color coding. Solunar timeline shows major/minor periods with sunrise/sunset. Tide chart is a standalone readable element. Barometric pressure shows trend with sparkline. Species classifications show active/less_active/inactive with 0–100 scores. Wind and swell display as informational (not scored). Responsive at 375px. Build clean.
+- Files: New `src/components/marine/tabs/SurfingTab.tsx` + supporting components
+- Reference: DASHBOARD-MANUAL §12, DESIGN-MANUAL for card patterns, API-MANUAL §18 surf endpoints
+- Do: Full surfing content rendered inside the Surfing tab/accordion panel. This is the complete surfing data ensemble — not condensed.
+  - 72-hour forecast timeline (horizontal scrollable strip with star ratings at each timestep).
+  - Wave face height chart (72h, post-supplement breaking height — the number surfers care about, NOT raw offshore Hs).
+  - Swell breakdown (spectral components as stacked colored bands showing individual swell systems — height, period, and direction per system). Reveals whether conditions are clean groundswell or mixed wind chop.
+  - Wind quality panel: direction relative to beach facing (offshore/cross/onshore label), speed, and trend over the forecast period. Offshore light winds highlighted as ideal conditions.
+  - Tide chart (standalone, 72h, CO-OPS predictions with high/low markers + observed water level overlay). Sized to be independently readable — not squeezed as a secondary overlay.
+  - Beach alignment diagram (simple compass showing swell direction vs beach facing — helps surfers see at a glance whether the swell angle is favorable for their break).
+  - General weather panel: air temperature, precipitation forecast, sky cover — from the configured forecast provider or weewx station.
+  - Activity-relevant alerts (Beach Hazards Statement, High Surf Advisory/Warning, Rip Current Statement — filtered per ADR-090).
+  - Material Symbols `surfing` inline SVG used as the activity icon.
+- Accept: Star ratings render visually. Wave face height (not offshore Hs) is the primary displayed height. Swell breakdown shows individual components with period and direction. Wind quality clearly labels offshore/cross/onshore relative to beach facing. Tide chart is a standalone readable element with hourly resolution. Forecast timeline scrollable. Responsive within tab container. Build clean.
 
-**T7.4 — Beach safety page**
+**T7.4 — Fishing tab content**
 - Owner: `clearskies-dashboard-dev` (Sonnet)
-- Files: New `repos/weewx-clearskies-dashboard/src/pages/BeachSafety.tsx` + `src/components/beach-safety/`
-- Do:
-  - Route: `/beach-safety`. Per-location → detail view.
-  - **Design priority:** Swimmers, sunbathers, and beachgoers need a safety-first page that combines sea state with environmental hazards. Unlike surfers (who seek waves) or boaters (who plan around wind), this audience's primary question is "is it safe to go in the water today?" The page must lead with clear safety signals:
-    1. **Sea state safety indicator** — a simple, color-coded overall assessment (green/yellow/red) derived from wave height and period. Calm conditions: waves under 1–2 ft with long period (10+ seconds, gentle rolling). Moderate: 2–3 ft or short period (4–6 seconds, choppy "washing machine" effect). Dangerous: over 3 ft or very short period. This is NOT the surf quality score — it's an inverted safety assessment (surfers want big waves; swimmers don't).
-    2. **Rip current risk** — the most critical safety element for swimmers. Display the NWS Surf Zone Forecast (SRF, T1.5) rip current risk level (low/moderate/high) prominently. When available, supplement with NWPS v1.5 rip current probability (show-when-available). High rip current risk should be visually alarming (red banner or similar).
-    3. **Tides & currents** — tide schedule with high/low times and heights. Current speed and direction where available from CO-OPS or NWPS. Important for understanding water depth, exposed sandbars, and beach access — and for avoiding getting swept away by longshore currents or tidal flow.
-    4. **Water temperature** — vital for preventing cold shock or hypothermia and for deciding whether a wetsuit is necessary. Display current SST from NDBC/CO-OPS with comfort context (e.g., "65°F — wetsuit recommended" or "78°F — comfortable for swimming"). Temperature thresholds: >75°F comfortable, 65–75°F cool (wetsuit optional), 55–65°F cold (wetsuit recommended), <55°F dangerous (hypothermia risk).
-    5. **Wind speed & direction** — wind dictates surface chop and affects body temperature. Note that offshore winds (land to sea) make the water flat but can push swimmers out, while onshore winds create surface chop. Display with safety context, not just raw numbers.
-    6. **Active alerts** — Beach Hazards Statement, High Surf Advisory/Warning, Rip Current Statement, Coastal Flood Advisory/Warning (filtered per ADR-090). Displayed as a prominent safety banner, similar to the marine page's advisory section.
-    7. **UV Index** — important for prolonged sun exposure. Available from NWS SRF text product (T1.5). Display with exposure guidance (e.g., "8 — Very High: seek shade 10am–4pm, SPF 30+ required").
-    8. **Atmospheric visibility** — fog, rain, or haze affecting beach conditions. From NDBC VIS column.
-  - **What this page does NOT include (v1):**
-    - **Water quality / bacterial counts** — no programmatic data source available in v1. EPA BEACON exists but is a web-only interface with annual state reporting, no REST API. Future enhancement: if EPA or state health departments expose water quality APIs, add a `water_quality` provider. For now, operators can link to their local water quality monitoring site via a configurable URL in the beach safety location config.
-    - **Marine life / wildlife alerts** — no universal US API for jellyfish, shark, or stingray sightings. Regional programs exist (e.g., Atlantic White Shark Conservancy's Sharktivity) but nothing standardizable. Future enhancement: add as operator-managed manual entries or integrate regional APIs when available.
-    - **Underwater visibility / water clarity** — NDBC VIS is atmospheric visibility, not underwater. No NOAA source provides underwater visibility data. Not available in v1.
-    - **Lightning/storm alerts** — covered by the existing general alerts system (Severe Thunderstorm Warning, etc.), which already displays on all pages via the alert banner.
-  - **Overview cards** (no locationId): grid of cards per beach safety location. Each card shows: location name, sea state safety indicator (green/yellow/red), rip current risk level, water temp, next tide, active alert count. Click → detail view.
-  - **Detail view** (with locationId):
-    - Safety alerts banner (top of page — active Beach Hazards, High Surf, Rip Current, Coastal Flood alerts).
-    - Sea state panel: current wave height and period with safety interpretation (calm/moderate/dangerous), color-coded. Wave forecast chart showing height + period over 72h with safety threshold lines overlaid.
-    - Rip current risk panel: NWS SRF rip current risk (low/moderate/high) with safety guidance text per level. NWPS v1.5 rip current probability when available (show-when-available).
-    - Tide chart (standalone, 72h, CO-OPS predictions with high/low markers + observed water level overlay). Current speed/direction where available.
-    - Water temperature panel: current SST with comfort/safety interpretation. Temperature trend if available.
-    - Wind panel: speed, direction, and offshore/onshore context for swimmers.
-    - UV Index: from NWS SRF, with exposure guidance.
-    - Visibility: atmospheric visibility from NDBC.
-    - Wave runup and total water level (NWPS v1.5, show-when-available) — relevant for beach erosion and flooding risk.
-    - General weather panel: air temperature, heat index, precipitation forecast, sky cover, thunderstorm probability — from the configured forecast provider or weewx station. Critical for beach safety (heat stroke, lightning, sudden storms).
-    - Hazardous structures note (if operator has configured structures for this location — informational safety warning about nearby jetties, piers, or boating channels).
-    - Operator-configurable external links section (for local water quality monitoring, lifeguard reports, or wildlife alert services — empty by default, operator adds URLs in admin).
-  - i18n: beach-safety-specific keys in `beach-safety.json`.
-- Accept: Sea state safety indicator renders with correct color coding (green/yellow/red based on wave height + period thresholds). Rip current risk displays prominently from SRF data. Water temperature shows comfort/safety interpretation. UV Index displays with guidance. Safety alerts banner shows relevant alerts. External links section renders when configured, hidden when empty. Responsive at 375px. Build clean.
+- Files: New `src/components/marine/tabs/FishingTab.tsx` + supporting components
+- Reference: DASHBOARD-MANUAL §12, DESIGN-MANUAL for card patterns, API-MANUAL §18 fishing endpoints
+- Do: Full fishing content rendered inside the Fishing tab/accordion panel. This is the complete fishing data ensemble — not condensed.
+  - 3-day period grid (5–6 periods per day). Each cell shows: overall score (0–100, color-coded: 70–100 green, 40–69 yellow, 0–39 red), top active species icons/names, solunar indicator (major/minor period marker), sunrise/sunset markers on dawn/dusk periods.
+  - Solunar calendar (moon phase, major/minor periods visualized on a 24h timeline with sunrise/sunset markers).
+  - Tide chart (standalone, 72h, CO-OPS predictions with high/low markers + observed water level overlay + current tide stage label). Sized for independent readability.
+  - Barometric pressure panel (current reading, trend arrow, 6–12h sparkline from NDBC buoy or station barometer).
+  - Species activity table (species name, activity status with color, individual component scores on 0–100 scale, water temperature suitability indicator).
+  - Conditions breakdown (pressure trend, tide state, time of day, water temp — each with score bar on 0–100 scale).
+  - Wind & swell panel (informational — current wind speed/direction/gust, swell height/period. Labeled as conditions data, not scored).
+  - CUDEM habitat features (informational: "Drop-off at 200m offshore", "Reef structure at 15m depth").
+  - Activity-relevant alerts (marine zone alerts per ADR-090).
+  - i18n: fishing-specific keys in `marine.fishing.*` namespace.
+- Accept: Period grid renders 3 days × 5–6 periods with 0–100 scores and color coding. Solunar timeline shows major/minor periods with sunrise/sunset. Tide chart is a standalone readable element. Barometric pressure shows trend with sparkline. Species classifications show active/less_active/inactive with 0–100 scores. Wind and swell display as informational (not scored). Responsive within tab container. Build clean.
 
-**T7.5 — Now page marine summary card**
+**T7.5 — Beach Safety tab content**
+- Owner: `clearskies-dashboard-dev` (Sonnet)
+- Files: New `src/components/marine/tabs/BeachSafetyTab.tsx` + supporting components
+- Reference: DASHBOARD-MANUAL §12, DESIGN-MANUAL for card patterns, API-MANUAL §18 beach-safety endpoints
+- Do: Full beach safety content rendered inside the Beach Safety tab/accordion panel. This is the complete beach safety data ensemble — not condensed.
+  - Safety alerts banner (top of tab — active Beach Hazards, High Surf, Rip Current, Coastal Flood alerts).
+  - Sea state panel: current wave height and period with safety interpretation (calm/moderate/dangerous), color-coded (green/yellow/red). Wave forecast chart showing height + period over 72h with safety threshold lines overlaid.
+  - Rip current risk panel: NWS SRF rip current risk (low/moderate/high) with safety guidance text per level. NWPS v1.5 rip current probability when available (show-when-available).
+  - Tide chart (standalone, 72h, CO-OPS predictions with high/low markers + observed water level overlay). Current speed/direction where available.
+  - Water temperature panel: current SST with comfort/safety interpretation. Thresholds: >75°F comfortable, 65–75°F cool (wetsuit optional), 55–65°F cold (wetsuit recommended), <55°F dangerous (hypothermia risk).
+  - Wind panel: speed, direction, and offshore/onshore context for swimmers.
+  - UV Index: from NWS SRF, with exposure guidance (e.g., "8 — Very High: seek shade 10am–4pm, SPF 30+ required").
+  - Visibility: atmospheric visibility from NDBC.
+  - Wave runup and total water level (NWPS v1.5, show-when-available) — relevant for beach erosion and flooding risk.
+  - General weather panel: air temperature, heat index, precipitation forecast, sky cover, thunderstorm probability — from the configured forecast provider or weewx station.
+  - Hazardous structures note (if operator has configured structures for this location — informational safety warning).
+  - Operator-configurable external links section (for local water quality monitoring, lifeguard reports, or wildlife alert services — empty by default, operator adds URLs in admin).
+  - **Not included in v1:** water quality/bacterial counts (no programmatic API), marine life/wildlife alerts (no universal API), underwater visibility (NDBC VIS is atmospheric only), lightning/storm alerts (covered by existing general alerts system).
+- Accept: Sea state safety indicator renders with correct color coding (green/yellow/red). Rip current risk displays prominently from SRF data. Water temperature shows comfort/safety interpretation. UV Index displays with guidance. Safety alerts banner shows relevant alerts. External links section renders when configured, hidden when empty. Responsive within tab container. Build clean.
+
+**T7.6 — Now page marine summary card**
 - Owner: `clearskies-dashboard-dev` (Sonnet)
 - Files: Modify `repos/weewx-clearskies-dashboard/src/pages/Now.tsx` or card registry
 - Reference: DASHBOARD-MANUAL now-page layout section, existing card patterns (`now-layout.json`)
-- Do: Add optional marine summary card to `now-layout.json` card registry. Card shows: current wave height + period, water temp (SST), next tide (type + time + height), wind speed/direction, active marine alert count (badge, links to alert detail). Card links to `/marine` detail view. Card hidden when marine not in `pages.json`.
+- Do: Add optional marine summary card to `now-layout.json` card registry. Card shows: current wave height + period, water temp (SST), next tide (type + time + height), wind speed/direction, active marine alert count (badge, links to alert detail). Card links to `/marine`. Card hidden when marine not in `pages.json`.
 - Accept: Card renders in now-page layout when configured. Links work. Hidden when marine not configured. Existing now-page cards unaffected.
 
-**T7.6 — Routing, navigation, pages.json**
-- Owner: `clearskies-dashboard-dev` (Sonnet)
-- Files:
-  - `repos/weewx-clearskies-dashboard/src/router.tsx` (add lazy routes)
-  - `repos/weewx-clearskies-dashboard/src/components/Navigation.tsx` (add nav items)
-  - `repos/weewx-clearskies-dashboard/public/pages.json` or equivalent visibility config
-- Do: Add lazy-loaded routes for `/marine`, `/surf`, `/fishing`, `/beach-safety`. Add navigation items with Phosphor icons (Waves for marine, Surfboard for surf, FishSimple for fishing, SwimmingPool or Umbrella for beach safety). `VisibilityGuard` wraps each route — hidden when page not in `pages.json`. i18n nav item labels.
-- Accept: Navigation shows marine/surf/fishing/beach-safety items when pages are in `pages.json`. Hidden when not. Lazy loading works (code-split chunks). No bundle size regression beyond expected page additions.
-
 ### QC Gate 7
-- Coordinator runs: `ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-dashboard && npm test"` — vitest baseline holds (40 passed) + new page tests pass.
+- Coordinator runs: `ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-dashboard && npm test"` — vitest baseline holds + new tests pass.
 - Coordinator runs: `ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-dashboard && npm run build"` — `tsc --noEmit` clean + `vite build` clean. Check bundle size against budget (200 KB gzipped JS).
 - Coordinator deploys to weather-dev and visually verifies in browser at `https://weather-test.shaneburkhardt.com`:
-  - Marine page loads with real data. Wind in knots. Wave height + period displayed together. Active advisories section prominent at top. Live buoy panel shows NDBC data with station ID. Pressure sparkline renders. Visibility displayed.
-  - Surf page shows star ratings, swell breakdown, forecast timeline.
-  - Fishing page shows period grid, solunar calendar, species table.
-  - Beach safety page loads with sea state safety indicator (green/yellow/red), rip current risk from SRF, water temp with comfort interpretation, UV index, safety alerts banner.
-  - Now-page marine card renders (if configured).
-  - All pages responsive at 375px viewport width.
+  - `/marine` loads with map and location markers. Location cards show conditions snapshots (no numeric scores). Air temp and hero weather icon visible per location.
+  - Selecting a location compresses map to hero strip. Tabs appear on desktop (≥768px), accordions on mobile (<768px).
+  - Boating tab: wind in knots, wave height + period together, active advisories prominent at top, buoy panel with station ID, pressure sparkline, tide chart standalone.
+  - Surfing tab: star ratings, swell breakdown, forecast timeline, wind quality (offshore/cross/onshore), tide chart standalone. Material Symbols `surfing` icon renders.
+  - Fishing tab: period grid with 0–100 scores, solunar calendar, species table, pressure sparkline.
+  - Beach Safety tab: sea state indicator (green/yellow/red), rip current risk from SRF, water temp with comfort interpretation, UV index, safety alerts.
+  - Now-page marine card renders (if configured). Links to `/marine`.
+  - All content responsive at 375px viewport.
   - Light and dark mode both work.
-  - Navigation items appear/disappear based on pages.json (including beach-safety).
+  - Single "Marine" nav item appears/disappears based on pages.json.
+  - Only tabs for activities enabled at selected location are shown.
+  - Activity icons correct: Sailboat (boating), surfing SVG (surfing), FishSimple (fishing), PersonSimpleSwim (beach safety).
 
 ### QA Gate 7
-- `clearskies-auditor`: verifies all user-facing text uses i18n translation keys (no hardcoded English strings). Verifies all 13 locale files have marine/surf/fishing/beach-safety translation keys (may be machine-translated placeholders — presence check only). Verifies all pages use `VisibilityGuard`. Verifies no page imports increase the main bundle chunk (all pages lazy-loaded). Verifies beach safety page does NOT include water quality, wildlife alerts, or underwater visibility (explicitly out of scope for v1 — see T7.4 "What this page does NOT include").
+- `clearskies-auditor`: verifies all user-facing text uses i18n translation keys (no hardcoded English). Verifies all 13 locale files have marine translation keys (presence check). Verifies page uses `VisibilityGuard`. Verifies page import doesn't increase main bundle chunk (lazy-loaded). Verifies beach safety tab does NOT include water quality, wildlife alerts, or underwater visibility (v1 scope exclusion). Verifies Material Symbols `surfing` SVG is inlined (not imported from external CDN). Verifies activity icons match spec (Sailboat, surfing SVG, FishSimple, PersonSimpleSwim). Verifies tab/accordion breakpoint at 768px. Verifies single `/marine` route (no `/surf`, `/fishing`, `/beach-safety` routes).
 
 ---
 
@@ -1464,23 +1464,23 @@ Full-stack validation against real NOAA data for a configured test location. Doc
   - Configure a test marine location on weewx + weather-dev: Wrightsville Beach (34.21, -77.79), activities: marine + surf + fishing + beach_safety. Nearest NDBC station: 41025. Nearest CO-OPS: 8658163. Marine zone: AMZ250.
   - Deploy via `scripts/deploy-api.sh` (API to weewx) and `scripts/redeploy-weather-dev.sh` (dashboard + config to weather-dev). Wait for cache warmer (~2 min).
   - **Smoke checklist** (at `https://weather-test.shaneburkhardt.com`):
-    - [ ] `/marine` page loads with location card for Wrightsville Beach
-    - [ ] Click card → detail view with buoy data, wave chart (height + period together), tide chart, NWS text forecast, wind in knots, pressure sparkline, visibility
-    - [ ] `/surf` page loads with star rating for Wrightsville Beach
-    - [ ] Surf detail shows wave face height (not offshore Hs), swell breakdown, forecast timeline, conditions text, wind quality (offshore/cross/onshore), standalone tide chart
-    - [ ] `/fishing` page loads with 3-day period grid, scores on 0–100 scale
-    - [ ] Fishing detail shows solunar calendar, species table, conditions breakdown, pressure sparkline, wind/swell informational panel
-    - [ ] `/beach-safety` page loads with sea state safety indicator (green/yellow/red)
-    - [ ] Beach safety detail shows rip current risk from SRF, water temp with comfort interpretation, UV index with guidance, tide chart, safety alerts banner
+    - [ ] `/marine` loads with map and location markers, Wrightsville Beach card shows conditions snapshot (air temp, hero icon, wave height, wind, water temp)
+    - [ ] Selecting Wrightsville Beach compresses map to hero strip, reveals activity tabs (desktop) / accordions (mobile)
+    - [ ] Boating tab: wind in knots, wave height + period together, active advisories, buoy panel with station ID, pressure sparkline, tide chart, NWS text forecast
+    - [ ] Surfing tab: star ratings, wave face height (not offshore Hs), swell breakdown, forecast timeline, wind quality (offshore/cross/onshore), tide chart, beach alignment
+    - [ ] Fishing tab: 3-day period grid with 0–100 scores, solunar calendar, species table, pressure sparkline, wind/swell informational
+    - [ ] Beach Safety tab: sea state indicator (green/yellow/red), rip current risk from SRF, water temp with comfort interpretation, UV index, safety alerts
     - [ ] `/api/v1/marine` returns valid JSON with freshness block
     - [ ] `/api/v1/surf/wrightsville-beach` returns star ratings
     - [ ] `/api/v1/fishing/wrightsville-beach` returns period scores on 0–100 scale
     - [ ] `/api/v1/almanac/solunar` returns solunar times matching published tables
     - [ ] Marine alerts display when active (may need to wait for SCA/Gale event)
     - [ ] Now-page marine summary card renders (if added to layout)
-    - [ ] All pages responsive at 375px
-    - [ ] Light/dark mode works on all new pages
-    - [ ] Navigation shows all four marine pages (marine, surf, fishing, beach-safety) when configured
+    - [ ] All content responsive at 375px viewport
+    - [ ] Light/dark mode works on all tabs
+    - [ ] Single "Marine" nav item appears/disappears based on pages.json
+    - [ ] Tabs ↔ accordions at 768px breakpoint
+    - [ ] Activity icons correct: Sailboat, surfing SVG, FishSimple, PersonSimpleSwim
     - [ ] Existing pages (now, forecast, almanac, etc.) unaffected — no regressions
     - [ ] API pytest: full suite passes, baseline holds
     - [ ] Dashboard: `tsc --noEmit` + `vite build` clean, bundle within budget
@@ -1496,6 +1496,7 @@ Full-stack validation against real NOAA data for a configured test location. Doc
   - `docs/manuals/OPERATIONS-MANUAL.md` — verify config sections, install instructions, wizard steps match implementation.
   - `contracts/canonical-data-model.md` — verify marine models and unit groups documented.
   - API `api.conf.example` — add example `[marine]` section with comments.
+  - `docs/contracts/openapi-v1.yaml` + dashboard `src/api/openapi-v1.yaml` — add marine/tides/surf/fishing/beach-safety/solunar endpoint schemas and response models. Phase 5 deployed these endpoints but never updated the OpenAPI spec. Dashboard `generated-types.ts` is unused (codebase uses hand-written types in `types.ts`), but the spec should still be complete.
 - Do: Read each governing document section added in Phase 0B. Compare against the actual implemented code. Fix discrepancies — the code is authoritative at this point; the docs must match the code.
 - Accept: grep across all governing documents for "TODO"/"TBD"/"FIXME" — zero hits in marine-related sections. Every marine endpoint documented in ARCHITECTURE.md and API-MANUAL matches a real route in the code. Every config key documented in OPERATIONS-MANUAL exists in `settings.py` or `marine_config.py`.
 
