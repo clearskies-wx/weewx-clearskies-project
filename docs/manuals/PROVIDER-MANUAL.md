@@ -1426,9 +1426,13 @@ NWPS v1.5 fields are show-when-available: display when the WFO provides them, ab
 
 **Not a dispatch-registered provider module.** The bathymetry component (`enrichment/bathymetry.py`) is a data-access layer that downloads and stores depth profiles. It runs once per surf/fishing spot at setup time, not per-request.
 
-**Data source:** NOAA Continuously Updated Digital Elevation Model (CUDEM) at 1/9 arc-second resolution (~3.4m). Accessed via NCEI THREDDS/OPeNDAP. CUDEM covers all US coastal areas including territories (Hawaii, PR, USVI, Guam, CNMI, American Samoa).
+**Data source:** NOAA Continuously Updated Digital Elevation Model (CUDEM). CUDEM covers all US coastal areas including territories (Hawaii, PR, USVI, Guam, CNMI, American Samoa).
 
-At 3.4m resolution, individual reef structures, sandbars, ledges, and channel edges are visible — producing accurate slope computations for the Battjes γ formula (ADR-084 supplement 1) and rich habitat profiles for fishing (drop-offs, reefs, ledges, channels, pinnacles).
+**v1 access method:** OpenTopoData CUDEM REST endpoint (`https://api.opentopodata.org/v1/cudem`) at 1/3 arc-second resolution (~10m). Simple, stable, keyless REST API. Rate limit: 1 req/sec, max 100 locations per request. At 10m resolution, large features (drop-offs, ledges, reef structures, channels) are visible and slope computation is accurate for the Battjes γ formula.
+
+**Future upgrade:** NCEI THREDDS/OPeNDAP direct access at 1/9 arc-second (~3.4m) for finer resolution — individual reef structures, sandbars, and channel edges become visible. THREDDS OPeNDAP subsetting is materially more complex to integrate (NetCDF/OPeNDAP client, dataset/grid discovery per region) and was deferred out of v1 scope.
+
+At v1 resolution (~10m), slope computations for the Battjes γ formula (ADR-084 supplement 1) are accurate and large habitat features are identifiable for fishing (drop-offs, reefs, ledges, channels, pinnacles).
 
 **Profile extraction:** For a surf or fishing spot:
 1. Request a transect of depth points from shore to offshore along the beach-facing direction

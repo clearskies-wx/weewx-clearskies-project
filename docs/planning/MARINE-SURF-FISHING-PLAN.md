@@ -1,8 +1,8 @@
 # Marine, Surf & Fishing Forecast — Implementation Plan
 
-**Status:** Phase 1 implementation complete, QC Gate 1 pending (requires push + deploy)  
+**Status:** Phase 3 ✓ COMPLETE — QC Gate 3 passed 2026-07-10  
 **Created:** 2026-07-08  
-**Last updated:** 2026-07-09 (all 7 Phase 1 tasks committed; grid overlap + manual corrections applied)  
+**Last updated:** 2026-07-10 (QC Gate 3 passed: pushed, deployed, 94 targeted tests passed, full suite 3949 passed/0 new failures, API health 200)  
 **Components:** API (`weewx-clearskies-api`), Dashboard (`weewx-clearskies-dashboard`), Config UI (`weewx-clearskies-stack`)
 
 ## Context
@@ -493,11 +493,11 @@ Define response models, config structures, and unit groups. No provider calls, n
 
 ---
 
-## PHASE 1 — NOAA Provider Modules + Marine Zone Alerts — IMPLEMENTATION COMPLETE, QC PENDING
+## PHASE 1 — NOAA Provider Modules + Marine Zone Alerts — ✓ COMPLETE
 
 Five provider modules following the existing contract (PROVIDER-MANUAL §1–§7: module identity, `CAPABILITY` constant, wire-shape Pydantic models, normalization to canonical types, cache layer, error handling via `ProviderHTTPClient`, `fetch()` entrypoint). Plus marine zone alerts extension to the existing alert system.
 
-**All tasks committed (2026-07-09). QC Gate 1 not yet run (requires push + deploy).**
+**QC Gate 1 passed (2026-07-10).** Pushed to GitHub, deployed to weewx (health 200), all 5 provider imports verified, dispatch registry confirmed (5 marine entries), alerts regression verified (`marine_zone_ids` default `None`), 190 targeted tests passed (0 failed). Full suite: 3799 passed; 95 pre-existing failures in `aqi/test_openweathermap` — unrelated to marine changes.
 
 | Task | Commit | Lines | Status |
 |------|--------|-------|--------|
@@ -662,9 +662,17 @@ Five provider modules following the existing contract (PROVIDER-MANUAL §1–§7
 
 ---
 
-## PHASE 2 — NWPS GRIB Provider
+## PHASE 2 — NWPS GRIB Provider — ✓ COMPLETE
 
 Primary nearshore data source for US. Requires eccodes (native dependency per ADR-085). This phase produces the NWPS provider module that Phase 3's supplements operate on.
+
+**QC Gate 2 passed (2026-07-10).** Pushed to GitHub (928af62), deployed to weewx (health 200). 56 targeted tests passed (0 failed). eccodes not installed on weewx (expected — marine feature not yet enabled); CAPABILITY correctly None when GRIB backend absent. pyproject.toml `[marine]` extra wired. WFO determination verified by code inspection: Wrightsville Beach → ILM, Huntington Beach → LOX, Galveston → HGX.
+
+| Task | Commit | Lines | Status |
+|------|--------|-------|--------|
+| T2.1 GRIBProcessor port | 928af62 | 424 | Done |
+| T2.2 NWPS provider module | 928af62 | 583 | Done |
+| T2.3 eccodes dependency wiring | 928af62 | pyproject.toml + Dockerfile | Done |
 
 ### Tasks
 
@@ -783,9 +791,24 @@ Primary nearshore data source for US. Requires eccodes (native dependency per AD
 
 ---
 
-## PHASE 3 — NOAA CUDEM Bathymetry + Surf Physics Enrichment
+## PHASE 3 — NOAA CUDEM Bathymetry + Surf Physics Enrichment — ✓ COMPLETE
 
-Enrichment processors (not provider modules). Take NWPS data → apply site-specific supplements → produce surf quality forecasts. These are registered as enrichment processors in the API's enrichment pipeline, following the pattern of `enrichment/conditions_text.py`. Bathymetry uses NOAA CUDEM (~3.4m resolution, covers all US coastal areas including territories) via NCEI THREDDS/OPeNDAP — replaces the originally planned GEBCO/OpenTopoData access (ADR-084, Phase 0A decision).
+Enrichment processors (not provider modules). Take NWPS data → apply site-specific supplements → produce surf quality forecasts. Bathymetry uses NOAA CUDEM via OpenTopoData REST endpoint (~10m resolution v1; THREDDS/OPeNDAP at ~3.4m deferred to future upgrade — see PROVIDER-MANUAL §14.7).
+
+**QC Gate 3 passed (2026-07-10).** Pushed to GitHub (e70e5a3), deployed to weewx (health 200). 94 targeted tests passed (0 failed). Full suite: 3949 passed, 0 new failures (95 pre-existing OWM AQI failures unchanged). PROVIDER-MANUAL §14.7 updated for v1 OpenTopoData access method.
+
+| Task | Commit | Lines | Status |
+|------|--------|-------|--------|
+| T3.1 CUDEM bathymetry processor | ce9ac4e | 714 | Done |
+| T3.2 NWPS supplement processor | 2b28331 | 363 | Done |
+| T3.3 Surf quality scorer | 5be33fc | 565 | Done |
+| Test fix (shoaling assertion) | e70e5a3 | — | Done |
+
+**Resolved issues:**
+1. v1 data source: OpenTopoData CUDEM (1/3 arc-second, ~10m) chosen over THREDDS/OPeNDAP (complex integration). PROVIDER-MANUAL §14.7 updated.
+2. Habitat features: all 5 types from manual implemented (dropoff, ledge, reef, channel, pinnacle).
+3. i18n: surf_scorer uses `locale: str | None = None` per API-MANUAL §17, not brief's hardcoded `"en"`.
+4. Time-of-day: dawn adjustment implemented; afternoon detection deferred (no UTC offset in function signature).
 
 ### Tasks
 
