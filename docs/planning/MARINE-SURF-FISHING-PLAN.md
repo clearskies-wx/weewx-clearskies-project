@@ -2,7 +2,7 @@
 
 **Status:** Phase 6 ✓ COMPLETE — QC Gate 6 passed 2026-07-10  
 **Created:** 2026-07-08  
-**Last updated:** 2026-07-10 (QC Gate 6 passed: pushed, deployed, API health 200, config UI restarted)  
+**Last updated:** 2026-07-10 (QC Gate 6 passed: pushed, deployed, API health 200, config UI restarted, 180 targeted API tests passed, 46 stack tests passed)  
 **Components:** API (`weewx-clearskies-api`), Dashboard (`weewx-clearskies-dashboard`), Config UI (`weewx-clearskies-stack`)
 
 ## Context
@@ -87,9 +87,10 @@ Clear Skies needs marine, surf, and fishing forecast capabilities. Two pre-Clear
 
 | Suite | Baseline | Command |
 |-------|----------|---------|
-| API pytest | 2311 passed, 365 skipped, 0 failed | `ssh weewx "cd /home/ubuntu/repos/weewx-clearskies-api && uv run pytest --tb=no -q 2>&1 \| tail -3"` |
-| Dashboard vitest | 40 passed, 0 skipped, 0 failed | `ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-dashboard && npm test -- --reporter=verbose 2>&1 \| tail -5"` |
+| API pytest | 4079 passed, 341 skipped, 96 failed (pre-existing OWM AQI) | `ssh weewx "cd /home/ubuntu/repos/weewx-clearskies-api && uv run pytest --tb=no -q 2>&1 \| tail -3"` |
+| Dashboard vitest | 320 passed, 26 failed (pre-existing) | `ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-dashboard && npm test -- --reporter=verbose 2>&1 \| tail -5"` |
 | Dashboard bundle | 96.21 KB gzipped (48% of 200 KB budget) | `ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-dashboard && npm run build 2>&1 \| grep gzip"` |
+| Stack pytest | 46 passed, 11 xfailed, 0 failed | `ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-stack && .venv/bin/python -m pytest -q 2>&1 \| tail -3"` |
 
 ---
 
