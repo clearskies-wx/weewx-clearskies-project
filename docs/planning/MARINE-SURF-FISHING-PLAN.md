@@ -1,8 +1,8 @@
 # Marine, Surf & Fishing Forecast — Implementation Plan
 
-**Status:** Phase 4 ✓ COMPLETE — QC Gate 4 passed 2026-07-10  
+**Status:** Phase 5 ✓ COMPLETE — QC Gate 5 passed 2026-07-10  
 **Created:** 2026-07-08  
-**Last updated:** 2026-07-10 (QC Gate 4 passed: pushed, deployed, 59 targeted tests passed, API health 200)  
+**Last updated:** 2026-07-10 (QC Gate 5 passed: pushed, deployed, 131 targeted tests passed, API health 200)  
 **Components:** API (`weewx-clearskies-api`), Dashboard (`weewx-clearskies-dashboard`), Config UI (`weewx-clearskies-stack`)
 
 ## Context
@@ -1020,9 +1020,28 @@ Parallel with Phases 1–3. Only depends on Phase 0C models. Can be dispatched a
 
 ---
 
-## PHASE 5 — API Endpoints
+## PHASE 5 — API Endpoints — ✓ COMPLETE
 
 Wire provider data + enrichment output to REST endpoints. All follow existing endpoint patterns: check capability → fetch from provider → normalize → apply unit conversion → attach freshness/stationClock. Reference implementation: `routes/earthquakes.py`.
+
+**QC Gate 5 passed (2026-07-10).** Pushed to GitHub (bc49a6d), deployed to weewx (health 200). 131 targeted tests passed (0 failed): 9 solunar + 50 fishing scorer + 21 marine endpoint + 23 tides endpoint + 12 surf endpoint + 17 fishing endpoint + 22 beach-safety endpoint (includes Phase 4 regression).
+
+| Task | Commit | Lines | Status |
+|------|--------|-------|--------|
+| T5.1 Marine endpoint | 77cd429 | 382 | Done |
+| T5.2 Tides endpoint | 77cd429 | 254 | Done |
+| T5.3 Surf endpoint | 0659754 | ~700 | Done |
+| T5.4 Fishing endpoint | 0659754 | ~700 | Done |
+| T5.5 Beach safety endpoint | 0659754 | ~700 | Done |
+| T5.6 Router wiring + freshness | bc49a6d | 33 | Done |
+| T5.7 Pages entries | bc49a6d | (in T5.6 commit) | Done |
+
+**Resolved issues:**
+1. GET /marine (no locationId): API-MANUAL §18 said "first configured location"; implemented as location list per dashboard design requirements (T7.1 card grid). Doc-code sync pending.
+2. CO-OPS function names: brief named `fetch_predictions()`/`fetch_water_levels()` but actual API is `coops.fetch(station_id, products=(...))` returning a dict. Used actual API.
+3. MarineBundle has no tide fields — CO-OPS traffic handled exclusively by tides.py, not duplicated in marine.py.
+4. Marine unit groups not in `get_units_block()`'s `_GROUP_MEMBERS` — endpoints use `get_target_unit()` + local preset table per API-MANUAL §16. Operator overrides for marine groups deferred.
+5. No *BundleResponse Pydantic envelope classes — endpoints return plain dicts with standard envelope, matching get_solunar() pattern.
 
 ### Tasks
 
