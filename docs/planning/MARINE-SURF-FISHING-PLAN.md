@@ -1,8 +1,8 @@
 # Marine, Surf & Fishing Forecast — Implementation Plan
 
-**Status:** Phase 3 ✓ COMPLETE — QC Gate 3 passed 2026-07-10  
+**Status:** Phase 4 ✓ COMPLETE — QC Gate 4 passed 2026-07-10  
 **Created:** 2026-07-08  
-**Last updated:** 2026-07-10 (QC Gate 3 passed: pushed, deployed, 94 targeted tests passed, full suite 3949 passed/0 new failures, API health 200)  
+**Last updated:** 2026-07-10 (QC Gate 4 passed: pushed, deployed, 59 targeted tests passed, API health 200)  
 **Components:** API (`weewx-clearskies-api`), Dashboard (`weewx-clearskies-dashboard`), Config UI (`weewx-clearskies-stack`)
 
 ## Context
@@ -912,9 +912,24 @@ Enrichment processors (not provider modules). Take NWPS data → apply site-spec
 
 ---
 
-## PHASE 4 — Fishing Enrichment (Solunar + Scoring)
+## PHASE 4 — Fishing Enrichment (Solunar + Scoring) — ✓ COMPLETE
 
 Parallel with Phases 1–3. Only depends on Phase 0C models. Can be dispatched as independent agent work alongside Phase 1 provider modules.
+
+**QC Gate 4 passed (2026-07-10).** Pushed to GitHub (ae78867), deployed to weewx (health 200). 59 targeted tests passed (9 solunar + 50 fishing scorer, 0 failed).
+
+| Task | Commit | Lines | Status |
+|------|--------|-------|--------|
+| T4.1 Solunar computation | 8b65bc6 | 242 | Done |
+| T4.2 Fishing scorer + species data | ae78867 | 1210 (713+497) | Done |
+| T4.3 Solunar almanac endpoint | d17e20f | 76 | Done |
+
+**Resolved issues:**
+1. moonPhase wire format: `_phase_name_from_angle()` returns hyphens ("waxing-crescent"); SolunarTimes model documents underscores ("waxing_crescent"). Resolved: solunar.py converts via `.replace("-", "_")` per wire contract.
+2. Transit/underfoot window: station-local calendar-day window frequently misses underfoot event. Resolved: ±1-day widened search, pick closest to day center.
+3. FishingForecast period_start/end: brief signature lacked period window inputs. Resolved: added `period_start_utc`/`period_end_utc` optional kwargs (default "").
+4. Habitat features: FishingForecast is per-period, habitat features are per-spot/static. Resolved: standalone `get_habitat_features()` wrapper; model field deferred to Phase 5 endpoints.
+5. Scoring weights: API-MANUAL §17 authoritative (0.30/0.25/0.20/0.15/0.10 five-component), not the plan's four-component (0.4/0.3/0.2/0.1).
 
 ### Tasks
 
