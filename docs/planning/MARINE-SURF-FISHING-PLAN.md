@@ -89,7 +89,7 @@ Clear Skies needs marine, surf, and fishing forecast capabilities. Two pre-Clear
 |-------|----------|---------|
 | API pytest | 4079 passed, 341 skipped, 96 failed (pre-existing OWM AQI) | `ssh weewx "cd /home/ubuntu/repos/weewx-clearskies-api && uv run pytest --tb=no -q 2>&1 \| tail -3"` |
 | Dashboard vitest | 320 passed, 26 failed (pre-existing) | `ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-dashboard && npm test -- --reporter=verbose 2>&1 \| tail -5"` |
-| Dashboard bundle | 96.21 KB gzipped (48% of 200 KB budget) | `ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-dashboard && npm run build 2>&1 \| grep gzip"` |
+| Dashboard bundle | 201.95 KB gzipped main chunk; marine lazy chunk 20.47 KB gzip (isolated) | `ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-dashboard && npm run build 2>&1 \| grep gzip"` |
 | Stack pytest | 46 passed, 11 xfailed, 0 failed | `ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-stack && .venv/bin/python -m pytest -q 2>&1 \| tail -3"` |
 
 ---
