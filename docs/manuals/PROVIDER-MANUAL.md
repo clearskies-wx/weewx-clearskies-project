@@ -1424,7 +1424,7 @@ Map to `SurfZoneForecast` canonical model.
 
 **CAPABILITY:** `geographic_coverage = "us_coastal"`, `auth_required = []`. `supplied_canonical_fields` includes nearshore wave height, period, direction, currents, bottom orbital velocity. Conditional fields (show-when-available, ~12 WFOs): rip current probability, total water level, wave runup.
 
-**Native dependency:** Requires eccodes (ECMWF GRIB processing library). See OPERATIONS-MANUAL §1 for install instructions. At module registration time, attempt `import eccodes` (fallback: `import pygrib`). If both fail, raise `MissingDependencyError` with platform-specific install instructions. The rest of the API continues functioning — only the marine feature is blocked.
+**Native dependency:** Requires eccodes (ECMWF GRIB processing library). See OPERATIONS-MANUAL §1 for install instructions. At module registration time, attempt `import eccodes` (fallback: `import pygrib`). If both fail, raise `MissingDependencyError` with platform-specific install instructions. The rest of the API continues functioning — only the marine feature is blocked. The setup wizard also probes this ahead of time via `GET /setup/marine/eccodes-check` (Marine Remediation Plan T3.6) — same `GRIB_AVAILABLE` detection from `providers/marine/grib_processor.py`, checked before the operator is allowed to enable marine features, so an operator on a host without eccodes is warned before configuring locations rather than after saving.
 
 **Wire format and parsing:**
 
