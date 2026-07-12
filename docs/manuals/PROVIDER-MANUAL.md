@@ -1226,14 +1226,14 @@ NDBC serves flat files over HTTP (not a REST API). Three file types per station:
 | File | URL pattern | Format | Content |
 |---|---|---|---|
 | Standard met (`.txt`) | `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.txt` | Fixed-width text columns | Wind, waves, pressure, temp, visibility |
-| Spectral density (`.data_spec`) | `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.data_spec` | `VALUE(FREQ)` token pairs (46 bands) | Wave energy density (m²/Hz) at 0.02–0.485 Hz |
-| Spectral direction (`.swdir`) | `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.swdir` | `VALUE(FREQ)` token pairs (46 bands) | Mean wave direction (degrees) at each frequency |
+| Spectral density (`.data_spec`) | `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.data_spec` | `VALUE(FREQ)` token pairs (variable, typically 47–98 depending on station) | Wave energy density (m²/Hz) at 0.02–0.485 Hz |
+| Spectral direction (`.swdir`) | `https://www.ndbc.noaa.gov/data/realtime2/{stationId}.swdir` | `VALUE(FREQ)` token pairs (variable, typically 47–98 depending on station) | Mean wave direction (degrees) at each frequency |
 
 **Standard met parsing:** First two rows are headers (column names + units). Data rows follow, most recent first. Parse the most recent row. Columns: WDIR, WSPD, GST, WVHT, DPD, APD, MWD, PRES, ATMP, WTMP, DEWP, VIS, PTDY, TIDE. Handle `MM` markers as `None` (missing data — not an error). NDBC reports in metric (m, m/s, °C, hPa) — convert via `UnitTransformer` to canonical types.
 
 **Spectral decomposition (when `.data_spec`/`.swdir` available):**
 
-1. Parse energy density at each of 46 frequency bands from `.data_spec` (most recent row).
+1. Parse energy density at each frequency band from `.data_spec` (most recent row; band count varies by station, typically 47–98).
 2. Parse mean direction at each band from `.swdir`.
 3. Identify spectral peaks: local maxima where energy(f) > energy(f-1) and energy(f) > energy(f+1).
 4. Discard peaks below 5% of the dominant peak's energy (noise threshold).
@@ -1246,7 +1246,7 @@ NDBC serves flat files over HTTP (not a REST API). Three file types per station:
 7. Cap at 4 swell systems. If more peaks detected, merge weakest into adjacent partitions.
 8. Map each partition to a `SpectralWaveComponent` canonical model.
 
-No scipy dependency — 46 values, not a signal processing problem.
+No scipy dependency — at most ~100 values per station, not a signal processing problem.
 
 **Station discovery:** Fetch `https://www.ndbc.noaa.gov/activestations.xml`. Parse XML for station ID, coordinates, sensor types. Differentiate station capabilities:
 - **Full capability:** wave sensors + atmospheric sensors + spectral (3 file types)
@@ -1368,9 +1368,39 @@ Variables (all 9 are `[time][depth][latitude][longitude]`): `Thgt` (significant 
 
 **Wire format and parsing:**
 
-`GET https://api.weather.gov/products/types/SRF/locations/{wfo}` to get the latest SRF text product for the WFO covering the spot. The SRF (Surf Zone Forecast) is a free-text product issued 1–2 times per day. It contains per-county-zone forecasts for 2 days.
+`GET https://api.weather.gov/products/types/SRF/locations/{wfo}` to get the latest SRF text product for the WFO covering the spot. The SRF (Surf Zone Forecast) is a free-text product issued 1–2 times per day. It contains per-county-zone forecasts for 2+ days.
 
-Parse the text product to extract per-county-zone:
+**SRF text structure (zone-then-period, verified from live WFO ILM product 2026-07-11):**
+
+The SRF product contains multiple county-zone sections separated by `$$`. Each zone section:
+
+1. **UGC line** — zone ID + expiration (e.g., `NCZ108-120515-`)
+2. **Zone name** — human-readable (e.g., `NEW HANOVER COUNTY BEACHES`)
+3. **Beach list** — enumeration of specific beaches covered
+4. **Period blocks** — each starts with a period marker (`.REST OF TODAY...`, `.SUNDAY...`, `.MONDAY NIGHT...`, `.EXTENDED...`)
+5. **Footnotes** — after `&&` at end of each zone section (asterisk-annotated field definitions)
+
+Within each period block, field labels use dot-leaders with optional asterisk footnote annotations:
+```
+Rip Current Risk*...........Moderate.
+Surf Height.................2 to 4 feet.
+UV Index**..................8.
+Winds.......................Southwest 10 to 15 mph.
+Water Temperature...........78 degrees.
+```
+
+Key format details:
+- Field names may have 0–3 asterisks between the name and the dot-leaders (footnote annotations)
+- "Winds" (plural) is the standard label — not "Wind"
+- Period labels include: `REST OF TODAY`, day-of-week names (`SUNDAY`, `MONDAY`, etc.), `TONIGHT`, `TOMORROW`, `TOMORROW NIGHT`, `EXTENDED`
+- Some zones split fields into sub-regions (e.g., "East of Ocean Isle Beach" / "Ocean Isle Beach West")
+- Compound rip-current-risk values (e.g., "MODERATE TO HIGH") resolve to the higher-risk category (safety-critical)
+
+**Parser approach:** Split text by `$$` into zone sections → match target zone by UGC code prefix in the zone's UGC line → strip footnotes after `&&` → parse period blocks within that section → extract field values.
+
+**County-zone matching:** The spot's public forecast zone ID (from `/points/{lat},{lon}` → `properties.forecastZone`) identifies the UGC zone prefix to search for in the SRF text's zone sections.
+
+Parse the text product to extract per-county-zone per-period:
 - Rip current risk: `low`, `moderate`, or `high`
 - Surf height: breaking wave height range (min/max in feet)
 - UV index: integer 1–11+
@@ -1378,7 +1408,7 @@ Parse the text product to extract per-county-zone:
 - Wind: text description
 - Hazards: text statement
 
-Map to `SurfZoneForecast` canonical model. The SRF is per coastal county — match the spot's coordinates to the appropriate county zone using the NWS `/zones/forecast` endpoint to determine the spot's public forecast zone.
+Map to `SurfZoneForecast` canonical model.
 
 **WFO determination:** Reuse the NWS `/points` → CWA lookup from the shared zone discovery utility (§14.8).
 
@@ -1386,7 +1416,7 @@ Map to `SurfZoneForecast` canonical model. The SRF is per coastal county — mat
 
 **Error handling:** WFO with no SRF product (not all WFOs issue SRF) → empty result (not error). Text parsing failure → log WARNING with the raw text, return partial result for successfully parsed fields.
 
-**Rate limiting:** Shared 5 req/s to `api.weather.gov` (same as §14.4 and NWS alerts).
+**Rate limiting:** Per-module rate limiter (5 req/s to `api.weather.gov`), matching the established per-module pattern used by other NWS providers.
 
 ### §14.6 NWPS nearshore wave data
 
@@ -1438,11 +1468,22 @@ NWPS v1.5 fields are show-when-available: display when the WFO provides them, ab
 
 **Data source:** NOAA Continuously Updated Digital Elevation Model (CUDEM). CUDEM covers all US coastal areas including territories (Hawaii, PR, USVI, Guam, CNMI, American Samoa).
 
-**v1 access method:** OpenTopoData CUDEM REST endpoint (`https://api.opentopodata.org/v1/cudem`) at 1/3 arc-second resolution (~10m). Simple, stable, keyless REST API. Rate limit: 1 req/sec, max 100 locations per request. At 10m resolution, large features (drop-offs, ledges, reef structures, channels) are visible and slope computation is accurate for the Battjes γ formula.
+**Access method:** NCEI ArcGIS ImageServer at `https://gis.ngdc.noaa.gov/arcgis/rest/services/DEM_mosaics/DEM_all/ImageServer/identify` — serves CUDEM 1/9 arc-second (~3.4m) data via REST point queries. Free, no API key, returns JSON.
 
-**Future upgrade:** NCEI THREDDS/OPeNDAP direct access at 1/9 arc-second (~3.4m) for finer resolution — individual reef structures, sandbars, and channel edges become visible. THREDDS OPeNDAP subsetting is materially more complex to integrate (NetCDF/OPeNDAP client, dataset/grid discovery per region) and was deferred out of v1 scope.
+Query format:
+```
+GET /identify?geometry={lon},{lat}&geometryType=esriGeometryPoint&returnGeometry=false&f=json
+→ {"value": "-3.30559", "catalogItems": {"features": [{"attributes": {"Name": "ncei19_n34x25_w078x00_2019v1"}}]}}
+```
 
-At v1 resolution (~10m), slope computations for the Battjes γ formula (ADR-084 supplement 1) are accurate and large habitat features are identifiable for fishing (drop-offs, reefs, ledges, channels, pinnacles).
+- `value`: string float, elevation in meters relative to MSL (negative = underwater)
+- `catalogItems.features[0].attributes.Name`: CUDEM tile name (prefix `ncei19` confirms 1/9 arc-second data)
+- `"NoData"` or null value: point is outside CUDEM coverage (return None)
+- No batch support — one point per request. Rate limit: 2 req/s (conservative; no documented limit)
+
+At 1/9 arc-second resolution (~3.4m), individual reef structures, sandbars, channel edges, and fine bathymetric detail are visible in addition to large features (drop-offs, ledges). Slope computations for the Battjes γ formula (ADR-084 supplement 1) are highly accurate.
+
+**Unified bounding box download:** When marine locations are saved (wizard apply or admin save), bathymetry downloads are triggered automatically for ALL configured surf/fishing spots in a single pass — no separate manual download button. The downloads share one HTTP client and rate-limit budget. Re-download triggers automatically when locations are added or moved.
 
 **Profile extraction:** For a surf or fishing spot:
 1. Request a transect of depth points from shore to offshore along the beach-facing direction
