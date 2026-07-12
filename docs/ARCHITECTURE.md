@@ -259,6 +259,7 @@ Used by the config UI wizard and admin per ADR-038. Not proxied through Caddy â€
 | `/setup/marine/discover-stations` | GET | Discover nearby NDBC buoy + CO-OPS tide stations for marine location setup (query: `lat`, `lon`, `radius_miles`) | Session |
 | `/setup/marine/bathymetry` | POST | Download (or regional-fallback) a CUDEM bathymetric depth profile for a surf/fishing spot | Session |
 | `/setup/marine/species` | GET | Species checklist for a coordinate + fishing target category (query: `lat`, `lon`, `category`), keyed by biogeographic region | Session |
+| `/setup/marine/discover-structures` | GET | Discover nearby coastal structures (jetties, piers, breakwaters, seawalls, groins) via the OpenStreetMap Overpass API, for surf spot wave-physics setup (query: `lat`, `lon`, `radius_m`, default 2000) | Session |
 | `/setup/apply` | POST | Write final config, API restarts. Accepts an optional `marine` block; NWPS WFO domain is resolved per location via NWS `/points` before writing `[marine]` to `api.conf` | Session |
 | `/setup/current-config` | GET | Full config for re-run + admin provider reads | Proxy secret |
 | `/setup/restart` | POST | Trigger graceful service restart | Proxy secret |

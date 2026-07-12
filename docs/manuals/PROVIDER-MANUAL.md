@@ -1211,6 +1211,7 @@ Supporting components (not dispatch-registered provider modules):
 | Component | File | Purpose |
 |---|---|---|
 | NOAA CUDEM bathymetry | `enrichment/bathymetry.py` | One-time per-spot bathymetric profile download |
+| OSM Overpass structure discovery | `endpoints/setup.py` (`GET /setup/marine/discover-structures`) | Setup-time-only coastal structure (jetty/pier/breakwater/seawall/groin) discovery for surf spot configuration (§14.9) |
 | NWS zone discovery | `providers/_common/nws_zones.py` | Shared utility: station → CWA → marine zones → distance filtering |
 
 ### §14.1 NDBC buoy observations
@@ -1531,6 +1532,67 @@ These are displayed as habitat annotations on the fishing page depth profile.
 **Rate limiting:** Per-module rate limiter (5 req/s to `api.weather.gov`), matching the established per-module pattern. Each NWS consumer module (nws_marine, nws_srf, nws_zones, NWS alerts, NWS forecast) maintains its own rate limiter instance. Combined NWS traffic across all modules may exceed 5 req/s during cache-warming bursts — acceptable because NWS's actual enforcement threshold is well above 5 req/s per IP, and burst traffic only occurs at startup or after TTL expiry, not sustained.
 
 **Invocation context:** `discover_marine_zones` is called at setup/wizard time, not per-request; results are stored in configuration. `get_cwa` and `get_wfo_for_zone` are called per-request by their respective providers (each independently cached — 24h for `get_cwa`, and `get_wfo_for_zone` rides the 24h-cached zone list).
+
+### §14.9 OSM Overpass structure discovery
+
+**File:** `endpoints/setup.py` (`GET /setup/marine/discover-structures`), T5.2.
+
+**Not a dispatch-registered provider module.** Setup-time-only helper, same category as §14.7 (bathymetry) and §14.8 (NWS zone discovery): populates `config/marine_config.py`'s `StructureConfig` entries (`type`, `material`, `length_m`, `bearing_degrees`, `distance_m` — see OPERATIONS-MANUAL.md "Structure configuration") so the operator doesn't have to enter every jetty/pier/breakwater/seawall/groin by hand during surf spot setup. Feeds API-MANUAL §17 "Supplement 2 — Coastal structure effects" (the NWPS wave-transmission/reflection correction).
+
+**Data source:** OpenStreetMap via the Overpass API — free, keyless, global coverage wherever OSM has coastal structure data mapped. `POST/GET https://overpass-api.de/api/interpreter`, `User-Agent: ClearSkies-WeatherStation/1.0 (structure-discovery)`.
+
+**Query (Overpass QL):**
+
+```
+[out:json][timeout:10];
+(
+  way["man_made"~"breakwater|groyne|pier"](around:{radius_m},{lat},{lon});
+  way["wall"="seawall"](around:{radius_m},{lat},{lon});
+  way["man_made"="dyke"](around:{radius_m},{lat},{lon});
+);
+out body geom;
+```
+
+`radius_m` defaults to 2000 (query parameter, operator/wizard-adjustable).
+
+**Tag mapping — OSM value → canonical `StructureConfig.type`:**
+
+| OSM tag | `type` |
+|---|---|
+| `man_made=breakwater` | `breakwater` |
+| `man_made=groyne` | `groin` |
+| `man_made=pier` | `pier` |
+| `wall=seawall` | `seawall` |
+| `man_made=dyke` | `seawall` |
+
+The response's `osm_type` field carries the raw OSM tag value (e.g. `groyne`, `dyke`) so the wizard/operator can see provenance even where it diverges from the mapped `type` (groyne→groin, dyke→seawall).
+
+**Material mapping — OSM `material` tag → canonical `StructureConfig.material`:**
+
+| OSM `material` | `material` | `material_source` |
+|---|---|---|
+| `concrete` | `impermeable` | `osm` |
+| `rock` | `semi_permeable` | `osm` |
+| `stone` | `semi_permeable` | `osm` |
+| `wood` | `permeable` | `osm` |
+| `metal` | `semi_permeable` | `osm` |
+| missing or unrecognised | `null` | `operator` |
+
+`material_source: "operator"` signals the wizard to require an operator choice before the structure can be saved — `_VALID_STRUCTURE_MATERIALS` has no "unknown" value.
+
+**Geometry computation** (from each way's `geometry` array of `{lat, lon}` node objects, local Haversine/bearing helpers in `endpoints/setup.py` — no project-wide haversine helper exists, same per-module-copy pattern as §14.8 and every other haversine use in this codebase):
+
+- `length_m` — sum of Haversine distances between consecutive nodes.
+- `bearing_degrees` — forward-azimuth bearing from the first node to the last node (0=N, 90=E, 180=S, 270=W).
+- `distance_m` — minimum Haversine distance from the query point (`lat`, `lon`) to any node on the way.
+
+**Filtering:** Ways tagged `floating=yes` (marina dock fingers — irrelevant to wave physics) are excluded. Ways with computed `length_m` < 5.0 are excluded as digitisation noise. Remaining structures are sorted by `distance_m` ascending.
+
+**Cache:** `get_cache()` (ADR-017 pluggable memory/Redis backend), TTL = 86400s (24h) — coastal structures rarely change. Key = hash of `(provider_id="overpass", endpoint="structure_discovery", {lat4, lon4, radius_m})`, same construction as §14.8's cache keys (lat/lon rounded to 4 decimal places per §3 "Cache key construction" — not the 3-decimal-place grouping originally sketched for this endpoint in the round brief; superseded to match the one established convention used everywhere else in this codebase).
+
+**Rate limiting:** 1 req/s "be polite" guard against the free, shared `overpass-api.de` instance (`RateLimiter(name="overpass-structures", ...)`) — this is a setup-time-only endpoint, called once per surf spot then cached 24h, so the limit never trips in normal use.
+
+**Error handling:** Any canonical `ProviderError` from the Overpass call (timeout, quota, 5xx after `ProviderHTTPClient` retries, unexpected response shape) is caught in the endpoint handler and returns HTTP 200 with an empty `structures` list and an `error` string populated — never a 500, and the failed lookup is not cached, so the next call retries live. Mirrors §14.7 bathymetry's "best-effort setup-time convenience" pattern: an Overpass outage does not block the wizard, the operator can still add structures manually.
 
 ### Source ADRs
 
