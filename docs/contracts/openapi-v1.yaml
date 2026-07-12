@@ -693,10 +693,13 @@ paths:
       description: |
         List of configured `[marine]` locations, one summary card each
         (`MarineLocationSummary`). `currentConditions`/`currentTide`/
-        `activeAlerts`/`surfRating`/`beachSafetyLevel` are always `null`
-        on this list route — full per-location population is deferred
-        until a cache-warmer exists to make it cheap. Use
-        `GET /marine/{locationId}` for live data on one location.
+        `surfRating`/`beachSafetyLevel` are always `null` on this list
+        route — full per-location population is deferred until a
+        cache-warmer exists to make it cheap. `activeAlerts` IS populated
+        on this route (T3.5): the NWS alerts provider caches for 5
+        minutes, so a per-location fetch here is cheap enough not to need
+        the cache warmer. Use `GET /marine/{locationId}` for live data on
+        one location.
       operationId: listMarineLocations
       responses:
         '200':
@@ -3583,7 +3586,13 @@ components:
         activeAlerts:
           type: array
           nullable: true
-          items: { type: string }
+          description: "Active marine alerts, each tagged with an alertType bucket for dashboard per-tab filtering (T3.5)."
+          items:
+            type: object
+            properties:
+              headline: { type: string, description: "NWS alert headline text" }
+              alertType: { type: string, enum: [marineZone, coastalFlood, beachHazard] }
+            required: [headline, alertType]
         surfRating: { type: integer, nullable: true, minimum: 1, maximum: 5 }
         beachSafetyLevel: { type: string, nullable: true, enum: [safe, caution, dangerous] }
       required: [locationId, name, coordinates, activities]
@@ -3631,12 +3640,12 @@ components:
 
     # ---------- Surf / Fishing / Beach-safety: actual endpoint shapes ----------
     #
-    # SurfBundle/FishingBundle/BeachSafetyBundle exist as Pydantic classes in
-    # models/responses.py but are NOT constructed by their endpoints (Phase
-    # 0C models written ahead of Phase 5 endpoint implementations - tracked
-    # cleanup item, not a Phase 8 blocker). The schemas below are the actual
-    # ground-truth shapes, read directly from endpoints/surf.py,
-    # endpoints/fishing.py, endpoints/beach_safety.py. See API-MANUAL §16.
+    # There are no SurfBundle/FishingBundle/BeachSafetyBundle Pydantic models
+    # (Phase 0C drafts of those classes, written ahead of the Phase 5 endpoint
+    # implementations, were removed from models/responses.py - T4.3, Phase 4
+    # cleanup). The schemas below are the actual ground-truth shapes, read
+    # directly from endpoints/surf.py, endpoints/fishing.py,
+    # endpoints/beach_safety.py. See API-MANUAL §16.
 
     ExternalLink:
       type: object
@@ -3680,7 +3689,7 @@ components:
         tidePredictions:
           type: array
           items: { $ref: '#/components/schemas/TidePrediction' }
-          description: "Informational overlay, not scored. Not present on the SurfBundle Pydantic class."
+          description: "Informational overlay, not scored."
         source: { type: string, example: "nwps+wavewatch+ndbc+coops+nws_srf" }
         generatedAt: { type: string, format: date-time }
       required: [locationId, locationName, coordinates, forecast, spectralComponents, tidePredictions, source, generatedAt]
@@ -3699,8 +3708,8 @@ components:
       type: object
       description: |
         Actual GET /fishing/{locationId} data shape (see components/schemas
-        note above). Structurally different from the FishingBundle Pydantic
-        class - no flat top-level forecast list or singular solunar.
+        note above). Nested by day - no flat top-level forecast list or
+        singular top-level solunar field.
       properties:
         locationId: { type: string }
         locationName: { type: string }

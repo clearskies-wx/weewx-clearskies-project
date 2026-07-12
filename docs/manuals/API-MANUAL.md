@@ -149,9 +149,9 @@ The canonical data model defines 9 core entity types and 2 container types:
 | `AlertList` | Container: list of active alerts |
 | `MarineBundle` | Container: marine conditions + forecast per location |
 | `TideBundle` | Container: predictions + observations per location |
-| `SurfBundle` | Container: surf forecast + rating per location |
-| `FishingBundle` | Container: fishing forecast + scoring per location |
-| `BeachSafetyBundle` | Container: beach safety assessment per location |
+| `MarineAlertSummary` | One active NWS alert tagged with a dashboard-tab `alertType` (T3.5) |
+
+Note: `GET /api/v1/surf[/{locationId}]`, `GET /api/v1/fishing[/{locationId}]`, and `GET /api/v1/beach-safety[/{locationId}]` return plain dicts (the standard envelope, §2), not Pydantic-backed bundle models — see "Surf bundle (actual shape)," "Fishing bundle (actual shape)," and "Beach-safety bundle (actual shape)" below for their ground-truth field tables.
 
 ### Response shapes
 
@@ -2070,7 +2070,7 @@ Summary snapshot for one marine location (used by Now page summary card).
 | `activities` | list[str] | — | No | Enabled activities for this location |
 | `currentConditions` | MarineObservation | — | Yes | Latest buoy observation (if buoy activity enabled) |
 | `currentTide` | object | — | Yes | Next high/low tide `{type, time, height}` |
-| `activeAlerts` | list[str] | — | Yes | Active marine alert headlines |
+| `activeAlerts` | list[MarineAlertSummary] | — | Yes | Active marine alerts, each `{headline, alertType}`; `alertType` is one of `marineZone`, `coastalFlood`, `beachHazard` (classified from the NWS `event` string for dashboard per-tab filtering, T3.5) |
 | `surfRating` | int | — | Yes | Current surf quality stars (1–5, if surf enabled) |
 | `beachSafetyLevel` | str | — | Yes | Current safety level (if beach_safety enabled) |
 
@@ -2087,7 +2087,7 @@ Bundles wrap domain-specific models with location metadata, freshness block (§2
 
 Each bundle also carries: `locationId`, `locationName`, `coordinates`, `freshness` block, `stationClock`, `units`.
 
-**`SurfBundle`, `FishingBundle`, and `BeachSafetyBundle` in `models/responses.py` do NOT match what their endpoints return.** Those three Pydantic classes were written in Phase 0C, ahead of the Phase 5 endpoint implementations; `endpoints/surf.py`, `endpoints/fishing.py`, and `endpoints/beach_safety.py` each build and return a plain dict directly (the standard envelope, §2) and never import or construct the corresponding Bundle class. **Cleanup finding (not a Phase 8 blocker):** `models/responses.py`'s `SurfBundle`/`FishingBundle`/`BeachSafetyBundle` need to be updated to match the shapes below, or removed if they stay unused. The tables below are the actual, ground-truth shapes — sourced by reading the endpoint code directly — and are what `docs/contracts/openapi-v1.yaml` documents.
+**There are no `SurfBundle`, `FishingBundle`, or `BeachSafetyBundle` Pydantic models.** Earlier drafts of those three classes (written in Phase 0C, ahead of the Phase 5 endpoint implementations) were removed from `models/responses.py` (T4.3, Phase 4 cleanup) — they were never referenced by `endpoints/surf.py`, `endpoints/fishing.py`, or `endpoints/beach_safety.py`, which each build and return a plain dict directly (the standard envelope, §2), and their field shapes had drifted from what those endpoints actually return. The tables below are the actual, ground-truth shapes — sourced by reading the endpoint code directly — and are what `docs/contracts/openapi-v1.yaml` documents.
 
 ##### Surf bundle (actual shape) — `GET /api/v1/surf[/{locationId}]`
 
@@ -2101,13 +2101,13 @@ Source: `endpoints/surf.py`.
 | `forecast` | list[SurfForecast] | No | 0 or 1 entries. Populated only when NWPS (preferred) or WaveWatch III (fallback) supplied a wave height; empty list if both providers failed |
 | `zoneForecast` | SurfZoneForecast | Yes | NWS SRF forecast for the covering county zone; `null` if unavailable |
 | `spectralComponents` | list[SpectralWaveComponent] | No | Current NDBC spectral swell decomposition; empty list if no spectral-capable buoy configured or NDBC fetch failed |
-| `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions for the surf page's tide overlay (informational, not scored). **Not a field on `SurfBundle` in models/responses.py.** |
+| `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions for the surf page's tide overlay (informational, not scored) |
 | `source` | str | No | Fixed string `"nwps+wavewatch+ndbc+coops+nws_srf"` |
 | `generatedAt` | str | No | UTC ISO-8601 with Z |
 
 ##### Fishing bundle (actual shape) — `GET /api/v1/fishing[/{locationId}]`
 
-Source: `endpoints/fishing.py`. Structurally different from `FishingBundle` in models/responses.py — there is no flat top-level `forecast` list or singular top-level `solunar` field.
+Source: `endpoints/fishing.py`. Nested by day: no flat top-level `forecast` list or singular top-level `solunar` field — each day carries its own periods and solunar data.
 
 | Field | Type | Nullable | Description |
 |---|---|---|---|
@@ -2122,8 +2122,6 @@ Source: `endpoints/fishing.py`. Structurally different from `FishingBundle` in m
 | `source` | str | No | Fixed string `"ndbc+coops+solunar"` |
 | `generatedAt` | str | No | UTC ISO-8601 with Z |
 
-`days`, `species`, `targetCategory`, and `habitatFeatures` do not exist on `FishingBundle` in models/responses.py.
-
 ##### Beach-safety bundle (actual shape) — `GET /api/v1/beach-safety[/{locationId}]`
 
 Source: `endpoints/beach_safety.py`. There is no `zoneForecast` field in the actual response — SRF-sourced rip current risk and UV index are folded directly into `assessment` instead.
@@ -2134,10 +2132,10 @@ Source: `endpoints/beach_safety.py`. There is no `zoneForecast` field in the act
 | `locationName` | str | No | Display name |
 | `coordinates` | object | No | `{lat, lon}` |
 | `assessment` | object (`BeachSafetyAssessment` shape) | No | `safetyLevel`, `waveHeight`, `wavePeriod`, `ripCurrentRisk`, `waterTemp`, `comfortLevel`, `uvIndex`, `visibility`, `windSpeed`, `windDirection`, `activeAlerts` |
-| `nwpsV15` | object \| null | Yes | `{ripCurrentProbability, totalWaterLevel, waveRunup}` when the covering WFO supplies NWPS v1.5 fields; `null` otherwise. **Not on `BeachSafetyBundle`.** |
-| `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions. **Not on `BeachSafetyBundle`.** |
-| `waterLevels` | list[WaterLevel] | No | CO-OPS observed water levels. **Not on `BeachSafetyBundle`.** |
-| `externalLinks` | list[object] | No | `{label, url}` from the location's `BeachSafetyConfig.external_links`. **Not on `BeachSafetyBundle`.** |
+| `nwpsV15` | object \| null | Yes | `{ripCurrentProbability, totalWaterLevel, waveRunup}` when the covering WFO supplies NWPS v1.5 fields; `null` otherwise |
+| `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions |
+| `waterLevels` | list[WaterLevel] | No | CO-OPS observed water levels |
+| `externalLinks` | list[object] | No | `{label, url}` from the location's `BeachSafetyConfig.external_links` |
 | `source` | str | No | Fixed string `"nwps+ndbc+nws_srf+coops+nws_alerts"` |
 | `generatedAt` | str | No | UTC ISO-8601 with Z |
 
