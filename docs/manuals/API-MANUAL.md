@@ -2213,7 +2213,9 @@ Influence zone: effects apply within structure-type-specific distance (jetty: 3�
 
 All output labeled: "estimated — structure effects are approximate."
 
-Operator inputs: structure type, material, dimensions, position relative to spot.
+Multiple structures combine via linear superposition (Kt values multiplied together). Example: a jetty (Kt=0.35) and a breakwater (Kt=0.10) together produce combined Kt=0.035 — wave height reduced to 3.5% of incident.
+
+Operator inputs: structure type (`jetty`/`pier`/`breakwater`/`seawall`/`groin`), material (`impermeable`/`semi_permeable`/`permeable`), `length_m`, `bearing_degrees`, `distance_m`. The wizard auto-discovers structures from OpenStreetMap via `GET /setup/marine/discover-structures` (PROVIDER-MANUAL §14.9) — operator confirms and can add structures manually.
 
 **Supplement 3 — Sub-grid spatial interpolation:**
 
