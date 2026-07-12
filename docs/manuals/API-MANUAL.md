@@ -1980,7 +1980,7 @@ Surf quality forecast for one spot at one timestep.
 | `qualityStars` | int | — | No | 1–5 star rating |
 | `qualityLabel` | str | — | No | (locale) Text label: "Poor", "Fair", "Good", "Very Good", "Epic" |
 | `conditionsText` | str | — | No | (locale) Natural-language conditions summary |
-| `windQuality` | str | — | No | (locale) "offshore", "cross_offshore", "cross", "cross_onshore", "onshore" |
+| `windQuality` | str | — | No | (locale) "glassy", "offshore", "cross_offshore", "cross", "cross_onshore", "onshore" |
 | `swellDominance` | float | — | No | Ratio of primary swell energy to total energy (0.0–1.0) |
 | `multiSwell` | list[SpectralWaveComponent] | — | Yes | Individual swell systems (when spectral data available) |
 
@@ -2267,10 +2267,10 @@ Quality labels: 1 = "Poor", 2 = "Fair", 3 = "Good", 4 = "Very Good", 5 = "Epic".
 | Component | Weight | Scoring method |
 |---|---|---|
 | Barometric pressure trend | 0.30 | 3-hour pressure delta. Rapid drop (> 3 hPa/3hr) = 100 (peak). Falling = 80. Stable = 50. Rising = 30 initially, improving to 60 over 12–24 hr. |
-| Tide state | 0.25 | Position in tidal cycle from CO-OPS predictions. Outgoing (ebb) = 100 (flushes bait). Incoming (flood) = 80. Slack high = 30. Slack low = 20. |
+| Tide state | 0.25 | Position in tidal cycle from CO-OPS predictions. Outgoing (ebb) = 100 (flushes bait). Incoming (flood) = 80. Peak flow (midpoint between tidal extremes) = 70. Slack high = 30. Slack low = 20. |
 | Water temperature | 0.20 | Compared to species-specific optimal ranges. Within optimal = 100. Good range = 80. Marginal = 50. Outside active range = 10. |
-| Solunar intensity | 0.15 | From solunar processor. During major period + new/full moon = 100. During minor period = 60. Outside any period = 30. |
-| Time of day | 0.10 | Dawn/dusk = 100 (low-light feeding peaks). Morning = 70. Night = 50 (species-dependent). Midday = 30. |
+| Solunar intensity | 0.15 | From solunar processor. During major period + new/full moon = 100. During major period (non-peak moon) = 80. During minor period = 60. Outside any period = 30. |
+| Time of day | 0.10 | Dawn = 100, Dusk = 90 (low-light feeding peaks). Morning = 70. Night = 50 (species-dependent). Midday = 30. |
 
 **Final score** = Σ(component_score × weight) × species_modifier × seasonal_multiplier, scaled to 0–100 integer.
 
