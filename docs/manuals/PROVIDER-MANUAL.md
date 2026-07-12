@@ -1528,7 +1528,7 @@ These are displayed as habitat annotations on the fishing page depth profile.
 
 **Haversine accuracy:** ~0.1 miles is sufficient. Use the standard haversine formula or the existing project utility if one exists.
 
-**Rate limiting:** Uses the shared 5 req/s rate limiter for `api.weather.gov`.
+**Rate limiting:** Per-module rate limiter (5 req/s to `api.weather.gov`), matching the established per-module pattern. Each NWS consumer module (nws_marine, nws_srf, nws_zones, NWS alerts, NWS forecast) maintains its own rate limiter instance. Combined NWS traffic across all modules may exceed 5 req/s during cache-warming bursts — acceptable because NWS's actual enforcement threshold is well above 5 req/s per IP, and burst traffic only occurs at startup or after TTL expiry, not sustained.
 
 **Invocation context:** `discover_marine_zones` is called at setup/wizard time, not per-request; results are stored in configuration. `get_cwa` and `get_wfo_for_zone` are called per-request by their respective providers (each independently cached — 24h for `get_cwa`, and `get_wfo_for_zone` rides the 24h-cached zone list).
 
