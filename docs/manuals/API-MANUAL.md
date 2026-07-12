@@ -1993,11 +1993,11 @@ Fishing conditions forecast for one spot for one period.
 | `periodStart` | str | — | No | Period start time (UTC ISO-8601) |
 | `periodEnd` | str | — | No | Period end time (UTC ISO-8601) |
 | `periodLabel` | str | — | No | (locale) Human-readable period: "Early Morning", "Late Afternoon", etc. |
-| `overallScore` | int | — | No | Composite score 0–100 |
+| `overallScore` | int | — | No | Composite score 0–100 (pressure + tide + solunar + time of day; does NOT include temperature — temperature is per-species only) |
 | `pressureScore` | int | — | No | Pressure component sub-score 0–100 |
 | `tideScore` | int | — | No | Tide component sub-score 0–100 |
 | `solunarScore` | int | — | No | Solunar component sub-score 0–100 |
-| `waterTempScore` | int | — | No | Water temperature component sub-score 0–100 |
+| `waterTempScore` | int\|null | — | No | Always null — temperature scoring is per-species via `speciesScores`, not a single composite value. Retained in the response schema for backward compatibility. |
 | `timeofdayScore` | int | — | No | Time-of-day component sub-score 0–100 |
 | `speciesScores` | list[object] | — | Yes | Per-species score adjustments; each entry's `status` field is (locale) |
 | `conditionsText` | str | — | No | (locale) Natural-language conditions summary |
@@ -2116,7 +2116,7 @@ Source: `endpoints/fishing.py`. Nested by day: no flat top-level `forecast` list
 | `coordinates` | object | No | `{lat, lon}` |
 | `days` | list[object] | No | One entry per forecast day (3 days). Each entry: `{"date": "YYYY-MM-DD", "periods": list[FishingForecast], "solunar": SolunarTimes}` |
 | `species` | list[str] | No | From the location's `FishingSpotConfig.species` |
-| `targetCategory` | str | No | From the location's `FishingSpotConfig.target_category` |
+| `targetCategory` | str | No | First entry from the location's `FishingSpotConfig.target_categories` list (singular for wire compatibility; config supports multiple categories) |
 | `habitatFeatures` | object \| null | Yes | CUDEM-derived habitat annotations (drop-offs, reefs, ledges, channels, pinnacles); `null` when the location has no bathymetric profile (i.e., no `surf` sub-block configured) |
 | `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions, also used server-side to derive each period's `tide_state` input to the fishing scorer |
 | `source` | str | No | Fixed string `"ndbc+coops+solunar"` |
@@ -2262,19 +2262,20 @@ Quality labels: 1 = "Poor", 2 = "Fair", 3 = "Good", 4 = "Very Good", 5 = "Epic".
 **Inputs:** Pressure trend (from weewx archive or NDBC buoy), tide state (from CO-OPS), water temperature (from NDBC/CO-OPS), solunar intensity (from solunar processor), current time.
 **Outputs:** `FishingForecast` with overall_score (0–100) and per-component sub-scores.
 
-**Five-component weighted scoring:**
+**Four-component weighted scoring (general conditions):**
 
 | Component | Weight | Scoring method |
 |---|---|---|
-| Barometric pressure trend | 0.30 | 3-hour pressure delta. Rapid drop (> 3 hPa/3hr) = 100 (peak). Falling = 80. Stable = 50. Rising = 30 initially, improving to 60 over 12–24 hr. |
-| Tide state | 0.25 | Position in tidal cycle from CO-OPS predictions. Outgoing (ebb) = 100 (flushes bait). Incoming (flood) = 80. Peak flow (midpoint between tidal extremes) = 70. Slack high = 30. Slack low = 20. |
-| Water temperature | 0.20 | Compared to species-specific optimal ranges. Within optimal = 100. Good range = 80. Marginal = 50. Outside active range = 10. |
-| Solunar intensity | 0.15 | From solunar processor. During major period + new/full moon = 100. During major period (non-peak moon) = 80. During minor period = 60. Outside any period = 30. |
-| Time of day | 0.10 | Dawn = 100, Dusk = 90 (low-light feeding peaks). Morning = 70. Night = 50 (species-dependent). Midday = 30. |
+| Barometric pressure trend | 0.375 | 3-hour pressure delta. Rapid drop (> 3 hPa/3hr) = 100 (peak). Falling = 80. Stable = 50. Rising = 30 initially, improving to 60 over 12–24 hr. |
+| Tide state | 0.3125 | Position in tidal cycle from CO-OPS predictions. Outgoing (ebb) = 100 (flushes bait). Incoming (flood) = 80. Peak flow (midpoint between tidal extremes) = 70. Slack high = 30. Slack low = 20. |
+| Solunar intensity | 0.1875 | From solunar processor. During major period + new/full moon = 100. During major period (non-peak moon) = 80. During minor period = 60. Outside any period = 30. |
+| Time of day | 0.125 | Dawn = 100, Dusk = 90 (low-light feeding peaks). Morning = 70. Night = 50 (species-dependent). Midday = 30. |
 
-**Final score** = Σ(component_score × weight) × species_modifier × seasonal_multiplier, scaled to 0–100 integer.
+Water temperature is **not** part of the general `overallScore`. Temperature is scored **per species** using each species' own optimal/good/marginal ranges from `SPECIES_PROFILES` — a 72°F day scores high for redfish (optimal 68–80°F) but low for striped bass (optimal 55–68°F). This matches industry practice (Fishbrain, BassForecast) where bite scores are species-specific.
 
-**Species profiles:** Four target categories, each with species auto-populated from 11 US biogeographic regions:
+**Final score** = Σ(component_score × weight) × species_modifier × temp_multiplier × seasonal_multiplier, scaled to 0–100 integer.
+
+**Species profiles:** Four target categories (operators can select multiple), each with species auto-populated from 11 US biogeographic regions:
 
 | Category | Example species | Pressure sensitivity | Typical temp range (°F) |
 |---|---|---|---|
