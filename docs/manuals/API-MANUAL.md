@@ -2335,10 +2335,10 @@ Computed locally via Skyfield — no external API call. Skyfield is already a pr
 |---|---|---|---|
 | `SurfForecast.qualityLabel` | "Epic" | `surf.quality.<1-5>` | `i18n.t("surf.quality.5")` → "Epic" (en), "Épique" (fr), "エピック" (ja) |
 | `SurfForecast.windQuality` | "offshore" | `surf.wind_quality.<value>` | `i18n.t("surf.wind_quality.offshore")` |
-| `SurfForecast.conditionsText` | "3-4 ft at 12s from SSW. Offshore winds 5-10 mph." | `surf.conditions.*` composition templates | Compose via locale-aware templates per §6 composition pattern. Direction abbreviations, unit labels, connectors all locale-resolved. |
+| `SurfForecast.conditionsText` | "3-4 ft at 12s from SSW. Offshore winds 5-10 mph." | `surf.conditions.*` composition templates | Flat `i18n.t()` template strings filled in with `str.format()` (T4.4) — not the full component-order/CJK-dispatch architecture of `sse/conditions_text.py` (weatherText); surf/fishing sentences are short enough that per-locale sentence templates suffice. Compass abbreviations (N/NE/E/...) are not locale-resolved — cross-locale marine/aviation notation. |
 | `SpectralWaveComponent.classification` | "groundswell" | `marine.swell_class.<value>` | `i18n.t("marine.swell_class.groundswell")` |
 | `FishingForecast.periodLabel` | "Early Morning" | `fishing.period.<value>` | `i18n.t("fishing.period.early_morning")` |
-| `FishingForecast.conditionsText` | "Falling pressure with incoming tide..." | `fishing.conditions.*` composition templates | Compose via locale-aware templates |
+| `FishingForecast.conditionsText` | "Falling pressure with incoming tide..." | `fishing.conditions.*` composition templates | Flat `i18n.t()` template strings filled in with `str.format()` (T4.4); see `SurfForecast.conditionsText` row |
 | `FishingForecast.speciesScores[].status` | "active" | `fishing.species_status.<value>` | `i18n.t("fishing.species_status.active")` |
 | `BeachSafetyAssessment.safetyLevel` | "caution" | `beach_safety.level.<value>` | `i18n.t("beach_safety.level.caution")` |
 | `BeachSafetyAssessment.comfortLevel` | "cool" | `beach_safety.comfort.<value>` | `i18n.t("beach_safety.comfort.cool")` |
@@ -2353,7 +2353,7 @@ Computed locally via Skyfield — no external API call. Skyfield is already a pr
 - Station IDs, zone IDs, location slugs, coordinates, timestamps
 - Numeric values (these are locale-formatted by `format_number()` at serialization, not by the enrichment processor)
 
-**Implementation requirement:** Each enrichment processor's output function must accept a `locale` parameter (defaulting to `i18n.get_active_locale()`). All label lookups use `i18n.t(key, locale=locale)`. All number formatting in composed text uses `i18n.format_number(value, decimals, locale=locale)`. This is the same pattern used by `enrichment/conditions_text.py` — read that module for the reference implementation.
+**Implementation requirement:** Each enrichment processor's output function must accept a `locale` parameter (defaulting to `i18n.get_active_locale()`). All label lookups use `i18n.t(key, locale=locale)`. All number formatting in composed text uses `i18n.format_number(value, decimals, locale=locale)`. `surf_scorer.py` and `fishing_scorer.py` compose `conditionsText` from flat `surf.conditions.*`/`fishing.conditions.*` template strings (T4.4); this is deliberately lighter than the component-order + connector + custom-CJK-composer architecture in `sse/conditions_text.py` (used for the current-conditions `weatherText` field), which exists to handle a longer, more structurally variable sentence (temperature/sky/wind/precipitation in locale-dependent order). Surf/fishing conditions text is short and fixed-shape enough that per-locale sentence templates are sufficient — read `sse/conditions_text.py` only if a future marine feature needs component reordering or CJK-specific composition.
 
 **Locale file additions:** Each locale file (`locales/{locale}.json`) must gain the following top-level sections:
 - `"surf"` — quality labels (5), wind quality labels (5), swell classifications (3), conditions composition templates
