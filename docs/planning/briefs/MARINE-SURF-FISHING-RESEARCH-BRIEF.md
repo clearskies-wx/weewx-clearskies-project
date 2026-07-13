@@ -790,6 +790,99 @@ Energy conservation constraint: Kr² + Kt² + Kd² = 1
 
 Sources: Zanuttigh & Van der Meer (2006), Goda (2000), Isaacson (1991), CERC (1984), Chakrabarti (2005).
 
+#### 11.5.1 Directional dependence (T7.1 research output, 2026-07-12)
+
+The §11.5 coefficients above assume normal (perpendicular) wave incidence — waves hitting the structure face-on. Real swells approach from arbitrary directions. Three corrections account for this:
+
+**1. Angular Kt modulation (cos² law)**
+
+The energy a structure intercepts from an obliquely-approaching swell is proportional to the structure's projected cross-section perpendicular to the wave direction. Since wave energy scales as H², the effective transmission coefficient modulates with cos²(θ):
+
+```
+Kt_eff(θ) = 1 − (1 − Kt_material) × cos²(θ)
+```
+
+Where:
+- `θ` = angle between the wave approach direction and the structure's normal (0° = head-on, 90° = parallel to structure)
+- `Kt_material` = base Kt from the material table (impermeable=0.10, semi_permeable=0.35, permeable=0.75)
+
+At θ = 0° (waves perpendicular to structure): `Kt_eff = Kt_material` (full blocking).
+At θ = 90° (waves parallel to structure): `Kt_eff = 1.0` (no blocking).
+
+**Computing θ from wave direction and structure bearing:**
+
+The structure bearing B is the direction along the structure's long axis (0°=N, clockwise). The structure has two normals at B±90°. The angle of incidence θ is derived from the acute angle α between the wave direction W and the structure bearing:
+
+```
+α = min(|W − B| mod 360, 360 − |W − B| mod 360)   # 0–180°
+θ = |α − 90°|                                         # 0° = perpendicular, 90° = parallel
+```
+
+Source: Projected cross-section energy interception principle; consistent with CEM Part II-7 (USACE 2002) treatment of oblique wave-structure interaction for emergent structures. Van der Meer et al. (2005) found Kt is approximately independent of angle for θ = 0–70° for low-crested (submerged) structures; the cos² modulation above applies to emergent structures (above water) where the full cross-section matters.
+
+**2. Shadow zone geometry**
+
+A structure blocks waves only when the surf spot is "behind" the structure relative to the incoming swell — i.e., the structure is between the wave source and the spot. This is a geometric check:
+
+Given:
+- Structure position relative to spot: `bearing_to_spot` (bearing from structure center to surf spot, degrees)
+- Wave travel direction: `wave_travel = (wave_direction + 180) mod 360` (direction waves propagate toward)
+- Shadow cone half-angle: `cone_half = arctan(length_m / (2 × distance_m))` (angular width of shadow)
+
+The spot is in the shadow if:
+
+```
+|angle_diff(bearing_to_spot, wave_travel)| < cone_half
+```
+
+Where `angle_diff` computes the signed angular difference, reduced to ±180°.
+
+If the spot is NOT in the shadow for this wave direction, the structure has no effect: `Kt = 1.0` regardless of distance or material.
+
+Implementation note: `bearing_to_spot` must be computed during auto-discovery (from structure geometry and spot coordinates) and stored in the structure config alongside bearing, length, and distance.
+
+Source: Geometric shadow zone concept from Goda (2000) Ch 6; the cone approximation uses the structure length as the shadow-casting aperture, analogous to the diffraction-diagram geometry in CERC (1984) Shore Protection Manual.
+
+**3. Diffraction (simplified — future enhancement)**
+
+At the shadow boundary, wave energy bends around structure endpoints (diffraction). The diffraction coefficient Kd ≈ 0.7 at the geometric shadow boundary (Goda et al. 1971), decreasing further inside the shadow. For our surf-forecasting application, the shadow zone check (above) with the angular Kt modulation provides sufficient accuracy. Full Sommerfeld/Penney-Price diffraction is appropriate for harbor design but overkill for recreational surf forecasts. Deferred to a future enhancement if wave height predictions at shadow-boundary spots show systematic error.
+
+**4. Interaction with directional exposure**
+
+The surf spot's `directional_exposure` (8 compass directions) already filters which swells can reach the spot. Precedence:
+
+- If a swell direction is blocked by directional exposure, the swell is excluded entirely — no structure effects apply (the swell never reaches the spot regardless of structures).
+- If a swell direction is open in directional exposure, structure effects apply normally (angular Kt modulation + shadow zone check).
+- A structure blocking waves from a direction already marked blocked in directional exposure is redundant — no double-counting.
+
+The directional exposure filter runs BEFORE the structure effects in the processing pipeline. This is the existing behavior — directional exposure is applied during surf scoring, and structure effects are applied in `wave_transform.apply_supplements()`.
+
+**Worked example: Huntington Beach Pier**
+
+Pier: bearing 221° (SSW), length ~567m, semi_permeable (Kt=0.35), distance ~150m from a surf spot to its south.
+
+*Case 1 — Swell from SSW (200°):*
+- α = min(|200−221|, 360−|200−221|) = min(21, 339) = 21°
+- θ = |21 − 90| = 69° (nearly parallel)
+- cos²(69°) ≈ 0.128
+- Kt_eff = 1 − (1−0.35) × 0.128 = 1 − 0.083 = **0.917** (minimal blocking — correct: waves slide along the pier)
+
+*Case 2 — Swell from WSW (250°):*
+- α = min(|250−221|, 360−29) = min(29, 331) = 29°
+- θ = |29 − 90| = 61°
+- cos²(61°) ≈ 0.235
+- Kt_eff = 1 − 0.65 × 0.235 = 1 − 0.153 = **0.847** (moderate blocking — waves hit pier at ~30° off its axis)
+
+*Case 3 — Swell from NNE (20°):*
+- α = min(|20−221|, 360−201) = min(201, 159) = 159°
+- θ = |159 − 90| = 69° (waves nearly along pier from opposite end)
+- cos²(69°) ≈ 0.128
+- Kt_eff = **0.917** (minimal blocking from angular modulation)
+- Shadow zone check: wave_travel = (20+180) = 200°. If bearing_to_spot ≈ 180° (spot is due south of pier), and cone_half = arctan(567/(2×150)) ≈ 62°: |angle_diff(180, 200)| = 20° < 62° → spot IS in shadow. Angular Kt applies.
+- If the spot were due east (bearing_to_spot ≈ 90°): |angle_diff(90, 200)| = 110° > 62° → spot is NOT in shadow → **Kt = 1.0**.
+
+Sources: d'Angremond, van der Meer & de Jong (1996); Van der Meer et al. (2005); Goda (2000) Ch 6 & Ch 10; CERC (1984) Shore Protection Manual; Goda, Takayama & Suzuki (1978) diffraction diagrams.
+
 ### 11.6 Regional Fishing Forecast Model
 
 The original development research envisioned a significantly richer fishing scoring model than the 4-component system described in Section 4. Key additions:

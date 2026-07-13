@@ -785,7 +785,7 @@ Marine locations are configured in the `[marine]` section of `api.conf`. This se
         directional_exposure = N:false, NE:false, E:true, SE:true, S:true, SW:true, W:false, NW:false
 
       [[[[fishing]]]]
-        target_category = saltwater_inshore
+        target_categories = saltwater_inshore, bottom_fish
 
       [[[[beach_safety]]]]
         [[[[[external_links]]]]]
@@ -837,8 +837,8 @@ Marine locations are configured in the `[marine]` section of `api.conf`. This se
 
 | Field | Type | Valid values | Description |
 |---|---|---|---|
-| `target_category` | str | `saltwater_inshore`, `bottom_fish`, `freshwater_sport`, `salmonids` | Primary fishing target category |
-| `species` | list[str] | — | Auto-populated from biogeographic region based on coordinates |
+| `target_categories` | list[str] | `saltwater_inshore`, `bottom_fish`, `freshwater_sport`, `salmonids` | Target fishing categories (multi-select). Backward compat: a bare string `target_category` is normalized to a single-element list on load. |
+| `species` | list[str] | — | Auto-populated from biogeographic region + selected categories. Species data loaded from `data/species.yaml` (see "Species database customization" below). |
 | `biogeographic_region` | str | — | Auto-classified from coordinates (11 US regions) |
 
 **Beach safety configuration (`[[beach_safety]]` sub-block):**
@@ -848,6 +848,54 @@ Marine locations are configured in the `[marine]` section of `api.conf`. This se
 | `external_links` | list | Operator-provided links to local water quality reports, lifeguard schedules, wildlife alert services. Displayed as informational resources on the beach safety page. Each link: `label` (str) + `url` (str). |
 
 **Validation:** Missing `[marine]` section → `load_marine_config()` returns `None` (no error, no marine features). Empty `[marine]` section → empty `MarineConfig`. Invalid values (out-of-range coordinates, unknown bottom type, unknown activity) → clear error naming the offending field and location.
+
+### Species database customization
+
+Species data (lists, scoring profiles, seasonal behavior) is loaded from `data/species.yaml` inside the API package at process start. Operators can edit this file to add local species, adjust temperature ranges, or add seasonal closures. Changes take effect after an API restart (`sudo systemctl restart weewx-clearskies-api`).
+
+The YAML file contains four sections:
+
+| Section | Purpose |
+|---|---|
+| `regions` | Biogeographic region bounding boxes (11 US regions). Used by `classify_region()` to auto-determine which species list applies to a given coordinate. |
+| `species_by_region` | Species lists per region per target category. Controls which species appear as checkboxes in the wizard. |
+| `species_profiles` | Per-species scoring parameters: pressure sensitivity, temperature ranges (optimal/good/marginal in °F), tide and time-of-day preferences with multipliers. |
+| `seasonal_behavior` | Per-species per-month entries for spawning runs (score multiplier), pre-spawn activity boosts, and regulatory closures. |
+
+**Adding a new species** (worked example — adding "spotted bay bass" to `pacific_sw`):
+
+1. Add the species name to the appropriate category in `species_by_region`:
+   ```yaml
+   pacific_sw:
+     saltwater_inshore:
+       - spotted bay bass    # ← add here
+       - california halibut
+       # ... existing species
+   ```
+
+2. Add a scoring profile in `species_profiles`:
+   ```yaml
+   spotted bay bass:
+     pressure_sensitivity: 0.7
+     temp_optimal: [65.0, 78.0]
+     temp_good: [58.0, 82.0]
+     temp_marginal: [50.0, 88.0]
+     tide_preference: incoming
+     tide_multiplier: 1.15
+     time_preference: dawn
+     time_multiplier: 1.2
+   ```
+
+3. Optionally add seasonal behavior in `seasonal_behavior`:
+   ```yaml
+   spotted bay bass:
+     4: {pre_spawn_multiplier: 1.5}
+     5: {spawning_multiplier: 2.0}
+   ```
+
+4. Restart the API: `sudo systemctl restart weewx-clearskies-api`
+
+Species listed in `species_by_region` but missing from `species_profiles` receive a neutral default profile (no temperature penalty, no tide/time preference) — the scorer degrades gracefully rather than failing.
 
 ### Marine location setup procedure
 
@@ -859,7 +907,7 @@ Step-by-step wizard flow for adding a marine location:
 4. **CO-OPS station discovery:** Same `GET /setup/marine/discover-stations` call also queries the CO-OPS metadata API and returns nearest tide/water-level stations with distances, available products, and a `quality` tier (excellent ≤20mi, good ≤40mi, fair beyond). Operator confirms or overrides.
 5. **NWS zone discovery:** System queries NWS `/points` → CWA, determines NWPS WFO domain and CG grid. Discovers marine zones within the configured alert radius (shared with the marine alert radius feature). Operator confirms. The NWPS WFO domain is re-resolved server-side at apply time (step 9) regardless of what the wizard discovered, so it is always current as of the save.
 6. **Surf spot configuration** (if surf activity selected): Operator selects bottom type, topographic feature, directional exposure. Wizard calls `POST /setup/marine/bathymetry` (`lat`, `lon`, `beach_facing_degrees`) to download the CUDEM bathymetric profile (or receive a logged regional fallback profile if CUDEM is unreachable — this endpoint never returns an error for upstream provider failures) and computes beach slope client-side or via the profile returned. Wizard also calls `GET /setup/marine/discover-structures` (`lat`, `lon`, `radius_m`) to pre-populate nearby coastal structures from OpenStreetMap (see "Structure auto-discovery" above); operator confirms, edits, removes, or adds structures manually — any structure with no OSM `material` tag match requires the operator to pick a material before saving.
-7. **Fishing spot configuration** (if fishing activity selected): System auto-classifies biogeographic region from coordinates and populates species list. Operator selects target category.
+7. **Fishing spot configuration** (if fishing activity selected): System auto-classifies biogeographic region from coordinates. Operator selects one or more target categories (multi-select checkboxes). Species checkboxes populate with the union of all selected categories' species for that region (no duplicates). Operator unchecks any species they don't target.
 8. **Beach safety configuration** (if beach safety selected): Operator optionally adds external links (water quality, lifeguard reports, wildlife alerts).
 9. **Review and save:** System presents a summary of the configured location with all discovered stations, zones, and settings. Operator confirms. Wizard sends the accumulated `marine` block on the next `POST /setup/apply` call. The API validates all locations (coordinates, activity/bottom-type/topographic-feature/target-category enums, NDBC/CO-OPS station-id and NWS marine-zone-id formats), resolves the NWPS WFO domain per location via `providers/_common/nws_zones.py`'s `get_cwa()` (a per-location NWS lookup failure is logged and leaves that location's `nwps_wfo` unset — it does not fail the whole apply), and writes the result to `api.conf [marine]` using the nested-subsection shape shown above (`[[[[surf]]]]`/`[[[[fishing]]]]`/`[[[[beach_safety]]]]` inside each location's own section — not top-level `[[surf_spots]]`/`[[fishing_spots]]` sections).
 
