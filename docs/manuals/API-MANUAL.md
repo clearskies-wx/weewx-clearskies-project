@@ -10,7 +10,7 @@ Companion documents:
 - **PROVIDER-MANUAL.md** — provider module rules
 - **contracts/canonical-data-model.md** — per-field data catalog (the field inventory)
 
-Last updated: 2026-07-02
+Last updated: 2026-07-12
 
 ---
 
@@ -2215,7 +2215,14 @@ All output labeled: "estimated — structure effects are approximate."
 
 Multiple structures combine via linear superposition (Kt values multiplied together). Example: a jetty (Kt=0.35) and a breakwater (Kt=0.10) together produce combined Kt=0.035 — wave height reduced to 3.5% of incident.
 
-Operator inputs: structure type (`jetty`/`pier`/`breakwater`/`seawall`/`groin`), material (`impermeable`/`semi_permeable`/`permeable`), `length_m`, `bearing_degrees`, `distance_m`. The wizard auto-discovers structures from OpenStreetMap via `GET /setup/marine/discover-structures` (PROVIDER-MANUAL §14.9) — operator confirms and can add structures manually.
+Operator inputs: structure type (`jetty`/`pier`/`breakwater`/`seawall`/`groin`), material (`impermeable`/`semi_permeable`/`permeable`), `length_m`, `bearing_degrees`, `distance_m`, `bearing_to_spot_degrees` (optional). The wizard auto-discovers structures from OpenStreetMap via `GET /setup/marine/discover-structures` (PROVIDER-MANUAL §14.9) — operator confirms and can add structures manually.
+
+**Directional Kt (T7.2):** The base Kt table above is omnidirectional (worst case — wave hitting the structure square-on). When `wave_direction` (from NWPS) is available, two direction-dependent refinements apply in `enrichment/wave_transform.py`'s `_structure_kt_effective()`:
+
+1. **Shadow zone check.** Requires the structure's `bearing_to_spot_degrees` (bearing from the structure's nearest point to the surf spot; auto-computed by `GET /setup/marine/discover-structures`). The spot is only in the structure's shadow if it falls within a cone projected along the wave's travel direction (`wave_direction + 180`), half-angle `atan2(length_m, 2 × distance_m)`. Outside that cone, the structure has zero effect on that wave direction (Kt = 1.0) regardless of material or distance. Skipped (no shadow check) when `bearing_to_spot_degrees` is not set.
+2. **Angular Kt modulation.** The blocking fraction `(1 - Kt)` is scaled by `cos²(θ)`, where `θ = |α - 90|` and `α` is the angle between `wave_direction` and the structure's `bearing_degrees` (its long axis), folded to [0, 180]. `θ = 0` (wave hits the structure perpendicular to its axis) → full blocking; `θ = 90` (wave travels parallel to the structure's length) → no blocking.
+
+When `wave_direction` is unavailable, both refinements are skipped and the original omnidirectional Kt (full material value within the influence zone, 1/r² decay beyond it) applies unchanged.
 
 **Supplement 3 — Sub-grid spatial interpolation:**
 
