@@ -385,9 +385,9 @@ All 16 areas audited with line-number evidence by two parallel adversarial agent
 | T3-F4 | MEDIUM | i18n conditionsText (13) | surf_scorer.py and fishing_scorer.py hardcode English composition. Locale templates don't exist |
 | T3-F5 | LOW | Pressure-trend (14) | Code has static 2-bucket (30/20) vs manual's "30→60 over 12-24hr" temporal description |
 
-### T3.2 — Leaflet.draw for manual structure drawing (F10) — DEFERRED
+### T3.2 — Leaflet.draw for structure drawing (F10) — MOVED TO T4.6
 
-**Status:** Intentionally deferred. Manual structure entry via form fields is functional.
+**Status:** Moved to Phase 4 T4.6. The manual numeric entry (bearing/distance/length by hand) is not usable in practice — operators need to draw structures on a map.
 
 ### QC Gate 3 ✓ PASSED (2026-07-13)
 - All 16 areas audited with evidence.
@@ -395,9 +395,11 @@ All 16 areas audited with line-number evidence by two parallel adversarial agent
 
 ---
 
-## Phase 4 — Audit Follow-up (T3.1 findings)
+## Phase 4 — Audit Follow-up (T3.1 findings) ✓ COMPLETE
 
-**Status:** Queued for user approval. These are polish/completeness items — no critical infrastructure gaps.
+**Status:** Complete (2026-07-13). T4.2 dropped (species counts already validated). All other tasks delivered.
+
+**Commits:** f850b3a (T4.1+T4.5, meta), ec492ef (T4.4, API), 8897a37 (T4.3, stack), e2e1ea8 (T4.6, stack), 99aef3b (T4.4 doc sync, meta).
 
 ### T4.1 — Add surf scorer weight table to API-MANUAL (T3-F1)
 
@@ -405,11 +407,9 @@ All 16 areas audited with line-number evidence by two parallel adversarial agent
 - File: `docs/manuals/API-MANUAL.md` §17
 - Do: Add a weight table to "Surf quality scorer" matching the fishing scorer table format.
 
-### T4.2 — Expand species YAML for under-populated regions (T3-F2)
+### T4.2 — ~~Expand species YAML~~ — DROPPED
 
-- Owner: `clearskies-api-dev`
-- File: `repos/weewx-clearskies-api/weewx_clearskies_api/data/species.yaml`
-- Do: Add species to alaska, hawaii, caribbean, pacific_territories to reach 15-25 per region.
+Species counts were already validated correct in a prior session. The 15-25 target is a guideline, not a hard requirement — some regions naturally have fewer target species. No action needed.
 
 ### T4.3 — Add species field to admin marine section (T3-F3)
 
@@ -423,11 +423,15 @@ All 16 areas audited with line-number evidence by two parallel adversarial agent
 - Files: `enrichment/surf_scorer.py`, `enrichment/fishing_scorer.py`, `locales/*.json`
 - Do: Replace hardcoded English conditionsText with locale-aware composition templates per rules/coding.md §6.
 
-### T4.5 — Fix pressure-trend scoring doc/code mismatch (T3-F5)
+### T4.5 — Fix pressure-trend scoring doc/code mismatch (T3-F5) ✓ DONE
 
-- Owner: Coordinator (lead-direct)
-- Files: `docs/manuals/API-MANUAL.md` §17 OR `enrichment/fishing_scorer.py`
-- Do: Align the manual with the code's actual static 2-bucket behavior (the temporal "30→60 over 12-24hr" is not implemented and likely not worth the complexity).
+- Commit: f850b3a (lead-direct, completed with T4.1)
+
+### T4.6 — Leaflet.draw for structure drawing on wizard marine step (F10)
+
+- Owner: `clearskies-dashboard-dev` or general-purpose agent
+- Files: `repos/weewx-clearskies-stack/weewx_clearskies_config/templates/wizard/step_marine.html`, potentially new JS
+- Do: Add a Leaflet map with draw controls to the wizard's structure entry UI. When the operator draws a polyline on the map, compute length, bearing, and distance-from-spot automatically from the geometry. Pre-fill the form fields. Replace the current manual numeric entry which is unusable in practice.
 
 ---
 
