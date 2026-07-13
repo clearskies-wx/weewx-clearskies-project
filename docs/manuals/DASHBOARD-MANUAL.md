@@ -984,7 +984,7 @@ Single page at `/marine` — map-based landing with operator-configured location
 | Fishing | Phosphor | `FishSimple` |
 | Beach Safety | Phosphor | `PersonSimpleSwim` |
 
-Follows existing icon convention: Phosphor for utility/nav/alert, inline Material Symbols SVG for domain-specific glyphs (per ADR-049/050). Main nav item: Phosphor `Compass`, label "Marine".
+Follows existing icon convention: Phosphor for utility/nav/alert, inline Material Symbols SVG for domain-specific glyphs (per ADR-049/050). Main nav item: Phosphor `Waves`, label "Marine". The Now page marine summary card (marine-summary-card.tsx) uses the same `Waves` icon for consistency (T2.3).
 
 ### Activity qualitative labels
 
