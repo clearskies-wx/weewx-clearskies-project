@@ -2286,7 +2286,7 @@ Water temperature is **not** part of the general `overallScore`. Temperature is 
 
 Each species has: optimal temp range (1.0×), good range (0.8×), marginal range (0.5×), inactive below/above (0.1×). Spawning season multipliers (2.0–3.0× during peak runs).
 
-Species data is hardcoded lookup tables in `enrichment/fishing_species.py`, keyed by biogeographic region and target category. No external API.
+Species data is loaded from `data/species.yaml` (an operator-editable reference file; parsed once at process start by `enrichment/fishing_species.py`), keyed by biogeographic region and target category. No external API.
 
 **Solunar evidence caveat:** Presented as one factor with appropriate context — "Solunar theory suggests feeding activity correlates with moon position. Scientific evidence is mixed; environmental conditions (pressure, temperature, tides) have stronger research support."
 
