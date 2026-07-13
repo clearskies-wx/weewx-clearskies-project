@@ -2252,11 +2252,16 @@ All physics constants (γ bounds, Kt values, topographic multipliers) defined as
 **Inputs:** Corrected wave data (from wave_transform or raw WaveWatch III), spectral components (from NDBC), spot config (beach facing, directional exposure), wind data.
 **Outputs:** `SurfForecast` with quality_stars (1–5), quality_label, conditions_text.
 
-Scoring factors:
-- **Wave height:** Larger = better (within rideable range for the spot)
-- **Period:** Longer = better (cleaner, more powerful waves)
-- **Swell dominance:** Higher ratio of primary swell energy to total energy = cleaner conditions
-- **Wind quality:** Offshore (blowing from land to sea) = best (holds wave face up); onshore = worst. Classification: offshore → cross_offshore → cross → cross_onshore → onshore, based on angle between wind direction and beach-facing direction.
+**Four-component weighted scoring:**
+
+| Component | Weight | Scoring method |
+|---|---|---|
+| Wave height | 0.35 | Larger = better within rideable range for the spot. Scaled linearly against the spot's configured ideal range. |
+| Wave period | 0.35 | Longer = better (cleaner, more powerful waves). Ground swell (≥12s) scores highest. |
+| Wind quality | 0.20 | Offshore (land to sea) = best (holds wave face up); onshore = worst. Classification: offshore → cross_offshore → cross → cross_onshore → onshore, based on angle between wind direction and beach-facing direction. |
+| Swell dominance | 0.10 | Ratio of primary swell energy to total energy. Higher = cleaner conditions; low ratio indicates confused multi-swell or wind chop. |
+
+Additional modifiers (applied after weighted sum, not weighted components):
 - **Beach angle alignment:** Per-component directional filter — a swell from a direction blocked by the beach's `directional_exposure` config scores zero for that component.
 - **Multi-swell interference:** Compatible swells (similar direction) combine constructively; opposing swells create confused seas and score lower.
 
@@ -2273,7 +2278,7 @@ Quality labels: 1 = "Poor", 2 = "Fair", 3 = "Good", 4 = "Very Good", 5 = "Epic".
 
 | Component | Weight | Scoring method |
 |---|---|---|
-| Barometric pressure trend | 0.375 | 3-hour pressure delta. Rapid drop (> 3 hPa/3hr) = 100 (peak). Falling = 80. Stable = 50. Rising = 30 initially, improving to 60 over 12–24 hr. |
+| Barometric pressure trend | 0.375 | 3-hour pressure delta. Rapid drop (> 3 hPa/3hr) = 100 (peak). Falling (1–3 hPa/3hr) = 80. Stable (< 1 hPa/3hr) = 50. Rising slow (1–3 hPa/3hr) = 30. Rising rapid (> 3 hPa/3hr) = 20 (fish stop feeding during rapid pressure increases). |
 | Tide state | 0.3125 | Position in tidal cycle from CO-OPS predictions. Outgoing (ebb) = 100 (flushes bait). Incoming (flood) = 80. Peak flow (midpoint between tidal extremes) = 70. Slack high = 30. Slack low = 20. |
 | Solunar intensity | 0.1875 | From solunar processor. During major period + new/full moon = 100. During major period (non-peak moon) = 80. During minor period = 60. Outside any period = 30. |
 | Time of day | 0.125 | Dawn = 100, Dusk = 90 (low-light feeding peaks). Morning = 70. Night = 50 (species-dependent). Midday = 30. |
