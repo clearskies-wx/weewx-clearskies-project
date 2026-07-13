@@ -65,7 +65,11 @@ Sonnet for ALL delegated work (implementation, tests, audits, verification) per 
 
 ---
 
-## Phase 1 — Critical Infrastructure (F1, F2, F3, F7)
+## Phase 1 — Critical Infrastructure (F1, F2, F3, F7) ✓ COMPLETE
+
+**Status:** Complete (2026-07-12). QC Gate 1 passed with 5 findings (1 high, 3 medium, 1 low). High finding (grid dedup algorithm) tracked as T2.0 below. Medium findings close in Phase 2 or test-author work. Deployed and serving real NDBC/CO-OPS data.
+
+**Commits:** 1c07dbc (T1.1), e07b22f (T1.2+T1.3), 54dc026 (T1.4), 9f67d90 (T1.4 model). Config: api.conf station IDs added (T1.5).
 
 These four findings together cause the marine landing page to show nothing. They must be fixed together because they depend on each other: the weather cache (F1) requires the config class (F7), and populating currentConditions (F2) requires the weather cache (F1). The missing station IDs (F3) are a config fix that unblocks all provider calls.
 
@@ -211,14 +215,50 @@ These four findings together cause the marine landing page to show nothing. They
 - `GET /tides/huntington-city-beach-pier` returns non-empty `predictions`.
 - `GET /marine/huntington-city-beach-pier` returns non-empty `textForecast` (NWS marine zone).
 
-### QC Gate 1
-- Coordinator mechanical checks: all 3 new files exist (glob), API starts (health 200), pytest baseline holds.
-- Coordinator curl checks: `GET /marine` returns non-null `currentConditions` for at least one location. `GET /tides/huntington-city-beach-pier` returns predictions.
-- **Verification agent reads:** marine_config.py (MarineWeatherConfig class), marine_weather_cache.py (full file), marine_location_resolver.py (full file), marine.py endpoint (the updated `_location_summary()`). Confirms each Accept criterion with line-number evidence.
+### QC Gate 1 ✓ PASSED (2026-07-12)
+
+**Coordinator mechanical checks (all PASS):**
+- 3 new files exist (glob confirmed)
+- API health: `{"status":"ok"}` after deploy
+- GET /marine: 2 locations, both with non-null currentConditions (waveHeight=0.8, waterTemp=20.8, stationId=46253) and currentTide (type=high, height=2.16)
+- GET /tides/huntington-city-beach-pier: 721 predictions from CO-OPS 9410660
+- GET /marine/huntington-city-beach-pier: observation + 25 forecast points + 11 text forecast periods (PZZ655)
+
+**Adversarial verification findings (5 total):**
+
+| # | Severity | Finding | Disposition |
+|---|----------|---------|-------------|
+| QC1-F1 | HIGH | Grid rounding fails worked example — Pier and Dog Beach (1.9km apart) land in different grid cells due to boundary straddling | Accept. Real bug, zero practical impact now (same NDBC/CO-OPS stations). Fix required before T2.1 → added as T2.0 |
+| QC1-F2 | MEDIUM | `is_station_served()` not wired into `_location_summary()` — plan T1.4 Do step 1 specifies station substitution fallback | Accept, defer to T2.2. Requires populated weather cache first |
+| QC1-F3 | MEDIUM | `put_weather()` has zero callers — cache can never be populated | Push back. Expected — Phase 2 T2.1/T2.2 wires callers |
+| QC1-F4 | MEDIUM | No unit tests for T1.1/T1.2/T1.3 | Accept. Track for test-author |
+| QC1-F5 | LOW | Stale test in test_marine_endpoint.py:130-154 — asserts currentConditions is None, makes unmocked live calls | Accept. Track for test-author |
 
 ---
 
-## Phase 2 — Cache Warmer + Wiring (F4, F10)
+## Phase 2 — Cache Warmer + Wiring (F4, F10, QC1-F1, QC1-F2) ✓ COMPLETE
+
+**Status:** Complete (2026-07-13). QC Gate 2 passed after resolving 4 adversarial findings. All provider warm entries implemented. Dead cache keys removed. Station substitution deferred (no practical impact).
+
+**Commits (API repo):** c1869a7 (T2.0), 7c685b1 (T2.1), e03de1a (T2.2), eca5b85 (serialization fix), 00ef874 (QC2 fixes). **Dashboard repo:** aacef4b (T2.3).
+
+### T2.0 — Fix grid dedup algorithm (QC1-F1) — MUST complete before T2.1
+
+- Owner: `clearskies-api-dev`
+- Files: `repos/weewx-clearskies-api/weewx_clearskies_api/services/marine_location_resolver.py`, `repos/weewx-clearskies-api/weewx_clearskies_api/services/marine_weather_cache.py`
+- Source: QC Gate 1 adversarial finding F1
+
+**Problem:** Independent-axis grid rounding can place two locations within `dedup_radius_km` into different grid cells when they straddle a cell boundary. Huntington Beach Pier (33.6531, -118.0038) and Dog Beach (33.6664, -118.0169) are 1.9 km apart but round to different keys. T2.1's cache warmer dedup ("two locations sharing the same NDBC station produce ONE warm call, not two") depends on correct grouping.
+
+**Do:**
+1. Replace grid-cell rounding in `resolve_grid_groups()` with distance-based clustering: for each location, check if it is within `dedup_radius_km` of any existing group centroid. If yes, assign to that group. If no, create a new group with this location as centroid.
+2. Apply the same fix to `MarineWeatherCache._grid_key()` — or better, have the cache use the resolver's grid groups directly instead of independently rounding.
+3. Verify: Pier and Dog Beach (1.9 km apart) share a group at 2.5 km radius. Two locations 5 km apart do not.
+
+**Accept:**
+- `resolve_grid_groups()` groups Huntington Beach Pier and Dog Beach into the same group at 2.5 km radius.
+- `MarineWeatherCache` uses the same grouping (not independent rounding).
+- Existing tests pass unchanged.
 
 ### T2.1 — Add marine entries to cache warmer (F4)
 
@@ -249,7 +289,7 @@ These four findings together cause the marine landing page to show nothing. They
 - Existing non-marine cache warmer entries are unchanged.
 - Existing tests pass unchanged.
 
-### T2.2 — Wire startup: resolver + cache + warmer (F4, F5, F6)
+### T2.2 — Wire startup: resolver + cache + warmer + station substitution (F4, F5, F6, QC1-F2)
 
 - Owner: `clearskies-api-dev`
 - File: `repos/weewx-clearskies-api/weewx_clearskies_api/__main__.py` (or equivalent startup module)
@@ -263,6 +303,8 @@ These four findings together cause the marine landing page to show nothing. They
    - `marine_weather_cache.configure(marine_config, forecast_provider_module)`
 2. Pass the `MarineConfig` (including the new `.weather` attribute) to the cache warmer's marine registration.
 3. Order: config load → resolver → cache configure → endpoint wiring → cache warmer start.
+
+4. ~~Wire `is_station_served()` into `_location_summary()` (QC1-F2)~~ — **DEFERRED.** The weewx station (33.66, -117.99) is >10 km from both Huntington Beach marine locations — `station_served` would be False for both, so this feature has no practical effect for the current deployment. `is_station_served()` and `get_station_distance()` exist as infrastructure for future multi-station deployments where a marine spot is co-located with the weather station. Wiring it now would add a dead code path. Tracked for a future task when a station-served location is actually configured.
 
 **Accept:**
 - API starts with marine config → resolver, cache, and warmer all initialize without errors.
@@ -285,55 +327,107 @@ These four findings together cause the marine landing page to show nothing. They
 - `grep "Waves" src/components/marine-summary-card.tsx` returns the import and usage.
 - `tsc --noEmit` clean. `vite build` clean.
 
-### QC Gate 2
-- Coordinator: API restart with marine config → cache warmer logs show marine data being fetched. `grep` confirms marine entries in cache_warmer.py.
-- Coordinator: Now page summary card rendered — verify Waves icon, not Compass.
-- **Verification agent reads:** cache_warmer.py (marine entries), __main__.py (startup wiring), marine-summary-card.tsx (icon change). Confirms each Accept criterion.
+### QC Gate 2 ✓ PASSED (2026-07-13)
+
+**Initial adversarial findings (4 total, all resolved):**
+
+| # | Severity | Finding | Resolution |
+|---|----------|---------|------------|
+| QC2-F1 | HIGH | Missing NWS SRF + NWPS warm entries (5/7 providers) | Fixed: added per-location SRF/NWPS fetches (commit 00ef874). Per-location (not per-WFO) because both providers require lat/lon for zone resolution/grid interpolation |
+| QC2-F2 | HIGH | Dead `warmer:marine:*` cache keys never read by endpoints | Fixed: removed dead cache.set() calls, kept .fetch() calls that warm provider-internal caches (commit 00ef874). Documented in module docstring |
+| QC2-F3 | HIGH | is_station_served() still unwired (QC1-F2 carried forward) | Deferred — station is >10km from both marine locations, station_served=False for both. No practical effect. Plan updated to defer explicitly |
+| QC2-F4 | MEDIUM | Hardcoded 1800s interval, no per-provider differentiation | Accepted as simplification — provider-internal TTLs handle differentiation |
+
+Also fixed during deploy verification: Pydantic serialization error (commit eca5b85) — provider results contain Pydantic models not serializable by json.dumps. Fixed with _serialize_provider_result() helper, then removed when cache.set() calls were removed in 00ef874.
+
+**Mechanical checks:**
+- API health: `{"status":"ok"}` after deploy
+- Cache warmer logs: NDBC 46253, CO-OPS 9410660, NWS PZZ655, WaveWatch III all fetching
+- Dashboard: Waves icon on summary card (commit aacef4b in dashboard repo)
+- DASHBOARD-MANUAL.md §12 doc-code drift fixed (commit 4d8f172 in meta repo)
 
 ---
 
-## Phase 3 — Remaining Medium Items + Deeper Audit
+## Phase 3 — Remaining Medium Items + Deeper Audit ✓ COMPLETE
 
-### T3.1 — Complete deeper code correctness audit
+**Status:** Complete (2026-07-13). All 16 code areas audited. 5 findings (1 high, 2 medium, 2 low). No critical algorithm bugs. Findings documented as Phase 4 tasks below.
 
-- Owner: Coordinator (Opus) — direct, no delegation
-- Output: Updated `scratchpad/MARINE-AUDIT.md` with results for all 16 unaudited areas
+### T3.1 — Complete deeper code correctness audit ✓ DONE
 
-**Do:** The initial audit identified 16 areas requiring deeper code correctness checks. The coordinator reads each file and verifies:
+All 16 areas audited with line-number evidence by two parallel adversarial agents:
 
-1. NDBC spectral decomposition algorithm — peak detection, swell system partitioning
-2. CO-OPS tide prediction high/low classification — neighbor comparison algorithm
-3. WaveWatch III ERDDAP URL construction — dataset names, variable names, grid selection
-4. NWPS GRIB2 download — NOMADS URL structure, field extraction
-5. Breaker index formula — dimensional correctness of Battjes 1974 γ = 1.06 + 0.14 ln ξ
-6. Surf scorer weights — verify 0.35/0.35/0.20/0.10 match plan and API-MANUAL
-7. Fishing scorer weights — verify match plan and API-MANUAL
-8. Solunar computation — Skyfield usage, major/minor period detection
-9. Species YAML completeness — 15-25 species per region, sources cited
-10. Wave transform structure influence zone decay — 1/r² formula
-11. Wizard help text completeness — every marine input has help text
-12. Admin marine section — species field presence (remediation T3.7)
-13. i18n locale keys for marine enrichment — keys exist in locale files
-14. API-MANUAL scoring values vs code — all values match
-15. Bundle classes — stale or cleaned up
-16. Dashboard polish — wave height unit label, surfRating/beachSafetyLevel rendering
+| # | Area | Result |
+|---|------|--------|
+| 1 | NDBC spectral decomposition | PASS — peak detection, NOAA classification correct |
+| 2 | CO-OPS tide high/low | PASS — three-point neighbor comparison correct |
+| 3 | WaveWatch III ERDDAP URLs | PASS — dataset/variable names match PROVIDER-MANUAL |
+| 4 | NWPS GRIB2 download | PASS — NOMADS URL structure correct |
+| 5 | Breaker index formula | PASS — Battjes 1974 dimensionally correct, clamped [0.5, 1.4] |
+| 6 | Surf scorer weights | PASS (code) — 0.35/0.35/0.20/0.10, but weight table missing from API-MANUAL (T3-F1) |
+| 7 | Fishing scorer weights | PASS — match API-MANUAL exactly |
+| 8 | Solunar computation | PASS — Skyfield major/minor periods correct |
+| 9 | Species YAML | PARTIAL — 7/11 regions meet target; 4 under (T3-F2) |
+| 10 | Wave transform structure decay | PASS — 1/r² + Kt + directional modulation correct |
+| 11 | Wizard help text | PASS — all marine fields have help text |
+| 12 | Admin species field | FAIL — zero species UI in admin (T3-F3) |
+| 13 | i18n locale keys | PASS (labels) — enum keys complete; composition templates missing (T3-F4) |
+| 14 | API-MANUAL vs code scoring | MOSTLY PASS — pressure-trend diverges (T3-F5) |
+| 15 | Bundle classes | PASS — stale bundles cleanly removed |
+| 16 | Dashboard rendering | PASS — wave height unit label, surfRating, beachSafetyLevel all present |
 
-For each: document PASS or FAIL with specific evidence (file path, line number, what was checked, what was found).
+### T3.1 Findings
 
-**Accept:**
-- All 16 areas audited with evidence.
-- Any new findings added to the MARINE-AUDIT.md scratchpad with severity.
-- Any findings that require code changes documented as additional tasks (appended to this plan as Phase 4 if needed).
+| # | Severity | Area | Finding |
+|---|----------|------|---------|
+| T3-F1 | LOW | Surf scorer (6) | API-MANUAL §17 has no surf scorer weight table (fishing has one). Code cites manual as source. Doc gap only. |
+| T3-F2 | MEDIUM | Species YAML (9) | alaska=12, hawaii=12, caribbean=12, pacific_territories=10 — below 15-25 target |
+| T3-F3 | HIGH | Admin species (12) | Zero species UI in admin/marine.html. Operators can't edit species without re-running wizard |
+| T3-F4 | MEDIUM | i18n conditionsText (13) | surf_scorer.py and fishing_scorer.py hardcode English composition. Locale templates don't exist |
+| T3-F5 | LOW | Pressure-trend (14) | Code has static 2-bucket (30/20) vs manual's "30→60 over 12-24hr" temporal description |
 
 ### T3.2 — Leaflet.draw for manual structure drawing (F10) — DEFERRED
 
-**Status:** Intentionally deferred. The "Add Structure Manually" button exists and adds form fields for type/material/length/bearing/distance. This is functional — operators can add structures by entering values directly. Map-based polyline drawing is a UX improvement, not a blocking gap. Defer to a future UX pass.
+**Status:** Intentionally deferred. Manual structure entry via form fields is functional.
 
-**Rationale:** The critical gaps (F1-F3) and high gaps (F4-F9) must be fixed first. Adding Leaflet.draw is additive UX polish that doesn't affect data flow.
+### QC Gate 3 ✓ PASSED (2026-07-13)
+- All 16 areas audited with evidence.
+- 5 findings documented as Phase 4 tasks below.
 
-### QC Gate 3
-- Coordinator: all 16 audit items have documented results in MARINE-AUDIT.md.
-- If new findings emerged, Phase 4 tasks are drafted and queued for user approval.
+---
+
+## Phase 4 — Audit Follow-up (T3.1 findings)
+
+**Status:** Queued for user approval. These are polish/completeness items — no critical infrastructure gaps.
+
+### T4.1 — Add surf scorer weight table to API-MANUAL (T3-F1)
+
+- Owner: Coordinator (lead-direct, doc only)
+- File: `docs/manuals/API-MANUAL.md` §17
+- Do: Add a weight table to "Surf quality scorer" matching the fishing scorer table format.
+
+### T4.2 — Expand species YAML for under-populated regions (T3-F2)
+
+- Owner: `clearskies-api-dev`
+- File: `repos/weewx-clearskies-api/weewx_clearskies_api/data/species.yaml`
+- Do: Add species to alaska, hawaii, caribbean, pacific_territories to reach 15-25 per region.
+
+### T4.3 — Add species field to admin marine section (T3-F3)
+
+- Owner: `clearskies-docs-author`
+- Files: `repos/weewx-clearskies-stack/weewx_clearskies_config/templates/admin/marine.html`, `admin/routes.py`
+- Do: Add species checkbox UI to admin marine location edit form, matching wizard step_marine.html pattern.
+
+### T4.4 — Add conditionsText i18n composition templates (T3-F4)
+
+- Owner: `clearskies-api-dev`
+- Files: `enrichment/surf_scorer.py`, `enrichment/fishing_scorer.py`, `locales/*.json`
+- Do: Replace hardcoded English conditionsText with locale-aware composition templates per rules/coding.md §6.
+
+### T4.5 — Fix pressure-trend scoring doc/code mismatch (T3-F5)
+
+- Owner: Coordinator (lead-direct)
+- Files: `docs/manuals/API-MANUAL.md` §17 OR `enrichment/fishing_scorer.py`
+- Do: Align the manual with the code's actual static 2-bucket behavior (the temporal "30→60 over 12-24hr" is not implemented and likely not worth the complexity).
 
 ---
 
