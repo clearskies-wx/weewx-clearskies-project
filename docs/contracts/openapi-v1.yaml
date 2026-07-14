@@ -3534,7 +3534,9 @@ components:
       properties:
         safetyLevel:
           type: string
+          nullable: true
           enum: [safe, caution, dangerous]
+          description: "Always null in v1 (T9.1). The composite safe/caution/dangerous classifier was rejected in favor of the individual hazard fields below (ripCurrentRisk, waveHeight, wavePeriod, uvIndex, comfortLevel, etc.); kept in the schema for backward compatibility."
         waveHeight: { type: number, nullable: true, description: "group_wave_height; current/forecast" }
         wavePeriod: { type: number, nullable: true, description: "group_wave_period; current/forecast" }
         ripCurrentRisk:
@@ -3760,7 +3762,7 @@ components:
         name: { type: string }
         lat: { type: number }
         lon: { type: number }
-        safetyLevel: { type: string, nullable: true, enum: [safe, caution, dangerous] }
+        safetyLevel: { type: string, nullable: true, enum: [safe, caution, dangerous], description: "Always null in v1 (T9.1) - see BeachSafetyAssessment.safetyLevel" }
         ripCurrentRisk: { type: string, nullable: true, enum: [low, moderate, high] }
         waterTemp: { type: number, nullable: true, description: "Fahrenheit - informational value, no operator unit conversion" }
       required: [locationId, name, lat, lon]

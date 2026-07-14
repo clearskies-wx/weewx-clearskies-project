@@ -2046,7 +2046,7 @@ Composite beach safety assessment per location.
 
 | Field | Type | Unit group | Nullable | Description |
 |---|---|---|---|---|
-| `safetyLevel` | str | — | No | (locale) `"safe"`, `"caution"`, or `"dangerous"` |
+| `safetyLevel` | str \| null | — | Yes | **Always null in v1 (T9.1).** The two-threshold sea-state classifier (`classify_sea_state()` in `endpoints/beach_safety.py`) that used to produce `"safe"`/`"caution"`/`"dangerous"` was rejected as a crude composite — a single label collapsing wave height and period loses information a visitor needs to make their own judgment call. The function is retained in the module (used by tests exercising the classification thresholds directly) but its output is no longer wired into the response. The individual hazard fields below (`ripCurrentRisk`, `waveHeight`, `wavePeriod`, `uvIndex`, `comfortLevel`, `visibility`, `windSpeed`, `activeAlerts`) speak for themselves; the field is kept in the response shape (rather than removed) for backward compatibility. |
 | `waveHeight` | float | `group_wave_height` | Yes | Current/forecast wave height |
 | `wavePeriod` | float | `group_wave_period` | Yes | Current/forecast wave period |
 | `ripCurrentRisk` | str | — | Yes | (locale) `"low"`, `"moderate"`, `"high"` (from SRF or NWPS v1.5) |
@@ -2224,7 +2224,7 @@ Source: `endpoints/fishing.py`. Nested by day: no flat top-level `forecast` list
 
 ##### Beach-safety bundle (actual shape) — `GET /api/v1/beach-safety[/{locationId}]`
 
-Source: `endpoints/beach_safety.py`. There is no `zoneForecast` field in the actual response — SRF-sourced rip current risk and UV index are folded directly into `assessment` instead.
+Source: `endpoints/beach_safety.py`. There is no `zoneForecast` field in the actual response — SRF-sourced rip current risk and UV index are folded directly into `assessment` instead. UV index falls back to `services/marine_weather_cache.py`'s `get_current_conditions()` (T9.2) when NWS SRF doesn't supply it — currently a no-op in practice because no forecast provider's `fetch_current_conditions()` populates a UV field yet (see PROVIDER-MANUAL §4 "Fields available from provider APIs but not yet mapped"); wired so `uvIndex` starts flowing automatically once a provider adds one.
 
 | Field | Type | Nullable | Description |
 |---|---|---|---|
@@ -2440,7 +2440,7 @@ Computed locally via Skyfield — no external API call. Skyfield is already a pr
 | `FishingForecast.periodLabel` | "Early Morning" | `fishing.period.<value>` | `i18n.t("fishing.period.early_morning")` |
 | `FishingForecast.conditionsText` | "Falling pressure with incoming tide..." | `fishing.conditions.*` composition templates | Flat `i18n.t()` template strings filled in with `str.format()` (T4.4); see `SurfForecast.conditionsText` row |
 | `FishingForecast.speciesScores[].status` | "active" | `fishing.species_status.<value>` | `i18n.t("fishing.species_status.active")` |
-| `BeachSafetyAssessment.safetyLevel` | "caution" | `beach_safety.level.<value>` | `i18n.t("beach_safety.level.caution")` |
+| ~~`BeachSafetyAssessment.safetyLevel`~~ | ~~"caution"~~ | ~~`beach_safety.level.<value>`~~ | **Deprecated (T9.1).** `safetyLevel` is always null in v1 — see §16 "BeachSafetyAssessment". The `beach_safety.level.<value>` locale keys may remain in locale files harmlessly unused; no code path resolves them. |
 | `BeachSafetyAssessment.comfortLevel` | "cool" | `beach_safety.comfort.<value>` | `i18n.t("beach_safety.comfort.cool")` |
 | `SurfZoneForecast.ripCurrentRisk` | "moderate" | `beach_safety.rip_risk.<value>` | `i18n.t("beach_safety.rip_risk.moderate")` |
 | `SolunarTimes.moonPhase` | "waxing_crescent" | `moon_phases.<value>` | Already exists in locale files (reuse existing moon phase keys from almanac feature) |
@@ -2482,7 +2482,7 @@ Marine endpoints follow existing patterns: capability gating, unit conversion, f
 | `GET /api/v1/tides[/{locationId}]` | `list[MarineLocationSummary]` | `TideBundle` | At least one location with a `coops_station_ids` entry configured. Per ADR-090, all four activities (marine, surf, fishing, beach_safety) use tide data, so "tide-capable" means "has a CO-OPS station configured," not a specific activity value. |
 | `GET /api/v1/surf[/{locationId}]` | `list[object]` (`locationId`, `name`, `lat`, `lon`, `qualityStars`, `conditionsText` — metadata only, no live fetch) | Surf bundle, actual shape (§16) | At least one location with `surf` activity enabled |
 | `GET /api/v1/fishing[/{locationId}]` | `list[object]` (`locationId`, `name`, `lat`, `lon`) | Fishing bundle, actual shape (§16) | At least one location with `fishing` activity enabled |
-| `GET /api/v1/beach-safety[/{locationId}]` | `list[object]` (`locationId`, `name`, `lat`, `lon`, `safetyLevel`, `ripCurrentRisk`, `waterTemp` — live-fetched per card) | Beach-safety bundle, actual shape (§16) | At least one location with `beach_safety` activity enabled |
+| `GET /api/v1/beach-safety[/{locationId}]` | `list[object]` (`locationId`, `name`, `lat`, `lon`, `safetyLevel` — always null, T9.1 — `ripCurrentRisk`, `waterTemp` — live-fetched per card) | Beach-safety bundle, actual shape (§16) | At least one location with `beach_safety` activity enabled |
 | `GET /api/v1/almanac/solunar` | — (single route, no location list) | `SolunarTimes` (or `list[SolunarTimes]` when `days` > 1) | Always available (not gated by marine feature) |
 
 ### Request parameters

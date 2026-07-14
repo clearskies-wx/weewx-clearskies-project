@@ -1009,7 +1009,7 @@ Map and LocationCards are direct children of the `PageLayout` Grid — no intern
     - Water temp: Phosphor `Thermometer` icon (12px) + formatted value
     - All icons decorative (`aria-hidden`, `focusable="false"`), 12px matching `--text-label`
   - **Alert badge**: amber alert count badge when `alerts > 0`
-  - **Location photo** (when `photoUrl` non-null): right ~40% of card, `object-fit: cover`, clipped to card's right border-radius. Gradient overlay where text meets photo: `linear-gradient(to right, rgb(var(--card-glass)) 55%, transparent 100%)`. Card layout switches to `flex-row`. When no photo: text-only layout (`flex-col`). `alt={location.name}`.
+  - **Location photo** (when `photoUrl` non-null): right ~40% of card, `object-fit: cover`, clipped to card's right border-radius. Gradient overlay where text meets photo: `linear-gradient(to right, rgb(var(--card-glass)) 55%, transparent 100%)`. Card layout switches to `flex-row`. When no photo: text-only layout (`flex-col`). `alt={location.name}`. Photo pane is `hidden` below the `sm` (640px) breakpoint — a "tile"-footprint card is too narrow on mobile to spare 40% of its width without crowding the stat row; content-only `flex-1` button fills the full width instead.
 - No "Updated X minutes ago" — removed per finding F12
 - No "Use my location" button — removed per finding F11
 - Linked hover: `onMouseEnter` → highlights corresponding map pin (scale 1.3×), `onMouseLeave` → resets. When hovered (by card hover or pin hover): `ring-2 ring-primary bg-foreground/5`.
@@ -1128,10 +1128,10 @@ Surfaces the fishing scoring system (`enrichment/fishing_scorer.py`). Hero condi
    - Major periods: accent color bars. Minor periods: muted color bars. Current time indicator.
 6. **Species Forecast** — `Card footprint="full"`:
    - Data table with `<thead>/<tbody>/<th scope>` following DESIGN-MANUAL §11 data table pattern
-   - Columns: Species name, Score (0-100), Status (active/moderate/inactive with color badge), Temperature suitability, Seasonal note
+   - Columns: Species name, Score (0-100), Status (active/less active/inactive with color badge), Notes (optional — shown only when at least one species has a seasonal note from the scorer)
    - Alternating row backgrounds (`bg-muted/30`), sticky first column on mobile (`position: sticky, left: 0`)
 7. **Tide Forecast** — `Card footprint="full"`:
-   - `TideChart` with tide direction color coding (flood=blue, ebb=amber, slack=muted)
+   - `TideChart` (shared component, reused as-is)
 
 ### Tab content — Beach Safety (F24 redesign)
 

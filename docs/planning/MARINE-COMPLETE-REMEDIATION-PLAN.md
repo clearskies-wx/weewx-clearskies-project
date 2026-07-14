@@ -1,9 +1,9 @@
 # Marine Feature Complete Remediation Plan
 
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 **Approved:** 2026-07-14
 **Created:** 2026-07-14
-**Last updated:** 2026-07-14 — Phases 0, 1, 2, 3, 4, 5, 6, 7 complete. Phases 8 (FishingTab), 9 (BeachSafetyTab), 10 (Admin/Wizard fixes) pending.
+**Last updated:** 2026-07-14 — All 11 phases (0-10) complete. All 25 findings (F0-F25) addressed.
 **Origin:** Post-deployment testing and troubleshooting of the marine dashboard page, admin marine section, and all four activity tabs. 25 findings (F0–F25) documented in `docs/planning/briefs/ADMIN-MARINE-FIXIT-BRIEF.md` with industry research across surf, fishing, beach safety, and boating sites.
 
 ## Context
@@ -1158,14 +1158,25 @@ Surface the fishing scoring system. Use `conditionsText` as the hero headline. F
 7. **Tide Forecast** — `Card footprint="full"`:
    - `TideChart` with tide direction color coding (flood=blue, ebb=amber, slack=muted) per Fish & Tides research
 
-### QC Gate 8
-**DESIGN-MANUAL compliance + scoring system surfaced:**
-- `conditionsText` displayed as hero headline
-- Scoring breakdown shows all 4 factors as visual bars
-- Solunar display uses `MoonPhaseIcon` from `components/moon-phase-icon.tsx`
-- Species table follows data table pattern (thead/tbody/th scope, sticky first column)
-- All Cards use `Card` + `CardHeader` + `CardTitle`
-- Forecast periods use structured columns (DailyColumns pattern)
+### QC Gate 8 — PASSED 2026-07-14
+
+**Adversarial audit findings (2), all resolved:**
+- F1 [HIGH]: StormSurgeBadge in BeachSafetyTab used `!== null` (strict) instead of `!= null` (loose), causing persistent false "Elevated" badge when API omits the field (undefined !== null === true) — FIXED (loose null check)
+- F2 [LOW]: Missing `tide.now` i18n key in all 13 locales — FIXED (key added)
+
+**DESIGN-MANUAL compliance (all pass):**
+- [x] FishingTab uses `Card` + `CardHeader` + `CardTitle as="h3"` (6/6 Cards)
+- [x] `conditionsText` displayed as hero headline
+- [x] Scoring breakdown shows all 4 weighted factors (Pressure 37.5%, Tide 31.25%, Solunar 18.75%, Time of Day 12.5%)
+- [x] Score bars use gauge tokens (var(--gauge-unfill), tiered fill)
+- [x] Solunar display uses `MoonPhaseIcon` + `MoonPhaseG` from `components/moon-phase-icon.tsx`
+- [x] Moon phase underscore→hyphen bug fixed (pre-existing, caught during rewrite)
+- [x] Species table follows data table pattern (thead/tbody/th scope)
+- [x] Species badge color derived from numeric score (not translated status string — avoids i18n bug)
+- [x] Zero local Panel/StatTile functions
+- [x] All i18n keys present in all 13 locales
+
+Dashboard commits bf6dced + 651f62b. tsc clean (zero errors).
 
 ---
 
@@ -1241,13 +1252,21 @@ Remove the crude `classify_sea_state()` safety classifier. Present itemized haza
 - Standalone `WaterTempPanel` (water temp becomes a stat tile in conditions)
 - Standalone `UVIndexPanel` (UV becomes a hazard row in conditions)
 
-### QC Gate 9
-- No "Safe/Caution/Dangerous" badge anywhere
-- No `SafetyIndicator` component imported or rendered
-- Each hazard shown as a separate indicator with its own color/badge
-- UV index shows non-null value (from forecast provider)
-- Rip current risk as a condition badge (not a full card)
-- All Cards use `Card` + `CardHeader` + `CardTitle`
+### QC Gate 9 — PASSED 2026-07-14
+
+**Adversarial audit findings:** F1 HIGH (storm surge null check) shared with Phase 8 audit — FIXED. No Phase 9-specific findings.
+
+**Results:**
+- [x] No "Safe/Caution/Dangerous" badge — SafetyIndicator not imported (comment-only reference)
+- [x] `safetyLevel` always null from API (T9.1, commit 7fec0b5)
+- [x] Each hazard shown as separate indicator: rip current (color badge + icon + guidance text), UV (5-tier EPA labels + SPF), wave height/period/wind (MarineStatTile), water temp (comfort badge)
+- [x] UV index wired with forecast-provider fallback (T9.2, currently no-op — no provider supplies UV yet)
+- [x] All Cards use `Card` + `CardHeader` + `CardTitle as="h3"` (4/4 Cards)
+- [x] Zero local Panel/StatTile functions
+- [x] Storm surge badge uses loose null check (catches undefined)
+- [x] API-MANUAL §16/§17/§18 updated for safetyLevel=null and UV fallback
+
+API commit 7fec0b5. Dashboard commits 844ea80 + 651f62b. tsc clean (zero errors).
 
 ---
 
@@ -1306,14 +1325,23 @@ Rename column header from "Stations" to "Data Sources".
 2. Wizard: Remove the "Download Bathymetry" button (line 183), the spinner (line 192), and the results div (line 196)
 3. Bathymetry downloads happen automatically during `/setup/apply` per PROVIDER-MANUAL §14.7 — no manual trigger needed
 
-### QC Gate 10
-- Activity icons (4 SVGs) render correctly in admin list
-- Buttons are standard Pico CSS size, not shrunken
-- Edit/Delete are separate buttons with gap, not merged
-- NWS zone shown in list view with amber indicator when missing
-- No per-location bathymetry buttons in admin or wizard
-- "Check Sources" label on the diagnostic button
-- Column header says "Data Sources" not "Stations" or "Connectivity"
+### QC Gate 10 — PASSED 2026-07-14
+
+**Adversarial audit findings (2), all resolved:**
+- F1 [HIGH]: Amber text (#f59e0b) on white fails WCAG AA (2.15:1 vs 4.5:1) — FIXED (amber-700 #b45309, ~5.9:1)
+- F2 [MEDIUM]: Orphaned bathymetry route handlers, API client method, result template, CSS selector — FIXED (all deleted)
+
+**Results:**
+- [x] Activity icons (4 SVGs) render with role="img" + aria-labelledby + title
+- [x] Buttons standard Pico CSS size (no shrunken font-size/padding)
+- [x] Edit/Delete as flex-spaced buttons (no role="group")
+- [x] NWS zone shown with amber-700 "not configured" indicator (AA compliant)
+- [x] No per-location bathymetry buttons in admin or wizard
+- [x] "Check Sources" label on diagnostic button
+- [x] Column headers: "Data Sources" and "Status"
+- [x] i18n keys added to all 13 locales
+
+Stack commits f6e4e03 + c83db78.
 
 ---
 
