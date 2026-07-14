@@ -1,8 +1,9 @@
 # Marine Feature Complete Remediation Plan
 
-**Status:** APPROVED
+**Status:** IN PROGRESS
 **Approved:** 2026-07-14
 **Created:** 2026-07-14
+**Last updated:** 2026-07-14 — Phases 0, 1, 2, 3, 5 complete. Phase 4 (photo system), 6 (BoatingTab), 7 (SurfingTab) pending.
 **Origin:** Post-deployment testing and troubleshooting of the marine dashboard page, admin marine section, and all four activity tabs. 25 findings (F0–F25) documented in `docs/planning/briefs/ADMIN-MARINE-FIXIT-BRIEF.md` with industry research across surf, fishing, beach safety, and boating sites.
 
 ## Context
