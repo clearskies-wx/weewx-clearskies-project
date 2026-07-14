@@ -342,9 +342,9 @@ All share: border-radius consistent with card scale, visible focus ring per acce
 
 ### Hero Weather Icons
 
-Rendered as inline SVG with `<linearGradient>` fills, Meteocons-style palette. Source library: Material Symbols (filled). Coverage: 31 hero icons covering all WMO condition codes plus Clear Skies extensions. Static — no animation. Partly-cloudy fix: sun uses absolute `M14.975 17.2`, `fill-rule="nonzero"` on both paths. License: Apache-2.0.
+Rendered as inline SVG with `<linearGradient>` fills, Meteocons-style palette. Source library: Material Symbols (filled). Coverage: 32 hero icons covering all WMO condition codes plus Clear Skies extensions. Static — no animation. Partly-cloudy fix: sun uses absolute `M14.975 17.2`, `fill-rule="nonzero"` on both paths. License: Apache-2.0.
 
-#### Icon inventory (31 total = 11 existing + 20 new)
+#### Icon inventory (32 total = 11 existing + 21 new)
 
 | Category | Icon | Day/Night | Glyph component | Status |
 |----------|------|-----------|-----------------|--------|
@@ -407,7 +407,7 @@ Icon selection consults precipitation probability (PoP) and cloud cover, not jus
 - **PoP 20–50% AND cloudCover < 75%:** Combined sky+precipitation icon (e.g., partly cloudy + rain).
 - **PoP > 50% OR cloudCover ≥ 75%:** Precipitation icon only (rain, snow, wintry mix, drizzle, thunderstorm — sky context dropped).
 
-See DASHBOARD-MANUAL §8 for the selection pipeline implementation (data flow, thresholds as consumed by the dashboard).
+See DASHBOARD-MANUAL §1 for the selection pipeline implementation (data flow, thresholds as consumed by the dashboard).
 
 #### Gradient definitions
 
