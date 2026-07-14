@@ -1,8 +1,9 @@
 # Marine Location Card & Detail Page Data Source Remediation Plan
 
-**Status:** IN PROGRESS — Phases 0-4 complete. T3.6 (coverage panel) + Phases 5-6 pending.
+**Status:** IN PROGRESS — Phases 0-4 complete, T3.6 complete. Phases 5-6 pending.
 **Phase 2 completed:** 2026-07-13 (API commit: 7081868)
-**Phase 3 completed:** 2026-07-13 (API commits: 7e00725, 8431f04, d49b9a2; T3.6 coverage panel deferred)
+**Phase 3 completed:** 2026-07-13 (API commits: 7e00725, 8431f04, d49b9a2; T3.6 completed 2026-07-13)
+**T3.6 completed:** 2026-07-13 (API commits: 43a65ff, 8987d9f; Stack commit: c5f907e)
 **Phase 4 completed:** 2026-07-14 (API commit: ec1f325; Dashboard commits: f5840bd, 0f146f3; Doc sync: 13388a5)
 **Approved:** 2026-07-13
 **Created:** 2026-07-13

@@ -39,7 +39,7 @@ Previous (2026-06-08): sky condition thresholds corrected for sensor accuracy, d
 
 | Service | Repo | What it does | Technology | Main port | Health port |
 |---------|------|-------------|------------|-----------|-------------|
-| **API** | weewx-clearskies-api | REST API + SSE for real-time data, unit conversion, enrichment pipeline, derived values. Queries weewx archive, aggregates provider data, serves setup endpoints. Marine/surf/fishing/beach-safety endpoints when configured. (ADR-058) | FastAPI (Python 3.12+), sync handlers, SQLAlchemy 2.x sync, sse-starlette, uvicorn, babel (locale-aware number formatting), eccodes (optional — marine GRIB2, via `[marine]` pip extra) | 8765 | 8081 |
+| **API** | weewx-clearskies-api | REST API + SSE for real-time data, unit conversion, enrichment pipeline, derived values. Queries weewx archive, aggregates provider data, serves setup endpoints. Marine/surf/fishing/beach-safety endpoints when configured. (ADR-058) | FastAPI (Python 3.12+), sync handlers, SQLAlchemy 2.x sync, sse-starlette, uvicorn, babel (locale-aware number formatting), eccodes (optional — marine GRIB2, via `[marine]` pip extra), xarray + netCDF4 (optional — OFS ocean model data, via `[marine]` pip extra) | 8765 | 8081 |
 | **Dashboard** | weewx-clearskies-dashboard | Weather UI (static SPA, 10 pages + custom pages) | React 19, Vite 8, Tailwind CSS v4, shadcn/ui, Recharts, Leaflet, **Phosphor** (utility/nav/alert) + **inline Material Symbols SVG** (hero weather, ADR-049/050); Lucide retained for deferred glyph families only, i18next | None (init container) | — |
 | **Config UI** | weewx-clearskies-stack | Setup wizard + ongoing config admin | FastAPI, Jinja2, HTMX, Pico CSS, babel (locale-aware wizard/admin i18n; Python-only, no Node build step) | 9876 | — |
 | **Caddy** | upstream (caddy:2-alpine) | Reverse proxy, TLS termination (auto Let's Encrypt), static file server | Caddy | 80, 443 | — |
@@ -260,6 +260,7 @@ Used by the config UI wizard and admin per ADR-038. Not proxied through Caddy �
 | `/setup/marine/bathymetry` | POST | Download (or regional-fallback) a CUDEM bathymetric depth profile for a surf/fishing spot | Session |
 | `/setup/marine/species` | GET | Species checklist for a coordinate + fishing target category (query: `lat`, `lon`, `category`), keyed by biogeographic region | Session |
 | `/setup/marine/discover-structures` | GET | Discover nearby coastal structures (jetties, piers, breakwaters, seawalls, groins) via the OpenStreetMap Overpass API, for surf spot wave-physics setup (query: `lat`, `lon`, `radius_m`, default 2000) | Session |
+| `/setup/marine/coverage` | GET | Data source coverage panel for a coordinate (query: `lat`, `lon`): OFS model assignment, coverage tier, available data capabilities, nearest NDBC/CO-OPS stations, NWS zone, NWPS WFO, on-premises sensor proximity (T3.6) | Session |
 | `/setup/apply` | POST | Write final config, API restarts. Accepts an optional `marine` block; NWPS WFO domain is resolved per location via NWS `/points` before writing `[marine]` to `api.conf` | Session |
 | `/setup/current-config` | GET | Full config for re-run + admin provider reads | Proxy secret |
 | `/setup/restart` | POST | Trigger graceful service restart | Proxy secret |
@@ -443,6 +444,13 @@ Wizard steps are defined by `wizard/routes.py` and `templates/wizard/step_*.html
 | `/admin/config/{component}/{section}` | GET/POST | Section edit form (component = api/stack — realtime removed per ADR-058; wizard update pending) |
 | `/admin/config/column-mapping` | GET/POST | Column mapping editor |
 | `/admin/config/test-provider` | POST | Test provider connectivity |
+| `/admin/marine` | GET | Marine locations list |
+| `/admin/marine/edit` | POST | Render add/edit form for one location |
+| `/admin/marine/save` | POST | Validate + save one location via `/setup/apply` |
+| `/admin/marine/delete` | POST | Delete one location via `/setup/apply` |
+| `/admin/marine/coverage` | POST | HTMX: data coverage panel for a location's coordinates (T3.6) |
+| `/admin/marine/test-connectivity` | POST | HTMX: NDBC/CO-OPS/NWS zone status for a location |
+| `/admin/marine/bathymetry` | POST | HTMX: re-run bathymetry download for a surf location |
 
 **Provider data source:** Provider sections (forecast, alerts, aqi, earthquakes, radar) read their current values from the API's `/setup/current-config` endpoint (on the weewx host), not from the local `api.conf`. This ensures the admin always shows the authoritative config. Falls back to the local `api.conf` if the API is unreachable. The radar section includes LibreWxR-specific fields (endpoint mode, self-hosted URL, geographic bounds) when LibreWxR is the configured provider.
 
@@ -575,12 +583,15 @@ weewx_clearskies_api/providers/
 ├── radar/            # rainviewer, librewxr, openweathermap, iem_nexrad (deprecated), noaa_mrms (deprecated), msc_geomet, dwd_radolan, iframe
 ├── marine/           # wavewatch, nwps, nws_marine, nws_srf (NOAA, keyless, US-only)
 ├── tides/            # coops (NOAA CO-OPS, keyless, US-only)
-└── buoy/             # ndbc (NOAA NDBC, keyless, US-only)
+├── buoy/             # ndbc (NOAA NDBC, keyless, US-only)
+└── ocean/            # ofs (NOAA OFS via THREDDS/OPeNDAP), erddap_ocean (MUR SST, RTOFS, regional models via ERDDAP griddap)
 ```
 
 Each module: outbound API call → response parsing → canonical field translation → capability declaration → error handling. Keyed providers proxied server-side (keys never reach browser).
 
-Three new provider domains for marine data: `"marine"` (wave forecasts and text), `"tides"` (predictions and water levels), `"buoy"` (point observations). All v1 marine providers are NOAA sources — free, keyless, US-only. See PROVIDER-MANUAL §14.
+Four provider domains for marine/ocean data: `"marine"` (wave forecasts and text), `"tides"` (predictions and water levels), `"buoy"` (point observations), `"ocean"` (water temperature profiles, currents, salinity from OFS coastal models and ERDDAP global datasets). All v1 marine/ocean providers are NOAA sources — free, keyless, US-only. See PROVIDER-MANUAL §14.
+
+Ocean data is accessed through the `ocean_data_resolver` service (`services/ocean_data_resolver.py`) which implements a tiered fallback chain: on-premises sensor → OFS regional model → regional ERDDAP → RTOFS/MUR SST global → unavailable. Endpoints call `resolve()` instead of calling ocean providers directly. Coverage tier and OFS model assignment are computed at configuration time via `find_ofs_model()` and persisted in `api.conf`.
 
 Shared utility: `_common/nws_zones.py` — marine zone discovery (station → CWA → zone list → polygon proximity). Used by NWS marine text, NWS SRF, and the marine zone alerts extension.
 
