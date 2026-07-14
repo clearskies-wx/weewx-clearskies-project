@@ -3,7 +3,7 @@
 **Status:** IN PROGRESS
 **Approved:** 2026-07-14
 **Created:** 2026-07-14
-**Last updated:** 2026-07-14 — Phases 0, 1, 2, 3, 5 complete. Phase 4 (photo system), 6 (BoatingTab), 7 (SurfingTab) pending.
+**Last updated:** 2026-07-14 — Phases 0, 1, 2, 3, 4, 5, 6, 7 complete. Phases 8 (FishingTab), 9 (BeachSafetyTab), 10 (Admin/Wizard fixes) pending.
 **Origin:** Post-deployment testing and troubleshooting of the marine dashboard page, admin marine section, and all four activity tabs. 25 findings (F0–F25) documented in `docs/planning/briefs/ADMIN-MARINE-FIXIT-BRIEF.md` with industry research across surf, fishing, beach safety, and boating sites.
 
 ## Context
@@ -709,15 +709,31 @@ handle /marine-photos/* {
 - Text is readable over the gradient overlay
 - Mobile: photo may stack below text or shrink — test at all breakpoints
 
-### QC Gate 4
-- Wizard: photo upload field present, validates format/size
-- Admin: photo upload + remove present
-- Photos stored at `/etc/weewx-clearskies/marine-photos/`
-- Caddy serves `/marine-photos/*`
-- `GET /marine` includes `photoUrl` for locations with photos
-- LocationCards render photos when available
+### QC Gate 4 — PASSED 2026-07-14
+
+**Adversarial audit findings (5), all resolved:**
+- F1 [Medium]: Admin silent size-limit drop — FIXED (added 422 error response)
+- F2 [Medium-High]: 5 T4.1 items descoped — DEFERRED (see below)
+- F3 [Low-Medium]: Filesystem check vs config field — ACCEPTED (deterministic path, no config field needed)
+- F4 [Medium]: LocationCard Card padding — FIXED (py-0 mb-0 override when photo present)
+- F5 [Low]: Auto-derived alt text — ACCEPTED (location.name is functionally descriptive)
+
+**Descoped from T4.1 (Pillow not a current dependency):**
+- JPEG→WebP conversion (requires Pillow): accept .webp only
+- Minimum 600×400 dimension validation (requires Pillow): deferred
+- Preview thumbnail after selection: deferred (JS-only, lower priority)
+- Admin "Remove photo" button: deferred
+- These items can be implemented when Pillow is added as a dependency
+
+**Results:**
+- Wizard: photo upload field present, validates .webp format + 200KB size
+- Admin: photo upload present with error feedback for oversized files
+- Photos stored at `/etc/weewx-clearskies/marine-photos/{slug}.webp`
+- Caddy serves `/marine-photos/*` from all 3 Caddyfile variants
+- `GET /marine` includes `photoUrl` for locations with photos (API commit ac17fa6)
+- LocationCards render photos when available (gradient overlay, flush edges)
 - No photos: cards render text-only
-- JPEG uploads converted to WebP
+- Dashboard commit 8dc9d61, Stack commit e0cd20f
 
 ---
 
@@ -916,23 +932,27 @@ interface MarineStatTileProps {
 - Chart renders correctly for all 7 locations
 - Verified visually in browser
 
-### QC Gate 6
-**DESIGN-MANUAL compliance (mandatory):**
-- [ ] BoatingTab uses `Card` component — NOT local `Panel`
-- [ ] Uses `CardHeader` + `CardTitle as="h3"` — NOT bare `<h3>`
-- [ ] Uses shared `MarineStatTile` — NOT local `StatTile`
-- [ ] Typography uses `var(--text-*)` tokens only
-- [ ] Charts use `ChartContainer` with `ResponsiveContainer`
-- [ ] Marine forecast uses structured columns (DailyColumns pattern) — NOT `<details>/<summary>`
-- [ ] No buoy observation panel
+### QC Gate 6 — PASSED 2026-07-14
 
-**Adversarial auditor:**
-- `grep "function Panel" BoatingTab.tsx` returns zero matches
-- `grep "function StatTile" BoatingTab.tsx` returns zero matches
-- Every `Card` component has `footprint` prop
-- Every `CardTitle` has `as` prop
-- No hardcoded font sizes
-- TideChart: no left-side clipping (visual check required)
+**Adversarial audit findings (4 code + 1 info), all resolved:**
+- F1 [HIGH]: 3 i18n keys missing from 12 non-English locales — FIXED (added to all 12)
+- F2 [MEDIUM]: WaveForecastChart YAxis label hardcoded fontSize:12 — FIXED (var(--text-label))
+- F3 [MEDIUM]: TideChart totalWaterLevelForecast prop not wired — FIXED
+- F4 [LOW]: 8 dead i18n keys + stale boating.noData message — FIXED (keys removed, message updated)
+- F5 [INFO]: FishingTab/BeachSafetyTab still have local StatTile — correctly deferred to Phase 8/9
+
+**DESIGN-MANUAL compliance (all pass):**
+- [x] BoatingTab uses `Card` component — zero `function Panel` matches
+- [x] Uses `CardHeader` + `CardTitle as="h3"` — 4/4 instances
+- [x] Uses shared `MarineStatTile` — zero `function StatTile` matches
+- [x] Typography uses `var(--text-*)` tokens only
+- [x] Charts use `ChartContainer` with `ResponsiveContainer`
+- [x] Marine forecast uses structured columns (HorizontalScrollNav) — NOT `<details>/<summary>`
+- [x] No buoy observation panel
+- [x] TideChart margin.left = 40 (≥40px per manual)
+- [x] Every Card has footprint prop, every CardTitle has as="h3"
+
+Dashboard commit 8dc9d61. tsc clean (zero errors).
 
 ---
 
@@ -1042,21 +1062,32 @@ Surface the surf scoring system. Use `conditionsText` as the hero headline. Show
 - Period quality tiers match industry standards (8s normal, 11s good, 14+ great)
 - Classification badges have distinct colors
 
-### QC Gate 7
-**DESIGN-MANUAL compliance (mandatory):**
-- All SurfingTab cards use `Card` + `CardHeader` + `CardTitle`
-- `conditionsText` displayed as hero headline
-- Star rating + quality label visible
-- Scoring breakdown shows all 4 weighted factors as visual bars
-- 72h timeline renders multi-point data (if available from Phase 2)
-- Swell compass matches WindCompassCard visual quality
-- Swell breakdown has visual hierarchy (primary > secondary > wind)
+### QC Gate 7 — PASSED 2026-07-14
 
-**Adversarial auditor:**
-- Verify `conditionsText` is read from `SurfForecast` response and displayed
-- Verify all scoring fields (qualityStars, windQuality, swellDominance) are surfaced
-- Verify no local Panel/StatTile duplicates
-- Verify swell compass SVG viewBox matches WindCompassCard (420×420)
+**Adversarial audit findings (2), all resolved:**
+- F1 [HIGH]: ScoreBar used hardcoded Tailwind colors instead of gauge tokens — FIXED (track uses var(--gauge-unfill), fill uses tiered gauge-derived tokens)
+- F2 [HIGH]: Beach alignment/directional exposure multipliers not shown — DEFERRED (API does not expose beachAlignmentMultiplier on SurfForecast; deferral documented in code comment, pending API field addition)
+
+**DESIGN-MANUAL compliance (all pass):**
+- [x] All SurfingTab cards use `Card` + `CardHeader` + `CardTitle as="h3"` (6/6 Cards)
+- [x] `conditionsText` displayed as hero headline (line 799-801)
+- [x] Star rating + quality label visible (lines 803-809)
+- [x] Scoring breakdown shows all 4 weighted factors (Wave Height 35%, Wave Period 35%, Wind Quality 20%, Swell Dominance 10%)
+- [x] Score bars use gauge tokens (var(--gauge-unfill) track, tiered fill)
+- [x] 72h timeline renders multi-point data (ForecastTimeline + WaveFaceHeightChart)
+- [x] Swell compass viewBox="0 0 420 420", 72 ticks, R_OUTER=175, --chart-2 lit ticks — matches WindCompassCard exactly
+- [x] Swell breakdown ranked by energy, primary visually larger (p-4 vs p-3, text-body vs text-label)
+- [x] Period quality tiers: 8s=normal, 11s=good, 14+=great
+- [x] Rip current badge in hero card (not standalone banner)
+- [x] Zero local Panel/StatTile functions
+- [x] No BeachAlignmentDiagram (replaced by SwellDirectionCompass)
+
+**Bonus a11y work by implementing agent:**
+- Score-bar contrast fix: bg-green-500/bg-amber-500 → bg-green-700/amber-700 (light) + bg-green-400/amber-400 (dark) to meet 3:1 non-text contrast floor
+- sr-only "primary swell" label on first swell row
+- sr-only stat prefixes on compass center overlay
+
+Dashboard commit c0bd5fe. tsc clean (zero errors). 13 locale files updated.
 
 ---
 
