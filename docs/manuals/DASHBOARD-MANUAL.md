@@ -117,31 +117,54 @@ The API passes raw `weatherCode`, `cloudCover`, and `precipProbability` per fore
 | Condition | Icon shown | Example |
 |-----------|-----------|---------|
 | PoP < 20% (any `weatherCode`) | Sky-condition icon based on `cloudCover` | 10% PoP + WMO 80 (showers) → Partly cloudy (not rain) |
-| PoP 20–50% AND `cloudCover` < 75% | Combined sky + precipitation icon *(Phase 4 — pending compound glyphs; currently shows precipitation icon)* | 30% PoP + cloudCover 40% + WMO 61 → Partly cloudy + rain |
+| PoP 20–50% AND `cloudCover` < 75% | Combined sky + precipitation icon (internal compound code 101/102/103) | 30% PoP + cloudCover 40% + WMO 61 → Partly cloudy + rain (code 101) |
 | PoP > 50% OR `cloudCover` ≥ 75% | Precipitation icon only | 60% PoP + WMO 61 → Rain |
 
-**Cloud-cover fallback tiers** (used when the PoP gate suppresses the precipitation icon):
+Thunderstorm codes (95–99) always show the full thunderstorm glyph regardless of PoP or cloud cover — a storm is never rendered as "partly cloudy."
+
+**Cloud-cover fallback tiers** (used when the PoP gate suppresses the precipitation icon, and as the base tier for combined/atmosphere compound codes):
 
 | Cloud cover | Sky icon shown |
 |------------|----------------|
 | 0–25% | Clear (WMO 0) |
 | 25–50% | Partly cloudy (WMO 2) |
-| 50–87% | Mostly cloudy (WMO 3, mostly cloudy glyph) |
-| 87–100% | Overcast (WMO 3, overcast glyph) |
+| 50–87% | Mostly cloudy (internal compound code 100 — distinct from WMO 3) |
+| 87–100% | Overcast (WMO 3) |
+
+**Internal compound codes (100–108):** `selectWeatherIcon()` returns codes above the WMO range for conditions no single WMO code covers. These are resolved to glyphs by `WMO_MAP` in `src/components/weather-icon.tsx` exactly like any WMO code — they are not a separate rendering path.
+
+| Code | Meaning |
+|------|---------|
+| 100 | Mostly cloudy (cloud cover 50–87%) |
+| 101 | Combined: partly cloudy + rain |
+| 102 | Combined: partly cloudy + snow |
+| 103 | Combined: partly cloudy + wintry mix |
+| 104 | Haze, partly cloudy tier |
+| 105 | Haze, overcast tier |
+| 106 | Smoke (or volcanic ash), partly cloudy tier |
+| 107 | Smoke (or volcanic ash), overcast tier |
+| 108 | Dust, overcast tier |
 
 **Atmosphere condition selection logic:**
 
 - Smoke (WMO 6) — overlay technique: smoke bubbles rendered on top of the cloud-cover-tier base icon.
 - Dust (WMO 7) — standalone technique: dust is the dominant visual, with sun/moon/cloud as secondary.
 - Haze (WMO 5) — cutout technique: sky element clipped, amber haze stripes below.
+- Volcanic ash (WMO 8) — reuses the smoke tiers (106/107); ash stays suspended in the atmosphere like smoke.
 
-Each atmosphere condition selects its cloud-cover tier variant based on the `cloudCover` field, per the fallback tiers above. *(Phase 4 — cloud-cover tier selection pending compound glyphs; currently atmosphere codes pass through unchanged.)*
+Each atmosphere condition selects its cloud-cover tier variant based on the `cloudCover` field:
+
+| Condition | Cloud cover < 25% (haze/smoke/ash) or < 50% (dust) | Cloud cover next tier | Cloud cover overcast tier |
+|-----------|------|------|------|
+| Haze (5) | 5 (clear) | 104 (< 50%) | 105 (≥ 50%) |
+| Smoke (6) / Ash (8) | 6 / 8 (clear) | 106 (< 50%) | 107 (≥ 50%) |
+| Dust (7) | 7 (< 50%, no separate partly-cloudy tier) | — | 108 (≥ 50%) |
 
 **Data flow:**
 
 1. API passes raw `weatherCode` + `cloudCover` + `precipProbability` per forecast point.
-2. Dashboard's `selectWeatherIcon()` applies the PoP gate and returns a resolved icon code.
-3. `WeatherIcon` component renders the glyph from `WMO_MAP`.
+2. Dashboard's `selectWeatherIcon()` (`src/utils/icon-selection.ts`) applies the PoP gate, the combined-icon logic, and the atmosphere cloud-cover tiers, returning a resolved icon code (a raw WMO code or an internal compound code 100–108).
+3. `WeatherIcon` component renders the glyph from `WMO_MAP` (`src/components/weather-icon.tsx`), which maps both raw WMO codes and internal compound codes to glyph components.
 
 **Per-consumer behavior:**
 
