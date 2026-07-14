@@ -106,6 +106,52 @@ The dashboard connects to a single backend: the API. Use relative `/api/v1` by d
 
 A global error boundary wraps the entire app tree. Any unhandled React error surfaces a top-level fallback rather than a blank screen.
 
+### Icon selection pipeline (PoP gate)
+
+**PoP gate — 20% threshold, dashboard-side decision.**
+
+The API passes raw `weatherCode`, `cloudCover`, and `precipProbability` per forecast point — it does **not** make icon selection decisions. The dashboard applies the PoP (probability of precipitation) gate via `selectWeatherIcon()` in `src/utils/icon-selection.ts`. The threshold is 20% PoP, matching NWS practice (precipitation icons appear starting at "Slight Chance," 20%+).
+
+**Selection tiers:**
+
+| Condition | Icon shown | Example |
+|-----------|-----------|---------|
+| PoP < 20% (any `weatherCode`) | Sky-condition icon based on `cloudCover` | 10% PoP + WMO 80 (showers) → Partly cloudy (not rain) |
+| PoP 20–50% AND `cloudCover` < 75% | Combined sky + precipitation icon | 30% PoP + cloudCover 40% + WMO 61 → Partly cloudy + rain |
+| PoP > 50% OR `cloudCover` ≥ 75% | Precipitation icon only | 60% PoP + WMO 61 → Rain |
+
+**Cloud-cover fallback tiers** (used when the PoP gate suppresses the precipitation icon):
+
+| Cloud cover | Sky icon shown |
+|------------|----------------|
+| 0–25% | Clear (WMO 0) |
+| 25–50% | Partly cloudy (WMO 2) |
+| 50–87% | Mostly cloudy (WMO 3, mostly cloudy glyph) |
+| 87–100% | Overcast (WMO 3, overcast glyph) |
+
+**Atmosphere condition selection logic:**
+
+- Smoke (WMO 6) — overlay technique: smoke bubbles rendered on top of the cloud-cover-tier base icon.
+- Dust (WMO 7) — standalone technique: dust is the dominant visual, with sun/moon/cloud as secondary.
+- Haze (WMO 5) — cutout technique: sky element clipped, amber haze stripes below.
+
+Each atmosphere condition selects its cloud-cover tier variant based on the `cloudCover` field, per the fallback tiers above.
+
+**Data flow:**
+
+1. API passes raw `weatherCode` + `cloudCover` + `precipProbability` per forecast point.
+2. Dashboard's `selectWeatherIcon()` applies the PoP gate and returns a resolved icon code.
+3. `WeatherIcon` component renders the glyph from `WMO_MAP`.
+
+**Per-consumer behavior:**
+
+| Consumer | PoP gate applied? | Notes |
+|----------|------------------|-------|
+| HourlyStrip | Yes | Has `precipProbability` + `cloudCover` available |
+| DailyColumns | Yes | Uses `precipProbabilityMax` + `cloudCover` |
+| CurrentConditionsCard | Forecast-fallback only | Station sensor `weatherCode` is NOT gated; the PoP gate only applies to forecast-sourced codes |
+| Marine LocationCard | No | Exempt — no precipitation probability data |
+
 ---
 
 ## §2 Time Zones
