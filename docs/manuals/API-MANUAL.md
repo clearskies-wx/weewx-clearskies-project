@@ -1247,14 +1247,19 @@ The `_derive_weather_code()` function emits WMO Code Table 4677/4680 codes. Prio
 2. Thunderstorm (96)
 3. Fog (45)
 4. Mist (10) — new, ADR-069
-5. Haze (05) — new, ADR-067
-6. Sky condition
+5. Smoke (06) — new, icon system expansion
+6. Dust (07) — new, icon system expansion
+7. Haze (05) — new, ADR-067
+8. Sky condition
 
 **Active code set:**
 
 | WMO code | Phenomenon | Status |
 |----------|-----------|--------|
 | 05 | Haze | Added — ADR-067 |
+| 06 | Smoke | New — icon system expansion |
+| 07 | Dust / blowing dust | New — icon system expansion |
+| 08 | Volcanic ash | New — icon system expansion |
 | 10 | Mist | Added — ADR-069 |
 | 45 | Fog | Existing |
 | 48 | Depositing rime fog (ice on surfaces + fog) | Added — ADR-070 |
@@ -1262,6 +1267,8 @@ The `_derive_weather_code()` function emits WMO Code Table 4677/4680 codes. Prio
 | 70–79 | Snow variants | Existing |
 | 79 | Ice pellets | Existing |
 | 96 | Thunderstorm | Existing |
+
+Codes 4, 5, 6, 7, 8, 10, and 79 are Clear Skies API extensions to the WMO code table. Standard WMO codes 0–3, 45–99 are used as-is from the Open-Meteo API. The extension codes do not collide with any WMO codes used by Open-Meteo (which uses only 0–3, 45–99).
 
 Anti-pattern: do NOT emit both a precipitation code and a fog/mist/haze code for the same observation cycle. Precipitation takes priority; fog/mist/haze codes are suppressed during active precipitation.
 
@@ -1795,6 +1802,16 @@ Each phrase generator consumes specific fields from the `ForecastPeriod` datacla
 | Fire: LAL | `weather_codes` + `precip_coverage` | derived | `weatherCode` + PoP | Y | Y | Y | Y |
 
 When a provider does not supply a field (marked "—"), the engine omits the corresponding phrase. It does not fabricate data.
+
+### `cloudCover` on `DailyForecastPoint`
+
+Max cloud cover (0–100) across the day's hourly forecast points. Added to support the dashboard's PoP-gated icon selection — combined sky+precipitation icons need cloud cover to determine the sky condition tier. This is a distinct field from `HourlyForecastPoint.cloudCover` (see "Forecast input traceability" table above, `sky_percent` row) — the hourly field is the raw per-hour value the aggregator means together for the GFE sky phrase; the daily field is the day's maximum, computed independently for icon selection.
+
+Populated by each provider:
+- **Open-Meteo:** `cloud_cover_max` from the daily variables endpoint
+- **Aeris:** `sky` field (0–100) from daily forecast periods
+- **NWS:** Derived from icon shortname (`skc`→0, `few`→15, `sct`→35, `bkn`→70, `ovc`→95). May be null.
+- **OWM:** `clouds` field (0–100) from daily periods
 
 ### Current-conditions input traceability
 
