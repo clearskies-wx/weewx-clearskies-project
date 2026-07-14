@@ -135,6 +135,7 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | ADR | Title | Archived | Original Date |
 |---|---|---|---|
 | [ADR-083](../archive/decisions/ADR-083-marine-provider-domain-architecture.md) | Marine provider domain architecture | 2026-07-09 | 2026-07-09 |
+| [ADR-091](../archive/decisions/ADR-091-marine-card-data-sources-and-ofs-ocean-data.md) | Marine card data sources, OFS ocean data, and composite water level | 2026-07-13 | 2026-07-13 |
 | [ADR-087](../archive/decisions/ADR-087-ndbc-spectral-wave-data.md) | NDBC spectral wave data consumption | 2026-07-09 | 2026-07-09 |
 
 ## Archived — consolidated into API-MANUAL.md (marine)

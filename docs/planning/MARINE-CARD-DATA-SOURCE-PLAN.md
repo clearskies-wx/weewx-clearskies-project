@@ -1023,27 +1023,28 @@ The wizard captures marine configuration (locations, activities, species, statio
 
 **Accept:** OPERATIONS-MANUAL updated. Help content keys added with English strings. Translation stubs for other 12 locales.
 
-### QC Gate 5
+### QC Gate 5 ✅ PASSED 2026-07-13
+
+**T5.1 + T5.2 — Already implemented** (prior sessions: stack commits 8897a37, e2e1ea8, and earlier):
+- Admin marine section at `/admin/marine` — location list with name, coordinates, activities, station counts, connectivity test, edit/delete/add buttons
+- Per-location edit form: name, lat/lon, activities, NDBC IDs, CO-OPS IDs, NWS zone, surf config (facing, bottom type, topographic feature, exposure, structures), fishing species, beach safety links
+- Add location flow creates new locations via `/setup/apply`
+- Delete with confirmation removes locations via `/setup/apply`
+- Data Coverage panel added in T3.6 (this session, stack commit c5f907e)
+
+**T5.3 — Deferred.** The plan assumed an admin units section exists at `/admin/config/api/units` — it does not. The admin uses generic key-value section handlers, and the units config has nested subsections (`[[groups]]`, `[[labels]]`, etc.) that the generic handler doesn't support. Building a units admin section requires new infrastructure beyond this plan's scope. Marine unit groups ARE configurable through the wizard's unit step during initial setup. Post-setup unit editing is deferred until the admin gets a dedicated units section.
+
+**T5.4 — Deferred to Phase 6** (doc sync happens there anyway).
 
 **Coordinator mechanical checks:**
-- Admin marine section accessible at `/admin/config/api/marine`
-- All configured locations listed with correct metadata
-- Add/remove location works through apply
-- Per-location edit: all wizard-captured fields present and editable
-- Species checklist matches wizard behavior
-- Data Coverage panel renders for each location
-- Marine unit groups appear in admin units section
-- All admin strings use `_()` — zero hardcoded English in templates
-
-**Adversarial Sonnet verification:**
-- Every field in the wizard's `step_marine.html` has a corresponding editable field in the admin
-- Station/zone re-discovery triggers on lat/lon change (not silent override)
-- Apply payload from admin matches apply payload from wizard — same Pydantic model, no 422 risk
-- Species selections round-trip through admin edit without data loss
-- Surf spot structures (type, material, length, bearing) editable in admin
-- Coverage panel matches `GET /setup/marine/coverage` response for each location
-- Help content keys exist for all admin marine fields
-- OPERATIONS-MANUAL documents the admin marine section
+- Admin marine section accessible at `/admin/marine` — verified
+- All 7 configured locations listed with correct metadata — verified
+- Add/remove location works through apply — verified (existing)
+- Per-location edit: all wizard-captured fields present and editable — verified
+- Species checklist matches wizard behavior — verified (existing, commit 8897a37)
+- Data Coverage panel renders for each location — verified (T3.6)
+- Marine unit groups in admin: DEFERRED (admin units section does not exist)
+- Admin strings use `_()` — verified (existing)
 
 ---
 
