@@ -342,7 +342,9 @@ All share: border-radius consistent with card scale, visible focus ring per acce
 
 ### Hero Weather Icons
 
-Rendered as inline SVG with `<linearGradient>` fills, Meteocons-style palette. Source library: Material Symbols (filled). Coverage: 32 hero icons covering all WMO condition codes plus Clear Skies extensions. Static — no animation. Partly-cloudy fix: sun uses absolute `M14.975 17.2`, `fill-rule="nonzero"` on both paths. License: Apache-2.0.
+Rendered as `<img>` references to hand-authored SVG files, Meteocons-style palette. Coverage: 32 hero icons covering all WMO condition codes plus Clear Skies extensions. Static — no animation.
+
+**Source of truth:** the `.svg` files are edited directly in Illustrator at `docs/design/icons/` (repo `weather-belchertown`) and copied verbatim into `public/icons/` in the dashboard repo (`weewx-clearskies-dashboard`) as static assets. Each glyph component in `src/components/weather-icon-glyphs.tsx` is a thin wrapper that renders `<img src="/icons/<name>.svg" width={size} height={size} alt="" aria-hidden="true" />` — there is no in-React path or gradient composition; the file's internal geometry, gradients, and any cutout/overlay/standalone visual treatment are baked into the artwork by the designer, not assembled at render time. `weather-icon.tsx` maps WMO codes to these glyph components exactly as before (`WMO_MAP`) and is unaffected by this rendering change. The `<img>` is decorative (`aria-hidden="true"`, `alt=""`); the accessible label is a sibling `<span class="sr-only">` carrying the translated condition text.
 
 #### Icon inventory (32 total = 11 existing + 21 new)
 
@@ -381,15 +383,15 @@ Rendered as inline SVG with `<linearGradient>` fills, Meteocons-style palette. S
 | Atmosphere — Dust | Dust overcast | Both | `GlyphDust` | **New** |
 | Fog | Fog / Mist / Rime fog | Both | `GlyphFoggy` | Existing |
 
-11 existing glyphs are implemented at `src/components/weather-icon-glyphs.tsx` (dashboard repo): `GlyphSunny`, `GlyphPartlyCloudy`, `GlyphPartlyCloudyNight`, `GlyphCloud`, `GlyphFoggy`, `GlyphRainy`, `GlyphSnowy`, `GlyphThunderstorm`, `GlyphBedtime`, `GlyphHazy`, `GlyphHazyNight`. The 20 **New** rows are the Phase 1+ deliverable of the icon system overhaul (see `docs/planning/ICON-SYSTEM-OVERHAUL-PLAN.md`) — component names above are the target API, not yet implemented as of this manual revision.
+All 32 glyphs are implemented at `src/components/weather-icon-glyphs.tsx` (dashboard repo) and are complete — the "Existing" / **New** column above records which glyphs shipped in the original ADR-049 set versus the Phase 1+ icon system overhaul (see `docs/planning/ICON-SYSTEM-OVERHAUL-PLAN.md`); it is a historical provenance marker, not an implementation-status flag. Each component name maps 1:1 to a `.svg` file in `public/icons/` per the file mapping in `weather-icon-glyphs.tsx`.
 
 #### Composition techniques
 
-New atmosphere-condition icons are built using one of three techniques, chosen per condition:
+Atmosphere-condition icons use one of three visual techniques, chosen per condition and realized directly in the Illustrator artwork (not assembled at render time):
 
 - **Standalone** (dust): Dust IS the dominant visual element. The sun/moon/cloud sky element is secondary, rendered smaller or behind the dust glyph.
-- **Overlay** (smoke): Smoke bubble paths are layered ON TOP of the underlying sky glyph (sun/moon/cloud). The base sky icon stays visually intact underneath.
-- **Cutout** (haze): The sky element is clipped at a boundary, with amber/dusty haze stripes rendered below the clip line. This is the same technique already used by `GlyphHazy` / `GlyphHazyNight`.
+- **Overlay** (smoke): Smoke bubble shapes are layered ON TOP of the underlying sky glyph (sun/moon/cloud). The base sky icon stays visually intact underneath.
+- **Cutout** (haze): The sky element is clipped at a boundary, with amber/dusty haze stripes rendered below the clip line. This is the same technique used by `GlyphHazy` / `GlyphHazyNight`.
 
 #### Cloud-cover × atmosphere-condition matrix
 
@@ -410,6 +412,8 @@ Icon selection consults precipitation probability (PoP) and cloud cover, not jus
 See DASHBOARD-MANUAL §1 for the selection pipeline implementation (data flow, thresholds as consumed by the dashboard).
 
 #### Gradient definitions
+
+The palette below is the locked design reference for the hero icon set. It is realized as native `<linearGradient>` fills inside each `.svg` file (edited directly in Illustrator), not generated in React — the table documents the intended visual language for anyone re-editing or extending the artwork, it is not read by any code path.
 
 | Element | Gradient Top → Bottom | Use |
 |---|---|---|
@@ -440,7 +444,7 @@ Some conditions do not get a dedicated hero icon:
 - **Wind:** No dedicated wind icon. Wind is a stat, not a sky condition — it doesn't change what the sky looks like. The NWS icon set uses prefixed condition codes like `wind_skc`, `wind_sct`, but Clear Skies strips the wind prefix and renders on the underlying sky condition instead.
 - **Hot/Cold:** Mapped to clear sky (WMO code 0). Temperature extremes are communicated via the temperature display and comfort text, not via the weather icon.
 
-**Haze hero icon (ADR-067):** Day variant: muted/pale sun disk with reduced ray intensity, overlaid with horizontal lines in smoky gray/dusty tan gradient. Night variant: obscured/dimmed stars with dirty haze layer. Both follow the existing Meteocons-style inline SVG with `<linearGradient>` fills — the cutout technique described above. As of this revision, haze also has partly-cloudy (`GlyphHazyPartlyCloudyDay`/`Night`) and overcast (`GlyphHazyOvercast`) variants, using the same cutout technique against the partly-cloudy and overcast sky glyphs respectively. Exact SVG geometry for the new variants TBD — separate design task (see ICON-SYSTEM-OVERHAUL-PLAN.md T1.4 mockup).
+**Haze hero icon (ADR-067):** Day variant: muted/pale sun disk with reduced ray intensity, overlaid with horizontal lines in smoky gray/dusty tan gradient. Night variant: obscured/dimmed stars with dirty haze layer. Both are Meteocons-style artwork with `<linearGradient>` fills baked into the `.svg` file — the cutout technique described above. Haze also has partly-cloudy (`GlyphHazyPartlyCloudyDay`/`Night`) and overcast (`GlyphHazyOvercast`) variants, using the same cutout technique against the partly-cloudy and overcast sky glyphs respectively. All 32 icons, including these, are finished artwork hand-edited in Illustrator at `docs/design/icons/` (repo `weather-belchertown`) — there is no outstanding geometry TBD.
 
 ### Utility/Stat/Nav Icons
 
