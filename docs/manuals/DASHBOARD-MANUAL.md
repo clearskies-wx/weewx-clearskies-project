@@ -117,7 +117,7 @@ The API passes raw `weatherCode`, `cloudCover`, and `precipProbability` per fore
 | Condition | Icon shown | Example |
 |-----------|-----------|---------|
 | PoP < 20% (any `weatherCode`) | Sky-condition icon based on `cloudCover` | 10% PoP + WMO 80 (showers) → Partly cloudy (not rain) |
-| PoP 20–50% AND `cloudCover` < 75% | Combined sky + precipitation icon | 30% PoP + cloudCover 40% + WMO 61 → Partly cloudy + rain |
+| PoP 20–50% AND `cloudCover` < 75% | Combined sky + precipitation icon *(Phase 4 — pending compound glyphs; currently shows precipitation icon)* | 30% PoP + cloudCover 40% + WMO 61 → Partly cloudy + rain |
 | PoP > 50% OR `cloudCover` ≥ 75% | Precipitation icon only | 60% PoP + WMO 61 → Rain |
 
 **Cloud-cover fallback tiers** (used when the PoP gate suppresses the precipitation icon):
@@ -135,7 +135,7 @@ The API passes raw `weatherCode`, `cloudCover`, and `precipProbability` per fore
 - Dust (WMO 7) — standalone technique: dust is the dominant visual, with sun/moon/cloud as secondary.
 - Haze (WMO 5) — cutout technique: sky element clipped, amber haze stripes below.
 
-Each atmosphere condition selects its cloud-cover tier variant based on the `cloudCover` field, per the fallback tiers above.
+Each atmosphere condition selects its cloud-cover tier variant based on the `cloudCover` field, per the fallback tiers above. *(Phase 4 — cloud-cover tier selection pending compound glyphs; currently atmosphere codes pass through unchanged.)*
 
 **Data flow:**
 
