@@ -133,8 +133,8 @@
      ════════════════════════════════════════════════════════════════════ -->
 <h2>1 · Sky conditions</h2>
 <p class="note">Clear, partly cloudy, mostly cloudy (NEW — cloud-cover tier between partly cloudy and
-  overcast), and overcast. Mostly-cloudy reuses the Sunny/Bedtime path scaled to 55% and tucked into the
-  top-right corner behind the dominant overcast cloud — "barely visible" celestial body.</p>
+  overcast), and overcast. Mostly-cloudy reuses the Sunny/Bedtime path scaled to 70% and tucked behind the
+  dominant overcast cloud with a clipPath cutout (evenodd) that punches the cloud shape out of the sun/moon.</p>
 <div class="set">
   <div class="set-h">
     <span class="opt">S1</span>
@@ -149,9 +149,9 @@
      ════════════════════════════════════════════════════════════════════ -->
 <h2>2 · Precipitation</h2>
 <p class="note">Rain, snow, and thunderstorm are existing glyphs. Drizzle (NEW) swaps the rain cloud's
-  angled streaks for small round dots — visually lighter than rain. Wintry mix (NEW) combines 2 rain
-  streaks (left) with 3 snow dots (right) under one cloud — serves freezing rain, sleet, and rain/snow
-  mix per the icon-selection brief §5.2.</p>
+  angled streaks for small round dots — visually lighter than rain. Wintry mix (NEW) alternates rain
+  streaks and snowflakes (streak/flake/streak/flake/streak) under one cloud — serves freezing rain,
+  sleet, and rain/snow mix per the icon-selection brief §5.2.</p>
 <div class="set">
   <div class="set-h">
     <span class="opt">S2</span>
@@ -166,8 +166,8 @@
      ════════════════════════════════════════════════════════════════════ -->
 <h2>3 · Combined sky + precipitation (all NEW)</h2>
 <p class="note">For the 20–50% PoP band where the sky is still partly visible (icon-selection brief §5.3).
-  The partly-cloudy cloud+sun/moon group is scaled to 80% and shifted up to leave room for rain streaks
-  and/or snow dots layered below.</p>
+  The partly-cloudy cloud+sun/moon group is scaled to 90% and shifted up to leave room for rain streaks
+  and/or snowflakes layered below. Wintry mix alternates streak/flake/streak/flake.</p>
 <div class="set">
   <div class="set-h">
     <span class="opt">S3</span>
@@ -297,36 +297,45 @@ function dot(cx, cy, r, grad) {
   return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${grad})"/>`;
 }
 
-// Smoke wisp cluster — 4 circles of varying size overlaid on the upper
-// area of the base icon (overlay technique, brief §5.5).
+// Smoke wisp cluster — 4 circles of varying size overlaid on the bottom
+// third of the base icon (overlay technique, brief §5.5).
 function smokeBubbles(p) {
-  return `<circle cx="8.5" cy="8.3" r="2.1" fill="url(#${p}smoke)" opacity="0.88"/>` +
-         `<circle cx="13.6" cy="6.4" r="1.5" fill="url(#${p}smoke)" opacity="0.82"/>` +
-         `<circle cx="11.3" cy="10.9" r="1.15" fill="url(#${p}smoke)" opacity="0.78"/>` +
-         `<circle cx="16.1" cy="9.6" r="1.7" fill="url(#${p}smoke)" opacity="0.82"/>`;
+  return `<circle cx="8.5" cy="18.3" r="2.1" fill="url(#${p}smoke)" opacity="0.88"/>` +
+         `<circle cx="13.6" cy="16.4" r="1.5" fill="url(#${p}smoke)" opacity="0.82"/>` +
+         `<circle cx="11.3" cy="20.9" r="1.15" fill="url(#${p}smoke)" opacity="0.78"/>` +
+         `<circle cx="16.1" cy="19.6" r="1.7" fill="url(#${p}smoke)" opacity="0.82"/>`;
 }
 
-// Dust particle cluster — irregular circles + short wind-arcs, dominant
-// visual per the standalone technique (brief §5.5).
-function dustCluster(p) {
-  const cx = 12, cy = 15.5;
-  return `<circle cx="${cx - 6}" cy="${cy}" r="1.3" fill="url(#${p}dust)"/>` +
-         `<circle cx="${cx - 3}" cy="${cy + 2.4}" r="1.7" fill="url(#${p}dust)"/>` +
-         `<circle cx="${cx}" cy="${cy - 1}" r="2.1" fill="url(#${p}dust)"/>` +
-         `<circle cx="${cx + 3.5}" cy="${cy + 2}" r="1.5" fill="url(#${p}dust)"/>` +
-         `<circle cx="${cx + 6}" cy="${cy - 0.4}" r="1.1" fill="url(#${p}dust)"/>` +
-         `<path d="M${cx - 8.5} ${cy + 4.5} q3 -1.6 6 0" stroke="url(#${p}dust)" stroke-width="1" fill="none" stroke-linecap="round"/>` +
-         `<path d="M${cx - 2.5} ${cy + 6} q3 -1.6 6 0" stroke="url(#${p}dust)" stroke-width="1" fill="none" stroke-linecap="round"/>` +
-         `<path d="M${cx + 1.5} ${cy + 7.4} q3 -1.6 6 0" stroke="url(#${p}dust)" stroke-width="0.8" fill="none" stroke-linecap="round"/>`;
+// Snowflake — 6-armed asterisk using 3 crossed stroked lines.
+function snowflake(cx, cy, r, grad) {
+  const dx = r * 0.866;
+  const dy = r * 0.5;
+  return `<path d="M${cx} ${cy - r}L${cx} ${cy + r}M${cx - dx} ${cy - dy}L${cx + dx} ${cy + dy}M${cx - dx} ${cy + dy}L${cx + dx} ${cy - dy}" stroke="url(#${grad})" stroke-width="0.7" stroke-linecap="round" fill="none"/>`;
 }
 
-// Partly-cloudy sky group (cloud + sun/moon) scaled to 80% and shifted up
+// Dust particle staircase — diagonal pattern from lower-left to upper-right,
+// matching Meteocons dust composition (paired circles stepping diagonally).
+// 10 circles at r=0.75, 5 pairs stepping from (9,19) to (19,7).
+function dustStaircase(p) {
+  return `<circle cx="9" cy="19" r="0.75" fill="url(#${p}dust)"/>` +
+         `<circle cx="11" cy="19" r="0.75" fill="url(#${p}dust)"/>` +
+         `<circle cx="11" cy="16" r="0.75" fill="url(#${p}dust)"/>` +
+         `<circle cx="13" cy="16" r="0.75" fill="url(#${p}dust)"/>` +
+         `<circle cx="13" cy="13" r="0.75" fill="url(#${p}dust)"/>` +
+         `<circle cx="15" cy="13" r="0.75" fill="url(#${p}dust)"/>` +
+         `<circle cx="15" cy="10" r="0.75" fill="url(#${p}dust)"/>` +
+         `<circle cx="17" cy="10" r="0.75" fill="url(#${p}dust)"/>` +
+         `<circle cx="17" cy="7" r="0.75" fill="url(#${p}dust)"/>` +
+         `<circle cx="19" cy="7" r="0.75" fill="url(#${p}dust)"/>`;
+}
+
+// Partly-cloudy sky group (cloud + sun/moon) scaled to 90% and shifted up
 // to leave clear space below for precipitation elements (combined icons).
 function skyGroupDay(p) {
-  return `<g transform="translate(0,-4) scale(0.8)">${cloudPath(p, D.pcCloud)}<path fill-rule="nonzero" fill="url(#${p}gold)" d="${D.pcSun}"/></g>`;
+  return `<g transform="translate(0,-1.5) scale(0.9)">${cloudPath(p, D.pcCloud)}<path fill-rule="nonzero" fill="url(#${p}gold)" d="${D.pcSun}"/></g>`;
 }
 function skyGroupNight(p) {
-  return `<g transform="translate(0,-4) scale(0.8)"><path fill-rule="nonzero" fill="url(#${p}moon)" d="${D.pcnMoon}"/>${cloudPath(p, D.pcnCloud)}</g>`;
+  return `<g transform="translate(0,-1.5) scale(0.9)"><path fill-rule="nonzero" fill="url(#${p}moon)" d="${D.pcnMoon}"/>${cloudPath(p, D.pcnCloud)}</g>`;
 }
 
 // Haze cutout — clips the sky element to the top 16.5px, then lays the
@@ -348,11 +357,17 @@ function iPcDay(size)      { const p = pfx(); return wrap(size, p, cloudPath(p, 
 function iPcNight(size)    { const p = pfx(); return wrap(size, p, `<path fill-rule="nonzero" fill="url(#${p}moon)" d="${D.pcnMoon}"/>` + cloudPath(p, D.pcnCloud)); }
 function iMostlyCloudyDay(size) {
   const p = pfx();
-  return wrap(size, p, `<g transform="translate(9,-4) scale(0.55)"><path fill="url(#${p}gold)" d="${D.sun}"/></g>` + cloudPath(p, D.cloud));
+  return wrap(size, p,
+    `<defs><clipPath id="${p}mcClip"><path d="M0 0h24v24H0z ${D.cloud}" clip-rule="evenodd"/></clipPath></defs>` +
+    `<g clip-path="url(#${p}mcClip)"><g transform="translate(4,-2) scale(0.7)"><path fill="url(#${p}gold)" d="${D.sun}"/></g></g>` +
+    cloudPath(p, D.cloud));
 }
 function iMostlyCloudyNight(size) {
   const p = pfx();
-  return wrap(size, p, `<g transform="translate(9,-4) scale(0.55)"><path fill="url(#${p}moon)" d="${D.moon}"/></g>` + cloudPath(p, D.cloud));
+  return wrap(size, p,
+    `<defs><clipPath id="${p}mcClipN"><path d="M0 0h24v24H0z ${D.cloud}" clip-rule="evenodd"/></clipPath></defs>` +
+    `<g clip-path="url(#${p}mcClipN)"><g transform="translate(4,-2) scale(0.7)"><path fill="url(#${p}moon)" d="${D.moon}"/></g></g>` +
+    cloudPath(p, D.cloud));
 }
 function iOvercast(size) { const p = pfx(); return wrap(size, p, cloudPath(p, D.cloud)); }
 
@@ -366,41 +381,46 @@ function iDrizzle(size) {
 function iSnow(size) { const p = pfx(); return wrap(size, p, cloudPath(p, D.snowCloud) + `<path fill="url(#${p}snow)" d="${D.snow}"/>`); }
 function iWintryMix(size) {
   const p = pfx();
-  const rain2 = [rainStreak(7, 20, `${p}rain`), rainStreak(10.5, 21.3, `${p}rain`)].join('');
-  const snow3 = [dot(14, 20, 1, `${p}snow`), dot(17, 21.3, 1, `${p}snow`), dot(20, 19.3, 1, `${p}snow`)].join('');
-  return wrap(size, p, cloudPath(p, D.rainCloud) + rain2 + snow3);
+  const mix = [
+    rainStreak(7, 19, `${p}rain`),
+    snowflake(10.5, 20.5, 1.1, `${p}snow`),
+    rainStreak(14, 19, `${p}rain`),
+    snowflake(17.5, 20.5, 1.1, `${p}snow`),
+    rainStreak(20, 19, `${p}rain`),
+  ].join('');
+  return wrap(size, p, cloudPath(p, D.rainCloud) + mix);
 }
 function iThunder(size) { const p = pfx(); return wrap(size, p, cloudPath(p, D.rainCloud) + `<path fill="url(#${p}gold)" d="${D.bolt}"/>`); }
 
 // -- Section 3: Combined sky + precipitation --------------------------------
 function iPcRainDay(size) {
   const p = pfx();
-  const rain = [rainStreak(8, 18, `${p}rain`), rainStreak(12, 19.4, `${p}rain`), rainStreak(16, 18, `${p}rain`)].join('');
+  const rain = [rainStreak(5, 18.5, `${p}rain`), rainStreak(8.5, 20, `${p}rain`), rainStreak(12, 18.5, `${p}rain`)].join('');
   return wrap(size, p, skyGroupDay(p) + rain);
 }
 function iPcRainNight(size) {
   const p = pfx();
-  const rain = [rainStreak(8, 18, `${p}rain`), rainStreak(12, 19.4, `${p}rain`), rainStreak(16, 18, `${p}rain`)].join('');
+  const rain = [rainStreak(5, 18.5, `${p}rain`), rainStreak(8.5, 20, `${p}rain`), rainStreak(12, 18.5, `${p}rain`)].join('');
   return wrap(size, p, skyGroupNight(p) + rain);
 }
 function iPcSnowDay(size) {
   const p = pfx();
-  const snow = [dot(8, 18.5, 1.1, `${p}snow`), dot(12, 20, 1.1, `${p}snow`), dot(16, 18.5, 1.1, `${p}snow`)].join('');
+  const snow = [snowflake(5.5, 19, 1.1, `${p}snow`), snowflake(9, 20.5, 1.1, `${p}snow`), snowflake(12.5, 19, 1.1, `${p}snow`)].join('');
   return wrap(size, p, skyGroupDay(p) + snow);
 }
 function iPcSnowNight(size) {
   const p = pfx();
-  const snow = [dot(8, 18.5, 1.1, `${p}snow`), dot(12, 20, 1.1, `${p}snow`), dot(16, 18.5, 1.1, `${p}snow`)].join('');
+  const snow = [snowflake(5.5, 19, 1.1, `${p}snow`), snowflake(9, 20.5, 1.1, `${p}snow`), snowflake(12.5, 19, 1.1, `${p}snow`)].join('');
   return wrap(size, p, skyGroupNight(p) + snow);
 }
 function iPcMixDay(size) {
   const p = pfx();
-  const mix = [rainStreak(8, 18, `${p}rain`), rainStreak(11, 19.4, `${p}rain`), dot(14.5, 18.8, 1.1, `${p}snow`), dot(17.5, 17.6, 1.1, `${p}snow`)].join('');
+  const mix = [rainStreak(5, 18.5, `${p}rain`), snowflake(8.5, 20, 1.1, `${p}snow`), rainStreak(11, 18.5, `${p}rain`), snowflake(14, 20, 1.1, `${p}snow`)].join('');
   return wrap(size, p, skyGroupDay(p) + mix);
 }
 function iPcMixNight(size) {
   const p = pfx();
-  const mix = [rainStreak(8, 18, `${p}rain`), rainStreak(11, 19.4, `${p}rain`), dot(14.5, 18.8, 1.1, `${p}snow`), dot(17.5, 17.6, 1.1, `${p}snow`)].join('');
+  const mix = [rainStreak(5, 18.5, `${p}rain`), snowflake(8.5, 20, 1.1, `${p}snow`), rainStreak(11, 18.5, `${p}rain`), snowflake(14, 20, 1.1, `${p}snow`)].join('');
   return wrap(size, p, skyGroupNight(p) + mix);
 }
 
@@ -431,15 +451,24 @@ function iSmokeOvercast(size) { const p = pfx(); return wrap(size, p, cloudPath(
 
 function iDustDay(size) {
   const p = pfx();
-  return wrap(size, p, `<g transform="translate(10,-8) scale(0.45)"><path fill="url(#${p}gold)" d="${D.sun}"/></g>` + dustCluster(p));
+  return wrap(size, p,
+    `<defs><mask id="${p}dustM"><path d="M0 0h24L0 24z" fill="white"/></mask></defs>` +
+    `<g mask="url(#${p}dustM)"><path fill="url(#${p}gold)" d="${D.sun}"/></g>` +
+    dustStaircase(p));
 }
 function iDustNight(size) {
   const p = pfx();
-  return wrap(size, p, `<g transform="translate(10,-8) scale(0.45)"><path fill="url(#${p}moon)" d="${D.moon}"/></g>` + dustCluster(p));
+  return wrap(size, p,
+    `<defs><mask id="${p}dustMN"><path d="M0 0h24L0 24z" fill="white"/></mask></defs>` +
+    `<g mask="url(#${p}dustMN)"><path fill="url(#${p}moon)" d="${D.moon}"/></g>` +
+    dustStaircase(p));
 }
 function iDustOvercast(size) {
   const p = pfx();
-  return wrap(size, p, `<g transform="translate(1,-2) scale(0.4)">${cloudPath(p, D.cloud)}</g>` + dustCluster(p));
+  return wrap(size, p,
+    `<defs><mask id="${p}dustMC"><path d="M0 0h24L0 24z" fill="white"/></mask></defs>` +
+    `<g mask="url(#${p}dustMC)">${cloudPath(p, D.cloud)}</g>` +
+    dustStaircase(p));
 }
 
 // -- Section 5: Fog ----------------------------------------------------------
