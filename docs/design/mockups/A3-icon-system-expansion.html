@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A3 — Icon System Expansion · 32 Hero Icons</title>
+<style>
+  /* ── CSS variables — mirrors A3-material-gradient.html ────────────── */
+  :root {
+    --bg: #eef0f3; --fg: #15171c; --card: #fff;
+    --muted: #646b76; --border: #e2e5ea; --accent: oklch(0.48 0.22 260);
+  }
+  [data-theme="dark"] {
+    --bg: #0e1014; --fg: #f1f3f6; --card: #1a1d24;
+    --muted: #99a0ac; --border: #282c35; --accent: oklch(0.70 0.15 260);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg); color: var(--fg);
+    padding: 22px; line-height: 1.4;
+    transition: background .2s, color .2s;
+  }
+  h1  { font-size: 21px; margin: 0 0 4px; }
+  h2  { font-size: 15px; margin: 26px 0 6px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 880px; margin: 0 0 8px; }
+
+  /* ── sticky control bar ─────────────────────────────────────────────── */
+  .bar {
+    position: sticky; top: 0; z-index: 9;
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    background: var(--bg); padding: 8px 0 12px;
+    border-bottom: 1px solid var(--border); margin-bottom: 14px;
+  }
+  .bar button {
+    background: var(--card); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 13px; font-size: 13px; cursor: pointer;
+  }
+  .bar button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  .bar label { font-size: 12px; color: var(--muted); }
+  .bar input[type="range"]:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  /* ── icon grid ──────────────────────────────────────────────────────── */
+  .set {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 13px; padding: 14px 16px; margin-bottom: 13px;
+  }
+  .set-h {
+    display: flex; align-items: baseline; gap: 10px;
+    flex-wrap: wrap; margin-bottom: 12px;
+  }
+  .set-h .n   { font-weight: 700; font-size: 14px; }
+  .set-h .opt { font-size: 11px; font-weight: 700; color: #fff; background: var(--accent); border-radius: 6px; padding: 2px 7px; }
+  .set-h .desc{ font-size: 12px; color: var(--muted); }
+  .set-h .lic { font-size: 10.5px; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; }
+
+  .icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 14px 10px;
+  }
+  .icon-col {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 8px;
+  }
+  .icon-label {
+    font-size: 10px; color: var(--muted);
+    text-align: center; letter-spacing: .02em;
+  }
+  .icon-label .cond { display: block; font-weight: 600; color: var(--fg); font-size: 11px; margin-bottom: 1px; }
+  .icon-label .wmo  { display: block; }
+  .icon-col svg { display: block; }
+
+  /* ── gradient swatches ─────────────────────────────────────────────── */
+  .swatch-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 12px;
+  }
+  .swatch-col {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .swatch-box {
+    width: 100%; height: 44px; border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .swatch-label { font-size: 11px; color: var(--fg); font-weight: 600; text-align: center; }
+  .swatch-hex   { font-size: 9.5px; color: var(--muted); text-align: center; }
+
+  .note { font-size: 11.5px; color: var(--muted); margin: 4px 0 10px; max-width: 880px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Gradient values (per ADR-049 palette + Icon System Overhaul additions):
+     Gold:  #FFD24D → #F5A623   (sun / lightning bolts)
+     Grey:  #F3F5F8 → #C7CDD6   (cloud volume / depth)
+     Rain:  #9CCEF5 → #5BA3DC   (rain streaks / drizzle dots)
+     Snow:  #E8F4FF → #B8D8F5   (snow dots)
+     Moon:  #86C3DB → #72B9D5   (crescent moon)
+     Haze:  #CDAA6D → #A07840   (haze stripes — amber/brown)
+     Smoke: #9EA5AD → #6B7280   (NEW — smoke wisps, darker grey than clouds)
+     Dust:  #D4A574 → #A0734A   (NEW — dust particles, earth-tone tan/brown)
+     ════════════════════════════════════════════════════════════════════ -->
+
+<h1>A3 — Icon System Expansion · 32 Hero Icons</h1>
+<p class="sub">
+  All hero weather glyphs after the Icon System Overhaul (Phase 1): the 11 existing Material-Symbols-based
+  glyphs from <code>weather-icon-glyphs.tsx</code> plus 21 new glyphs — mostly-cloudy day/night, drizzle,
+  wintry mix, 6 combined sky+precipitation icons, and 13 atmosphere-condition icons (haze, smoke, dust)
+  across cloud-cover tiers. Every SVG below has its own scoped <code>&lt;defs&gt;</code> block
+  (<code>i&lt;n&gt;-</code> prefixed gradient IDs) since this is a static HTML file, not React with
+  <code>useId()</code>. WMO code labels are sourced from
+  <code>docs/planning/briefs/FORECAST-ICON-SELECTION-BRIEF.md</code> §2.2 and §5.4 (proposed extension
+  codes for smoke/dust are marked with *).
+</p>
+
+<!-- ── Control bar ─────────────────────────────────────────────────────── -->
+<div class="bar">
+  <button id="themeBtn" onclick="toggleTheme()">◐ Dark</button>
+  <label for="sz">Hero size <span id="szlab">96px</span></label>
+  <input type="range" min="40" max="180" value="96" id="sz" oninput="setSize(this.value)">
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     SECTION 1 — Sky conditions
+     ════════════════════════════════════════════════════════════════════ -->
+<h2>1 · Sky conditions</h2>
+<p class="note">Clear, partly cloudy, mostly cloudy (NEW — cloud-cover tier between partly cloudy and
+  overcast), and overcast. Mostly-cloudy reuses the Sunny/Bedtime path scaled to 55% and tucked into the
+  top-right corner behind the dominant overcast cloud — "barely visible" celestial body.</p>
+<div class="set">
+  <div class="set-h">
+    <span class="opt">S1</span>
+    <span class="n">Sky conditions</span>
+    <span class="desc">7 icons · 5 existing + 2 new</span>
+  </div>
+  <div id="grid1" class="icon-grid"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     SECTION 2 — Precipitation
+     ════════════════════════════════════════════════════════════════════ -->
+<h2>2 · Precipitation</h2>
+<p class="note">Rain, snow, and thunderstorm are existing glyphs. Drizzle (NEW) swaps the rain cloud's
+  angled streaks for small round dots — visually lighter than rain. Wintry mix (NEW) combines 2 rain
+  streaks (left) with 3 snow dots (right) under one cloud — serves freezing rain, sleet, and rain/snow
+  mix per the icon-selection brief §5.2.</p>
+<div class="set">
+  <div class="set-h">
+    <span class="opt">S2</span>
+    <span class="n">Precipitation</span>
+    <span class="desc">5 icons · 3 existing + 2 new</span>
+  </div>
+  <div id="grid2" class="icon-grid"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     SECTION 3 — Combined sky + precipitation
+     ════════════════════════════════════════════════════════════════════ -->
+<h2>3 · Combined sky + precipitation (all NEW)</h2>
+<p class="note">For the 20–50% PoP band where the sky is still partly visible (icon-selection brief §5.3).
+  The partly-cloudy cloud+sun/moon group is scaled to 80% and shifted up to leave room for rain streaks
+  and/or snow dots layered below.</p>
+<div class="set">
+  <div class="set-h">
+    <span class="opt">S3</span>
+    <span class="n">Combined sky + precipitation</span>
+    <span class="desc">6 icons · all new</span>
+  </div>
+  <div id="grid3" class="icon-grid"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     SECTION 4 — Atmosphere conditions
+     ════════════════════════════════════════════════════════════════════ -->
+<h2>4 · Atmosphere conditions — haze, smoke, dust</h2>
+<p class="note">Three different composition techniques per icon-selection brief §5.5: haze uses the
+  existing <b>cutout</b> technique (clip sky element at y=16.5, haze stripes below) extended to partly-cloudy
+  and overcast; smoke uses an <b>overlay</b> technique (smoke bubbles superimposed on the intact base icon);
+  dust uses a <b>standalone</b> technique (dust particles dominate, sun/moon/cloud reduced to a small
+  background element) since Meteocons treats dust as visually incompatible with cloud overlay.</p>
+<div class="set">
+  <div class="set-h">
+    <span class="opt">S4</span>
+    <span class="n">Atmosphere conditions</span>
+    <span class="desc">13 icons · 2 existing (haze clear) + 11 new</span>
+  </div>
+  <div id="grid4" class="icon-grid"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     SECTION 5 — Fog
+     ════════════════════════════════════════════════════════════════════ -->
+<h2>5 · Fog</h2>
+<div class="set">
+  <div class="set-h">
+    <span class="opt">S5</span>
+    <span class="n">Fog / Mist / Rime fog</span>
+    <span class="desc">1 icon · existing</span>
+  </div>
+  <div id="grid5" class="icon-grid"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     SECTION 6 — Gradient swatches
+     ════════════════════════════════════════════════════════════════════ -->
+<h2>6 · Gradient swatches</h2>
+<p class="note">All 8 gradients used across the icon set, including the 2 new additions for this
+  overhaul (smoke, dust).</p>
+<div class="set">
+  <div class="set-h">
+    <span class="opt">S6</span>
+    <span class="n">Gradient reference</span>
+    <span class="desc">8 gradients · 6 existing + 2 new</span>
+  </div>
+  <div id="swatchGrid" class="swatch-grid"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+//  GRADIENT-ID PREFIXING
+//  Each icon gets its own <defs> block with an "i<n>-" prefix so every
+//  gradient id is document-unique (no useId() available in static HTML).
+// ═══════════════════════════════════════════════════════════════════════
+let gid = 0;
+function pfx() { return 'i' + (gid++) + '-'; }
+
+function gradDefs(p) {
+  return `<defs>
+    <linearGradient id="${p}gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FFD24D"/><stop offset="100%" stop-color="#F5A623"/></linearGradient>
+    <linearGradient id="${p}grey" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F3F5F8"/><stop offset="100%" stop-color="#C7CDD6"/></linearGradient>
+    <linearGradient id="${p}rain" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9CCEF5"/><stop offset="100%" stop-color="#5BA3DC"/></linearGradient>
+    <linearGradient id="${p}snow" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#E8F4FF"/><stop offset="100%" stop-color="#B8D8F5"/></linearGradient>
+    <linearGradient id="${p}moon" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#86C3DB"/><stop offset="100%" stop-color="#72B9D5"/></linearGradient>
+    <linearGradient id="${p}haze" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#CDAA6D"/><stop offset="100%" stop-color="#A07840"/></linearGradient>
+    <linearGradient id="${p}smoke" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9EA5AD"/><stop offset="100%" stop-color="#6B7280"/></linearGradient>
+    <linearGradient id="${p}dust" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#D4A574"/><stop offset="100%" stop-color="#A0734A"/></linearGradient>
+  </defs>`;
+}
+
+function wrap(size, p, inner) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${gradDefs(p)}${inner}</svg>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PATH DATA — copied verbatim from weather-icon-glyphs.tsx (existing
+//  icons) or hand-authored per the Icon System Overhaul brief (new icons).
+// ═══════════════════════════════════════════════════════════════════════
+const D = {
+  sun: 'M11 5V1h2v4zm6.65 2.75l-1.375-1.375l2.8-2.875l1.4 1.425zM19 13v-2h4v2zm-8 10v-4h2v4zM6.35 7.7L3.5 4.925l1.425-1.4L7.75 6.35zm12.7 12.8l-2.775-2.875l1.35-1.35l2.85 2.75zM1 13v-2h4v2zm3.925 7.5l-1.4-1.425l2.8-2.8l.725.675l.725.7zm2.825-4.25Q6 14.5 6 12t1.75-4.25T12 6t4.25 1.75T18 12t-1.75 4.25T12 18t-4.25-1.75',
+  moon: 'M12.1 22q-2.1 0-3.937-.8t-3.2-2.162t-2.163-3.2T2 11.9q0-3.65 2.325-6.437T10.25 2q-.45 2.475.275 4.838t2.5 4.137t4.138 2.5T22 13.75q-.65 3.6-3.45 5.925T12.1 22',
+  pcCloud: 'M6 20q-1.65 0-2.825-1.175T2 16t1.175-2.825T6 12q1.2 0 2.213.65t1.462 1.775l.25.575h.6q1.05 0 1.763.725T13 17.5t-.725 1.775T10.5 20z',
+  pcSun: 'M14.975 17.2q-.1-1.575-1.137-2.725t-2.613-1.425q-.775-1.35-2.087-2.137T6.25 10q.65-1.825 2.225-2.912T12 6q2.5 0 4.25 1.75T18 12q0 1.625-.8 3.013T14.975 17.2M11 5V1h2v4zm6.65 2.75l-1.4-1.4l2.8-2.85l1.425 1.425zM19 13v-2h4v2zm.05 7.5l-2.8-2.85l1.4-1.4l2.85 2.8zM6.35 7.75L3.525 4.925L4.95 3.5l2.8 2.85z',
+  pcnCloud: 'M6 13q1.2 0 2.2.65t1.475 1.775l.25.575h.625q1.05 0 1.75.738T13 18.5q0 1.05-.725 1.775T10.5 21H6q-1.65 0-2.825-1.175T2 17q0-1.675 1.175-2.838T6 13',
+  pcnMoon: 'M11.25 2q-.45 2.475.275 4.838t2.5 4.137t4.138 2.5T23 13.75q-.65 3.55-3.375 5.863T13.325 22q.8-.65 1.238-1.562T15 18.5q0-1.7-1.062-2.937t-2.713-1.488q-.8-1.425-2.187-2.25T6 11q-.8 0-1.562.2T3 11.8q.05-3.625 2.363-6.375T11.25 2',
+  cloud: 'M6.5 20q-2.275 0-3.887-1.575T1 14.575q0-1.95 1.175-3.475T5.25 9.15q.625-2.3 2.5-3.725T12 4q2.925 0 4.963 2.038T19 11q1.725.2 2.863 1.488T23 15.5q0 1.875-1.312 3.188T18.5 20z',
+  fog: 'M18 19q-.425 0-.712-.288T17 18t.288-.712T18 17t.713.288T19 18t-.288.713T18 19M7 22q-.425 0-.712-.288T6 21t.288-.712T7 20t.713.288T8 21t-.288.713T7 22m-1-3q-.425 0-.712-.288T5 18t.288-.712T6 17h9q.425 0 .713.288T16 18t-.288.713T15 19zm4 3q-.425 0-.712-.288T9 21t.288-.712T10 20h7q.425 0 .713.288T18 21t-.288.713T17 22zm-2.5-6q-2.275 0-3.887-1.612T2 10.5q0-2.075 1.375-3.625t3.4-1.825q.8-1.425 2.188-2.238T12 2q2.25 0 3.913 1.438t2.012 3.587q1.725.15 2.9 1.425T22 11.5q0 1.875-1.312 3.188T17.5 16z',
+  rainCloud: 'M7.5 16q-2.275 0-3.887-1.612T2 10.5q0-2.075 1.375-3.625t3.4-1.825q.8-1.425 2.188-2.238T12 2q2.25 0 3.913 1.438t2.012 3.587q1.725.15 2.9 1.425T22 11.5q0 1.875-1.312 3.188T17.5 16z',
+  rain: 'M13.95 21.9q-.375.2-.762.063t-.588-.513l-1.5-3q-.2-.375-.062-.762t.512-.588t.763-.062t.587.512l1.5 3q.2.375.063.763t-.513.587m6 0q-.375.2-.762.063t-.588-.513l-1.5-3q-.2-.375-.062-.762t.512-.588t.763-.062t.587.512l1.5 3q.2.375.063.763t-.513.587m-12 0q-.375.2-.762.063T6.6 21.45l-1.5-3q-.2-.375-.062-.762t.512-.588t.763-.062t.587.512l1.5 3q.2.375.063.763t-.513.587',
+  snowCloud: 'M7.5 15q-2.275 0-3.887-1.612T2 9.5q0-2.075 1.375-3.625t3.4-1.825q.8-1.425 2.188-2.238T12 1q2.25 0 3.913 1.438t2.012 3.587q1.725.15 2.9 1.425T22 10.5q0 1.875-1.312 3.188T17.5 15z',
+  snow: 'M5.613 18.638q-.363-.363-.363-.888t.363-.888t.887-.362t.888.363t.362.887t-.363.888T6.5 19t-.888-.363m3 3q-.362-.362-.362-.887t.363-.888t.887-.362t.888.363t.362.887t-.363.888T9.5 22t-.888-.363m3-3q-.362-.362-.362-.887t.363-.888t.887-.362t.888.363t.362.887t-.363.888T12.5 19t-.888-.363m6 0q-.362-.362-.362-.887t.363-.888t.887-.362t.888.363t.362.887t-.363.888T18.5 19t-.888-.363m-3 3q-.362-.362-.362-.887t.363-.888t.887-.362t.888.363t.362.887t-.363.888T15.5 22t-.888-.363',
+  bolt: 'm7.5 23l.9-2.5H6.5L7.75 17h2.5l-1.075 2.5h2.075L8.5 23zm6.75-1l.7-2H13l1.075-3h2.5l-.875 2h2.05l-2.5 3z',
+  hazeStripes: [
+    'M6 19q-.425 0-.712-.288T5 18t.288-.712T6 17h9q.425 0 .713.288T16 18t-.288.713T15 19z',
+    'M18 19q-.425 0-.712-.288T17 18t.288-.712T18 17t.713.288T19 18t-.288.713T18 19',
+    'M10 22q-.425 0-.712-.288T9 21t.288-.712T10 20h7q.425 0 .713.288T18 21t-.288.713T17 22z',
+    'M7 22q-.425 0-.712-.288T6 21t.288-.712T7 20t.713.288T8 21t-.288.713T7 22',
+  ],
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SHAPE HELPERS — reusable primitive shapes for new-icon composition.
+// ═══════════════════════════════════════════════════════════════════════
+
+// Thin outline on cloud shapes so they don't vanish on light backgrounds
+// (matches CLOUD_STROKE in weather-icon-glyphs.tsx).
+function cloudPath(p, d, gradKey) {
+  gradKey = gradKey || 'grey';
+  return `<path fill-rule="nonzero" fill="url(#${p}${gradKey})" stroke="rgba(0,0,0,.12)" stroke-width="0.4" d="${d}"/>`;
+}
+
+// A single angled rain streak — rounded capsule, rotated ~18deg to match
+// the angle of the existing Material Symbols rain streak subpaths.
+function rainStreak(cx, cy, grad) {
+  return `<rect x="-0.55" y="-1.8" width="1.1" height="3.6" rx="0.55" fill="url(#${grad})" transform="translate(${cx} ${cy}) rotate(18)"/>`;
+}
+
+// A single round dot — used for snow (snowGrad) and drizzle (rainGrad).
+function dot(cx, cy, r, grad) {
+  return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${grad})"/>`;
+}
+
+// Smoke wisp cluster — 4 circles of varying size overlaid on the upper
+// area of the base icon (overlay technique, brief §5.5).
+function smokeBubbles(p) {
+  return `<circle cx="8.5" cy="8.3" r="2.1" fill="url(#${p}smoke)" opacity="0.88"/>` +
+         `<circle cx="13.6" cy="6.4" r="1.5" fill="url(#${p}smoke)" opacity="0.82"/>` +
+         `<circle cx="11.3" cy="10.9" r="1.15" fill="url(#${p}smoke)" opacity="0.78"/>` +
+         `<circle cx="16.1" cy="9.6" r="1.7" fill="url(#${p}smoke)" opacity="0.82"/>`;
+}
+
+// Dust particle cluster — irregular circles + short wind-arcs, dominant
+// visual per the standalone technique (brief §5.5).
+function dustCluster(p) {
+  const cx = 12, cy = 15.5;
+  return `<circle cx="${cx - 6}" cy="${cy}" r="1.3" fill="url(#${p}dust)"/>` +
+         `<circle cx="${cx - 3}" cy="${cy + 2.4}" r="1.7" fill="url(#${p}dust)"/>` +
+         `<circle cx="${cx}" cy="${cy - 1}" r="2.1" fill="url(#${p}dust)"/>` +
+         `<circle cx="${cx + 3.5}" cy="${cy + 2}" r="1.5" fill="url(#${p}dust)"/>` +
+         `<circle cx="${cx + 6}" cy="${cy - 0.4}" r="1.1" fill="url(#${p}dust)"/>` +
+         `<path d="M${cx - 8.5} ${cy + 4.5} q3 -1.6 6 0" stroke="url(#${p}dust)" stroke-width="1" fill="none" stroke-linecap="round"/>` +
+         `<path d="M${cx - 2.5} ${cy + 6} q3 -1.6 6 0" stroke="url(#${p}dust)" stroke-width="1" fill="none" stroke-linecap="round"/>` +
+         `<path d="M${cx + 1.5} ${cy + 7.4} q3 -1.6 6 0" stroke="url(#${p}dust)" stroke-width="0.8" fill="none" stroke-linecap="round"/>`;
+}
+
+// Partly-cloudy sky group (cloud + sun/moon) scaled to 80% and shifted up
+// to leave clear space below for precipitation elements (combined icons).
+function skyGroupDay(p) {
+  return `<g transform="translate(0,-4) scale(0.8)">${cloudPath(p, D.pcCloud)}<path fill-rule="nonzero" fill="url(#${p}gold)" d="${D.pcSun}"/></g>`;
+}
+function skyGroupNight(p) {
+  return `<g transform="translate(0,-4) scale(0.8)"><path fill-rule="nonzero" fill="url(#${p}moon)" d="${D.pcnMoon}"/>${cloudPath(p, D.pcnCloud)}</g>`;
+}
+
+// Haze cutout — clips the sky element to the top 16.5px, then lays the
+// amber haze stripes below (same technique as existing GlyphHazy).
+function hazeCutout(p, skyInner) {
+  return `<defs><clipPath id="${p}clip"><rect x="0" y="0" width="24" height="16.5"/></clipPath></defs>` +
+         `<g clip-path="url(#${p}clip)">${skyInner}</g>` +
+         D.hazeStripes.map(d => `<path fill="url(#${p}haze)" d="${d}"/>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ICON BUILDERS
+// ═══════════════════════════════════════════════════════════════════════
+
+// -- Section 1: Sky conditions --------------------------------------------
+function iClearDay(size)   { const p = pfx(); return wrap(size, p, `<path fill="url(#${p}gold)" d="${D.sun}"/>`); }
+function iClearNight(size) { const p = pfx(); return wrap(size, p, `<path fill="url(#${p}moon)" d="${D.moon}"/>`); }
+function iPcDay(size)      { const p = pfx(); return wrap(size, p, cloudPath(p, D.pcCloud) + `<path fill-rule="nonzero" fill="url(#${p}gold)" d="${D.pcSun}"/>`); }
+function iPcNight(size)    { const p = pfx(); return wrap(size, p, `<path fill-rule="nonzero" fill="url(#${p}moon)" d="${D.pcnMoon}"/>` + cloudPath(p, D.pcnCloud)); }
+function iMostlyCloudyDay(size) {
+  const p = pfx();
+  return wrap(size, p, `<g transform="translate(9,-4) scale(0.55)"><path fill="url(#${p}gold)" d="${D.sun}"/></g>` + cloudPath(p, D.cloud));
+}
+function iMostlyCloudyNight(size) {
+  const p = pfx();
+  return wrap(size, p, `<g transform="translate(9,-4) scale(0.55)"><path fill="url(#${p}moon)" d="${D.moon}"/></g>` + cloudPath(p, D.cloud));
+}
+function iOvercast(size) { const p = pfx(); return wrap(size, p, cloudPath(p, D.cloud)); }
+
+// -- Section 2: Precipitation ----------------------------------------------
+function iRain(size) { const p = pfx(); return wrap(size, p, cloudPath(p, D.rainCloud) + `<path fill="url(#${p}rain)" d="${D.rain}"/>`); }
+function iDrizzle(size) {
+  const p = pfx();
+  const dots = [dot(7, 20, 0.9, `${p}rain`), dot(11, 21.5, 0.9, `${p}rain`), dot(15, 20, 0.9, `${p}rain`), dot(19, 21.5, 0.9, `${p}rain`)].join('');
+  return wrap(size, p, cloudPath(p, D.rainCloud) + dots);
+}
+function iSnow(size) { const p = pfx(); return wrap(size, p, cloudPath(p, D.snowCloud) + `<path fill="url(#${p}snow)" d="${D.snow}"/>`); }
+function iWintryMix(size) {
+  const p = pfx();
+  const rain2 = [rainStreak(7, 20, `${p}rain`), rainStreak(10.5, 21.3, `${p}rain`)].join('');
+  const snow3 = [dot(14, 20, 1, `${p}snow`), dot(17, 21.3, 1, `${p}snow`), dot(20, 19.3, 1, `${p}snow`)].join('');
+  return wrap(size, p, cloudPath(p, D.rainCloud) + rain2 + snow3);
+}
+function iThunder(size) { const p = pfx(); return wrap(size, p, cloudPath(p, D.rainCloud) + `<path fill="url(#${p}gold)" d="${D.bolt}"/>`); }
+
+// -- Section 3: Combined sky + precipitation --------------------------------
+function iPcRainDay(size) {
+  const p = pfx();
+  const rain = [rainStreak(8, 18, `${p}rain`), rainStreak(12, 19.4, `${p}rain`), rainStreak(16, 18, `${p}rain`)].join('');
+  return wrap(size, p, skyGroupDay(p) + rain);
+}
+function iPcRainNight(size) {
+  const p = pfx();
+  const rain = [rainStreak(8, 18, `${p}rain`), rainStreak(12, 19.4, `${p}rain`), rainStreak(16, 18, `${p}rain`)].join('');
+  return wrap(size, p, skyGroupNight(p) + rain);
+}
+function iPcSnowDay(size) {
+  const p = pfx();
+  const snow = [dot(8, 18.5, 1.1, `${p}snow`), dot(12, 20, 1.1, `${p}snow`), dot(16, 18.5, 1.1, `${p}snow`)].join('');
+  return wrap(size, p, skyGroupDay(p) + snow);
+}
+function iPcSnowNight(size) {
+  const p = pfx();
+  const snow = [dot(8, 18.5, 1.1, `${p}snow`), dot(12, 20, 1.1, `${p}snow`), dot(16, 18.5, 1.1, `${p}snow`)].join('');
+  return wrap(size, p, skyGroupNight(p) + snow);
+}
+function iPcMixDay(size) {
+  const p = pfx();
+  const mix = [rainStreak(8, 18, `${p}rain`), rainStreak(11, 19.4, `${p}rain`), dot(14.5, 18.8, 1.1, `${p}snow`), dot(17.5, 17.6, 1.1, `${p}snow`)].join('');
+  return wrap(size, p, skyGroupDay(p) + mix);
+}
+function iPcMixNight(size) {
+  const p = pfx();
+  const mix = [rainStreak(8, 18, `${p}rain`), rainStreak(11, 19.4, `${p}rain`), dot(14.5, 18.8, 1.1, `${p}snow`), dot(17.5, 17.6, 1.1, `${p}snow`)].join('');
+  return wrap(size, p, skyGroupNight(p) + mix);
+}
+
+// -- Section 4: Atmosphere conditions ---------------------------------------
+function iHazeDay(size)   { const p = pfx(); return wrap(size, p, hazeCutout(p, `<path fill="url(#${p}gold)" d="${D.sun}"/>`)); }
+function iHazeNight(size) { const p = pfx(); return wrap(size, p, hazeCutout(p, `<path fill="url(#${p}moon)" d="${D.moon}"/>`)); }
+function iHazePcDay(size) {
+  const p = pfx();
+  return wrap(size, p, hazeCutout(p, cloudPath(p, D.pcCloud) + `<path fill-rule="nonzero" fill="url(#${p}gold)" d="${D.pcSun}"/>`));
+}
+function iHazePcNight(size) {
+  const p = pfx();
+  return wrap(size, p, hazeCutout(p, `<path fill-rule="nonzero" fill="url(#${p}moon)" d="${D.pcnMoon}"/>` + cloudPath(p, D.pcnCloud)));
+}
+function iHazeOvercast(size) { const p = pfx(); return wrap(size, p, hazeCutout(p, cloudPath(p, D.cloud))); }
+
+function iSmokeDay(size)   { const p = pfx(); return wrap(size, p, `<path fill="url(#${p}gold)" d="${D.sun}"/>` + smokeBubbles(p)); }
+function iSmokeNight(size) { const p = pfx(); return wrap(size, p, `<path fill="url(#${p}moon)" d="${D.moon}"/>` + smokeBubbles(p)); }
+function iSmokePcDay(size) {
+  const p = pfx();
+  return wrap(size, p, cloudPath(p, D.pcCloud) + `<path fill-rule="nonzero" fill="url(#${p}gold)" d="${D.pcSun}"/>` + smokeBubbles(p));
+}
+function iSmokePcNight(size) {
+  const p = pfx();
+  return wrap(size, p, `<path fill-rule="nonzero" fill="url(#${p}moon)" d="${D.pcnMoon}"/>` + cloudPath(p, D.pcnCloud) + smokeBubbles(p));
+}
+function iSmokeOvercast(size) { const p = pfx(); return wrap(size, p, cloudPath(p, D.cloud) + smokeBubbles(p)); }
+
+function iDustDay(size) {
+  const p = pfx();
+  return wrap(size, p, `<g transform="translate(10,-8) scale(0.45)"><path fill="url(#${p}gold)" d="${D.sun}"/></g>` + dustCluster(p));
+}
+function iDustNight(size) {
+  const p = pfx();
+  return wrap(size, p, `<g transform="translate(10,-8) scale(0.45)"><path fill="url(#${p}moon)" d="${D.moon}"/></g>` + dustCluster(p));
+}
+function iDustOvercast(size) {
+  const p = pfx();
+  return wrap(size, p, `<g transform="translate(1,-2) scale(0.4)">${cloudPath(p, D.cloud)}</g>` + dustCluster(p));
+}
+
+// -- Section 5: Fog ----------------------------------------------------------
+function iFog(size) { const p = pfx(); return wrap(size, p, cloudPath(p, D.fog)); }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ICON TABLES — grouped per section. `wmo` labels sourced from
+//  FORECAST-ICON-SELECTION-BRIEF.md §2.2 (existing codes) and §5.4
+//  (proposed extension codes, marked *).
+// ═══════════════════════════════════════════════════════════════════════
+const SECTIONS = [
+  { id: 'grid1', icons: [
+    { label: 'Clear day',            wmo: 'WMO 0',              fn: iClearDay },
+    { label: 'Clear night',          wmo: 'WMO 0',              fn: iClearNight },
+    { label: 'Partly cloudy day',    wmo: 'WMO 1–2',            fn: iPcDay },
+    { label: 'Partly cloudy night',  wmo: 'WMO 1–2',            fn: iPcNight },
+    { label: 'Mostly cloudy day',    wmo: 'WMO 4* (NEW)',       fn: iMostlyCloudyDay },
+    { label: 'Mostly cloudy night',  wmo: 'WMO 4* (NEW)',       fn: iMostlyCloudyNight },
+    { label: 'Overcast',             wmo: 'WMO 3',              fn: iOvercast },
+  ]},
+  { id: 'grid2', icons: [
+    { label: 'Rain',        wmo: 'WMO 61–65, 80–82',  fn: iRain },
+    { label: 'Drizzle',     wmo: 'WMO 51–55 (NEW)',   fn: iDrizzle },
+    { label: 'Snow',        wmo: 'WMO 71–75, 85–86',  fn: iSnow },
+    { label: 'Wintry mix',  wmo: 'WMO 56–57,66–67,79 (NEW)', fn: iWintryMix },
+    { label: 'Thunderstorm',wmo: 'WMO 95, 96, 99',    fn: iThunder },
+  ]},
+  { id: 'grid3', icons: [
+    { label: 'Partly cloudy + rain (day)',      wmo: 'WMO 61–65,80–82 · PoP 20–50%', fn: iPcRainDay },
+    { label: 'Partly cloudy + rain (night)',    wmo: 'WMO 61–65,80–82 · PoP 20–50%', fn: iPcRainNight },
+    { label: 'Partly cloudy + snow (day)',      wmo: 'WMO 71–75,85–86 · PoP 20–50%', fn: iPcSnowDay },
+    { label: 'Partly cloudy + snow (night)',    wmo: 'WMO 71–75,85–86 · PoP 20–50%', fn: iPcSnowNight },
+    { label: 'Partly cloudy + wintry mix (day)',   wmo: 'WMO 56,57,66,67,79 · PoP 20–50%', fn: iPcMixDay },
+    { label: 'Partly cloudy + wintry mix (night)', wmo: 'WMO 56,57,66,67,79 · PoP 20–50%', fn: iPcMixNight },
+  ]},
+  { id: 'grid4', icons: [
+    { label: 'Haze, clear (day)',            wmo: 'WMO 5*',                  fn: iHazeDay },
+    { label: 'Haze, clear (night)',          wmo: 'WMO 5*',                  fn: iHazeNight },
+    { label: 'Haze, partly cloudy (day)',    wmo: 'WMO 5* · cloud 25–50% (NEW)', fn: iHazePcDay },
+    { label: 'Haze, partly cloudy (night)',  wmo: 'WMO 5* · cloud 25–50% (NEW)', fn: iHazePcNight },
+    { label: 'Haze, overcast',               wmo: 'WMO 5* · cloud 50%+ (NEW)',   fn: iHazeOvercast },
+    { label: 'Smoke, clear (day)',           wmo: 'WMO 6*(proposed) (NEW)',  fn: iSmokeDay },
+    { label: 'Smoke, clear (night)',         wmo: 'WMO 6*(proposed) (NEW)',  fn: iSmokeNight },
+    { label: 'Smoke, partly cloudy (day)',   wmo: 'WMO 6* · cloud 25–50% (NEW)', fn: iSmokePcDay },
+    { label: 'Smoke, partly cloudy (night)', wmo: 'WMO 6* · cloud 25–50% (NEW)', fn: iSmokePcNight },
+    { label: 'Smoke, overcast',              wmo: 'WMO 6* · cloud 50%+ (NEW)',   fn: iSmokeOvercast },
+    { label: 'Dust (day)',                   wmo: 'WMO 7*(proposed) (NEW)',  fn: iDustDay },
+    { label: 'Dust (night)',                 wmo: 'WMO 7*(proposed) (NEW)',  fn: iDustNight },
+    { label: 'Dust, overcast',               wmo: 'WMO 7* · cloud 50%+ (NEW)',   fn: iDustOvercast },
+  ]},
+  { id: 'grid5', icons: [
+    { label: 'Fog / Mist / Rime fog', wmo: 'WMO 45, 48, 10*', fn: iFog },
+  ]},
+];
+
+let heroSize = 96;
+
+function buildGrid(section) {
+  const grid = document.getElementById(section.id);
+  grid.innerHTML = section.icons.map(ic => `
+    <div class="icon-col">
+      ${ic.fn(heroSize)}
+      <div class="icon-label"><span class="cond">${ic.label}</span><span class="wmo">${ic.wmo}</span></div>
+    </div>
+  `).join('');
+}
+
+function render() {
+  gid = 0;
+  SECTIONS.forEach(buildGrid);
+}
+
+function setSize(v) {
+  heroSize = +v;
+  document.getElementById('szlab').textContent = v + 'px';
+  render();
+}
+
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('themeBtn').textContent = isDark ? '◐ Dark' : '◑ Light';
+}
+
+// ── Gradient swatches (static — not affected by the hero-size slider) ────
+const SWATCHES = [
+  { name: 'Gold',  hex: '#FFD24D → #F5A623', from: '#FFD24D', to: '#F5A623' },
+  { name: 'Grey',  hex: '#F3F5F8 → #C7CDD6', from: '#F3F5F8', to: '#C7CDD6' },
+  { name: 'Rain',  hex: '#9CCEF5 → #5BA3DC', from: '#9CCEF5', to: '#5BA3DC' },
+  { name: 'Snow',  hex: '#E8F4FF → #B8D8F5', from: '#E8F4FF', to: '#B8D8F5' },
+  { name: 'Moon',  hex: '#86C3DB → #72B9D5', from: '#86C3DB', to: '#72B9D5' },
+  { name: 'Haze',  hex: '#CDAA6D → #A07840', from: '#CDAA6D', to: '#A07840' },
+  { name: 'Smoke (NEW)', hex: '#9EA5AD → #6B7280', from: '#9EA5AD', to: '#6B7280' },
+  { name: 'Dust (NEW)',  hex: '#D4A574 → #A0734A', from: '#D4A574', to: '#A0734A' },
+];
+
+function buildSwatches() {
+  const grid = document.getElementById('swatchGrid');
+  grid.innerHTML = SWATCHES.map((s, i) => `
+    <div class="swatch-col">
+      <div class="swatch-box" style="background: linear-gradient(180deg, ${s.from}, ${s.to});"></div>
+      <div class="swatch-label">${s.name}</div>
+      <div class="swatch-hex">${s.hex}</div>
+    </div>
+  `).join('');
+}
+
+render();
+buildSwatches();
+</script>
+</body>
+</html>
