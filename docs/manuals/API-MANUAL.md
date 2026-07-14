@@ -2060,7 +2060,7 @@ Composite beach safety assessment per location.
 
 #### MarineLocationSummary
 
-Summary snapshot for one marine location (used by Now page summary card).
+Summary snapshot for one marine location (used by the marine landing page location cards and the Now page summary card).
 
 | Field | Type | Unit group | Nullable | Description |
 |---|---|---|---|---|
@@ -2068,11 +2068,110 @@ Summary snapshot for one marine location (used by Now page summary card).
 | `name` | str | — | No | Display name |
 | `coordinates` | object | — | No | `{lat, lon}` |
 | `activities` | list[str] | — | No | Enabled activities for this location |
-| `currentConditions` | MarineObservation | — | Yes | Latest buoy observation (if buoy activity enabled) |
-| `currentTide` | object | — | Yes | Next high/low tide `{type, time, height}` |
+| `currentConditions` | MarineObservation | — | Yes | Latest conditions — populated from the card data source contract (below), not raw NDBC buoy |
+| `currentTide` | object | — | Yes | **Null on cards (ADR-091).** All locations sharing a CO-OPS station show identical tide data — visual noise on the landing page. Tide information lives in the activity detail tabs (boating, fishing, beach safety, surfing) where it has context. |
 | `activeAlerts` | list[MarineAlertSummary] | — | Yes | Active marine alerts, each `{headline, alertType}`; `alertType` is one of `marineZone`, `coastalFlood`, `beachHazard` (classified from the NWS `event` string for dashboard per-tab filtering, T3.5) |
 | `surfRating` | int | — | Yes | Current surf quality stars (1–5, if surf enabled) |
 | `beachSafetyLevel` | str | — | Yes | Current safety level (if beach_safety enabled) |
+
+#### Card data source contract (ADR-091)
+
+`_location_summary()` in `endpoints/marine.py` populates card fields from these sources. The dashboard never sees provider names — it renders whatever the API returns.
+
+| Card field | Primary source | Fallback | Unit conversion |
+|---|---|---|---|
+| `waveHeight` | NWPS → `wave_transform.apply_supplements()` (for locations with surf activity + `nwps_wfo`) | WaveWatch III first forecast point (no supplements), then NDBC buoy Hs | meter → operator `group_wave_height` |
+| `windSpeed` | Station hardware via weewx archive (when `is_station_served()` returns True) | Configured forecast provider `fetch_current_conditions(lat, lon)` | Provider handles conversion |
+| `windDirection` | Same as windSpeed | Same as windSpeed | degrees (no conversion) |
+| `airTemp` | Same as windSpeed | Same as windSpeed | Provider handles conversion |
+| `waterTemp` | Ocean data resolver `resolve(needs="surface")` — tiered: on-premises sensor → OFS → MUR SST → RTOFS | Full chain in PROVIDER-MANUAL §14.12 | Celsius → operator `group_temperature` |
+| `weatherCode` | Configured forecast provider `fetch_current_conditions(lat, lon)` | None | WMO code (no conversion) |
+| `isDay` | Configured forecast provider | None | boolean |
+
+`is_station_served()` (in `services/marine_location_resolver.py`) determines whether a marine location is within `dedup_radius_km` (default 2.5 km) of the weather station. Locations within range get station hardware data; all others get forecast provider data.
+
+#### Ocean data canonical models (ADR-091)
+
+These models are the output of the ocean data resolver (`services/ocean_data_resolver.py`). Endpoints call the resolver and populate response fields from whichever result fields are non-null — no branching on provider names or coverage tier. Full architecture, per-consumer usage table, coverage tier semantics, and unit conversion rules in `docs/planning/briefs/WATER-TEMPERATURE-DATA-SOURCE-BRIEF.md` §"System Integration: Marine Ocean Data Resolver".
+
+##### OceanDataResult
+
+Resolver output — all ocean model data for one location at one point in time.
+
+| Field | Type | Nullable | Description |
+|---|---|---|---|
+| `surface_temp` | float | Yes | Surface water temperature (Celsius, pre-conversion) |
+| `column_profile` | list[WaterColumnLayer] | Yes | Temperature + salinity at each depth level |
+| `thermocline_depth_m` | float | Yes | Depth of maximum dT/dz gradient |
+| `bottom_temp_c` | float | Yes | Temperature at deepest non-null depth level |
+| `seafloor_depth_m` | float | Yes | Model-grid seafloor depth (NOT CUDEM — model resolution only) |
+| `surface_current_speed` | float | Yes | Surface current speed (m/s) |
+| `surface_current_dir` | float | Yes | Surface current direction (degrees true north) |
+| `current_profile` | list[object] | Yes | `[{"depth_m", "speed_ms", "dir_deg"}, ...]` |
+| `surface_salinity` | float | Yes | Surface salinity (PSU) |
+| `water_level_msl` | float | Yes | Modeled water level vs MSL (meters) |
+| `water_level_mllw` | float | Yes | Modeled water level vs MLLW (meters) |
+| `forecast` | list[OceanForecastPoint] | Yes | Surface temp + currents over forecast horizon |
+| `source` | str | No | e.g. `"ofs:WCOFS"`, `"rtofs"`, `"mur_sst"` |
+| `source_type` | str | No | `"modeled"` or `"observed"` |
+| `timestamp` | str | No | ISO 8601 |
+| `coverage_tier` | str | No | `"ofs"`, `"regional_erddap"`, `"rtofs"`, `"mur_sst"`, `"observed"`, `"unavailable"` |
+
+##### WaterColumnLayer
+
+| Field | Type | Nullable | Description |
+|---|---|---|---|
+| `depth_m` | float | No | Depth in meters |
+| `temperature` | float | No | Temperature (operator display units after `convert()`) |
+| `salinity` | float | Yes | Salinity in PSU (no conversion) |
+
+##### WaterColumnProfile
+
+| Field | Type | Nullable | Description |
+|---|---|---|---|
+| `layers` | list[WaterColumnLayer] | No | One entry per depth level |
+| `thermocline_depth_m` | float | Yes | Depth of maximum temperature gradient |
+| `bottom_temp` | float | Yes | Temperature at deepest level (operator display units) |
+| `seafloor_depth_m` | float | Yes | Model-grid seafloor depth |
+| `source` | str | No | e.g. `"ofs:WCOFS"` |
+| `timestamp` | str | No | ISO 8601 |
+
+##### OceanCurrentSnapshot
+
+| Field | Type | Nullable | Description |
+|---|---|---|---|
+| `speed` | float | No | Current speed (operator display units) |
+| `direction` | float | No | Degrees true north |
+| `depth_m` | float | Yes | null = surface |
+
+##### OceanForecastPoint
+
+| Field | Type | Nullable | Description |
+|---|---|---|---|
+| `time` | str | No | ISO 8601 |
+| `surface_temp` | float | No | Surface temperature (operator display units) |
+| `current_speed` | float | Yes | Current speed (operator display units) |
+| `current_direction` | float | Yes | Degrees true north |
+| `source` | str | No | Provider attribution |
+
+#### Composite water level models (ADR-091)
+
+Output of the water level compositor (`services/water_level_compositor.py`). Combines CO-OPS harmonic predictions with OFS non-tidal residual. Full algorithm rationale, bias correction technique, and persistence fallback formula in `docs/planning/briefs/TIDE-ACCURACY-BRIEF.md` §"The Optimal Architecture: Composite Water Level" and §"Implementation Design" (compositor algorithm, data flow diagram, API response shape). CO-OPS vs OFS accuracy comparison in §"Research Questions — Answered" Q1/Q3/Q4. Dashboard display design (TideChart overlays, residual stat tile, storm surge indicator) in §"Dashboard Display Design".
+
+##### Compositor output fields (on TideBundle)
+
+The compositor output is inlined into the `TideBundle` response (not a separate model). The compositor's `compute_composite()` returns these fields, which are set directly on the TideBundle:
+
+| Field | Type | Nullable | Description |
+|---|---|---|---|
+| `currentResidual` | object | Yes | `{"value": float, "quality": "good"\|"stale", "source": "coops_observed", "description": str}` — measured meteorological water level offset. Quality is `"good"` when most recent observation ≤1h old, `"stale"` when 1–6h old. Null when no CO-OPS observations available or most recent is >6h old. |
+| `totalWaterLevelForecast` | list[object] | Yes | `[{"time": iso, "height": float, "residual": float}, ...]` — composite forecast: CO-OPS prediction + bias-corrected OFS residual (or persistence-decayed residual). Heights and residuals in the operator's target unit. |
+| `residualForecastSource` | str | Yes | `"ofs"` (bias-corrected OFS forecast), `"persistence"` (exponentially decayed current residual), or `"unavailable"`. |
+| `stormSurgeLevel` | str | Yes | Classification of current absolute residual: `"elevated"` / `"depressed"` (0.15–0.5 ft), `"significant"` (0.5–1.0 ft), `"storm_surge"` (>1.0 ft), or null (normal, <0.15 ft). Thresholds apply after unit conversion to target unit. |
+
+The existing TideBundle fields (`predictions`, `waterLevels`, `locationId`, `locationName`, `coordinates`, `source`) are unchanged. All compositor fields are nullable — when OFS is unavailable or the compositor returns no residual, the response is identical to the pre-compositor behavior.
+
+**Composite algorithm:** (1) Observed residual = CO-OPS observation − interpolated CO-OPS prediction for each past 24h timestamp. (2) Current residual = most recent observed residual. (3) When OFS available: forecast residual = OFS zeta − CO-OPS prediction, bias-corrected by anchoring to observed residual at current time. When OFS unavailable: persistence fallback — decay current residual exponentially (tau = 12h). (4) Total water level = prediction + corrected residual.
 
 #### Bundle types
 
@@ -2083,7 +2182,7 @@ Bundles wrap domain-specific models with location metadata, freshness block (§2
 | Bundle | Contains | Response for |
 |---|---|---|
 | `MarineBundle` | `MarineObservation`, `list[MarineForecastPoint]`, `list[MarineTextForecast]` | `GET /api/v1/marine[/{locationId}]` |
-| `TideBundle` | `list[TidePrediction]`, `list[WaterLevel]` | `GET /api/v1/tides[/{locationId}]` |
+| `TideBundle` | `list[TidePrediction]`, `list[WaterLevel]`, `totalWaterLevelForecast` (ADR-091), `currentResidual` (ADR-091), `stormSurgeLevel` (ADR-091) | `GET /api/v1/tides[/{locationId}]` |
 
 Each bundle also carries: `locationId`, `locationName`, `coordinates`, `freshness` block, `stationClock`, `units`.
 
@@ -2417,8 +2516,27 @@ All marine endpoints return the standard response envelope (§2): `data`, `stati
 | `/beach-safety` | 1800 | Matches wave forecast cache TTL |
 | `/almanac/solunar` | 86400 | Celestial mechanics — changes daily |
 
+### Card summary: currentTide removed (ADR-091)
+
+`GET /api/v1/marine` returns `currentTide: null` for all locations. All locations sharing a CO-OPS station show identical tide predictions — this is visual noise on the landing page, not useful differentiation. Tide information surfaces in the activity detail tabs (boating, fishing, beach safety, surfing) via `GET /api/v1/tides/{locationId}` where it provides context for the specific activity.
+
+### Composite water level on tides endpoint (ADR-091)
+
+`GET /api/v1/tides/{locationId}` returns additional fields when composite water level data is available:
+
+| Field | Type | Nullable | Description |
+|---|---|---|---|
+| `totalWaterLevelForecast` | list[object] | Yes | `[{"time": iso, "height": float, "residual": float}, ...]` — CO-OPS prediction + bias-corrected OFS non-tidal residual |
+| `currentResidual` | object | Yes | `{"value": float, "quality": str, "source": str, "description": str}` — measured meteorological effect at current time |
+| `residualForecastSource` | str | Yes | `"ofs:WCOFS"`, `"persistence"`, or `"unavailable"` |
+| `stormSurgeLevel` | str | Yes | `"elevated"`, `"depressed"`, `"significant"`, `"storm_surge"`, or null (normal) |
+
+All new fields are nullable — when OFS is unavailable or the compositor returns no residual, the response is identical to the current behavior (predictions + observations only). Zero regression.
+
+The `sources` block includes `"waterLevelComposite"` attribution when compositor data is present.
+
 ### Capability gating and the activity matrix
 
-Which provider modules and enrichment processors are activated depends on the union of enabled activities across all configured locations. The activity capability matrix (consolidated from ADR-090) defines which capabilities each activity enables. The API activates only the provider modules required by the union of activities. See PROVIDER-MANUAL §14 for per-provider details.
+Which provider modules and enrichment processors are activated depends on the union of enabled activities across all configured locations. The activity capability matrix (consolidated from ADR-090, amended 2026-07-13 per ADR-091 with ocean data rows) defines which capabilities each activity enables. The API activates only the provider modules required by the union of activities. See PROVIDER-MANUAL §14 for per-provider details.
 
 When no marine locations are configured (no `[marine]` section in `api.conf`), no marine provider modules register, no marine endpoints are available, and the API behaves identically to a non-marine installation.

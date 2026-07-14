@@ -1193,7 +1193,9 @@ The following patterns are forbidden. Any pull request introducing them must be 
 
 ## §14 Marine & Coastal Providers
 
-Six provider modules across three new domains (`"marine"`, `"tides"`, `"buoy"`) plus one data-access component (bathymetry) and one shared utility (NWS zone discovery). All v1 marine providers are NOAA sources — free, keyless, US-only. Each module follows the §1 Module Contract.
+Six provider modules across three existing domains (`"marine"`, `"tides"`, `"buoy"`) plus two providers in the new `"ocean"` domain (ADR-091), two service-layer components (ocean data resolver, water level compositor), one data-access component (bathymetry), and one shared utility (NWS zone discovery). All v1 marine providers are NOAA sources — free, keyless, US-only. Each module follows the §1 Module Contract.
+
+**Ocean domain (ADR-091, 2026-07-13):** Two provider modules + one resolver + one compositor service for ocean model data. The resolver provides a provider-agnostic interface — endpoints call the resolver, never the ocean providers directly. The compositor combines CO-OPS tidal predictions with OFS meteorological water level signals. See §14.10–§14.13.
 
 ### Provider set
 
@@ -1205,6 +1207,8 @@ Six provider modules across three new domains (`"marine"`, `"tides"`, `"buoy"`) 
 | NWS marine zone text | `providers/marine/nws_marine.py` | `nws_marine` | `marine` | NWS API | No |
 | NWS Surf Zone Forecast | `providers/marine/nws_srf.py` | `nws_srf` | `marine` | NWS API (SRF text product) | No |
 | NWPS nearshore wave data | `providers/marine/nwps.py` | `nwps` | `marine` | NOAA NWPS GRIB2 | No |
+| OFS ocean model data | `providers/ocean/ofs.py` | `ofs` | `ocean` | NOAA OFS via THREDDS/OPeNDAP | No |
+| ERDDAP ocean data | `providers/ocean/erddap_ocean.py` | `erddap_ocean` | `ocean` | MUR SST, RTOFS, PacIOOS, CARICOOS via ERDDAP | No |
 
 Supporting components (not dispatch-registered provider modules):
 
@@ -1213,10 +1217,14 @@ Supporting components (not dispatch-registered provider modules):
 | NOAA CUDEM bathymetry | `enrichment/bathymetry.py` | One-time per-spot bathymetric profile download |
 | OSM Overpass structure discovery | `endpoints/setup.py` (`GET /setup/marine/discover-structures`) | Setup-time-only coastal structure (jetty/pier/breakwater/seawall/groin) discovery for surf spot configuration (§14.9) |
 | NWS zone discovery | `providers/_common/nws_zones.py` | Shared utility: station → CWA → marine zones → distance filtering |
+| Ocean data resolver | `services/ocean_data_resolver.py` | Orchestrates OFS → ERDDAP fallback chain, normalizes output (§14.12) |
+| Water level compositor | `services/water_level_compositor.py` | Combines CO-OPS predictions + OFS non-tidal residual (§14.13) |
 
 ### §14.1 NDBC buoy observations
 
 **Module identity:** `providers/buoy/ndbc.py`, `PROVIDER_ID = "ndbc"`, `DOMAIN = "buoy"`.
+
+**Role change (ADR-091, 2026-07-13):** NDBC buoy observations are demoted from primary water temperature source to **labeled offshore reference data**. The ocean data resolver (§14.12) is now the primary source for water temperature. NDBC buoy data remains available for spectral wave decomposition and as an observational reference — when displayed, it is labeled with the buoy's station ID and offshore distance (e.g., "Nearest Offshore Buoy (46253)") so visitors understand this data is not at the beach location.
 
 **CAPABILITY:** `geographic_coverage = "us_coastal"`, `auth_required = []`. `supplied_canonical_fields` includes wind speed, wind direction, wind gust, wave height, dominant period, average period, mean wave direction, pressure, air temp, water temp (SST), dewpoint, visibility, pressure tendency, tide level. Spectral fields (per-swell-system height, period, direction, energy, classification) when station has spectral sensors.
 
@@ -1267,6 +1275,8 @@ Return stations sorted by haversine distance from the target coordinates, with c
 **Module identity:** `providers/tides/coops.py`, `PROVIDER_ID = "coops"`, `DOMAIN = "tides"`.
 
 **CAPABILITY:** `geographic_coverage = "us_coastal"`, `auth_required = []`. `supplied_canonical_fields` includes tide prediction times and heights, observed water levels, water temperature, currents.
+
+**Dual-product usage for water level compositor (ADR-091, 2026-07-13):** This provider fetches both `predictions` (harmonic, 72h) and `water_level` (observed, 24h) products. Both are consumed by the water level compositor (§14.13) to compute the observed non-tidal residual: `residual = observed − predicted` at matching timestamps. The observed water level is ground truth for the meteorological effect at the station.
 
 **Wire format and parsing:**
 
@@ -1594,6 +1604,135 @@ The response's `osm_type` field carries the raw OSM tag value (e.g. `groyne`, `d
 
 **Error handling:** Any canonical `ProviderError` from the Overpass call (timeout, quota, 5xx after `ProviderHTTPClient` retries, unexpected response shape) is caught in the endpoint handler and returns HTTP 200 with an empty `structures` list and an `error` string populated — never a 500, and the failed lookup is not cached, so the next call retries live. Mirrors §14.7 bathymetry's "best-effort setup-time convenience" pattern: an Overpass outage does not block the wizard, the operator can still add structures manually.
 
+### §14.10 NOAA OFS ocean model data (ADR-091)
+
+**Module identity:** `providers/ocean/ofs.py`, `PROVIDER_ID = "ofs"`, `DOMAIN = "ocean"`.
+
+**CAPABILITY:** `geographic_coverage = "us_coastal"` (major coasts — see coverage table below), `auth_required = []`. Supplies: water temperature (full column), salinity (full column), ocean currents (u/v components, full column), sea surface elevation (vs MSL and MLLW), seafloor depth, forecast time series. New dependency: `xarray` + `netCDF4` in the `[marine]` pip extra.
+
+**Data source:** NOAA Operational Forecast Systems — 15 physics-based coastal ocean models (ROMS, FVCOM) at 34m–4km resolution, served via THREDDS/OPeNDAP at `opendap.co-ops.nos.noaa.gov/thredds/`. Updated 1–4 times daily depending on the model. Full research, verified OPeNDAP metadata, grid structure details, and code examples in `docs/planning/briefs/WATER-TEMPERATURE-DATA-SOURCE-BRIEF.md` §"Technical Detail: THREDDS/OPeNDAP Data Extraction".
+
+**OFS models covered:** WCOFS (US West Coast, ~4km), GOMOFS (Gulf of Maine, ~700m), CBOFS (Chesapeake Bay, 34m–4.9km), DBOFS (Delaware Bay, 100m–3km), TBOFS (Tampa Bay, 100m–1.2km), CIOFS (Cook Inlet, 10m–3.5km), SFBOFS (San Francisco Bay, 10m–3.9km), NGOFS2 (Northern Gulf of Mexico, 45m–300m), SSCOFS (Salish Sea + Columbia River, 100m–10km), LMHOFS (Lake Michigan + Huron), LEOFS (Lake Erie), LOOFS (Lake Ontario), LSOFS (Lake Superior), NYOFS (Port of NY/NJ), SJROFS (St. Johns River FL). Full coverage and gap analysis in `docs/planning/briefs/WATER-TEMPERATURE-DATA-SOURCE-BRIEF.md`.
+
+**Key implementation rules:**
+- Always use `regulargrid` files (pre-interpolated to regular lat/lon). Never use native `fields` files (curvilinear/unstructured grids requiring spatial interpolation).
+- Grid point lookup: `Latitude` and `Longitude` are 2D arrays `[ny, nx]`. Use Euclidean distance with land mask filtering — `ds.sel()` does not work on 2D coordinate arrays.
+- Cache grid coordinates per model (lat, lon, depth, mask, h arrays). TTL = 24h.
+- Cycle selection: `floor(current_utc_hour / 6) * 6` for 4x/day models, fixed cycle for 1x/day (WCOFS = 03z). Fall back up to 4 cycles.
+- Variables extracted at the nearest water grid point: `temp`, `salt`, `u_eastward`, `v_northward` (all `[time, Depth, ny, nx]`), `zeta`, `zetatomllw` (`[time, ny, nx]`), `h`, `mask` (`[ny, nx]`).
+
+**Cache:** Key includes model name + cycle + lat/lon (rounded to 3 decimals). TTL = 1800s.
+
+**Error handling:** THREDDS 404 → cycle fallback. Timeout (>10s) → `TransientNetworkError`. Grid point on land → null result. All per error taxonomy.
+
+**Implementation details (from code, 2026-07-13):**
+
+- `fetch(*, model: str, lat: float, lon: float) -> dict` — primary entry point. Returns dict with `source`, `surface_temp`, `column_profile`, `surface_current_speed`, `surface_current_dir`, `salinity`, `water_level_msl`, `water_level_mllw`, `seafloor_depth`. Returns `{"source": "unavailable"}` on total failure.
+- `find_ofs_model(lat: float, lon: float) -> tuple[str | None, str | None]` — returns `(primary, fallback)` by checking `OFS_DOMAINS` bounding boxes. When domains overlap, sorts by `_MODEL_RESOLUTION_DEG` (smallest first) and returns the two highest-resolution matches.
+- `_get_grid(model: str)` — fetches and caches lat/lon/depth/mask/h arrays per model. Cache key: `ofs:grid:{model}`, TTL 86400s.
+- `_find_nearest_water_point(lat_grid, lon_grid, mask, lat, lon)` — Euclidean `sqrt((lat_grid - lat)² + (lon_grid - lon)²)`, masks land cells (`mask == 0`), rejects if minimum distance > 0.5°.
+- `_extract_data(ds, ny, nx, depth_levels)` — pulls `temp`, `salt`, `u_eastward`, `v_northward`, `zeta`, `zetatomllw`, `h` via xarray indexing.
+- `_select_cycle(model, now_utc)` — walks back up to 48 hours in 6-hour steps. Returns the most recent valid cycle. 1x/day models (WCOFS) use fixed cycle (03z).
+- Result cache key: `ofs:{model}:{lat:.3f}:{lon:.3f}`, TTL 1800s.
+- Grid cache key: `ofs:grid:{model}`, TTL 86400s (grid topology is static).
+- Constants: `_RESULT_CACHE_TTL = 1800`, `_GRID_CACHE_TTL = 86400`, `_MAX_CYCLE_FALLBACKS = 3`, `_DATASET_TIMEOUT = 20` seconds.
+
+### §14.11 ERDDAP ocean data (ADR-091)
+
+**Module identity:** `providers/ocean/erddap_ocean.py`, `PROVIDER_ID = "erddap_ocean"`, `DOMAIN = "ocean"`.
+
+**CAPABILITY:** `geographic_coverage = "global"`, `auth_required = []`. Config-driven module that handles multiple ERDDAP datasets through a single interface.
+
+**Datasets:**
+
+| Dataset key | Server | Dataset ID | Content | Depth | Lon convention |
+|---|---|---|---|---|---|
+| `mur_sst` | coastwatch.pfeg.noaa.gov | `jplMURSST41` | Surface temp only (1km, global, daily) | Surface | -180/+180 |
+| `rtofs_3d` | coastwatch.pfeg.noaa.gov | `ncepRtofsG3DForeDaily` | Temp column + currents + salinity (8km, global, 41 levels, 8-day forecast) | 41 levels | 0–360 |
+| `rtofs_2d` | coastwatch.pfeg.noaa.gov | `ncepRtofsG2DFore3hrlyProg` | Surface SST (8km, global, 3-hourly) | Surface | 0–360 |
+| `pacioos` | pae-paha.pacioos.hawaii.edu | `roms_hiig` | Full column (4km, Hawaii/Pacific, 36 levels) | 36 levels | -180/+180 |
+| `caricoos` | dm3.caricoos.org | `FVCOM_Historical_3D_StructuredGrid` | Full column (800m, PR/USVI, 11 levels) | 11 levels | -180/+180 |
+
+Standard ERDDAP griddap URL pattern: `https://{server}/erddap/griddap/{datasetID}.json?{variable}[(time)][(depth)][(lat)][(lon)]`. Handles longitude convention conversion per dataset. Full ERDDAP API consistency analysis and per-dataset details in `docs/planning/briefs/WATER-TEMPERATURE-DATA-SOURCE-BRIEF.md` §"ERDDAP API Consistency" and §"Fallback Data Sources".
+
+**Cache:** Key includes dataset key + lat/lon. TTL per dataset: MUR SST 3600s (daily), RTOFS 1800s.
+
+**Implementation details (from code, 2026-07-13):**
+
+- `fetch(*, dataset: str, lat: float, lon: float) -> dict | None` — primary entry point. Returns dict with provider-standard fields (`surface_temp`, `column_profile`, etc.) or `None` on failure.
+- `_build_url(dataset_config, lat, lon)` — constructs ERDDAP griddap JSON query URL with per-dataset variable names and longitude convention conversion (`lon + 360` for 0–360 datasets).
+- `_parse_response(resp_json, dataset_config)` — parses `table.columnNames`/`table.rows`, filters NaN values, builds depth-level profile list when `has_depth=True`.
+- `DATASETS` dict: keyed by dataset name, each entry specifies `server`, `dataset_id`, `variables` (dict of temp/salt/current variable names), `has_depth`, `lon_convention`, `ttl`.
+- Cache key: `erddap_ocean:{dataset}:{lat:.3f}:{lon:.3f}`. TTL: MUR SST 3600s, all others 1800s.
+- Error handling: broad try/except around HTTP fetch → `logger.warning(exc_info=True)`, returns `None`. Empty ERDDAP response (no data for time range) logged at WARNING.
+
+### §14.12 Ocean data resolver (ADR-091)
+
+**Not a provider module.** Service-layer orchestrator (`services/ocean_data_resolver.py`) that implements the ADR-091 fallback chain across providers and normalizes output. Endpoints call the resolver, not the ocean providers directly. Full architecture, canonical data models (`OceanDataResult` fields), two query modes, coverage tier semantics, per-consumer usage table, and unit conversion rules in `docs/planning/briefs/WATER-TEMPERATURE-DATA-SOURCE-BRIEF.md` §"System Integration: Marine Ocean Data Resolver".
+
+**Interface:** `resolve(lat, lon, location_config, mode="modeled", needs="surface") -> OceanDataResult`
+
+**Fallback chain (`mode="modeled"`):**
+
+1. `location_config.ofs_model` set → OFS provider (§14.10). If fails, try `ofs_fallback`.
+2. `location_config.ofs_region` set → ERDDAP regional model (§14.11, PacIOOS/CARICOOS).
+3. Global fallback, split by `needs`:
+   - `needs="full"`: RTOFS via ERDDAP (column + forecast), then MUR SST (surface only).
+   - `needs="surface"`: MUR SST via ERDDAP (1km surface), then RTOFS surface.
+4. All sources exhausted → `coverage_tier = "unavailable"`.
+
+**`mode="observed"`:** Returns only a real sensor reading (on-premises or NDBC buoy within threshold). Does NOT fall back to models — null if no sensor. The caller can decide whether to then call again with `mode="modeled"`.
+
+**Coverage tier field:** Set on the result so endpoints can populate response fields without branching on provider names. Values: `"ofs"`, `"regional_erddap"`, `"rtofs"`, `"mur_sst"`, `"observed"`, `"unavailable"`.
+
+**Derived computations:**
+- Thermocline depth: depth of maximum `abs(dT/dz)` gradient between adjacent depth levels
+- Bottom temperature: temperature at the deepest non-null depth level
+- Current speed/direction: `sqrt(u² + v²)` and `atan2(v, u)` from u_eastward + v_northward at depth=0
+
+Each tier is independently wrapped in try/except — failure at one tier does not prevent trying the next.
+
+**Implementation details (from code, 2026-07-13):**
+
+- `resolve(lat: float, lon: float, location_config: dict, mode: str = "modeled", needs: str = "surface") -> OceanDataResult` — primary entry point. `location_config` keys: `ofs_model`, `ofs_fallback`, `ofs_region`.
+- `_resolve_modeled(lat, lon, location_config, needs)` — runs the fallback chain. Each tier independently try/excepted with `logger.warning(..., exc_info=True)`.
+- `_build_result(raw_data, coverage_tier)` — normalizes provider output into `OceanDataResult`. Computes derived values:
+  - Thermocline depth: scans adjacent depth-level pairs for maximum `abs(dT/dz)` gradient
+  - Bottom temperature: temperature at the deepest non-null profile entry
+  - Current speed: `sqrt(u² + v²)` from u_eastward + v_northward at depth=0
+  - Current direction: `atan2(v, u)` converted to meteorological convention (direction FROM)
+- `mode="observed"` currently returns `coverage_tier="unavailable"` (no on-premises sensor support implemented yet).
+- All returned values in raw units: °C, m/s, PSU, meters. Unit conversion happens at the endpoint layer.
+
+### §14.13 Water level compositor (ADR-091)
+
+**Not a provider module.** Service-layer component (`services/water_level_compositor.py`) that combines CO-OPS harmonic predictions with the OFS non-tidal residual to produce a composite total water level forecast. See API-MANUAL §16 `CompositeWaterLevel` for the output model. Full algorithm and pseudocode in `docs/planning/briefs/TIDE-ACCURACY-BRIEF.md` §"Implementation Design" → "Compositor algorithm". Bias correction rationale and OFS accuracy data in §"Research Questions — Answered" Q1/Q3/Q4. Cache warmer integration in §"Cache warmer integration". STOFS-2D-Global comparison (why it's not needed separately) in §"What STOFS-2D-Global Offers".
+
+**Interface:** `compute_composite(predictions, observations, ofs_water_levels, now, target_unit="foot") -> dict`
+
+**Algorithm:**
+1. **Observed residual:** For each CO-OPS observation in the past 24h, interpolate the 6-minute prediction series to the observation timestamp. Compute `residual = observation.height − interpolated_prediction`.
+2. **Current residual:** Most recent observed residual — ground truth for the meteorological effect.
+3. **Forecast residual (OFS available):** `ofs_residual = ofs_zeta − coops_prediction`. Bias-correct: `bias = current_observed_residual − ofs_residual_at_now`. Apply `corrected = ofs_residual + bias`.
+4. **Forecast residual (OFS unavailable):** Persistence — `residual_t = current_residual × exp(−dt / tau)` where tau = 12 hours.
+5. **Total water level:** `prediction + corrected_residual` at each time step.
+
+**Storm surge classification:** Configurable per location. Default thresholds: < 0.15 ft normal, 0.15–0.5 ft `"elevated"`/`"depressed"`, 0.5–1.0 ft `"significant"`, > 1.0 ft `"storm_surge"`.
+
+**Cache warmer integration:** Runs after CO-OPS + OFS warm calls. Composite cached at 10-minute TTL (matches CO-OPS `water_level` observation refresh). The endpoint reads the cached composite, not recomputing per request.
+
+**Implementation details (from code, 2026-07-13):**
+
+- `compute_composite(predictions, observations, ofs_water_levels, now, target_unit="foot") -> dict` — primary entry point. The `target_unit` parameter (added in implementation) allows the compositor to return values in the operator's display unit directly.
+- Returns dict with keys: `currentResidual` (object or None), `totalWaterLevelForecast` (list or None), `stormSurgeLevel` (str or None), `residualForecastSource` (str).
+- `currentResidual` shape: `{"value": float, "quality": "good"|"stale", "source": "coops_observed", "description": str}`. Quality is `"good"` when the most recent observation is ≤1h old, `"stale"` when 1–6h old, absent when >6h.
+- `_interpolate_prediction(predictions, target_time)` — linear interpolation of CO-OPS 6-minute prediction series. Handles edge cases (target before first or after last prediction).
+- `_compute_ofs_residual_at_time(ofs_levels, predictions, target_time)` — finds the closest OFS forecast point within 2 hours, computes `ofs_height - interpolated_prediction`.
+- `_classify_surge(abs_residual_ft, signed_residual_ft)` — applies threshold table. Note: classification operates on converted values (target unit), not raw meters.
+- Persistence decay constant: `_PERSISTENCE_TAU_HOURS = 12.0`.
+- Surge threshold constants: `_SURGE_THRESHOLDS_FT = {"minor": 0.15, "moderate": 0.5, "major": 1.0}`.
+- Unit conversion via `weewx_clearskies_api.units.conversion.convert()`.
+
 ### Source ADRs
 
-§14 consolidates prescriptive rules from: ADR-083 (marine domain architecture), ADR-084 (NWPS supplementation), ADR-085 (eccodes dependency), ADR-087 (NDBC spectral data), ADR-088 (fishing scoring — bathymetry for habitat), ADR-089 (marine zone alerts). ADRs are archived in `docs/archive/decisions/` and explain the *why* behind these rules.
+§14 consolidates prescriptive rules from: ADR-083 (marine domain architecture), ADR-084 (NWPS supplementation), ADR-085 (eccodes dependency), ADR-087 (NDBC spectral data), ADR-088 (fishing scoring — bathymetry for habitat), ADR-089 (marine zone alerts), ADR-091 (marine card data sources, OFS ocean data, composite water level). ADRs are archived in `docs/archive/decisions/` and explain the *why* behind these rules.
