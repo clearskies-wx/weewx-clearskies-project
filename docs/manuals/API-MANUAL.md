@@ -2073,6 +2073,7 @@ Summary snapshot for one marine location (used by the marine landing page locati
 | `activeAlerts` | list[MarineAlertSummary] | — | Yes | Active marine alerts, each `{headline, alertType}`; `alertType` is one of `marineZone`, `coastalFlood`, `beachHazard` (classified from the NWS `event` string for dashboard per-tab filtering, T3.5) |
 | `surfRating` | int | — | Yes | Current surf quality stars (1–5, if surf enabled) |
 | `beachSafetyLevel` | str | — | Yes | Current safety level (if beach_safety enabled) |
+| `photoUrl` | str | — | Yes | `/marine-photos/{locationId}.webp` when the operator has uploaded a location photo (T4.1-T4.3, Marine Complete Remediation Plan); `null` otherwise. `_photo_url()` in `endpoints/marine.py` does a filesystem existence check against `/etc/weewx-clearskies/marine-photos/{locationId}.webp` — no config field read. Populated on `GET /marine` only; `GET /tides` uses its own `_location_summary()` (tides.py) which does not set it, so it is always `null` there. |
 
 #### Card data source contract (ADR-091)
 

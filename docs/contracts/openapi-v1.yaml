@@ -3595,6 +3595,10 @@ components:
             required: [headline, alertType]
         surfRating: { type: integer, nullable: true, minimum: 1, maximum: 5 }
         beachSafetyLevel: { type: string, nullable: true, enum: [safe, caution, dangerous] }
+        photoUrl:
+          type: string
+          nullable: true
+          description: "/marine-photos/{locationId}.webp when the operator has uploaded a location photo (T4.1-T4.3), else null."
       required: [locationId, name, coordinates, activities]
 
     MarineBundle:
