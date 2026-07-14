@@ -1225,9 +1225,9 @@ Marine page accessibility requirements, following the precedent set by §10 (Rad
 - Tab/accordion state changes announced via `aria-live="polite"` region or native role semantics
 
 **Map markers (numbered pins):**
-- Each `L.divIcon` marker has `aria-label="{location name}, location {number}"` on the containing element
-- Map container has `role="img"` with `aria-label="Map showing {n} marine locations"` as a fallback for non-interactive contexts
-- Keyboard: markers focusable via Tab, Enter/Space to select
+- Markers are a mouse/touch supplementary affordance — not the primary keyboard path. `LocationCard` buttons (real `<button>` elements in the card grid) provide the keyboard-accessible selection path for each location, matching the Seismic page's precedent.
+- Markers set `keyboard={false}` to avoid axe-core `aria-command-name` violations on Leaflet's internal DOM structure.
+- Map container has `role="region"` with `aria-label` describing the map content.
 
 **SwellDirectionCompass (informational SVG):**
 - `role="img"` on the root `<svg>` element

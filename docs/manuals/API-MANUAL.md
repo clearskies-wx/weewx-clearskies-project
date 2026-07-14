@@ -2197,7 +2197,7 @@ Source: `endpoints/surf.py`.
 | `locationId` | str | No | Location slug from config |
 | `locationName` | str | No | Display name |
 | `coordinates` | object | No | `{lat, lon}` |
-| `forecast` | list[SurfForecast] | No | 0 or 1 entries. Populated only when NWPS (preferred) or WaveWatch III (fallback) supplied a wave height; empty list if both providers failed |
+| `forecast` | list[SurfForecast] | No | 1 entry when NWPS supplies the current snapshot; up to 25 entries (one per WaveWatch III 3-hourly timestep) when WaveWatch III fallback fires; empty list if both providers failed |
 | `zoneForecast` | SurfZoneForecast | Yes | NWS SRF forecast for the covering county zone; `null` if unavailable |
 | `spectralComponents` | list[SpectralWaveComponent] | No | Current NDBC spectral swell decomposition; empty list if no spectral-capable buoy configured or NDBC fetch failed |
 | `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions for the surf page's tide overlay (informational, not scored) |
