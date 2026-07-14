@@ -342,20 +342,105 @@ All share: border-radius consistent with card scale, visible focus ring per acce
 
 ### Hero Weather Icons
 
-Rendered as inline SVG with `<linearGradient>` fills, Meteocons-style palette. Source library: Material Symbols (filled). Coverage: all 29 WMO condition codes. Static — no animation. Partly-cloudy fix: sun uses absolute `M14.975 17.2`, `fill-rule="nonzero"` on both paths. License: Apache-2.0.
+Rendered as inline SVG with `<linearGradient>` fills, Meteocons-style palette. Source library: Material Symbols (filled). Coverage: 31 hero icons covering all WMO condition codes plus Clear Skies extensions. Static — no animation. Partly-cloudy fix: sun uses absolute `M14.975 17.2`, `fill-rule="nonzero"` on both paths. License: Apache-2.0.
 
-| Element | Gradient Top → Bottom |
-|---|---|
-| Sun | `#FFD24D` → `#F5A623` (gold) |
-| Clouds | `#F3F5F8` → `#C7CDD6` (light grey, lighter at top for depth) |
-| Lightning | `#FFD24D` → `#F5A623` (gold, same as Sun) |
-| Moon | `#86C3DB` → `#72B9D5` (periwinkle) |
-| Rain | soft blue (tunable) |
-| Snow | pale icy white (tunable) |
-| Haze layer (day) | `#C4B99A` → `#A89878` (dusty tan) |
-| Haze layer (night) | `#8A8A7A` → `#6A6A5A` (smoky gray) |
+#### Icon inventory (31 total = 11 existing + 20 new)
 
-**Haze hero icon (ADR-067):** Day variant: muted/pale sun disk with reduced ray intensity, overlaid with horizontal lines in smoky gray/dusty tan gradient. Night variant: obscured/dimmed stars with dirty haze layer. Follows the existing Meteocons-style inline SVG with `<linearGradient>` fills. Exact SVG geometry TBD — separate design task.
+| Category | Icon | Day/Night | Glyph component | Status |
+|----------|------|-----------|-----------------|--------|
+| Sky — Clear | Clear day | Day | `GlyphSunny` | Existing |
+| Sky — Clear | Clear night | Night | `GlyphBedtime` | Existing |
+| Sky — Partly cloudy | Partly cloudy day | Day | `GlyphPartlyCloudy` | Existing |
+| Sky — Partly cloudy | Partly cloudy night | Night | `GlyphPartlyCloudyNight` | Existing |
+| Sky — Mostly cloudy | Mostly cloudy day | Day | `GlyphMostlyCloudyDay` | **New** |
+| Sky — Mostly cloudy | Mostly cloudy night | Night | `GlyphMostlyCloudyNight` | **New** |
+| Sky — Overcast | Overcast | Both | `GlyphCloud` | Existing |
+| Precip — Rain | Rain | Both | `GlyphRainy` | Existing |
+| Precip — Drizzle | Drizzle | Both | `GlyphDrizzle` | **New** |
+| Precip — Snow | Snow | Both | `GlyphSnowy` | Existing |
+| Precip — Wintry mix | Wintry mix | Both | `GlyphWintryMix` | **New** |
+| Precip — Thunderstorm | Thunderstorm | Both | `GlyphThunderstorm` | Existing |
+| Combined sky+precip | Partly cloudy + rain day | Day | `GlyphPartlyCloudyRainDay` | **New** |
+| Combined sky+precip | Partly cloudy + rain night | Night | `GlyphPartlyCloudyRainNight` | **New** |
+| Combined sky+precip | Partly cloudy + snow day | Day | `GlyphPartlyCloudySnowDay` | **New** |
+| Combined sky+precip | Partly cloudy + snow night | Night | `GlyphPartlyCloudySnowNight` | **New** |
+| Combined sky+precip | Partly cloudy + wintry mix day | Day | `GlyphPartlyCloudyWintryMixDay` | **New** |
+| Combined sky+precip | Partly cloudy + wintry mix night | Night | `GlyphPartlyCloudyWintryMixNight` | **New** |
+| Atmosphere — Haze | Haze clear day | Day | `GlyphHazy` | Existing |
+| Atmosphere — Haze | Haze clear night | Night | `GlyphHazyNight` | Existing |
+| Atmosphere — Haze | Haze partly cloudy day | Day | `GlyphHazyPartlyCloudyDay` | **New** |
+| Atmosphere — Haze | Haze partly cloudy night | Night | `GlyphHazyPartlyCloudyNight` | **New** |
+| Atmosphere — Haze | Haze overcast | Both | `GlyphHazyOvercast` | **New** |
+| Atmosphere — Smoke | Smoke clear day | Day | `GlyphSmokeDay` | **New** |
+| Atmosphere — Smoke | Smoke clear night | Night | `GlyphSmokeNight` | **New** |
+| Atmosphere — Smoke | Smoke partly cloudy day | Day | `GlyphSmokePartlyCloudyDay` | **New** |
+| Atmosphere — Smoke | Smoke partly cloudy night | Night | `GlyphSmokePartlyCloudyNight` | **New** |
+| Atmosphere — Smoke | Smoke overcast | Both | `GlyphSmokeOvercast` | **New** |
+| Atmosphere — Dust | Dust day | Day | `GlyphDustDay` | **New** |
+| Atmosphere — Dust | Dust night | Night | `GlyphDustNight` | **New** |
+| Atmosphere — Dust | Dust overcast | Both | `GlyphDust` | **New** |
+| Fog | Fog / Mist / Rime fog | Both | `GlyphFoggy` | Existing |
+
+11 existing glyphs are implemented at `src/components/weather-icon-glyphs.tsx` (dashboard repo): `GlyphSunny`, `GlyphPartlyCloudy`, `GlyphPartlyCloudyNight`, `GlyphCloud`, `GlyphFoggy`, `GlyphRainy`, `GlyphSnowy`, `GlyphThunderstorm`, `GlyphBedtime`, `GlyphHazy`, `GlyphHazyNight`. The 20 **New** rows are the Phase 1+ deliverable of the icon system overhaul (see `docs/planning/ICON-SYSTEM-OVERHAUL-PLAN.md`) — component names above are the target API, not yet implemented as of this manual revision.
+
+#### Composition techniques
+
+New atmosphere-condition icons are built using one of three techniques, chosen per condition:
+
+- **Standalone** (dust): Dust IS the dominant visual element. The sun/moon/cloud sky element is secondary, rendered smaller or behind the dust glyph.
+- **Overlay** (smoke): Smoke bubble paths are layered ON TOP of the underlying sky glyph (sun/moon/cloud). The base sky icon stays visually intact underneath.
+- **Cutout** (haze): The sky element is clipped at a boundary, with amber/dusty haze stripes rendered below the clip line. This is the same technique already used by `GlyphHazy` / `GlyphHazyNight`.
+
+#### Cloud-cover × atmosphere-condition matrix
+
+| Atmosphere condition | Clear sky | Partly cloudy | Overcast |
+|---------------------|-----------|---------------|----------|
+| Haze | `GlyphHazy` / `GlyphHazyNight` (existing) | `GlyphHazyPartlyCloudyDay` / `GlyphHazyPartlyCloudyNight` (new, cutout) | `GlyphHazyOvercast` (new, cutout) |
+| Smoke | `GlyphSmokeDay` / `GlyphSmokeNight` (new, overlay) | `GlyphSmokePartlyCloudyDay` / `GlyphSmokePartlyCloudyNight` (new, overlay) | `GlyphSmokeOvercast` (new, overlay) |
+| Dust | `GlyphDustDay` / `GlyphDustNight` (new, standalone) | — (dust renders as standalone regardless of partly-cloudy sky) | `GlyphDust` (new, standalone with cloud) |
+
+#### PoP-gated icon selection tiers
+
+Icon selection consults precipitation probability (PoP) and cloud cover, not just the raw weather code:
+
+- **PoP < 20%:** Sky-condition icon only (chosen by cloud cover — clear, partly cloudy, mostly cloudy, or overcast). No precipitation icon shown regardless of weather code.
+- **PoP 20–50% AND cloudCover < 75%:** Combined sky+precipitation icon (e.g., partly cloudy + rain).
+- **PoP > 50% OR cloudCover ≥ 75%:** Precipitation icon only (rain, snow, wintry mix, drizzle, thunderstorm — sky context dropped).
+
+See DASHBOARD-MANUAL §8 for the selection pipeline implementation (data flow, thresholds as consumed by the dashboard).
+
+#### Gradient definitions
+
+| Element | Gradient Top → Bottom | Use |
+|---|---|---|
+| Sun | `#FFD24D` → `#F5A623` (gold) | Sky-condition day icons |
+| Clouds | `#F3F5F8` → `#C7CDD6` (light grey, lighter at top for depth) | Sky-condition icons |
+| Lightning | `#FFD24D` → `#F5A623` (gold, same as Sun) | Thunderstorm |
+| Moon | `#86C3DB` → `#72B9D5` (periwinkle) | Sky-condition night icons |
+| Rain | soft blue (tunable) | Rain, combined rain icons |
+| Snow | pale icy white (tunable) | Snow, combined snow icons |
+| Haze layer (day) | `#C4B99A` → `#A89878` (dusty tan) | Haze cutout stripes, day |
+| Haze layer (night) | `#8A8A7A` → `#6A6A5A` (smoky gray) | Haze cutout stripes, night |
+| Smoke wisps | `#9EA5AD` → `#6B7280` (darker grey than clouds) | Smoke overlay bubbles |
+| Dust particles | `#D4A574` → `#A0734A` (earth-tone tan/brown) | Dust standalone icons |
+
+#### Day/night variant rules per icon category
+
+- **Sky conditions** (clear, partly cloudy, mostly cloudy): Day = sun/gold, Night = moon/periwinkle.
+- **Precipitation-only** (rain, snow, drizzle, wintry mix, thunderstorm): Same glyph day and night — no day/night variant.
+- **Combined sky+precip**: Day = sun variant, Night = moon variant.
+- **Atmosphere — haze, smoke**: Day = sun, Night = moon for the clear and partly-cloudy tiers; the overcast tier has no day/night distinction (cloud dominates, sun/moon not visible).
+- **Atmosphere — dust**: Day = sun, Night = moon, Overcast = cloud (standalone technique — dust is the dominant visual regardless of sky element).
+- **Fog**: Same glyph day and night — no day/night variant.
+
+#### Excluded icons
+
+Some conditions do not get a dedicated hero icon:
+
+- **Wind:** No dedicated wind icon. Wind is a stat, not a sky condition — it doesn't change what the sky looks like. The NWS icon set uses prefixed condition codes like `wind_skc`, `wind_sct`, but Clear Skies strips the wind prefix and renders on the underlying sky condition instead.
+- **Hot/Cold:** Mapped to clear sky (WMO code 0). Temperature extremes are communicated via the temperature display and comfort text, not via the weather icon.
+
+**Haze hero icon (ADR-067):** Day variant: muted/pale sun disk with reduced ray intensity, overlaid with horizontal lines in smoky gray/dusty tan gradient. Night variant: obscured/dimmed stars with dirty haze layer. Both follow the existing Meteocons-style inline SVG with `<linearGradient>` fills — the cutout technique described above. As of this revision, haze also has partly-cloudy (`GlyphHazyPartlyCloudyDay`/`Night`) and overcast (`GlyphHazyOvercast`) variants, using the same cutout technique against the partly-cloudy and overcast sky glyphs respectively. Exact SVG geometry for the new variants TBD — separate design task (see ICON-SYSTEM-OVERHAUL-PLAN.md T1.4 mockup).
 
 ### Utility/Stat/Nav Icons
 
