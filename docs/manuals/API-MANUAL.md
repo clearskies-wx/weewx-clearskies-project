@@ -2540,3 +2540,48 @@ The `sources` block includes `"waterLevelComposite"` attribution when compositor
 Which provider modules and enrichment processors are activated depends on the union of enabled activities across all configured locations. The activity capability matrix (consolidated from ADR-090, amended 2026-07-13 per ADR-091 with ocean data rows) defines which capabilities each activity enables. The API activates only the provider modules required by the union of activities. See PROVIDER-MANUAL §14 for per-provider details.
 
 When no marine locations are configured (no `[marine]` section in `api.conf`), no marine provider modules register, no marine endpoints are available, and the API behaves identically to a non-marine installation.
+
+### Detail endpoint enrichment contract
+
+`GET /api/v1/marine/{locationId}` must return an enriched `MarineBundle` observation using the same data sources as the card summary endpoint (`_location_summary()`). The raw NDBC buoy observation alone is insufficient — most buoys do not report wind, air temp, pressure, visibility, or weather conditions.
+
+**Enrichment sources (applied after the NDBC buoy fetch):**
+
+| Response field | Primary source | Fallback | Notes |
+|---|---|---|---|
+| `observation.windSpeed` | Station hardware (when `is_station_served()`) | `marine_weather_cache.get_current_conditions()` | Knots in API internal units |
+| `observation.windDirection` | Station hardware | `marine_weather_cache` | Degrees |
+| `observation.windGust` | Station hardware | `marine_weather_cache` | Knots |
+| `observation.airTemp` | Station hardware | `marine_weather_cache` | °C internal |
+| `observation.pressure` | Station hardware | `marine_weather_cache` | hPa internal |
+| `observation.visibility` | `marine_weather_cache` | null | km internal |
+| `observation.waveHeight` | NWPS + `wave_transform` (surf locations) | WaveWatch III → NDBC buoy (last resort) | Meters internal. Null for harbor locations (no open-ocean fallback). |
+| `observation.waterTemp` | `ocean_data_resolver.resolve()` (OFS → MUR SST → RTOFS) | NDBC buoy | °C internal |
+| `observation.weatherCode` | `marine_weather_cache` | null | WMO code integer |
+| `observation.isDay` | `marine_weather_cache` | null | boolean |
+
+**Implementation rule:** Do NOT refactor `_location_summary()` and `get_marine_location()` into a shared function. The two endpoints have different response shapes and different additional data. Copy the enrichment dispatch pattern.
+
+**Unit conversion:** Apply `_convert_observation()` to the enriched observation (same as current behavior, but now with non-null fields).
+
+**Existing fields preserved:** `dominantPeriod`, `averagePeriod`, `spectralComponents` from the NDBC buoy remain in the response when available.
+
+### Multi-point surf forecast contract
+
+`GET /api/v1/surf/{locationId}` must return multi-point forecast data by scoring each NWPS time step, not just the current snapshot.
+
+| Field | Type | Description |
+|---|---|---|
+| `forecast` | `list[SurfForecast]` | One entry per NWPS time step across the forecast cycle |
+| `forecast[].time` | ISO 8601 | Time of this forecast point |
+| `forecast[].qualityStars` | int (1-5) | Star rating from `score_surf()` |
+| `forecast[].qualityLabel` | str | "Poor"/"Fair"/"Good"/"Very Good"/"Epic" |
+| `forecast[].conditionsText` | str | Composed natural-language summary |
+| `forecast[].windQuality` | str | "Offshore"/"Glassy"/"Cross-shore"/"Onshore" |
+| `forecast[].swellDominance` | float (0-1) | Swell dominance score |
+| `forecast[].waveHeightAtBreak` | float | Post-transform breaking height in display units |
+| `forecast[].period` | float | Dominant period in seconds |
+| `forecast[].direction` | float | Swell direction in degrees |
+| `forecast[].multiSwell` | list[object] | Spectral breakdown components |
+
+When NWPS provides only one time step (current snapshot), the array contains a single element. The dashboard's `ForecastTimeline` component handles both single and multi-point data.

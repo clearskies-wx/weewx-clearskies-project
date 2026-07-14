@@ -1169,3 +1169,70 @@ Settings panel opens as a **full-screen overlay** (fixed, inset-0, z above the r
 | <1024px (mobile) | Full-screen overlay | Simplified bottom bar | Full-screen settings panel, dismiss to return to map |
 
 All interactive elements: ≥44px tap targets on mobile (WCAG 2.5.8).
+
+## 20. Marine Activity Tab Patterns
+
+Marine activity tabs MUST use the standard card system and shared components. These rules prevent the pattern drift that occurred in prior implementations.
+
+### Card usage (mandatory)
+
+All marine tab content uses `Card` / `CardHeader` / `CardTitle` / `CardContent` from `components/ui/card.tsx`. No local `Panel` functions, no bare `<section>` or `<div>` wrappers posing as cards.
+
+| Element | Component | Props |
+|---|---|---|
+| Tab section | `Card` | `footprint="full"` (spans all Grid columns) |
+| Section header | `CardHeader` + `CardTitle` | `CardTitle as="h3"` for tab-level sections |
+| Section body | `CardContent` | Standard padding, contains stat grids / charts / tables |
+
+### MarineStatTile (shared component)
+
+File: `src/components/marine/shared/MarineStatTile.tsx`. Exported, used by all 4 tab files. Matches the `StatItem` pattern from `todays-highlights-card.tsx`.
+
+```
+interface MarineStatTileProps {
+  icon?: React.ReactNode;   // Phosphor icon, decorative, size-4 (16px)
+  label: string;            // --text-label, text-muted-foreground, <dt>
+  value: string;            // --text-stat-tile, font-semibold, tnum, <dd>
+  unit?: string;            // --text-label, text-muted-foreground, after value
+}
+```
+
+- Layout: `flex flex-col gap-0.5` (label above value, icon inline with label)
+- Value uses `fontFeatureSettings: '"tnum"'` for tabular number alignment
+- No per-tab duplicates — `grep "function StatTile"` in any tab file must return zero matches
+
+### Marine forecast columns
+
+Marine forecast text (boating, fishing) uses the `DailyColumns` pattern from `ForecastDailyCard`, not expandable `<details>/<summary>` text blobs.
+
+Each forecast period renders as a column: period name at top, then structured data rows (wind, seas, visibility, weather text). Horizontal scrolling via `HorizontalScrollNav` when periods exceed viewport width.
+
+### Swell direction compass
+
+The `SwellDirectionCompass` component follows the `WindCompassCard` tick-ring visual pattern (`src/components/WindCompassCard.tsx`):
+
+- SVG `viewBox="0 0 420 420"` (same geometry as wind compass)
+- 72 ticks every 5° (outer radius 175, tick length 24px)
+- Ticks within ±8° of swell direction are "lit" with `--chart-2` color (not `--primary` — distinct from wind)
+- Cardinal labels (N/S/E/W) at same positions as wind compass
+- Center overlay: swell direction degrees + cardinal text, dominant height + period
+- Rendered at ~160×160px within Card content (smaller than the full wind compass)
+
+### Solunar display
+
+Fishing tab solunar display follows the `SunMoonDetailCard` arc + `MoonPhaseIcon` pattern from the Almanac page:
+
+- Uses `MoonPhaseIcon` from `components/moon-phase-icon.tsx` (same component, not a copy)
+- Major/minor feeding periods on a horizontal timeline with accent/muted color bars
+- Moon phase icon + illumination percentage
+- Arc visualization matching `SunMoonDetailCard` styling
+
+### Scoring factor breakdown
+
+Surf and fishing tabs display scoring factor breakdowns as horizontal bar segments:
+
+- Each factor: label + score + colored fill proportional to score
+- Bar fill uses gauge color tokens (`--gauge-fill` for filled portion, `--gauge-unfill` for empty)
+- Green for high scores (>60), amber for moderate (30-60), muted for low (<30)
+- Factor weights shown as percentages (e.g., "Wave Height 35%")
+- Tap/click for explanation text (fishing tab)

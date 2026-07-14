@@ -137,7 +137,20 @@ Use the Nygard format. Template at `docs/decisions/_TEMPLATE.md`. Required: Stat
 
 **Foreground for fast tasks.** If an agent's task takes <2 min (verify git state, extract git stats, run one command), use foreground mode. Background is for tasks >5 min where parallel work is possible.
 
-**Agents commit locally, never on production containers.** Code is edited and committed on the local machine (DILBERT/CATBERT), pushed to GitHub, then deployed via the deploy scripts. Agents must never commit directly on a production container. If an agent needs to run tests on weewx, it reads results — it does not edit source or commit there. The deploy flow is always: local commit → push to GitHub → deploy script.
+**Agents edit and commit ONLY on the local machine — HARD BAN on container edits.** All source code editing and `git commit` happens on the local machine (DILBERT/CATBERT) at `c:\CODE\weather-belchertown\repos\weewx-clearskies-*`. Agents must NEVER:
+- Edit source files on weewx or weather-dev (not via SSH, not via any mechanism)
+- Run `git add` or `git commit` on weewx or weather-dev
+- Run any git write operation on any container
+
+SSH to containers is for READ-ONLY operations: running tests, reading logs, checking service status, verifying deployed behavior. That's it.
+
+**Agents have NO GitHub rights.** Agents must NOT run `git push`, `git pull`, `git fetch`, `git rebase`, `git merge`, or `git checkout` of remote branches — not on the local machine, not on containers, not anywhere. The coordinator handles all GitHub operations (push/pull) with explicit user authorization. If an agent discovers it needs to sync with a remote, it STOPS and reports via SendMessage.
+
+**The deploy flow is always:** local edit → local commit → coordinator pushes to GitHub → deploy script pulls to container. No shortcuts.
+
+**Never run the full pytest suite.** The full API test suite takes too long and wastes tokens. When verifying changes, run ONLY the tests relevant to the files changed — e.g., `pytest tests/providers/marine/test_nwps.py -q` not `pytest`. Find the matching test file for each changed source file. Same applies to dashboard vitest — run specific test files, not the entire suite.
+
+**Why (2026-07-14):** Full pytest suite runs for minutes and produces thousands of lines of output that flood agent context. Targeted tests verify the same thing in seconds.
 
 **Deploy scripts (use these, not manual commands):**
 - `scripts/deploy-api.sh` — API changes → weewx container (pull + restart + wait + verify)
@@ -146,7 +159,7 @@ Use the Nygard format. Template at `docs/decisions/_TEMPLATE.md`. Required: Stat
 
 The scripts handle user-switching (`sudo -u ubuntu` for git/build, `sudo` for systemctl). Never run manual `git pull`, `systemctl restart`, `chown`, or `chmod` on containers — see CLAUDE.md "Filesystem permissions on containers" and `rules/coding.md` §1 rule 12.
 
-**Why (2026-06-22):** An agent committed directly on the weewx container (production API host). The commit couldn't be pushed to GitHub because weewx has no GitHub credentials. The automated Nextcloud sync nearly destroyed it. Recovery required extracting the commit as a git bundle and replaying it locally. Commits on production bypass the local-review-then-deploy workflow and create orphaned state that's one sync cron away from data loss.
+**Why (2026-06-22, repeated 2026-07-13):** Agents committed directly on the weewx container TWICE. First incident: commit couldn't be pushed (no GitHub creds), Nextcloud sync nearly destroyed it, required git-bundle recovery. Second incident: 2 commits orphaned on weewx for coverage endpoint + OFS model, never made it to GitHub or local checkout, required manual patch extraction and replay. Both times the agent SSH'd in, edited files on the container, and committed there instead of editing on the local machine. The rule existed both times. Enforcement must be in every agent prompt — not just the rules file.
 
 **Pre-flight repo verification before EVERY agent dispatch.** Before spawning any agent that will modify a repo, the coordinator runs `git status` and `git log --oneline -1` on the target repo. If there are uncommitted changes, unexpected HEAD, or any other surprise — STOP and report to the user. Do not dispatch the agent. Additionally, every agent prompt must include this block:
 

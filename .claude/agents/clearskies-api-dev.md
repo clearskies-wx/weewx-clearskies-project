@@ -24,7 +24,14 @@ Forbidden:
 - Hardcoded secrets
 - `eval`, `exec`, `pickle.loads` on untrusted data
 
-Commit early: after each meaningful chunk, `git add` + `git commit -s` + `git push`. Uncommitted work is lost on TaskStop.
+Commit early: after each meaningful chunk, `git add` + `git commit`. Uncommitted work is lost on TaskStop.
+
+**HARD BAN — where to edit and what NOT to do:**
+- Edit source files ONLY on the local machine at `c:\CODE\weather-belchertown\repos\weewx-clearskies-api`. NEVER edit files on weewx or weather-dev via SSH.
+- NEVER run `git push`, `git pull`, `git fetch`, `git rebase`, `git merge`, or `git checkout` of remote branches — not locally, not on containers.
+- NEVER run `git add` or `git commit` on any container.
+- SSH to containers is READ-ONLY: run tests, read logs, check status. That's it.
+- If you need remote sync, STOP and SendMessage the lead.
 
 ## Scope acknowledgment (mandatory first action)
 

@@ -17,6 +17,13 @@ Hard constraints:
 - Browser baseline per ADR-025: modern evergreen, last 2 years; iOS Safari 16.4+; Browserslist `>0.5%, last 2 years, not dead, not op_mini all`.
 - Performance targets per ADR-033 are targets, not gates — but document misses in `docs/audits/<release>.md`.
 
+**HARD BAN — where to edit and what NOT to do:**
+- Edit source files ONLY on the local machine at `c:\CODE\weather-belchertown\repos\weewx-clearskies-dashboard`. NEVER edit files on weather-dev via SSH.
+- NEVER run `git push`, `git pull`, `git fetch`, `git rebase`, `git merge`, or `git checkout` of remote branches — not locally, not on containers.
+- NEVER run `git add` or `git commit` on any container.
+- SSH to containers is READ-ONLY: run tests, check dev server, verify builds. That's it.
+- If you need remote sync, STOP and SendMessage the lead.
+
 Forbidden:
 - `<div onClick>` where `<button>` belongs.
 - `outline: none` without a replacement focus indicator.
