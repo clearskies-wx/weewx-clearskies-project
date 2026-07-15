@@ -494,6 +494,7 @@ The service refuses to start with no config file and no `--init` flag. A missing
 | `api.conf` | API component configuration | No | 0640 |
 | `charts.conf` | Chart group, chart, and series definitions | No | 0640 |
 | `stack.conf` | Stack and config UI state | No | 0640 |
+| `marine-photos.json` | Local-only marine location photo metadata (`photo_url`, `photo_attribution` per location slug). Never sent to the API; not Caddy-served — read/written directly by the wizard and admin routers to pre-populate the photo preview and attribution field on re-render. | No | 0640 |
 | `secrets.env` | All secrets: DB passwords, API keys, proxy secret, admin credential hash | **Yes** | **0600** |
 | `branding.json` | Operator branding: accent colour, logos, theme, social links, analytics identifiers | No | 0644 |
 | `webcam.json` | Webcam config: enabled flag, image URL, video URL, refresh interval | No | 0644 |
@@ -1659,6 +1660,7 @@ Every runtime process runs under a dedicated system user with no login shell, no
 | `api.conf` | `clearskies:clearskies` | 0640 | API, Config UI | Config UI (wizard apply) | No secrets — secret-leak guard enforced at startup. |
 | `charts.conf` | `clearskies:clearskies` | 0640 | API | Config UI, migration tool | Chart definitions. |
 | `stack.conf` | `clearskies:clearskies` | 0640 | Config UI | Config UI | Wizard/UI state. |
+| `marine-photos.json` | `clearskies:clearskies` | 0640 | Config UI | Config UI | Local-only marine photo metadata (`photo_url`, `photo_attribution`). Never sent to the API; not Caddy-served. |
 | `secrets.env` | `clearskies:clearskies` | **0600** | API (`EnvironmentFile=`), Config UI | Config UI (wizard apply) | **Most restricted file.** DB passwords, API keys, proxy secret. Caddy never reads this. |
 | `branding.json` | `clearskies:clearskies` | 0644 | Caddy (serves to browser), API | Config UI (wizard apply) | World-readable — Caddy serves it directly. No secrets. |
 | `webcam.json` | `clearskies:clearskies` | 0644 | Caddy (serves to browser) | Config UI (wizard apply) | World-readable. No secrets. |
