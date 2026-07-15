@@ -1247,8 +1247,8 @@ The `_derive_weather_code()` function emits WMO Code Table 4677/4680 codes. Prio
 2. Thunderstorm (96)
 3. Fog (45)
 4. Mist (10) — new, ADR-069
-5. Smoke (06) — new, icon system expansion (forecast pipeline via provider mapping only; conditions engine detection deferred)
-6. Dust (07) — new, icon system expansion (forecast pipeline via provider mapping only; conditions engine detection deferred)
+5. Smoke (06) — new, icon system expansion
+6. Dust (07) — new, icon system expansion
 7. Haze (05) — new, ADR-067
 8. Sky condition
 
@@ -1257,8 +1257,8 @@ The `_derive_weather_code()` function emits WMO Code Table 4677/4680 codes. Prio
 | WMO code | Phenomenon | Status |
 |----------|-----------|--------|
 | 05 | Haze | Added — ADR-067 |
-| 06 | Smoke | New — icon system expansion. Forecast pipeline: provider mapping (Aeris `K`, NWS `smoke`, OWM 711). Conditions engine: `_derive_weather_code()` accepts `is_smoky` but detection not yet wired — deferred. |
-| 07 | Dust / blowing dust | New — icon system expansion. Forecast pipeline: provider mapping (Aeris `BD`, NWS `dust`, OWM 731/751/761). Conditions engine: `_derive_weather_code()` accepts `is_dusty` but detection not yet wired — deferred. |
+| 06 | Smoke | New — icon system expansion. Forecast: provider mapping. Conditions engine: provider weather text keyword scan ("smoke", "smoky"). |
+| 07 | Dust / blowing dust | New — icon system expansion. Forecast: provider mapping. Conditions engine: provider weather text keyword scan ("dust", "dusty", "sand", "sandy", "blowing dust"). |
 | 08 | Volcanic ash | New — icon system expansion |
 | 10 | Mist | Added — ADR-069 |
 | 45 | Fog | Existing |
@@ -1810,7 +1810,7 @@ Max cloud cover (0–100) across the day's hourly forecast points. Added to supp
 Populated by each provider:
 - **Open-Meteo:** `cloud_cover_max` from the daily variables endpoint
 - **Aeris:** `sky` field (0–100) from daily forecast periods
-- **NWS:** Not yet implemented — returns null. (Planned: derive from icon shortname `skc`→0, `few`→15, `sct`→35, `bkn`→70, `ovc`→95.)
+- **NWS:** Derived from icon shortname (`skc`→0, `few`→15, `sct`→35, `bkn`→70, `ovc`→95). Returns null when no sky-cover shortname is recognised.
 - **OWM:** `clouds` field (0–100) from daily periods
 
 ### Current-conditions input traceability
