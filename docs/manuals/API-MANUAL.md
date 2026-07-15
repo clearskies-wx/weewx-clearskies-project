@@ -39,6 +39,10 @@ Last updated: 2026-07-12
 
 ## §1 Purpose and Principles
 
+### THE API IS NOT A FILE SERVER
+
+THE API SERVES WEEWX DATA AND EXTERNAL PROVIDER DATA. NOTHING ELSE. It does not serve static files, resolve photo URLs, check filesystem paths for images, or perform any function that belongs to Caddy or the stack. Static assets (location photos, branding images, config JSON files) are served by Caddy from `/etc/weewx-clearskies/`. The API has zero involvement in static file serving — no filesystem existence checks, no URL construction, no file path resolution. If a proposed change involves the API reading a file to tell the dashboard where a static asset is, that change is wrong. Caddy serves static files. The dashboard constructs static asset URLs from known patterns. The API is not in the middle.
+
 ### What the API is
 
 The API (`weewx-clearskies-api`) is the weewx application layer — not merely a dashboard backend. It is the canonical programmatic interface to weewx station data. Any client (dashboard, Home Assistant, third-party scripts) that needs weather station data connects to the API. The API does not exist solely to serve the dashboard.
