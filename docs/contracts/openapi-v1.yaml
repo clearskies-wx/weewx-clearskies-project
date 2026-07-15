@@ -3600,7 +3600,7 @@ components:
         photoUrl:
           type: string
           nullable: true
-          description: "/marine-photos/{locationId}.webp when the operator has uploaded a location photo (T4.1-T4.3), else null."
+          description: "/marine-photos/{locationId}.{ext} (JPG, PNG, or WebP) when the operator has uploaded a location photo (T4.1-T4.3), else null."
       required: [locationId, name, coordinates, activities]
 
     MarineBundle:
