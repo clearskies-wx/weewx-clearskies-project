@@ -1350,8 +1350,9 @@ Grid notation `CxR` maps to the `Card` component's `footprint` (column span) and
 |---|---|---|---|---|
 | Marine landing | Location card | `wide` | — | Photo alongside wave/wind/temp data |
 | Surf | Surf Score Card (hero) | `wide` | `2` | 2x2 hero: prominent numeric score + scoring breakdown bars |
-| Surf | Swell Card | `wide` | — | 2x1: wave height at break, period, direction, model-processed swell components, compass |
-| Surf | Wind Card | `wide` | — | 2x1: wind speed, direction, quality label, gust (from MarineObservation) |
+| Surf | Swell Card | `wide` | `2` | 2×tall: wave height at break, period, direction, model-processed swell components, compass |
+| Surf | Wind Card | `wide` | `"half"` | 2×half compact strip: wind speed, direction, quality label, gust (from MarineObservation) |
+| Surf | Current Conditions Card | `wide` | `"half"` | 2×half compact strip: weather icon + air temp (station/forecast provider), water temp (marine observation), UV index (station) |
 | Surf | 72-Hour Forecast Card | `full` | — | Day-grouped forecast columns with score, waves, wind, tide |
 | Fishing | Fishing Score Card (hero) | `wide` | `2` | 2x2 hero: prominent fishing score + scoring breakdown bars |
 | Fishing | Current Conditions Card | `wide` | `2` | 2x2: pressure + trend, wind speed/gust/direction, water temp, air temp, tide state |
