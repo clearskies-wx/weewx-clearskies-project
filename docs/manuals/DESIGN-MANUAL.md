@@ -107,6 +107,18 @@ Six curated accents, AA-verified in both themes. No free-form picker. Operator s
 | `--gauge-unfill` | `rgba(0,0,0,0.22)` | — | Gauge unfilled arc |
 | `--gauge-indicator` | `#1e40af` | — | Gauge needle/indicator |
 
+### Score Tier Colors
+
+Used by: surf score stars (filled color), scoring breakdown bars (fill color), quality label text, forecast column score numbers. Reusable for fishing score.
+
+| Token | Light | Dark | Usage |
+|---|---|---|---|
+| `--score-1` | `#ea580c` (orange-600) | `#fb923c` (orange-400) | Poor (score 0–1) |
+| `--score-2` | `#d97706` (amber-600) | `#fbbf24` (amber-400) | Fair (score 1–2) |
+| `--score-3` | `#65a30d` (lime-600) | `#a3e635` (lime-400) | Good (score 2–3) |
+| `--score-4` | `#15803d` (green-700) | `#4ade80` (green-400) | Very Good (score 3–4) |
+| `--score-5` | `#7c3aed` (violet-600) | `#a78bfa` (violet-400) | Epic (score 4–5) |
+
 ### Semantic Color Assignments
 
 These assignments are locked across themes:
@@ -1304,7 +1316,7 @@ The `SwellDirectionCompass` component follows the `WindCompassCard` tick-ring vi
 - 72 ticks every 5° (outer radius 175, tick length 24px)
 - Ticks within ±8° of swell direction are "lit" with `--chart-2` color (not `--primary` — distinct from wind)
 - Cardinal labels (N/S/E/W) at same positions as wind compass
-- Center overlay: swell direction degrees + cardinal text, dominant height + period
+- Center overlay: swell direction degrees (`--text-stat-tile`, `--font-display`, 600 weight) + cardinal text (`--text-label`, `--font-sans`, 600 weight). No height or period in the center — those appear in the swell component table.
 - Rendered at ~160×160px within Card content (smaller than the full wind compass)
 
 ### Solunar display
@@ -1318,14 +1330,15 @@ Fishing tab solunar display follows the `SunMoonDetailCard` arc + `MoonPhaseIcon
 
 ### Scoring factor breakdown
 
-Surf and fishing tabs display scoring factor breakdowns as horizontal bar segments:
+Surf and fishing tabs display scoring factor breakdowns as horizontal bar segments showing **weighted contributions** (raw score × weight), not raw scores:
 
-- Each factor: label + score + colored fill proportional to score
-- Bar fill uses gauge color tokens (`--gauge-fill` for filled portion, `--gauge-unfill` for empty)
-- Green for high scores (>60), amber for moderate (30-60), muted for low (<30)
+- Each factor bar: label + weighted score + colored fill proportional to weighted score
+- Bar fill uses score tier tokens (`--score-1` through `--score-5`): 0–20 orange, 20–40 amber, 40–60 lime, 60–80 green, 80–100 purple
 - Weighted factors shown as "Label (N%)" (e.g., "Wave Height (35%)")
-- Penalty factors (no weight) shown as "Label (penalty)" (e.g., "Beach Alignment (penalty)")
-- Tap/click for explanation text (fishing tab)
+- Beach alignment shown as "Beach Alignment (penalty)" with negative value (e.g., "−29") — orange bar fill
+- Total score (XX/100) displayed right-justified next to the star rating at the top of the card
+- Star rating: 5 star SVG icons, filled stars use the score tier color, unfilled stars use `--muted-foreground` at 25% opacity
+- Quality label text below stars in the matching tier color
 
 ### Scoring explainer modal (surf tab)
 
@@ -1349,8 +1362,8 @@ Grid notation `CxR` maps to the `Card` component's `footprint` (column span) and
 | Page | Card | `footprint` | `rowSpan` | Description |
 |---|---|---|---|---|
 | Marine landing | Location card | `wide` | — | Photo alongside wave/wind/temp data |
-| Surf | Surf Score Card (hero) | `wide` | `2` | 2x2 hero: prominent numeric score + scoring breakdown bars |
-| Surf | Swell Card | `wide` | `2` | 2×tall: wave height at break, period, direction, model-processed swell components, compass |
+| Surf | Surf Score Card (hero) | `wide` | `2` | 2x2 hero: 5-star rating + XX/100 total + quality label + conditions text + weighted scoring breakdown bars (including beach alignment penalty) |
+| Surf | Swell Card | `wide` | `2` | 2×2: Conditions at Break stat tiles (icon-left layout: Waves/Timer/Compass icons), swell component table (Type/Dir/Height/Period columns), Dominant Direction compass (1/3 right column) |
 | Surf | Wind Card | `wide` | `"half"` | 2×half compact strip: wind speed, direction, quality label, gust (from MarineObservation) |
 | Surf | Current Conditions Card | `wide` | `"half"` | 2×half compact strip: weather icon + air temp (station/forecast provider), water temp (marine observation), UV index (station) |
 | Surf | 72-Hour Forecast Card | `full` | — | Day-grouped forecast columns with score, waves, wind, tide |
@@ -1377,3 +1390,23 @@ Grid notation `CxR` maps to the `Card` component's `footprint` (column span) and
 - Beach Safety weather summary uses `WeatherIcon` (shared) + `MarineStatTile` (shared) for weather icon and air temp display at the top of the Beach Conditions card — data sourced from `useMarineDetail` (MarineObservation), not the Now page component (which reads station-specific data via `useRealtimeObservation`).
 - Solunar display = same `MoonPhaseIcon`/`MoonPhaseG` from `components/moon-phase-icon.tsx` (imported, not copied). Arc geometry is currently duplicated between FishingTab and SunMoonDetailCard — extraction to a shared module is a tracked maintainability item.
 - No duplicate implementations — grep for the component name; only one definition should exist.
+
+### Tide chart
+
+The `TideChart` component (`src/components/marine/tabs/shared/TideChart.tsx`) renders a 72-hour tide prediction curve shared by all four activity tabs.
+
+**Chart features:**
+
+- Area curve of 6-minute CO-OPS predictions (monotone interpolation, `--chart-2` fill at 25% opacity)
+- Extrema dots at every high/low with labels: "High X.XX ft" above peaks, "Low X.XX ft" below troughs
+- "Now" reference line (dashed, `--foreground`)
+- Midnight boundary reference lines (dashed, `--border`) with date labels (`position: 'bottom'`, offset below X-axis)
+- Optional observed water level line (`--chart-3`) when CO-OPS gauge data available
+
+**Tide table (below chart):**
+
+- Date-column layout: one column per day, aligned with chart date periods
+- Three rows: High, Low, Moon
+- High/Low cells show height + time for each extremum that day (multiple entries stack)
+- Moon row: `MoonPhaseIcon` (size 18) + phase name in parentheses (e.g., "(Waning Crescent)")
+- Styled per DESIGN-MANUAL §11 Data Tables

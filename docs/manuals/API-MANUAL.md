@@ -2004,6 +2004,23 @@ Surf quality forecast for one spot at one timestep.
 | `windQuality` | str | — | No | (locale) "glassy", "offshore", "cross_offshore", "cross", "cross_onshore", "onshore" |
 | `swellDominance` | float | — | No | Ratio of primary swell energy to total energy (0.0–1.0) |
 | `multiSwell` | list[SpectralWaveComponent] | — | Yes | Individual swell systems (when spectral data available) |
+| `scoring` | SurfScoringBreakdown | — | Yes | Per-factor scoring breakdown (see below) |
+
+#### SurfScoringBreakdown
+
+Per-factor scoring detail returned inside each `SurfForecast` entry.
+
+| Field | Type | Description |
+|---|---|---|
+| `waveHeight` | float | Wave height factor score (0–100) |
+| `wavePeriod` | float | Wave period factor score (0–100) |
+| `windQuality` | float | Wind quality factor score (0–100, clamped from raw ≤120) |
+| `swellDominance` | float | Swell dominance factor score (0–100) |
+| `beachAlignment` | float | Beach alignment multiplier × 100 (100 = direct hit, 30 = 70% penalty) |
+| `waveHeightWeight` | int | 35 |
+| `wavePeriodWeight` | int | 35 |
+| `windQualityWeight` | int | 20 |
+| `swellDominanceWeight` | int | 10 |
 
 #### FishingForecast
 
