@@ -1958,7 +1958,7 @@ Observed water level from CO-OPS gauges.
 
 #### MarineForecastPoint
 
-Single timestep from WaveWatch III wave forecast.
+Single timestep from WaveWatch III wave forecast, optionally enriched with OFS water temperature.
 
 | Field | Type | Unit group | Nullable | Description |
 |---|---|---|---|---|
@@ -1974,6 +1974,7 @@ Single timestep from WaveWatch III wave forecast.
 | `windWaveHeight` | float | `group_wave_height` | Yes | Wind wave height |
 | `windWavePeriod` | float | `group_wave_period` | Yes | Wind wave period |
 | `windWaveDirection` | float | — | Yes | Wind wave direction (degrees true north) |
+| `waterTemp` | float | `group_temperature` | Yes | Sea surface water temperature from OFS model forecast time series. Populated by `ocean_data_resolver.resolve_forecast()` → `ofs.fetch_forecast()`. Null when OFS is not configured for the location, the location is on land, or all OFS cycles are unavailable. Source: `ofs.py` `fetch_forecast()`, PROVIDER-MANUAL §14.10. |
 
 #### MarineTextForecast
 
