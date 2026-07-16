@@ -1056,7 +1056,7 @@ Map and LocationCards are direct children of the `PageLayout` Grid — no intern
 - Numbered `L.divIcon` pins — each location gets a 1-based index number
 - Pin style: 24×24px circle, `background: var(--primary)` (operator accent color), white centered number text (12px, weight 600)
 - Alert locations: amber circle (`background: #f59e0b`) with number
-- OpenSeaMap tile overlay (`tiles.openseamap.org/seamark/{z}/{x}/{y}.png`, opacity 0.7) renders marine features (buoys, channels, harbors, depth contours)
+- CARTO `light_only_labels` tile overlay (`basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png`) renders geographic labels (water body names, city names) as a transparent overlay above the basemap
 - Linked hover: pin `mouseover` → highlights corresponding LocationCard (`ring-2 ring-primary`), pin scale 1.3× when its card is hovered
 - Map height adapts to site geography via aspect ratio computation:
   - Compute bounding box from location coordinates, adjust longitude span by `cos(centerLat)`
@@ -1064,9 +1064,9 @@ Map and LocationCards are direct children of the `PageLayout` Grid — no intern
   - `aspect < 0.8` (vertical spread): at lg, map as `footprint="panel"` (3 columns) with cards stacked in 1 column; height 600px. Below lg: stacked (map on top)
 - `LocationMap` accepts `height: number` prop — no hardcoded CSS class for height
 
-**LocationCards (each `footprint="tile"`):**
-- Uses `Card` component from `components/ui/card.tsx` with `footprint="tile"` — placed as direct Grid children
-- At lg (1024px+): 4 cards per row; md (768px+): 2 per row; mobile: 1 per row (stacked)
+**LocationCards (each `footprint="wide"`):**
+- Uses `Card` component from `components/ui/card.tsx` with `footprint="wide"` — placed as direct Grid children
+- At lg (1024px+): 2 cards per row (`wide` = `col-span-2`); md (768px+): 1 per row (wide spans full 2-col grid); mobile: 1 per row (stacked)
 - Click-to-select button inside the Card (not the Card itself)
 - Each card contains:
   - **Number badge**: small circle (20×20px), `bg-primary text-primary-foreground`, showing same number as the map pin. Top-left area near location name.
@@ -1088,7 +1088,7 @@ Map and LocationCards are direct children of the `PageLayout` Grid — no intern
 **Combo card (`Card footprint="full"`):**
 - Replaces the 120px hero map strip
 - Interior layout: `flex-row` at md+, `flex-col` on mobile
-- Left ~60%: `LocationMap variant="hero"`, height 220px, zoomed to single location at zoom 14-15 (coastal features visible — pier, harbor, breakwater). Only the selected marker rendered. OpenSeaMap overlay active. No fly-to animation on initial render.
+- Left ~60%: `LocationMap variant="hero"`, height 220px, zoomed to single location at zoom 14-15 (coastal features visible — pier, harbor, breakwater). Only the selected marker rendered. CARTO light_only_labels overlay active. Back-to-map button overlaid inside the map container (top-left, card-glass background, z-1000). No fly-to animation on initial render.
 - Right ~40%: `<img src={selectedLocation.photoUrl}>` with `object-fit: cover`, clipped to card's right border-radius. `alt` = location name.
 - No photo: map takes full width, height 220px
 - Mobile: map full width 180px, photo below or hidden
@@ -1116,19 +1116,22 @@ Unified conditions dashboard pattern (Windfinder/My Marine Forecast reference). 
 
 **Panel order (top to bottom):**
 
-1. **Alerts** — `AlertsPanel` (shared, unchanged)
+1. **Alerts** — `AlertsPanel` (with per-activity filterTypes: `marineZone` + `coastalFlood`)
 2. **Current Conditions** — `Card footprint="full"`:
-   - `<dl>` grid of `MarineStatTile` components: wind speed + gust + direction, air temp, water temp, pressure + trend indicator (`PressureTrend` component), water level offset (from tide compositor), storm surge badge (when `stormSurgeLevel` non-null)
+   - Weather icon (`WeatherIcon` from `observation?.weatherCode`) when available
+   - `<dl>` grid of `MarineStatTile` components: air temp, water temp, pressure + trend indicator (`PressureTrend` component), visibility, dewpoint, water level offset (from tide compositor), storm surge badge (when `stormSurgeLevel` non-null)
    - When ALL fields null: "Conditions unavailable" message
-3. **Waves** — `Card footprint="full"`:
+3. **Wind Card** — `Card footprint="wide"`:
+   - Wind speed, gust, direction (cardinal) as MarineStatTile components — extracted from Current Conditions into a dedicated card
+5. **Waves** — `Card footprint="full"`:
    - Wave stats (height, period, direction) as `MarineStatTile` tiles at top
    - 72h wave forecast chart below (`WaveForecastChart` with legend)
    - Wave data from NWPS/model sources (not buoy)
    - Self-hides for harbor locations where wave data is null
-4. **Tide Forecast** — `Card footprint="full"`:
+6. **Tide Forecast** — `Card footprint="full"`:
    - `TideChart` (left margin ≥40px to prevent clipping, XAxis domain starts at first data point)
    - Total water level overlay when compositor data available
-5. **Marine Forecast** — `Card footprint="full"`:
+7. **Marine Forecast** — `Card footprint="full"`:
    - Structured columns following `DailyColumns` pattern (from `ForecastDailyCard`)
    - Each period column: period name, wind (speed + direction icon), seas (wave height text), visibility, weather text
    - `HorizontalScrollNav` for horizontal scrolling
@@ -1136,39 +1139,32 @@ Unified conditions dashboard pattern (Windfinder/My Marine Forecast reference). 
 
 **Removed from BoatingTab:** "Nearest Offshore Buoy" panel (F21b), "Weather at {location}" panel (duplicate of conditions), standalone wind forecast chart (wind consolidated into Conditions).
 
-### Tab content — Surfing (F22 redesign)
+### Tab content — Surfing (F22 redesign, updated Phase 5 T5.1/T5.2)
 
-Surfaces the surf scoring system (`enrichment/surf_scorer.py`). Hero conditions summary pattern.
+Surfaces the surf scoring system (`enrichment/surf_scorer.py`). Three focused cards replace the prior monolithic hero.
+
+**Data sources:** `useSurfDetail(locationId)` (GET /surf/{id}) for scoring/wave/swell data, `useMarineDetail(locationId)` (GET /marine/{id}) for live wind speed/gust/direction and per-period wind time-matching.
 
 **Panel order:**
 
-1. **Alerts** — `AlertsPanel`
-2. **Current Conditions Hero** — `Card footprint="full"`:
-   - `conditionsText` from `SurfForecast` as headline (large text, full width) — the composed natural-language summary (e.g., "3-4 ft at 12 seconds from the SSW. Offshore winds 5-10 mph. Clean conditions.")
-   - Star rating badge + `qualityLabel` ("Poor" / "Fair" / "Good" / "Very Good" / "Epic") with `qualityColorClasses`
-   - Stat grid: wave height at break (`waveHeightAtBreak`), period, direction compass, `windQuality` badge ("Offshore"/"Glassy"/"Cross-shore"/"Onshore" with color), water temp
-   - Rip current risk as status badge (from `zoneForecast.ripCurrentRisk`)
-3. **Scoring Breakdown** — `Card footprint="full"`:
-   - 4 horizontal bars showing weighted factors: Wave Height (35%), Wave Period (35%), Wind Quality (20%), Swell Dominance (10%)
-   - Each bar: label, score, colored fill proportional to score using gauge color tokens (`--gauge-fill`, `--gauge-unfill`)
-   - Beach alignment and directional exposure shown as multipliers
-4. **72-Hour Surf Forecast Timeline** — `Card footprint="full"`:
-   - `HorizontalScrollNav` with star-rated time slots (`ForecastTimeline` with multi-point data from `GET /surf/{id}`)
-   - Wave face height chart below the timeline
-   - Each slot: time, star rating, quality color
-5. **Swell Components** — `Card footprint="full"`:
-   - Each swell component as a row, ranked by energy (primary → secondary → wind swell)
-   - Primary swell visually larger (more padding, larger text)
-   - Per component: classification badge ("Groundswell"/"Swell"/"Wind Swell" with color), direction arrow (8px rotated icon), height, period with quality tier ("14s — Great"; tiers: 8s=normal, 11s=good, 14+=great), energy value
-6. **Swell Direction Compass** — `SwellDirectionCompass` component:
-   - SVG `viewBox="0 0 420 420"` matching `WindCompassCard` visual pattern
-   - 72 ticks every 5° (outer radius 175, tick length 24px)
-   - Ticks within ±8° of swell direction lit with `--chart-2` color
-   - Cardinal labels (N/S/E/W), center overlay: direction degrees + cardinal text, dominant height + period
-   - Render at ~160×160px within Card content
-7. **Tide Forecast** — `Card footprint="full"` with `TideChart`
+1. **Alerts** — `AlertsPanel` (with per-activity filterTypes)
+2. **Surf Score Card** — `Card footprint="wide"`:
+   - `conditionsText` as subtitle
+   - Prominent NUMERIC score (qualityStars as digit, e.g., "4") + `qualityLabel` ("Poor"/"Fair"/"Good"/"Very Good"/"Epic") with color-coded badge. No star glyphs — `StarRating` component deleted entirely.
+   - Scoring breakdown bars below the score (absorbed from the former separate card): 4 weighted factors — Wave Height (35%), Wave Period (35%), Wind Quality (20%), Swell Dominance (10%). Each bar: label, score, colored fill proportional to score.
+3. **Swell Card** — `Card footprint="wide"`:
+   - Wave height at break, period, direction as MarineStatTile stats
+   - Swell component breakdown: prefers `SurfForecast.multiSwell` (NWPS/WW3 model-processed) over raw `spectralComponents` (NDBC spectral). Falls back to spectral when multiSwell is null.
+   - Swell direction compass folded in as one element (WindCompassCard tick-ring pattern, --chart-2 color, reduced footprint ~112-128px)
+4. **Wind Card** — `Card footprint="wide"`:
+   - Wind speed, gust, direction (from MarineObservation via useMarineDetail), wind quality label (from SurfForecast)
+5. **72-Hour Surf Forecast** — `Card footprint="full"`:
+   - Day-grouped HorizontalScrollNav columns (one per station-local day with day-header label)
+   - Per-period column: time, numeric score + qualityLabel, wave height, swell period, swell direction (cardinal), wind quality, wind speed + direction (time-matched from marine forecast), nearest tide event
+   - Wave face height area chart below the forecast columns
+6. **Tide Forecast** — `Card footprint="full"` with `TideChart`
 
-**Removed:** Standalone "Conditions" card (consolidated into hero), standalone rip current alert banner (rip current becomes condition badge).
+**Removed (Phase 5):** Star rating glyphs (StarRating component deleted), standalone "Swell Components" card, standalone "Swell Direction Compass" card, rip current risk badge (lives on Beach Safety tab).
 
 ### Tab content — Fishing (F23 redesign)
 
@@ -1177,14 +1173,12 @@ Surfaces the fishing scoring system (`enrichment/fishing_scorer.py`). Hero condi
 **Panel order:**
 
 1. **Alerts** — `AlertsPanel`
-2. **Current Conditions Hero** — `Card footprint="full"`:
-   - `conditionsText` from `FishingForecast` as headline (e.g., "Good fishing. Falling pressure and incoming tide favor activity.")
-   - Overall score (0-100) as prominent numeric display
-   - Stat grid: pressure + trend, tide state, wind speed, water temp
-3. **Scoring Breakdown** — `Card footprint="full"`:
-   - 4 horizontal bars: Pressure (37.5%), Tide (31.25%), Solunar (18.75%), Time (12.5%)
-   - Each bar: label, score (0-100), colored fill (green >60, amber 30-60, muted <30)
-   - Click/tap each bar for explanation text
+2. **Fishing Score Card** — `Card footprint="wide"`:
+   - `conditionsText` as subtitle
+   - Overall score (0-100) as prominent numeric display + qualitative label (Excellent/Good/Fair/Poor)
+   - Scoring breakdown bars below the score (absorbed from the former separate card): 4 weighted factors — Pressure (37.5%), Tide (31.25%), Solunar (18.75%), Time (12.5%). Each bar: label, score (0-100), colored fill (green >60, amber 30-60, muted <30). Click/tap each bar for explanation text.
+3. **Current Conditions Card** — `Card footprint="wide"`:
+   - All stats from MarineObservation via `useMarineDetail`: barometric pressure + trend (PressureTrend component), wind speed, wind gust, wind direction (cardinal), water temperature, air temperature, tide state (rising/falling)
 4. **Forecast Periods** — `Card footprint="full"`:
    - Structured columns following `DailyColumns` pattern
    - Each period: time window, overall score, color-coded
@@ -1208,8 +1202,9 @@ Itemized hazard indicators (Beach Report flag pattern). No overall "safe/caution
 
 **Panel order:**
 
-1. **Alerts** — `AlertsPanel`
+1. **Alerts** — `AlertsPanel` (with per-activity filterTypes)
 2. **Beach Conditions** — `Card footprint="full"`:
+   - Weather summary at top (when `observation?.weatherCode` non-null from `useMarineDetail`): `WeatherIcon` + air temperature MarineStatTile
    - Itemized hazard indicators, each as its own status row:
      - **Rip Current Risk**: badge (low=green, moderate=amber, high=red) + text label + guidance text
      - **UV Index**: numeric value + EPA tier label (Low/Moderate/High/Very High/Extreme) + SPF recommendation + guidance

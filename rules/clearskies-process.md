@@ -47,7 +47,11 @@ Incident history and rationale at [reference/process-rule-history.md](../referen
 
 **Wizard ↔ API apply contract sync.** When a wizard step sends a new field in the `/setup/apply` payload, the API's `ApplyRequest` Pydantic model (and its nested models like `ProviderApplyConfig`) MUST accept that field — otherwise the API rejects it with 422 "Extra inputs are not permitted" because the models use `extra="forbid"`. Every wizard change that adds, renames, or removes a field in the apply payload requires a corresponding update to the API's apply endpoint Pydantic models AND the config-writing logic in the apply handler. Verify by running the wizard apply flow end-to-end after every such change.
 
+**Conversely, fields that the API resolves internally during apply must NOT be sent by the wizard or admin.** The apply payload should contain only operator-provided or operator-confirmed data. If the API internally derives a value during apply processing (e.g., resolving `nwps_wfo` via NWS `/points` from the location's coordinates), the wizard/admin must not include that field in the payload — doing so causes the entire payload to be rejected because `extra="forbid"` treats the extra field as an unknown input.
+
 **Why (2026-07-11):** The marine alert radius field (`marine_alert_radius_miles`) was added to the wizard's apply payload (T6.1) but never added to `ProviderApplyConfig` in the API's setup endpoint. The wizard worked, the API compiled, tests passed — but every real wizard apply attempt returned 422. This class of bug is invisible to unit tests because the Pydantic model validation only fires on the actual HTTP request path.
+
+**Why (2026-07-15, `nwps_wfo` incident):** `build_marine_payload` in `config_writer.py` sent `nwps_wfo` in each location entry. But `MarineLocationApplyConfig` does NOT have a `nwps_wfo` field — the API resolves it internally during apply via NWS `/points`. Because the model uses `extra="forbid"`, the entire apply payload was rejected with 422. **No marine data saved at all** — buoy IDs, COOPS stations, zone IDs, surf config, fishing config, everything was lost. The fix was to remove `nwps_wfo` from the wizard payload, not to add it to the API model.
 
 **Help content sync.** When a wizard step's behavior, fields, or options change, the step-level help content (`help.wizard.{step_id}.*` translation keys) and affected field-level help text (`ConfigField.help_text` / `wizard_help`) must be updated in the same commit. Same applies to admin sections: when an admin section's behavior changes, `help.admin.{section_id}.*` keys must be updated.
 
@@ -231,6 +235,10 @@ When a teammate's self-reported numbers are proven wrong by the lead's independe
 **Real findings only.** Every finding cites a specific ADR/rule/RFC and identifies: (a) a specific failure mode, (b) a missed constraint, or (c) forced downstream rework. Generic tradeoffs are not findings. Empty audits are fine.
 
 **Lead synthesizes auditor findings.** Per finding: accept (with specific remediation + reasoning), push back (with reasoning), or defer (with condition). Don't forward raw findings to dev unedited.
+
+**Remediation covers ALL affected documents, not just the ones the auditor named.** When accepting a finding, grep all governing documents (plan, manuals, ARCHITECTURE.md, mockups) for the same error before committing the fix. A finding that says "DESIGN-MANUAL count is wrong" almost certainly means the plan, the mockup, and the verification section have the same wrong number. Fix them all in one commit.
+
+**Why (2026-07-14):** QC Gate 1 flagged "icon count 31→32" (11+21=32, not 11+20=31). The remediation fixed the DESIGN-MANUAL and mockup but left the plan document with "20 new" and "31 total" in 9 places. The next session's agent caught the discrepancy at dispatch time — wasting a scope-acknowledgment round-trip to confirm the correct count.
 
 **Phase-boundary ADR compliance sweep (mandatory).** Before declaring any phase complete, run the audit in the *other* direction: for each Accepted ADR, verify that every v0.1 implementation requirement has corresponding code, config, or documentation in the repos. The per-round auditor checks the code that *was* written; this sweep catches code that *should have been* written but wasn't. Walk the full ADR index — not just the ADRs the current phase touched. Surface every gap to the user before closing the phase.
 

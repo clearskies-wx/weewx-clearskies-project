@@ -10,7 +10,7 @@ Companion documents:
 - **PROVIDER-MANUAL.md** — provider module rules
 - **contracts/canonical-data-model.md** — per-field data catalog (the field inventory)
 
-Last updated: 2026-07-12
+Last updated: 2026-07-15
 
 ---
 
@@ -2370,8 +2370,22 @@ All physics constants (γ bounds, Kt values, topographic multipliers) defined as
 
 **File:** `enrichment/surf_scorer.py`
 **Registration:** Against the surf endpoint — runs after wave_transform.
-**Inputs:** Corrected wave data (from wave_transform or raw WaveWatch III), spectral components (from NDBC), spot config (beach facing, directional exposure), wind data.
+**Inputs:** Corrected wave data (from wave_transform or raw WaveWatch III), spectral components (from NDBC), spot config (beach facing, directional exposure), wind data (local — see wind source below).
 **Outputs:** `SurfForecast` with quality_stars (1–5), quality_label, conditions_text.
+
+**Wind source for surf quality scoring (HARD RULE):**
+
+Wind input for the surf scorer MUST come from local/coastal sources — the wind AT THE BEACH determines wave face quality, not offshore wind. Precedence:
+
+1. **Station hardware** (operator's anemometer) — best source when the station is coastal/near the spot.
+2. **Forecast provider** (NWS/Aeris point forecast for the spot's coordinates) — captures mesoscale coastal wind patterns including sea breeze onset.
+3. **NDBC buoy wind — NEVER used for surf quality scoring.** Offshore buoys (typically 12+ miles out) measure the synoptic wind field, which can be completely different from beach conditions. Coastal wind is dominated by thermal effects (sea/land breezes, topographic channeling, temperature gradients) that buoys cannot see.
+
+This is the same wind precedence used by the marine endpoint (`endpoints/marine.py` — station hardware → `marine_weather_cache` forecast provider fallback). The surf endpoint must adopt the same pattern.
+
+**Why NDBC buoy wind is wrong for surf quality:** Surfline invested in beach-level wind stations worldwide specifically because offshore buoys miss local effects: "Small-scale phenomena such as thermal sea breezes, air interacting with topography, or localized temperature differences near the coast can have a significant impact on surf quality" (Surfline support documentation). Beach wind and offshore wind can be completely different — SoCal morning glass-off conditions at the beach while the buoy 12 miles out reports a steady westerly is the textbook case.
+
+**NDBC buoy wind's valid role:** Spectral swell decomposition ONLY. Offshore wind reflects the synoptic-scale wind field that drives fetch and generates swells — this context is already captured by the spectral decomposition data. NDBC wind data must not be used for surf wind quality classification.
 
 **Four-component weighted scoring:**
 
@@ -2379,7 +2393,7 @@ All physics constants (γ bounds, Kt values, topographic multipliers) defined as
 |---|---|---|
 | Wave height | 0.35 | Larger = better within rideable range for the spot. Scaled linearly against the spot's configured ideal range. |
 | Wave period | 0.35 | Longer = better (cleaner, more powerful waves). Ground swell (≥12s) scores highest. |
-| Wind quality | 0.20 | Offshore (land to sea) = best (holds wave face up); onshore = worst. Classification: offshore → cross_offshore → cross → cross_onshore → onshore, based on angle between wind direction and beach-facing direction. |
+| Wind quality | 0.20 | Offshore (land to sea) = best (holds wave face up); onshore = worst. Classification: offshore → cross_offshore → cross → cross_onshore → onshore, based on angle between wind direction and beach-facing direction. Wind data sourced per the wind precedence above (station → forecast provider — NOT NDBC buoy). |
 | Swell dominance | 0.10 | Ratio of primary swell energy to total energy. Higher = cleaner conditions; low ratio indicates confused multi-swell or wind chop. |
 
 Additional modifiers (applied after weighted sum, not weighted components):
@@ -2392,7 +2406,7 @@ Quality labels: 1 = "Poor", 2 = "Fair", 3 = "Good", 4 = "Very Good", 5 = "Epic".
 
 **File:** `enrichment/fishing_scorer.py`
 **Registration:** Against the fishing endpoint.
-**Inputs:** Pressure trend (from weewx archive or NDBC buoy), tide state (from CO-OPS), water temperature (from NDBC/CO-OPS), solunar intensity (from solunar processor), current time.
+**Inputs:** Pressure trend (from weewx archive or NDBC buoy), tide state (from CO-OPS), water temperature (from ocean data resolver — same tiered fallback as marine/surf endpoints; NDBC/CO-OPS as last-resort fallback only), solunar intensity (from solunar processor), current time.
 **Outputs:** `FishingForecast` with overall_score (0–100) and per-component sub-scores.
 
 **Four-component weighted scoring (general conditions):**
@@ -2587,6 +2601,31 @@ When no marine locations are configured (no `[marine]` section in `api.conf`), n
 **Unit conversion:** Apply `_convert_observation()` to the enriched observation (same as current behavior, but now with non-null fields).
 
 **Existing fields preserved:** `dominantPeriod`, `averagePeriod`, `spectralComponents` from the NDBC buoy remain in the response when available.
+
+### NWPS GRIB2 temporal awareness requirement
+
+NWPS GRIB2 files contain **144 hourly forecast timesteps** (hours 0 through 144). The GRIB reader (`providers/marine/grib_processor.py`) MUST select messages by forecast hour using the `endStep` key — it must NOT iterate all messages and let the last one win.
+
+**The `endStep` key** is an integer representing the forecast hour. It is available in both GRIB backends:
+- eccodes: `eccodes.codes_get(msgid, "endStep")` → integer
+- pygrib: `grb.endStep` → integer
+
+For instantaneous fields (wave height, period, direction), `endStep` equals the forecast hour directly.
+
+**Temporal selection rules:**
+- **Current conditions:** Pass `target_step=0` to `read_grib_fields()` to select the analysis/hour-0 timestep. This represents current conditions, not a future forecast.
+- **Unfiltered (default):** When `target_step` is `None`, the reader iterates all messages and the last matching field wins (legacy behavior). This is NOT the correct behavior for current conditions — always pass `target_step=0` for that use case.
+- **Forecast arrays (future, FIX-18):** A future change will modify the `target_step=None` path to return all timesteps indexed by `end_step`, enabling forecast arrays and the animated map. This is deferred — do not implement multi-timestep indexing until FIX-18.
+
+**Previous bug (fixed):** Both `_read_eccodes()` and `_read_pygrib()` iterated all GRIB messages and overwrote `result.fields[short_name]` for each matching field name. Since GRIB2 messages are typically ordered chronologically, the last overwrite was hour 144 (six days in the future). The "current conditions" wave height, period, and direction were showing the 6-day-out prediction instead of what was happening at the time. This was a data correctness bug, not a design choice.
+
+### Surf endpoint data source rules
+
+**Water temperature:** The surf endpoint (`GET /api/v1/surf/{locationId}`) MUST source water temperature from the ocean data resolver (`services/ocean_data_resolver.py`), which provides modeled/observed water temp via a tiered fallback chain: on-premises sensor → OFS regional model → regional ERDDAP → RTOFS/MUR SST global. This is the same source the marine endpoint uses for `observation.waterTemp`.
+
+The NWS SRF text product's `waterTemp` field (a manually-entered forecaster value parsed from the SRF text, not modeled or observed data) may serve as a last-resort fallback only — not as the primary source. The SRF water temp is a stale, hand-typed value that does not update with ocean conditions.
+
+**Wind:** The surf endpoint uses the same wind precedence as the marine endpoint: station hardware → forecast provider. NOT NDBC buoy wind. See §17 "Wind source for surf quality scoring" for the full rationale and rules.
 
 ### Multi-point surf forecast contract
 

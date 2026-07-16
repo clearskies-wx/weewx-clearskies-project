@@ -1325,3 +1325,42 @@ Surf and fishing tabs display scoring factor breakdowns as horizontal bar segmen
 - Green for high scores (>60), amber for moderate (30-60), muted for low (<30)
 - Factor weights shown as percentages (e.g., "Wave Height 35%")
 - Tap/click for explanation text (fishing tab)
+
+### Marine card sizing and layout
+
+Activity detail pages reuse Now page and Forecast page card patterns — same anatomy, tokens, stat tiles. All cards use the standard `Card` / `CardHeader` / `CardTitle` / `CardContent` components.
+
+**Card footprint specifications by page:**
+
+Grid notation `CxR` maps to the `Card` component's `footprint` (column span) prop: `1` = `tile`, `2` = `wide`, `4` = `full`. Note: marine activity tab content renders inside a flex container (`ActivityTabs`/`ActivityAccordion`), not the page-level Grid — `rowSpan` has no effect in this context (it's a CSS Grid property). All marine tab cards use `footprint` only. See §5 "Card Footprint Vocabulary" for the full prop definitions.
+
+| Page | Card | `footprint` | Description |
+|---|---|---|---|
+| Marine landing | Location card | `wide` | Photo alongside wave/wind/temp data |
+| Surf | Surf Score Card | `wide` | Numeric score + scoring breakdown bars merged in |
+| Surf | Swell Card | `wide` | Wave height at break, period, direction, model-processed swell components, compass |
+| Surf | Wind Card | `wide` | Wind speed, direction, quality label, gust (from MarineObservation) |
+| Surf | 72-Hour Forecast Card | `full` | Day-grouped forecast columns with score, waves, wind, tide |
+| Fishing | Fishing Score Card | `wide` | Prominent fishing score + scoring breakdown bars merged in |
+| Fishing | Current Conditions Card | `wide` | Pressure + trend, wind speed/gust/direction, water temp, air temp, tide state |
+| Fishing | Forecast Card | `full` | Day-labeled forecast with score, period buttons + species accordion |
+| Beach Safety | Beach Conditions Card | `full` | Weather icon + air temp, rip current, UV index, wave/wind/temp stats |
+| Boating | Current Conditions Card | `full` | Weather icon, air/water temp, pressure + trend, visibility, dewpoint |
+| Boating | Wind Card | `wide` | Wind speed, gust, direction (extracted from conditions) |
+| Boating | Waves Card | `full` | Wave stats + 72h wave forecast chart |
+| Boating | NWS Marine Forecast | `full` | Structured period columns (wind, seas, visibility, weather) |
+
+**Score cards** (surf, fishing) are hero cards with prominent numeric score + scoring breakdown. Numeric scores only — no star ratings in forecast cards.
+
+**Location cards** on the marine landing page are 2×1 or 1×2 footprint with photo + data. When `photoUrl` is present, display the location photo alongside wave/wind/temp summary data.
+
+**Activity tabs** must follow a defined design pattern — styled tabs or status strip buttons, not floating unstyled elements. Follow the dashboard's existing tab/button patterns.
+
+**Marine alert strip:** A thin color-coded strip below the map and above content cards on every activity detail page, shown when marine/coastal alerts are active. Severity color coding: yellow (advisory), orange (watch), red (warning). Strip content: severity color + alert name + brief text. This is NOT the full-width hero banner from the main dashboard — it is a compact strip. Filter to marine/coastal alert types only (Small Craft Advisory, Beach Hazards Statement, High Surf Warning, Rip Current Statement, Hurricane Watch/Warning, etc.) — not inland alerts.
+
+**Solunar display** on the fishing tab reuses the Almanac Sun/Moon card component (`SunMoonDetailCard` + `MoonPhaseIcon`) — no separate solunar card. If solunar major/minor feeding period info is added, it is added TO the existing card matching its design style.
+
+**Component reuse rules:**
+- Beach Safety weather summary uses `WeatherIcon` (shared) + `MarineStatTile` (shared) for weather icon and air temp display at the top of the Beach Conditions card — data sourced from `useMarineDetail` (MarineObservation), not the Now page component (which reads station-specific data via `useRealtimeObservation`).
+- Solunar display = same `MoonPhaseIcon`/`MoonPhaseG` from `components/moon-phase-icon.tsx` (imported, not copied). Arc geometry is currently duplicated between FishingTab and SunMoonDetailCard — extraction to a shared module is a tracked maintainability item.
+- No duplicate implementations — grep for the component name; only one definition should exist.

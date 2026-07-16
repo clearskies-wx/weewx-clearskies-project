@@ -783,7 +783,7 @@ Marine locations are configured in the `[marine]` section of `api.conf`. This se
         beach_facing_degrees = 135
         bottom_type = sand
         topographic_feature = straight_beach
-        directional_exposure = N:false, NE:false, E:true, SE:true, S:true, SW:true, W:false, NW:false
+        directional_exposure = E:true, SE:true, S:true, SW:true
 
       [[[[fishing]]]]
         target_categories = saltwater_inshore, bottom_fish

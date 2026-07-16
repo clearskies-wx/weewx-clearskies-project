@@ -9,7 +9,7 @@ Companion documents:
 - **ARCHITECTURE.md** — system topology, provider module layout
 - **contracts/canonical-data-model.md** — per-field data catalog
 
-Last updated: 2026-07-04
+Last updated: 2026-07-15
 
 ---
 
@@ -1226,6 +1226,15 @@ Supporting components (not dispatch-registered provider modules):
 
 **Role change (ADR-091, 2026-07-13):** NDBC buoy observations are demoted from primary water temperature source to **labeled offshore reference data**. The ocean data resolver (§14.12) is now the primary source for water temperature. NDBC buoy data remains available for spectral wave decomposition and as an observational reference — when displayed, it is labeled with the buoy's station ID and offshore distance (e.g., "Nearest Offshore Buoy (46253)") so visitors understand this data is not at the beach location.
 
+**Wind data limitation (HARD RULE):** NDBC buoy wind data is **offshore** and must NOT be used for surf wind quality scoring. Buoys are typically 12+ miles from shore and measure the synoptic-scale wind field, which can be completely different from beach conditions. Coastal wind is dominated by thermal effects (sea/land breezes, topographic channeling, coastal temperature gradients) that offshore buoys cannot see.
+
+**NDBC's valid roles:**
+1. **Spectral swell decomposition** — swell propagation is large-scale; offshore spectral data accurately represents the swell systems arriving at the coast.
+2. **Offshore wave height/period reference** — as labeled observational data (not as beach conditions).
+
+**NDBC's invalid role for surf scoring:**
+- Wind speed and direction for surf quality classification. Beach wind and offshore wind can be completely different — SoCal morning glass-off conditions at the beach while the buoy reports a steady westerly. The surf quality scorer uses station hardware → forecast provider wind instead (see API-MANUAL §17).
+
 **CAPABILITY:** `geographic_coverage = "us_coastal"`, `auth_required = []`. `supplied_canonical_fields` includes wind speed, wind direction, wind gust, wave height, dominant period, average period, mean wave direction, pressure, air temp, water temp (SST), dewpoint, visibility, pressure tendency, tide level. Spectral fields (per-swell-system height, period, direction, energy, classification) when station has spectral sensors.
 
 **Wire format and parsing:**
@@ -1462,6 +1471,12 @@ GRIB2 files from NOMADS: `https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwps/pr
 | Wave runup | wave_runup | ~12 WFOs (NWPS v1.5) |
 
 NWPS v1.5 fields are show-when-available: display when the WFO provides them, absent without error when they don't.
+
+**GRIB2 temporal awareness (HARD RULE):** Each NWPS GRIB2 file contains **144 hourly forecast timesteps** (hours 0–144). The GRIB reader (`grib_processor.py`) MUST select messages by forecast hour using the `endStep` key:
+- eccodes: `eccodes.codes_get(msgid, "endStep")` → integer forecast hour
+- pygrib: `grb.endStep` → integer forecast hour
+
+For current conditions, callers pass `target_step=0` to `read_grib_fields()` to select only the analysis timestep. When `target_step` is not specified (`None`), the reader uses legacy behavior (last matching field wins) — this is not correct for current conditions but is preserved for backwards compatibility until FIX-18 adds proper multi-timestep indexing by `end_step` for forecast arrays and animated maps. The previous behavior — iterating all messages and overwriting with the last match — was a bug that caused current conditions to show hour-144 data (six days out).
 
 **Update cadence:** 2–3 cycles per day per WFO (typically 00z, 06z, 12z). Data is never more than ~8–12 hours old under normal NOAA operations.
 
