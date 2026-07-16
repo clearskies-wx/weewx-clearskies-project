@@ -1323,8 +1323,20 @@ Surf and fishing tabs display scoring factor breakdowns as horizontal bar segmen
 - Each factor: label + score + colored fill proportional to score
 - Bar fill uses gauge color tokens (`--gauge-fill` for filled portion, `--gauge-unfill` for empty)
 - Green for high scores (>60), amber for moderate (30-60), muted for low (<30)
-- Factor weights shown as percentages (e.g., "Wave Height 35%")
+- Weighted factors shown as "Label (N%)" (e.g., "Wave Height (35%)")
+- Penalty factors (no weight) shown as "Label (penalty)" (e.g., "Beach Alignment (penalty)")
 - Tap/click for explanation text (fishing tab)
+
+### Scoring explainer modal (surf tab)
+
+The Surf Score card header contains an info button (`ph:info` Phosphor icon, 18px) that opens a modal explaining the scoring system. Pattern:
+
+- **Trigger:** `<button>` in `CardHeader` (right of `CardTitle`), `aria-label` = modal title. Minimum touch target: `minWidth: 44px; minHeight: 44px`. Color: `text-muted-foreground` / hover `text-foreground`.
+- **Modal surface:** overlay `rgba(0,0,0,0.60)` + `blur(4px)` (§8); content `.card-glass` + `blur(16px)` + `ring-1 ring-foreground/10` (§8). `max-w-lg`, `max-height: 80vh`, `overflow-y: auto`.
+- **A11y:** `role="dialog"` + `aria-modal="true"` + `aria-labelledby` on content div. Focus moves to close button on open. Tab/Shift-Tab trapped within modal. Escape closes. Focus returns to trigger on close.
+- **Close:** `<button>` top-right of modal header, `ph:x` icon (18px), `aria-label` = translated "Close". `minWidth: 44px; minHeight: 44px`.
+- **Content:** intro paragraph → factor list (name + weight/penalty label + one-line explanation) → tier summary line.
+- **i18n:** All text via `t()` keys in `marine.json` under `surfing.scoringExplainer.*`.
 
 ### Marine card sizing and layout
 
@@ -1332,23 +1344,23 @@ Activity detail pages reuse Now page and Forecast page card patterns — same an
 
 **Card footprint specifications by page:**
 
-Grid notation `CxR` maps to the `Card` component's `footprint` (column span) prop: `1` = `tile`, `2` = `wide`, `4` = `full`. Note: marine activity tab content renders inside a flex container (`ActivityTabs`/`ActivityAccordion`), not the page-level Grid — `rowSpan` has no effect in this context (it's a CSS Grid property). All marine tab cards use `footprint` only. See §5 "Card Footprint Vocabulary" for the full prop definitions.
+Grid notation `CxR` maps to the `Card` component's `footprint` (column span) and `rowSpan` props. Column: `1` = `tile`, `2` = `wide`, `4` = `full`. Row: default = 1 (4 quarter-row tracks), `2` = 2 (8 quarter-row tracks). Marine activity tab content MUST render inside a `<Grid>` wrapper (imported from `components/layout/grid.tsx`) so that `footprint` column spans and `rowSpan` height spans work correctly — the same grid primitive the Now page uses. See §5 "Card Footprint Vocabulary" for the full prop definitions.
 
-| Page | Card | `footprint` | Description |
-|---|---|---|---|
-| Marine landing | Location card | `wide` | Photo alongside wave/wind/temp data |
-| Surf | Surf Score Card | `wide` | Numeric score + scoring breakdown bars merged in |
-| Surf | Swell Card | `wide` | Wave height at break, period, direction, model-processed swell components, compass |
-| Surf | Wind Card | `wide` | Wind speed, direction, quality label, gust (from MarineObservation) |
-| Surf | 72-Hour Forecast Card | `full` | Day-grouped forecast columns with score, waves, wind, tide |
-| Fishing | Fishing Score Card | `wide` | Prominent fishing score + scoring breakdown bars merged in |
-| Fishing | Current Conditions Card | `wide` | Pressure + trend, wind speed/gust/direction, water temp, air temp, tide state |
-| Fishing | Forecast Card | `full` | Day-labeled forecast with score, period buttons + species accordion |
-| Beach Safety | Beach Conditions Card | `full` | Weather icon + air temp, rip current, UV index, wave/wind/temp stats |
-| Boating | Current Conditions Card | `full` | Weather icon, air/water temp, pressure + trend, visibility, dewpoint |
-| Boating | Wind Card | `wide` | Wind speed, gust, direction (extracted from conditions) |
-| Boating | Waves Card | `full` | Wave stats + 72h wave forecast chart |
-| Boating | NWS Marine Forecast | `full` | Structured period columns (wind, seas, visibility, weather) |
+| Page | Card | `footprint` | `rowSpan` | Description |
+|---|---|---|---|---|
+| Marine landing | Location card | `wide` | — | Photo alongside wave/wind/temp data |
+| Surf | Surf Score Card (hero) | `wide` | `2` | 2x2 hero: prominent numeric score + scoring breakdown bars |
+| Surf | Swell Card | `wide` | — | 2x1: wave height at break, period, direction, model-processed swell components, compass |
+| Surf | Wind Card | `wide` | — | 2x1: wind speed, direction, quality label, gust (from MarineObservation) |
+| Surf | 72-Hour Forecast Card | `full` | — | Day-grouped forecast columns with score, waves, wind, tide |
+| Fishing | Fishing Score Card (hero) | `wide` | `2` | 2x2 hero: prominent fishing score + scoring breakdown bars |
+| Fishing | Current Conditions Card | `wide` | `2` | 2x2: pressure + trend, wind speed/gust/direction, water temp, air temp, tide state |
+| Fishing | Forecast Card | `full` | — | Day-labeled forecast with score, period buttons + species accordion |
+| Beach Safety | Beach Conditions Card | `full` | — | Weather icon + air temp, rip current, UV index, wave/wind/temp stats |
+| Boating | Current Conditions Card | `full` | — | Weather icon, air/water temp, pressure + trend, visibility, dewpoint |
+| Boating | Wind Card | `wide` | — | Wind speed, gust, direction (extracted from conditions) |
+| Boating | Waves Card | `full` | — | Wave stats + 72h wave forecast chart |
+| Boating | NWS Marine Forecast | `full` | — | Structured period columns (wind, seas, visibility, weather) |
 
 **Score cards** (surf, fishing) are hero cards with prominent numeric score + scoring breakdown. Numeric scores only — no star ratings in forecast cards.
 
