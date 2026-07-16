@@ -1180,8 +1180,8 @@ Surfaces the fishing scoring system (`enrichment/fishing_scorer.py`). Hero condi
 3. **Current Conditions Card** — `Card footprint="wide"`:
    - All stats from MarineObservation via `useMarineDetail`: barometric pressure + trend (PressureTrend component), wind speed, wind gust, wind direction (cardinal), water temperature, air temperature, tide state (rising/falling)
 4. **Forecast Periods** — `Card footprint="full"`:
-   - Structured columns following `DailyColumns` pattern
-   - Each period: time window, overall score, color-coded
+   - Semantic `<table>` (day rows × period columns); each period cell is a `<button>` that expands a per-period species accordion below the grid
+   - Each period cell: overall score (color-coded), top species by score, major/minor solunar indicator, and — per period — wind speed + cardinal direction, wind gust (shown only when non-null), and swell height + swell period, all sourced from `FishingForecast.windSpeed/windDirection/windGust/swellHeight/swellPeriod` (`GET /fishing/{locationId}`). These per-period tokens are visually compact/aria-hidden; the button's `aria-label` carries the full equivalent sentence for screen readers.
    - `HorizontalScrollNav` for scrolling
 5. **Solunar Calendar** — `Card footprint="full"`:
    - Uses `MoonPhaseIcon` from `components/moon-phase-icon.tsx` (same component as Almanac page)
