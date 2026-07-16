@@ -802,7 +802,9 @@ Wrong data sources, missing schema fields, and broken data flows that prevent ma
 
 ---
 
-## Phase 8 — Final QA (Adversarial Meta-Audit)
+## Phase 8 — Final QA (Adversarial Meta-Audit) 🔄 IN PROGRESS
+
+> **Execution status (2026-07-16):** T8.1 done (QC Gates 4-7 all run, findings remediated). T8.2 done (7 findings: F1 uncommitted Phase 0 fixed, F2 photo attributions fixed eebd29e, F3 fishing forecast fixed 52eca6c, F4 what-to-wear was auditor error — ComfortBadge IS the feature, F5-F6 blocked on API data gaps, F7 BeachSafety alerts fixed e7302a6). T8.3 done (5/6 PASS, 1 finding on cache warmer docs — already documented at ARCHITECTURE.md line 98). T8.4 partially done (API-level checks complete, full visual walkthrough needs browser).
 
 This phase verifies that Phases 0-7 were actually completed correctly — not just that agents claimed they were. It checks for subverted QC gates, silent deferrals, and gaps between what the plan required and what was delivered.
 
