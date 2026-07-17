@@ -160,7 +160,7 @@ Verification: after weewx restarts, check that `maxSolarRad` values at sunrise a
 
 ### eccodes native dependency (marine feature)
 
-eccodes is ECMWF's C library for GRIB/BUFR encoding and decoding. It is required for the marine feature (NWPS nearshore wave data is distributed as GRIB2 only). This is the first native (non-pure-Python) dependency in Clear Skies API.
+eccodes is ECMWF's C library for GRIB/BUFR encoding and decoding. It is required for the marine feature (GRIB2 processing for wave data and HRRR wind). This is the first native (non-pure-Python) dependency in Clear Skies API.
 
 **How it's provided depends on the deployment method:**
 
@@ -776,8 +776,6 @@ Marine locations are configured in the `[marine]` section of `api.conf`. This se
       ndbc_station_ids = 41110, 41037
       coops_station_ids = 8658163
       nws_marine_zone_id = AMZ250
-      nwps_wfo = ILM
-      nwps_cg_grid = CG1
 
       [[[[surf]]]]
         beach_facing_degrees = 135
@@ -806,8 +804,8 @@ Marine locations are configured in the `[marine]` section of `api.conf`. This se
 | `ndbc_station_ids` | list[str] | No | — | NDBC buoy station IDs (auto-discovered or operator-selected) |
 | `coops_station_ids` | list[str] | No | — | CO-OPS tide/water-level station IDs |
 | `nws_marine_zone_id` | str | No | AMZ/GMZ/PZZ/ANZ/PKZ/PHZ prefix | NWS coastal marine zone |
-| `nwps_wfo` | str | No | 3-letter WFO code | NWPS WFO domain (auto-determined from coordinates) |
-| `nwps_cg_grid` | str | No | CG1–CG5 | NWPS computational grid |
+| ~~`nwps_wfo`~~ | — | — | — | Removed (ADR-093). NWPS eliminated. |
+| ~~`nwps_cg_grid`~~ | — | — | — | Removed (ADR-093). SWAN+TruShore uses its own grid bbox. |
 | `station_distance_km` | float | — | — | Computed at config time (haversine from weewx station to this location) |
 
 **Surf configuration (`[[surf]]` sub-block):**
@@ -821,6 +819,8 @@ Marine locations are configured in the `[marine]` section of `api.conf`. This se
 | `directional_exposure` | dict | 8 compass directions → bool | Which swell directions reach this spot |
 | `bathymetric_profile` | list | — | Stored after CUDEM download: `[(distance_m, depth_m), ...]` |
 | `structures` | list | — | Optional coastal structures (see below) |
+| `breaker_formula` | str | `komar_gaughan` (default), `caldwell` | Breaker height formula used to convert post-supplement Hsig to face height (T2.6). `komar_gaughan` — Komar & Gaughan (1973), general-purpose, all periods and coastlines. `caldwell` — Caldwell & Aucan (2007) H1/10 empirical predictor calibrated to steep volcanic island coasts (Oahu north shore); auto-crossover to Komar-Gaughan below Tp=10s. |
+| `surf_height_display` | str | `face` (default), `hawaiian` | Display convention for the breaking wave height in the surf card. `face` — trough-to-crest face height (Western scale). `hawaiian` — back-of-wave scale (= face height × 0.5). |
 
 **Structure configuration (within `[[surf]]`):**
 
@@ -906,11 +906,11 @@ Step-by-step wizard flow for adding a marine location:
 2. **Select activities:** Choose one or more of: marine/boating, surf, fishing, beach safety.
 3. **NDBC station discovery:** Wizard calls `GET /setup/marine/discover-stations` (`lat`, `lon`, `radius_miles`), which queries `activestations.xml`, finds nearest buoys with distances and sensor capabilities (full, wave-only, atmospheric-only), and returns a `quality` tier per station (excellent ≤25mi, good ≤50mi, fair beyond). Operator confirms or overrides.
 4. **CO-OPS station discovery:** Same `GET /setup/marine/discover-stations` call also queries the CO-OPS metadata API and returns nearest tide/water-level stations with distances, available products, and a `quality` tier (excellent ≤20mi, good ≤40mi, fair beyond). Operator confirms or overrides.
-5. **NWS zone discovery:** System queries NWS `/points` → CWA, determines NWPS WFO domain and CG grid. Discovers marine zones within the configured alert radius (shared with the marine alert radius feature). Operator confirms. The NWPS WFO domain is re-resolved server-side at apply time (step 9) regardless of what the wizard discovered, so it is always current as of the save.
+5. **NWS zone discovery:** System queries NWS `/points` → CWA. Discovers marine zones within the configured alert radius (shared with the marine alert radius feature). Operator confirms.
 6. **Surf spot configuration** (if surf activity selected): Operator selects bottom type, topographic feature, directional exposure. Wizard calls `POST /setup/marine/bathymetry` (`lat`, `lon`, `beach_facing_degrees`) to download the CUDEM bathymetric profile (or receive a logged regional fallback profile if CUDEM is unreachable — this endpoint never returns an error for upstream provider failures) and computes beach slope client-side or via the profile returned. Wizard also calls `GET /setup/marine/discover-structures` (`lat`, `lon`, `radius_m`) to pre-populate nearby coastal structures from OpenStreetMap (see "Structure auto-discovery" above); operator confirms, edits, removes, or adds structures manually — any structure with no OSM `material` tag match requires the operator to pick a material before saving.
 7. **Fishing spot configuration** (if fishing activity selected): System auto-classifies biogeographic region from coordinates. Operator selects one or more target categories (multi-select checkboxes). Species checkboxes populate with the union of all selected categories' species for that region (no duplicates). Operator unchecks any species they don't target.
 8. **Beach safety configuration** (if beach safety selected): Operator optionally adds external links (water quality, lifeguard reports, wildlife alerts).
-9. **Review and save:** System presents a summary of the configured location with all discovered stations, zones, and settings. Operator confirms. Wizard sends the accumulated `marine` block on the next `POST /setup/apply` call. The API validates all locations (coordinates, activity/bottom-type/topographic-feature/target-category enums, NDBC/CO-OPS station-id and NWS marine-zone-id formats), resolves the NWPS WFO domain per location via `providers/_common/nws_zones.py`'s `get_cwa()` (a per-location NWS lookup failure is logged and leaves that location's `nwps_wfo` unset — it does not fail the whole apply), and writes the result to `api.conf [marine]` using the nested-subsection shape shown above (`[[[[surf]]]]`/`[[[[fishing]]]]`/`[[[[beach_safety]]]]` inside each location's own section — not top-level `[[surf_spots]]`/`[[fishing_spots]]` sections).
+9. **Review and save:** System presents a summary of the configured location with all discovered stations, zones, and settings. Operator confirms. Wizard sends the accumulated `marine` block on the next `POST /setup/apply` call. The API validates all locations (coordinates, activity/bottom-type/topographic-feature/target-category enums, NDBC/CO-OPS station-id and NWS marine-zone-id formats), and writes the result to `api.conf [marine]` using the nested-subsection shape shown above (`[[[[surf]]]]`/`[[[[fishing]]]]`/`[[[[beach_safety]]]]` inside each location's own section — not top-level `[[surf_spots]]`/`[[fishing_spots]]` sections). When the `[nearshore]` pip extra is installed, the wizard also collects SWAN+TruShore grid configuration (bbox, resolution, deployment mode) — see §4 SWAN+TruShore wizard step.
 
 ### §4.1 Config Registry
 
