@@ -1143,12 +1143,12 @@ Unified conditions dashboard pattern (Windfinder/My Marine Forecast reference). 
 
 Surfaces the surf scoring system (`enrichment/surf_scorer.py`). Three focused cards replace the prior monolithic hero.
 
-**Data sources:** `useSurfDetail(locationId)` (GET /surf/{id}) for scoring/wave/swell data, `useMarineDetail(locationId)` (GET /marine/{id}) for live wind speed/gust/direction and per-period wind time-matching.
+**Data sources:** `useSurfDetail(locationId)` (GET /surf/{id}) for scoring/wave/swell data, `useMarineDetail(locationId)` (GET /marine/{id}) for live wind speed/gust/direction and per-period wind time-matching, `useForecast({ hours: 72 })` (GET /forecast?hours=72) for hourly weather data time-matched to surf forecast periods, `useObservation()` for current conditions (air temp, dewpoint, UV, weather icon).
 
-**Panel order:**
+**Panel order (all cards in a single `<Grid>`):**
 
 1. **Alerts** — `AlertsPanel` (with per-activity filterTypes)
-2. **Surf Score Card** — `Card footprint="wide"`:
+2. **Surf Score Card** — `Card footprint="wide" rowSpan={2}`:
    - `conditionsText` as subtitle
    - Prominent NUMERIC score (qualityStars as digit, e.g., "4") + `qualityLabel` ("Poor"/"Fair"/"Good"/"Very Good"/"Epic") with color-coded badge. No star glyphs — `StarRating` component deleted entirely.
    - Scoring breakdown bars below the score (absorbed from the former separate card): 4 weighted factors — Wave Height (35%), Wave Period (35%), Wind Quality (20%), Swell Dominance (10%). Each bar: label, score, colored fill proportional to score.
@@ -1156,13 +1156,19 @@ Surfaces the surf scoring system (`enrichment/surf_scorer.py`). Three focused ca
    - Wave height at break, period, direction as MarineStatTile stats
    - Swell component breakdown: prefers `SurfForecast.multiSwell` (NWPS/WW3 model-processed) over raw `spectralComponents` (NDBC spectral). Falls back to spectral when multiSwell is null.
    - Swell direction compass folded in as one element (WindCompassCard tick-ring pattern, --chart-2 color, reduced footprint ~112-128px)
-4. **Wind Card** — `Card footprint="wide"`:
+4. **Wind Card** — `Card footprint="wide" rowSpan="half"`:
    - Wind speed, gust, direction (from MarineObservation via useMarineDetail), wind quality label (from SurfForecast)
-5. **72-Hour Surf Forecast** — `Card footprint="full"`:
-   - Day-grouped HorizontalScrollNav columns (one per station-local day with day-header label)
-   - Per-period column: time, numeric score + qualityLabel, wave height, swell period, swell direction (cardinal), wind quality, wind speed + direction (time-matched from marine forecast), nearest tide event
-   - Wave face height area chart below the forecast columns
-6. **Tide Forecast** — `Card footprint="full"` with `TideChart`
+5. **Current Conditions Card** — `Card footprint="wide" rowSpan="half"`:
+   - 5-column grid: weather icon (WeatherIcon), air temp (Thermometer icon, station observation), dewpoint (Drop icon, station observation), water temp (WaterThermometerIcon, marine observation), UV index (UvIndex icon, station observation)
+6. **72-Hour Surf Forecast** — `Card footprint="full"`:
+   - `HorizontalScrollNav` with sticky row header column (card-glass background, labels for each row section)
+   - Three sections separated by horizontal dividers:
+     - **Score:** time buttons + 0-100 score (colored by star-tier mapping via `scoreTierColor`, not raw percentage — 41/100 = amber, not green)
+     - **Current Conditions:** WeatherIcon + air temp (with unit) + precip % + WindSymbol + wind quality label — all time-matched from `useForecast({ hours: 72 })`
+     - **Swells:** water temp (1 decimal, with unit) + swell height area chart (smooth cubic bezier curve, blue fill `#3b82f6`, Y-axis 0–12 ft minimum with auto-scale, gridlines at 3 ft intervals, 140px height) + swell height values row (bold foreground, with unit, same visual treatment as air temp) + dom direction + period + energy
+   - Swell height chart line is continuous across day boundaries (unified Y-axis scale across all days)
+   - Click any time column to expand a detail panel below with chip data and swell component breakdown
+7. **Tide Forecast** — `Card footprint="full"` with `TideChart`
 
 **Removed (Phase 5):** Star rating glyphs (StarRating component deleted), standalone "Swell Components" card, standalone "Swell Direction Compass" card, rip current risk badge (lives on Beach Safety tab).
 

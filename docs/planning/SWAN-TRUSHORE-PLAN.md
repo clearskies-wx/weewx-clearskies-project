@@ -22,18 +22,20 @@ This plan implements TruShore: the complete Clear Skies nearshore wave pipeline.
 |---|---|
 | `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md` | Full technical findings: NWPS failure analysis, SWAN compute requirements, input data inventory, HRRR wind evidence, industry practice, architecture decisions |
 | `docs/ARCHITECTURE.md` | Services table, provider module layout, container topology, port registry |
-| `docs/manuals/API-MANUAL.md` §17 | Current wave_transform.py supplements, surf_scorer.py scoring rules, wind source precedence, NWPS/WW3 fallback behavior |
-| `docs/manuals/PROVIDER-MANUAL.md` §14.3, §14.6 | WaveWatch III module identity and ERDDAP access, NWPS module identity and error handling |
+| `docs/manuals/API-MANUAL.md` §17 | Current wave_transform.py supplements, surf_scorer.py scoring rules, wind source precedence |
+| `docs/manuals/PROVIDER-MANUAL.md` §14.3 | WaveWatch III module identity and ERDDAP access |
 | `docs/manuals/OPERATIONS-MANUAL.md` §1 | Native install pip extras pattern (model for `[nearshore]` extra) |
 | `rules/clearskies-process.md` | Agents must read source documents directly; git restrictions; deploy scripts; verification mandate |
 
 **Agents must read source documents directly — NEVER paraphrase manuals or plans into agent prompts.** The coordinator tells agents WHICH files to read and WHICH sections are relevant. The agent reads the original text. See `rules/clearskies-process.md` "Agents must read source documents directly."
 
+**All tasks are mandatory.** No deferrals are allowed. Every T-numbered task in every phase must be completed and verified before the plan is considered done. If a task cannot be completed, STOP and report to the user — do not silently defer it.
+
 **Git restrictions (mandatory in every agent prompt):**
 
-> **Git restrictions:** You must NOT run `git pull`, `git push`, `git fetch`, `git rebase`, `git merge`, or `git checkout` of remote branches. You may only `git add`, `git commit`, `git status`, `git log`, `git diff`. If the remote is ahead or behind, STOP and report via SendMessage. Do not resolve it yourself.
+> **Git restrictions:** You must NOT run `git pull`, `git push`, `git fetch`, `git rebase`, `git merge`, `git checkout` of remote branches, `git add`, or `git commit`. You may only run read-only git commands: `git status`, `git log`, `git diff`. All commits are made by the coordinator, not agents. If the remote is ahead or behind, STOP and report via SendMessage. Do not resolve it yourself.
 
-**Agents edit and commit on the local machine only.** All source code editing and `git commit` happens on the local machine at `c:\CODE\weather-belchertown\repos\weewx-clearskies-*`. SSH to containers is for READ-ONLY verification: running tests, reading logs, checking service status. Never edit source files on weewx or weather-dev.
+**Only the coordinator commits.** Agents edit files on the local machine at `c:\CODE\weather-belchertown\repos\weewx-clearskies-*` but do NOT run `git add` or `git commit`. The coordinator reviews agent work and commits. SSH to containers is for READ-ONLY verification: running tests, reading logs, checking service status. Never edit source files on weewx or weather-dev.
 
 **Deploy scripts — use these, not manual commands:**
 - `scripts/deploy-api.sh` — API changes → weewx container
@@ -51,7 +53,7 @@ This plan implements TruShore: the complete Clear Skies nearshore wave pipeline.
 | API pytest | Establish at Phase 1 kickoff | `ssh weewx "cd /home/ubuntu/repos/weewx-clearskies-api && uv run pytest --tb=no -q 2>&1 \| tail -3"` |
 | Dashboard vitest | Establish at Phase 5 kickoff | `ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-dashboard && npm test -- --reporter=verbose 2>&1 \| tail -5"` |
 
-**NWPS deprecation order:** NWPS is not removed until Phase 3 T3.4. Until then it continues to serve as legacy fallback while TruShore is validated alongside it. Never remove the NWPS module before T3.4 acceptance criteria are met.
+**NWPS elimination:** NWPS is removed entirely — code, docs, cache warmer schedule, config keys. There is no legacy mode. SWAN+TruShore is the only nearshore model. Phase 3 T3.4 handles the deletion.
 
 ---
 
@@ -68,13 +70,18 @@ Before any code is written, the governing documents must describe the architectu
 **Do:**
 - Draft an ADR (status: Proposed) documenting the decision to run our own SWAN instance (TruShore) instead of depending on NWPS.
 - Follow the Nygard format per `docs/decisions/_TEMPLATE.md`.
-- Decision section: 1–2 sentences. Context section: why NWPS is inadequate (from §1 of the research brief). Options considered: NWPS dependency (current), NWPS with extended cache TTL (partial mitigation), own SWAN instance (chosen). Consequences: SWAN binary dependency, HRRR provider needed, NWPS downgraded to legacy. Implementation guidance: pip extra `[nearshore]`, config key `[marine] nearshore_model`.
+- Frontmatter includes `supersedes: ADR-084` — this ADR replaces the "NWPS as primary nearshore source" decision. The four supplements from ADR-084 (γ correction, structure effects, spatial interpolation, topographic focusing) survive and apply to SWAN output; only the primary source decision changes.
+- Decision section: 1–2 sentences. Context section: why NWPS is inadequate (from §1 of the research brief). Options considered: NWPS dependency (current), NWPS with extended cache TTL (partial mitigation), own SWAN instance (chosen). Consequences: SWAN binary dependency, HRRR provider needed, NWPS eliminated (code and docs removed). Implementation guidance: pip extra `[nearshore]`, SWAN+TruShore is the only nearshore model (no `nearshore_model` config key — if `[nearshore]` extra is installed, SWAN+TruShore runs).
 - Keep to ~80 lines per ADR content standards in `rules/clearskies-process.md`.
+- Update ADR-084: add `superseded-by: ADR-{this ADR's number}` to its frontmatter. Add a one-line note at top of its Decision section: "**Superseded by ADR-{N}.** NWPS is eliminated. The nearshore source is now SWAN+TruShore (locally-run SWAN instance). The four supplements defined here continue to apply to SWAN output."
+- Update the ADR INDEX: move ADR-084 from "Archived" to "Superseded" section, noting the superseding ADR.
 
 **Accept:**
 - ADR exists as Proposed in `docs/decisions/`.
 - All required Nygard sections are present (Status, Context, Options, Decision, Consequences, Implementation guidance, References).
 - Options table includes all three options evaluated.
+- ADR-084 frontmatter has `superseded-by` populated.
+- ADR INDEX reflects the supersession.
 - User reviews and approves before status changes to Accepted.
 
 ### T0.2 — Draft ADR: surf wind source (HRRR forecast wind)
@@ -86,13 +93,13 @@ Before any code is written, the governing documents must describe the architectu
 **Do:**
 - Draft an ADR (status: Proposed) documenting the change in wind source for surf quality scoring from the current precedence chain (station hardware → forecast provider) to HRRR forecast wind as the canonical source for TruShore-driven surf forecasts.
 - Context: current rule prefers station hardware, but station hardware is a real-time observation — not a forecast. For 72-hour surf forecasts, HRRR forecast wind (the same model that forces SWAN) is the correct source. Station hardware remains correct for the current-conditions snapshot but not for forecast timesteps.
-- Decision: for TruShore-sourced surf forecasts, wind source = HRRR (the same model run that drove SWAN). The current station hardware → forecast provider rule applies only when nearshore_model is set to `nwps` (legacy) or when scoring current conditions.
+- Decision: for SWAN+TruShore surf forecasts, wind source = HRRR (the same model run that drove SWAN). Station hardware wind observations remain the source for the current-conditions snapshot (`t=0` scoring).
 - Implementation guidance: surf_scorer.py receives wind data with a `source` tag; when source is `hrrr_trushore`, the station hardware lookup is bypassed.
 
 **Accept:**
 - ADR exists as Proposed.
 - Decision clearly distinguishes between current-conditions scoring (station hardware) and forecast scoring (HRRR).
-- No conflict with existing §17 rule — the existing rule applies to NWPS mode; the new rule applies to TruShore mode.
+- No conflict with existing §17 rule — the existing station hardware rule applies to `t=0` current conditions; the HRRR rule applies to forecast timesteps.
 - User approves before Accepted status.
 
 ### T0.3 — Update API-MANUAL §17 — TruShore as nearshore model
@@ -102,19 +109,18 @@ Before any code is written, the governing documents must describe the architectu
 - Reference: `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md` §2, §6, §7; current §17 text
 
 **Do:**
-- Add a sub-section under §17 "NWPS supplement processor" documenting TruShore as the new default nearshore model when `[nearshore]` extra is installed.
-- Document the HRRR wind sourcing rule for TruShore-mode forecasts (from T0.2 ADR).
+- Rewrite §17 "NWPS supplement processor" as "SWAN+TruShore nearshore model". Remove all NWPS content — NWPS is eliminated, not legacy.
+- Document SWAN+TruShore as the nearshore model when `[nearshore]` extra is installed. No `nearshore_model` config key — if the extra is installed, SWAN+TruShore runs.
+- Document the HRRR wind sourcing rule for forecast timesteps (from T0.2 ADR).
 - Document the SWAN integration: subprocess model, input sources (HRRR wind → SWAN, WW3 boundary conditions, CUDEM bathymetry, RTOFS tidal currents), output format (MarineForecastPoint per timestep).
-- Update the no-fallback rule: when TruShore is configured, WW3 is NEVER used as the surf forecast source. WW3 remains the deep-water boundary input to SWAN and continues to serve the marine endpoint's deep-water forecast. The surf endpoint serves the last successful TruShore cache if the runner fails.
-- Note NWPS as legacy mode (`nearshore_model = nwps`).
+- Document the no-WW3-fallback rule: WW3 is NEVER used as the surf forecast source. WW3 remains the deep-water boundary input to SWAN and continues to serve the marine endpoint's deep-water forecast. The surf endpoint serves the last successful SWAN+TruShore cache if the runner fails.
 
 **Accept:**
-- §17 correctly describes TruShore as the primary model when `[nearshore]` extra is installed.
+- §17 describes SWAN+TruShore as the only nearshore model. No NWPS documentation remains.
 - HRRR wind sourcing rule is documented with the distinction between forecast mode and current-conditions mode.
-- WW3's role is correctly scoped: boundary input to SWAN + marine deep-water endpoint, never surf forecast primary source.
-- NWPS is documented as legacy with a deprecation note.
+- WW3's role is correctly scoped: boundary input to SWAN + marine deep-water endpoint, never surf forecast source.
 
-### T0.4 — Update PROVIDER-MANUAL — HRRR wind provider + NWPS deprecation
+### T0.4 — Update PROVIDER-MANUAL — HRRR wind provider + NWPS removal
 
 - Owner: Coordinator (Opus)
 - File: `docs/manuals/PROVIDER-MANUAL.md`
@@ -122,14 +128,13 @@ Before any code is written, the governing documents must describe the architectu
 
 **Do:**
 - Add §14.{next} documenting the HRRR wind provider: module identity (`providers/wind/hrrr.py`, PROVIDER_ID `hrrr`, DOMAIN `wind`), NOMADS Grib Filter URL, AWS S3 backup URL, geographic bounding box config, U/V at 10m AGL variable names, grid-relative to earth-relative rotation requirement (`wgrib2 -new_grid_winds earth`), hourly fixed schedule, cache TTL.
-- Update §14.6 NWPS: mark as "Legacy — superseded by TruShore when `[nearshore]` extra installed." Keep the full technical documentation intact (NWPS remains functional and supported for operators who set `nearshore_model = nwps`). Add a note at the top of the section: "**Legacy provider.** When `[nearshore]` pip extra is installed, the default nearshore model is TruShore (own SWAN instance). NWPS remains available via `[marine] nearshore_model = nwps`. See §14.{trushore section} for TruShore provider documentation."
-- Add §14.{trushore} documenting the TruShore/SWAN runner: not a network provider but a local subprocess provider; SWAN binary dependency; input sources; output points format; cache key and TTL; run schedule tied to HRRR cycle.
+- Remove §14.6 NWPS entirely. NWPS is eliminated, not legacy. The section is deleted (the archived ADR-084 preserves the historical decision rationale).
+- Add §14.{trushore} documenting the SWAN+TruShore runner: not a network provider but a local subprocess provider; SWAN binary dependency; input sources; output points format; cache key and TTL; run schedule tied to HRRR cycle.
 
 **Accept:**
 - HRRR wind provider fully documented: URL, variables, rotation requirement, schedule, TTL.
-- NWPS §14.6 carries a legacy marker and a forward reference to TruShore.
-- TruShore/SWAN runner documented as a local subprocess provider.
-- No existing documented behavior removed (NWPS still works; it's just not the default).
+- NWPS §14.6 is removed. No NWPS documentation remains in the PROVIDER-MANUAL.
+- SWAN+TruShore runner documented as a local subprocess provider.
 
 ### T0.5 — Update ARCHITECTURE.md — SWAN subprocess, HRRR wind provider, TruShore service option
 
@@ -147,14 +152,34 @@ Before any code is written, the governing documents must describe the architectu
 - Optional separated TruShore service is documented following the existing extension note pattern.
 - No port changes (SWAN is internal to the API process, not a network service in the default topology).
 
+### T0.6 — Amend ADR-091 Decision 1: waveHeight source contract
+
+- Owner: Coordinator (Opus)
+- Files: `docs/archive/decisions/ADR-091-marine-card-data-sources-and-ofs-ocean-data.md`, `docs/manuals/API-MANUAL.md` (if Decision 1's table was consolidated there)
+- Reference: T0.1 ADR (supersedes ADR-084), T0.3 (API-MANUAL §17 TruShore update)
+
+**Do:**
+- ADR-091 Decision 1 defines the `waveHeight` card data source contract as: primary = `NWPS → wave_transform.apply_supplements()`, fallback = `WaveWatch III first forecast point (no supplements per ADR-084), then NDBC buoy Hs`. NWPS is eliminated and WW3 is removed from the surf fallback chain.
+- Amend Decision 1's `waveHeight` row: primary = `SWAN+TruShore → wave_transform.apply_supplements()`. Fallback = last successful SWAN+TruShore cache (any age) → null. No NWPS, no WW3 for surf.
+- Add an amendment note at the top of ADR-091: "**Amendment (SWAN+TruShore, ADR-{T0.1 number}):** Decision 1 waveHeight source updated — NWPS eliminated, SWAN+TruShore is the only nearshore source. WW3 removed from the surf fallback chain. See ADR-{T0.1 number}."
+- If Decision 1's table was consolidated into API-MANUAL.md or PROVIDER-MANUAL.md, update the manual table to match. (T0.3 likely covers this — verify no conflict.)
+
+**Accept:**
+- ADR-091 Decision 1 `waveHeight` row reflects SWAN+TruShore as default primary.
+- WW3 no longer listed as a surf fallback in ADR-091.
+- Amendment note references the superseding ADR by number.
+- No conflict with T0.3 API-MANUAL updates (same contract, documented in both places).
+
 ### QC Gate 0
 
-- All five documents (ADRs Proposed, API-MANUAL, PROVIDER-MANUAL, ARCHITECTURE.md) reflect a consistent architecture.
+- All documents (ADRs Proposed, API-MANUAL, PROVIDER-MANUAL, ARCHITECTURE.md, ADR-084 superseded, ADR-091 amended) reflect a consistent architecture.
 - ADRs are Proposed (not Accepted — user approval pending); no other documents say "Accepted" on behalf of the user.
-- NWPS is documented as legacy, not removed.
+- ADR-084 has `superseded-by` in its frontmatter; ADR INDEX reflects this.
+- ADR-091 Decision 1 waveHeight row matches the SWAN+TruShore source contract.
+- NWPS documentation is removed from all manuals (not marked legacy — eliminated).
 - WW3's role is correctly limited: marine deep-water endpoint + SWAN boundary conditions.
 - No manual update contradicts any existing Accepted ADR.
-- Adversarial auditor (`clearskies-auditor`) reviews all five documents for internal consistency before Phase 1 begins.
+- Adversarial auditor (`clearskies-auditor`) reviews all documents for internal consistency before Phase 1 begins.
 
 ---
 
@@ -213,12 +238,12 @@ HRRR is the wind forcing source for SWAN. This provider must be implemented and 
 - Reference: ARCHITECTURE.md (cache warmer runs at API startup); OPERATIONS-MANUAL §1 (startup sequence)
 
 **Do:**
-- Add a cache warmer entry for the HRRR wind provider, but only when `nearshore_model = trushore` is configured. The HRRR fetch should run at startup and on the hourly schedule (HRRR cycle cadence).
+- Add a cache warmer entry for the HRRR wind provider, active when the `[nearshore]` pip extra is installed. The HRRR fetch should run at startup and on the hourly schedule (HRRR cycle cadence).
 - The HRRR warm does NOT block the API startup — it fires async in the background. SWAN cannot run until HRRR data is warm, but the API can serve other endpoints while the first HRRR fetch completes.
 - If HRRR warm fails at startup, log WARNING (not ERROR) — the SWAN runner will retry on the next hourly cycle.
 
 **Accept:**
-- API startup log shows HRRR cache warm attempt when `nearshore_model = trushore`.
+- API startup log shows HRRR cache warm attempt when `[nearshore]` extra is installed.
 - HRRR warm failure at startup does not cause API startup to fail.
 - On the hour, HRRR is re-fetched automatically (verify via log entries).
 
@@ -250,13 +275,13 @@ SWAN is the wave physics engine. This phase installs SWAN, implements the runner
 - Add `[nearshore]` to `pyproject.toml` optional dependencies, following the same pattern as `[marine]` (which adds eccodes). The `[nearshore]` extra includes: cfgrib or pygrib (GRIB2 processing), xarray, the HRRR provider (T1.1), and documentation of the SWAN binary requirement.
 - SWAN binary is NOT a pip package — it is compiled Fortran. `install_swan.sh` automates: download SWAN 41.45 source from sourceforge, compile with gfortran and OpenMP, install binary to `/usr/local/bin/swan`.
 - Dockerfile: add a build stage that runs `install_swan.sh`. The `[nearshore]` Docker target builds on the `[marine]` target.
-- The API startup check: if `nearshore_model = trushore` is configured but SWAN binary is not found on PATH, log a CRITICAL error with installation instructions and fall back to `nearshore_model = nwps`.
+- The API startup check: if `[nearshore]` extra is installed but SWAN binary is not found on PATH, log a CRITICAL error with installation instructions. The surf endpoint returns null surf data until SWAN is available — no fallback to any other model.
 
 **Accept:**
 - `pip install weewx-clearskies-api[nearshore]` completes without error on a clean Ubuntu 22.04 system (after `apt install gfortran libopenmpi-dev`).
 - `swan --version` returns a SWAN version string after `install_swan.sh` runs.
 - API startup log shows "SWAN found at /usr/local/bin/swan, version 41.xx" when `[nearshore]` extra is installed.
-- API startup falls back gracefully to `nearshore_model = nwps` with CRITICAL log when SWAN binary is not found.
+- API startup logs CRITICAL with install instructions when SWAN binary is not found. Surf endpoint returns null (no fallback model).
 - Docker image builds successfully with SWAN included.
 
 ### T2.2 — Implement SWAN runner service
@@ -265,7 +290,7 @@ SWAN is the wave physics engine. This phase installs SWAN, implements the runner
 - Files:
   - New: `repos/weewx-clearskies-api/weewx_clearskies_api/services/swan_runner.py`
   - New: `repos/weewx-clearskies-api/weewx_clearskies_api/services/__init__.py` (if not present)
-- Reference: `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md` §6, §7; API-MANUAL §17 (current NWPS supplement processor — output format this must match)
+- Reference: `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md` §6, §7; API-MANUAL §17 (MarineForecastPoint output format)
 
 **Do:**
 - Implement `services/swan_runner.py` with a `SWANRunner` class:
@@ -319,7 +344,7 @@ SWAN is the wave physics engine. This phase installs SWAN, implements the runner
 - Owner: `clearskies-api-dev` (Sonnet)
 - Files:
   - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/services/swan_runner.py`
-- Reference: API-MANUAL §17 (MarineForecastPoint format the NWPS provider also produces — TruShore must produce the same shape); PROVIDER-MANUAL §14.6 (NWPS output format for comparison)
+- Reference: API-MANUAL §17 (MarineForecastPoint format — SWAN+TruShore must produce this shape)
 
 **Do:**
 - SWAN TABLE output format: space-separated columns. The table header (starting with `%`) names the columns. Parse the header to identify Hs, Tm01, MWD column indices — do not hardcode column positions.
@@ -332,7 +357,7 @@ SWAN is the wave physics engine. This phase installs SWAN, implements the runner
 - Parser correctly identifies column positions from TABLE header regardless of column order.
 - Multi-spot output produces correctly labeled data per surf spot.
 - Validation rejects physically impossible values and logs them.
-- MarineForecastPoint objects from SWAN output match the same schema as NWPS-sourced MarineForecastPoint objects (verified by comparing API-MANUAL §17 field names).
+- MarineForecastPoint objects from SWAN output match the API-MANUAL §17 schema.
 
 ### T2.5 — Integration with cache warmer: run SWAN on HRRR cycle schedule
 
@@ -340,27 +365,64 @@ SWAN is the wave physics engine. This phase installs SWAN, implements the runner
 - Files:
   - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/cache_warmer.py` (or scheduling equivalent)
   - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/providers/nearshore/trushore.py` (new provider wrapper)
-- Reference: ARCHITECTURE.md (cache warmer startup sequence); PROVIDER-MANUAL §14.6 (NWPS cache TTL pattern to match or improve upon)
+- Reference: ARCHITECTURE.md (cache warmer startup sequence)
 
 **Do:**
-- Create `providers/nearshore/trushore.py` as a thin provider wrapper around `services/swan_runner.py`. This is the object the endpoint calls, matching the same provider interface as `providers/marine/nwps.py`.
+- Create `providers/nearshore/trushore.py` as a thin provider wrapper around `services/swan_runner.py`. This is the object the endpoint calls, following the existing provider interface pattern.
 - `TrushoreProvider.fetch(surf_spot_id, ...)`: retrieves HRRR wind, WW3 boundary, CUDEM bathymetry (all from cache — they run on their own schedules); calls `SWANRunner.run()`; caches results keyed by `(provider_id, spot_domain_id, hrrr_cycle_time)` with a TTL of 55 minutes (matching HRRR cycle cadence).
 - SWAN runs in a background thread (not in the request path). The cache warmer fires the first SWAN run at startup (after HRRR and WW3 data are warm) and on the hourly schedule thereafter.
 - If SWAN run fails: log ERROR, retain the last successful cache entry. Do NOT invalidate the cache on failure — stale TruShore data is always preferred to no data.
 - Expose cache age in the surf endpoint response (e.g., `dataAge: 3420` seconds) so the dashboard can show when the last SWAN run completed.
 
 **Accept:**
-- `GET /surf/{spot_id}` returns TruShore data when `nearshore_model = trushore` is configured.
+- `GET /surf/{spot_id}` returns SWAN+TruShore data when `[nearshore]` extra is installed.
 - Wave data varies across all 144 forecast timesteps (not identical values — this is the key regression vs. WW3 fallback).
 - Data age is present in the response.
 - SWAN run failure retains last-good cache: verify by temporarily breaking SWAN binary path, confirm API continues to serve (stale but non-null) surf data.
 - SWAN completes within 15 minutes on the weewx host hardware (it will likely be 2–5 minutes; 15 minutes is the upper bound tolerance).
 
+### T2.6 — Research and implement Hsig → breaking face height conversion
+
+- Owner: Coordinator (Opus) for research; `clearskies-api-dev` (Sonnet) for implementation
+- Files:
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/services/swan_runner.py` (or new `swan_breaker.py`)
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/enrichment/wave_transform.py`
+- Reference: `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md`; Caldwell 2007 (empirical surf height formula); SWAN manual §4 (output variables)
+
+**Background:**
+
+SWAN outputs significant wave height (Hsig / Hm0) — the average height of the highest one-third of waves in the sea state. This is a purely oceanographic metric, not a surf height. Three gaps exist between Hsig and what surfers actually see:
+
+1. **Hsig vs. maximum breaker height:** Individual breaking waves (Hmax) can be 1.4–1.6× larger than Hsig. Surfers track individual waves and set waves, so raw Hsig will feel too small.
+2. **Shoaling and period factor:** If the SWAN output point is slightly offshore (e.g., 10m depth), the wave hasn't finished its final steepening. A 3 ft Hsig with a 16s period will swell and double when it hits a shallow reef; the same Hsig with a 6s period will crumble and look smaller. A breaking formula is needed to compute the actual height at the lip.
+3. **Surfer scale:** Even with the true physical face height, the display scale must match audience expectations. The Surfline/face-height scale maps physical breaker height directly to the chart. The Hawaiian/traditional scale divides by ~2. Clear Skies should use the face-height scale (consistent with US mainland expectations) with a configurable operator option for Hawaiian scale.
+
+ADR-084's Supplement 1 (γ correction via Battjes 1974) partially addresses this: it corrects the breaker index for bottom slope and type, computing `H_max = γ_corrected × depth`. However, this does not fully account for period-dependent shoaling amplification or the Hsig-to-Hmax statistical gap.
+
+**Do:**
+
+- **Research phase (Coordinator):** Evaluate the Caldwell Surf Height formula (`H_b = f(H_sig, T_p)`) and other empirical breaker models (Komar 1998, Goda 2010) for converting SWAN Hsig + peak period + SWAN output depth into a breaking face height. Determine which formula best fits the SWAN output point depths configured per surf spot. Key question: where are the SWAN output nodes relative to the beach (deep water, 10m contour, or surf zone)?
+- **Implementation phase:** Apply the chosen conversion in `wave_transform.py` or `swan_runner.py` (whichever is architecturally appropriate). The conversion must account for:
+  - SWAN output depth at the configured output point
+  - Peak period (Tp) from SWAN — longer periods amplify more during shoaling
+  - The statistical Hsig → Hmax factor (Rayleigh distribution: Hmax ≈ 1.4–1.6 × Hsig for typical wave records)
+  - Operator-configurable scale: face-height (default, US mainland) or Hawaiian (÷2)
+- The existing γ correction (Supplement 1 from ADR-084) should compose with this conversion, not duplicate it. Clarify which correction applies at which stage.
+- Add a `surf_height_scale` config option: `face` (default) or `hawaiian`. Document in OPERATIONS-MANUAL.
+
+**Accept:**
+- Research findings documented in a brief (`docs/planning/briefs/WAVE-BREAKING-CONVERSION-BRIEF.md`) with the chosen formula, source citations, and worked examples comparing raw Hsig vs. converted face height for at least 3 representative conditions (small day 2ft 8s, medium day 4ft 12s, large day 8ft 16s).
+- Conversion applied in the enrichment pipeline: `waveHeightAtBreak` in the API response reflects breaking face height, not raw Hsig.
+- Face-height values match expectations: a 2.4 ft Hsig with a 7s period should convert to approximately the same face height surfers would observe.
+- Hawaiian scale option produces values ≈ ½ of face-height values when configured.
+- Existing γ correction (Supplement 1) still functions and does not double-count with the new conversion.
+
 ### QC Gate 2
 
 - SWAN produces physically reasonable wave forecasts for the Huntington Beach test domain: Hs 0.3–3.0m, Tm01 8–16s for a typical SoCal winter swell.
 - Wave data varies across forecast timesteps (not identical values across 144 hours).
-- Compare TruShore Hs at surf spot against NWPS Hs at the same location for overlapping cycles: values should be within ±0.5m for typical conditions. Significant divergence indicates an input data or domain setup error.
+- Compare SWAN+TruShore breaking face height at surf spot against NDBC buoy observations at the nearest coastal buoy for overlapping periods: values should be physically reasonable and within the expected nearshore-to-buoy offset range.
+- Hsig → breaking face height conversion verified: raw SWAN Hsig + Tp + output depth produces a face height consistent with surfer expectations for the given conditions.
 - SWAN run completes within 15 minutes on weewx host.
 - Cache retains last-good data on SWAN failure.
 - All Phase 1 test baselines hold.
@@ -370,21 +432,20 @@ SWAN is the wave physics engine. This phase installs SWAN, implements the runner
 
 ## Phase 3 — TruShore Post-Processing Integration
 
-SWAN output replaces NWPS as the input to the existing wave_transform.py and surf_scorer.py processors. This is primarily wiring, not new code.
+SWAN output feeds the existing wave_transform.py and surf_scorer.py enrichment processors. This phase wires the new data source, removes NWPS, and cleans up.
 
 ### T3.1 — Wire SWAN output through wave_transform.py
 
 - Owner: `clearskies-api-dev` (Sonnet)
 - Files:
   - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/endpoints/surf.py`
-  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/enrichment/wave_transform.py` (if NWPS-specific assumptions exist)
-- Reference: API-MANUAL §17 (NWPS supplement processor spec — same supplements must run on SWAN output); `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md` §7
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/enrichment/wave_transform.py` (remove any NWPS-specific assumptions)
+- Reference: API-MANUAL §17 (supplement processor spec); `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md` §7
 
 **Do:**
-- In the surf endpoint, when `nearshore_model = trushore`, use `TrushoreProvider.fetch()` to get wave data instead of `NWPSProvider.fetch()`. Pass the resulting wave data to `wave_transform.apply_supplements()` exactly as NWPS data is currently passed.
-- Verify that wave_transform.py makes no NWPS-specific assumptions about its input data format. The input to `apply_supplements()` is `MarineForecastPoint` — if SWAN produces the same format (T2.4), no changes to wave_transform.py are needed.
-- If wave_transform.py has any code paths that check `data_source == "nwps"`, update those to also accept `data_source == "trushore"`.
-- All four supplements (γ correction, structure effects, spatial interpolation, topographic focusing) must fire for TruShore data exactly as they do for NWPS data.
+- In the surf endpoint, use `TrushoreProvider.fetch()` to get wave data. Pass the resulting wave data to `wave_transform.apply_supplements()`.
+- Remove any NWPS-specific code paths in wave_transform.py (e.g., `data_source == "nwps"` checks). The input is `MarineForecastPoint` — source-agnostic.
+- All four supplements (γ correction, structure effects, spatial interpolation, topographic focusing) must fire for SWAN+TruShore data.
 
 **Accept:**
 - `GET /surf/{spot_id}` with TruShore configured returns `waveHeight` values that differ from the raw SWAN output (confirming supplements were applied, not bypassed).
@@ -411,7 +472,7 @@ SWAN output replaces NWPS as the input to the existing wave_transform.py and sur
 - `windSource` field in `SurfForecast` response reflects `"hrrr_trushore"` for forecast timesteps and `"station"` or `"forecast_provider"` for the current-conditions snapshot.
 - The "glassy" wind quality label (wind < 5 mph) applies correctly when HRRR reports winds below that threshold.
 
-### T3.3 — Update surf endpoint to use TruShore as primary source
+### T3.3 — Update surf endpoint to use SWAN+TruShore as sole source
 
 - Owner: `clearskies-api-dev` (Sonnet)
 - Files:
@@ -419,35 +480,43 @@ SWAN output replaces NWPS as the input to the existing wave_transform.py and sur
 - Reference: API-MANUAL §17 (data source hierarchy); `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md` §5 (last-good-run fallback industry pattern)
 
 **Do:**
-- Add config branch: `if config.marine.nearshore_model == "trushore": use TrushoreProvider else: use NWPSProvider`.
-- TruShore primary fallback chain: TruShore (current cache) → TruShore (last successful cache, any age) → no surf data (return null surf fields with a note "surf forecast unavailable"). Do NOT fall to WW3 for surf data.
-- NWPS mode fallback chain (legacy, unchanged): NWPS → WW3 → identical values across timesteps.
-- Add `nearshoreModel` field to the surf endpoint response: `"trushore"` or `"nwps"` so the dashboard can display the data source.
+- The surf endpoint uses `TrushoreProvider.fetch()` as its only data source. No config branch, no alternative model — SWAN+TruShore is the only nearshore model.
+- Fallback chain: SWAN+TruShore (current cache) → SWAN+TruShore (last successful cache, any age) → no surf data (return null surf fields with a note "surf forecast unavailable"). Do NOT fall to WW3 for surf data.
+- Add `nearshoreModel` field to the surf endpoint response: `"swan_trushore"`.
 - Add `lastRunTime` field: ISO timestamp of when the SWAN run that produced this data completed.
 
 **Accept:**
-- `GET /surf/{spot_id}` returns `nearshoreModel: "trushore"` when TruShore is configured.
+- `GET /surf/{spot_id}` returns `nearshoreModel: "swan_trushore"`.
 - `lastRunTime` is present and reflects the SWAN run timestamp (not the request time).
-- With TruShore unavailable (SWAN binary broken): response returns null surf fields with `nearshoreModel: "trushore"`, `error: "surf forecast unavailable"`. No WW3 fallback for surf data.
-- With TruShore in legacy/stale state (last run 6 hours ago): response serves the stale cache with `dataAge: 21600` in the response. Does not fall to WW3.
+- With SWAN unavailable (binary broken): response returns null surf fields with `error: "surf forecast unavailable"`. No WW3 fallback.
+- With stale cache (last run 6 hours ago): response serves the stale cache with `dataAge: 21600`. Does not fall to WW3.
 
-### T3.4 — Move NWPS to legacy status
+### T3.4 — Delete NWPS module and clean up all references
 
 - Owner: `clearskies-api-dev` (Sonnet)
 - Files:
-  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/providers/marine/nwps.py`
-  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/cache_warmer.py`
-- Reference: PROVIDER-MANUAL §14.6 (legacy marker added in T0.4)
+  - Delete: `repos/weewx-clearskies-api/weewx_clearskies_api/providers/marine/nwps.py`
+  - Delete: `repos/weewx-clearskies-api/tests/providers/marine/test_nwps.py` (and any NWPS test fixtures)
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/providers/marine/__init__.py` (remove NWPS registration)
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/cache_warmer.py` (remove NWPS schedule entry)
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/endpoints/surf.py` (remove any remaining NWPS import or reference)
+  - Modify: any config files or examples that reference `nwps` or `nearshore_model`
 
 **Do:**
-- Add a deprecation warning to `NWPSProvider.fetch()`: when called with no `nearshore_model = nwps` config, log WARNING "NWPS is the legacy nearshore model. Set `nearshore_model = trushore` and install the `[nearshore]` pip extra for TruShore (recommended)."
-- Remove NWPS from the cache warmer's default schedule when `nearshore_model = trushore` is configured. NWPS should only run on schedule if `nearshore_model = nwps` is explicitly set.
-- NWPS module itself is NOT removed or modified further — it remains functional for operators who choose to use it.
+- Delete `providers/marine/nwps.py` and its tests. NWPS is eliminated — no dead code.
+- Remove NWPS from the cache warmer schedule.
+- Remove NWPS from the provider registry.
+- Remove any `nearshore_model` config key — there is no choice to make. If `[nearshore]` extra is installed, SWAN+TruShore runs.
+- Remove `nwps_wfo` from any config models or apply logic (the wizard resolved this per-location for NWPS grid selection — SWAN+TruShore uses its own configurable grid bbox instead).
+- Grep the entire API codebase for "nwps" (case-insensitive) and remove all references. This includes imports, config parsing, error messages, comments, and test fixtures.
+- Grep the stack repo for "nwps" and remove all references: `nwps_wfo` from config_writer.py, marine wizard step templates, admin marine section, and translation files. NWPS setup/admin UI is eliminated along with the code.
 
 **Accept:**
-- With `nearshore_model = trushore`: NWPS does not appear in startup cache warmer logs.
-- With `nearshore_model = nwps`: NWPS runs on schedule, no deprecation warning at startup (the operator has made an explicit choice).
-- NWPS module passes all existing tests without modification.
+- `grep -ri "nwps" repos/weewx-clearskies-api/` returns zero hits (excluding git history).
+- `grep -ri "nwps" repos/weewx-clearskies-stack/` returns zero hits (excluding git history).
+- No `nearshore_model` config key exists anywhere.
+- API starts and serves surf data without any NWPS code present.
+- All existing non-NWPS tests pass.
 
 ### T3.5 — Scope WaveWatch III correctly as marine (not surf) source
 
@@ -458,25 +527,25 @@ SWAN output replaces NWPS as the input to the existing wave_transform.py and sur
 - Reference: API-MANUAL §17 (WW3 role — boundary input to SWAN and marine deep-water endpoint, not surf fallback); T0.3 updates
 
 **Do:**
-- Remove WaveWatch III from the surf endpoint fallback chain when `nearshore_model = trushore`. WW3 must not appear as a fallback for the surf endpoint.
+- Remove WaveWatch III from the surf endpoint fallback chain. WW3 must not appear as a fallback for the surf endpoint.
 - Confirm WaveWatch III continues to serve the marine endpoint's deep-water wave forecast (not affected by TruShore).
 - Confirm WaveWatch III continues to be fetched by the TruShore pipeline as a boundary condition input (T2.3). The wavewatch.py provider is unchanged and continues to be called — just not for surf fallback.
 - Add a code comment in `endpoints/surf.py`: "WaveWatch III (50km resolution) is not used as a surf forecast source. See API-MANUAL §17. WW3 data serves as SWAN boundary conditions via TrushoreProvider."
 
 **Accept:**
-- `GET /surf/{spot_id}` response never shows `waveDataSource: "wavewatch"` when `nearshore_model = trushore`.
+- `GET /surf/{spot_id}` response never shows `waveDataSource: "wavewatch"`.
 - `GET /marine/{location_id}` response continues to show WaveWatch III deep-water wave data.
 - TruShore pipeline continues to fetch WW3 for boundary conditions (verify via WW3 cache hit logs).
 
 ### QC Gate 3
 
 - `GET /surf/{spot_id}` returns varying `waveHeight`, `wavePeriod`, and `waveDirection` across all 144 forecast timesteps — not identical values.
-- All four wave_transform.py supplements fire for TruShore data (verify via DEBUG logs or supplement-specific unit tests).
+- All four wave_transform.py supplements fire for SWAN+TruShore data (verify via DEBUG logs or supplement-specific unit tests).
 - `windQualityScore` varies across forecast timesteps, reflecting the HRRR forecast wind pattern.
 - `windSource` field correctly reflects "hrrr_trushore" for forecast timesteps.
-- `nearshoreModel` field is present in the surf response.
-- WaveWatch III never appears as a surf data source when `nearshore_model = trushore`.
-- NWPS module passes all existing tests (no regression from T3.4 changes).
+- `nearshoreModel: "swan_trushore"` is present in the surf response.
+- WaveWatch III never appears as a surf data source.
+- `grep -ri "nwps" repos/weewx-clearskies-api/` returns zero hits (T3.4 cleanup confirmed).
 - All Phase 1 and 2 test baselines hold.
 
 ---
@@ -535,7 +604,7 @@ Operators who want to run SWAN on dedicated hardware (a more powerful machine, a
 - Config loads without error when `[trushore] service_url` is present.
 - With `service_url = http://remote:8767`: API calls the remote endpoint, not the local SWAN runner.
 - With `service_url = http://unreachable:8767`: API falls back to bundled mode with ERROR log.
-- Config wizard (if applicable) does not show `service_url` field unless `nearshore_model = trushore` is set (advanced operator option — not a day-1 wizard requirement).
+- Wizard SWAN+TruShore step (T4.4) presents `service_url` only when operator selects the separated service deployment mode.
 
 ### T4.3 — Health check and unreachable-service fallback
 
@@ -554,6 +623,82 @@ Operators who want to run SWAN on dedicated hardware (a more powerful machine, a
 - With remote service back up: API resumes fresh data on the next health check cycle (within 60 seconds).
 - `dataAge` accurately reflects the age of the SWAN output, not the age of the API's last cache fetch.
 
+### T4.4 — Add SWAN+TruShore setup to the wizard
+
+- Owner: `clearskies-api-dev` (Sonnet) + `clearskies-docs-author` (Sonnet)
+- Files:
+  - New: `repos/weewx-clearskies-stack/weewx_clearskies_config/templates/wizard/step_trushore.html`
+  - Modify: `repos/weewx-clearskies-stack/weewx_clearskies_config/wizard/routes.py` (add step)
+  - Modify: `repos/weewx-clearskies-stack/weewx_clearskies_config/wizard/config_writer.py` (write `[trushore]` config)
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/endpoints/setup.py` (accept `[trushore]` in apply payload)
+  - Modify: all 13 locale translation files in `repos/weewx-clearskies-stack/weewx_clearskies_config/translations/`
+- Reference: OPERATIONS-MANUAL §1 (wizard step patterns); existing marine wizard step for reference
+
+**Do:**
+- Add a SWAN+TruShore wizard step (shown only when the `[nearshore]` pip extra is detected via the existing eccodes-style check pattern — `GET /setup/marine/swan-check`).
+- Step presents two deployment modes:
+  - **Bundled** (default): SWAN runs as a subprocess inside the API. No additional config needed beyond the SWAN binary being on PATH.
+  - **Separated service**: Operator provides `service_url` pointing to a remote SWAN+TruShore instance. Step validates connectivity with a test request to `{service_url}/health`.
+- Step also collects:
+  - SWAN computational grid bounding box (pre-filled from the marine location coordinates configured in an earlier wizard step, with a default margin of ±0.2°).
+  - Grid resolution (default 200m, configurable).
+- Add a `GET /setup/marine/swan-check` endpoint that probes whether the SWAN binary is available on PATH and returns `{"available": true/false, "version": "41.xx", "path": "/usr/local/bin/swan"}`.
+- All labels, descriptions, help text, and error messages must use i18n translation keys. Add keys to all 13 locale JSON files (English values first; translations follow the existing pattern of marking new keys for translator review).
+- Step-level help content: `help.wizard.trushore.*` keys explaining what SWAN+TruShore is, what the deployment modes mean, and how to install the SWAN binary if missing. Follow the existing `ConfigField.help_text` pattern.
+
+**Accept:**
+- Wizard step renders and functions in all 13 locales.
+- SWAN binary check blocks the step with install instructions if SWAN is not found.
+- Bundled mode: step completes with no `service_url` in the apply payload.
+- Separated mode: step validates connectivity before allowing next.
+- Apply payload includes `[trushore]` section; API's `ApplyRequest` model accepts it without 422.
+- All strings are i18n-keyed; no hardcoded English in templates.
+
+### T4.5 — Add SWAN+TruShore section to admin
+
+- Owner: `clearskies-api-dev` (Sonnet) + `clearskies-docs-author` (Sonnet)
+- Files:
+  - New: `repos/weewx-clearskies-stack/weewx_clearskies_config/templates/admin/trushore.html`
+  - Modify: `repos/weewx-clearskies-stack/weewx_clearskies_config/config/routes.py` (add admin section)
+  - Modify: all 13 locale translation files
+- Reference: existing admin marine section for patterns; OPERATIONS-MANUAL (admin section patterns)
+
+**Do:**
+- Add a SWAN+TruShore section under the admin marine configuration area. The section allows operators to:
+  - Switch between bundled and separated deployment modes.
+  - Update `service_url` for separated mode (with connectivity test button).
+  - View current SWAN+TruShore status: last run time, SWAN version, grid bbox, resolution.
+  - Trigger a manual SWAN run (calls `POST /trigger` on the service or bundled runner).
+- Admin section reads current config from `/setup/current-config` (same pattern as other admin sections).
+- All strings use i18n translation keys. Add `help.admin.trushore.*` keys for the admin help panel.
+
+**Accept:**
+- Admin section renders and functions in all 13 locales.
+- Deployment mode switch applies via `/setup/apply` without 422.
+- SWAN+TruShore status (last run, version, grid) displays correctly.
+- Manual trigger fires a SWAN run and reports completion.
+- All strings are i18n-keyed.
+
+### T4.6 — Update Operator Manual for SWAN+TruShore setup
+
+- Owner: `clearskies-docs-author` (Sonnet)
+- Files:
+  - Modify: `repos/weewx-clearskies-stack/docs/OPERATOR-MANUAL.md`
+- Reference: OPERATIONS-MANUAL §1 (native dependency documentation pattern)
+
+**Do:**
+- Add a "SWAN+TruShore Nearshore Model" section to the Operator Manual documenting:
+  - Prerequisites: SWAN binary installation (`install_swan.sh` or `apt install` on Debian), gfortran, OpenMP.
+  - Wizard setup flow: what each field means, bundled vs. separated mode.
+  - Admin maintenance: how to check status, trigger manual runs, switch modes.
+  - Troubleshooting: common SWAN errors, missing binary, grid resolution tuning.
+- Follow the existing native dependency documentation pattern (eccodes section).
+
+**Accept:**
+- Operator Manual has a complete SWAN+TruShore section.
+- Prerequisites are documented with platform-specific install commands.
+- Both deployment modes are documented with when to use each.
+
 ### QC Gate 4
 
 - Standalone `weewx-clearskies-trushore` service starts and returns health and forecast data.
@@ -561,6 +706,10 @@ Operators who want to run SWAN on dedicated hardware (a more powerful machine, a
 - Remote service failure: API serves stale cache, logs ERROR, never falls to WW3.
 - Remote service recovery: API resumes fresh data within 60 seconds of health check recovery.
 - No regression in bundled mode (the default, no `service_url` set).
+- Wizard SWAN+TruShore step functional in all 13 locales.
+- Admin SWAN+TruShore section functional in all 13 locales.
+- Operator Manual SWAN+TruShore section present and complete.
+- All wizard/admin i18n keys present in all 13 locale files.
 
 ---
 
@@ -586,7 +735,7 @@ The dashboard surf tab already has a 72-hour forecast card that shows wave data.
 - 72-hour surf forecast chart shows a curve, not a flat line, for a real TruShore SWAN run.
 - Time axis is in the operator's configured timezone.
 - Wave height is in the configured unit (feet for US preset).
-- No visual regression compared to NWPS mode (chart renders correctly when NWPS data is shown via legacy mode).
+- Chart handles edge cases: null surf data (SWAN unavailable) shows an appropriate empty/error state.
 
 ### T5.2 — Add data source indicator on surf tab
 
@@ -596,16 +745,17 @@ The dashboard surf tab already has a 72-hour forecast card that shows wave data.
 - Reference: DESIGN-MANUAL (attribution badge pattern if one exists); `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md` §7 (TruShore name)
 
 **Do:**
-- Add a data source indicator on the surf tab showing: "Model: TruShore" (when `nearshoreModel: "trushore"` in the API response) or "Model: NWPS" (when `nearshoreModel: "nwps"`).
-- Include a small tooltip or info icon that explains: "TruShore is a Clear Skies nearshore wave model that runs on an hourly schedule, independent of NWS operations."
+- Add a data source indicator on the surf tab showing: "Model: SWAN+TruShore" (from `nearshoreModel: "swan_trushore"` in the API response).
+- Include a small tooltip or info icon that explains: "SWAN+TruShore is the Clear Skies nearshore wave model powered by SWAN, running on an hourly schedule independent of NWS operations."
 - Placement: footer of the surf forecast card, or alongside the "Last updated" timestamp. Consistent with how other data source attributions appear on the dashboard.
 - `lastRunTime` from the API response: display as "Last model run: [relative time]" (e.g., "34 minutes ago").
+- All user-facing strings (indicator label, tooltip) must use i18n translation keys, not hardcoded English.
 
 **Accept:**
-- "Model: TruShore" indicator visible on the surf tab when TruShore is the configured model.
+- "Model: SWAN+TruShore" indicator visible on the surf tab.
 - Tooltip text is present and accessible (keyboard focusable, screen reader compatible).
 - `lastRunTime` displays as a relative timestamp.
-- In NWPS legacy mode: indicator shows "Model: NWPS" instead.
+- All strings are i18n-keyed (no hardcoded English in component JSX).
 
 ### T5.3 — Update current conditions card to use TruShore snapshot
 
@@ -620,17 +770,17 @@ The dashboard surf tab already has a 72-hour forecast card that shows wave data.
 - No chart changes needed for the Now page — just confirm the data source is correct.
 
 **Accept:**
-- `surfRating` on the Now page reflects TruShore's `t=0` output, not the NWPS output.
-- Wind source for `t=0` scoring: station hardware if available, HRRR `t=0` otherwise (not legacy NDBC buoy).
+- `surfRating` on the Now page reflects SWAN+TruShore's `t=0` output.
+- Wind source for `t=0` scoring: station hardware if available, HRRR `t=0` otherwise.
 
 ### QC Gate 5
 
 - 72-hour surf forecast chart shows varying data (wave height curve, not flat line) for real TruShore output.
-- Data source indicator "Model: TruShore" visible and accessible on surf tab.
+- Data source indicator "Model: SWAN+TruShore" visible and accessible on surf tab.
 - `lastRunTime` relative timestamp displayed correctly.
 - Current conditions surf rating sourced from TruShore.
 - Dashboard vitest baseline holds.
-- No visual regression in NWPS legacy mode.
+- All surf tab strings are i18n-keyed.
 
 ---
 
@@ -669,7 +819,7 @@ This phase re-validates everything independently after implementation is complet
 ### T6.3 — Manual-code consistency verification
 
 - Owner: `clearskies-auditor` (Sonnet)
-- Reading list: `docs/manuals/API-MANUAL.md` §17; `docs/manuals/PROVIDER-MANUAL.md` §14.{HRRR}, §14.{TruShore}, §14.6; `docs/ARCHITECTURE.md`; relevant source files
+- Reading list: `docs/manuals/API-MANUAL.md` §17; `docs/manuals/PROVIDER-MANUAL.md` §14.{HRRR}, §14.{TruShore}; `docs/ARCHITECTURE.md`; relevant source files
 
 **Do:**
 - For each claim in the updated §17 and PROVIDER-MANUAL sections, trace the claim to the implementing code.
@@ -681,25 +831,25 @@ This phase re-validates everything independently after implementation is complet
 - Every implemented behavior is documented.
 - No claim in the manuals refers to code that does not exist.
 
-### T6.4 — End-to-end validation: TruShore vs. NWPS comparison
+### T6.4 — End-to-end validation: SWAN+TruShore output sanity check
 
 - Owner: `clearskies-auditor` (Sonnet)
-- Environment: live weewx host with both TruShore and NWPS available
+- Environment: live weewx host
 
 **Do:**
-- For a period when NWPS data is available, compare TruShore output against NWPS output at the same surf spot:
-  - Hs (significant wave height): should be within ±0.5m for typical conditions.
-  - Tm01 (mean period): should be within ±2s.
-  - MWD (mean wave direction): should be within ±30°.
-- Document any systematic biases (TruShore consistently higher/lower than NWPS). Biases are expected and acceptable — they do not indicate bugs. Document them for operator awareness.
-- Verify physically impossible values are absent in the live TruShore output (Hs > 20m, Tm01 < 1s, MWD out of range, NaN).
+- Compare SWAN+TruShore output at a surf spot against the nearest NDBC coastal buoy observations for the same time period:
+  - Hs (significant wave height): should be physically reasonable for the nearshore environment (typically lower than offshore buoy due to bottom friction).
+  - Tm01 (mean period): should be within ±3s of buoy-observed dominant period.
+  - MWD (mean wave direction): should be consistent with the regional swell direction.
+- Verify physically impossible values are absent in live output (Hs > 20m, Tm01 < 1s, MWD out of range, NaN).
 - Verify wave data varies across forecast timesteps in the live surf endpoint response.
+- Verify `grep -ri "nwps" repos/weewx-clearskies-api/` returns zero hits — NWPS is fully eliminated.
 
 **Accept:**
-- Comparison results documented (pass/fail per metric, with observed values).
+- Sanity check results documented (pass/fail per metric, with observed values).
 - No physically impossible values in live output.
 - Wave data varies across forecast timesteps.
-- Systematic biases documented if present.
+- No NWPS code or references remain in the API codebase.
 
 ### T6.5 — Performance verification
 
@@ -724,17 +874,19 @@ This phase re-validates everything independently after implementation is complet
 
 After all phases complete:
 
-- Surf endpoint returns varying wave data across all 144 forecast timesteps for TruShore-configured locations
-- All four wave_transform.py supplements fire for TruShore data (γ correction, structure effects, spatial interpolation, topographic focusing)
+- Surf endpoint returns varying wave data across all 144 forecast timesteps
+- All four wave_transform.py supplements fire for SWAN+TruShore data (γ correction, structure effects, spatial interpolation, topographic focusing)
 - Wind quality in surf score reflects HRRR forecast wind, not station observation, for forecast timesteps
-- `nearshoreModel: "trushore"` appears in surf endpoint responses
+- `nearshoreModel: "swan_trushore"` appears in surf endpoint responses
 - `lastRunTime` reflects SWAN run completion time
-- WaveWatch III never appears as a surf endpoint data source when TruShore is configured
-- NWPS remains functional in legacy mode (`nearshore_model = nwps`) with no regression
-- NWPS remains functional as SWAN boundary condition source via `providers/marine/wavewatch.py`
-- Standalone `weewx-clearskies-trushore` service starts and serves data (if Phase 4 is complete)
+- WaveWatch III never appears as a surf endpoint data source
+- NWPS is fully eliminated: `grep -ri "nwps" repos/weewx-clearskies-api/` returns zero hits
+- No `nearshore_model` config key exists — SWAN+TruShore is the only nearshore model
+- WaveWatch III continues to serve the marine endpoint and as SWAN boundary conditions via `providers/marine/wavewatch.py`
+- Standalone `weewx-clearskies-trushore` service starts and serves data (Phase 4)
 - 72-hour surf forecast chart on dashboard shows a curve, not a flat line
-- "Model: TruShore" indicator visible on surf tab
-- All governing documents (API-MANUAL §17, PROVIDER-MANUAL, ARCHITECTURE.md) match implemented code
-- Phase-boundary ADR compliance sweep: every ADR that touches marine/surf/nearshore is verified against the TruShore implementation
+- "Model: SWAN+TruShore" indicator visible on surf tab, i18n-keyed
+- Wizard/admin SWAN+TruShore setup section functional with i18n-compliant help content
+- All governing documents (API-MANUAL §17, PROVIDER-MANUAL, ARCHITECTURE.md) match implemented code — no NWPS references remain
+- Phase-boundary ADR compliance sweep: every ADR that touches marine/surf/nearshore is verified against the SWAN+TruShore implementation
 - All test baselines established at phase kickoff hold at plan completion

@@ -1802,6 +1802,7 @@ Each phrase generator consumes specific fields from the `ForecastPeriod` datacla
 | Weather/precip | `weather_codes`, `precip_type`, `pop`, `precip_coverage` | union, mode, max, derived from pop | `weatherCode`, `precipType`, `precipProbability` | Y | Y | Y | Y |
 | Snow accumulation | `snow_amount` | sum(precipAmount) where type=snow | `precipAmount` | Y | — | Y | Y |
 | Ice accumulation | `ice_accumulation` | from daily `iceAccumulation` | daily field | Y | — | — | — |
+| Dewpoint | `dewpoint` | passthrough | `dewpoint` | Y | — | Y | — |
 | Fire: humidity | `humidity_max/min` | max/min(outHumidity) | `outHumidity` | Y | — | Y | Y |
 | Fire: LAL | `weather_codes` + `precip_coverage` | derived | `weatherCode` + PoP | Y | Y | Y | Y |
 
