@@ -56,37 +56,88 @@ SWAN license: open-source, free to use, well-documented. Available from `swanmod
 
 ### Compute Requirements
 
-Research across multiple operational deployments establishes that SWAN is far less computationally demanding than NWPS's operational deployment implies.
+SWAN memory and runtime are driven by total grid points (domain extent ÷ resolution) multiplied by spectral bins (typically 36 directions × 31 frequencies = 1,116 bins). Each grid point stores approximately 16 bytes per spectral bin across internal working arrays.
 
-**For a single surf spot domain (30km × 15km, 200m resolution, ~11,000 grid points):**
+**Memory formula (approximate):**
 
-| Resource | Requirement |
+```
+Memory (MB) ≈ grid_points × 1,116 × 16 / 1,000,000
+```
+
+| Grid points | Approx. memory |
 |---|---|
-| RAM | 100–300 MB |
-| Runtime, single core | 2–10 minutes |
-| Runtime, 4–6 cores (OpenMP) | 1–5 minutes |
-| Hardware | Any modern computer, including a $200 mini-PC |
+| 5,000 | ~90 MB |
+| 10,000 | ~180 MB |
+| 25,000 | ~450 MB |
+| 100,000 | ~1.8 GB |
+| 250,000 | ~4.5 GB |
 
-**Why NWPS runs on 96-core WCOSS when SWAN is so lightweight:**
+**CORRECTION (2026-07-17):** The original brief estimated 100–300 MB for a "30km × 15km, 200m resolution" domain. This estimate was never validated. A 30km × 15km domain at 200m resolution produces 150 × 75 = 11,250 grid points × 1,116 spectral bins × 16 bytes ≈ 200 MB. That particular domain size happens to fit. However, the plan (SWAN-TRUSHORE-PLAN.md) specified a ±0.5° domain around surf locations (~110km × 110km at 200m = 257,000 grid points ≈ 4.5 GB), which vastly exceeds the brief's estimate. The mismatch was not caught until the production deployment on 2026-07-17 crashed with an OOM kill on a 1.9 GB host.
 
-The NWPS-WCOSS Pre-Kickoff Presentation (NCEP/EMC, 2014) shows 96 cores were allocated for ALL 36 WFOs running simultaneously, not for a single location. Each WFO covers a large domain at finer resolution than a surf forecast needs. Before WCOSS, NWPS ran at the National Hurricane Center on a 24-core departmental Linux cluster — not dedicated supercomputing. The move to WCOSS was about operational reliability and centralized management for a National Weather Service program, not about the physics being computationally intensive.
+### Grid Configuration: Nested Grids (Standard Practice)
 
-**Validated operational examples (not lab benchmarks):**
+**No operational nearshore wave forecast system runs fine resolution over the entire domain.** Every operational system uses nested grids: a coarse outer grid for wave propagation across the continental shelf, and a fine inner grid focused on the nearshore area of interest.
 
-| Deployment | Hardware | Runtime |
-|---|---|---|
-| Bulgarian Meteorological Service | Standard Linux workstation | Daily operational forecasts |
-| USGS South San Francisco Bay study | Standard Linux workstation | HRRR → SWAN pipeline demonstrated |
-| Inductiva.ai cloud demo | Single cloud VM | ~2.5 minutes for a complete simulation |
+**NWPS SGX (San Diego WFO) — actual configuration from [NOAA-EMC/nwps](https://github.com/NOAA-EMC/nwps) source code:**
+
+| Level | Resolution | Domain | Extent | Grid points |
+|---|---|---|---|---|
+| CG1 (outer) | 2.0 arc-min (~3.6 km) | 32.08–33.82°N, 119.00–116.50°W | ~193 km × 230 km | ~3,900 |
+| CG2 (inner nest) | 0.125 arc-min (~230m) | 32.68–32.89°N, 117.34–117.24°W | ~23 km × 9 km | ~4,800 |
+| **Total** | | | | **~8,700** |
+
+The inner nest covers only the coastline of interest at fine resolution. The outer grid handles deep-water-to-shelf wave propagation at coarse resolution. SWAN natively supports this: the outer run completes first, then the inner run uses the outer's output as boundary conditions.
+
+**Estimated memory: ~160 MB total for both grids combined.**
+
+**Other operational systems:**
+
+| System | Approach | Nearshore resolution | Forecast length |
+|---|---|---|---|
+| NWPS SGX | 2-level regular nested grid | ~230m | GFS wind, 180 hours |
+| PacIOOS Oahu | Single grid, WW3 boundary | ~500m | 5 days (120 hours) |
+| Rogers 2007 SoCal | 3-level nested grid | ~45m (finest) | Research hindcast |
+| USGS CoSMoS SoCal | 3-level nested (1km → 200m → 40m) | 40m (finest) | Storm event |
+
+**Key findings:**
+- The nesting ratio (resolution step between levels) should not exceed 3–5x per level for numerical stability (multiple sources). NWPS SGX uses ~16:1 in a single step; published research typically uses 3–5x per step with 2–3 nesting levels.
+- Published finding: "a uniform 40m resolution led to unacceptable memory requirements of 4 GB" — confirming that fine resolution over large areas is not viable without nesting.
+- PacIOOS runs operational 5-day forecasts at 500m on standard infrastructure, with WW3 at 5km providing boundary conditions. This is a proven operational configuration.
+
+**Wind forcing and forecast length:**
+
+NWPS uses GFS wind forcing (not HRRR), which extends to 180 hours (7.5 days). HRRR provides higher resolution (3km vs GFS's 25km) but only extends to 18 or 48 hours depending on the cycle (4 extended cycles per day at 00/06/12/18Z reach 48h; the other 20 hourly cycles reach only 18h). To produce a 72-hour surf forecast, either GFS wind must be used for the extended range (hours 48–72), or HRRR data from multiple cycles must be stitched together.
 
 **Cited sources:**
-- SWAN parallel computing efficiency: Zijlema (2021), *Parallel Computing Efficiency of SWAN 40.91*, Geoscientific Model Development
+- NWPS SGX domain config: https://github.com/NOAA-EMC/nwps (fix/domains/SGX, fix/configs/sgx_ncep_config.sh)
+- SWAN parallel computing efficiency: Zijlema (2021), *Parallel Computing Efficiency of SWAN 40.91*, Geoscientific Model Development — https://gmd.copernicus.org/articles/14/4241/2021/
+- PacIOOS Oahu operational forecast: https://www.pacioos.hawaii.edu/waves/model-oahu/
+- Rogers et al. (2007), *Forecasting and hindcasting waves with the SWAN model in the Southern California Bight*, Coastal Engineering — https://falk.ucsd.edu/seminar/Rogers2007CoastalEng.pdf
 - NWPS operational deployment: NWPS-WCOSS Pre-Kickoff Presentation, NCEP/EMC, 2014
-- USGS SF Bay study: HRRR-driven SWAN pipeline, U.S. Geological Survey Western Coastal and Marine Geology
+
+### TruShore Grid Configuration (Revised)
+
+Based on the operational research above, TruShore should use a two-level nested grid approach:
+
+**Level 1 — Outer grid (shelf-to-shore wave propagation):**
+- Resolution: ~2–3 km (matches NWPS CG1 pattern)
+- Domain: covers the full continental shelf approach for the configured coast (~200km alongshore × 150km offshore)
+- Purpose: propagates deep-water WW3 swell across the shelf with bathymetric refraction, bottom friction, and wind-wave growth
+- Grid points: ~5,000–8,000
+- Memory: ~100–150 MB
+
+**Level 2 — Inner nest (spot-specific nearshore resolution):**
+- Resolution: 200–500m (matches NWPS CG2 and USGS CoSMoS intermediate grids)
+- Domain: tight around each configured surf location (~20–30 km alongshore × 10–15 km offshore)
+- Purpose: resolves coastal features (jetties, piers, headlands, reefs, sandbars) that make each surf spot different
+- Grid points: ~3,000–8,000
+- Memory: ~50–150 MB
+
+**Total: ~8,000–16,000 grid points, ~200–300 MB memory.** Fits on the weewx host alongside the API, MariaDB, Redis, and weewx.
 
 ### Multi-Spot Efficiency
 
-Multiple surf spots on the same coastline do not require multiple SWAN runs. All spots within a single coastal domain (e.g., 7 spots from Sunset Beach to The Wedge, ~20km) run in ONE domain with ONE SWAN execution. Results are extracted at specific grid points corresponding to each spot's coordinates. The compute cost of forecasting 7 spots is identical to forecasting 1 spot, as long as all spots fall within the domain grid.
+Multiple surf spots on the same coastline share the outer grid. Each spot (or cluster of nearby spots) gets its own inner nest, using the outer grid's output as boundary conditions. The compute cost scales with the number of distinct inner nests, not the number of spots — 5 spots within one 20km nest cost the same as 1 spot.
 
 ---
 
@@ -318,11 +369,20 @@ The following files are already built and deployed in the current Clear Skies AP
 **Q1: HRRR vs. forecaster-edited winds — quantitative impact on surf forecasts.**
 The literature gap identified in §4 remains. The honest position is: HRRR will be at least as good as the NDFD grid for routine conditions; it may be worse for unusual coastal meteorological events where forecasters apply local knowledge. Monitoring TruShore output against NWPS output during the overlap period (Phase 2 QC Gate) will provide empirical data.
 
-**Q2: SWAN binary distribution.**
-SWAN 41.45 requires Fortran compilation. Options: (a) distribute a pre-compiled binary with the pip package for supported platforms (Linux x86-64, ARM64); (b) include a CMake build step in pip install; (c) document manual installation. This is a packaging decision, not a physics decision. The plan schedules this for Phase 2.
+**Q2: SWAN binary distribution — RESOLVED (2026-07-17).**
+SWAN 41.51 must be compiled from source on each target platform. Pre-compiled binaries from SourceForge are ABI-incompatible with Ubuntu 24.04's gfortran 13.3 runtime (Fortran allocatable array metadata layout differs between gfortran versions, causing garbage memory allocation sizes). The source is available at https://gitlab.tudelft.nl/citg/wavemodels/swan and builds with CMake + Ninja + gfortran in ~2 minutes. Docker images compile SWAN at build time, eliminating the ABI issue (binary and runtime are in the same image layer). The `install_swan.sh` script handles native installations.
 
 **Q3: Boundary condition format.**
-WaveWatch III output as SWAN boundary spectra (BOUND SPEC format) requires converting ERDDAP NetCDF wave spectral data to SWAN's directional-frequency spectrum format. This is well-documented in the SWAN manual but requires implementing the conversion. Existing code in `providers/marine/wavewatch.py` fetches the data; the conversion is new.
+WaveWatch III output as SWAN boundary spectra (BOUND SPEC format) requires converting ERDDAP NetCDF wave spectral data to SWAN's directional-frequency spectrum format. This is well-documented in the SWAN manual but requires implementing the conversion. Existing code in `providers/marine/wavewatch.py` fetches the data; the conversion is new. Implementation note (2026-07-17): SWAN 41.51 requires `BOUNDSPEC SIDE ... CONSTANT FILE` with separate files per boundary side (SWAN cannot open the same file twice for two BOUNDSPEC commands).
 
 **Q4: Multiple WFO coverage.**
 The current NWPS provider is keyed by WFO (`wfo` parameter in `providers/marine/nwps.py`). TruShore is keyed by surf spot, not WFO — one SWAN domain per coastal segment, regardless of WFO boundaries. Operators with multiple surf spots across a WFO boundary run one SWAN domain per coastal segment, not one per WFO. This simplification is correct but requires that the API switch from WFO-keyed to location-keyed surf data.
+
+**Q5: Nested grid implementation — NEW (2026-07-17).**
+The current SWAN runner (`services/swan_runner.py`) uses a single flat regular grid (`CGRID REG`). The research in §2 "Grid Configuration: Nested Grids" establishes that all operational nearshore systems use 2–3 level nested grids. Implementing nesting requires: (a) two sequential SWAN runs (outer grid → inner nest, boundary conditions passed via SWAN's native nesting support), (b) computing appropriate domain extents for each level (outer covers the shelf approach, inner covers the coastline of interest), (c) managing the intermediate boundary files between runs. SWAN's user manual documents the nesting workflow. This is the next implementation task.
+
+**Q6: 72-hour forecast range — NEW (2026-07-17).**
+HRRR provides wind forcing for only 18 hours (standard cycles) or 48 hours (extended cycles at 00/06/12/18Z). The dashboard's 72-hour surf forecast card requires 72 hours of wind forcing. NWPS solved this by using GFS wind (0.25°, extends to 384 hours). TruShore needs either: (a) GFS wind for hours 48–72 (blended with HRRR for 0–48h), or (b) GFS wind for the full range (simpler, matches NWPS approach, at the cost of coarser wind for the first 48 hours). A GFS wind provider module is needed. This is a prerequisite for matching the pre-existing 72-hour forecast capability.
+
+**Q7: SWAN INPUT file syntax — RESOLVED (2026-07-17).**
+SWAN 41.51 requires: (a) spectral resolution in the CGRID command (`CIRCLE 36 0.0418 1.0 31`), (b) `COORDINATES SPHERICAL` as a separate command (not `SET CGRID SPHERICAL`), (c) `GEN3 WESTHUYSEN` (not `WESTIN` or `WEST`), (d) `SET NAUTICAL` as a separate command. These were discovered through iterative debugging on the production host. Future changes to the INPUT file generator should be tested with a minimal SWAN run before deployment.
