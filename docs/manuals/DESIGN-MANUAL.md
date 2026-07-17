@@ -1366,7 +1366,7 @@ Grid notation `CxR` maps to the `Card` component's `footprint` (column span) and
 | Surf | Swell Card | `wide` | `2` | 2×2: Conditions at Break stat tiles (icon-left layout: Waves/Timer/Compass icons), swell component table (Type/Dir/Height/Period columns), Dominant Direction compass (1/3 right column) |
 | Surf | Wind Card | `wide` | `"half"` | 2×half compact strip: wind speed, direction, quality label, gust (from MarineObservation) |
 | Surf | Current Conditions Card | `wide` | `"half"` | 2×half compact strip: weather icon + air temp (station/forecast provider), water temp (marine observation), UV index (station) |
-| Surf | 72-Hour Forecast Card | `full` | — | Day-grouped forecast columns with score, waves, wind, tide |
+| Surf | 72-Hour Forecast Card | `full` | — | Row-major HourlyStrip-style layout (72px columns, HorizontalScrollNav). Section 1 (transparent): time `<button>` + 0-100 score colored by tier. Section 2 (bg-muted/15 tint): WeatherIcon + air temp + precip % + WindSymbol — all time-matched from hourly forecast. Section 3 (transparent): wind quality label + water temp (marine.forecast[].waterTemp) + wave height trend SVG polyline (spanning all columns) + dom direction + period + energy. Click time label to expand detail panel (chips + SwellBreakdown). |
 | Fishing | Fishing Score Card (hero) | `wide` | `2` | 2x2 hero: prominent fishing score + scoring breakdown bars |
 | Fishing | Current Conditions Card | `wide` | `2` | 2x2: pressure + trend, wind speed/gust/direction, water temp, air temp, tide state |
 | Fishing | Forecast Card | `full` | — | Day-labeled forecast with score, period buttons + species accordion |
