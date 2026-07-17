@@ -135,7 +135,24 @@ Use the Nygard format. Template at `docs/decisions/_TEMPLATE.md`. Required: Stat
 
 **Small, focused tasks.** Each agent gets one specific job with a clear deliverable. "Implement 2 provider modules + tile proxy + wiring" is too big. "Implement openweathermap.py radar provider per this spec" is right. Shorter runs = less idle-bug risk, easier to monitor, cheaper to retry.
 
-**Focused agent prompts.** Each agent receives ONLY the context needed for its specific task. Don't load full rules files, full ADRs, or project history into agent prompts. Extract the relevant section and inline it. The lead carries the full context; agents carry task context.
+**Agents must read source documents directly — NEVER paraphrase manuals or plans into agent prompts.** The coordinator tells the agent WHICH files to read and WHICH sections are relevant, and the agent reads the original text itself. The coordinator's prompt provides: (1) the task description and deliverables, (2) a reading list of specific file paths and section names/line ranges the agent must read before coding, (3) scope block and verification commands per the existing rules. The coordinator does NOT restate, summarize, or paraphrase manual content, plan task specs, design criteria, or acceptance criteria into the prompt — the agent reads those from the source documents.
+
+**Why this is a hard rule:** When the coordinator paraphrases a 50-line task spec into a 15-line brief, information is lost — field names get wrong, acceptance criteria get dropped, design constraints get simplified away. The agent codes from the lossy summary. The coordinator then QCs the output against the same lossy summary — not against the original spec. Errors pass undetected. The result is slop that technically matches the brief but violates the plan. This happened systematically across every phase of the MARINE-FIXIT-PLAN and required a complete redo.
+
+**What the reading list looks like (example):**
+```
+READING LIST (read these files BEFORE writing any code):
+1. docs/planning/MARINE-FIXIT-PLAN.md — read Phase 5, tasks T5.1 and T5.2 (your assigned tasks). These contain the exact card specs, data sources, acceptance criteria, and design references.
+2. docs/manuals/DESIGN-MANUAL.md — read the marine cards section. Your cards must follow these patterns.
+3. docs/manuals/API-MANUAL.md §17-18 — read the surf endpoint contract and wind/water-temp data source rules.
+4. src/components/marine/tabs/SurfingTab.tsx — read the current implementation you're modifying.
+```
+
+**What the coordinator adds beyond the reading list:** task-specific context the documents don't contain — e.g., "T2.5 already landed and changed the wind source, so the NDBC wind fetch at lines 284-298 no longer exists; your starting point is the current file, not the plan's line numbers." Also: the scope block, git restrictions, verification commands, and any lead calls that resolve ambiguities between documents.
+
+**Anti-pattern (BANNED):** Restating plan content in the prompt. If the plan says "Surf Score Card (2x2): The hero card. Prominently displays the current surf score (numeric, not stars — e.g., '4.2 Very Good'). Below the score: scoring breakdown showing what factors contributed..." — the coordinator must NOT rewrite this as "Build a 2x2 score card showing the surf score with a breakdown." That loses "numeric, not stars", the example format, and the absorption of the separate breakdown card. Instead: "Read MARINE-FIXIT-PLAN.md T5.1 — it specifies three cards with exact sizes, data elements, and design references. Build exactly what it says."
+
+**The coordinator still reads the documents first.** The coordinator must understand the task deeply enough to write the scope block, resolve ambiguities, and QC the output. But understanding the task ≠ restating the task. The coordinator reads to understand; the agent reads to implement.
 
 **Monitor via SendMessage.** After spawning background agents, check git log for commits every 3-4 minutes. If an agent has committed but gone quiet >4 min, SendMessage to wake it. After ~3 silent pings, TaskStop and reconstruct from git. The idle bug (#56930) means agents can finish work and sit silent for 30+ min — polling is the only mitigation.
 

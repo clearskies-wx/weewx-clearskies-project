@@ -1126,7 +1126,7 @@ Unified conditions dashboard pattern (Windfinder/My Marine Forecast reference). 
 5. **Waves** — `Card footprint="full"`:
    - Wave stats (height, period, direction) as `MarineStatTile` tiles at top
    - 72h wave forecast chart below (`WaveForecastChart` with legend)
-   - Wave data from NWPS/model sources (not buoy)
+   - Wave data from SWAN+TruShore model (not buoy)
    - Self-hides for harbor locations where wave data is null
 6. **Tide Forecast** — `Card footprint="full"`:
    - `TideChart` (left margin ≥40px to prevent clipping, XAxis domain starts at first data point)
@@ -1154,7 +1154,7 @@ Surfaces the surf scoring system (`enrichment/surf_scorer.py`). Three focused ca
    - Scoring breakdown bars below the score (absorbed from the former separate card): 4 weighted factors — Wave Height (35%), Wave Period (35%), Wind Quality (20%), Swell Dominance (10%). Each bar: label, score, colored fill proportional to score.
 3. **Swell Card** — `Card footprint="wide"`:
    - Wave height at break, period, direction as MarineStatTile stats
-   - Swell component breakdown: prefers `SurfForecast.multiSwell` (NWPS/WW3 model-processed) over raw `spectralComponents` (NDBC spectral). Falls back to spectral when multiSwell is null.
+   - Swell component breakdown: prefers `SurfForecast.multiSwell` (SWAN+TruShore model-processed) over raw `spectralComponents` (NDBC spectral). Falls back to spectral when multiSwell is null.
    - Swell direction compass folded in as one element (WindCompassCard tick-ring pattern, --chart-2 color, reduced footprint ~112-128px)
 4. **Wind Card** — `Card footprint="wide" rowSpan="half"`:
    - Wind speed, gust, direction (from MarineObservation via useMarineDetail), wind quality label (from SurfForecast)
@@ -1220,7 +1220,7 @@ Itemized hazard indicators (Beach Report flag pattern). No overall "safe/caution
    - Storm surge badge when `stormSurgeLevel` non-null
    - NO composite "Dangerous" badge
 3. **Tide Forecast** — `Card footprint="full"` with `TideChart`
-4. **Coastal Flooding Risk** (show-when-available) — `Card footprint="full"` with NWPS total water level and wave runup
+4. **Coastal Flooding Risk** (show-when-available) — `Card footprint="full"` with total water level and wave runup data (from SRF when available)
 5. **Local Resources** (show-when-available) — external links (operator-configurable)
 
 **Removed:** `SafetyIndicator` component and its "Safe/Caution/Dangerous" badge, standalone `RipCurrentPanel`, standalone `WaterTempPanel`, standalone `UVIndexPanel` (all consolidated into Beach Conditions card).
@@ -1249,7 +1249,8 @@ Alert filtering applies within each activity tab, sourced from the general alert
 
 | Data type | `refreshInterval` (seconds) | Source |
 |---|---|---|
-| Marine forecast (WaveWatch III / NWPS) | 1800 | Provider cache TTL |
+| Marine forecast (WaveWatch III) | 1800 | Provider cache TTL |
+| Nearshore surf (SWAN+TruShore) | 21600 | Extended HRRR cycle cadence (4×/day at 00/06/12/18Z) |
 | Buoy observations (NDBC) | 3600 | Provider cache TTL |
 | Tide predictions (CO-OPS) | 21600 | Predictions don't change within tidal epoch |
 | Tide observations (CO-OPS water levels) | 600 | 6–10 min update cadence |

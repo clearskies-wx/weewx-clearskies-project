@@ -2,9 +2,10 @@
 
 **Session 1:** 2026-07-16 to 2026-07-17
 **Session 2:** 2026-07-17
-**Session 3:** 2026-07-17 (current)
+**Session 3:** 2026-07-17
+**Session 4:** 2026-07-17 (current)
 **Plan:** docs/planning/SWAN-TRUSHORE-PLAN.md
-**Status:** Phases 0–5 complete. Phase 6 in progress (T6.1–T6.3 done, T6.4–T6.5 blocked on SWAN install).
+**Status:** Phases 0–5 complete. Phase 6 T6.1–T6.3 done (T6.4–T6.5 blocked → deferred to Phase 7 T7.5). Phase 7 T7.0 complete — all governing documents updated for nested grid + GFS wind. T7.1–T7.5 pending.
 
 ## Phase Tracker
 
@@ -16,7 +17,28 @@
 | Phase 3 — TruShore Post-Processing | ✅ COMPLETE (2026-07-17) | QC Gate 3: PASS |
 | Phase 4 — Separated Service Option | ✅ COMPLETE (2026-07-17) | QC Gate 4: auditor pass (session 3) |
 | Phase 5 — Dashboard Integration | ✅ COMPLETE (2026-07-17) | QC Gate 5: auditor pass (session 3) |
-| Phase 6 — Final QA Audit | 🔄 IN PROGRESS | T6.1–T6.3 done. T6.4/T6.5 blocked on SWAN install. |
+| Phase 6 — Final QA Audit | 🔄 IN PROGRESS | T6.1–T6.3 done. T6.4/T6.5 deferred to Phase 7 T7.5. |
+| Phase 7 — Remedial: Nested Grid + GFS Wind | 🔄 IN PROGRESS | T7.0 complete (docs). T7.1–T7.5 pending (code + verification). |
+
+## Session 4 Work Completed
+
+### T7.0 — Document and manual updates (COMPLETE)
+
+All governing documents updated to describe nested grid architecture, GFS wind supplement, and memory budget before any coding begins:
+
+| Document | Changes |
+|----------|---------|
+| `docs/manuals/API-MANUAL.md` §17 | SWAN integration table: added GFS wind for hours 48–72, nested grid description, blended wind forcing section, updated schedule to 4×/day extended cycles, cache TTL 6h, wind source table now shows `gfs_trushore` for hours 48–72 |
+| `docs/manuals/PROVIDER-MANUAL.md` §14.14 | Added HRRR forecast range limitation table (18h vs 48h cycles), extended cycle usage note, cache TTL updated to 6h |
+| `docs/manuals/PROVIDER-MANUAL.md` §14.15 | Replaced single flat grid with nested grid table (outer 2–3km + inner 200–500m), ≤300 MB memory budget, added GFS to input sources, runner API updated for nested execution, cache TTL 6h, schedule 4×/day |
+| `docs/manuals/PROVIDER-MANUAL.md` §14.16 | NEW: GFS wind provider — module identity, NOMADS URL, 0.25° resolution, 384h range, 3-hour timesteps, earth-relative winds (no rotation), 6h cache TTL, graceful degradation on GFS failure |
+| `docs/ARCHITECTURE.md` | SWAN+TruShore note: nested grid description + memory budget + GFS provider. Standalone service: 4×/day. Provider layout: `gfs` added to `wind/`. Caching TTLs: HRRR/GFS/TruShore all 6h |
+| `docs/manuals/DASHBOARD-MANUAL.md` | TruShore refresh interval: 3300s → 21600s |
+| `docs/manuals/OPERATIONS-MANUAL.md` | Wizard flow: nested grid parameters (outer resolution, inner resolution, inner nest bbox) |
+| `repos/weewx-clearskies-stack/docs/OPERATOR-MANUAL.md` §5 | Intro: nested grid + blended wind + 4×/day. Prerequisites: GFS provider. Wizard: nested grid field table (outer/inner). Admin: outer/inner resolution fields + memory budget. Troubleshooting: OOM guidance. §6 wizard step: nested grid params. §7 admin: nested grid resolutions + memory |
+| `docs/planning/SWAN-TRUSHORE-PLAN.md` | Verification section: wind source updated for HRRR + GFS |
+
+**Verification sweep:** Grepped all governing documents for stale references (flat grid, single resolution, hourly schedule, 55-min TTL, swan_grid_resolution_m). Zero stale references remain in manuals, ARCHITECTURE.md, or Operator Manual. Plan and research brief references are historical context (documenting what went wrong), not governing.
 
 ## Session 3 Commits
 

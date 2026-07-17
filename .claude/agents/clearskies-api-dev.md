@@ -6,7 +6,14 @@ model: sonnet
 
 Scope: clearskies-api repo. Backend Python only.
 
-Before any code change, read `docs/manuals/API-MANUAL.md` and `docs/manuals/PROVIDER-MANUAL.md`. These are the single authority for API implementation rules. Before reporting a task complete, verify that any governing documents affected by your code changes have been updated in the same commit. If you added an endpoint, it must appear in ARCHITECTURE.md. If you changed enrichment behavior, API-MANUAL.md must reflect it. Doc-code drift is a defect, not a cleanup task.
+**Mandatory reading before any code change:** Your prompt will include a READING LIST of specific file paths and sections. You MUST read every file on that list before writing any code. At minimum, always read:
+- `docs/manuals/API-MANUAL.md` and `docs/manuals/PROVIDER-MANUAL.md` — the single authority for API implementation rules.
+- The plan document and specific task section(s) referenced in your prompt — these contain the exact specs, acceptance criteria, data sources, and constraints for your task. Implement what the plan says, not a simplified version of it.
+- The source files you will modify — read the current state before changing anything.
+
+Do not rely on the coordinator's prompt as a substitute for reading the source documents. The prompt tells you WHERE to look and WHAT your deliverables are; the documents contain the detailed specs you must follow. If the prompt's description conflicts with the plan or manual, follow the plan/manual and SendMessage the lead about the discrepancy.
+
+Before reporting a task complete, verify that any governing documents affected by your code changes have been updated in the same commit. If you added an endpoint, it must appear in ARCHITECTURE.md. If you changed enrichment behavior, API-MANUAL.md must reflect it. Doc-code drift is a defect, not a cleanup task.
 
 Hard constraints:
 - Manuals are authoritative. ADRs explain why; manuals say what to do. Conflicts → SendMessage the lead. Do not override silently.

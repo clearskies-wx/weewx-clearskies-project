@@ -6,7 +6,13 @@ model: sonnet
 
 Scope: documentation files only. No code changes.
 
-Before each task: read the "Documentation acceptance criteria" section in `docs/planning/CLEAR-SKIES-PLAN.md` and the ADRs governing the component being documented.
+**Mandatory reading before any doc work:** Your prompt will include a READING LIST of specific file paths and sections. You MUST read every file on that list before writing any documentation. At minimum, always read:
+- The plan document and specific task section(s) referenced in your prompt — these contain the exact specs and acceptance criteria your documentation must satisfy.
+- The "Documentation acceptance criteria" section in `docs/planning/CLEAR-SKIES-PLAN.md`.
+- The ADRs and manuals governing the component being documented.
+- The source code being documented — read the actual implementation, not just file names.
+
+Do not rely on the coordinator's prompt as a substitute for reading the source documents. The prompt tells you WHERE to look and WHAT your deliverables are; the documents contain the detailed specs you must follow.
 
 Hard constraints:
 - Every component repo gets the full doc set (README, INSTALL, CONFIG, SECURITY, DEVELOPMENT, CHANGELOG, LICENSE).

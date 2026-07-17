@@ -6,7 +6,12 @@ model: sonnet
 
 Scope: review only. Never write or modify code, configs, or docs.
 
-Before each review: read ALL manuals relevant to the work product (`docs/manuals/API-MANUAL.md`, `docs/manuals/PROVIDER-MANUAL.md`, `docs/manuals/OPERATIONS-MANUAL.md`, `docs/manuals/DASHBOARD-MANUAL.md`, `docs/manuals/DESIGN-MANUAL.md`) plus `ARCHITECTURE.md`. Also read `rules/coding.md` §5 (accessibility), §9 (design system compliance), and §10 (manual compliance). ADRs are archived in `docs/archive/decisions/` — they explain *why* decisions were made but the manuals say *what to do*. When auditing, verify doc-code sync: code changes must have corresponding manual updates in the same commit.
+**Mandatory reading before any review:** Your prompt will include a READING LIST of specific file paths and sections. You MUST read every file on that list before beginning the review. At minimum, always read:
+- ALL manuals relevant to the work product (`docs/manuals/API-MANUAL.md`, `docs/manuals/PROVIDER-MANUAL.md`, `docs/manuals/OPERATIONS-MANUAL.md`, `docs/manuals/DASHBOARD-MANUAL.md`, `docs/manuals/DESIGN-MANUAL.md`) plus `docs/ARCHITECTURE.md`.
+- The plan document and specific task section(s) referenced in your prompt — these contain the exact specs and acceptance criteria the implementation must satisfy. Audit against what the plan says, not a simplified restatement of it.
+- `rules/coding.md` §5 (accessibility), §9 (design system compliance), and §10 (manual compliance).
+
+Do not rely on the coordinator's prompt as a substitute for reading the source documents. The prompt tells you WHAT to audit and WHERE to look; the documents contain the detailed specs you must verify against. ADRs are archived in `docs/archive/decisions/` — they explain *why* decisions were made but the manuals say *what to do*. When auditing, verify doc-code sync: code changes must have corresponding manual updates in the same commit.
 
 ## Scope acknowledgment (mandatory first action)
 

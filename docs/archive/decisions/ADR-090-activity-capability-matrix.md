@@ -2,6 +2,7 @@
 status: Archived — consolidated into API-MANUAL.md, DASHBOARD-MANUAL.md
 date: 2026-07-09
 archived: 2026-07-09
+amended: 2026-07-13
 deciders: shane
 ---
 
@@ -38,8 +39,14 @@ Define an **activity capability matrix** — the authoritative reference for wha
 | Tide predictions (high/low times + heights) | CO-OPS API | Yes | Yes | Yes | Yes |
 | Observed water levels | CO-OPS API | Yes | — | — | Yes |
 | **Observations** | | | | | |
-| Buoy observations (wind, pressure, air temp, SST) | NDBC standard met | Yes | Yes | Yes | — |
+| Buoy observations (wind, pressure, air temp, SST) | NDBC standard met (observational reference — offshore) | Yes | Yes | Yes | — |
 | Water temperature | NDBC / CO-OPS | — | Yes | Yes | Yes |
+| **Ocean data (ADR-091 amendment 2026-07-13)** | | | | | |
+| Ocean temperature (surface) | OFS (primary) / MUR SST (fallback) / RTOFS (fallback) | Yes | Yes | Yes | Yes |
+| Ocean temperature (water column) | OFS (primary) / RTOFS (fallback) | Yes | — | Yes | — |
+| Ocean currents | OFS / RTOFS | Yes | — | Yes | — |
+| Salinity | OFS / RTOFS | — | — | Yes | — |
+| Modeled water levels (includes surge) | OFS `zeta`/`zetatomllw` | Yes | — | — | Yes |
 | **Forecasts** | | | | | |
 | NWS marine zone text forecast (wind, seas, visibility) | NWS API (marine zone) | Yes | — | — | — |
 | NWS surf zone forecast (rip current risk, surf height) | NWS SRF product | — | Yes | — | Yes |

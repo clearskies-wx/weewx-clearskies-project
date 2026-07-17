@@ -2,10 +2,13 @@
 status: Archived — consolidated into API-MANUAL.md, PROVIDER-MANUAL.md
 date: 2026-07-09
 archived: 2026-07-09
+superseded-by: ADR-093
 deciders: shane
 ---
 
 # ADR-084: NWPS as primary nearshore source with site-specific supplementation
+
+**Superseded by ADR-093.** NWPS is eliminated. The nearshore source is now SWAN+TruShore (locally-run SWAN instance). The four supplements defined here continue to apply to SWAN output.
 
 ## Context
 

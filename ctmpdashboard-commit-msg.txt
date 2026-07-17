@@ -1,0 +1,7 @@
+fix(branding): add TM mark to all deployed logo SVGs (T9.1)
+
+Regenerate splash screen logo (blue), footer logo (POWERED light), and
+stage the user-edited POWERED blue variant -- all now include the TM mark
+from the updated source artwork.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>

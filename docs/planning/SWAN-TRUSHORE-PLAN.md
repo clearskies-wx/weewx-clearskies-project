@@ -1052,7 +1052,7 @@ After all phases complete (including Phase 7 remedial):
 - `breakingHawaiianHeight` = `breakingFaceHeight × 0.5` for all timesteps
 - All four wave_transform.py supplements fire for SWAN+TruShore data (γ correction, structure effects, spatial interpolation, topographic focusing) — supplements apply to Hsig BEFORE face height conversion
 - Scorer uses `breakingFaceHeight` — `qualityStars` reflects face height, not raw Hsig
-- Wind quality in surf score reflects HRRR forecast wind, not station observation, for forecast timesteps
+- Wind quality in surf score reflects HRRR forecast wind (hours 0–48) and GFS forecast wind (hours 48–72), not station observation, for forecast timesteps
 - `nearshoreModel: "swan_trushore"` appears in surf endpoint responses
 - `breakerFormula` and `surfHeightDisplay` fields present and reflect per-spot config
 - Per-spot config: `breaker_formula` (komar_gaughan / caldwell) and `surf_height_display` (face / hawaiian) configurable via wizard and admin

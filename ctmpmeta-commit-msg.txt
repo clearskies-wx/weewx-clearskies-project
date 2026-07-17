@@ -1,0 +1,11 @@
+docs: T7.1 research brief + T8.4 OPERATIONS-MANUAL update
+
+T7.1: Add 11.5.1 Directional dependence to the marine research brief
+with angular Kt modulation, shadow zone geometry, diffraction notes,
+and worked Huntington Beach Pier examples.
+
+T8.4: Update OPERATIONS-MANUAL with species database customization
+docs (target_categories multi-select, species.yaml editing guide with
+worked example, restart requirement).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>

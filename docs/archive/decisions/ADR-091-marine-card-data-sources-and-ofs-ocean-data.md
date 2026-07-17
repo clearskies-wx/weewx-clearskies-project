@@ -8,6 +8,8 @@ deciders: shane
 
 # ADR-091: Marine card data sources, OFS ocean data, and composite water level
 
+**Amendment (SWAN+TruShore, ADR-093):** Decision 1 waveHeight source updated — NWPS eliminated, SWAN+TruShore is the only nearshore source. WW3 removed from the surf fallback chain. See ADR-093.
+
 ## Context
 
 The marine feature shipped with correct data sourcing in the surf detail endpoint (`GET /surf/{id}`) — NWPS → wave_transform → surf_scorer per ADR-084. But the marine list endpoint (`GET /marine`) and marine detail endpoint (`GET /marine/{id}`) never wired into this chain. The result: all 7 location cards show identical offshore buoy data (NDBC 46253, 12 miles offshore in 66m deep water), weather fields are null (buoy doesn't report wind/pressure/air temp), water temperature is raw Celsius with no unit conversion, and tide height is identical across all locations sharing the same CO-OPS station.
@@ -58,7 +60,7 @@ The `_location_summary()` function in `endpoints/marine.py` populates `currentCo
 
 | Card field | Primary source | Fallback | Unit conversion |
 |---|---|---|---|
-| waveHeight | NWPS → `wave_transform.apply_supplements()` (for locations with surf activity + `nwps_wfo`) | WaveWatch III first forecast point (no supplements per ADR-084), then NDBC buoy Hs | meter → operator `group_wave_height` via `convert()` |
+| waveHeight | SWAN+TruShore → `wave_transform.apply_supplements()` (for locations with surf activity, ADR-093) | Last successful SWAN+TruShore cache (any age) → null. No WW3 fallback for surf. | meter → operator `group_wave_height` via `convert()` |
 | windSpeed | Station hardware via weewx archive (when `is_station_served(location.id)` returns True) | Configured forecast provider `fetch_current_conditions(lat, lon)` (returns in operator target unit) | Provider handles conversion |
 | windDirection | Same as windSpeed | Same as windSpeed | degrees (no conversion) |
 | airTemp | Same as windSpeed | Same as windSpeed | Provider handles conversion |

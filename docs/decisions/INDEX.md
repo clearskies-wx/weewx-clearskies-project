@@ -129,6 +129,8 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | [ADR-078](ADR-078-geographic-features-overlay.md) | Geographic features overlay (OSM via Overpass API) | 2026-06-29 |
 | [ADR-080](ADR-080-provider-attribution-architecture.md) | Provider attribution architecture | 2026-07-01 |
 | [ADR-081](ADR-081-license-change-polyform.md) | License change — PolyForm Noncommercial 1.0.0 (supersedes ADR-003) | 2026-07-09 |
+| [ADR-093](ADR-093-swan-trushore-nearshore-model.md) | SWAN+TruShore replaces NWPS as nearshore wave model (supersedes ADR-084) | 2026-07-16 |
+| [ADR-094](ADR-094-hrrr-surf-wind-source.md) | HRRR forecast wind as surf quality scoring source for TruShore forecasts | 2026-07-16 |
 
 ## Archived — consolidated into PROVIDER-MANUAL.md (marine)
 
@@ -142,7 +144,7 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 
 | ADR | Title | Archived | Original Date |
 |---|---|---|---|
-| [ADR-084](../archive/decisions/ADR-084-nwps-primary-nearshore-with-supplementation.md) | NWPS as primary nearshore source with site-specific supplementation | 2026-07-09 | 2026-07-09 |
+| [ADR-084](../archive/decisions/ADR-084-nwps-primary-nearshore-with-supplementation.md) | NWPS as primary nearshore source with site-specific supplementation (superseded by ADR-093) | 2026-07-09 | 2026-07-09 |
 | [ADR-088](../archive/decisions/ADR-088-fishing-forecast-scoring-model.md) | Fishing forecast scoring model | 2026-07-09 | 2026-07-09 |
 | [ADR-090](../archive/decisions/ADR-090-activity-capability-matrix.md) | Activity capability matrix | 2026-07-09 | 2026-07-09 |
 
@@ -175,6 +177,7 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | [ADR-044](../archive/decisions/ADR-044-sky-condition-classification.md) | Current conditions text / sky condition classification | ADR-073 | 2026-05-26 |
 | [ADR-003](../archive/decisions/ADR-003-license.md) | License = GPL v3 | ADR-081 | 2026-04-30 |
 | [ADR-074](../archive/decisions/ADR-074-wms-t-rendering-strategy.md) | WMS-T rendering strategy | LibreWxR (XYZ tiles) | 2026-06-26 |
+| [ADR-084](../archive/decisions/ADR-084-nwps-primary-nearshore-with-supplementation.md) | NWPS as primary nearshore source with supplementation | ADR-093 | 2026-07-09 |
 
 ## Amendments (2026-06-21)
 

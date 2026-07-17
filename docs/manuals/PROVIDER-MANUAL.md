@@ -1712,13 +1712,22 @@ Each tier is independently wrapped in try/except — failure at one tier does no
 
 **CAPABILITY:** `geographic_coverage = "us"`, `auth_required = []`. `supplied_canonical_fields` includes U-component and V-component of wind at 10m above ground level, earth-relative.
 
-**Availability:** Active only when the `[nearshore]` pip extra is installed. Not part of the standard provider registry startup — invoked by the SWAN runner (`services/swan_runner.py`), not by the cache warmer directly. The cache warmer fires HRRR warm at startup and on the hourly schedule when `[nearshore]` is installed.
+**Availability:** Active only when the `[nearshore]` pip extra is installed. Not part of the standard provider registry startup — invoked by the SWAN runner (`services/swan_runner.py`), not by the cache warmer directly. The cache warmer fires HRRR warm at startup and on the extended cycle schedule (4×/day at 00/06/12/18Z) when `[nearshore]` is installed.
 
 **Data source (primary):** NOMADS Grib Filter at `https://nomads.ncep.noaa.gov/cgi-bin/filter_hrrr_2d.pl`. Supports geographic subsetting (bounding box), variable selection (UGRD/VGRD at 10m AGL), and GRIB2 output. Free, no API key.
 
 **Data source (backup):** AWS S3 at `s3://noaa-hrrr-bdp-pds/`. Same data, hosted by Amazon as a public dataset.
 
 **Schedule:** HRRR runs on a fixed hourly schedule (00Z through 23Z). Availability: ~45–60 minutes after the nominal run hour. Completely predictable — no dependency on human forecaster input.
+
+**Forecast range limitation:** HRRR does not produce a consistent forecast range. NCEP allocates different forecast lengths depending on the cycle:
+
+| Cycle times (UTC) | Forecast range | Hourly wind grids |
+|---|---|---|
+| 00Z, 06Z, 12Z, 18Z (4 per day) | 48 hours | f00–f48 (49 grids) |
+| All other hours (20 per day) | 18 hours | f00–f18 (19 grids) |
+
+TruShore uses only the 4 extended cycles (00/06/12/18Z) to get the full 48-hour HRRR range. GFS wind (§14.16) supplements hours 48–72 to fill the 72-hour surf forecast card. See §14.15 for the blended wind architecture.
 
 **Extracted variables:**
 
@@ -1742,7 +1751,7 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 
 **Bounding box:** Configurable per marine location. Default: spot coordinates ± 0.2° (configurable via wizard SWAN grid bbox settings).
 
-**Cache:** Key = `(provider_id, bbox_hash, cycle_time)`. TTL = 3300s (55 min) — slightly less than the hourly HRRR cycle to ensure fresh data on each cycle.
+**Cache:** Key = `(provider_id, bbox_hash, cycle_time)`. TTL = 21600s (6 hours) — matches the extended cycle interval (4×/day at 00/06/12/18Z). Previous TTL was 3300s (55 min) when TruShore ran hourly; now aligned with the 6-hour extended cycle cadence.
 
 **Error handling:** 404 on all attempted cycles → `ProviderUnavailableError`. Network errors → canonical taxonomy. GRIB2 parse error → `ProviderProtocolError`.
 
@@ -1760,30 +1769,79 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 
 | Input | Source | Cache key pattern |
 |---|---|---|
-| Wind forcing | HRRR wind provider (§14.14) | `(hrrr, bbox, cycle_time)` |
+| Wind forcing (hours 0–48) | HRRR wind provider (§14.14) — 3km resolution, extended cycles only | `(hrrr, bbox, cycle_time)` |
+| Wind forcing (hours 48–72) | GFS wind provider (§14.16) — 0.25° resolution, supplements HRRR | `(gfs, bbox, cycle_time)` |
 | Deep-water boundary | WaveWatch III (§14.3) | `(wavewatch, ...)` |
 | Bathymetry | CUDEM (§14.7) | Setup-time download, stored in spot config |
 | Tidal currents | RTOFS/OFS (§14.10) | `(ofs, ...)` |
 
 **SWAN runner** (`services/swan_runner.py`):
 
-- `SWANRunner.__init__`: takes config (domain bbox, surf spot coordinates, bathymetry data, HRRR bbox, SWAN binary path)
-- `run(hrrr_wind_field, ww3_boundary, cudem_bathymetry)`: orchestrates the full SWAN run, returns `dict[str, list[MarineForecastPoint]]` keyed by spot_id
-- `_write_input_files(tmpdir, hrrr_wind_field, ww3_boundary, cudem_bathymetry)`: writes SWAN INPUT, BOTTOM.txt, WIND.txt, BOUND_SPEC.txt, OUTPUT_POINTS.txt; returns grid_info dict
+- `SWANRunner.__init__`: takes config (outer grid bbox, inner nest bbox, surf spot coordinates, bathymetry data, SWAN binary path)
+- `run(hrrr_wind_field, gfs_wind_field, ww3_boundary, cudem_bathymetry)`: orchestrates the full nested SWAN run (outer + inner), returns `dict[str, list[MarineForecastPoint]]` keyed by spot_id
+- `_run_outer_grid(tmpdir, blended_wind, ww3_boundary, cudem_bathymetry)`: runs outer grid SWAN, writes `NESTOUT` boundary files for the inner nest
+- `_run_inner_nest(tmpdir, blended_wind, cudem_bathymetry)`: runs inner nest SWAN using outer grid boundary output via `NGRID`, parses TABLE output at configured surf spot output points
+- `_stitch_wind(hrrr_wind_field, gfs_wind_field)`: blends HRRR (hours 0–48) and GFS (hours 48–72) into a single continuous 72-hour wind input
+- `_write_input_files(tmpdir, wind_field, boundary, bathymetry, grid_level)`: writes SWAN INPUT, BOTTOM.txt, WIND.txt, BOUND_SPEC.txt for a given grid level; returns grid_info dict
 - `_spawn_swan(tmpdir)`: subprocess `swan < INPUT`, captures stdout/stderr, raises `SWANRunError` on non-zero exit
 - `_parse_output(tmpdir, grid_info)`: reads SWAN TABLE output, extracts Hs, Tm01, MWD at each output point, matches rows to spot_id by (Xp, Yp) coordinates
 
-**SWAN grid:** 200m default resolution (configurable via `[marine] swan_grid_resolution_m`). For a 30km × 15km domain, this is 150 × 75 = 11,250 grid points. Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour (matching HRRR cadence).
+**Nested grid architecture:** Two sequential SWAN runs per cycle. No operational nearshore system runs fine resolution over the full domain — all use nested grids.
 
-**Output:** `dict[spot_id, list[MarineForecastPoint]]` — each `MarineForecastPoint` carries `waveHeight=Hs`, `wavePeriod=Tm01`, `waveDirection=MWD`, and `time` (ISO-8601). Source attribution ("trushore") is set at the `TrushoreProvider` response level, not inside `MarineForecastPoint` (which has no `source` field). **Validation:** reject timesteps where Hs > 20m or ≤ 0m, Tm01 < 1s or > 30s, or MWD is NaN (numerical instability).
+| Grid level | Config key | Default resolution | Typical domain | Grid points | Memory |
+|---|---|---|---|---|---|
+| Outer grid | `outer_grid_resolution_km` | ~2–3 km | ~200km × 150km (continental shelf approach, from `hrrr_bbox`) | ~5,000–8,000 | ~100–150 MB |
+| Inner nest | `inner_nest_resolution_m` | 200–500m | ~20–30km × 10–15km (tight around surf spots, from `swan_domain_bbox`) | ~3,000–8,000 | ~50–150 MB |
+| **Total** | | | | **~8,000–16,000** | **≤300 MB** |
 
-**Cache:** Key = `(provider_id, spot_domain_id, hrrr_cycle_time)`. TTL = 3300s (55 min). On SWAN run failure: log ERROR, retain last-good cache indefinitely. Do NOT invalidate cache on failure — stale TruShore data is always preferred to no data.
+The outer run writes `NESTOUT` boundary files. The inner run reads them via SWAN's `NGRID` command. Multiple surf spots on the same coastline share the outer grid; each spot (or cluster of nearby spots) gets its own inner nest.
 
-**Schedule:** Runs hourly via the cache warmer, triggered after HRRR and WW3 data are warm. Runs in a background thread — not in the request path. Expected runtime: 2–10 minutes (single core) or 1–5 minutes (4–6 cores with OpenMP). Must complete within 15 minutes.
+Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Forecast span: 72 hours (HRRR hours 0–48, GFS hours 48–72).
+
+**Output:** `dict[spot_id, list[MarineForecastPoint]]` — 72 forecast hours per spot. Each `MarineForecastPoint` carries `waveHeight=Hs`, `wavePeriod=Tm01`, `waveDirection=MWD`, and `time` (ISO-8601). Source attribution ("trushore") is set at the `TrushoreProvider` response level, not inside `MarineForecastPoint` (which has no `source` field). **Validation:** reject timesteps where Hs > 20m or ≤ 0m, Tm01 < 1s or > 30s, or MWD is NaN (numerical instability).
+
+**Cache:** Key = `(provider_id, spot_domain_id, hrrr_cycle_time)`. TTL = 21600s (6 hours) — matches the extended HRRR cycle interval (4×/day at 00/06/12/18Z). On SWAN run failure: log ERROR, retain last-good cache indefinitely. Do NOT invalidate cache on failure — stale TruShore data is always preferred to no data.
+
+**Schedule:** Runs 4× daily on extended HRRR cycles (00/06/12/18Z) via the cache warmer, triggered after both HRRR and GFS wind data are warm. Runs in a background thread — not in the request path. Both grid levels (outer + inner) must complete within 15 minutes total. Expected runtime: 2–10 minutes for both grids combined on the weewx host. Peak memory: ≤300 MB (both grids run sequentially, not simultaneously).
 
 **Temp directory:** SWAN runs in a `tempfile.mkdtemp`-created directory. `SWANRunner` does NOT clean it up — the caller (`TrushoreProvider`) is responsible for cleanup on success. On failure: preserved and path logged for debugging so that SWAN's `Errfile` and `PRINT` output are inspectable.
 
 **Optional separated service:** When `[trushore] service_url` is set to a remote host, `TrushoreProvider.fetch()` calls the remote HTTP endpoint instead of running SWAN locally. Health check polls `GET {service_url}/health` every 60 seconds. Three consecutive failures → log ERROR, serve last-good cache. See ARCHITECTURE.md for the standalone `weewx-clearskies-trushore` package.
+
+### §14.16 GFS wind provider (Phase 7 — supplements HRRR for 72-hour forecast)
+
+**Module identity:** `providers/wind/gfs.py`, `PROVIDER_ID = "gfs"`, `DOMAIN = "wind"`.
+
+**CAPABILITY:** `geographic_coverage = "global"`, `auth_required = []`. `supplied_canonical_fields` includes U-component and V-component of wind at 10m above ground level, earth-relative.
+
+**Availability:** Active only when the `[nearshore]` pip extra is installed. Invoked by the SWAN runner alongside the HRRR wind provider — not by the cache warmer directly. The cache warmer fires GFS warm at startup and on the 6-hour schedule when `[nearshore]` is installed.
+
+**Purpose:** Supplements HRRR wind (which reaches only 48 hours on extended cycles) to fill the 72-hour surf forecast card. GFS provides wind data for forecast hours 48–72. GFS is coarser than HRRR (0.25° / ~25km vs. HRRR's 3km), but the resolution transition at hour 48 does not affect SWAN's nearshore physics — wave refraction, shoaling, and breaking are computed at the SWAN grid resolution (200–500m), not the wind grid resolution.
+
+**Data source (primary):** NOMADS Grib Filter at `https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl`. Supports geographic subsetting (bounding box), variable selection (UGRD/VGRD at 10m AGL), and GRIB2 output. Free, no API key.
+
+**Data source (backup):** AWS S3 at `s3://noaa-gfs-bdp-pds/`. Same data, hosted by Amazon as a public dataset.
+
+**Schedule:** GFS runs on a 6-hourly schedule (00Z, 06Z, 12Z, 18Z). Availability: ~3.5–4.5 hours after the nominal run hour (GFS takes longer to post than HRRR due to its global domain). Aligned with the TruShore extended HRRR cycle schedule.
+
+**Forecast range:** GFS produces forecasts to 384 hours (16 days) at 3-hour timesteps (f00–f384). For TruShore, only hours 48–72 are fetched (9 grids at 3-hour intervals: f048, f051, f054, f057, f060, f063, f066, f069, f072). The SWAN runner interpolates 3-hourly GFS wind to hourly resolution to match the HRRR cadence.
+
+**Extracted variables:**
+
+| GRIB2 parameter | Variable | Description |
+|---|---|---|
+| UGRD:10 m above ground | U-component | East-west wind at 10m AGL |
+| VGRD:10 m above ground | V-component | North-south wind at 10m AGL |
+
+**Wind rotation:** GFS uses a regular latitude-longitude grid (0.25° spacing). Wind components are earth-relative by default — no rotation required (unlike HRRR's Lambert Conformal grid). Verify by checking the GRIB2 metadata `componentFlags` field.
+
+**Bounding box:** Same as the HRRR bounding box for the marine location — configured per spot via the wizard SWAN grid bbox settings.
+
+**Cache:** Key = `(provider_id, bbox_hash, cycle_time)`. TTL = 21600s (6 hours) — matches the GFS cycle cadence.
+
+**Error handling:** 404 on all attempted cycles → `ProviderUnavailableError`. Network errors → canonical taxonomy. GRIB2 parse error → `ProviderProtocolError`. On GFS failure, TruShore produces a shortened forecast (HRRR hours 0–48 only) rather than no forecast.
+
+**Rate limiting:** 2 req/s to NOMADS (shared NOAA infrastructure, same rate as HRRR).
 
 ### Source ADRs
 
