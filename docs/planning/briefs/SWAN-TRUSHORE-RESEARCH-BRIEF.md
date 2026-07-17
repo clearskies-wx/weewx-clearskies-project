@@ -235,6 +235,27 @@ wgrib2 hrrr.grib2 -new_grid_winds earth -grib hrrr_earthrel.grib2
 
 Or using the equivalent Python rotation formula from the Lambert Conformal grid parameters. Skipping this step produces SWAN wind inputs that are systematically wrong by up to ~20° near the domain boundaries.
 
+### HRRR Forecast Range Limitation (Added 2026-07-17)
+
+HRRR does not produce a consistent forecast range. NCEP runs HRRR every hour, but allocates different forecast lengths depending on the cycle:
+
+| Cycle times (UTC) | Forecast range | Hourly wind grids available |
+|---|---|---|
+| 00Z, 06Z, 12Z, 18Z (4 per day) | 48 hours | f00–f48 (49 grids) |
+| All other hours (20 per day) | 18 hours | f00–f18 (19 grids) |
+
+This is an NCEP resource allocation decision — the 48-hour runs require more compute time, so only the 4 synoptic cycles get the extended range.
+
+**Impact on TruShore:** The dashboard displays a 72-hour surf forecast card. HRRR alone cannot fill this — even the extended cycles only reach 48 hours. The previous system (NWPS) used GFS wind forcing, which extends to 384 hours (16 days). GFS is coarser than HRRR (0.25° / ~25km vs. HRRR's 3km), but it provided the forecast range needed for 72+ hour surf forecasts.
+
+**Required solution:** TruShore needs a blended wind forcing approach:
+- **Hours 0–48:** HRRR wind at 3km resolution (high quality, available from extended cycles)
+- **Hours 48–72:** GFS wind at 0.25° resolution (coarser but covers the required range)
+
+This requires a GFS wind provider module (`providers/wind/gfs.py`) that fetches GFS forecast data from NOMADS, with the SWAN runner stitching HRRR and GFS wind grids together at the 48-hour boundary. The wind resolution transition at hour 48 does not affect SWAN's nearshore physics — wave refraction, shoaling, and breaking are computed at the SWAN grid resolution (200–500m), not the wind grid resolution.
+
+Alternatively, GFS wind could be used for the entire 72-hour range (simpler, matches NWPS's approach), accepting coarser wind for the first 48 hours. The wave physics improvement from HRRR's 3km vs. GFS's 25km may be marginal for swell-dominated conditions where the wave field is driven by remote storms, not local wind.
+
 ---
 
 ## §5 — Industry Practice: How Others Handle NWPS Outages

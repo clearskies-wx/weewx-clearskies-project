@@ -57,7 +57,7 @@ This plan implements TruShore: the complete Clear Skies nearshore wave pipeline.
 
 ---
 
-## Phase 0 — ADR & Manual Updates
+## Phase 0 — ADR & Manual Updates ✅ COMPLETE (2026-07-16)
 
 Before any code is written, the governing documents must describe the architecture we are building toward. This gives dev agents a correct reading list and prevents them from implementing against stale contracts.
 
@@ -183,7 +183,7 @@ Before any code is written, the governing documents must describe the architectu
 
 ---
 
-## Phase 1 — HRRR Wind Provider
+## Phase 1 — HRRR Wind Provider ✅ COMPLETE (2026-07-16)
 
 HRRR is the wind forcing source for SWAN. This provider must be implemented and validated against real HRRR data before SWAN integration can proceed.
 
@@ -222,7 +222,7 @@ HRRR is the wind forcing source for SWAN. This provider must be implemented and 
 
 **Do:**
 - Implement GRIB2 wind rotation using either: (a) subprocess call to `wgrib2 -new_grid_winds earth` if wgrib2 is available on PATH; or (b) Python formula using the Lambert Conformal grid's `lov` and `latin1`/`latin2` parameters to compute the rotation angle per grid point. Option (b) is preferred as it eliminates the wgrib2 binary requirement for the wind rotation step.
-- The Lambert Conformal wind rotation formula: `rot_angle = lon_grid_point - lov`, then U_earth = U_grid × cos(rot_angle) - V_grid × sin(rot_angle), V_earth = U_grid × sin(rot_angle) + V_grid × cos(rot_angle). Source the exact HRRR Lambert parameters from the GRIB2 metadata (cfgrib or pygrib can extract them).
+- The Lambert Conformal wind rotation formula (NCEP Office Note 388, Appendix C): compute cone factor `n = sin(latin1)` (tangent case; HRRR: latin1 = latin2 = 38.5° → n ≈ 0.6225), then per grid point `alpha = radians(n × (lon - lov))`, `U_earth = U_grid × cos(alpha) - V_grid × sin(alpha)`, `V_earth = U_grid × sin(alpha) + V_grid × cos(alpha)`. Source the exact HRRR Lambert parameters (`lov`, `latin1`, `latin2`) from the GRIB2 metadata (eccodes or pygrib).
 - Add a validation step: after rotation, compute wind direction at a test point and verify it is within ±5° of the expected direction based on the synoptic pattern.
 - Document the rotation approach in the module docstring with a source citation (NCEP GRIB2 documentation or equivalent).
 
@@ -258,7 +258,7 @@ HRRR is the wind forcing source for SWAN. This provider must be implemented and 
 
 ---
 
-## Phase 2 — SWAN Model Integration
+## Phase 2 — SWAN Model Integration ✅ COMPLETE (2026-07-17)
 
 SWAN is the wave physics engine. This phase installs SWAN, implements the runner service, and produces physically correct wave forecasts at configured surf spot locations.
 
@@ -381,56 +381,84 @@ SWAN is the wave physics engine. This phase installs SWAN, implements the runner
 - SWAN run failure retains last-good cache: verify by temporarily breaking SWAN binary path, confirm API continues to serve (stale but non-null) surf data.
 - SWAN completes within 15 minutes on the weewx host hardware (it will likely be 2–5 minutes; 15 minutes is the upper bound tolerance).
 
-### T2.6 — Research and implement Hsig → breaking face height conversion
+### T2.6 — Implement Hsig → breaking face height conversion
 
-- Owner: Coordinator (Opus) for research; `clearskies-api-dev` (Sonnet) for implementation
+- Owner: Coordinator (Opus) for research (DONE — see brief); `clearskies-api-dev` (Sonnet) for implementation
 - Files:
-  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/services/swan_runner.py` (or new `swan_breaker.py`)
-  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/enrichment/wave_transform.py`
-- Reference: `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md`; Caldwell 2007 (empirical surf height formula); SWAN manual §4 (output variables)
+  - New: `repos/weewx-clearskies-api/weewx_clearskies_api/enrichment/breaker_height.py`
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/enrichment/surf_scorer.py` (score using `breakingFaceHeight`)
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/endpoints/surf.py` (add three height fields to response)
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/models/responses.py` (add `swellHeight`, `breakingFaceHeight`, `breakingHawaiianHeight` to `SurfForecast`)
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/config/marine_config.py` (add per-spot `breaker_formula` and `surf_height_display`)
+- Reference: `docs/planning/briefs/WAVE-BREAKING-CONVERSION-BRIEF.md` (full research findings — read §3–§5 before coding); SWAN manual §4 (output variables)
 
-**Background:**
+**Research findings (completed 2026-07-16):**
 
-SWAN outputs significant wave height (Hsig / Hm0) — the average height of the highest one-third of waves in the sea state. This is a purely oceanographic metric, not a surf height. Three gaps exist between Hsig and what surfers actually see:
+Full research brief at `docs/planning/briefs/WAVE-BREAKING-CONVERSION-BRIEF.md`. Key decisions:
 
-1. **Hsig vs. maximum breaker height:** Individual breaking waves (Hmax) can be 1.4–1.6× larger than Hsig. Surfers track individual waves and set waves, so raw Hsig will feel too small.
-2. **Shoaling and period factor:** If the SWAN output point is slightly offshore (e.g., 10m depth), the wave hasn't finished its final steepening. A 3 ft Hsig with a 16s period will swell and double when it hits a shallow reef; the same Hsig with a 6s period will crumble and look smaller. A breaking formula is needed to compute the actual height at the lip.
-3. **Surfer scale:** Even with the true physical face height, the display scale must match audience expectations. The Surfline/face-height scale maps physical breaker height directly to the chart. The Hawaiian/traditional scale divides by ~2. Clear Skies should use the face-height scale (consistent with US mainland expectations) with a configurable operator option for Hawaiian scale.
-
-ADR-084's Supplement 1 (γ correction via Battjes 1974) partially addresses this: it corrects the breaker index for bottom slope and type, computing `H_max = γ_corrected × depth`. However, this does not fully account for period-dependent shoaling amplification or the Hsig-to-Hmax statistical gap.
+- **Two breaker formulas supported.** Komar-Gaughan (1973) is the default — general-purpose, works for all periods and coastline types. Caldwell (2007) is an opt-in alternative for steep volcanic island coasts (Hawaii, Indonesia, Tahiti) — empirically tuned against 32 years of Oahu visual surf observations, predicts H1/10 (set waves), but fails below 10s period.
+- **Three height fields in the surf response.** `swellHeight` (raw SWAN Hsig), `waveHeightAtBreak` (post-supplement Hsig, backward compatible), `breakingFaceHeight` (trough-to-crest face height via breaker formula) + `breakingHawaiianHeight` (back-of-wave, ×0.5 of face height). All four always present in every response — the operator's display preference selects which the dashboard shows as primary, but the API returns all.
+- **Scorer uses face height.** `surf_scorer.py` scores using `breakingFaceHeight`, not raw Hsig. The scoring thresholds represent what surfers consider good waves — surfers think in face height. `_WAVE_HEIGHT_RANGES_FT` recalibrated accordingly.
+- **Hawaiian and face height are always proportional** (fixed ×0.5 factor). Scoring always uses face height regardless of display preference — the score is scale-independent.
+- **Per-spot operator config.** `breaker_formula` (default `komar_gaughan`, opt-in `caldwell`) and `surf_height_display` (default `face`, alt `hawaiian`) are per-spot fields in the marine location config. Set via wizard/admin.
+- **Caldwell auto-crossover.** When `breaker_formula = caldwell`, the system uses Caldwell for timesteps where Tp ≥ 10s and automatically falls to Komar-Gaughan for Tp < 10s (Caldwell is unreliable for short-period wind swell).
+- **Existing supplements preserved.** All four wave_transform.py supplements (γ correction, structure effects, spatial interpolation, topographic focusing) fire before the face height conversion. No changes to supplement behavior. The pipeline is: SWAN Hsig → supplements → corrected Hsig → breaker formula → face height.
 
 **Do:**
 
-- **Research phase (Coordinator):** Evaluate the Caldwell Surf Height formula (`H_b = f(H_sig, T_p)`) and other empirical breaker models (Komar 1998, Goda 2010) for converting SWAN Hsig + peak period + SWAN output depth into a breaking face height. Determine which formula best fits the SWAN output point depths configured per surf spot. Key question: where are the SWAN output nodes relative to the beach (deep water, 10m contour, or surf zone)?
-- **Implementation phase:** Apply the chosen conversion in `wave_transform.py` or `swan_runner.py` (whichever is architecturally appropriate). The conversion must account for:
-  - SWAN output depth at the configured output point
-  - Peak period (Tp) from SWAN — longer periods amplify more during shoaling
-  - The statistical Hsig → Hmax factor (Rayleigh distribution: Hmax ≈ 1.4–1.6 × Hsig for typical wave records)
-  - Operator-configurable scale: face-height (default, US mainland) or Hawaiian (÷2)
-- The existing γ correction (Supplement 1 from ADR-084) should compose with this conversion, not duplicate it. Clarify which correction applies at which stage.
-- Add a `surf_height_scale` config option: `face` (default) or `hawaiian`. Document in OPERATIONS-MANUAL.
+- **`breaker_height.py`:** Implement `hsig_to_face_height(hsig_m, period_s, output_depth_m, formula)` using both formulas:
+  - **Komar-Gaughan (1973):** `Hb = 0.39 × g^(1/5) × (Tp × Hsig²)^(2/5)`. Depth-aware correction when SWAN output is in shallow water (< 15m) to avoid double-counting shoaling SWAN already computed. Clamp output to [Hsig, 3 × Hsig].
+  - **Caldwell (2007):** Empirical formula from the Caldwell & Aucan paper. Auto-fall to Komar-Gaughan when Tp < 10s.
+  - `hawaiian_height(face_height_m)`: returns `face_height_m × 0.5`.
+- **`SurfForecast` model:** Add `swellHeight`, `breakingFaceHeight`, `breakingHawaiianHeight` fields (all `float | None`). Existing `waveHeightAtBreak` field retained (backward compatible — post-supplement Hsig, same semantics as today).
+- **Surf endpoint pipeline:**
+  ```
+  SWAN output (Hsig at output point)
+    → store as swellHeight
+    → wave_transform.apply_supplements() → corrected Hsig
+    → store as waveHeightAtBreak
+    → breaker_height.hsig_to_face_height(corrected_hsig, Tp, depth, formula)
+    → store as breakingFaceHeight
+    → breaker_height.hawaiian_height(face_height) → store as breakingHawaiianHeight
+    → surf_scorer.score_surf(breakingFaceHeight, ...) → quality score
+  ```
+- **Scorer recalibration:** Change `score_surf()` wave height input from `waveHeightAtBreak` to `breakingFaceHeight`. Adjust `_WAVE_HEIGHT_RANGES_FT` thresholds upward by ~15–20% to reflect face height values (e.g., optimal range shifts from 3–6ft Hsig to approximately 3.5–7ft face height). Verify that scoring produces the same quality labels as before for typical conditions — this is a recalibration, not a redesign.
+- **Per-spot config:** Add `breaker_formula` and `surf_height_display` to the marine location config model in `marine_config.py`. Default values: `komar_gaughan` and `face`.
+- **Unit conversion:** All three height fields (`swellHeight`, `breakingFaceHeight`, `breakingHawaiianHeight`) are converted to the operator's configured `group_wave_height` unit (feet or meters) at the endpoint level, same as `waveHeightAtBreak`.
 
 **Accept:**
-- Research findings documented in a brief (`docs/planning/briefs/WAVE-BREAKING-CONVERSION-BRIEF.md`) with the chosen formula, source citations, and worked examples comparing raw Hsig vs. converted face height for at least 3 representative conditions (small day 2ft 8s, medium day 4ft 12s, large day 8ft 16s).
-- Conversion applied in the enrichment pipeline: `waveHeightAtBreak` in the API response reflects breaking face height, not raw Hsig.
-- Face-height values match expectations: a 2.4 ft Hsig with a 7s period should convert to approximately the same face height surfers would observe.
-- Hawaiian scale option produces values ≈ ½ of face-height values when configured.
-- Existing γ correction (Supplement 1) still functions and does not double-count with the new conversion.
+- Research findings documented in `docs/planning/briefs/WAVE-BREAKING-CONVERSION-BRIEF.md` (DONE — completed 2026-07-16).
+- `breaker_height.py` implements both Komar-Gaughan and Caldwell formulas with correct constants and source citations.
+- Three new fields present in every `SurfForecast` entry: `swellHeight` (raw SWAN Hsig), `breakingFaceHeight` (face height via breaker formula), `breakingHawaiianHeight` (×0.5 of face height).
+- `waveHeightAtBreak` retained with its current semantics (post-supplement Hsig) — no breaking change.
+- Face height increases monotonically with wave period for the same Hsig: a 4ft Hsig at 16s produces a taller `breakingFaceHeight` than 4ft Hsig at 8s.
+- Komar-Gaughan worked examples match the brief's §3 table within ±5%.
+- Caldwell auto-crossover: with `breaker_formula = caldwell`, timesteps with Tp < 10s use Komar-Gaughan (verify via unit test).
+- `breakingHawaiianHeight` is exactly `breakingFaceHeight × 0.5` for all timesteps.
+- Scorer uses `breakingFaceHeight`: verify that `qualityStars` changes when the same Hsig is presented with a short vs. long period (the period amplifies face height, which changes the height score).
+- Existing γ correction (Supplement 1) still fires and does not double-count — supplements operate on Hsig before the face height conversion.
+- All four supplements confirmed active in the pipeline (log output or unit test).
+- Unit tests in `tests/enrichment/test_breaker_height.py` cover: Komar-Gaughan formula (known inputs → expected outputs), Caldwell formula, Caldwell auto-crossover at Tp < 10s, depth-aware correction, Hawaiian conversion, clamp bounds.
 
 ### QC Gate 2
 
 - SWAN produces physically reasonable wave forecasts for the Huntington Beach test domain: Hs 0.3–3.0m, Tm01 8–16s for a typical SoCal winter swell.
 - Wave data varies across forecast timesteps (not identical values across 144 hours).
 - Compare SWAN+TruShore breaking face height at surf spot against NDBC buoy observations at the nearest coastal buoy for overlapping periods: values should be physically reasonable and within the expected nearshore-to-buoy offset range.
-- Hsig → breaking face height conversion verified: raw SWAN Hsig + Tp + output depth produces a face height consistent with surfer expectations for the given conditions.
+- Three height fields present in every `SurfForecast` entry: `swellHeight` < `waveHeightAtBreak` ≤ `breakingFaceHeight` for typical nearshore conditions (supplements reduce height; face conversion amplifies it).
+- `breakingFaceHeight` increases with period for the same Hsig: verify a 1.2m Hsig at 16s produces a larger face height than 1.2m Hsig at 8s.
+- `breakingHawaiianHeight` is exactly 0.5× `breakingFaceHeight` for all timesteps.
+- Komar-Gaughan worked examples from the brief match implementation output within ±5%.
+- Caldwell auto-crossover verified: with `breaker_formula = caldwell`, a timestep with Tp = 8s uses Komar-Gaughan.
+- Scorer `qualityStars` uses `breakingFaceHeight` — verified by checking that two timesteps with identical Hsig but different periods produce different height scores.
 - SWAN run completes within 15 minutes on weewx host.
 - Cache retains last-good data on SWAN failure.
 - All Phase 1 test baselines hold.
-- Unit tests for SWAN runner and TruShore provider pass.
+- Unit tests for SWAN runner, TruShore provider, and `breaker_height.py` pass.
 
 ---
 
-## Phase 3 — TruShore Post-Processing Integration
+## Phase 3 — TruShore Post-Processing Integration ✅ COMPLETE (2026-07-17)
 
 SWAN output feeds the existing wave_transform.py and surf_scorer.py enrichment processors. This phase wires the new data source, removes NWPS, and cleans up.
 
@@ -443,30 +471,35 @@ SWAN output feeds the existing wave_transform.py and surf_scorer.py enrichment p
 - Reference: API-MANUAL §17 (supplement processor spec); `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md` §7
 
 **Do:**
-- In the surf endpoint, use `TrushoreProvider.fetch()` to get wave data. Pass the resulting wave data to `wave_transform.apply_supplements()`.
+- In the surf endpoint, use `TrushoreProvider.fetch()` to get wave data. Store raw SWAN Hsig as `swellHeight`. Pass the resulting wave data to `wave_transform.apply_supplements()`. Store the supplement-corrected Hsig as `waveHeightAtBreak`. Then pass it through `breaker_height.hsig_to_face_height()` to produce `breakingFaceHeight` and `breakingHawaiianHeight`.
 - Remove any NWPS-specific code paths in wave_transform.py (e.g., `data_source == "nwps"` checks). The input is `MarineForecastPoint` — source-agnostic.
-- All four supplements (γ correction, structure effects, spatial interpolation, topographic focusing) must fire for SWAN+TruShore data.
+- All four supplements (γ correction, structure effects, spatial interpolation, topographic focusing) must fire for SWAN+TruShore data. The supplements operate on Hsig BEFORE the face height conversion — they are unchanged.
+- The full pipeline per forecast timestep is: SWAN Hsig → `swellHeight` → supplements → `waveHeightAtBreak` → breaker formula → `breakingFaceHeight` → ×0.5 → `breakingHawaiianHeight`.
 
 **Accept:**
-- `GET /surf/{spot_id}` with TruShore configured returns `waveHeight` values that differ from the raw SWAN output (confirming supplements were applied, not bypassed).
-- Structure effects: a surf spot with a configured jetty shows a lower wave height than the raw SWAN output at that point (confirming Kt multiplication was applied).
+- `GET /surf/{spot_id}` with TruShore configured returns `waveHeightAtBreak` values that differ from `swellHeight` (confirming supplements were applied, not bypassed).
+- `breakingFaceHeight` ≥ `waveHeightAtBreak` for all timesteps (face height conversion amplifies, does not reduce).
+- Structure effects: a surf spot with a configured jetty shows a lower `waveHeightAtBreak` than `swellHeight` at that point (confirming Kt multiplication was applied).
 - All four supplements confirmed active via log output (wave_transform.py should log at DEBUG level which supplements ran and their correction factors).
 
-### T3.2 — Wire SWAN output through surf_scorer.py using HRRR wind
+### T3.2 — Wire SWAN output through surf_scorer.py using HRRR wind and face height
 
 - Owner: `clearskies-api-dev` (Sonnet)
 - Files:
   - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/endpoints/surf.py`
   - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/enrichment/surf_scorer.py`
-- Reference: API-MANUAL §17 (surf quality scorer spec, wind source precedence); T0.2 ADR (HRRR wind source for TruShore mode)
+- Reference: API-MANUAL §17 (surf quality scorer spec, wind source precedence); T0.2 ADR (HRRR wind source for TruShore mode); `docs/planning/briefs/WAVE-BREAKING-CONVERSION-BRIEF.md` §5 (scorer recalibration)
 
 **Do:**
-- In `surf_scorer.py`, add a `wind_source` parameter to `score_surf()`. When `wind_source == "hrrr_trushore"`, use the HRRR wind field (interpolated to the surf spot location and the relevant forecast timestep) instead of the station hardware wind observation.
+- In `surf_scorer.py`, change `score_surf()` to accept `breakingFaceHeight` (from T2.6) as the wave height input instead of `waveHeightAtBreak`. Recalibrate `_WAVE_HEIGHT_RANGES_FT` thresholds upward by ~15–20% to reflect face height values. The score must produce the same quality labels as before for typical conditions — this is a recalibration to a new height convention, not a redesign of the scoring logic.
+- Add a `wind_source` parameter to `score_surf()`. When `wind_source == "hrrr_trushore"`, use the HRRR wind field (interpolated to the surf spot location and the relevant forecast timestep) instead of the station hardware wind observation.
 - The HRRR wind for a given forecast timestep is already in the TruShore cache (it was the forcing wind for that SWAN run). Extract the HRRR wind at the surf spot coordinates and the timestep's `valid_time` for wind quality scoring.
 - Wind quality scoring (offshore/cross_offshore/cross/cross_onshore/onshore classification) uses the same angle formula regardless of wind source — only the source of the U/V values changes.
 - Station hardware wind source remains active for current-conditions snapshot scoring (the "now" card). HRRR wind is used for the 72-hour forecast timesteps.
 
 **Accept:**
+- Scorer uses `breakingFaceHeight` as wave height input: verified by unit test showing that two calls with identical Hsig but different periods (8s vs 16s) produce different height sub-scores (the longer period amplifies face height via Komar-Gaughan).
+- `_WAVE_HEIGHT_RANGES_FT` thresholds are expressed in face-height feet. Typical SoCal conditions still produce the same quality labels as before (e.g., a 4ft Hsig at 14s was "Good" before; 4.6ft face height at 14s should still be "Good" or "Very Good").
 - Wind quality scores vary across forecast timesteps (a morning sea-breeze pattern produces onshore wind during the day, potentially shifting to offshore at night — the HRRR forecast should reflect this).
 - `windQualityScore` is non-null for all TruShore forecast timesteps.
 - `windSource` field in `SurfForecast` response reflects `"hrrr_trushore"` for forecast timesteps and `"station"` or `"forecast_provider"` for the current-conditions snapshot.
@@ -484,9 +517,14 @@ SWAN output feeds the existing wave_transform.py and surf_scorer.py enrichment p
 - Fallback chain: SWAN+TruShore (current cache) → SWAN+TruShore (last successful cache, any age) → no surf data (return null surf fields with a note "surf forecast unavailable"). Do NOT fall to WW3 for surf data.
 - Add `nearshoreModel` field to the surf endpoint response: `"swan_trushore"`.
 - Add `lastRunTime` field: ISO timestamp of when the SWAN run that produced this data completed.
+- Add `breakerFormula` field: `"komar_gaughan"` or `"caldwell"` — which formula was used for this spot.
+- Add `surfHeightDisplay` field: `"face"` or `"hawaiian"` — the operator's configured display preference for this spot. The dashboard uses this to select which height field to show as primary.
+- All four height fields (`swellHeight`, `waveHeightAtBreak`, `breakingFaceHeight`, `breakingHawaiianHeight`) are present in every `SurfForecast` entry regardless of display preference. The API always returns all representations.
 
 **Accept:**
 - `GET /surf/{spot_id}` returns `nearshoreModel: "swan_trushore"`.
+- `breakerFormula` and `surfHeightDisplay` reflect the spot's per-location config.
+- All four height fields present and non-null for every forecast timestep.
 - `lastRunTime` is present and reflects the SWAN run timestamp (not the request time).
 - With SWAN unavailable (binary broken): response returns null surf fields with `error: "surf forecast unavailable"`. No WW3 fallback.
 - With stale cache (last run 6 hours ago): response serves the stale cache with `dataAge: 21600`. Does not fall to WW3.
@@ -539,20 +577,27 @@ SWAN output feeds the existing wave_transform.py and surf_scorer.py enrichment p
 
 ### QC Gate 3
 
-- `GET /surf/{spot_id}` returns varying `waveHeight`, `wavePeriod`, and `waveDirection` across all 144 forecast timesteps — not identical values.
+- `GET /surf/{spot_id}` returns varying `swellHeight`, `breakingFaceHeight`, `wavePeriod`, and `waveDirection` across all 144 forecast timesteps — not identical values.
+- All four height fields present in every `SurfForecast` entry: `swellHeight`, `waveHeightAtBreak`, `breakingFaceHeight`, `breakingHawaiianHeight`.
+- `breakingFaceHeight` > `swellHeight` for ground swell conditions (period ≥ 12s), confirming supplements + face height conversion are active.
+- `breakingHawaiianHeight` = `breakingFaceHeight × 0.5` for all timesteps.
 - All four wave_transform.py supplements fire for SWAN+TruShore data (verify via DEBUG logs or supplement-specific unit tests).
+- Scorer uses `breakingFaceHeight`: `qualityStars` varies with period for the same Hsig.
 - `windQualityScore` varies across forecast timesteps, reflecting the HRRR forecast wind pattern.
 - `windSource` field correctly reflects "hrrr_trushore" for forecast timesteps.
 - `nearshoreModel: "swan_trushore"` is present in the surf response.
+- `breakerFormula` and `surfHeightDisplay` fields present and reflect per-spot config.
 - WaveWatch III never appears as a surf data source.
 - `grep -ri "nwps" repos/weewx-clearskies-api/` returns zero hits (T3.4 cleanup confirmed).
 - All Phase 1 and 2 test baselines hold.
 
 ---
 
-## Phase 4 — Separated Service Option
+## Phase 4 — Separated Service Option 🔄 IN PROGRESS
 
 Operators who want to run SWAN on dedicated hardware (a more powerful machine, a cloud VM) can install the standalone TruShore service. This phase implements that option.
+
+> **Session 2 progress (2026-07-17):** T4.1–T4.3 complete and committed. T4.4/T4.5 code written (wizard template, admin template, routes, state, config_writer) and committed as WIP — **translation keys (13 locales) and Operator Manual (T4.6) still pending.** See `docs/planning/SWAN-TRUSHORE-PROGRESS.md` for full commit list and remaining work. Known issue: `step_trushore.html` uses Jinja2 `{% do %}` extension — verify it's enabled in the app's Jinja2 env before testing.
 
 ### T4.1 — Create `weewx-clearskies-trushore` pip package
 
@@ -642,6 +687,9 @@ Operators who want to run SWAN on dedicated hardware (a more powerful machine, a
 - Step also collects:
   - SWAN computational grid bounding box (pre-filled from the marine location coordinates configured in an earlier wizard step, with a default margin of ±0.2°).
   - Grid resolution (default 200m, configurable).
+- **Per-spot surf config fields** (shown for each spot with `surf` activity enabled):
+  - **Breaker formula** (`breaker_formula`): `komar_gaughan` (default) or `caldwell`. Help text explains: Komar-Gaughan is a general-purpose formula suitable for most coastlines. Caldwell is empirically tuned for steep volcanic island coasts (Hawaii, Indonesia, Tahiti) and auto-falls to Komar-Gaughan for short-period swell (< 10s).
+  - **Surf height display** (`surf_height_display`): `face` (default) or `hawaiian`. Help text explains: Face height measures trough-to-crest of the breaking wave face (standard in US mainland, Europe). Hawaiian/traditional measures from the back of the wave (~half face height, standard in Hawaii and Australia).
 - Add a `GET /setup/marine/swan-check` endpoint that probes whether the SWAN binary is available on PATH and returns `{"available": true/false, "version": "41.xx", "path": "/usr/local/bin/swan"}`.
 - All labels, descriptions, help text, and error messages must use i18n translation keys. Add keys to all 13 locale JSON files (English values first; translations follow the existing pattern of marking new keys for translator review).
 - Step-level help content: `help.wizard.trushore.*` keys explaining what SWAN+TruShore is, what the deployment modes mean, and how to install the SWAN binary if missing. Follow the existing `ConfigField.help_text` pattern.
@@ -669,6 +717,7 @@ Operators who want to run SWAN on dedicated hardware (a more powerful machine, a
   - Update `service_url` for separated mode (with connectivity test button).
   - View current SWAN+TruShore status: last run time, SWAN version, grid bbox, resolution.
   - Trigger a manual SWAN run (calls `POST /trigger` on the service or bundled runner).
+  - **Per-spot surf settings** (editable per surf location): breaker formula (Komar-Gaughan / Caldwell) and surf height display preference (face / Hawaiian). Changes apply via `/setup/apply` same as other per-spot config.
 - Admin section reads current config from `/setup/current-config` (same pattern as other admin sections).
 - All strings use i18n translation keys. Add `help.admin.trushore.*` keys for the admin help panel.
 
@@ -713,9 +762,11 @@ Operators who want to run SWAN on dedicated hardware (a more powerful machine, a
 
 ---
 
-## Phase 5 — Dashboard Integration and Polish
+## Phase 5 — Dashboard Integration and Polish 🔄 IN PROGRESS
 
 The dashboard surf tab already has a 72-hour forecast card that shows wave data. With TruShore providing varying per-timestep data, the visualization should display meaningful variation rather than a flat line.
+
+> **Session 2 progress (2026-07-17):** T5.1 and T5.2 implemented and committed (types.ts, openapi, 14 locale files, SurfingTab height field switch + NearshoreModelIndicator). T5.3 verified (no code change needed). TypeScript type-check passes. **Pending:** axe-core a11y scan of NearshoreModelIndicator not yet run — must run before release sign-off. See `docs/planning/SWAN-TRUSHORE-PROGRESS.md` for commits and remaining work.
 
 ### T5.1 — Verify 72-hour forecast card displays varying TruShore data
 
@@ -727,12 +778,14 @@ The dashboard surf tab already has a 72-hour forecast card that shows wave data.
 
 **Do:**
 - Load `GET /surf/{spot_id}` with TruShore data active and verify the 72-hour chart/table correctly renders per-timestep wave height, period, and surf score.
+- The chart's primary height value must come from the operator's configured `surfHeightDisplay` preference (returned in the surf response): use `breakingFaceHeight` when `surfHeightDisplay: "face"`, use `breakingHawaiianHeight` when `surfHeightDisplay: "hawaiian"`. The API returns all four height fields — the dashboard selects which to display.
 - If the dashboard hardcoded handling for "identical values across timesteps" (which was the WW3 fallback behavior), remove that workaround. TruShore data varies — the chart should show the variation.
 - Verify time axis: forecast timesteps should display in the operator's configured timezone, not UTC.
 - Verify units: wave height displayed in the operator's `group_wave_height` configured unit (feet or meters), not always meters.
 
 **Accept:**
 - 72-hour surf forecast chart shows a curve, not a flat line, for a real TruShore SWAN run.
+- Chart plots `breakingFaceHeight` (or `breakingHawaiianHeight` per operator config) — NOT `swellHeight` or `waveHeightAtBreak`.
 - Time axis is in the operator's configured timezone.
 - Wave height is in the configured unit (feet for US preset).
 - Chart handles edge cases: null surf data (SWAN unavailable) shows an appropriate empty/error state.
@@ -870,23 +923,149 @@ This phase re-validates everything independently after implementation is complet
 
 ---
 
+## Phase 7 — Remedial: Nested Grid Architecture + GFS Wind + 72-Hour Forecast
+
+**Added 2026-07-17.** Phases 1–6 implemented SWAN with a single flat grid (462×555, 200m resolution over a 1° domain). Production deployment on 2026-07-17 revealed two critical issues:
+
+1. **Memory:** The flat grid produces ~257,000 grid points requiring ~1.3 GB RAM. The weewx host has 1.9 GB total — SWAN was OOM-killed after 15 minutes of swap-thrashing. Every operational nearshore system uses nested grids (coarse outer + fine inner), not flat grids. See research brief §2 "Grid Configuration: Nested Grids."
+2. **Forecast range:** HRRR extends to only 18 or 48 hours depending on the cycle (4 extended cycles/day reach 48h; the other 20 reach only 18h). The dashboard's 72-hour surf forecast card requires 72 hours of wind forcing. NWPS used GFS wind (extends to 384h). See research brief §4 "HRRR Forecast Range Limitation."
+
+**All document and manual updates in T7.0 must be completed BEFORE any coding work in T7.1–T7.5.** The Phases 1–6 pattern of coding first and documenting later led to the flat-grid estimate going unvalidated. Documents first forces the design to be reviewed before implementation.
+
+### T7.0 — Document and manual updates (BEFORE coding)
+
+- Owner: Coordinator (Opus)
+- Files:
+  - `docs/manuals/API-MANUAL.md` §17 — update SWAN+TruShore description to specify nested grid architecture (outer grid + inner nest), GFS wind for hours 48–72, and memory budget (≤300 MB combined)
+  - `docs/manuals/PROVIDER-MANUAL.md` — add §14.{next} GFS wind provider: module identity (`providers/wind/gfs.py`, PROVIDER_ID `gfs`, DOMAIN `wind`), NOMADS URL, 0.25° resolution, forecast range 384 hours, cache TTL
+  - `docs/manuals/PROVIDER-MANUAL.md` §14.{HRRR} — amend to document the 18/48-hour forecast range limitation and the blended wind approach
+  - `docs/manuals/PROVIDER-MANUAL.md` §14.{TruShore} — amend to document nested grid architecture (two sequential SWAN runs per cycle) and the memory budget
+  - `docs/ARCHITECTURE.md` — update SWAN subprocess description to specify nested grid execution and GFS wind provider
+  - `docs/manuals/OPERATIONS-MANUAL.md` — update SWAN+TruShore section (§5) to document nested grid parameters visible in wizard/admin (outer resolution, inner resolution, nest domain)
+
+**Accept:** All governing documents describe the nested grid architecture and GFS wind supplement before any code is written. No document references a flat single-grid SWAN configuration.
+
+### T7.1 — Implement GFS wind provider
+
+- Owner: `clearskies-api-dev` (Sonnet)
+- Files:
+  - New: `repos/weewx-clearskies-api/weewx_clearskies_api/providers/wind/gfs.py`
+- Reference: PROVIDER-MANUAL §14.{GFS section from T7.0}
+
+**Do:**
+- Implement `providers/wind/gfs.py` with `PROVIDER_ID = "gfs"`, `DOMAIN = "wind"`.
+- Fetch GFS 0.25° forecast wind (U/V at 10m AGL) from NOMADS Grib Filter for a configurable bounding box.
+- GFS forecast hours: f00–f384, 3-hour timesteps. For TruShore, fetch hours 48–72 (or the full range for simplicity).
+- Cache with TTL matching GFS cycle cadence (6 hours).
+- Follow the same provider module patterns as `providers/wind/hrrr.py`.
+
+**Accept:**
+- `fetch(bbox=..., hours_start=48, hours_end=72)` returns a wind field for the requested forecast range.
+- GFS wind values at coastal sites are physically reasonable.
+- Unit tests cover: successful fetch, 404 handling, wind rotation (if GFS uses a non-earth-relative grid).
+
+### T7.2 — Implement nested grid SWAN runner
+
+- Owner: `clearskies-api-dev` (Sonnet)
+- Files:
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/services/swan_runner.py`
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/services/swan_formats.py`
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/config/marine_config.py`
+- Reference: PROVIDER-MANUAL §14.{TruShore section from T7.0}; research brief §2 "Grid Configuration: Nested Grids"
+
+**Do:**
+- Modify `swan_runner.py` to execute two sequential SWAN runs per cycle:
+  1. **Outer grid:** ~2–3 km resolution, large domain (from `MarineConfig.hrrr_bbox`). Writes `NESTOUT` command to produce boundary files for the inner nest.
+  2. **Inner nest:** ~200–500m resolution, tight domain around surf spots (from `MarineConfig.swan_domain_bbox`). Reads outer grid boundary via `NGRID` command.
+- Modify `marine_config.py` to add `outer_grid_resolution_km` and `inner_nest_resolution_m` config fields with appropriate defaults.
+- Modify `swan_formats.py` to generate input files for both grid levels.
+- Stitch HRRR wind (hours 0–48) and GFS wind (hours 48–72) into a single SWAN WIND input spanning 72 hours.
+
+**Accept:**
+- Two SWAN runs complete per cycle (outer + inner), total memory ≤300 MB.
+- Inner nest produces output at configured surf spot coordinates.
+- Wave data spans 72 forecast hours (not limited to 18 or 48).
+- SWAN completes within 15 minutes total (both levels) on the weewx host.
+- No OOM kill during a full cycle.
+
+### T7.3 — Update cache warmer and TruShore provider for nested execution
+
+- Owner: `clearskies-api-dev` (Sonnet)
+- Files:
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/services/cache_warmer.py`
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/providers/nearshore/trushore.py`
+
+**Do:**
+- Cache warmer: fetch both HRRR (hours 0–48) and GFS (hours 48–72) wind, pass both to TruShore as a single combined wind field.
+- TruShore `run_all_spots()`: run outer grid first, then inner nest, using outer grid boundary output.
+- Schedule: run on extended HRRR cycles (00/06/12/18Z, 4×/day) to get the full 48-hour HRRR range. GFS supplements to 72 hours.
+- Cache TTL: 6 hours (matches extended cycle interval).
+
+**Accept:**
+- `GET /surf/{spot_id}` returns 72 hours of forecast data.
+- HRRR wind used for hours 0–48, GFS for hours 48–72.
+- `windSource` field correctly reflects `"hrrr_trushore"` for hours 0–48 and `"gfs_trushore"` for hours 48–72.
+- SWAN memory stays under 300 MB during execution.
+
+### T7.4 — Wizard/admin updates for nested grid parameters
+
+- Owner: `clearskies-api-dev` (Sonnet)
+- Files:
+  - Modify: wizard and admin templates for TruShore step
+  - Modify: all 13 locale translation files
+
+**Do:**
+- Update wizard TruShore step to display nested grid parameters (outer resolution, inner resolution) instead of the single flat grid resolution.
+- Update admin TruShore section similarly.
+- Add translation keys for new/changed labels.
+
+**Accept:**
+- Wizard and admin display nested grid parameters.
+- All strings i18n-keyed.
+
+### T7.5 — End-to-end verification and Phase 6 completion
+
+- Owner: `clearskies-auditor` (Sonnet)
+
+**Do:**
+- Verify SWAN produces 72 hours of varying wave data at the configured surf spot.
+- Verify memory stays under 300 MB during SWAN execution.
+- Verify SWAN completes in <15 minutes.
+- Compare SWAN output against nearest NDBC buoy for physical reasonableness.
+- Complete T6.4 and T6.5 (blocked since Phase 6 by the flat-grid OOM issue).
+- Run full QC gate sweep across all phases.
+
+**Accept:**
+- All Phase 6 (T6.1–T6.5) acceptance criteria met.
+- 72-hour surf forecast card on dashboard shows a wave height curve, not a flat line.
+- SWAN memory ≤300 MB, runtime ≤15 minutes, no OOM kill.
+
+---
+
 ## Verification
 
-After all phases complete:
+After all phases complete (including Phase 7 remedial):
 
 - Surf endpoint returns varying wave data across all 144 forecast timesteps
-- All four wave_transform.py supplements fire for SWAN+TruShore data (γ correction, structure effects, spatial interpolation, topographic focusing)
+- All four height fields present in every `SurfForecast` entry: `swellHeight`, `waveHeightAtBreak`, `breakingFaceHeight`, `breakingHawaiianHeight`
+- `breakingFaceHeight` increases with period for the same Hsig (Komar-Gaughan period dependence confirmed)
+- `breakingHawaiianHeight` = `breakingFaceHeight × 0.5` for all timesteps
+- All four wave_transform.py supplements fire for SWAN+TruShore data (γ correction, structure effects, spatial interpolation, topographic focusing) — supplements apply to Hsig BEFORE face height conversion
+- Scorer uses `breakingFaceHeight` — `qualityStars` reflects face height, not raw Hsig
 - Wind quality in surf score reflects HRRR forecast wind, not station observation, for forecast timesteps
 - `nearshoreModel: "swan_trushore"` appears in surf endpoint responses
+- `breakerFormula` and `surfHeightDisplay` fields present and reflect per-spot config
+- Per-spot config: `breaker_formula` (komar_gaughan / caldwell) and `surf_height_display` (face / hawaiian) configurable via wizard and admin
+- Caldwell auto-crossover: with `breaker_formula = caldwell`, timesteps with Tp < 10s automatically use Komar-Gaughan
 - `lastRunTime` reflects SWAN run completion time
 - WaveWatch III never appears as a surf endpoint data source
 - NWPS is fully eliminated: `grep -ri "nwps" repos/weewx-clearskies-api/` returns zero hits
 - No `nearshore_model` config key exists — SWAN+TruShore is the only nearshore model
 - WaveWatch III continues to serve the marine endpoint and as SWAN boundary conditions via `providers/marine/wavewatch.py`
 - Standalone `weewx-clearskies-trushore` service starts and serves data (Phase 4)
-- 72-hour surf forecast chart on dashboard shows a curve, not a flat line
+- 72-hour surf forecast chart on dashboard shows a curve, not a flat line, using `breakingFaceHeight` or `breakingHawaiianHeight` per operator display preference
 - "Model: SWAN+TruShore" indicator visible on surf tab, i18n-keyed
-- Wizard/admin SWAN+TruShore setup section functional with i18n-compliant help content
+- Wizard/admin SWAN+TruShore setup section functional with i18n-compliant help content, including per-spot breaker formula and surf height display fields
 - All governing documents (API-MANUAL §17, PROVIDER-MANUAL, ARCHITECTURE.md) match implemented code — no NWPS references remain
 - Phase-boundary ADR compliance sweep: every ADR that touches marine/surf/nearshore is verified against the SWAN+TruShore implementation
 - All test baselines established at phase kickoff hold at plan completion
