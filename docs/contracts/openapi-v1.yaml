@@ -3437,7 +3437,10 @@ components:
       description: Surf quality forecast for one spot at one timestep (post wave_transform + surf_scorer).
       properties:
         time: { type: string, format: date-time }
-        waveHeightAtBreak: { type: number, description: "group_wave_height; after NWPS supplements" }
+        waveHeightAtBreak: { type: number, description: "group_wave_height; post-supplement Hsig (after wave_transform supplements)" }
+        swellHeight: { type: number, nullable: true, description: "Raw SWAN Hsig (significant wave height) before wave_transform.py supplements. Absent on WW3 fallback responses." }
+        breakingFaceHeight: { type: number, nullable: true, description: "Trough-to-crest breaking wave face height via breaker formula (Komar-Gaughan or Caldwell per per-spot config). Primary surfer-scale height; display when surfHeightDisplay='face'. Absent on WW3 fallback." }
+        breakingHawaiianHeight: { type: number, nullable: true, description: "Back-of-wave (Hawaiian) scale = breakingFaceHeight × 0.5. Display when surfHeightDisplay='hawaiian'. Null when breakingFaceHeight is null." }
         period: { type: number, description: "group_wave_period; dominant period" }
         direction: { type: number, description: "Degrees true north; dominant swell direction" }
         qualityStars: { type: integer, minimum: 1, maximum: 5 }
@@ -3448,6 +3451,7 @@ components:
         windQuality:
           type: string
           enum: [offshore, cross_offshore, cross, cross_onshore, onshore]
+        windSource: { type: string, nullable: true, description: "Wind data source for this timestep: 'hrrr_trushore' for forecast timesteps, 'station' or 'forecast_provider' for current-conditions." }
         swellDominance: { type: number, minimum: 0, maximum: 1, description: "Ratio of primary swell energy to total energy" }
         multiSwell:
           type: array
@@ -3684,9 +3688,8 @@ components:
           properties: { lat: { type: number }, lon: { type: number } }
         forecast:
           type: array
-          maxItems: 1
           items: { $ref: '#/components/schemas/SurfForecast' }
-          description: "0 or 1 entries depending on NWPS/WaveWatch III availability"
+          description: "Up to 144 timesteps of surf forecast data from SWAN+TruShore. Empty array when SWAN is unavailable."
         zoneForecast:
           nullable: true
           allOf: [{ $ref: '#/components/schemas/SurfZoneForecast' }]
@@ -3698,7 +3701,11 @@ components:
           type: array
           items: { $ref: '#/components/schemas/TidePrediction' }
           description: "Informational overlay, not scored."
-        source: { type: string, example: "nwps+wavewatch+ndbc+coops+nws_srf" }
+        nearshoreModel: { type: string, nullable: true, example: "swan_trushore", description: "Identifies the nearshore model in use. 'swan_trushore' when SWAN+TruShore is active; absent/null when SWAN is not installed." }
+        lastRunTime: { type: string, format: date-time, nullable: true, description: "UTC ISO-8601 timestamp when the last SWAN model run completed." }
+        breakerFormula: { type: string, enum: [komar_gaughan, caldwell], nullable: true, description: "Per-spot configured breaker formula used for breakingFaceHeight calculation." }
+        surfHeightDisplay: { type: string, enum: [face, hawaiian], nullable: true, description: "Operator-configured height display preference: 'face' for trough-to-crest, 'hawaiian' for back-of-wave scale." }
+        source: { type: string, example: "swan_trushore+wavewatch+ndbc+coops+nws_srf" }
         generatedAt: { type: string, format: date-time }
       required: [locationId, locationName, coordinates, forecast, waterTemp, spectralComponents, tidePredictions, source, generatedAt]
 
