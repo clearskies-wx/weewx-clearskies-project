@@ -82,9 +82,11 @@ weewx_clearskies_api/providers/
 ├── earthquakes/     # Earthquakes domain modules (§9)
 ├── radar/           # Radar domain modules (§7)
 ├── seeing/          # 7Timer seeing forecast (§6 exception — see below)
-├── marine/          # Marine domain modules (§14): wavewatch, nwps, nws_marine, nws_srf
+├── marine/          # Marine domain modules (§14): wavewatch, nws_marine, nws_srf
 ├── tides/           # Tides domain modules (§14): coops
-└── buoy/            # Buoy domain modules (§14): ndbc
+├── buoy/            # Buoy domain modules (§14): ndbc
+├── wind/            # Wind domain modules (§14): hrrr ([nearshore] extra)
+└── nearshore/       # Nearshore domain modules (§14): trushore ([nearshore] extra)
 ```
 
 ### Capability declaration fields
@@ -1206,7 +1208,9 @@ Six provider modules across three existing domains (`"marine"`, `"tides"`, `"buo
 | WaveWatch III forecasts | `providers/marine/wavewatch.py` | `wavewatch` | `marine` | NOAA WaveWatch III via ERDDAP | No |
 | NWS marine zone text | `providers/marine/nws_marine.py` | `nws_marine` | `marine` | NWS API | No |
 | NWS Surf Zone Forecast | `providers/marine/nws_srf.py` | `nws_srf` | `marine` | NWS API (SRF text product) | No |
-| NWPS nearshore wave data | `providers/marine/nwps.py` | `nwps` | `marine` | NOAA NWPS GRIB2 | No |
+| ~~NWPS nearshore wave data~~ | ~~`providers/marine/nwps.py`~~ | — | — | Eliminated (ADR-093). Replaced by SWAN+TruShore. | — |
+| HRRR wind | `providers/wind/hrrr.py` | `hrrr` | `wind` | NOAA HRRR GRIB2 via NOMADS | No |
+| SWAN+TruShore runner | `providers/nearshore/trushore.py` | `trushore` | `nearshore` | Local SWAN subprocess | No |
 | OFS ocean model data | `providers/ocean/ofs.py` | `ofs` | `ocean` | NOAA OFS via THREDDS/OPeNDAP | No |
 | ERDDAP ocean data | `providers/ocean/erddap_ocean.py` | `erddap_ocean` | `ocean` | MUR SST, RTOFS, PacIOOS, CARICOOS via ERDDAP | No |
 
@@ -1354,7 +1358,7 @@ Variables (all 9 are `[time][depth][latitude][longitude]`): `Thgt` (significant 
 1. `GET https://api.weather.gov/products/types/CWF/locations/{wfo}` with `User-Agent: weewx-clearskies-api/{version} (contact email)` — a JSON-LD envelope with an `@graph` array of product stubs, most recent first in practice. Take `@graph[0]`; use its `@id` URL, or fall back to `{base}/products/{id}` from its `id` (UUID).
 2. `GET` that product URL → `productText`, the raw CWF text.
 
-**WFO determination:** `fetch()` takes `zone_id` only (no lat/lon required) — the WFO is resolved via `providers/_common/nws_zones.py::get_wfo_for_zone(zone_id)` (§14.8), which reuses the already-cached (24h) `type=coastal` zone list's `cwa` property. An optional `wfo_override` kwarg (naming matches §14.6 NWPS's `wfo_override` pattern) lets a caller that already knows the WFO skip this lookup.
+**WFO determination:** `fetch()` takes `zone_id` only (no lat/lon required) — the WFO is resolved via `providers/_common/nws_zones.py::get_wfo_for_zone(zone_id)` (§14.8), which reuses the already-cached (24h) `type=coastal` zone list's `cwa` property. An optional `wfo_override` kwarg lets a caller that already knows the WFO skip this lookup.
 
 **CWF text parsing:** A CWF product concatenates one UGC (Universal Geographic Code) header segment per zone-group, e.g. `AMZ250-121115-` (zone id + 6-digit expiration), each terminated by a `$$` line. A header may abbreviate additional zones sharing identical text to their 3-digit suffix (e.g. `AMZ250-256-262-121115-` → `AMZ250`, `AMZ256`, `AMZ262`). Locate the segment for the operator's configured `zone_id`, then split it into forecast periods on `.PERIOD...` markers (e.g. `.TONIGHT...`, `.SUN...`, `.SUN NIGHT...` — the narrative follows immediately on the same line, unlike SRF's standalone day-period header lines). Per period:
 
@@ -1438,55 +1442,9 @@ Map to `SurfZoneForecast` canonical model.
 
 **Rate limiting:** Per-module rate limiter (5 req/s to `api.weather.gov`), matching the established per-module pattern used by other NWS providers.
 
-### §14.6 NWPS nearshore wave data
+### §14.6 (Removed — NWPS eliminated per ADR-093)
 
-**Module identity:** `providers/marine/nwps.py`, `PROVIDER_ID = "nwps"`, `DOMAIN = "marine"`.
-
-**CAPABILITY:** `geographic_coverage = "us_coastal"`, `auth_required = []`. `supplied_canonical_fields` includes nearshore wave height, period, direction, currents, bottom orbital velocity. Conditional fields (show-when-available, ~12 WFOs): rip current probability, total water level, wave runup.
-
-**Native dependency:** Requires eccodes (ECMWF GRIB processing library). See OPERATIONS-MANUAL §1 for install instructions. At module registration time, attempt `import eccodes` (fallback: `import pygrib`). If both fail, raise `MissingDependencyError` with platform-specific install instructions. The rest of the API continues functioning — only the marine feature is blocked. The setup wizard also probes this ahead of time via `GET /setup/marine/eccodes-check` (Marine Remediation Plan T3.6) — same `GRIB_AVAILABLE` detection from `providers/marine/grib_processor.py`, checked before the operator is allowed to enable marine features, so an operator on a host without eccodes is warned before configuring locations rather than after saving.
-
-**Wire format and parsing:**
-
-GRIB2 files from NOMADS: `https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwps/prod/`. Directory structure (live-verified 2026-07-10): `{region}.{YYYYMMDD}/{wfo}/{HH}/CG{n}/` — e.g. `er.20260710/ilm/06/CG1/ilm_nwps_CG1_20260710_0600.grib2`. Region prefixes: er (Eastern), sr (Southern), wr (Western), ar (Alaska), pr (Pacific). WFO codes are lowercase. One consolidated GRIB2 file per CG grid per cycle (~27 MB) contains all forecast hours and fields.
-
-**WFO domain determination:** From the spot's coordinates, determine which of the 36 US coastal WFOs (+ Great Lakes) covers the location. Use the NWS `/points` → CWA mapping.
-
-**CG grid selection:**
-- CG1: baseline grid, ~1.8 km resolution, covers the full WFO nearshore domain
-- CG2–CG5: nested grids at higher resolution for specific areas (harbors, inlets)
-- Default to CG1. Use higher-resolution CG grids when the spot falls within their domain.
-
-**Extracted fields:**
-
-| GRIB2 parameter | Canonical field | Available |
-|---|---|---|
-| Significant wave height | wave_height | All WFOs |
-| Peak wave period | wave_period | All WFOs |
-| Mean wave direction | wave_direction | All WFOs |
-| Surface current speed/direction | current_speed, current_direction | All WFOs |
-| Bottom orbital velocity | bottom_orbital_velocity | All WFOs |
-| Rip current probability | rip_current_probability | ~12 WFOs (NWPS v1.5) |
-| Total water level | total_water_level | ~12 WFOs (NWPS v1.5) |
-| Wave runup | wave_runup | ~12 WFOs (NWPS v1.5) |
-
-NWPS v1.5 fields are show-when-available: display when the WFO provides them, absent without error when they don't.
-
-**GRIB2 temporal awareness (HARD RULE):** Each NWPS GRIB2 file contains **144 hourly forecast timesteps** (hours 0–144). The GRIB reader (`grib_processor.py`) MUST select messages by forecast hour using the `endStep` key:
-- eccodes: `eccodes.codes_get(msgid, "endStep")` → integer forecast hour
-- pygrib: `grb.endStep` → integer forecast hour
-
-For current conditions, callers pass `target_step=0` to `read_grib_fields()` to select only the analysis timestep. When `target_step` is not specified (`None`), the reader uses legacy behavior (last matching field wins) — this is not correct for current conditions but is preserved for backwards compatibility until FIX-18 adds proper multi-timestep indexing by `end_step` for forecast arrays and animated maps. The previous behavior — iterating all messages and overwriting with the last match — was a bug that caused current conditions to show hour-144 data (six days out).
-
-**Update cadence:** 2–3 cycles per day per WFO (typically 00z, 06z, 12z). Data is never more than ~8–12 hours old under normal NOAA operations.
-
-**No fallback transformation pipeline.** When NWPS data is temporarily unavailable (NOAA outage, WFO maintenance), the marine page shows WaveWatch III offshore data without nearshore supplementation. No separate code path.
-
-**Cache:** Key = `(provider_id, wfo, cg_grid, cycle_time)`. TTL = 1800s (30 min) — a fixed interval, not derived from cycle cadence (implementation: `providers/marine/nwps.py` `_CACHE_TTL_SECONDS`).
-
-**Error handling:** GRIB2 file not found (NOMADS returns 404) → log WARNING, fall back to WaveWatch III offshore data. eccodes parse error → `ProviderProtocolError` with the GRIB message details. Network errors → canonical taxonomy.
-
-**Rate limiting:** 2 req/s to NOMADS (shared NOAA infrastructure).
+NWPS is eliminated. The nearshore wave model is SWAN+TruShore (§14.15). The `providers/marine/nwps.py` module, its tests, cache warmer entry, and all config keys (`nwps_wfo`, `nearshore_model`) are deleted. The historical decision rationale is preserved in the archived ADR-084.
 
 ### §14.7 NOAA CUDEM bathymetry
 
@@ -1535,7 +1493,7 @@ These are displayed as habitat annotations on the fishing page depth profile.
 **Not a provider module.** Shared utility used by:
 - NWS marine zone text forecast provider (§14.4) — `get_wfo_for_zone(zone_id)` to determine the WFO whose CWF product covers a known zone_id (no coordinates needed)
 - NWS Surf Zone Forecast provider (§14.5) — `get_cwa(lat, lon)` to determine WFO from coordinates
-- NWPS nearshore wave data provider (§14.6) — `get_cwa(lat, lon)` as first attempt at WFO determination, falling back to a bounding-box lookup
+- ~~NWPS nearshore wave data provider (§14.6)~~ — eliminated per ADR-093
 - Marine zone alerts extension (§8) — `discover_marine_zones(lat, lon, radius_miles)` to discover marine zones within the operator's alert radius
 
 **Functions:**
@@ -1562,7 +1520,7 @@ These are displayed as habitat annotations on the fishing page depth profile.
 
 **File:** `endpoints/setup.py` (`GET /setup/marine/discover-structures`), T5.2.
 
-**Not a dispatch-registered provider module.** Setup-time-only helper, same category as §14.7 (bathymetry) and §14.8 (NWS zone discovery): populates `config/marine_config.py`'s `StructureConfig` entries (`type`, `material`, `length_m`, `bearing_degrees`, `distance_m` — see OPERATIONS-MANUAL.md "Structure configuration") so the operator doesn't have to enter every jetty/pier/breakwater/seawall/groin by hand during surf spot setup. Feeds API-MANUAL §17 "Supplement 2 — Coastal structure effects" (the NWPS wave-transmission/reflection correction).
+**Not a dispatch-registered provider module.** Setup-time-only helper, same category as §14.7 (bathymetry) and §14.8 (NWS zone discovery): populates `config/marine_config.py`'s `StructureConfig` entries (`type`, `material`, `length_m`, `bearing_degrees`, `distance_m` — see OPERATIONS-MANUAL.md "Structure configuration") so the operator doesn't have to enter every jetty/pier/breakwater/seawall/groin by hand during surf spot setup. Feeds API-MANUAL §17 "Supplement 2 — Coastal structure effects" (the wave-transmission/reflection correction applied to SWAN output).
 
 **Data source:** OpenStreetMap via the Overpass API — free, keyless, global coverage wherever OSM has coastal structure data mapped. `POST/GET https://overpass-api.de/api/interpreter`, `User-Agent: ClearSkies-WeatherStation/1.0 (structure-discovery)`.
 
@@ -1748,6 +1706,85 @@ Each tier is independently wrapped in try/except — failure at one tier does no
 - Surge threshold constants: `_SURGE_THRESHOLDS_FT = {"minor": 0.15, "moderate": 0.5, "major": 1.0}`.
 - Unit conversion via `weewx_clearskies_api.units.conversion.convert()`.
 
+### §14.14 HRRR wind provider (ADR-093, ADR-094)
+
+**Module identity:** `providers/wind/hrrr.py`, `PROVIDER_ID = "hrrr"`, `DOMAIN = "wind"`.
+
+**CAPABILITY:** `geographic_coverage = "us"`, `auth_required = []`. `supplied_canonical_fields` includes U-component and V-component of wind at 10m above ground level, earth-relative.
+
+**Availability:** Active only when the `[nearshore]` pip extra is installed. Not part of the standard provider registry startup — invoked by the SWAN runner (`services/swan_runner.py`), not by the cache warmer directly. The cache warmer fires HRRR warm at startup and on the hourly schedule when `[nearshore]` is installed.
+
+**Data source (primary):** NOMADS Grib Filter at `https://nomads.ncep.noaa.gov/cgi-bin/filter_hrrr_2d.pl`. Supports geographic subsetting (bounding box), variable selection (UGRD/VGRD at 10m AGL), and GRIB2 output. Free, no API key.
+
+**Data source (backup):** AWS S3 at `s3://noaa-hrrr-bdp-pds/`. Same data, hosted by Amazon as a public dataset.
+
+**Schedule:** HRRR runs on a fixed hourly schedule (00Z through 23Z). Availability: ~45–60 minutes after the nominal run hour. Completely predictable — no dependency on human forecaster input.
+
+**Extracted variables:**
+
+| GRIB2 parameter | Variable | Description |
+|---|---|---|
+| UGRD:10 m above ground | U-component | East-west wind at 10m AGL |
+| VGRD:10 m above ground | V-component | North-south wind at 10m AGL |
+
+**Wind rotation (CRITICAL):** HRRR uses a Lambert Conformal Conic projection. Wind components in GRIB2 files are grid-relative (U positive = East along the grid's X axis, not geographic East). Before passing winds to SWAN, they MUST be rotated to earth-relative using the Lambert Conformal grid parameters:
+
+Rotation formula (full NCEP Lambert Conformal, NCEP Office Note 388 Appendix C):
+1. Compute cone factor: `n = sin(latin1)` (tangent case, latin1 = latin2 = 38.5° for HRRR → n ≈ 0.6225)
+2. Per grid point: `alpha = radians(n × (lon_grid_point - lov))`
+3. Rotate: `U_earth = U_grid × cos(alpha) - V_grid × sin(alpha)`, `V_earth = U_grid × sin(alpha) + V_grid × cos(alpha)`
+
+Source the exact HRRR Lambert parameters (`lov`, `latin1`, `latin2`) from the GRIB2 metadata (eccodes or pygrib). The cone factor `n` must NOT be omitted — dropping it (equivalent to n=1, Polar Stereographic) over-rotates HRRR winds by ~60%. Skipping rotation entirely produces wind inputs that are systematically wrong by up to ~20° near domain boundaries.
+
+Python formula approach preferred (eliminates wgrib2 binary requirement for wind rotation). If wgrib2 subprocess is used, log a clear error if wgrib2 is not found on PATH.
+
+**Cycle fallback:** If the most recent cycle (e.g., 15Z) returns 404 (not yet posted), try the previous cycle (14Z). Log at INFO level which cycle was used.
+
+**Bounding box:** Configurable per marine location. Default: spot coordinates ± 0.2° (configurable via wizard SWAN grid bbox settings).
+
+**Cache:** Key = `(provider_id, bbox_hash, cycle_time)`. TTL = 3300s (55 min) — slightly less than the hourly HRRR cycle to ensure fresh data on each cycle.
+
+**Error handling:** 404 on all attempted cycles → `ProviderUnavailableError`. Network errors → canonical taxonomy. GRIB2 parse error → `ProviderProtocolError`.
+
+**Rate limiting:** 2 req/s to NOMADS (shared NOAA infrastructure).
+
+### §14.15 SWAN+TruShore runner (ADR-093)
+
+**Not a network provider.** `providers/nearshore/trushore.py` is a thin provider wrapper around `services/swan_runner.py`. It follows the existing provider interface pattern but runs a local SWAN subprocess instead of making a network call.
+
+**Module identity:** `providers/nearshore/trushore.py`, `PROVIDER_ID = "trushore"`, `DOMAIN = "nearshore"`.
+
+**SWAN binary:** SWAN 41.45 (Fortran). Compiled from source via `scripts/install_swan.sh` or included in the Docker image. Binary on PATH at `/usr/local/bin/swan`. API startup check: if `[nearshore]` extra is installed but SWAN binary is not found, log CRITICAL with installation instructions. The surf endpoint returns null surf data until SWAN is available — no fallback to any other model.
+
+**Input sources (all from cache — they run on their own schedules):**
+
+| Input | Source | Cache key pattern |
+|---|---|---|
+| Wind forcing | HRRR wind provider (§14.14) | `(hrrr, bbox, cycle_time)` |
+| Deep-water boundary | WaveWatch III (§14.3) | `(wavewatch, ...)` |
+| Bathymetry | CUDEM (§14.7) | Setup-time download, stored in spot config |
+| Tidal currents | RTOFS/OFS (§14.10) | `(ofs, ...)` |
+
+**SWAN runner** (`services/swan_runner.py`):
+
+- `SWANRunner.__init__`: takes config (domain bbox, surf spot coordinates, bathymetry data, HRRR bbox, SWAN binary path)
+- `run(hrrr_wind_field, ww3_boundary, cudem_bathymetry)`: orchestrates the full SWAN run, returns `dict[str, list[MarineForecastPoint]]` keyed by spot_id
+- `_write_input_files(tmpdir, hrrr_wind_field, ww3_boundary, cudem_bathymetry)`: writes SWAN INPUT, BOTTOM.txt, WIND.txt, BOUND_SPEC.txt, OUTPUT_POINTS.txt; returns grid_info dict
+- `_spawn_swan(tmpdir)`: subprocess `swan < INPUT`, captures stdout/stderr, raises `SWANRunError` on non-zero exit
+- `_parse_output(tmpdir, grid_info)`: reads SWAN TABLE output, extracts Hs, Tm01, MWD at each output point, matches rows to spot_id by (Xp, Yp) coordinates
+
+**SWAN grid:** 200m default resolution (configurable via `[marine] swan_grid_resolution_m`). For a 30km × 15km domain, this is 150 × 75 = 11,250 grid points. Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour (matching HRRR cadence).
+
+**Output:** `dict[spot_id, list[MarineForecastPoint]]` — each `MarineForecastPoint` carries `waveHeight=Hs`, `wavePeriod=Tm01`, `waveDirection=MWD`, and `time` (ISO-8601). Source attribution ("trushore") is set at the `TrushoreProvider` response level, not inside `MarineForecastPoint` (which has no `source` field). **Validation:** reject timesteps where Hs > 20m or ≤ 0m, Tm01 < 1s or > 30s, or MWD is NaN (numerical instability).
+
+**Cache:** Key = `(provider_id, spot_domain_id, hrrr_cycle_time)`. TTL = 3300s (55 min). On SWAN run failure: log ERROR, retain last-good cache indefinitely. Do NOT invalidate cache on failure — stale TruShore data is always preferred to no data.
+
+**Schedule:** Runs hourly via the cache warmer, triggered after HRRR and WW3 data are warm. Runs in a background thread — not in the request path. Expected runtime: 2–10 minutes (single core) or 1–5 minutes (4–6 cores with OpenMP). Must complete within 15 minutes.
+
+**Temp directory:** SWAN runs in a `tempfile.mkdtemp`-created directory. `SWANRunner` does NOT clean it up — the caller (`TrushoreProvider`) is responsible for cleanup on success. On failure: preserved and path logged for debugging so that SWAN's `Errfile` and `PRINT` output are inspectable.
+
+**Optional separated service:** When `[trushore] service_url` is set to a remote host, `TrushoreProvider.fetch()` calls the remote HTTP endpoint instead of running SWAN locally. Health check polls `GET {service_url}/health` every 60 seconds. Three consecutive failures → log ERROR, serve last-good cache. See ARCHITECTURE.md for the standalone `weewx-clearskies-trushore` package.
+
 ### Source ADRs
 
-§14 consolidates prescriptive rules from: ADR-083 (marine domain architecture), ADR-084 (NWPS supplementation), ADR-085 (eccodes dependency), ADR-087 (NDBC spectral data), ADR-088 (fishing scoring — bathymetry for habitat), ADR-089 (marine zone alerts), ADR-091 (marine card data sources, OFS ocean data, composite water level). ADRs are archived in `docs/archive/decisions/` and explain the *why* behind these rules.
+§14 consolidates prescriptive rules from: ADR-083 (marine domain architecture), ADR-084 (NWPS supplementation — superseded by ADR-093), ADR-085 (eccodes dependency), ADR-087 (NDBC spectral data), ADR-088 (fishing scoring — bathymetry for habitat), ADR-089 (marine zone alerts), ADR-091 (marine card data sources, OFS ocean data, composite water level), ADR-093 (SWAN+TruShore replaces NWPS), ADR-094 (HRRR wind source for surf scoring). ADRs are archived in `docs/archive/decisions/` and explain the *why* behind these rules.
