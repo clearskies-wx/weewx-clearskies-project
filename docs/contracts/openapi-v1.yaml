@@ -3403,7 +3403,7 @@ components:
 
     MarineForecastPoint:
       type: object
-      description: Single timestep from a WaveWatch III wave forecast.
+      description: Single timestep from a WaveWatch III wave forecast, optionally enriched with OFS water temperature.
       properties:
         time: { type: string, format: date-time, description: "Forecast valid time" }
         waveHeight: { type: number, nullable: true, description: "group_wave_height; significant wave height" }
@@ -3417,6 +3417,7 @@ components:
         windWaveHeight: { type: number, nullable: true, description: "group_wave_height" }
         windWavePeriod: { type: number, nullable: true, description: "group_wave_period" }
         windWaveDirection: { type: number, nullable: true }
+        waterTemp: { type: number, nullable: true, description: "group_temperature; OFS model forecast water temp — from ofs.fetch_forecast() via ocean_data_resolver.resolve_forecast()" }
       required: [time]
 
     MarineTextForecast:
@@ -3689,6 +3690,7 @@ components:
         zoneForecast:
           nullable: true
           allOf: [{ $ref: '#/components/schemas/SurfZoneForecast' }]
+        waterTemp: { type: number, nullable: true, description: "group_temperature; sourced from ocean_data_resolver.resolve(needs=\"surface\") (tiered: on-premises sensor -> OFS -> regional ERDDAP -> RTOFS/MUR SST), falling back to zoneForecast.waterTemp (NWS SRF text product) only when the resolver returns nothing" }
         spectralComponents:
           type: array
           items: { $ref: '#/components/schemas/SpectralWaveComponent' }
@@ -3698,7 +3700,7 @@ components:
           description: "Informational overlay, not scored."
         source: { type: string, example: "nwps+wavewatch+ndbc+coops+nws_srf" }
         generatedAt: { type: string, format: date-time }
-      required: [locationId, locationName, coordinates, forecast, spectralComponents, tidePredictions, source, generatedAt]
+      required: [locationId, locationName, coordinates, forecast, waterTemp, spectralComponents, tidePredictions, source, generatedAt]
 
     FishingDayEntry:
       type: object
