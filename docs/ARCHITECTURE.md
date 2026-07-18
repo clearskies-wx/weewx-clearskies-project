@@ -266,7 +266,6 @@ Used by the config UI wizard and admin per ADR-038. Not proxied through Caddy â€
 | `/setup/station` | GET | Station identity from `weewx.conf` | Session |
 | `/setup/marine/eccodes-check` | GET | Probe whether a GRIB2 backend (eccodes or pygrib fallback) is installed, before the wizard allows enabling marine features | Session |
 | `/setup/marine/discover-stations` | GET | Discover nearby NDBC buoy + CO-OPS tide stations for marine location setup (query: `lat`, `lon`, `radius_miles`) | Session |
-| `/setup/marine/bathymetry` | POST | Download (or regional-fallback) a CUDEM bathymetric depth profile for a surf/fishing spot | Session |
 | `/setup/marine/species` | GET | Species checklist for a coordinate + fishing target category (query: `lat`, `lon`, `category`), keyed by biogeographic region | Session |
 | `/setup/marine/discover-structures` | GET | Discover nearby coastal structures (jetties, piers, breakwaters, seawalls, groins) via the OpenStreetMap Overpass API, for surf spot wave-physics setup (query: `lat`, `lon`, `radius_m`, default 2000) | Session |
 | `/setup/marine/coverage` | GET | Data source coverage panel for a coordinate (query: `lat`, `lon`): OFS model assignment, coverage tier, available data capabilities, nearest NDBC/CO-OPS stations, NWS zone, SWAN status, on-premises sensor proximity (T3.6) | Session |
