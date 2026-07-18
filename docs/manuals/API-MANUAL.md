@@ -2007,6 +2007,14 @@ Surf quality forecast for one spot at one timestep.
 | `swellDominance` | float | — | No | Ratio of primary swell energy to total energy (0.0–1.0) |
 | `multiSwell` | list[SpectralWaveComponent] | — | Yes | Individual swell systems from SWAN SPECOUT decomposition for this timestep (T3.3/T3.5). `null` when SPECOUT is unavailable. Not populated from NDBC. |
 | `scoring` | SurfScoringBreakdown | — | Yes | Per-factor scoring breakdown (see below) |
+| `swellHeight` | float | `group_wave_height` | Yes | SWAN HSWELL at the ~10m depth point (swell-only height, display value). `null` when no transect output. |
+| `breakingFaceHeight` | float | `group_wave_height` | Yes | K-G/Caldwell face height (trough-to-crest) at ~10m depth. `null` when unavailable. |
+| `breakingHawaiianHeight` | float | `group_wave_height` | Yes | Hawaiian scale = `breakingFaceHeight × 0.5`. `null` when unavailable. |
+| `windSource` | str | — | Yes | `"hrrr"` for forecast timesteps; `"station"` or `"forecast_provider"` for t=0. |
+| `breakPoints` | list[object] | — | Yes | QB peak locations along the cross-shore transect (T3.4). `null` when no QB peak ≥ 0.25 detected (flat conditions, single-point mode, or QB data absent). Multiple entries for multi-bar beaches (outer bar + inner bar). |
+| `breakPoints[].distanceFromShore` | float | — | — | Distance from shore in meters. |
+| `breakPoints[].depth` | float | — | — | Water depth at the break point in meters. |
+| `breakPoints[].waveHeight` | float | — | — | Wave height (HSIGN) at the break point in meters (not unit-converted — physical position). |
 
 #### SurfScoringBreakdown
 
@@ -2238,7 +2246,7 @@ Source: `endpoints/surf.py`.
 | `locationId` | str | No | Location slug from config |
 | `locationName` | str | No | Display name |
 | `coordinates` | object | No | `{lat, lon}` |
-| `forecast` | list[SurfForecast] | No | One entry per SWAN forecast timestep. Contains all four height fields (`swellHeight`, `waveHeightAtBreak`, `breakingFaceHeight`, `breakingHawaiianHeight`) plus `windSource` and `scoringBreakdown` per timestep. Empty list if SWAN has never run successfully. |
+| `forecast` | list[SurfForecast] | No | One entry per SWAN forecast timestep. Contains all four height fields (`swellHeight`, `waveHeightAtBreak`, `breakingFaceHeight`, `breakingHawaiianHeight`) plus `windSource`, `scoringBreakdown`, and `breakPoints` (QB peak locations, T3.4) per timestep. Empty list if SWAN has never run successfully. |
 | `zoneForecast` | SurfZoneForecast | Yes | NWS SRF forecast for the covering county zone; `null` if unavailable |
 | `spectralComponents` | list[SpectralWaveComponent] | No | NDBC buoy spectral swell decomposition — **reference data only**. Not used for scoring or `multiSwell` display (T3.5). Empty list if no spectral-capable buoy configured or NDBC fetch failed. |
 | `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions for the surf page's tide overlay (informational, not scored) |

@@ -1819,6 +1819,18 @@ Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Fo
 
 **Cache:** Key = `(provider_id, spot_domain_id, hrrr_cycle_time)`. TTL = 21600s (6 hours) — matches the extended HRRR cycle interval (4×/day at 00/06/12/18Z). On SWAN run failure: log ERROR, retain last-good cache indefinitely. Do NOT invalidate cache on failure — stale SWAN data is always preferred to no data. **Run marker:** stored only when `spots_cached > 0` — prevents a failed SWAN run (exit 0 but no valid output) from blocking future attempts for the same HRRR cycle.
 
+**Cache payload shape** (per-spot, stored at `last_good_key`):
+
+| Key | Type | Description |
+|---|---|---|
+| `forecast` | `list[dict]` | Serialised `MarineForecastPoint` objects — one entry per transect point per timestep (all timesteps, all transect positions). Grouped by time in `surf.py`. |
+| `spectral` | `list[dict]` | Per-timestep SPECOUT spectral decompositions from SWAN SPECOUT at the ~10m depth point (T3.3). Each entry: `{time, components}`. |
+| `transect` | `dict[str, list[dict]]` | Full cross-shore transect per timestep, keyed by ISO-8601 time string (T3.4). Each list entry: `{distanceFromShore, depth, waveHeight, swellHeight, breakingFraction, breakingDissipation}` for one transect point. Used by the beach profile endpoint (T5.1). |
+| `run_time` | `str` | ISO-8601 UTC timestamp when the SWAN run completed. |
+| `hrrr_cycle_time` | `str` | HRRR cycle time that forced this SWAN run. |
+
+`fetch()` returns all five keys from `last_good_key`; `data_age_seconds` is computed live from `run_time`.
+
 **Two-tier schedule:**
 
 | Tier | Trigger | Grids | Mode | Forecast span | Runtime | Interval |
