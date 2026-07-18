@@ -2005,7 +2005,7 @@ Surf quality forecast for one spot at one timestep.
 | `conditionsText` | str | — | No | (locale) Natural-language conditions summary |
 | `windQuality` | str | — | No | (locale) "glassy", "offshore", "cross_offshore", "cross", "cross_onshore", "onshore" |
 | `swellDominance` | float | — | No | Ratio of primary swell energy to total energy (0.0–1.0) |
-| `multiSwell` | list[SpectralWaveComponent] | — | Yes | Individual swell systems (when spectral data available) |
+| `multiSwell` | list[SpectralWaveComponent] | — | Yes | Individual swell systems from SWAN SPECOUT decomposition for this timestep (T3.3/T3.5). `null` when SPECOUT is unavailable. Not populated from NDBC. |
 | `scoring` | SurfScoringBreakdown | — | Yes | Per-factor scoring breakdown (see below) |
 
 #### SurfScoringBreakdown
@@ -2240,7 +2240,7 @@ Source: `endpoints/surf.py`.
 | `coordinates` | object | No | `{lat, lon}` |
 | `forecast` | list[SurfForecast] | No | One entry per SWAN forecast timestep. Contains all four height fields (`swellHeight`, `waveHeightAtBreak`, `breakingFaceHeight`, `breakingHawaiianHeight`) plus `windSource` and `scoringBreakdown` per timestep. Empty list if SWAN has never run successfully. |
 | `zoneForecast` | SurfZoneForecast | Yes | NWS SRF forecast for the covering county zone; `null` if unavailable |
-| `spectralComponents` | list[SpectralWaveComponent] | No | Current NDBC spectral swell decomposition; empty list if no spectral-capable buoy configured or NDBC fetch failed |
+| `spectralComponents` | list[SpectralWaveComponent] | No | NDBC buoy spectral swell decomposition — **reference data only**. Not used for scoring or `multiSwell` display (T3.5). Empty list if no spectral-capable buoy configured or NDBC fetch failed. |
 | `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions for the surf page's tide overlay (informational, not scored) |
 | `nearshoreModel` | str | No | `"swan"` (ADR-096) |
 | `lastRunTime` | str | Yes | ISO-8601 timestamp of SWAN run completion |
