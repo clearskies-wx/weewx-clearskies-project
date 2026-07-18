@@ -1,8 +1,8 @@
 # SWAN Model Corrections & Scoring Restructure Plan
 
-**Status:** IN PROGRESS (Phases 0–4 complete, Phases 5–7 pending)
+**Status:** COMPLETE (all phases done)
 **Created:** 2026-07-18
-**Last updated:** 2026-07-18 (session 1 closeout)
+**Last updated:** 2026-07-18 (session 2 closeout)
 **Origin:** Post-deployment review of SWAN+TruShore implementation (2026-07-17). Production testing revealed multiple issues: NDBC spectral data overriding SWAN values in the scorer, output point placed in the surf zone (4.3m depth) instead of at ~10m, missing SWAN inputs (water levels, currents), TruShore branding overstating proprietary contribution, and scoring display bugs.
 **Companion:** [SWAN-TRUSHORE-PLAN.md](SWAN-TRUSHORE-PLAN.md) — original implementation plan (completed). [SWAN-TRUSHORE-RESEARCH-BRIEF.md](briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md) — technical research. [WAVE-BREAKING-CONVERSION-BRIEF.md](briefs/WAVE-BREAKING-CONVERSION-BRIEF.md) — breaker height research.
 
@@ -506,8 +506,8 @@ Replace the single pin-drop output point with a cross-shore transect. Add HSWELL
 
 ## Phase 4 — Scoring Restructure ✓ COMPLETE
 
-**Completed:** 2026-07-18 session 1. Commit: 66c9634 (API), fccfb2f (doc sync). Pushed, not yet deployed.
-**QC Gate 4:** Not yet run (auditor was not dispatched before session end — must be run at start of next session before Phase 5 begins). Test divergence: 2 tests calling removed `_effective_swell()` were replaced with `_directional_spread_score()` and `_cross_swell_score()` tests.
+**Completed:** 2026-07-18 session 1. Commit: 66c9634 (API), fccfb2f (doc sync). Deployed session 2.
+**QC Gate 4:** Passed (session 2). Auditor found 3 findings — F1 LOW (plan criterion imprecise for glassy org score), F2 MEDIUM (sub-factor rounding vs org total — documented as ≤0.5 tolerance), F3 MEDIUM (test coverage gaps — deferred to T7.2). All remediated or tracked. Production verified: scoring=waveHeight:4, wavePeriod:1, waveOrganization:24, beachAlignment:-6, directionalExposure:0, timeOfDay:0, nearshoreModel:swan.
 
 Restructure the 4-factor weighted scoring into a 3-factor model with a composite "Wave Organization" factor. Fix bar display normalization. Surface all penalty factors.
 
@@ -573,7 +573,10 @@ Restructure the 4-factor weighted scoring into a 3-factor model with a composite
 
 ---
 
-## Phase 5 — API: Beach Profile Endpoint ⏳ PENDING
+## Phase 5 — API: Beach Profile Endpoint ✓ COMPLETE
+
+**Completed:** 2026-07-18 session 2. Commits: d279c43 (T5.1+T5.2), 267e3e2 (F2 fix). Deployed.
+**QC Gate 5:** Passed. Auditor found 2 LOW findings — F1 (setup field undocumented in API-MANUAL table, deferred to T7.1), F2 (stale swellHeight comment, remediated in 267e3e2). All 7 acceptance criteria MET.
 
 New endpoint for the cross-shore transect visualization.
 
@@ -661,7 +664,10 @@ New endpoint for the cross-shore transect visualization.
 
 ---
 
-## Phase 6 — Dashboard Changes ⏳ PENDING
+## Phase 6 — Dashboard Changes ✓ COMPLETE
+
+**Completed:** 2026-07-18 session 2. Dashboard commits: ef6f322 (T6.1+T6.2+T6.5), 336b099 (T6.3), 4af021b (TS fix). Deployed.
+**QC Gate 6:** T6.1 DONE, T6.2 DONE, T6.3 DONE, T6.4 diagnosed (external CO-OPS outage — NOAA predictions API returns no data for any station; not a code bug; TideChart.tsx is correct), T6.5 DONE. tsc: zero errors.
 
 Update the surf tab to display the corrected data, restructured scoring, and beach profile.
 
@@ -785,7 +791,10 @@ Update the surf tab to display the corrected data, restructured scoring, and bea
 
 ---
 
-## Phase 7 — Documentation & Cleanup ⏳ PENDING
+## Phase 7 — Documentation & Cleanup ✓ COMPLETE
+
+**Completed:** 2026-07-18 session 2. API commit: cf66a43 (T7.2). Meta commit: pending (T7.1). Deployed.
+**QC Gate 7:** T7.1 DONE (API-MANUAL setup/scoring/breakPoints fields fixed, ARCHITECTURE.md beach profile endpoint added, PROVIDER-MANUAL NDBC scoped, plan status updated). T7.2 DONE (Supplement 2 removed, test fixes, 51 tests pass 0 fail, zero trushore hits, stale comments fixed).
 
 ### T7.1 — Update governing documents
 

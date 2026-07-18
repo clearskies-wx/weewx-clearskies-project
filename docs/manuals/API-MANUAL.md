@@ -2773,14 +2773,16 @@ The NWS SRF text product's `waterTemp` field (a manually-entered forecaster valu
 | `forecast[].direction` | float | Swell direction in degrees |
 | `forecast[].multiSwell` | list[object] | Spectral breakdown from SWAN SPECOUT per timestep (not NDBC — ADR-095/096) |
 | `forecast[].directionalSpread` | float | DSPR at ~10m depth in degrees (ADR-095) |
-| `forecast[].scoringBreakdown` | object | 3-factor + 3-penalty scoring breakdown (ADR-096) |
+| `forecast[].setup` | float \| null | SETUP — wave-induced water level rise at shore (meters, ADR-095) |
+| `forecast[].breakPoints` | list[object] \| null | QB peak locations — break points along the transect (T3.4) |
+| `forecast[].scoring` | object | 3-factor + 3-penalty scoring breakdown (ADR-096) |
 | `nearshoreModel` | str | `"swan"` (ADR-096) |
 | `lastRunTime` | ISO 8601 | When the SWAN run completed |
 | `dataAge` | int | Age of SWAN output in seconds |
 | `breakerFormula` | str | `"komar_gaughan"` or `"caldwell"` |
 | `surfHeightDisplay` | str | `"face"` or `"hawaiian"` — operator's configured display preference |
 
-**`scoringBreakdown` fields (ADR-096):** `waveHeight` (out of 35), `wavePeriod` (out of 35), `waveOrganization` (out of 30), `organizationWind`, `organizationSwellDominance`, `organizationDirectionalSpread`, `organizationCrossSwell` (sub-factors), `beachAlignment` (signed penalty), `directionalExposure` (signed penalty), `timeOfDay` (signed bonus/penalty).
+**`scoring` fields (ADR-096):** `waveHeight` (out of 35), `wavePeriod` (out of 35), `waveOrganization` (out of 30), `organizationWind`, `organizationSwellDominance`, `organizationDirectionalSpread`, `organizationCrossSwell` (sub-factors), `beachAlignment` (signed penalty), `directionalExposure` (signed penalty), `timeOfDay` (signed bonus/penalty).
 
 SWAN always produces multi-timestep output. The dashboard's 72-hour forecast chart shows `breakingFaceHeight` (or `breakingHawaiianHeight` per operator config) — not `swellHeight` or `waveHeightAtBreak`.
 

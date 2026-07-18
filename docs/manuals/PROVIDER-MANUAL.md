@@ -1233,7 +1233,7 @@ Supporting components (not dispatch-registered provider modules):
 **Wind data limitation (HARD RULE):** NDBC buoy wind data is **offshore** and must NOT be used for surf wind quality scoring. Buoys are typically 12+ miles from shore and measure the synoptic-scale wind field, which can be completely different from beach conditions. Coastal wind is dominated by thermal effects (sea/land breezes, topographic channeling, coastal temperature gradients) that offshore buoys cannot see.
 
 **NDBC's valid roles:**
-1. **Spectral swell decomposition** — swell propagation is large-scale; offshore spectral data accurately represents the swell systems arriving at the coast.
+1. **Offshore reference data** — swell propagation is large-scale; offshore spectral data accurately represents the swell systems arriving at the coast. Returned in the surf response as `spectralComponents` for operators and third-party consumers. **Not used for scoring or multiSwell display** — the surf score and multiSwell use SWAN SPECOUT at ~10m depth instead (ADR-096).
 2. **Offshore wave height/period reference** — as labeled observational data (not as beach conditions).
 
 **NDBC's invalid role for surf scoring:**
