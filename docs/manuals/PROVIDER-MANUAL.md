@@ -1772,7 +1772,7 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 | Wind forcing (hours 0–48) | HRRR wind provider (§14.14) — 3km resolution, extended cycles only | `(hrrr, bbox, cycle_time)` |
 | Wind forcing (hours 48–72) | GFS wind provider (§14.16) — 0.25° resolution, supplements HRRR | `(gfs, bbox, cycle_time)` |
 | Deep-water boundary | WaveWatch III (§14.3) | `(wavewatch, ...)` |
-| Bathymetry | CUDEM (§14.7) | Setup-time download, stored in spot config |
+| Bathymetry (2-D grid) | CUDEM via NCEI getSamples (§14.7) | Lazy-downloaded on first SWAN run, cached to `/etc/weewx-clearskies/swan_bathymetry.json` |
 | Tidal currents | RTOFS/OFS (§14.10) | `(ofs, ...)` |
 
 **SWAN runner** (`services/swan_runner.py`):
@@ -1783,8 +1783,9 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 - `_run_inner_nest(tmpdir, blended_wind, cudem_bathymetry)`: runs inner nest SWAN using outer grid boundary output via `NGRID`, parses TABLE output at configured surf spot output points
 - `_stitch_wind(hrrr_wind_field, gfs_wind_field)`: blends HRRR (hours 0–48) and GFS (hours 48–72) into a single continuous 72-hour wind input
 - `_write_input_files(tmpdir, wind_field, boundary, bathymetry, grid_level)`: writes SWAN INPUT, BOTTOM.txt, WIND.txt, BOUND_SPEC.txt for a given grid level; returns grid_info dict
-- `_spawn_swan(tmpdir)`: subprocess `swan < INPUT`, captures stdout/stderr, raises `SWANRunError` on non-zero exit
-- `_parse_output(tmpdir, grid_info)`: reads SWAN TABLE output, extracts Hs, Tm01, MWD at each output point, matches rows to spot_id by (Xp, Yp) coordinates
+- `_spawn_swan(tmpdir)`: subprocess `swan < INPUT`, captures stdout/stderr, raises `SWANRunError` on non-zero exit or severe errors in Errfile
+- `_save_hotstart(run_dir, grid_level)`: copies hotstart file from run dir to persistent parent dir for next cycle
+- `_parse_output(tmpdir, grid_info)`: reads SWAN TABLE output (HEAD format), discovers column indices from header line (accepts HSIG/HSIGN), extracts Hs, Tm01, MWD at each output point, matches rows to spot_id by (Xp, Yp) coordinates
 
 **Nested grid architecture:** Two sequential SWAN runs per cycle. No operational nearshore system runs fine resolution over the full domain — all use nested grids.
 
@@ -1798,13 +1799,29 @@ The outer run writes `NESTOUT` boundary files. The inner run reads them via SWAN
 
 Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Forecast span: 72 hours (HRRR hours 0–48, GFS hours 48–72).
 
-**Output:** `dict[spot_id, list[MarineForecastPoint]]` — 72 forecast hours per spot. Each `MarineForecastPoint` carries `waveHeight=Hs`, `wavePeriod=Tm01`, `waveDirection=MWD`, and `time` (ISO-8601). Source attribution ("trushore") is set at the `TrushoreProvider` response level, not inside `MarineForecastPoint` (which has no `source` field). **Validation:** reject timesteps where Hs > 20m or ≤ 0m, Tm01 < 1s or > 30s, or MWD is NaN (numerical instability).
+**Output:** `dict[spot_id, list[MarineForecastPoint]]` — 72 forecast hours per spot. Each `MarineForecastPoint` carries `waveHeight=Hs`, `wavePeriod=Tm01`, `waveDirection=MWD`, and `time` (ISO-8601). Source attribution ("trushore") is set at the `TrushoreProvider` response level, not inside `MarineForecastPoint` (which has no `source` field). **Validation:** SWAN INPUT files set `QUANTITY HSIGN TM01 DIR excv=-9.` (explicit no-data sentinel per SWAN user manual §3.5). The TABLE parser rejects rows with values ≤ -9 (exception value) or extreme upper bounds (Hs > 25m, Tm01 > 35s). NaN values are also rejected. Sub-1s Tm01 and near-zero Hs are physically valid SWAN output for weak wind-sea and are NOT rejected.
 
-**Cache:** Key = `(provider_id, spot_domain_id, hrrr_cycle_time)`. TTL = 21600s (6 hours) — matches the extended HRRR cycle interval (4×/day at 00/06/12/18Z). On SWAN run failure: log ERROR, retain last-good cache indefinitely. Do NOT invalidate cache on failure — stale TruShore data is always preferred to no data.
+**SWAN INPUT file conventions (per SWAN 41.51 user manual):**
+
+| Setting | Value | Why |
+|---|---|---|
+| `SET ... MAXERR 3` | Only stop on severe errors (level 3) | Default MAXERR=1 stops on boundary mismatch warnings (level 2), which are normal for nonstationary TPAR boundaries |
+| `QUANTITY HSIGN TM01 DIR excv=-9.` | Explicit no-data sentinel | Without this, SWAN uses an implementation default indistinguishable from real near-zero values |
+| `TABLE ... TIME XP YP HSIGN TM01 DIR` | SWAN output quantity names | `HSIGN` (not `HS`) is the correct quantity name; `TIME` must be explicitly requested (not automatic) |
+| `INIT HOTSTART 'hotstart.dat'` | Load wave field from previous run | Eliminates cold-start spin-up; t=0 has realistic waves immediately |
+| `HOTFILE 'hotstart.dat'` | Write wave field after COMPUTE | Saved to persistent location for next cycle |
+
+**Hotstart:** Each SWAN run writes a hotstart file (`HOTFILE` command, placed immediately after `COMPUTE`) capturing the full spectral state at the end of computation. The next run reads it via `INIT HOTSTART`, starting from the previous run's wave field instead of the default near-zero JONSWAP spectrum. Hotstart files persist at `/var/run/weewx-clearskies/swan/{outer,inner}_hotstart.dat` across the outer/inner subdir cleanup between runs. If no hotstart exists (first run ever), SWAN initializes from the default wind-derived spectrum — a one-time cold start.
+
+**SWAN error detection:** `_spawn_swan()` checks both exit code AND stderr/Errfile content. SWAN (Fortran) can exit 0 despite writing "Severe error" to its Errfile. When severe errors are detected, `SWANRunError` is raised so the failure is visible and the run_marker is not stored.
+
+**Cache:** Key = `(provider_id, spot_domain_id, hrrr_cycle_time)`. TTL = 21600s (6 hours) — matches the extended HRRR cycle interval (4×/day at 00/06/12/18Z). On SWAN run failure: log ERROR, retain last-good cache indefinitely. Do NOT invalidate cache on failure — stale TruShore data is always preferred to no data. **Run marker:** stored only when `spots_cached > 0` — prevents a failed SWAN run (exit 0 but no valid output) from blocking future attempts for the same HRRR cycle.
 
 **Schedule:** Runs 4× daily on extended HRRR cycles (00/06/12/18Z) via the cache warmer, triggered after both HRRR and GFS wind data are warm. Runs in a background thread — not in the request path. Both grid levels (outer + inner) must complete within 15 minutes total. Expected runtime: 2–10 minutes for both grids combined on the weewx host. Peak memory: ≤300 MB (both grids run sequentially, not simultaneously).
 
-**Temp directory:** SWAN runs in a `tempfile.mkdtemp`-created directory. `SWANRunner` does NOT clean it up — the caller (`TrushoreProvider`) is responsible for cleanup on success. On failure: preserved and path logged for debugging so that SWAN's `Errfile` and `PRINT` output are inspectable.
+**Working directory:** SWAN runs in `/var/run/weewx-clearskies/swan/` (fixed path, not tempfile). Subdirectories `outer/` and `inner/` are cleaned at the start of each run. Hotstart files persist one level up. The fixed path is visible from SSH (unlike `tempfile.mkdtemp` which was hidden by systemd's `PrivateTmp=yes`) and survives service restarts.
+
+**2-D bathymetry grid:** Downloaded lazily on first SWAN run from the NCEI ArcGIS ImageServer `getSamples` endpoint (POST, multipoint, 1000-point batches). Covers the outer grid bbox at the outer grid resolution. Cached persistently to `/etc/weewx-clearskies/swan_bathymetry.json`. `cudem_to_swan_bottom()` bilinear-interpolates this source grid onto both SWAN grid levels. Sign convention: CUDEM (negative = ocean) → SWAN (positive = ocean). Download takes ~5 seconds for a typical 65×78 grid.
 
 **Optional separated service:** When `[trushore] service_url` is set to a remote host, `TrushoreProvider.fetch()` calls the remote HTTP endpoint instead of running SWAN locally. Health check polls `GET {service_url}/health` every 60 seconds. Three consecutive failures → log ERROR, serve last-good cache. See ARCHITECTURE.md for the standalone `weewx-clearskies-trushore` package.
 

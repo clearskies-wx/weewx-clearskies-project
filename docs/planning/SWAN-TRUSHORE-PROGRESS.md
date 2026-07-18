@@ -3,9 +3,10 @@
 **Session 1:** 2026-07-16 to 2026-07-17
 **Session 2:** 2026-07-17
 **Session 3:** 2026-07-17
-**Session 4:** 2026-07-17 (current)
+**Session 4:** 2026-07-17
+**Session 5:** 2026-07-17 (current)
 **Plan:** docs/planning/SWAN-TRUSHORE-PLAN.md
-**Status:** Phases 0–5 complete. Phase 6 T6.1–T6.3 done (T6.4–T6.5 blocked → deferred to Phase 7 T7.5). Phase 7 T7.0 complete — all governing documents updated for nested grid + GFS wind. T7.1–T7.5 pending.
+**Status:** Phases 0–5 complete. Phase 6 T6.1–T6.3 done. Phase 7 T7.0–T7.4 complete. T7.5 in progress — SWAN pipeline end-to-end functional, producing real surf forecast data with CUDEM bathymetry and hotstart support. Remaining: period/scoring per-timestep variation, remove debug logging, final QA.
 
 ## Phase Tracker
 
@@ -101,8 +102,46 @@ All governing documents updated to describe nested grid architecture, GFS wind s
 
 Auditor reviewed all files. Findings pending final report.
 
-## Known Issues (carried from session 2)
+## Session 5 Work Completed (2026-07-17)
 
-- **Brief §3 table discrepancy:** WAVE-BREAKING-CONVERSION-BRIEF.md worked examples don't match deepwater K-G formula. Formula is authoritative; table needs correction.
-- **SWAN not installed on weewx:** T6.4 and T6.5 cannot run until SWAN binary is installed. Install via `scripts/install_swan.sh` or `apt install swan`.
-- **Grid bbox not configurable via wizard:** Wizard template displays grid bbox fields (editable inputs) but POST handler does not read them — API auto-computes bbox from marine location coordinates. Grid resolution IS configurable and saved.
+### Bugs fixed (SWAN pipeline end-to-end)
+
+| Bug | Root cause | Fix |
+|-----|-----------|-----|
+| `_warm_swan()` silently returns | Run marker stored on empty results; HRRR cache returned same cycle; dedup skipped at DEBUG level | Gate run_marker on `spots_cached > 0` |
+| SWAN exits 0 with errors | `_spawn_swan()` only checked exit code, not stderr/Errfile | Check for "Severe error" in Errfile after exit 0 |
+| TABLE parser misses all rows | SWAN 41.51 column header is `Hsig` not `HS`; `TIME` not requested; multi-line `%` header not parsed | Accept HSIG/HSIGN; request `TIME HSIGN` in TABLE command; scan `%` lines for column names |
+| Validation rejects all output | `Tm01 < 1.0s` threshold rejected valid weak wind-sea; no QUANTITY excv set | Use SWAN `QUANTITY excv=-9.` sentinel; only reject ≤ -9 and extreme upper bounds |
+| Tmpdir invisible from SSH | systemd `PrivateTmp=yes` hid tempfile dirs | Fixed path `/var/run/weewx-clearskies/swan/` |
+| Flat 15m bathymetry | `cudem_bathymetry = {}` hardcoded; 2-D grid download deferred as "later task" | `download_swan_depth_grid()` via NCEI getSamples (POST, 1000-point batches); cached to `/etc/weewx-clearskies/swan_bathymetry.json` |
+| Cold-start spin-up (t=0 shows 0.1ft) | No hotstart — every run starts from near-zero JONSWAP | `INIT HOTSTART` + `HOTFILE` per SWAN manual §4.5.3/§4.7; hotstart persists across runs |
+
+### Commits (API repo)
+
+| Commit | Description |
+|--------|-------------|
+| ee13dc9 | fix(trushore): gate run_marker on success + detect SWAN stderr errors |
+| b3348b6 | debug(T7.5): fixed-path SWAN workdir + validation logging |
+| 81a0b89 | fix(swan): accept HSIG column header from SWAN 41.51 |
+| 59b4225 | fix(swan): use correct SWAN output quantity names per user manual |
+| 78b1f7c | fix(swan): QUANTITY excv, header detection, validation per SWAN docs |
+| c8261e9 | fix(swan): SET MAXERR 3 — SWAN was aborting on boundary warnings |
+| c963fee | fix(swan): wire real CUDEM 2-D bathymetry into SWAN pipeline |
+| 8904220 | fix(trushore): move CUDEM load after resolution config |
+| a206977 | feat(swan): hotstart support — eliminates cold-start spin-up |
+
+### Verification
+
+- SWAN producing 67 timesteps of varying wave data (0.1ft → 4.0ft south swell over 72 hours)
+- CUDEM 2-D grid: 65×78 = 5,070 points downloaded in 3.5 seconds, 2,215 ocean / 2,855 land
+- Supplement pipeline active: `swellHeight` differs from `waveHeightAtBreak` (structure effects apply Kt < 1.0)
+- Face height conversion working: `breakingFaceHeight` > `waveHeightAtBreak` for swell periods
+- Dashboard displaying "Model: SWAN+TruShore" with live data
+
+### Remaining issues
+
+- **Period identical across all timesteps (8.2s)** — per-timestep period not varying in surf endpoint response
+- **qualityStars identical (2) across all timesteps** — scoring not varying despite wave height differences
+- **Debug WARNING logging in TABLE parser** — should be reverted to DEBUG after validation
+- **Grid bbox not configurable via wizard** — API auto-computes from coordinates
+- **Brief §3 table discrepancy** — carried from session 2
