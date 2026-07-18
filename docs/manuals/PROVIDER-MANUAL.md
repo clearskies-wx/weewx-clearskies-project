@@ -86,7 +86,7 @@ weewx_clearskies_api/providers/
 ├── tides/           # Tides domain modules (§14): coops
 ├── buoy/            # Buoy domain modules (§14): ndbc
 ├── wind/            # Wind domain modules (§14): hrrr ([nearshore] extra)
-└── nearshore/       # Nearshore domain modules (§14): trushore ([nearshore] extra)
+└── nearshore/       # Nearshore domain modules (§14): swan ([nearshore] extra)
 ```
 
 ### Capability declaration fields
@@ -1208,9 +1208,9 @@ Six provider modules across three existing domains (`"marine"`, `"tides"`, `"buo
 | WaveWatch III forecasts | `providers/marine/wavewatch.py` | `wavewatch` | `marine` | NOAA WaveWatch III via ERDDAP | No |
 | NWS marine zone text | `providers/marine/nws_marine.py` | `nws_marine` | `marine` | NWS API | No |
 | NWS Surf Zone Forecast | `providers/marine/nws_srf.py` | `nws_srf` | `marine` | NWS API (SRF text product) | No |
-| ~~NWPS nearshore wave data~~ | ~~`providers/marine/nwps.py`~~ | — | — | Eliminated (ADR-093). Replaced by SWAN+TruShore. | — |
+| ~~NWPS nearshore wave data~~ | ~~`providers/marine/nwps.py`~~ | — | — | Eliminated (ADR-093). Replaced by SWAN. | — |
 | HRRR wind | `providers/wind/hrrr.py` | `hrrr` | `wind` | NOAA HRRR GRIB2 via NOMADS | No |
-| SWAN+TruShore runner | `providers/nearshore/trushore.py` | `trushore` | `nearshore` | Local SWAN subprocess | No |
+| SWAN runner | `providers/nearshore/swan.py` | `swan` | `nearshore` | Local SWAN subprocess (ADR-096 renamed) | No |
 | OFS ocean model data | `providers/ocean/ofs.py` | `ofs` | `ocean` | NOAA OFS via THREDDS/OPeNDAP | No |
 | ERDDAP ocean data | `providers/ocean/erddap_ocean.py` | `erddap_ocean` | `ocean` | MUR SST, RTOFS, PacIOOS, CARICOOS via ERDDAP | No |
 
@@ -1444,7 +1444,7 @@ Map to `SurfZoneForecast` canonical model.
 
 ### §14.6 (Removed — NWPS eliminated per ADR-093)
 
-NWPS is eliminated. The nearshore wave model is SWAN+TruShore (§14.15). The `providers/marine/nwps.py` module, its tests, cache warmer entry, and all config keys (`nwps_wfo`, `nearshore_model`) are deleted. The historical decision rationale is preserved in the archived ADR-084.
+NWPS is eliminated. The nearshore wave model is SWAN (§14.15). The `providers/marine/nwps.py` module, its tests, cache warmer entry, and all config keys (`nwps_wfo`, `nearshore_model`) are deleted. The historical decision rationale is preserved in the archived ADR-084.
 
 ### §14.7 NOAA CUDEM bathymetry
 
@@ -1727,7 +1727,7 @@ Each tier is independently wrapped in try/except — failure at one tier does no
 | 00Z, 06Z, 12Z, 18Z (4 per day) | 48 hours | f00–f48 (49 grids) |
 | All other hours (20 per day) | 18 hours | f00–f18 (19 grids) |
 
-TruShore uses only the 4 extended cycles (00/06/12/18Z) to get the full 48-hour HRRR range. GFS wind (§14.16) supplements hours 48–72 to fill the 72-hour surf forecast card. See §14.15 for the blended wind architecture.
+SWAN uses only the 4 extended cycles (00/06/12/18Z) to get the full 48-hour HRRR range. GFS wind (§14.16) supplements hours 48–72 to fill the 72-hour surf forecast card. See §14.15 for the blended wind architecture.
 
 **Extracted variables:**
 
@@ -1751,17 +1751,17 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 
 **Bounding box:** Configurable per marine location. Default: spot coordinates ± 0.2° (configurable via wizard SWAN grid bbox settings).
 
-**Cache:** Key = `(provider_id, bbox_hash, cycle_time)`. TTL = 21600s (6 hours) — matches the extended cycle interval (4×/day at 00/06/12/18Z). Previous TTL was 3300s (55 min) when TruShore ran hourly; now aligned with the 6-hour extended cycle cadence.
+**Cache:** Key = `(provider_id, bbox_hash, cycle_time)`. TTL = 21600s (6 hours) — matches the extended cycle interval (4×/day at 00/06/12/18Z). Previous TTL was 3300s (55 min) when SWAN ran hourly; now aligned with the 6-hour extended cycle cadence.
 
 **Error handling:** 404 on all attempted cycles → `ProviderUnavailableError`. Network errors → canonical taxonomy. GRIB2 parse error → `ProviderProtocolError`.
 
 **Rate limiting:** 2 req/s to NOMADS (shared NOAA infrastructure).
 
-### §14.15 SWAN+TruShore runner (ADR-093)
+### §14.15 SWAN runner (ADR-093, corrected ADR-095)
 
-**Not a network provider.** `providers/nearshore/trushore.py` is a thin provider wrapper around `services/swan_runner.py`. It follows the existing provider interface pattern but runs a local SWAN subprocess instead of making a network call.
+**Not a network provider.** `providers/nearshore/swan.py` is a thin provider wrapper around `services/swan_runner.py`. It follows the existing provider interface pattern but runs a local SWAN subprocess instead of making a network call.
 
-**Module identity:** `providers/nearshore/trushore.py`, `PROVIDER_ID = "trushore"`, `DOMAIN = "nearshore"`.
+**Module identity:** `providers/nearshore/swan.py`, `PROVIDER_ID = "swan"`, `DOMAIN = "nearshore"` (ADR-096 renamed from `trushore`).
 
 **SWAN binary:** SWAN 41.45 (Fortran). Compiled from source via `scripts/install_swan.sh` or included in the Docker image. Binary on PATH at `/usr/local/bin/swan`. API startup check: if `[nearshore]` extra is installed but SWAN binary is not found, log CRITICAL with installation instructions. The surf endpoint returns null surf data until SWAN is available — no fallback to any other model.
 
@@ -1773,19 +1773,21 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 | Wind forcing (hours 48–72) | GFS wind provider (§14.16) — 0.25° resolution, supplements HRRR | `(gfs, bbox, cycle_time)` |
 | Deep-water boundary | WaveWatch III (§14.3) | `(wavewatch, ...)` |
 | Bathymetry (2-D grid) | CUDEM via NCEI getSamples (§14.7) | Lazy-downloaded on first SWAN run, cached to `/etc/weewx-clearskies/swan_bathymetry.json` |
-| Tidal currents | RTOFS/OFS (§14.10) | `(ofs, ...)` |
+| Water level (WLEVEL) | CO-OPS tidal predictions (§14.8) — time-varying, uniform across domain, hourly (ADR-095) | Reuses existing tide fetch |
+| Ocean currents (CURRENT) | OFS surface current U/V (§14.10) — time-varying per grid point. Omitted when unavailable (ADR-095) | `(ofs, ...)` |
+| Coastal structures (OBSTACLE) | Wizard Overpass API discovery — native SWAN OBSTACLE command (ADR-095) | From marine location config |
 
 **SWAN runner** (`services/swan_runner.py`):
 
 - `SWANRunner.__init__`: takes config (outer grid bbox, inner nest bbox, surf spot coordinates, bathymetry data, SWAN binary path)
-- `run(hrrr_wind_field, gfs_wind_field, ww3_boundary, cudem_bathymetry)`: orchestrates the full nested SWAN run (outer + inner), returns `dict[str, list[MarineForecastPoint]]` keyed by spot_id
-- `_run_outer_grid(tmpdir, blended_wind, ww3_boundary, cudem_bathymetry)`: runs outer grid SWAN, writes `NESTOUT` boundary files for the inner nest
-- `_run_inner_nest(tmpdir, blended_wind, cudem_bathymetry)`: runs inner nest SWAN using outer grid boundary output via `NGRID`, parses TABLE output at configured surf spot output points
+- `run(hrrr_wind_field, gfs_wind_field, ww3_boundary, cudem_bathymetry, tide_predictions, ofs_currents)`: orchestrates the full nested SWAN run (outer + inner), returns transect data per spot keyed by spot_id (ADR-095)
+- `_run_outer_grid(tmpdir, blended_wind, ww3_boundary, cudem_bathymetry, wlevel, current)`: runs outer grid SWAN with WLEVEL/CURRENT inputs, writes `NESTOUT` boundary files for the inner nest
+- `_run_inner_nest(tmpdir, blended_wind, cudem_bathymetry, wlevel, current, obstacles)`: runs inner nest SWAN with WLEVEL/CURRENT/OBSTACLE inputs, outputs CURVE transect TABLE and SPECOUT at ~10m depth points
 - `_stitch_wind(hrrr_wind_field, gfs_wind_field)`: blends HRRR (hours 0–48) and GFS (hours 48–72) into a single continuous 72-hour wind input
 - `_write_input_files(tmpdir, wind_field, boundary, bathymetry, grid_level)`: writes SWAN INPUT, BOTTOM.txt, WIND.txt, BOUND_SPEC.txt for a given grid level; returns grid_info dict
 - `_spawn_swan(tmpdir)`: subprocess `swan < INPUT`, captures stdout/stderr, raises `SWANRunError` on non-zero exit or severe errors in Errfile
 - `_save_hotstart(run_dir, grid_level)`: copies hotstart file from run dir to persistent parent dir for next cycle
-- `_parse_output(tmpdir, grid_info)`: reads SWAN TABLE output (HEAD format), discovers column indices from header line (accepts HSIG/HSIGN), extracts Hs, Tm01, MWD at each output point, matches rows to spot_id by (Xp, Yp) coordinates
+- `_parse_output(tmpdir, grid_info)`: reads SWAN TABLE output (HEAD format), discovers column indices from header line. Extracts HSIGN, HSWELL, DIR, TM01, DEPTH, QB, DISSURF, SETUP, DSPR at each transect point. Matches rows to spots by (Xp, Yp) coordinates. Also parses SPECOUT files at ~10m depth points for spectral decomposition (ADR-095)
 
 **Nested grid architecture:** Two sequential SWAN runs per cycle. No operational nearshore system runs fine resolution over the full domain — all use nested grids.
 
@@ -1799,7 +1801,7 @@ The outer run writes `NESTOUT` boundary files. The inner run reads them via SWAN
 
 Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Forecast span: 72 hours (HRRR hours 0–48, GFS hours 48–72).
 
-**Output:** `dict[spot_id, list[MarineForecastPoint]]` — 72 forecast hours per spot. Each `MarineForecastPoint` carries `waveHeight=Hs`, `wavePeriod=Tm01`, `waveDirection=MWD`, and `time` (ISO-8601). Source attribution ("trushore") is set at the `TrushoreProvider` response level, not inside `MarineForecastPoint` (which has no `source` field). **Validation:** SWAN INPUT files set `QUANTITY HSIGN TM01 DIR excv=-9.` (explicit no-data sentinel per SWAN user manual §3.5). The TABLE parser rejects rows with values ≤ -9 (exception value) or extreme upper bounds (Hs > 25m, Tm01 > 35s). NaN values are also rejected. Sub-1s Tm01 and near-zero Hs are physically valid SWAN output for weak wind-sea and are NOT rejected.
+**Output:** `dict[spot_id, list[MarineForecastPoint]]` — 72 forecast hours per spot. Each `MarineForecastPoint` carries `waveHeight=Hs`, `wavePeriod=Tm01`, `waveDirection=MWD`, and `time` (ISO-8601). Source attribution ("swan") is set at the `SwanProvider` response level, not inside `MarineForecastPoint` (which has no `source` field). **Validation:** SWAN INPUT files set `QUANTITY HSIGN TM01 DIR excv=-9.` (explicit no-data sentinel per SWAN user manual §3.5). The TABLE parser rejects rows with values ≤ -9 (exception value) or extreme upper bounds (Hs > 25m, Tm01 > 35s). NaN values are also rejected. Sub-1s Tm01 and near-zero Hs are physically valid SWAN output for weak wind-sea and are NOT rejected.
 
 **SWAN INPUT file conventions (per SWAN 41.51 user manual):**
 
@@ -1815,7 +1817,7 @@ Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Fo
 
 **SWAN error detection:** `_spawn_swan()` checks both exit code AND stderr/Errfile content. SWAN (Fortran) can exit 0 despite writing "Severe error" to its Errfile. When severe errors are detected, `SWANRunError` is raised so the failure is visible and the run_marker is not stored.
 
-**Cache:** Key = `(provider_id, spot_domain_id, hrrr_cycle_time)`. TTL = 21600s (6 hours) — matches the extended HRRR cycle interval (4×/day at 00/06/12/18Z). On SWAN run failure: log ERROR, retain last-good cache indefinitely. Do NOT invalidate cache on failure — stale TruShore data is always preferred to no data. **Run marker:** stored only when `spots_cached > 0` — prevents a failed SWAN run (exit 0 but no valid output) from blocking future attempts for the same HRRR cycle.
+**Cache:** Key = `(provider_id, spot_domain_id, hrrr_cycle_time)`. TTL = 21600s (6 hours) — matches the extended HRRR cycle interval (4×/day at 00/06/12/18Z). On SWAN run failure: log ERROR, retain last-good cache indefinitely. Do NOT invalidate cache on failure — stale SWAN data is always preferred to no data. **Run marker:** stored only when `spots_cached > 0` — prevents a failed SWAN run (exit 0 but no valid output) from blocking future attempts for the same HRRR cycle.
 
 **Two-tier schedule:**
 
@@ -1832,7 +1834,7 @@ Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Fo
 
 **2-D bathymetry grid:** Downloaded lazily on first SWAN run from the NCEI ArcGIS ImageServer `getSamples` endpoint (POST, multipoint, 1000-point batches). Covers the outer grid bbox at the outer grid resolution. Cached persistently to `/etc/weewx-clearskies/swan_bathymetry.json`. `cudem_to_swan_bottom()` bilinear-interpolates this source grid onto both SWAN grid levels. Sign convention: CUDEM (negative = ocean) → SWAN (positive = ocean). Download takes ~5 seconds for a typical 65×78 grid.
 
-**Optional separated service:** When `[trushore] service_url` is set to a remote host, `TrushoreProvider.fetch()` calls the remote HTTP endpoint instead of running SWAN locally. Health check polls `GET {service_url}/health` every 60 seconds. Three consecutive failures → log ERROR, serve last-good cache. See ARCHITECTURE.md for the standalone `weewx-clearskies-trushore` package.
+**Optional separated service:** When `[swan] service_url` is set to a remote host, `SwanProvider.fetch()` calls the remote HTTP endpoint instead of running SWAN locally. Health check polls `GET {service_url}/health` every 60 seconds. Three consecutive failures → log ERROR, serve last-good cache. See ARCHITECTURE.md for the standalone `weewx-clearskies-swan` package (ADR-096 renamed).
 
 ### §14.16 GFS wind provider (Phase 7 — supplements HRRR for 72-hour forecast)
 
@@ -1848,9 +1850,9 @@ Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Fo
 
 **Data source (backup):** AWS S3 at `s3://noaa-gfs-bdp-pds/`. Same data, hosted by Amazon as a public dataset.
 
-**Schedule:** GFS runs on a 6-hourly schedule (00Z, 06Z, 12Z, 18Z). Availability: ~3.5–4.5 hours after the nominal run hour (GFS takes longer to post than HRRR due to its global domain). Aligned with the TruShore extended HRRR cycle schedule.
+**Schedule:** GFS runs on a 6-hourly schedule (00Z, 06Z, 12Z, 18Z). Availability: ~3.5–4.5 hours after the nominal run hour (GFS takes longer to post than HRRR due to its global domain). Aligned with the SWAN extended HRRR cycle schedule.
 
-**Forecast range:** GFS produces forecasts to 384 hours (16 days) at 3-hour timesteps (f00–f384). For TruShore, only hours 48–72 are fetched (9 grids at 3-hour intervals: f048, f051, f054, f057, f060, f063, f066, f069, f072). The SWAN runner interpolates 3-hourly GFS wind to hourly resolution to match the HRRR cadence.
+**Forecast range:** GFS produces forecasts to 384 hours (16 days) at 3-hour timesteps (f00–f384). For SWAN, only hours 48–72 are fetched (9 grids at 3-hour intervals: f048, f051, f054, f057, f060, f063, f066, f069, f072). The SWAN runner interpolates 3-hourly GFS wind to hourly resolution to match the HRRR cadence.
 
 **Extracted variables:**
 
@@ -1865,10 +1867,10 @@ Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Fo
 
 **Cache:** Key = `(provider_id, bbox_hash, cycle_time)`. TTL = 21600s (6 hours) — matches the GFS cycle cadence.
 
-**Error handling:** 404 on all attempted cycles → `ProviderUnavailableError`. Network errors → canonical taxonomy. GRIB2 parse error → `ProviderProtocolError`. On GFS failure, TruShore produces a shortened forecast (HRRR hours 0–48 only) rather than no forecast.
+**Error handling:** 404 on all attempted cycles → `ProviderUnavailableError`. Network errors → canonical taxonomy. GRIB2 parse error → `ProviderProtocolError`. On GFS failure, SWAN produces a shortened forecast (HRRR hours 0–48 only) rather than no forecast.
 
 **Rate limiting:** 2 req/s to NOMADS (shared NOAA infrastructure, same rate as HRRR).
 
 ### Source ADRs
 
-§14 consolidates prescriptive rules from: ADR-083 (marine domain architecture), ADR-084 (NWPS supplementation — superseded by ADR-093), ADR-085 (eccodes dependency), ADR-087 (NDBC spectral data), ADR-088 (fishing scoring — bathymetry for habitat), ADR-089 (marine zone alerts), ADR-091 (marine card data sources, OFS ocean data, composite water level), ADR-093 (SWAN+TruShore replaces NWPS), ADR-094 (HRRR wind source for surf scoring). ADRs are archived in `docs/archive/decisions/` and explain the *why* behind these rules.
+§14 consolidates prescriptive rules from: ADR-083 (marine domain architecture), ADR-084 (NWPS supplementation — superseded by ADR-093), ADR-085 (eccodes dependency), ADR-087 (NDBC spectral data), ADR-088 (fishing scoring — bathymetry for habitat), ADR-089 (marine zone alerts), ADR-091 (marine card data sources, OFS ocean data, composite water level), ADR-093 (SWAN replaces NWPS), ADR-094 (HRRR wind source for surf scoring), ADR-095 (SWAN model corrections — transect, WLEVEL, CURRENT, OBSTACLE), ADR-096 (scoring restructure, TruShore branding removal). ADRs are archived in `docs/archive/decisions/` and explain the *why* behind these rules.

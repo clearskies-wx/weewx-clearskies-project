@@ -2121,7 +2121,7 @@ Summary snapshot for one marine location (used by the marine landing page locati
 
 | Card field | Primary source | Fallback | Unit conversion |
 |---|---|---|---|
-| `waveHeight` | SWAN+TruShore → `wave_transform.apply_supplements()` (for locations with surf activity, ADR-093) | Last successful SWAN+TruShore cache (any age) → null. No WW3 fallback for surf. | meter → operator `group_wave_height` |
+| `waveHeight` | SWAN → `wave_transform.apply_supplements()` (for locations with surf activity, ADR-093/095) | Last successful SWAN cache (any age) → null. No WW3 fallback for surf. | meter → operator `group_wave_height` |
 | `windSpeed` | Station hardware via weewx archive (when `is_station_served()` returns True) | Configured forecast provider `fetch_current_conditions(lat, lon)` | Provider handles conversion |
 | `windDirection` | Same as windSpeed | Same as windSpeed | degrees (no conversion) |
 | `airTemp` | Same as windSpeed | Same as windSpeed | Provider handles conversion |
@@ -2238,16 +2238,16 @@ Source: `endpoints/surf.py`.
 | `locationId` | str | No | Location slug from config |
 | `locationName` | str | No | Display name |
 | `coordinates` | object | No | `{lat, lon}` |
-| `forecast` | list[SurfForecast] | No | One entry per SWAN+TruShore forecast timestep. Contains all four height fields (`swellHeight`, `waveHeightAtBreak`, `breakingFaceHeight`, `breakingHawaiianHeight`) plus `windSource` per timestep. Empty list if SWAN has never run successfully. |
+| `forecast` | list[SurfForecast] | No | One entry per SWAN forecast timestep. Contains all four height fields (`swellHeight`, `waveHeightAtBreak`, `breakingFaceHeight`, `breakingHawaiianHeight`) plus `windSource` and `scoringBreakdown` per timestep. Empty list if SWAN has never run successfully. |
 | `zoneForecast` | SurfZoneForecast | Yes | NWS SRF forecast for the covering county zone; `null` if unavailable |
 | `spectralComponents` | list[SpectralWaveComponent] | No | Current NDBC spectral swell decomposition; empty list if no spectral-capable buoy configured or NDBC fetch failed |
 | `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions for the surf page's tide overlay (informational, not scored) |
-| `nearshoreModel` | str | No | `"swan_trushore"` |
+| `nearshoreModel` | str | No | `"swan"` (ADR-096) |
 | `lastRunTime` | str | Yes | ISO-8601 timestamp of SWAN run completion |
 | `dataAge` | int | Yes | Age of SWAN output in seconds |
 | `breakerFormula` | str | No | `"komar_gaughan"` or `"caldwell"` per spot config |
 | `surfHeightDisplay` | str | No | `"face"` or `"hawaiian"` per spot config |
-| `source` | str | No | Fixed string `"trushore+ndbc+coops+nws_srf"` |
+| `source` | str | No | Fixed string `"swan+ndbc+coops+nws_srf"` (ADR-096) |
 | `generatedAt` | str | No | UTC ISO-8601 with Z |
 
 ##### Fishing bundle (actual shape) — `GET /api/v1/fishing[/{locationId}]`
@@ -2281,7 +2281,7 @@ Source: `endpoints/beach_safety.py`. There is no `zoneForecast` field in the act
 | `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions |
 | `waterLevels` | list[WaterLevel] | No | CO-OPS observed water levels |
 | `externalLinks` | list[object] | No | `{label, url}` from the location's `BeachSafetyConfig.external_links` |
-| `source` | str | No | Fixed string `"trushore+ndbc+nws_srf+coops+nws_alerts"` |
+| `source` | str | No | Fixed string `"swan+ndbc+nws_srf+coops+nws_alerts"` (ADR-096) |
 | `generatedAt` | str | No | UTC ISO-8601 with Z |
 
 ### Marine unit groups
@@ -2318,26 +2318,28 @@ Display labels: `"kt"` (knot), `"ft"` (foot), `"m"` (meter), `"s"` (second), `"n
 
 Four enrichment processors for marine data. Each follows the existing enrichment pipeline pattern (register against an endpoint key, run after provider fetch and before response serialization).
 
-### SWAN+TruShore nearshore model (ADR-093)
+### SWAN nearshore model (ADR-093, corrected ADR-095)
 
-**SWAN+TruShore is the only nearshore wave model.** When the `[nearshore]` pip extra is installed, SWAN runs as a subprocess within the API process on a schedule tied to the extended HRRR cycles (4×/day at 00/06/12/18Z). There is no `nearshore_model` config key — if the extra is installed, TruShore runs. NWPS is eliminated (ADR-093 supersedes ADR-084).
+**SWAN is the only nearshore wave model.** When the `[nearshore]` pip extra is installed, SWAN runs as a subprocess within the API process on a schedule tied to the extended HRRR cycles (4×/day at 00/06/12/18Z). There is no `nearshore_model` config key — if the extra is installed, SWAN runs. NWPS is eliminated (ADR-093 supersedes ADR-084).
 
-**WaveWatch III is NOT a surf forecast source.** WW3 remains the deep-water boundary input to SWAN (via `providers/marine/wavewatch.py`) and continues serving the marine endpoint's offshore forecast. WW3 is never used as a surf endpoint data source. The surf endpoint serves the last successful SWAN+TruShore cache if the runner fails — no fallback to any other model.
+**WaveWatch III is NOT a surf forecast source.** WW3 remains the deep-water boundary input to SWAN (via `providers/marine/wavewatch.py`) and continues serving the marine endpoint's offshore forecast. WW3 is never used as a surf endpoint data source. The surf endpoint serves the last successful SWAN cache if the runner fails — no fallback to any other model.
 
-**Data pipeline per forecast timestep:**
+**Data pipeline per forecast timestep (ADR-095 corrected):**
 
 ```
-SWAN output (Hsig at output point)
-  → store as swellHeight (raw SWAN Hsig)
-  → wave_transform.apply_supplements() → corrected Hsig
+SWAN cross-shore CURVE transect output
+  → find ~10m depth point on transect
+  → HSWELL at ~10m depth → store as swellHeight
+  → HSIGN at ~10m depth → wave_transform.apply_supplements() → corrected Hsig
   → store as waveHeightAtBreak (backward compatible — post-supplement Hsig)
   → breaker_height.hsig_to_face_height(corrected_hsig, Tp, depth, formula)
   → store as breakingFaceHeight (trough-to-crest breaking face height)
   → breaker_height.hawaiian_height(face_height) → store as breakingHawaiianHeight (×0.5)
-  → surf_scorer.score_surf(breakingFaceHeight, ...) → quality score
+  → SPECOUT at ~10m → spectral decomposition → store as multiSwell
+  → surf_scorer.score_surf(breakingFaceHeight, DSPR, SPECOUT, ...) → quality score
 ```
 
-**SWAN integration:**
+**SWAN integration (ADR-095 corrections):**
 
 | Component | Source |
 |---|---|
@@ -2346,24 +2348,32 @@ SWAN output (Hsig at output point)
 | Wind forcing (hours 48–72) | GFS forecast wind at 0.25° (~25km) via NOMADS (`providers/wind/gfs.py`) — supplements HRRR to reach 72h |
 | Deep-water boundary | WaveWatch III directional spectrum via ERDDAP (`providers/marine/wavewatch.py`) |
 | Bathymetry (2-D grid) | CUDEM via NCEI getSamples endpoint (`enrichment/bathymetry.py`) — lazy-downloaded on first run, cached to `/etc/weewx-clearskies/swan_bathymetry.json` |
-| Tidal currents | RTOFS/OFS ocean model (`providers/ocean/ofs.py`) |
+| Water level (WLEVEL) | CO-OPS tidal predictions (`providers/tides/coops.py`) — time-varying, uniform across domain, hourly timestep (ADR-095) |
+| Ocean currents (CURRENT) | OFS surface current U/V components (`providers/ocean/ofs.py`) — time-varying per grid point. Omitted when OFS unavailable (ADR-095) |
+| Structure physics (OBSTACLE) | SWAN native OBSTACLE command — structure types from wizard Overpass API discovery. Replaces wave_transform Supplement 2 (ADR-095) |
 
 **Nested grid architecture:** SWAN executes two sequential runs per cycle — an outer grid (~2–3 km resolution, ~5,000–8,000 points) covering the continental shelf approach, then an inner nest (~200–500m resolution, ~3,000–8,000 points) focused tightly on the configured surf locations. The outer run writes `NESTOUT` boundary files; the inner run reads them via `NGRID`. Total memory budget: ≤300 MB combined (both grids). This matches the operational pattern used by NWPS, PacIOOS, and other production nearshore systems — no operational system runs fine resolution over the full domain.
 
 **Blended wind forcing:** HRRR (3km) provides high-resolution wind for hours 0–48 from extended cycles (00/06/12/18Z, 4×/day). GFS (0.25°, ~25km) supplements hours 48–72 to fill the 72-hour surf forecast card. The SWAN runner stitches HRRR and GFS wind grids into a single continuous wind input spanning 72 hours. The resolution transition at hour 48 does not affect nearshore physics — wave refraction, shoaling, and breaking are computed at the SWAN grid resolution, not the wind grid resolution.
 
-**SWAN runner:** `services/swan_runner.py` — executes two SWAN runs per cycle (outer grid + inner nest). Writes input files (computational grid, wind field, boundary spectra, bathymetry, output points), spawns SWAN subprocess, parses TABLE output. Output: `MarineForecastPoint` per surf spot per timestep across 72 forecast hours. Working directory: `/var/run/weewx-clearskies/swan/` (fixed path, not tempfile). **Hotstart:** each run writes a hotstart file after `COMPUTE`; the next run reads it via `INIT HOTSTART` so t=0 immediately has the real wave field from the previous run (no cold-start spin-up). Hotstart files persist at `{outer,inner}_hotstart.dat` in the SWAN workdir.
+**SWAN runner:** `services/swan_runner.py` — executes two SWAN runs per cycle (outer grid + inner nest). Writes input files (computational grid, wind field, boundary spectra, bathymetry, WLEVEL, CURRENT, OBSTACLE, output CURVE transects), spawns SWAN subprocess, parses TABLE output and SPECOUT files. Output: transect data per surf spot per timestep across 72 forecast hours. Working directory: `/var/run/weewx-clearskies/swan/` (fixed path, not tempfile). **Hotstart:** each run writes a hotstart file after `COMPUTE`; the next run reads it via `INIT HOTSTART` so t=0 immediately has the real wave field from the previous run (no cold-start spin-up). Hotstart files persist at `{outer,inner}_hotstart.dat` in the SWAN workdir.
 
-**Two-tier schedule:** Full runs 4× daily on extended HRRR cycles (00/06/12/18Z) — outer + inner grids, 72-hour nonstationary forecast, ~7–12 min runtime. Hourly quick updates between full runs — stationary inner nest only with latest HRRR wind, <1 min runtime, single-snapshot merged into the existing forecast cache. Quick updates keep the "current conditions" entry fresh (< 1 hour old) without re-running the expensive outer grid. Not in the request path. Cache TTL = 6 hours (matches extended cycle interval). On failure, last-good cache retained indefinitely — stale TruShore data is always preferred to no data.
+**Cross-shore CURVE transect output (ADR-095).** Each surf spot gets a CURVE transect perpendicular to the beach, from ~15m depth to ~1m depth, ~50m spacing (10–20 output points). Direction derived from `beach_facing_degrees + 180°`. Replaces the single-point OUTPUT POINTS command. TABLE output at each transect point: `HSIGN HSWELL DIR TM01 DEPTH QB DISSURF SETUP DSPR XP YP`. SPECOUT (2D directional-frequency spectrum) at the ~10m depth point only (one per spot). Break points identified by QB peaks along the transect.
+
+**SWAN physics enabled (ADR-095).** TRIAD (Eldeberky 1996 defaults) for shallow-water triad wave-wave interactions. SETUP for wave-induced water level computation. Both add negligible compute cost. SETUP values stored for future beach safety use (Q4 — deferred).
+
+**Two-tier schedule:** Full runs 4× daily on extended HRRR cycles (00/06/12/18Z) — outer + inner grids, 72-hour nonstationary forecast, ~7–12 min runtime. Hourly quick updates between full runs — stationary inner nest only with latest HRRR wind, <1 min runtime, single-snapshot merged into the existing forecast cache. Quick updates keep the "current conditions" entry fresh (< 1 hour old) without re-running the expensive outer grid. Not in the request path. Cache TTL = 6 hours (matches extended cycle interval). On failure, last-good cache retained indefinitely — stale SWAN data is always preferred to no data.
 
 **Four height fields in every `SurfForecast` entry:**
 
 | Field | What it is | Source |
 |---|---|---|
-| `swellHeight` | Raw SWAN Hsig at the output point | SWAN output, no post-processing |
-| `waveHeightAtBreak` | Post-supplement Hsig (backward compatible) | After wave_transform.apply_supplements() |
-| `breakingFaceHeight` | Trough-to-crest breaking face height via breaker formula | After breaker_height.hsig_to_face_height() |
+| `swellHeight` | Swell-only wave height at ~10m depth on the cross-shore transect | HSWELL from SWAN TABLE at ~10m depth point (ADR-095) |
+| `waveHeightAtBreak` | Post-supplement total wave height at ~10m (backward compatible) | HSIGN at ~10m → wave_transform.apply_supplements() |
+| `breakingFaceHeight` | Trough-to-crest breaking face height via breaker formula at ~10m | After breaker_height.hsig_to_face_height() applied to ~10m HSIGN |
 | `breakingHawaiianHeight` | Back-of-wave height (×0.5 of face height) | breakingFaceHeight × 0.5 |
+
+**swellHeight and breakingFaceHeight are meaningfully different values.** At ~10m depth, SWAN has handled refraction but not final shoaling-to-breaking. K-G applies ~60–80% of full amplification. For typical groundswell: breakingFaceHeight ≈ 1.1–1.3× swellHeight.
 
 All four fields are present in every response regardless of the operator's `surfHeightDisplay` preference. The API returns all representations; the dashboard selects which to show as primary.
 
@@ -2388,21 +2398,23 @@ Full research at `docs/planning/briefs/WAVE-BREAKING-CONVERSION-BRIEF.md`.
 
 | Field | Value | Description |
 |---|---|---|
-| `nearshoreModel` | `"swan_trushore"` | Always present when TruShore is active |
+| `nearshoreModel` | `"swan"` | Always present when SWAN is active (ADR-096) |
 | `lastRunTime` | ISO timestamp | When the SWAN run that produced this data completed |
 | `dataAge` | integer (seconds) | Age of the SWAN output |
 | `breakerFormula` | `"komar_gaughan"` or `"caldwell"` | Which formula was used for this spot |
 | `surfHeightDisplay` | `"face"` or `"hawaiian"` | Operator's configured display preference |
+| `directionalSpread` | float (degrees) | DSPR from SWAN TABLE at ~10m depth (ADR-095). Typically 10–40° for nearshore conditions |
+| `setup` | float (meters) | Wave-induced water level rise from SWAN SETUP at shore (ADR-095). For future beach safety use |
 
-**Wind source for surf quality scoring (ADR-094):**
+**Wind source for surf quality scoring (ADR-094, updated ADR-096):**
 
-For SWAN+TruShore surf forecasts, the wind source is HRRR (the same model run that drove SWAN). Station hardware wind observations remain the source for `t=0` current-conditions scoring when available.
+For SWAN surf forecasts, the wind source is HRRR (the same model run that drove SWAN). Station hardware wind observations remain the source for `t=0` current-conditions scoring when available.
 
 | Timestep | Wind source | `windSource` field value |
 |---|---|---|
 | `t=0` (current conditions) | Station hardware → forecast provider → HRRR `t=0` | `"station"` or `"forecast_provider"` |
-| `t+1h` through `t+48h` (forecast, HRRR range) | HRRR forecast wind at 3km from TruShore cache | `"hrrr_trushore"` |
-| `t+49h` through `t+72h` (forecast, GFS range) | GFS forecast wind at 0.25° from TruShore cache | `"gfs_trushore"` |
+| `t+1h` through `t+48h` (forecast, HRRR range) | HRRR forecast wind at 3km from SWAN cache | `"hrrr"` |
+| `t+49h` through `t+72h` (forecast, GFS range) | GFS forecast wind at 0.25° from SWAN cache | `"gfs"` |
 
 The NDBC buoy wind exclusion (HARD RULE) is unchanged — NDBC buoy wind is never used for surf quality scoring regardless of source mode.
 
@@ -2432,30 +2444,9 @@ Application: H_max = γ_corrected × depth (recompute maximum wave height at bre
 
 Operator inputs: `bottom_type` (sand/rock/coral_reef/mixed), `beach_slope` (computed from CUDEM).
 
-**Supplement 2 — Coastal structure effects (transmission/reflection):**
+**~~Supplement 2 — Coastal structure effects~~ (REMOVED — ADR-095):**
 
-H_transmitted = Kt × H_incident
-
-| Material | Kt | Examples |
-|---|---|---|
-| Impermeable | 0.10 ± 0.05 | Concrete seawall, solid breakwater |
-| Semi-permeable | 0.35 ± 0.15 | Rubble mound, rock jetty |
-| Permeable | 0.75 ± 0.10 | Timber pier, open groin |
-
-Influence zone: effects apply within structure-type-specific distance (jetty: 3–5× length, breakwater: 2–4× length) and diminish as 1/r² with distance from the structure.
-
-All output labeled: "estimated — structure effects are approximate."
-
-Multiple structures combine via linear superposition (Kt values multiplied together). Example: a jetty (Kt=0.35) and a breakwater (Kt=0.10) together produce combined Kt=0.035 — wave height reduced to 3.5% of incident.
-
-Operator inputs: structure type (`jetty`/`pier`/`breakwater`/`seawall`/`groin`), material (`impermeable`/`semi_permeable`/`permeable`), `length_m`, `bearing_degrees`, `distance_m`, `bearing_to_spot_degrees` (optional). The wizard auto-discovers structures from OpenStreetMap via `GET /setup/marine/discover-structures` (PROVIDER-MANUAL §14.9) — operator confirms and can add structures manually.
-
-**Directional Kt:** The base Kt table above is omnidirectional (worst case — wave hitting the structure square-on). When `wave_direction` (from SWAN) is available, two direction-dependent refinements apply in `enrichment/wave_transform.py`'s `_structure_kt_effective()`:
-
-1. **Shadow zone check.** Requires the structure's `bearing_to_spot_degrees` (bearing from the structure's nearest point to the surf spot; auto-computed by `GET /setup/marine/discover-structures`). The spot is only in the structure's shadow if it falls within a cone projected along the wave's travel direction (`wave_direction + 180`), half-angle `atan2(length_m, 2 × distance_m)`. Outside that cone, the structure has zero effect on that wave direction (Kt = 1.0) regardless of material or distance. Skipped (no shadow check) when `bearing_to_spot_degrees` is not set.
-2. **Angular Kt modulation.** The blocking fraction `(1 - Kt)` is scaled by `cos²(θ)`, where `θ = |α - 90|` and `α` is the angle between `wave_direction` and the structure's `bearing_degrees` (its long axis), folded to [0, 180]. `θ = 0` (wave hits the structure perpendicular to its axis) → full blocking; `θ = 90` (wave travels parallel to the structure's length) → no blocking.
-
-When `wave_direction` is unavailable, both refinements are skipped and the original omnidirectional Kt (full material value within the influence zone, 1/r² decay beyond it) applies unchanged.
+Replaced by SWAN native OBSTACLE command. Structure physics are now handled within the SWAN model using physics-based formulations (Goda, d'Angremond, transmission/reflection coefficients), which account for diffraction and wave field reorganization behind structures. Structure types mapped from wizard Overpass API discovery: pier → TRANSM, breakwater → DAM DANGremond, jetty → DAM GODA, seawall → REFL, groin → DAM GODA. Structure coordinates from the marine location config.
 
 **Supplement 3 — Sub-grid spatial interpolation:**
 
@@ -2478,12 +2469,14 @@ Operator inputs: topographic feature classification from spot config.
 
 All physics constants (γ bounds, Kt values, topographic multipliers) defined as module-level constants with source citations.
 
-### Surf quality scorer
+### Surf quality scorer (ADR-096 restructure)
 
 **File:** `enrichment/surf_scorer.py`
 **Registration:** Against the surf endpoint — runs after wave_transform and breaker height conversion.
-**Inputs:** `breakingFaceHeight` (from `breaker_height.hsig_to_face_height()`), spectral components (from NDBC), spot config (beach facing, directional exposure), wind data (HRRR for forecast timesteps, station hardware for `t=0` — see §17 "Wind source for surf quality scoring" above).
-**Outputs:** `SurfForecast` with quality_stars (1–5), quality_label, conditions_text.
+**Inputs:** `breakingFaceHeight` (from `breaker_height.hsig_to_face_height()` at ~10m depth), DSPR (from SWAN TABLE at ~10m), SPECOUT spectral components (from SWAN at ~10m), spot config (beach facing, directional exposure), wind data (HRRR for forecast timesteps, station hardware for `t=0`).
+**Outputs:** `SurfForecast` with quality_stars (1–5), quality_label, conditions_text, full scoring breakdown.
+
+**All scoring data from SWAN (ADR-096).** NDBC spectral data is NOT passed to the scorer. The `_effective_swell()` NDBC override is removed. The scorer uses SWAN height/period/direction directly. NDBC spectral data is retained in the surf response as reference data but does not feed scoring or multiSwell.
 
 **Scorer uses `breakingFaceHeight`, not raw Hsig.** The scoring thresholds (`_WAVE_HEIGHT_RANGES_FT`) are calibrated in face-height feet. This means two timesteps with identical Hsig but different periods produce different height scores — the longer period amplifies face height via the breaker formula.
 
@@ -2491,24 +2484,38 @@ All physics constants (γ bounds, Kt values, topographic multipliers) defined as
 
 Wind input for the surf scorer uses HRRR forecast wind for forecast timesteps (`t > 0`) and station hardware or forecast provider for current conditions (`t=0`). See §17 "Wind source for surf quality scoring (ADR-094)" above for the full precedence.
 
-**NDBC buoy wind — NEVER used for surf quality scoring.** Offshore buoys (typically 12+ miles out) measure the synoptic wind field, which can be completely different from beach conditions. Coastal wind is dominated by thermal effects (sea/land breezes, topographic channeling, temperature gradients) that buoys cannot see.
+**NDBC buoy wind — NEVER used for surf quality scoring.** Offshore buoys (typically 12+ miles out) measure the synoptic wind field, which can be completely different from beach conditions.
 
-**Why NDBC buoy wind is wrong for surf quality:** Surfline invested in beach-level wind stations worldwide specifically because offshore buoys miss local effects: "Small-scale phenomena such as thermal sea breezes, air interacting with topography, or localized temperature differences near the coast can have a significant impact on surf quality" (Surfline support documentation). Beach wind and offshore wind can be completely different — SoCal morning glass-off conditions at the beach while the buoy 12 miles out reports a steady westerly is the textbook case.
+**Three-component weighted scoring (ADR-096):**
 
-**NDBC buoy wind's valid role:** Spectral swell decomposition ONLY. Offshore wind reflects the synoptic-scale wind field that drives fetch and generates swells — this context is already captured by the spectral decomposition data. NDBC wind data must not be used for surf wind quality classification.
+| Component | Weight | Max score | Scoring method |
+|---|---|---|---|
+| Wave Height | 0.35 | 35 | Larger = better within rideable range for the spot. Scaled linearly against the spot's configured ideal range. |
+| Wave Period | 0.35 | 35 | Longer = better (cleaner, more powerful waves). Ground swell (≥12s) scores highest. |
+| Wave Organization | 0.30 | 30 | Composite sub-score (see below). Higher = cleaner, more organized wave conditions. |
 
-**Four-component weighted scoring:**
+**Wave Organization sub-factors (weights within the 30%):**
 
-| Component | Weight | Scoring method |
+| Sub-factor | Weight within Organization | Effective weight | Source | Scoring |
+|---|---|---|---|---|
+| Wind effect | 50% | 15% | HRRR/station wind | Offshore = best, onshore = worst. Same classification as before. |
+| Swell dominance | 25% | 7.5% | SWAN SPECOUT at ~10m | Ratio of primary swell energy to total energy. Computed from SWAN spectral decomposition, not NDBC. |
+| Directional spread | 15% | 4.5% | SWAN TABLE DSPR at ~10m | < 15° → 1.0, 15–25° → 0.7, 25–35° → 0.4, > 35° → 0.2 |
+| Cross-swell interference | 10% | 3% | SWAN SPECOUT at ~10m | No cross-swell → 1.0, secondary system > 50% primary energy at > 30° angle diff → 0.4 |
+
+Organization sub-score = weighted sum of sub-factors × 30.
+
+**Visible penalty/bonus factors (ADR-096):**
+
+| Factor | Type | Description |
 |---|---|---|
-| Wave height | 0.35 | Larger = better within rideable range for the spot. Scaled linearly against the spot's configured ideal range. |
-| Wave period | 0.35 | Longer = better (cleaner, more powerful waves). Ground swell (≥12s) scores highest. |
-| Wind quality | 0.20 | Offshore (land to sea) = best (holds wave face up); onshore = worst. Classification: offshore → cross_offshore → cross → cross_onshore → onshore, based on angle between wind direction and beach-facing direction. Wind data sourced per the wind precedence above (station → forecast provider — NOT NDBC buoy). |
-| Swell dominance | 0.10 | Ratio of primary swell energy to total energy. Higher = cleaner conditions; low ratio indicates confused multi-swell or wind chop. |
+| Beach alignment | Penalty (signed integer) | Per-component directional filter — swell from blocked direction scores zero |
+| Directional exposure | Penalty (signed integer) | 0 when open, negative when blocked. Previously hidden. |
+| Time of day | Bonus/penalty (signed integer) | Positive at dawn, negative in afternoon, 0 otherwise. Previously hidden. |
 
-Additional modifiers (applied after weighted sum, not weighted components):
-- **Beach angle alignment:** Per-component directional filter — a swell from a direction blocked by the beach's `directional_exposure` config scores zero for that component.
-- **Multi-swell interference:** Compatible swells (similar direction) combine constructively; opposing swells create confused seas and score lower.
+**Total score:** `total = waveHeight + wavePeriod + waveOrganization + beachAlignment + directionalExposure + timeOfDay`. All factors visible — no hidden modifiers.
+
+**Score bar normalization:** Each bar's fill is proportional to its own maximum, not to 100. Wave Height 28/35 = 80% fill. Wave Organization 24/30 = 80% fill.
 
 Quality labels: 1 = "Poor", 2 = "Fair", 3 = "Good", 4 = "Very Good", 5 = "Epic".
 
@@ -2701,7 +2708,7 @@ When no marine locations are configured (no `[marine]` section in `api.conf`), n
 | `observation.airTemp` | Station hardware | `marine_weather_cache` | °C internal |
 | `observation.pressure` | Station hardware | `marine_weather_cache` | hPa internal |
 | `observation.visibility` | `marine_weather_cache` | null | km internal |
-| `observation.waveHeight` | SWAN+TruShore + `wave_transform` (surf locations) | Last-good TruShore cache (any age) → null | Meters internal. No WW3 fallback for surf. Null for harbor locations. |
+| `observation.waveHeight` | SWAN + `wave_transform` (surf locations) | Last-good SWAN cache (any age) → null | Meters internal. No WW3 fallback for surf. Null for harbor locations. |
 | `observation.waterTemp` | `ocean_data_resolver.resolve()` (OFS → MUR SST → RTOFS) | NDBC buoy | °C internal |
 | `observation.weatherCode` | `marine_weather_cache` | null | WMO code integer |
 | `observation.isDay` | `marine_weather_cache` | null | boolean |
@@ -2725,7 +2732,7 @@ For instantaneous fields (wave height, period, direction, wind), `endStep` equal
 **Temporal selection rules:**
 - **Current conditions:** Pass `target_step=0` to `read_grib_fields()` to select the analysis/hour-0 timestep.
 - **Unfiltered (default):** When `target_step` is `None`, the reader iterates all messages and the last matching field wins (legacy behavior). Not correct for current conditions — always pass `target_step=0` for that use case.
-- **Multi-timestep (TruShore):** The SWAN runner reads all timesteps from the HRRR GRIB2 to construct the full wind forcing field for the SWAN simulation.
+- **Multi-timestep (SWAN):** The SWAN runner reads all timesteps from the HRRR GRIB2 to construct the full wind forcing field for the SWAN simulation.
 
 **Previous bug (fixed):** Both `_read_eccodes()` and `_read_pygrib()` iterated all GRIB messages and overwrote `result.fields[short_name]` for each matching field name. Since GRIB2 messages are typically ordered chronologically, the last overwrite was the furthest forecast hour. The "current conditions" values were showing far-future predictions instead of what was happening at the time.
 
@@ -2735,11 +2742,11 @@ For instantaneous fields (wave height, period, direction, wind), `endStep` equal
 
 The NWS SRF text product's `waterTemp` field (a manually-entered forecaster value parsed from the SRF text, not modeled or observed data) may serve as a last-resort fallback only — not as the primary source. The SRF water temp is a stale, hand-typed value that does not update with ocean conditions.
 
-**Wind:** For forecast timesteps (`t > 0`), the surf endpoint uses HRRR forecast wind from the TruShore cache (ADR-094). For `t=0` current conditions, the existing precedence applies: station hardware → forecast provider. NOT NDBC buoy wind. See §17 "Wind source for surf quality scoring (ADR-094)" for the full rationale and rules.
+**Wind:** For forecast timesteps (`t > 0`), the surf endpoint uses HRRR forecast wind from the SWAN cache (ADR-094). For `t=0` current conditions, the existing precedence applies: station hardware → forecast provider. NOT NDBC buoy wind. See §17 "Wind source for surf quality scoring (ADR-094)" for the full rationale and rules.
 
 ### Multi-point surf forecast contract
 
-`GET /api/v1/surf/{locationId}` must return multi-point forecast data by scoring each SWAN+TruShore forecast timestep.
+`GET /api/v1/surf/{locationId}` must return multi-point forecast data by scoring each SWAN forecast timestep.
 
 | Field | Type | Description |
 |---|---|---|
@@ -2749,19 +2756,43 @@ The NWS SRF text product's `waterTemp` field (a manually-entered forecaster valu
 | `forecast[].qualityLabel` | str | "Poor"/"Fair"/"Good"/"Very Good"/"Epic" |
 | `forecast[].conditionsText` | str | Composed natural-language summary |
 | `forecast[].windQuality` | str | "Offshore"/"Glassy"/"Cross-shore"/"Onshore" |
-| `forecast[].windSource` | str | `"hrrr_trushore"` for forecast timesteps, `"station"` or `"forecast_provider"` for `t=0` |
-| `forecast[].swellDominance` | float (0-1) | Swell dominance score |
-| `forecast[].swellHeight` | float | Raw SWAN Hsig in display units |
-| `forecast[].waveHeightAtBreak` | float | Post-supplement Hsig in display units (backward compatible) |
+| `forecast[].windSource` | str | `"hrrr"` or `"gfs"` for forecast timesteps, `"station"` or `"forecast_provider"` for `t=0` (ADR-096) |
+| `forecast[].swellHeight` | float | HSWELL at ~10m depth in display units (ADR-095) |
+| `forecast[].waveHeightAtBreak` | float | Post-supplement HSIGN at ~10m in display units (backward compatible) |
 | `forecast[].breakingFaceHeight` | float | Trough-to-crest breaking face height in display units |
 | `forecast[].breakingHawaiianHeight` | float | Back-of-wave height (×0.5 of face height) in display units |
 | `forecast[].period` | float | Dominant period in seconds |
 | `forecast[].direction` | float | Swell direction in degrees |
-| `forecast[].multiSwell` | list[object] | Spectral breakdown components |
-| `nearshoreModel` | str | `"swan_trushore"` |
+| `forecast[].multiSwell` | list[object] | Spectral breakdown from SWAN SPECOUT per timestep (not NDBC — ADR-095/096) |
+| `forecast[].directionalSpread` | float | DSPR at ~10m depth in degrees (ADR-095) |
+| `forecast[].scoringBreakdown` | object | 3-factor + 3-penalty scoring breakdown (ADR-096) |
+| `nearshoreModel` | str | `"swan"` (ADR-096) |
 | `lastRunTime` | ISO 8601 | When the SWAN run completed |
 | `dataAge` | int | Age of SWAN output in seconds |
 | `breakerFormula` | str | `"komar_gaughan"` or `"caldwell"` |
 | `surfHeightDisplay` | str | `"face"` or `"hawaiian"` — operator's configured display preference |
 
-SWAN+TruShore always produces multi-timestep output. The dashboard's 72-hour forecast chart shows `breakingFaceHeight` (or `breakingHawaiianHeight` per operator config) — not `swellHeight` or `waveHeightAtBreak`.
+**`scoringBreakdown` fields (ADR-096):** `waveHeight` (out of 35), `wavePeriod` (out of 35), `waveOrganization` (out of 30), `organizationWind`, `organizationSwellDominance`, `organizationDirectionalSpread`, `organizationCrossSwell` (sub-factors), `beachAlignment` (signed penalty), `directionalExposure` (signed penalty), `timeOfDay` (signed bonus/penalty).
+
+SWAN always produces multi-timestep output. The dashboard's 72-hour forecast chart shows `breakingFaceHeight` (or `breakingHawaiianHeight` per operator config) — not `swellHeight` or `waveHeightAtBreak`.
+
+### Beach profile endpoint (ADR-097)
+
+`GET /api/v1/surf/{location_id}/profile` returns the cross-shore transect for the current forecast timestep (closest to now).
+
+| Field | Type | Description |
+|---|---|---|
+| `locationId` | str | Location slug |
+| `transect` | list[object] | 10+ points ordered from offshore to shore |
+| `transect[].distanceFromShore` | float | Distance from shore in meters (always meters) |
+| `transect[].depth` | float | Water depth in meters (always meters) |
+| `transect[].waveHeight` | float | Total wave height (HSIGN) in display units |
+| `transect[].swellHeight` | float | Swell-only height (HSWELL) in display units |
+| `transect[].breakingFraction` | float | QB (0–1) — fraction of breaking waves |
+| `transect[].breakingDissipation` | float | DISSURF — breaking dissipation rate |
+| `breakPoints` | list[object] | QB peak locations — break points |
+| `breakPoints[].distanceFromShore` | float | Distance from shore in meters |
+| `breakPoints[].depth` | float | Water depth at break point in meters |
+| `breakPoints[].waveHeight` | float | Wave height at break point in display units |
+
+Unit conversion applies to `waveHeight` and `swellHeight` fields. Distance and depth are always in meters (physical positions, not display values). Multiple `breakPoints` entries for multi-break spots (outer bar, inner bar).

@@ -4,7 +4,7 @@ Single source of truth for what each service is, where it runs, what it exposes,
 
 Authoritative for current system state. ADRs are authoritative for *why* decisions were made. If this document conflicts with an ADR, investigate — one of them is stale.
 
-Last verified: 2026-07-17 (Phase 7 remedial: SWAN+TruShore updated to nested grid architecture, GFS wind provider added for 72-hour forecast range, memory budget ≤300 MB). Previous: 2026-07-16 (ADR-093/094 Accepted: SWAN+TruShore replaces NWPS, HRRR wind provider added, NWPS eliminated from all docs, provider layout updated).
+Last verified: 2026-07-18 (ADR-095/096/097: SWAN model corrections — cross-shore transect, WLEVEL/CURRENT/OBSTACLE inputs, scoring restructure, beach profile endpoint, TruShore branding removed). Previous: 2026-07-17 (SWAN nested grid architecture, GFS wind provider, memory budget ≤300 MB).
 
 ---
 
@@ -91,9 +91,13 @@ Each repo builds its own container image independently (ADR-034). A dashboard CS
 >
 > **ClearSkiesFeelsLikeXType weewx extension** (`weewx-clearskies-feelslike`) is NOT a container. It is a weewx XType extension that runs inside the weewx process, installed via `weectl extension install`. It provides corrected thermal comfort values (`feelsLike`, `windchillSustained`) using 2-minute averaged wind (NWS ASOS sustained wind standard) instead of instantaneous readings. When this extension is not installed, weewx falls back to its built-in instantaneous-wind formulas for `appTemp` and `windchill` (no regression). No external dependencies.
 
-> **SWAN+TruShore nearshore model (ADR-093).** Optional `[nearshore]` pip extra adds the SWAN Fortran binary (subprocess), wgrib2, the HRRR wind provider, and the GFS wind provider. SWAN executes a two-level nested grid per cycle: a coarse outer grid (~2–3 km, ~5,000–8,000 points) for shelf-to-shore wave propagation, then a fine inner nest (~200–500m, ~3,000–8,000 points) focused on configured surf spots. Total memory budget: ≤300 MB. Wind forcing is blended: HRRR (3km, hours 0–48) + GFS (0.25°, hours 48–72) to fill the 72-hour surf forecast card. Two-tier schedule: full runs 4× daily on extended HRRR cycles (00/06/12/18Z, ~7–12 min, outer+inner nonstationary 72h); hourly quick updates (stationary inner nest only, <1 min, latest HRRR wind). SWAN runs as a subprocess within the API process on the same host — it is NOT a separate network service. Working directory: `/var/run/weewx-clearskies/swan/` (fixed path, visible from SSH). Hotstart files (`{outer,inner}_hotstart.dat`) persist between runs so each cycle starts from the previous run's wave field (no cold-start spin-up). 2-D CUDEM bathymetry grid cached at `/etc/weewx-clearskies/swan_bathymetry.json` (lazy-downloaded on first run from NCEI getSamples). When `[trushore] service_url` is set to a remote host, the API reads TruShore output from that host instead of running SWAN locally.
+> **SWAN nearshore model (ADR-093, corrected ADR-095).** Optional `[nearshore]` pip extra adds the SWAN Fortran binary (subprocess), wgrib2, the HRRR wind provider, and the GFS wind provider. SWAN executes a two-level nested grid per cycle: a coarse outer grid (~2–3 km, ~5,000–8,000 points) for shelf-to-shore wave propagation, then a fine inner nest (~200–500m, ~3,000–8,000 points) focused on configured surf spots. Total memory budget: ≤300 MB. Wind forcing is blended: HRRR (3km, hours 0–48) + GFS (0.25°, hours 48–72) to fill the 72-hour surf forecast card. Two-tier schedule: full runs 4× daily on extended HRRR cycles (00/06/12/18Z, ~7–12 min, outer+inner nonstationary 72h); hourly quick updates (stationary inner nest only, <1 min, latest HRRR wind). SWAN runs as a subprocess within the API process on the same host — it is NOT a separate network service. Working directory: `/var/run/weewx-clearskies/swan/` (fixed path, visible from SSH). Hotstart files (`{outer,inner}_hotstart.dat`) persist between runs so each cycle starts from the previous run's wave field (no cold-start spin-up). 2-D CUDEM bathymetry grid cached at `/etc/weewx-clearskies/swan_bathymetry.json` (lazy-downloaded on first run from NCEI getSamples). When `[swan] service_url` is set to a remote host, the API reads SWAN output from that host instead of running locally.
 >
-> **ClearSkiesTruShore** (`weewx-clearskies-trushore`) is an OPTIONAL standalone service. Operators who want to run SWAN on dedicated hardware install this pip package on a separate machine. It runs the nested SWAN grid 4× daily on extended HRRR cycles (00/06/12/18Z) and serves results via Redis or HTTP. The API reads from it via `[trushore] service_url`. When not installed, TruShore runs bundled inside the API process on the weewx host. No port change — SWAN is internal to the API process in the default topology, not a network service.
+> **SWAN model inputs (ADR-095):** Wind forcing (HRRR + GFS), deep-water boundary spectra (WaveWatch III), 2-D bathymetry (CUDEM), time-varying water level (CO-OPS WLEVEL — tidal predictions, uniform across domain, hourly), ocean currents (OFS CURRENT — surface U/V per grid point, when available), coastal structures (OBSTACLE — from wizard Overpass API discovery). TRIAD (shallow-water triad interactions) and SETUP (wave-induced water level) enabled.
+>
+> **SWAN model outputs (ADR-095):** Cross-shore CURVE transect per surf spot (10–20 points, ~15m to ~1m depth, ~50m spacing). TABLE output: HSIGN, HSWELL, DIR, TM01, DEPTH, QB (breaking fraction), DISSURF (breaking dissipation), SETUP, DSPR (directional spread). SPECOUT (2D spectrum) at ~10m depth point per spot for spectral decomposition (replaces NDBC for multiSwell). Break points detected from QB peaks along the transect.
+>
+> **ClearSkiesSWAN** (`weewx-clearskies-swan`) is an OPTIONAL standalone service. Operators who want to run SWAN on dedicated hardware install this pip package on a separate machine. It runs the nested SWAN grid 4× daily on extended HRRR cycles (00/06/12/18Z) and serves results via Redis or HTTP. The API reads from it via `[swan] service_url`. When not installed, SWAN runs bundled inside the API process on the weewx host. No port change — SWAN is internal to the API process in the default topology, not a network service.
 
 > **Config UI containerization (resolved 2026-07-02).** The Config UI has a Dockerfile (multi-stage, two-repo build context) and is included as the `config` service in `frontend-host/` and `single-host/` compose files. Caddy proxies `/wizard*`, `/bootstrap*`, `/login*`, `/admin*`, `/static/*` to the config service on port 9876. It is also distributed as a pip package (`weewx-clearskies-config`) for native installs.
 
@@ -265,8 +269,8 @@ Used by the config UI wizard and admin per ADR-038. Not proxied through Caddy �
 | `/setup/marine/bathymetry` | POST | Download (or regional-fallback) a CUDEM bathymetric depth profile for a surf/fishing spot | Session |
 | `/setup/marine/species` | GET | Species checklist for a coordinate + fishing target category (query: `lat`, `lon`, `category`), keyed by biogeographic region | Session |
 | `/setup/marine/discover-structures` | GET | Discover nearby coastal structures (jetties, piers, breakwaters, seawalls, groins) via the OpenStreetMap Overpass API, for surf spot wave-physics setup (query: `lat`, `lon`, `radius_m`, default 2000) | Session |
-| `/setup/marine/coverage` | GET | Data source coverage panel for a coordinate (query: `lat`, `lon`): OFS model assignment, coverage tier, available data capabilities, nearest NDBC/CO-OPS stations, NWS zone, SWAN+TruShore status, on-premises sensor proximity (T3.6) | Session |
-| `/setup/apply` | POST | Write final config, API restarts. Accepts an optional `marine` block with SWAN+TruShore grid config when `[nearshore]` extra is installed | Session |
+| `/setup/marine/coverage` | GET | Data source coverage panel for a coordinate (query: `lat`, `lon`): OFS model assignment, coverage tier, available data capabilities, nearest NDBC/CO-OPS stations, NWS zone, SWAN status, on-premises sensor proximity (T3.6) | Session |
+| `/setup/apply` | POST | Write final config, API restarts. Accepts an optional `marine` block with SWAN grid config when `[nearshore]` extra is installed | Session |
 | `/setup/current-config` | GET | Full config for re-run + admin provider reads | Proxy secret |
 | `/setup/restart` | POST | Trigger graceful service restart | Proxy secret |
 | `/setup/calibration-state` | GET | Per-month calibration data for admin UI | Proxy secret |
@@ -591,19 +595,19 @@ weewx_clearskies_api/providers/
 ├── tides/            # coops (NOAA CO-OPS, keyless, US-only)
 ├── buoy/             # ndbc (NOAA NDBC, keyless, US-only)
 ├── wind/             # hrrr (NOAA HRRR via NOMADS, keyless, [nearshore] extra), gfs (NOAA GFS via NOMADS, keyless, [nearshore] extra — supplements HRRR for hours 48–72)
-├── nearshore/        # trushore (SWAN runner wrapper, [nearshore] extra)
+├── nearshore/        # swan (SWAN runner wrapper, [nearshore] extra)
 └── ocean/            # ofs (NOAA OFS via THREDDS/OPeNDAP), erddap_ocean (MUR SST, RTOFS, regional models via ERDDAP griddap)
 ```
 
 Each module: outbound API call → response parsing → canonical field translation → capability declaration → error handling. Keyed providers proxied server-side (keys never reach browser).
 
-Six provider domains for marine/ocean/nearshore data: `"marine"` (wave forecasts and text), `"tides"` (predictions and water levels), `"buoy"` (point observations), `"ocean"` (water temperature profiles, currents, salinity from OFS coastal models and ERDDAP global datasets), `"wind"` (HRRR + GFS forecast wind for SWAN forcing, `[nearshore]` extra), `"nearshore"` (SWAN+TruShore runner wrapper, `[nearshore]` extra). All v1 marine/ocean/wind providers are NOAA sources — free, keyless, US-only. See PROVIDER-MANUAL §14.
+Six provider domains for marine/ocean/nearshore data: `"marine"` (wave forecasts and text), `"tides"` (predictions and water levels), `"buoy"` (point observations), `"ocean"` (water temperature profiles, currents, salinity from OFS coastal models and ERDDAP global datasets), `"wind"` (HRRR + GFS forecast wind for SWAN forcing, `[nearshore]` extra), `"nearshore"` (SWAN runner wrapper, `[nearshore]` extra). All v1 marine/ocean/wind providers are NOAA sources — free, keyless, US-only. See PROVIDER-MANUAL §14.
 
 Ocean data is accessed through the `ocean_data_resolver` service (`services/ocean_data_resolver.py`) which implements a tiered fallback chain: on-premises sensor → OFS regional model → regional ERDDAP → RTOFS/MUR SST global → unavailable. Endpoints call `resolve()` instead of calling ocean providers directly. Coverage tier and OFS model assignment are computed at configuration time via `find_ofs_model()` and persisted in `api.conf`.
 
 Shared utility: `_common/nws_zones.py` — marine zone discovery (station → CWA → zone list → polygon proximity). Used by NWS marine text, NWS SRF, and the marine zone alerts extension.
 
-> **eccodes native dependency (marine feature):** The marine GRIB2 processing requires eccodes (ECMWF's GRIB processing C library). Docker images bake it in; native pip installs use `pip install weewx-clearskies-api[marine]` after installing the system library. The `[nearshore]` extra (SWAN+TruShore) also uses GRIB2 for HRRR wind data and extends the `[marine]` extra. See OPERATIONS-MANUAL §1.
+> **eccodes native dependency (marine feature):** The marine GRIB2 processing requires eccodes (ECMWF's GRIB processing C library). Docker images bake it in; native pip installs use `pip install weewx-clearskies-api[marine]` after installing the system library. The `[nearshore]` extra (SWAN) also uses GRIB2 for HRRR wind data and extends the `[marine]` extra. See OPERATIONS-MANUAL §1.
 
 ## Caching (ADR-017)
 
@@ -612,7 +616,7 @@ Shared utility: `_common/nws_zones.py` — marine zone discovery (station → CW
 | `memory` (default) | No config needed | Single worker (v0.1 default) |
 | `redis` (**active on weewx host**) | `CLEARSKIES_CACHE_URL=redis://localhost:6379/0` (set in `/etc/weewx-clearskies/secrets.env`) | Multi-worker deploys |
 
-Per-provider TTLs: forecast 30 min, alerts 5 min, AQI 15 min, radar metadata 5 min, seeing forecast 3 hours, marine forecasts (WaveWatch III) 30 min, HRRR wind 6 hr (aligned with extended cycle interval), GFS wind 6 hr, TruShore nearshore 6 hr, tide predictions 6 hr, tide observations 10 min, tide water temperature 30 min, buoy observations 60 min, NWS marine text 30 min, NWS SRF 60 min.
+Per-provider TTLs: forecast 30 min, alerts 5 min, AQI 15 min, radar metadata 5 min, seeing forecast 3 hours, marine forecasts (WaveWatch III) 30 min, HRRR wind 6 hr (aligned with extended cycle interval), GFS wind 6 hr, SWAN nearshore 6 hr, tide predictions 6 hr, tide observations 10 min, tide water temperature 30 min, buoy observations 60 min, NWS marine text 30 min, NWS SRF 60 min.
 
 ## Repo layout
 

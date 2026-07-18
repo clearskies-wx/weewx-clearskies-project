@@ -1340,9 +1340,15 @@ Surf and fishing tabs display scoring factor breakdowns as horizontal bar segmen
 - Star rating: 5 star SVG icons, filled stars use the score tier color, unfilled stars use `--muted-foreground` at 25% opacity
 - Quality label text below stars in the matching tier color
 
+### Score bar normalization rule (ADR-096)
+
+**Score bars fill relative to each factor's own maximum, not to 100.** Fill width = `(score / factorMax) * 100%`. A Wave Height score of 28/35 renders as 80% fill, not 28% fill. A Wave Organization score of 24/30 renders as 80% fill, not 24% fill. This applies to both surf and fishing score cards.
+
+**Color reflects performance within the factor's range:** green for high relative score, amber for mid, muted for low — all relative to the factor's maximum, not to 100.
+
 ### Scoring explainer modal (surf tab)
 
-The Surf Score card header contains an info button (`ph:info` Phosphor icon, 18px) that opens a modal explaining the scoring system. Pattern:
+The Surf Score card header contains an info button (`ph:info` Phosphor icon, 18px) that opens a modal explaining the scoring system (3-factor + 3-penalty structure with Wave Organization sub-factors). Pattern:
 
 - **Trigger:** `<button>` in `CardHeader` (right of `CardTitle`), `aria-label` = modal title. Minimum touch target: `minWidth: 44px; minHeight: 44px`. Color: `text-muted-foreground` / hover `text-foreground`.
 - **Modal surface:** overlay `rgba(0,0,0,0.60)` + `blur(4px)` (§8); content `.card-glass` + `blur(16px)` + `ring-1 ring-foreground/10` (§8). `max-w-lg`, `max-height: 80vh`, `overflow-y: auto`.
@@ -1362,11 +1368,12 @@ Grid notation `CxR` maps to the `Card` component's `footprint` (column span) and
 | Page | Card | `footprint` | `rowSpan` | Description |
 |---|---|---|---|---|
 | Marine landing | Location card | `wide` | — | Photo alongside wave/wind/temp data |
-| Surf | Surf Score Card (hero) | `wide` | `2` | 2x2 hero: 5-star rating + XX/100 total + quality label + conditions text + weighted scoring breakdown bars (including beach alignment penalty) |
-| Surf | Swell Card | `wide` | `2` | 2×2: Conditions at Break stat tiles (icon-left layout: Waves/Timer/Compass icons), swell component table (Type/Dir/Height/Period columns), Dominant Direction compass (1/3 right column) |
+| Surf | Surf Score Card (hero) | `wide` | `2` | 2x2 hero: XX/100 total + quality label + conditions text. Two-column scoring breakdown: Col 1 = Wave Height (35%), Wave Period (35%), Wave Organization (30%) with bars normalized to each factor's max. Col 2 = Beach Alignment, Directional Exposure, Time of Day (signed penalties/bonuses). ADR-096. |
+| Surf | Swell Card | `wide` | `2` | 2×2: 3 top-row stats (Swell Height, Breaking Face Height, Period — no Direction in top row). Swell component table (Type/Dir/Height/Period). Dominant Direction compass (sole direction display). ADR-095/096. |
 | Surf | Wind Card | `wide` | `"half"` | 2×half compact strip: wind speed, direction, quality label, gust (from MarineObservation) |
 | Surf | Current Conditions Card | `wide` | `"half"` | 2×half 5-column grid: weather icon, air temp (Thermometer, station), dewpoint (Drop icon, station), water temp (WaterThermometerIcon, marine observation), UV index (UvIndex, station) |
-| Surf | 72-Hour Forecast Card | `full` | — | HorizontalScrollNav with sticky row header column (card-glass bg, backdrop-filter). Three sections separated by `--border` dividers. **Score section:** time `<button>` + 0-100 score colored by star-tier mapping (scoreTierColor, not raw pct). **Current Conditions section:** WeatherIcon + air temp (with unit) + precip % + WindSymbol + wind quality — time-matched from `useForecast({ hours: 72 })`. **Swells section:** water temp (1 decimal + unit) + swell height area chart (smooth cubic bezier, `#3b82f6` blue fill, Y-axis 0–12 ft min auto-scale, 3 ft tick gridlines, 140px) + swell height values row (bold foreground + unit, same treatment as air temp) + dom direction + period + energy. Chart line is continuous across day boundaries. Click time column → detail panel with chips + SwellBreakdown. |
+| Surf | Beach Profile Card | `full` | — | Cross-shore transect: inline SVG with bathymetry (brown/tan), water surface, wave envelope (blue), break point markers at QB peaks. Multi-break spots show multiple markers. `role="img"` + `aria-label` + sr-only data table. ADR-097. |
+| Surf | 72-Hour Forecast Card | `full` | — | HorizontalScrollNav with sticky row header column (card-glass bg, backdrop-filter). Three sections separated by `--border` dividers. **Score section:** time `<button>` + 0-100 score colored by star-tier mapping (scoreTierColor, not raw pct). **Current Conditions section:** WeatherIcon + air temp (with unit) + precip % + WindSymbol + wind quality (wraps to second line, 34px row height) — time-matched from `useForecast({ hours: 72 })`. **Swells section:** water temp (1 decimal + unit) + swell height area chart (smooth cubic bezier, `#3b82f6` blue fill, Y-axis 0–12 ft min auto-scale, 3 ft tick gridlines, 140px) + swell height values row (bold foreground + unit, same treatment as air temp) + dom direction + period + energy. Chart line is continuous across day boundaries. Click time column → detail panel with chips + SwellBreakdown. |
 | Fishing | Fishing Score Card (hero) | `wide` | `2` | 2x2 hero: prominent fishing score + scoring breakdown bars |
 | Fishing | Current Conditions Card | `wide` | `2` | 2x2: pressure + trend, wind speed/gust/direction, water temp, air temp, tide state |
 | Fishing | Forecast Card | `full` | — | Day-labeled forecast with score, period buttons + species accordion |

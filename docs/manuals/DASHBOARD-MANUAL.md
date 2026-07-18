@@ -1126,7 +1126,7 @@ Unified conditions dashboard pattern (Windfinder/My Marine Forecast reference). 
 5. **Waves** — `Card footprint="full"`:
    - Wave stats (height, period, direction) as `MarineStatTile` tiles at top
    - 72h wave forecast chart below (`WaveForecastChart` with legend)
-   - Wave data from SWAN+TruShore model (not buoy)
+   - Wave data from SWAN model (not buoy)
    - Self-hides for harbor locations where wave data is null
 6. **Tide Forecast** — `Card footprint="full"`:
    - `TideChart` (left margin ≥40px to prevent clipping, XAxis domain starts at first data point)
@@ -1139,38 +1139,47 @@ Unified conditions dashboard pattern (Windfinder/My Marine Forecast reference). 
 
 **Removed from BoatingTab:** "Nearest Offshore Buoy" panel (F21b), "Weather at {location}" panel (duplicate of conditions), standalone wind forecast chart (wind consolidated into Conditions).
 
-### Tab content — Surfing (F22 redesign, updated Phase 5 T5.1/T5.2)
+### Tab content — Surfing (F22 redesign, updated ADR-095/096/097)
 
-Surfaces the surf scoring system (`enrichment/surf_scorer.py`). Three focused cards replace the prior monolithic hero.
+Surfaces the surf scoring system (`enrichment/surf_scorer.py`). Data sources from SWAN nearshore model (ADR-095), scoring from 3-factor weighted model (ADR-096).
 
-**Data sources:** `useSurfDetail(locationId)` (GET /surf/{id}) for scoring/wave/swell data, `useMarineDetail(locationId)` (GET /marine/{id}) for live wind speed/gust/direction and per-period wind time-matching, `useForecast({ hours: 72 })` (GET /forecast?hours=72) for hourly weather data time-matched to surf forecast periods, `useObservation()` for current conditions (air temp, dewpoint, UV, weather icon).
+**Data sources:** `useSurfDetail(locationId)` (GET /surf/{id}) for scoring/wave/swell data, `useBeachProfile(locationId)` (GET /surf/{id}/profile) for cross-shore transect, `useMarineDetail(locationId)` (GET /marine/{id}) for live wind speed/gust/direction and per-period wind time-matching, `useForecast({ hours: 72 })` (GET /forecast?hours=72) for hourly weather data time-matched to surf forecast periods, `useObservation()` for current conditions (air temp, dewpoint, UV, weather icon).
 
 **Panel order (all cards in a single `<Grid>`):**
 
 1. **Alerts** — `AlertsPanel` (with per-activity filterTypes)
 2. **Surf Score Card** — `Card footprint="wide" rowSpan={2}`:
    - `conditionsText` as subtitle
-   - Prominent NUMERIC score (qualityStars as digit, e.g., "4") + `qualityLabel` ("Poor"/"Fair"/"Good"/"Very Good"/"Epic") with color-coded badge. No star glyphs — `StarRating` component deleted entirely.
-   - Scoring breakdown bars below the score (absorbed from the former separate card): 4 weighted factors — Wave Height (35%), Wave Period (35%), Wind Quality (20%), Swell Dominance (10%). Each bar: label, score, colored fill proportional to score.
+   - Prominent NUMERIC score (qualityStars as digit, e.g., "4") + `qualityLabel` ("Poor"/"Fair"/"Good"/"Very Good"/"Epic") with color-coded badge. No star glyphs.
+   - Two-column scoring breakdown (ADR-096):
+     - Column 1: Wave Height (35%), Wave Period (35%), Wave Organization (30%). Each bar: label, score, colored fill normalized to each factor's own maximum (not to 100). Wave Height 28/35 = 80% fill.
+     - Column 2: Beach Alignment (penalty), Directional Exposure (penalty), Time of Day (bonus/penalty). Signed integers.
+   - Organization bar is a single composite score. Sub-factors (wind, swell dominance, directional spread, cross-swell) shown in the explainer modal, not on the main card.
+   - All bars + penalties sum to the displayed total.
 3. **Swell Card** — `Card footprint="wide"`:
-   - Wave height at break, period, direction as MarineStatTile stats
-   - Swell component breakdown: prefers `SurfForecast.multiSwell` (SWAN+TruShore model-processed) over raw `spectralComponents` (NDBC spectral). Falls back to spectral when multiSwell is null.
-   - Swell direction compass folded in as one element (WindCompassCard tick-ring pattern, --chart-2 color, reduced footprint ~112-128px)
+   - Top row: 3 stats (not 4) — Swell Height (HSWELL from API), Breaking Face Height (K-G result), Period. Direction removed from top row (redundant with compass below). Swell Height and Breaking Face Height show meaningfully different values (~1.1–1.3× ratio).
+   - Compass remains as the sole direction display.
+   - Swell component breakdown from SWAN SPECOUT (via `multiSwell` in API response — per-timestep spectral decomposition, not NDBC broadcast).
 4. **Wind Card** — `Card footprint="wide" rowSpan="half"`:
    - Wind speed, gust, direction (from MarineObservation via useMarineDetail), wind quality label (from SurfForecast)
 5. **Current Conditions Card** — `Card footprint="wide" rowSpan="half"`:
    - 5-column grid: weather icon (WeatherIcon), air temp (Thermometer icon, station observation), dewpoint (Drop icon, station observation), water temp (WaterThermometerIcon, marine observation), UV index (UvIndex icon, station observation)
-6. **72-Hour Surf Forecast** — `Card footprint="full"`:
+6. **Beach Profile** — `Card footprint="full"` (ADR-097):
+   - Cross-shore transect visualization. Data source: `GET /api/v1/surf/{id}/profile`.
+   - Inline SVG (not Recharts). X-axis: distance from shore (right-to-left, shore on right). Y-axis: elevation.
+   - Bathymetric profile line (brown/tan fill), water surface at tidal elevation, wave height envelope (blue fill), break point markers at QB peaks (vertical dashed, wave height label). Multi-break spots show multiple markers.
+   - A11y: `role="img"`, descriptive `aria-label`, sr-only data table with transect values.
+7. **72-Hour Surf Forecast** — `Card footprint="full"`:
    - `HorizontalScrollNav` with sticky row header column (card-glass background, labels for each row section)
    - Three sections separated by horizontal dividers:
-     - **Score:** time buttons + 0-100 score (colored by star-tier mapping via `scoreTierColor`, not raw percentage — 41/100 = amber, not green)
-     - **Current Conditions:** WeatherIcon + air temp (with unit) + precip % + WindSymbol + wind quality label — all time-matched from `useForecast({ hours: 72 })`
-     - **Swells:** water temp (1 decimal, with unit) + swell height area chart (smooth cubic bezier curve, blue fill `#3b82f6`, Y-axis 0–12 ft minimum with auto-scale, gridlines at 3 ft intervals, 140px height) + swell height values row (bold foreground, with unit, same visual treatment as air temp) + dom direction + period + energy
+     - **Score:** time buttons + 0-100 score (colored by star-tier mapping via `scoreTierColor`, not raw percentage)
+     - **Current Conditions:** WeatherIcon + air temp (with unit) + precip % + WindSymbol + wind quality label (text wraps to second line, row height 34px for long labels like "Cross-Offshore") — all time-matched from `useForecast({ hours: 72 })`
+     - **Swells:** water temp (1 decimal, with unit) + swell height area chart (smooth cubic bezier curve, blue fill `#3b82f6`, Y-axis 0–12 ft minimum with auto-scale, gridlines at 3 ft intervals, 140px height) + swell height values row (bold foreground, with unit) + dom direction + period + energy
    - Swell height chart line is continuous across day boundaries (unified Y-axis scale across all days)
    - Click any time column to expand a detail panel below with chip data and swell component breakdown
-7. **Tide Forecast** — `Card footprint="full"` with `TideChart`
+8. **Tide Forecast** — `Card footprint="full"` with `TideChart`
 
-**Removed (Phase 5):** Star rating glyphs (StarRating component deleted), standalone "Swell Components" card, standalone "Swell Direction Compass" card, rip current risk badge (lives on Beach Safety tab).
+**Removed (Phase 5 + ADR-096):** Star rating glyphs (StarRating component deleted), standalone "Swell Components" card, standalone "Swell Direction Compass" card, rip current risk badge (lives on Beach Safety tab), duplicate Direction stat in swell card top row.
 
 ### Tab content — Fishing (F23 redesign)
 
@@ -1250,7 +1259,7 @@ Alert filtering applies within each activity tab, sourced from the general alert
 | Data type | `refreshInterval` (seconds) | Source |
 |---|---|---|
 | Marine forecast (WaveWatch III) | 1800 | Provider cache TTL |
-| Nearshore surf (SWAN+TruShore) | 21600 | Extended HRRR cycle cadence (4×/day at 00/06/12/18Z) |
+| Nearshore surf (SWAN) | 21600 | Extended HRRR cycle cadence (4×/day at 00/06/12/18Z) |
 | Buoy observations (NDBC) | 3600 | Provider cache TTL |
 | Tide predictions (CO-OPS) | 21600 | Predictions don't change within tidal epoch |
 | Tide observations (CO-OPS water levels) | 600 | 6–10 min update cadence |

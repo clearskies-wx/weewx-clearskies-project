@@ -120,7 +120,11 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 
 ## Proposed
 
-(none)
+| ADR | Title | Proposed |
+|---|---|---|
+| [ADR-095](ADR-095-swan-model-corrections.md) | SWAN model corrections — cross-shore transect, WLEVEL, CURRENT, OBSTACLE | 2026-07-18 |
+| [ADR-096](ADR-096-scoring-restructure.md) | Surf scoring restructure — Wave Organization composite, SWAN-only data, TruShore branding removal | 2026-07-18 |
+| [ADR-097](ADR-097-beach-profile-endpoint.md) | Beach profile endpoint — cross-shore transect visualization | 2026-07-18 |
 
 ## Accepted — pending manual consolidation
 
