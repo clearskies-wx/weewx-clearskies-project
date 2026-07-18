@@ -1,7 +1,8 @@
 # SWAN Model Corrections & Scoring Restructure Plan
 
-**Status:** PROPOSED
+**Status:** IN PROGRESS (Phases 0–4 complete, Phases 5–7 pending)
 **Created:** 2026-07-18
+**Last updated:** 2026-07-18 (session 1 closeout)
 **Origin:** Post-deployment review of SWAN+TruShore implementation (2026-07-17). Production testing revealed multiple issues: NDBC spectral data overriding SWAN values in the scorer, output point placed in the surf zone (4.3m depth) instead of at ~10m, missing SWAN inputs (water levels, currents), TruShore branding overstating proprietary contribution, and scoring display bugs.
 **Companion:** [SWAN-TRUSHORE-PLAN.md](SWAN-TRUSHORE-PLAN.md) — original implementation plan (completed). [SWAN-TRUSHORE-RESEARCH-BRIEF.md](briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md) — technical research. [WAVE-BREAKING-CONVERSION-BRIEF.md](briefs/WAVE-BREAKING-CONVERSION-BRIEF.md) — breaker height research.
 
@@ -48,7 +49,7 @@ Six categories of issues identified during production testing of the SWAN implem
 | `docs/manuals/API-MANUAL.md` §17–18 | Surf endpoint contract, wave_transform supplements, scorer factors | All phases |
 | `rules/clearskies-process.md` | Agent rules, git restrictions, deploy scripts, verification mandate | All phases |
 
-**SWAN documentation is mandatory reading for model work.** Any agent working on SWAN inputs (Phase 2: WLEVEL, CURRENT, OBSTACLE, TRIAD, SETUP) or SWAN outputs (Phase 3: CURVE transect, HSWELL, QB, DSPR, SPECOUT) MUST read the relevant sections of `docs/reference/swan-user-manual.pdf` and `docs/reference/swan-technical-manual.pdf` BEFORE writing code. The agent's reading list in the brief must cite the specific SWAN manual sections (e.g., "SWAN user manual §4.5.2 INPGRID WLEVEL" or "SWAN user manual §4.6.1 CURVE"). Agents must not guess at SWAN command syntax or output format — the manual is the authority. The PDFs are local project files, not web resources.
+**SWAN documentation is mandatory reading for model work.** Agents working on SWAN inputs or outputs MUST read `docs/reference/swan-commands-extract.md` — a distilled reference of SWAN command syntax, output quantity names, and file formats. **Do NOT give agents the full 154-page SWAN PDF** (`docs/reference/swan-user-manual.pdf`) — it exceeds Sonnet's 200K context window and causes agents to stall. The extract contains all command names, parameter formats, and output quantities needed for implementation. The full PDFs remain as coordinator reference for resolving ambiguities.
 
 **Git restrictions (mandatory in every agent prompt):**
 
@@ -68,7 +69,10 @@ Six categories of issues identified during production testing of the SWAN implem
 
 ---
 
-## Phase 0 — ADR & Documentation Updates
+## Phase 0 — ADR & Documentation Updates ✓ COMPLETE
+
+**Completed:** 2026-07-18 session 1. Commit: 10d243f (meta repo).
+**QC Gate 0:** Auditor found 3 low findings, all remediated (F1: ADR-097 envelope note, F2: ADR-096 amends annotation, F3: ADR-093/094 archival).
 
 Before any code is written, the governing documents must describe the architecture we are building toward. This gives dev agents a correct reading list and prevents them from implementing against stale contracts.
 
@@ -197,7 +201,10 @@ Before any code is written, the governing documents must describe the architectu
 
 ---
 
-## Phase 1 — Branding: TruShore → SWAN
+## Phase 1 — Branding: TruShore → SWAN ✓ COMPLETE
+
+**Completed:** 2026-07-18 session 1. Commits: 0685121 (API), 61e8ac5 (dashboard), 10d243f (meta).
+**QC Gate 1:** Verified in production — `nearshoreModel: "swan"`, `source: "swan+ndbc+coops+nws_srf"`. Zero trushore in active code/docs. Phase 1 QC was combined with Phase 0 auditor run.
 
 Remove TruShore branding everywhere. The nearshore model is SWAN. The product is Clear Skies. The surf scoring system is the Surf Score. No proprietary physics branding.
 
@@ -265,7 +272,10 @@ Remove TruShore branding everywhere. The nearshore model is SWAN. The product is
 
 ---
 
-## Phase 2 — SWAN Model Input Corrections
+## Phase 2 — SWAN Model Input Corrections ✓ COMPLETE
+
+**Completed:** 2026-07-18 session 1. Commit: 4ec7860 (API). Deployed.
+**QC Gate 2:** Auditor found 3 findings — F1 HIGH (OBSTACLE DAM missing DANGremond/GODA keywords, remediated), F2 MEDIUM (OFS gridded fetch, implemented via fetch_surface_currents()), F3 LOW (docstring, fixed). All remediated before commit.
 
 Add the missing inputs the SWAN manual documents as important for nearshore accuracy.
 
@@ -366,7 +376,10 @@ Add the missing inputs the SWAN manual documents as important for nearshore accu
 
 ---
 
-## Phase 3 — Cross-Shore Transect & Output Expansion
+## Phase 3 — Cross-Shore Transect & Output Expansion ✓ COMPLETE
+
+**Completed:** 2026-07-18 session 1. Commits: ea47ed6 (main impl), cdcc38d (QB fix), 5e26e41 (doc sync). All deployed.
+**QC Gate 3:** Auditor found 1 HIGH finding — QB peak detection and transect storage not implemented. Remediated in cdcc38d before commit. New file: `services/swan_spectral.py` (488 lines — SPECOUT parser + spectral decomposition).
 
 Replace the single pin-drop output point with a cross-shore transect. Add HSWELL, QB, DSPR, SPECOUT to SWAN output.
 
@@ -491,7 +504,10 @@ Replace the single pin-drop output point with a cross-shore transect. Add HSWELL
 
 ---
 
-## Phase 4 — Scoring Restructure
+## Phase 4 — Scoring Restructure ✓ COMPLETE
+
+**Completed:** 2026-07-18 session 1. Commit: 66c9634 (API), fccfb2f (doc sync). Pushed, not yet deployed.
+**QC Gate 4:** Not yet run (auditor was not dispatched before session end — must be run at start of next session before Phase 5 begins). Test divergence: 2 tests calling removed `_effective_swell()` were replaced with `_directional_spread_score()` and `_cross_swell_score()` tests.
 
 Restructure the 4-factor weighted scoring into a 3-factor model with a composite "Wave Organization" factor. Fix bar display normalization. Surface all penalty factors.
 
@@ -557,7 +573,7 @@ Restructure the 4-factor weighted scoring into a 3-factor model with a composite
 
 ---
 
-## Phase 5 — API: Beach Profile Endpoint
+## Phase 5 — API: Beach Profile Endpoint ⏳ PENDING
 
 New endpoint for the cross-shore transect visualization.
 
@@ -645,7 +661,7 @@ New endpoint for the cross-shore transect visualization.
 
 ---
 
-## Phase 6 — Dashboard Changes
+## Phase 6 — Dashboard Changes ⏳ PENDING
 
 Update the surf tab to display the corrected data, restructured scoring, and beach profile.
 
@@ -769,7 +785,7 @@ Update the surf tab to display the corrected data, restructured scoring, and bea
 
 ---
 
-## Phase 7 — Documentation & Cleanup
+## Phase 7 — Documentation & Cleanup ⏳ PENDING
 
 ### T7.1 — Update governing documents
 
