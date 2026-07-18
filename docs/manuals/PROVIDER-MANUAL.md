@@ -1817,7 +1817,16 @@ Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Fo
 
 **Cache:** Key = `(provider_id, spot_domain_id, hrrr_cycle_time)`. TTL = 21600s (6 hours) — matches the extended HRRR cycle interval (4×/day at 00/06/12/18Z). On SWAN run failure: log ERROR, retain last-good cache indefinitely. Do NOT invalidate cache on failure — stale TruShore data is always preferred to no data. **Run marker:** stored only when `spots_cached > 0` — prevents a failed SWAN run (exit 0 but no valid output) from blocking future attempts for the same HRRR cycle.
 
-**Schedule:** Runs 4× daily on extended HRRR cycles (00/06/12/18Z) via the cache warmer, triggered after both HRRR and GFS wind data are warm. Runs in a background thread — not in the request path. Both grid levels (outer + inner) must complete within 15 minutes total. Expected runtime: 2–10 minutes for both grids combined on the weewx host. Peak memory: ≤300 MB (both grids run sequentially, not simultaneously).
+**Two-tier schedule:**
+
+| Tier | Trigger | Grids | Mode | Forecast span | Runtime | Interval |
+|---|---|---|---|---|---|---|
+| Full run | Extended HRRR cycle (00/06/12/18Z) + GFS + WW3 | Outer + inner | Nonstationary (72h time-stepping) | 72 hours | ~7–12 min | Every 6 hours |
+| Quick update | Any HRRR cycle (hourly) | Inner only | Stationary (single snapshot, no time-stepping) | 1 timestep ("now") | <1 min | Every hour |
+
+**Full runs** produce the 72-hour forecast. Both grid levels must complete within 15 minutes total. Peak memory: ≤300 MB (both grids run sequentially, not simultaneously).
+
+**Quick updates** run a stationary SWAN computation on the inner nest only with the latest HRRR wind, reusing the outer grid's `nest_boundary.dat` from the last full run. Per SWAN user manual §4.7: "For small domains (< 100 km), a stationary computation is recommended." The inner nest is ~20km. The stationary result is merged into the existing forecast cache (replaces the entry closest to the snapshot time). Skipped for 30 minutes after a full run completes (no overlap). Quick updates refresh nearshore wind effects (sea breeze, wind chop, wind quality scoring) hourly; the deep-water swell propagation stays correct from the last full run.
 
 **Working directory:** SWAN runs in `/var/run/weewx-clearskies/swan/` (fixed path, not tempfile). Subdirectories `outer/` and `inner/` are cleaned at the start of each run. Hotstart files persist one level up. The fixed path is visible from SSH (unlike `tempfile.mkdtemp` which was hidden by systemd's `PrivateTmp=yes`) and survives service restarts.
 

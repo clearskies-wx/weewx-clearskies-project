@@ -2354,7 +2354,7 @@ SWAN output (Hsig at output point)
 
 **SWAN runner:** `services/swan_runner.py` — executes two SWAN runs per cycle (outer grid + inner nest). Writes input files (computational grid, wind field, boundary spectra, bathymetry, output points), spawns SWAN subprocess, parses TABLE output. Output: `MarineForecastPoint` per surf spot per timestep across 72 forecast hours. Working directory: `/var/run/weewx-clearskies/swan/` (fixed path, not tempfile). **Hotstart:** each run writes a hotstart file after `COMPUTE`; the next run reads it via `INIT HOTSTART` so t=0 immediately has the real wave field from the previous run (no cold-start spin-up). Hotstart files persist at `{outer,inner}_hotstart.dat` in the SWAN workdir.
 
-**Schedule:** Runs 4× daily on extended HRRR cycles (00/06/12/18Z), triggered after both HRRR and GFS wind data are warm. Not in the request path. Cache TTL = 6 hours (matches extended cycle interval). On failure, last-good cache retained indefinitely — stale TruShore data is always preferred to no data.
+**Two-tier schedule:** Full runs 4× daily on extended HRRR cycles (00/06/12/18Z) — outer + inner grids, 72-hour nonstationary forecast, ~7–12 min runtime. Hourly quick updates between full runs — stationary inner nest only with latest HRRR wind, <1 min runtime, single-snapshot merged into the existing forecast cache. Quick updates keep the "current conditions" entry fresh (< 1 hour old) without re-running the expensive outer grid. Not in the request path. Cache TTL = 6 hours (matches extended cycle interval). On failure, last-good cache retained indefinitely — stale TruShore data is always preferred to no data.
 
 **Four height fields in every `SurfForecast` entry:**
 
