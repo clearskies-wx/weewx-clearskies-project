@@ -418,21 +418,172 @@ Update governing documents to reflect all changes (expanded from original Phase 
 
 ---
 
+---
+
+## Phase 19: NCEI Regional DEM Index
+
+Build the static index of all 262 NCEI regional coastal DEMs so the bathymetry resolver can find the best source for any US coastal location.
+
+### 19a. Scrape bounding boxes from OPeNDAP metadata
+
+For each of the 262 NetCDF files at `https://www.ngdc.noaa.gov/thredds/catalog/regional/catalog.html`, query the OPeNDAP metadata endpoint to extract:
+- Bounding box (lat_min, lat_max, lon_min, lon_max)
+- Resolution (cell size in arc-seconds or meters)
+- Datum (NAVD88, MHW, MHHW — needed for vertical alignment)
+- Filename
+
+Save as a static JSON index file shipped with the API (similar to `gsfm_shelf_boundary.json`).
+
+### 19b. Implement `find_best_dem(bbox)` resolver
+
+Given a grid bbox, search the index for regional DEMs that fully cover it. Return the highest-resolution match. If no regional DEM covers the bbox, return None (caller falls back to `DEM_all`).
+
+**Files:**
+- New: `weewx_clearskies_api/data/ncei_regional_dem_index.json`
+- New: `weewx_clearskies_api/services/bathymetry_resolver.py`
+
+---
+
+## Phase 20: OPeNDAP Bathymetry Fetcher
+
+Replace the `DEM_all/ImageServer/getSamples` query with OPeNDAP subset queries against the NCEI regional DEMs.
+
+### 20a. OPeNDAP NetCDF subset query
+
+Implement a function that, given a THREDDS filename and a lat/lon bbox, queries the OPeNDAP endpoint to extract a depth grid subset. Return the same dict format (`lat_first, lon_first, ni, nj, depths`) that `cudem_to_swan_bottom()` expects.
+
+OPeNDAP endpoint pattern: `https://www.ngdc.noaa.gov/thredds/dodsC/regional/{filename}`
+
+Use `xarray` + OPeNDAP (xarray can open remote NetCDF via OPeNDAP natively — already a dependency via the `[marine]` extra).
+
+### 20b. Wire into per-level bathymetry download
+
+Modify `download_bathymetry_for_level()` in `swan.py`:
+1. Call `find_best_dem()` for the level's bbox
+2. If found → fetch via OPeNDAP
+3. If not found → fall back to existing `DEM_all/getSamples` query
+4. Cache result with same 180-day TTL
+
+**Files:**
+- Modify: `weewx_clearskies_api/providers/nearshore/swan.py` (per-level download)
+- New or modify: `weewx_clearskies_api/services/bathymetry_resolver.py` (OPeNDAP fetch)
+
+---
+
+## Phase 21: USGS Great Lakes DEM Integration
+
+Integrate the USGS Great Lakes seamless topobathymetric DEMs (Rohweder 2025) for operators with spots on the Great Lakes.
+
+### 21a. Download and tile Great Lakes DEMs
+
+The USGS GeoTIFF files are large (150 MB - 1.4 GB per lake). Strategy:
+- At wizard setup time, if the operator's spot is on a Great Lake, download the relevant lake GeoTIFF from ScienceBase
+- Cache locally at `/etc/weewx-clearskies/bathymetry/great_lakes/{lake}.tif`
+- Extract the bbox subset needed for SWAN grids using `rasterio` or GDAL
+
+### 21b. Wire into bathymetry resolver
+
+The resolver checks:
+1. Is the spot on a Great Lake? (simple lat/lon bbox check per lake)
+2. If yes → use the cached GeoTIFF, extract subset for the grid bbox
+3. Return in the same dict format as the NCEI/OPeNDAP path
+
+**Files:**
+- Modify: `weewx_clearskies_api/services/bathymetry_resolver.py`
+- Modify: `pyproject.toml` (add `rasterio` or equivalent to `[nearshore]` extra if needed)
+
+**ScienceBase download URLs (per lake):**
+
+| Lake | ScienceBase ID |
+|------|---------------|
+| Michigan | `669041b8d34e341cbf15576c` |
+| Erie | `66903b2dd34e7f6636ec211b` |
+| Huron | `66904150d34e341cbf15576a` |
+| Ontario | `669041edd34e341cbf15576e` |
+| Superior | `6690427ad34e341cbf155772` |
+| St. Clair | `66904251d34e341cbf155770` |
+
+---
+
+## Phase 22: Wizard/Admin Bathymetry Coverage Indicator
+
+Show the operator the bathymetry data quality for their spot locations in the wizard marine step and admin marine page.
+
+### 22a. API coverage endpoint update
+
+Extend the existing `/setup/marine/coverage` endpoint to include a `bathymetry` section reporting:
+- Data source name (e.g., "NCEI Orange County Regional DEM", "USGS Lake Michigan", "NOAA Coastal Relief Model")
+- Resolution (~10m, ~30m, ~90m, etc.)
+- Data vintage (year of source surveys)
+- Quality tier: "high" (regional DEM / Great Lakes), "degraded" (CRM fallback)
+- Warning text when degraded: "Using lower-resolution bathymetry — surf zone features like sandbars and break points may not be resolved"
+
+### 22b. Wizard/admin UI display
+
+In the wizard marine step and admin marine page:
+- Show the bathymetry data source and resolution for each spot
+- Display warning banner when quality is "degraded"
+- No operator action required — informational only
+
+**Files:**
+- Modify: `weewx_clearskies_api/endpoints/setup.py` (coverage endpoint)
+- Modify: `weewx-clearskies-stack` wizard/admin templates
+
+---
+
+## Phase 23: SWAN INPUT Research & Cross-Section Fix
+
+Before any further SWAN INPUT file modifications, complete the research that should have been done before Phase 14.
+
+### 23a. SWAN manual deep read
+
+Read the full SWAN User Manual sections on:
+- BOUNDNEST1 syntax and constraints (§4.5.5)
+- NGRID + NESTOUT interaction (§3.5, §4.7)
+- Wet/dry cell determination from BOTTOM values
+- What depth value makes a cell dry vs wet
+- CURVE output behavior at dry points
+- Nesting ratio constraints and best practices
+
+Save findings to `docs/reference/swan-nesting-reference.md` as a permanent project resource.
+
+### 23b. Fix cross-section transect placement
+
+Using the SWAN manual findings from 23a, fix `compute_spot_transect()` so the CURVE starts in wet cells:
+- Use a dedicated coastline data source (OSM coastline or NOAA shoreline) for the land/water boundary — NOT the bathymetry grid
+- Start the CURVE at the first point guaranteed wet in the SWAN BOTTOM grid
+- Verify by checking TABLE output has >80% valid (non-exception) points
+
+### 23c. Regression verification
+
+After any SWAN INPUT changes:
+1. SWAN exits 0
+2. TABLE output has Hs > 0 at scoring depth
+3. QB > 0 at at least one transect point
+4. Surf forecast card shows non-zero swell height matching buoy observations within 50%
+5. Beach profile card shows a cross-section with depth decreasing toward shore
+
+**This is a HARD GATE. Do not deploy without all 5 passing.**
+
+---
+
 ## Execution Order
 
 ```
-Phases 1-8          ← COMPLETE (session 1)
-Phase 12 (Sundry)   ← independent, ship immediately
-Phase 9 (Units)     ← independent, can run in parallel with 13-14
-Phase 13 (GSFM)    ← prerequisite for Phase 14
-Phase 14 (Nesting) ← the big one, depends on 13
-Phase 15 (Alignment) ← depends on 14 (needs domain sizing to exist)
-Phase 16 (Calculator) ← depends on 14 (needs sizing math)
-Phase 17 (Docs)     ← after all code phases complete
-Phase 18 (Audit)    ← final gate
+Phases 1-8          ← COMPLETE (sessions 1-2)
+Phases 9, 12        ← COMPLETE (session 3)
+Phases 13-16        ← COMPLETE (session 3) — code landed, domain sizing bug fixed
+Phase 17 (Docs)     ← PARTIAL (ARCHITECTURE.md done, manuals pending)
+Phase 18 (Audit)    ← COMPLETE (session 3) — 6 findings, 5 remediated
+
+Phase 19 (DEM Index)     ← prerequisite for Phase 20
+Phase 20 (OPeNDAP)       ← prerequisite for useful Level 2/3 grids
+Phase 21 (Great Lakes)   ← independent of 19-20 (different data path)
+Phase 22 (Coverage UI)   ← depends on 19 (needs index to report coverage)
+Phase 23 (Cross-section) ← independent, but should follow 20 (needs real bathy to test against)
 ```
 
-Phase 12 and Phase 9 are independent — ship anytime.
-Phase 13 enables Phase 14 (must have shelf data before domain sizing works).
-Phases 15-16 depend on Phase 14's domain sizing algorithm.
-Phases 17-18 are the closeout gate.
+Phases 19-20 are the critical path — without the OPeNDAP fetcher, the 3-level system runs on garbage CRM data.
+Phase 21 can be done in parallel (different data source, different geography).
+Phase 22 is UI polish — can follow whenever the resolver exists.
+Phase 23 fixes the cross-section and must include SWAN manual research FIRST.
