@@ -912,6 +912,69 @@ Step-by-step wizard flow for adding a marine location:
 8. **Beach safety configuration** (if beach safety selected): Operator optionally adds external links (water quality, lifeguard reports, wildlife alerts).
 9. **Review and save:** System presents a summary of the configured location with all discovered stations, zones, and settings. Operator confirms. Wizard sends the accumulated `marine` block on the next `POST /setup/apply` call. The API validates all locations (coordinates, activity/bottom-type/topographic-feature/target-category enums, NDBC/CO-OPS station-id and NWS marine-zone-id formats), and writes the result to `api.conf [marine]` using the nested-subsection shape shown above (`[[[[surf]]]]`/`[[[[fishing]]]]`/`[[[[beach_safety]]]]` inside each location's own section — not top-level `[[surf_spots]]`/`[[fishing_spots]]` sections). When the `[nearshore]` pip extra is installed, the wizard also collects SWAN nested grid configuration (outer grid resolution, inner nest resolution, inner nest bounding box, deployment mode) — see §4 SWAN wizard step.
 
+### SWAN configuration
+
+The `[swan]` section in `api.conf` controls nearshore wave-model behavior. It is only relevant when the `[nearshore]` pip extra is installed. These keys are collected by the wizard's SWAN nested grid step (referenced in "Marine location setup procedure" above) and are not normally edited by hand.
+
+#### SWAN configuration keys (`[swan]` in `api.conf`)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `convergence_retry` | bool | `false` | Controls behavior on SWAN numerical divergence — see "SWAN convergence monitoring" below |
+
+#### SWAN convergence monitoring
+
+After every SWAN run, a convergence health check runs. If it fails, the run's hotstart is NOT saved and the API continues serving the last-good forecast, preventing a single bad run from infecting all subsequent runs.
+
+**Config key:** `convergence_retry` in `[swan]` section of `api.conf`
+
+**Mode: `convergence_retry = false` (default, recommended during testing)**
+
+When a SWAN run fails the convergence health check:
+- ERROR log emitted with level, check type, and numeric metrics (greppable pattern: `SWAN convergence FAILED`)
+- No retry attempted
+- Failed working directory (`/var/run/weewx-clearskies/swan/level{N}/`) preserved untouched for debugging — contains INPUT, PRINT, TABLE, and hotstart files from the failed run
+- Hotstart NOT saved — prevents NaN propagation to next cycle
+- Forecast cache NOT updated — API serves the previous good run with its true timestamp (staleness visible on the card)
+- The failed workdir is overwritten only by the next scheduled SWAN cycle
+
+**Mode: `convergence_retry = true` (production, enable after verified stable)**
+
+When a SWAN run fails:
+- Evidence quarantined to `/var/run/weewx-clearskies/swan/failed/{cycle}_{level}/` (retains last 5 quarantines, older pruned)
+- Degradation ladder fires, one rung per retry:
+  - Rung 1: Rerun with DIFFRACTION smoothing doubled (smnum ×2)
+  - Rung 2: Rerun with DIFFRACTION removed for this cycle only
+  - Rung 3: Abandon cycle — no hotstart save, no cache update, API serves last-good
+- Each rung logged at ERROR with the specific rung and metrics
+- A successful degraded run (rung > 0) IS cached and served — degraded data beats stale data — but a WARNING log notes the degradation
+
+**Health checks performed (all three must pass):**
+
+1. **PRINT scan:** Any `******` in accuracy lines (overflow/divergence marker) → FAIL
+2. **NaN scan:** Any NaN values in the run's hotstart or TABLE output → FAIL
+3. **Valid-point fraction:** Percentage of timesteps where ≥50% of wet transect points have non-exception values must be ≥80% → otherwise FAIL
+
+**Metrics exposed:**
+- `swan_convergence_failures_total{level, check}` — Prometheus counter, incremented per failure
+- `swan_last_run_valid_fraction{level}` — Prometheus gauge, most recent valid-point fraction
+
+**Purging a contaminated hotstart:**
+
+If a diverged run's hotstart was saved (before this gate was implemented), manually delete it:
+
+```bash
+rm -f /var/run/weewx-clearskies/swan/level3_0_hotstart.dat
+```
+
+The next full run will cold-start (first 3-6 hours show reduced accuracy, then the hotstart chain recovers).
+
+**Hotstart isolation:**
+
+Stationary quick updates (hourly) never save hotstart files. Only full nonstationary runs (every 6 hours) write `level{N}_hotstart.dat`. This prevents a diverged quick-update snapshot from contaminating the nonstationary warm-start chain.
+
+---
+
 ### §4.1 Config Registry
 
 The config wizard and admin UI share a unified config registry: a set of Python frozen dataclasses registered at import time that drive field rendering, validation, and persistence in both UIs. An implementing agent reads this section — not ADR-077 (archived) — to build the registry.

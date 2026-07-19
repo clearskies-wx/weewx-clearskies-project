@@ -2366,9 +2366,9 @@ SWAN cross-shore CURVE transect output
 
 **SWAN runner:** `services/swan_runner.py` — executes two SWAN runs per cycle (outer grid + inner nest). Writes input files (computational grid, wind field, boundary spectra, bathymetry, WLEVEL, CURRENT, OBSTACLE, output CURVE transects), spawns SWAN subprocess, parses TABLE output and SPECOUT files. Output: transect data per surf spot per timestep across 72 forecast hours. Working directory: `/var/run/weewx-clearskies/swan/` (fixed path, not tempfile). **Hotstart:** each run writes a hotstart file after `COMPUTE`; the next run reads it via `INIT HOTSTART` so t=0 immediately has the real wave field from the previous run (no cold-start spin-up). Hotstart files persist at `{outer,inner}_hotstart.dat` in the SWAN workdir.
 
-**Cross-shore CURVE transect output (ADR-095).** Each surf spot gets a CURVE transect perpendicular to the beach, from ~15m depth to ~1m depth, ~50m spacing (10–20 output points). Direction derived from `beach_facing_degrees + 180°`. Replaces the single-point OUTPUT POINTS command. TABLE output at each transect point: `HSIGN HSWELL DIR TM01 DEPTH QB DISSURF SETUP DSPR XP YP`. SPECOUT (2D directional-frequency spectrum) at the ~10m depth point only (one per spot). Break points identified by QB peaks along the transect.
+**Cross-shore CURVE transect output (ADR-095).** Each surf spot gets a CURVE transect perpendicular to the beach, from ~15m depth to ~1m depth, ~50m spacing (10–20 output points). Direction derived from `beach_facing_degrees + 180°`. Replaces the single-point OUTPUT POINTS command. TABLE output at each transect point: `HSIGN HSWELL DIR TM01 DEPTH QB DISSURF DSPR XP YP` (SETUP removed — SWAN SETUP command disabled in parallel OpenMP runs; `setup` field returns `null` in API responses). SPECOUT (2D directional-frequency spectrum) at the ~10m depth point only (one per spot). Break points identified by QB peaks along the transect.
 
-**SWAN physics enabled (ADR-095).** TRIAD (Eldeberky 1996 defaults) for shallow-water triad wave-wave interactions. SETUP for wave-induced water level computation. Both add negligible compute cost. SETUP values stored for future beach safety use (Q4 — deferred).
+**SWAN physics enabled (ADR-095).** TRIAD (Eldeberky 1996 defaults) for shallow-water triad wave-wave interactions — enabled at all levels. SETUP removed (unsupported in parallel OpenMP runs; nest boundary condition structurally wrong). Setup effect is delivered via WLEVEL input (tide + future analytic estimate). Per-level DIFFRACTION: stabilized (`DIFFRACTION 1 0.2 27`) at Level 3 only.
 
 **Two-tier schedule:** Full runs 4× daily on extended HRRR cycles (00/06/12/18Z) — outer + inner grids, 72-hour nonstationary forecast, ~7–12 min runtime. Hourly quick updates between full runs — stationary inner nest only with latest HRRR wind, <1 min runtime, single-snapshot merged into the existing forecast cache. Quick updates keep the "current conditions" entry fresh (< 1 hour old) without re-running the expensive outer grid. Not in the request path. Cache TTL = 6 hours (matches extended cycle interval). On failure, last-good cache retained indefinitely — stale SWAN data is always preferred to no data.
 
@@ -2412,7 +2412,7 @@ Full research at `docs/planning/briefs/WAVE-BREAKING-CONVERSION-BRIEF.md`.
 | `breakerFormula` | `"komar_gaughan"` or `"caldwell"` | Which formula was used for this spot |
 | `surfHeightDisplay` | `"face"` or `"hawaiian"` | Operator's configured display preference |
 | `directionalSpread` | float (degrees) | DSPR from SWAN TABLE at ~10m depth (ADR-095). Typically 10–40° for nearshore conditions |
-| `setup` | float (meters) | Wave-induced water level rise from SWAN SETUP at shore (ADR-095). For future beach safety use |
+| `setup` | float \| null | Wave-induced setup. Currently `null` — SETUP command removed (unsupported in parallel runs). Future: analytic estimate via WLEVEL injection. |
 
 **Wind source for surf quality scoring (ADR-094, updated ADR-096):**
 
@@ -2773,7 +2773,7 @@ The NWS SRF text product's `waterTemp` field (a manually-entered forecaster valu
 | `forecast[].direction` | float | Swell direction in degrees |
 | `forecast[].multiSwell` | list[object] | Spectral breakdown from SWAN SPECOUT per timestep (not NDBC — ADR-095/096) |
 | `forecast[].directionalSpread` | float | DSPR at ~10m depth in degrees (ADR-095) |
-| `forecast[].setup` | float \| null | SETUP — wave-induced water level rise at shore (meters, ADR-095) |
+| `forecast[].setup` | float \| null | Wave-induced setup. Currently always `null` — SWAN SETUP command removed. Field retained for API contract stability. |
 | `forecast[].breakPoints` | list[object] \| null | QB peak locations — break points along the transect (T3.4) |
 | `forecast[].scoring` | object | 3-factor + 3-penalty scoring breakdown (ADR-096) |
 | `nearshoreModel` | str | `"swan"` (ADR-096) |

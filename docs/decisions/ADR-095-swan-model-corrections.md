@@ -37,7 +37,7 @@ Four corrections to the SWAN integration:
 
 **Decision 3: Native OBSTACLE replaces Supplement 2.** Coastal structures modeled via SWAN's OBSTACLE command: pier → TRANSM, breakwater → DAM DANGremond, jetty → DAM GODA, seawall → REFL. Structure coordinates from the wizard's Overpass API discovery. Supplement 2 removed from `wave_transform.apply_supplements()`. Supplements 1, 3, 4 retained.
 
-**Decision 4: TRIAD and SETUP enabled.** TRIAD (Eldeberky 1996 defaults) for shallow-water triad interactions. SETUP for wave-induced water level computation. SETUP values stored for future beach safety use.
+**Decision 4: TRIAD and SETUP enabled.** TRIAD (Eldeberky 1996 defaults) for shallow-water triad interactions. SETUP for wave-induced water level computation. SETUP values stored for future beach safety use. **Amendment (2026-07-19):** SETUP subsequently removed in SWAN-L3-STABILITY-PLAN — unsupported in parallel OpenMP runs (finding A1) and nest boundary condition structurally wrong (finding A2). Setup effect now delivered via WLEVEL input. See PROVIDER-MANUAL §14.15.
 
 ## Consequences
 

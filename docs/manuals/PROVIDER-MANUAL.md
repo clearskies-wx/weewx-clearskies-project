@@ -1803,25 +1803,28 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 
 **SWAN runner** (`services/swan_runner.py`):
 
-- `SWANRunner.__init__`: takes config (outer grid bbox, inner nest bbox, surf spot coordinates, bathymetry data, SWAN binary path)
-- `run(hrrr_wind_field, gfs_wind_field, ww3_boundary, cudem_bathymetry, tide_predictions, ofs_currents)`: orchestrates the full nested SWAN run (outer + inner), returns transect data per spot keyed by spot_id (ADR-095)
-- `_run_outer_grid(tmpdir, blended_wind, ww3_boundary, cudem_bathymetry, wlevel, current)`: runs outer grid SWAN with WLEVEL/CURRENT inputs, writes `NESTOUT` boundary files for the inner nest
-- `_run_inner_nest(tmpdir, blended_wind, cudem_bathymetry, wlevel, current, obstacles)`: runs inner nest SWAN with WLEVEL/CURRENT/OBSTACLE inputs, outputs CURVE transect TABLE and SPECOUT at ~10m depth points
+- `SWANRunner.__init__`: takes config (per-level grid bboxes, surf spot coordinates, bathymetry data, SWAN binary path)
+- `run(hrrr_wind_field, gfs_wind_field, ww3_boundary, cudem_bathymetry, tide_predictions, ofs_currents)`: orchestrates the full nested SWAN run (L1 → L2 → L3), returns transect data per spot keyed by spot_id (ADR-095)
+- `_run_level1(tmpdir, blended_wind, ww3_boundary, cudem_bathymetry, wlevel, current)`: runs Level 1 (1 km) SWAN with WLEVEL/CURRENT inputs, writes `NESTOUT` boundary files for Level 2
+- `_run_level2(tmpdir, blended_wind, cudem_bathymetry, wlevel, current)`: runs Level 2 (100 m) SWAN with WLEVEL/CURRENT inputs, writes `NESTOUT` boundary files for Level 3
+- `_run_level3(tmpdir, blended_wind, cudem_bathymetry, wlevel, current, obstacles)`: runs Level 3 (10 m) SWAN with WLEVEL/CURRENT/OBSTACLE inputs, outputs CURVE transect TABLE and SPECOUT at ~10m depth points
 - `_stitch_wind(hrrr_wind_field, gfs_wind_field)`: blends HRRR (hours 0–48) and GFS (hours 48–72) into a single continuous 72-hour wind input
 - `_write_input_files(tmpdir, wind_field, boundary, bathymetry, grid_level)`: writes SWAN INPUT, BOTTOM.txt, WIND.txt, BOUND_SPEC.txt for a given grid level; returns grid_info dict
 - `_spawn_swan(tmpdir)`: subprocess `swan < INPUT`, captures stdout/stderr, raises `SWANRunError` on non-zero exit or severe errors in Errfile
-- `_save_hotstart(run_dir, grid_level)`: copies hotstart file from run dir to persistent parent dir for next cycle
-- `_parse_output(tmpdir, grid_info)`: reads SWAN TABLE output (HEAD format), discovers column indices from header line. Extracts HSIGN, HSWELL, DIR, TM01, DEPTH, QB, DISSURF, SETUP, DSPR at each transect point. Matches rows to spots by (Xp, Yp) coordinates. Also parses SPECOUT files at ~10m depth points for spectral decomposition (ADR-095)
+- `_check_convergence(tmpdir, grid_level)`: health checks after each SWAN run — PRINT scan for `******`, NaN scan in hotstart/TABLE output, and valid-point fraction check; raises `SWANConvergenceError` on failure (see convergence gate subsection below)
+- `_save_hotstart(run_dir, grid_level)`: copies hotstart file from run dir to persistent parent dir for next cycle; only called for nonstationary runs (see hotstart isolation subsection below)
+- `_parse_output(tmpdir, grid_info)`: reads SWAN TABLE output (HEAD format), discovers column indices from header line. Extracts HSIGN, HSWELL, DIR, TM01, DEPTH, QB, DISSURF, DSPR at each transect point. Matches rows to spots by (Xp, Yp) coordinates. Also parses SPECOUT files at ~10m depth points for spectral decomposition (ADR-095)
 
-**Nested grid architecture:** Two sequential SWAN runs per cycle. No operational nearshore system runs fine resolution over the full domain — all use nested grids.
+**Nested grid architecture:** Three sequential SWAN runs per cycle (L1 → L2 → L3). No operational nearshore system runs fine resolution over the full domain — all use nested grids.
 
 | Grid level | Config key | Default resolution | Typical domain | Grid points | Memory |
 |---|---|---|---|---|---|
-| Outer grid | `outer_grid_resolution_km` | ~2–3 km | ~200km × 150km (continental shelf approach, from `hrrr_bbox`) | ~5,000–8,000 | ~100–150 MB |
-| Inner nest | `inner_nest_resolution_m` | 200–500m | ~20–30km × 10–15km (tight around surf spots, from `swan_domain_bbox`) | ~3,000–8,000 | ~50–150 MB |
-| **Total** | | | | **~8,000–16,000** | **≤300 MB** |
+| L1 (outer) | `outer_grid_resolution_km` | ~1 km | ~200km × 150km (continental shelf approach, from `hrrr_bbox`) | ~5,000–8,000 | ~100–150 MB |
+| L2 (inner) | `inner_nest_resolution_m` | ~100 m | ~20–30km × 10–15km (tight around surf spots, from `swan_domain_bbox`) | ~3,000–8,000 | ~50–150 MB |
+| L3 (surf) | `surf_nest_resolution_m` | ~10 m | ~2–5km × 1–2km (per surf cluster) | ~2,000–4,000 | ~50–100 MB |
+| **Total** | | | | **~10,000–20,000** | **≤400 MB** |
 
-The outer run writes `NESTOUT` boundary files. The inner run reads them via SWAN's `NGRID` command. Multiple surf spots on the same coastline share the outer grid; each spot (or cluster of nearby spots) gets its own inner nest.
+Level 1 writes `NESTOUT` boundary files; Level 2 reads them via SWAN's `NGRID` command and writes its own `NESTOUT`; Level 3 reads Level 2's `NESTOUT`. Multiple surf spots on the same coastline share Levels 1 and 2; each cluster gets its own Level 3 nest. The runner copies boundary files between level subdirs: `level1/nest_out.dat` → `level2/nest_in.dat`, `level2/nest_out.dat` → `level3_{idx}/nest_in.dat`.
 
 Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Forecast span: 72 hours (HRRR hours 0–48, GFS hours 48–72).
 
@@ -1837,7 +1840,44 @@ Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Fo
 | `INIT HOTSTART 'hotstart.dat'` | Load wave field from previous run | Eliminates cold-start spin-up; t=0 has realistic waves immediately |
 | `HOTFILE 'hotstart.dat'` | Write wave field after COMPUTE | Saved to persistent location for next cycle |
 
-**Hotstart:** Each SWAN run writes a hotstart file (`HOTFILE` command, placed immediately after `COMPUTE`) capturing the full spectral state at the end of computation. The next run reads it via `INIT HOTSTART`, starting from the previous run's wave field instead of the default near-zero JONSWAP spectrum. Hotstart files persist at `/var/run/weewx-clearskies/swan/{outer,inner}_hotstart.dat` across the outer/inner subdir cleanup between runs. If no hotstart exists (first run ever), SWAN initializes from the default wind-derived spectrum — a one-time cold start.
+**Per-level physics (SWAN-L3-STABILITY-PLAN Phase 2):**
+
+The shared physics block is differentiated per level. Common commands emitted at all levels: `GEN3 WESTHUYSEN`, `BREAKING CONSTANT 1.0 0.73`, `FRICTION JON 0.067`, `TRIAD`. Level-specific:
+
+| Command | L1 (1 km) | L2 (100 m) | L3 (10 m) |
+|---|---|---|---|
+| SETUP | Removed (unsupported in OpenMP parallel runs; nest BC structurally wrong) | Removed | Removed |
+| DIFFRACTION | Removed (sub-grid at 1 km) | Removed (sub-grid at 100 m) | `DIFFRACTION 1 0.2 27` (smoothed; filter εx≈45m) |
+| NUMERIC alfa | — | — | Stationary only: `NUMERIC STOPC dabs=0.005 drel=0.01 curvat=0.005 npnts=99.5 STAT mxitst=50 alfa=0.01` |
+
+The SETUP physical effect (~10–15 cm near shore) is delivered via the WLEVEL input grid. Stage 1 (current): tide-only. Stage 2 (future): tide + analytic radiation-stress-balance setup estimate.
+
+**Convergence gate (SWAN-L3-STABILITY-PLAN Phase 4):**
+
+After every SWAN run, `_check_convergence()` performs three health checks:
+1. PRINT scan: any `******` in accuracy lines → FAIL.
+2. NaN scan: any NaN in the run's hotstart or TABLE output → FAIL.
+3. Valid-point fraction: wet transect points with non-exception values below 80% → FAIL.
+
+Behavior controlled by `convergence_retry` config key (default `false`):
+- `false` (testing/default): ERROR log with metrics, no retry, failed workdir preserved untouched, no hotstart saved, API serves last-good run.
+- `true` (future production): quarantine evidence to `/var/run/weewx-clearskies/swan/failed/{cycle}_{level}/`, then degrade: smnum×2 → DIFFRACTION removed → abandon cycle. API serves last-good run with honest timestamp.
+
+A diverged run NEVER saves a hotstart, NEVER overwrites the last-good cache, and NEVER fails silently.
+
+**Hotstart isolation:**
+
+Stationary quick updates do NOT save hotstart files. The nonstationary chain's persistent hotstarts (`level3_{idx}_hotstart.dat`) are only written by full nonstationary runs. This prevents a diverged stationary snapshot from infecting the next full run's warm-start.
+
+**OBSTACLE emission from bearing/length/distance:**
+
+When a structure config has `bearing_degrees`, `length_m`, and `distance_m` but no explicit `coordinates` field, the runner computes endpoint coordinates (geodesic projection from the spot pin) and emits the OBSTACLE line. Every structure is logged at INFO as emitted or WARNING as skipped — never silent.
+
+**Quick update WLEVEL:**
+
+The stationary quick update now includes a WLEVEL input (current tide at compute time). Previously, quick updates ran with no tidal water level correction — up to ±1m depth error.
+
+**Hotstart:** Each nonstationary SWAN run writes a hotstart file (`HOTFILE` command, placed immediately after `COMPUTE`) capturing the full spectral state at the end of computation. The next full run reads it via `INIT HOTSTART`, starting from the previous run's wave field instead of the default near-zero JONSWAP spectrum. Hotstart files persist at `/var/run/weewx-clearskies/swan/level1_hotstart.dat`, `level2_hotstart.dat`, and `level3_{idx}_hotstart.dat` across subdir cleanup between runs. If no hotstart exists (first run ever), SWAN initializes from the default wind-derived spectrum — a one-time cold start. Stationary quick updates do not write hotstart files; see the hotstart isolation subsection above.
 
 **SWAN error detection:** `_spawn_swan()` checks both exit code AND stderr/Errfile content. SWAN (Fortran) can exit 0 despite writing "Severe error" to its Errfile. When severe errors are detected, `SWANRunError` is raised so the failure is visible and the run_marker is not stored.
 
@@ -1859,10 +1899,10 @@ Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Fo
 
 | Tier | Trigger | Grids | Mode | Forecast span | Runtime | Interval |
 |---|---|---|---|---|---|---|
-| Full run | Extended HRRR cycle (00/06/12/18Z) + GFS + WW3 | Outer + inner | Nonstationary (72h time-stepping) | 72 hours | ~7–12 min | Every 6 hours |
-| Quick update | Any HRRR cycle (hourly) | Inner only | Stationary (single snapshot, no time-stepping) | 1 timestep ("now") | <1 min | Every hour |
+| Full run | Extended HRRR cycle (00/06/12/18Z) + GFS + WW3 | L1 + L2 + L3 | Nonstationary (72h time-stepping) | 72 hours | ~7–12 min | Every 6 hours |
+| Quick update | Any HRRR cycle (hourly) | L3 only | Stationary (single snapshot, no time-stepping) | 1 timestep ("now") | <1 min | Every hour |
 
-**Full runs** produce the 72-hour forecast. Both grid levels must complete within 15 minutes total. Peak memory: ≤300 MB (both grids run sequentially, not simultaneously).
+**Full runs** produce the 72-hour forecast. All three grid levels must complete within 15 minutes total. Peak memory: ≤400 MB (all three grids run sequentially, not simultaneously).
 
 **Quick updates** run a stationary Level 3 SWAN computation per cluster with the latest HRRR wind, reusing Level 2's `nest_out.dat` from the last full run. Per SWAN user manual §4.7: "For small domains (< 100 km), a stationary computation is recommended." Each Level 3 grid is ~2-5 km. The stationary result is merged into the existing forecast cache (replaces the entry closest to the snapshot time). Skipped for 30 minutes after a full run completes (no overlap). Quick updates refresh nearshore wind effects (sea breeze, wind chop, wind quality scoring) hourly; the deep-water swell propagation stays correct from the last full run.
 
