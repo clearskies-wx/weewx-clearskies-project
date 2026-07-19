@@ -1446,43 +1446,67 @@ Map to `SurfZoneForecast` canonical model.
 
 NWPS is eliminated. The nearshore wave model is SWAN (§14.15). The `providers/marine/nwps.py` module, its tests, cache warmer entry, and all config keys (`nwps_wfo`, `nearshore_model`) are deleted. The historical decision rationale is preserved in the archived ADR-084.
 
-### §14.7 NOAA CUDEM bathymetry
+### §14.7 Bathymetry data sources
 
-**Not a dispatch-registered provider module.** The bathymetry component (`enrichment/bathymetry.py`) is a data-access layer that downloads and stores depth profiles. It runs once per surf/fishing spot at setup time, not per-request.
+**Not a dispatch-registered provider module.** Bathymetry is accessed through two components: `services/bathymetry_resolver.py` (2-D grid resolution for SWAN) and `enrichment/bathymetry.py` (1-D profile extraction for surf/fishing spots). Both run at SWAN run time, not per-request.
 
-**Data source:** NOAA Continuously Updated Digital Elevation Model (CUDEM). CUDEM covers all US coastal areas including territories (Hawaii, PR, USVI, Guam, CNMI, American Samoa).
+#### Data source priority chain
 
-**Access method:** NCEI ArcGIS ImageServer at `https://gis.ngdc.noaa.gov/arcgis/rest/services/DEM_mosaics/DEM_all/ImageServer/identify` — serves CUDEM 1/9 arc-second (~3.4m) data via REST point queries. Free, no API key, returns JSON.
+The bathymetry resolver (`services/bathymetry_resolver.py`) selects the highest-resolution available data source for each SWAN grid level:
 
-Query format:
-```
-GET /identify?geometry={lon},{lat}&geometryType=esriGeometryPoint&returnGeometry=false&f=json
-→ {"value": "-3.30559", "catalogItems": {"features": [{"attributes": {"Name": "ncei19_n34x25_w078x00_2019v1"}}]}}
-```
+| Priority | Source | Resolution | Access method | Coverage |
+|----------|--------|-----------|---------------|----------|
+| 1 | Operator-supplied file | Varies | GeoTIFF/NetCDF/ASCII XYZ upload via admin UI | Operator's site |
+| 2 | NCEI regional coastal DEMs | ~10m (1/3") | OPeNDAP subset via `xarray` | 199 US coastal regions |
+| 3 | USGS Great Lakes DEMs | ~3-5m | GeoTIFF windowed read via `rasterio` | All 5 Great Lakes + St. Clair |
+| 4 | CRM/DEM_all (fallback) | ~90m (3") | NCEI ArcGIS ImageServer getSamples | All US coast |
 
-- `value`: string float, elevation in meters relative to MSL (negative = underwater)
-- `catalogItems.features[0].attributes.Name`: CUDEM tile name (prefix `ncei19` confirms 1/9 arc-second data)
-- `"NoData"` or null value: point is outside CUDEM coverage (return None)
-- No batch support — one point per request. Rate limit: 2 req/s (conservative; no documented limit)
+**Resolution impact:** CRM at ~90m produces staircase depth profiles — the same depth value repeats across 5-10 adjacent 10m cells. Level 3 surf-zone grids require at least 10m bathymetry to resolve sandbars and break points. The resolver ensures the finest available source is used per grid level.
 
-At 1/9 arc-second resolution (~3.4m), individual reef structures, sandbars, channel edges, and fine bathymetric detail are visible in addition to large features (drop-offs, ledges). Slope computations for the Battjes γ formula (ADR-084 supplement 1) are highly accurate.
+#### NCEI regional coastal DEMs (Priority 2)
 
-**Unified bounding box download:** When marine locations are saved (wizard apply or admin save), bathymetry downloads are triggered automatically for ALL configured surf/fishing spots in a single pass — no separate manual download button. The downloads share one HTTP client and rate-limit budget. Re-download triggers automatically when locations are added or moved.
+**Static index:** `data/ncei_regional_dem_index.json` — 199 NetCDF files from the NCEI THREDDS server at `https://www.ngdc.noaa.gov/thredds/catalog/regional/catalog.xml`. Built offline by `scripts/build_ncei_dem_index.py` (not shipped). Each entry records filename, bounding box, resolution (arc-seconds), vertical datum, and elevation variable name (`z` or `Band1`).
 
-**Profile extraction:** For a surf or fishing spot:
-1. Request a transect of depth points from shore to offshore along the beach-facing direction
-2. Adaptive refinement: denser sampling near shore (where slope matters most for breaking), sparser offshore
-3. Store the profile as a list of `(distance_m, depth_m)` points in the spot's configuration
-4. Compute `beach_slope` from the nearshore portion of the profile (used by the Battjes γ formula)
+**OPeNDAP access:** `fetch_opendap_grid()` opens the remote NetCDF file via `xarray.open_dataset()` using the OPeNDAP URL (`https://www.ngdc.noaa.gov/thredds/dodsC/regional/{filename}`). Only the requested bbox subset is downloaded — not the full file. For Level 2 (100m), a typical download is ~75×75 cells and takes <10 seconds. For Level 3 (10m), ~220×220 cells.
 
-**Habitat annotation (fishing):** The depth profile is scanned for:
-- Drop-offs: rapid depth change over short distance
-- Ledges: flat areas adjacent to steep changes
-- Reef structures: irregular depth patterns at shallow depths
-- Channels: linear depressions
-- Pinnacles: isolated shallow spots in deeper water
+**Resolution lookup:** `find_best_dem(bbox)` finds all index entries that fully contain the query bbox, then returns the one with the finest (smallest) `resolution_arcsec`. Partial matches return `None` — the caller falls back to the next priority.
 
-These are displayed as habitat annotations on the fishing page depth profile.
+**Elevation variable inconsistency:** Older DEMs (pre-~2015) use `Band1`; newer DEMs (post-~2018) use `z`. The index records the correct variable name per file.
+
+#### Vertical datum normalization
+
+SWAN expects depth relative to MSL (Mean Sea Level). NCEI regional DEMs use different datums (NAVD88, MHW, MHHW, MLLW). The offsets between datums are spatially varying — a constant regional offset is wrong.
+
+**VDatum REST API:** `_query_vdatum_offset()` queries `https://vdatum.noaa.gov/vdatumweb/api/convert` to get the MSL offset at the grid center. No API key required. Rate limit: 1 req/s. Result cached per (rounded lat, rounded lon, datum).
+
+| Location | NAVD88→MSL offset | Impact on 2m depth |
+|----------|------------------|--------------------|
+| San Diego | -0.764m | 38% depth error |
+| Sandy Hook NJ | +0.073m | 3.7% depth error |
+
+On VDatum API failure: 0.0m offset applied with a warning log. The SWAN run proceeds with potentially biased bathymetry rather than failing entirely.
+
+#### USGS Great Lakes DEMs (Priority 3)
+
+Per-lake GeoTIFF files from ScienceBase (Rohweder 2025, DOI: 10.5066/P1DA6L6U). Downloaded on first use, cached at `/etc/weewx-clearskies/great_lakes/{lake}.tif`, 365-day TTL. Requires `rasterio` (optional dependency, conditional import). Windowed reads load only the tiles intersecting the requested bbox — <50 MB from a 1.4 GB file.
+
+#### CRM fallback (Priority 4)
+
+NCEI ArcGIS ImageServer `getSamples` endpoint (POST, multipoint, 1000-point batches). ~90m effective resolution for most of the US coast. Adequate for Level 1 (1km grid) but produces staircase artifacts in Level 2/3 grids.
+
+#### Profile extraction (1-D)
+
+`download_bidirectional_profile()` in `enrichment/bathymetry.py` produces a 1-D depth transect from the coastline to deep water (~15m). Used for Level 3 grid sizing and cross-shore CURVE placement. When a regional DEM covers the spot, the profile uses OPeNDAP data (smooth depth progression). Otherwise falls back to single-point CRM queries (staircase pattern with ~5-6 unique values across 48 points).
+
+#### Cache paths
+
+| Data | Path | TTL |
+|------|------|-----|
+| Level 1 grid | `/etc/weewx-clearskies/swan_bathymetry_L1.json` | 180 days |
+| Level 2 grid | `/etc/weewx-clearskies/swan_bathymetry_L2.json` | 180 days |
+| Level 3 grid | `/etc/weewx-clearskies/swan_bathymetry_L3_{hash}.json` | 180 days |
+| Spot profile | `/etc/weewx-clearskies/spot_profiles/{spot_id}.json` | 180 days |
+| Great Lakes DEM | `/etc/weewx-clearskies/great_lakes/{lake}.tif` | 365 days |
 
 **Attribution:** NOAA CUDEM data requires attribution: "NOAA National Centers for Environmental Information." Display on any page showing bathymetric data.
 
@@ -1772,7 +1796,7 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 | Wind forcing (hours 0–48) | HRRR wind provider (§14.14) — 3km resolution, extended cycles only | `(hrrr, bbox, cycle_time)` |
 | Wind forcing (hours 48–72) | GFS wind provider (§14.16) — 0.25° resolution, supplements HRRR | `(gfs, bbox, cycle_time)` |
 | Deep-water boundary | WaveWatch III (§14.3) | `(wavewatch, ...)` |
-| Bathymetry (2-D grid) | CUDEM via NCEI getSamples (§14.7) | Lazy-downloaded on first SWAN run, cached to `/etc/weewx-clearskies/swan_bathymetry.json` |
+| Bathymetry (2-D grid) | Resolver chain: operator file > NCEI regional OPeNDAP > Great Lakes > CRM fallback (§14.7) | Per-level cache: `swan_bathymetry_L{1,2,3}.json`, 180-day TTL |
 | Water level (WLEVEL) | CO-OPS tidal predictions (§14.8) — time-varying, uniform across domain, hourly (ADR-095) | Reuses existing tide fetch |
 | Ocean currents (CURRENT) | OFS surface current U/V (§14.10) — time-varying per grid point. Omitted when unavailable (ADR-095) | `(ofs, ...)` |
 | Coastal structures (OBSTACLE) | Wizard Overpass API discovery — native SWAN OBSTACLE command (ADR-095) | From marine location config |
@@ -1844,7 +1868,7 @@ Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Fo
 
 **Working directory:** SWAN runs in `/var/run/weewx-clearskies/swan/` (fixed path, not tempfile). Subdirectories `outer/` and `inner/` are cleaned at the start of each run. Hotstart files persist one level up. The fixed path is visible from SSH (unlike `tempfile.mkdtemp` which was hidden by systemd's `PrivateTmp=yes`) and survives service restarts.
 
-**2-D bathymetry grid:** Downloaded lazily on first SWAN run from the NCEI ArcGIS ImageServer `getSamples` endpoint (POST, multipoint, 1000-point batches). Covers the outer grid bbox at the outer grid resolution. Cached persistently to `/etc/weewx-clearskies/swan_bathymetry.json`. `cudem_to_swan_bottom()` bilinear-interpolates this source grid onto both SWAN grid levels. Sign convention: CUDEM (negative = ocean) → SWAN (positive = ocean). Download takes ~5 seconds for a typical 65×78 grid.
+**2-D bathymetry grid:** Downloaded lazily on first SWAN run via the bathymetry resolver priority chain (§14.7): operator file → NCEI regional OPeNDAP → Great Lakes → CRM fallback. Per-level caches at `/etc/weewx-clearskies/swan_bathymetry_L{1,2,3}.json` with 180-day TTL. `cudem_to_swan_bottom()` bilinear-interpolates the source grid onto SWAN grid dimensions. Sign convention: CUDEM (negative = ocean) → SWAN (positive = ocean). Vertical datum normalized to MSL via VDatum REST API.
 
 **Optional separated service:** When `[swan] service_url` is set to a remote host, `SwanProvider.fetch()` calls the remote HTTP endpoint instead of running SWAN locally. Health check polls `GET {service_url}/health` every 60 seconds. Three consecutive failures → log ERROR, serve last-good cache. See ARCHITECTURE.md for the standalone `weewx-clearskies-swan` package (ADR-096 renamed).
 
