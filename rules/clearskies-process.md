@@ -435,6 +435,22 @@ The operator should never see first-draft slop. If the coordinator cannot run th
 
 These are pattern matches, not judgment calls. FAIL if any violation is found.
 
+## Research-to-implementation discipline
+
+**Verify data coverage claims per-location before coding against them.** When a research brief claims a data source has a given resolution or coverage area, verify the claim at the specific target location before writing code that depends on it. "CUDEM 1/9" has 3.4m resolution in its metadata but no tiles exist for SoCal. Coverage metadata describes the intended extent, not the actual extent.
+
+**Why (2026-07-19):** The SWAN implementation assumed CUDEM 1/9 arc-second data existed for HB Pier because the metadata listed a bounding box covering 23-52°N. Investigation revealed no tiles exist south of 36°N on the Pacific coast. The entire nearshore grid ran on ~90m CRM data instead of the expected 3.4m data, producing staircase bathymetry.
+
+**SWAN nesting files must use different names for BOUNDNEST1 (read) and NESTOUT (write).** When a SWAN level both reads boundary data from a parent and writes boundary data for a child, the input and output files MUST have different names. SWAN reads boundary files progressively during simulation — if NESTOUT overwrites the same file BOUNDNEST1 is reading, the output is corrupt.
+
+**Why (2026-07-19):** Level 2 used `nest_boundary.dat` for both BOUNDNEST1 and NESTOUT. SWAN overwrote Level 1's 83 MB boundary file with a 3.5 MB file during the run. Level 3 read garbage and produced 0.005 m wave heights.
+
+**Vertical datum offsets are spatially varying — never use constant regional offsets.** The offset between NAVD88 and MSL is -0.764m at San Diego but +0.073m at Sandy Hook NJ. A 0.764m error in 2m of water is 38% depth error, shifting SWAN's breaking criterion by tens of meters. Use the VDatum REST API for per-location corrections.
+
+**Grid sizing must come from actual data (profiles, measurements), not illustrative estimates in briefs.** Research briefs contain approximate numbers for illustration. Implementation code must use real data (cached depth profiles, GSFM shelf distances) to size domains. A brief saying "~1 km offshore" is a rough estimate; the actual 15m depth contour at HB Pier is 2,350m offshore.
+
+**Why (2026-07-19):** Level 3 grid was hardcoded to 1 km offshore based on a brief illustration. The bidirectional profile showed 15m depth at 2,350m. 42% of transect CURVE points fell outside the grid and returned exception values.
+
 **"Code-complete" requires coordinator visual sign-off.** The agent that writes the code cannot declare it done. The coordinator must render the output, verify it against the spec, and sign off. Self-attestation of visual quality is not accepted.
 
 **Why (2026-06-02):** C1–C6 were all self-attested as code-complete. QC gates checked `tsc` (compiles) and `vite build` (bundles) but never compared the rendered output against the mockups. Every tile card had wrong font sizes, missing separators, broken sr-only hiding, no vertical centering, and inconsistent text hierarchy. The operator discovered all of this during live testing — not during any QC gate.
