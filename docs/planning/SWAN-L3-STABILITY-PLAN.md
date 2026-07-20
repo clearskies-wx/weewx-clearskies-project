@@ -631,22 +631,99 @@ All of the following must be true:
 
 ---
 
+## Phase 7 — Stage 2: Analytic Setup via WLEVEL Injection
+
+**Prerequisite:** Phase 5 verified stable (Stage 1 tide-only WLEVEL converges). Verified 2026-07-19.
+
+**Problem:** With SETUP removed, the ~10-15cm wave-induced water level rise near shore is absent. On a 1:100 beach slope this shifts the break point ~1 grid cell (10m). Acceptable for v1 but improvable.
+
+**Design (from brief §5.3):** OUR code computes the setup estimate and delivers it through the WLEVEL input grid — mathematically identical to SWAN's internal SETUP from the wave model's perspective, but parallel-safe and BC-correct.
+
+### T7.1 — Analytic setup computation module
+
+- Owner: `clearskies-api-dev` (Sonnet)
+- Files:
+  - New: `repos/weewx-clearskies-api/weewx_clearskies_api/services/wave_setup.py`
+- Reference: Brief §5.3 Stage 2, Longuet-Higgins & Stewart (1964), USACE CEM II-4
+
+**Do:**
+1. Implement `compute_setup_profile(hs_offshore: float, tm01: float, profile: list[dict], gamma: float = 0.73) -> list[dict]`:
+   a. Shoal `hs_offshore` along the cached bidirectional profile (`spot_profiles/{spot}.json`) to find breaking: Hb where Hs/d ≈ gamma.
+   b. Compute static setup profile η(x) from the radiation-stress balance:
+      - η = 0 seaward of the break point
+      - Inside the surf zone: dη/dx = −K·(dd/dx) with K = 1/(1 + 8/(3γ²)), γ = 0.73
+      - η(shoreline) ≈ 0.15-0.2·Hb
+   c. Return list of `{"distance_m": float, "setup_m": float}` along the profile.
+
+2. Implement `build_wlevel_with_setup(tide_predictions: list[dict], setup_profile: list[dict], grid_dims: dict) -> list[dict]`:
+   a. For each forecast hour: `wlevel(x, y, t) = coops_tide(t) + η(cross-shore distance)`
+   b. Uniform alongshore (open straight beach assumption).
+   c. Return in the same format `_write_input_files` expects for WLEVEL.
+
+**Accept:**
+- For a 1m breaker at HB Pier: setup at shoreline ≈ 0.15-0.20m.
+- Setup profile is zero offshore of the break point and increases monotonically toward shore.
+- WLEVEL grid = tide + setup at each grid point.
+
+### T7.2 — Wire into the SWAN runner
+
+- Owner: `clearskies-api-dev` (Sonnet)
+- Files:
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/providers/nearshore/swan.py` (`run_all_spots` and `_run_quick_update_locked`)
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/services/swan_runner.py` (L3 WLEVEL composition)
+
+**Do:** Per the brief §5.3 injection sequence:
+1. After L2 runs, extract Hs/TM01 at the L3 offshore boundary from L2's TABLE output (add a small POINTS/TABLE output to L2's INPUT at the L3 seaward-edge midpoint).
+2. Call `compute_setup_profile()` with L2's Hs and the cached bidirectional profile.
+3. Call `build_wlevel_with_setup()` to compose the L3 WLEVEL grid (tide + setup).
+4. Pass the composed WLEVEL to L3's `_write_input_files` (replaces the tide-only WLEVEL).
+5. Quick update: same with the single latest hour (stationary WLEVEL).
+
+**Logging:** INFO: `"SWAN L3 WLEVEL: tide=%.2fm + setup=%.3fm (Hb=%.2fm at %.0fm from shore)"` per forecast hour.
+
+**Accept:**
+- L3 WLEVEL grid contains tide + setup (not tide-only).
+- Setup values are physically reasonable (0-0.2m for typical swell).
+- Convergence gate still passes with the enhanced WLEVEL.
+- Break point location shifts by ~1 grid cell compared to Stage 1 (expected).
+
+### T7.3 — Update governing documents
+
+- Owner: Coordinator (Opus)
+- Files: PROVIDER-MANUAL §14.15, API-MANUAL §17-18
+
+**Do:**
+- PROVIDER-MANUAL §14.15: Update WLEVEL composition from "tide-only (Stage 1)" to "tide + analytic setup (Stage 2)".
+- API-MANUAL §17-18: Update `setup` field description — now populated with the analytic estimate (no longer null).
+
+### QC Gate 7
+
+- `clearskies-auditor` verifies:
+  - Setup profile is physically reasonable for HB Pier (shoreline setup 0.15-0.20m for 1m breaker).
+  - L3 WLEVEL grid contains tide + setup.
+  - Convergence gate still passes.
+  - TABLE output unchanged (setup is in WLEVEL, not TABLE).
+  - Docs match implementation.
+  - All test baselines hold.
+
+---
+
 ## Execution Order
 
 ```
-Phase 1 (Docs)       ← HARD PREREQUISITE — agents read manuals before coding
-Phase 2 (Physics)    ← Core fix: SETUP removal + DIFFRACTION stabilization
-Phase 3 (OBSTACLE)   ← Finding C + quick update WLEVEL/structures + fishing.py fix
-Phase 4 (Safeguards) ← Convergence gate + hotstart isolation + metrics
-Phase 5 (Deploy)     ← Deploy, purge, verify production output
-Phase 6 (Audit)      ← Adversarial verification of every QC gate
+Phase 1 (Docs)       ← COMPLETE — agents read manuals before coding
+Phase 2 (Physics)    ← COMPLETE — SETUP removal + DIFFRACTION stabilization
+Phase 3 (OBSTACLE)   ← COMPLETE — Finding C + quick update WLEVEL/structures + fishing.py fix
+Phase 4 (Safeguards) ← COMPLETE — Convergence gate + hotstart isolation + metrics
+Phase 5 (Deploy)     ← COMPLETE — Deploy, purge, verify production output
+Phase 6 (Audit)      ← IN PROGRESS — Adversarial verification of every QC gate
+Phase 7 (Setup Est.) ← PENDING — Stage 2: analytic setup via WLEVEL injection
 ```
 
 **Sequence constraints:**
-1. Phase 1 blocks Phases 2-4. Agents read the updated docs before writing code.
-2. Phases 2-4 are partially parallelizable (T2.1 must complete before T2.2-T2.3; T3.1-T3.3 are independent of each other; Phase 4 is independent of Phase 3).
-3. Phase 5 blocks on ALL of Phases 1-4 being complete and all QC gates passed.
-4. Phase 6 is last — adversarial audit of the entire implementation.
+1. Phases 1-6 are the stability fix (mandatory, no deferrals).
+2. Phase 7 is the Stage 2 enhancement — gated on Stage 1 being verified stable (verified 2026-07-19).
+3. Phase 7 is a separate session — do not combine with Phase 6.
 
 ---
 
@@ -657,4 +734,3 @@ Phase 6 (Audit)      ← Adversarial verification of every QC gate
 - Any rewrite/"cleanup" of `build_swan_input()` beyond the physics-list change (RULE 4).
 - Nesting ratios, bathymetry resolver, domain sizing — all working; leave alone.
 - `convergence_retry = true` degradation ladder implementation — config key only, implementation is future work.
-- Stage 2 WLEVEL injection (analytic setup estimate) — future work after Stage 1 is verified stable.
