@@ -1850,7 +1850,7 @@ The shared physics block is differentiated per level. Common commands emitted at
 | DIFFRACTION | Removed (sub-grid at 1 km) | Removed (sub-grid at 100 m) | `DIFFRACTION 1 0.2 27` (smoothed; filter εx≈45m) |
 | NUMERIC alfa | — | — | Stationary only: `NUMERIC STOPC dabs=0.005 drel=0.01 curvat=0.005 npnts=99.5 STAT mxitst=50 alfa=0.01` |
 
-The SETUP physical effect (~10–15 cm near shore) is delivered via the WLEVEL input grid. Stage 1 (current): tide-only. Stage 2 (future): tide + analytic radiation-stress-balance setup estimate.
+The SETUP physical effect (~10–15 cm near shore) is delivered via the WLEVEL input grid. Stage 2 (current): tide + analytic radiation-stress-balance setup estimate (`services/wave_setup.py`). The setup profile is computed from the previous run's cached Hs using Green's law shoaling to find breaking, then Longuet-Higgins & Stewart (1964) radiation-stress integration (K ≈ 0.167 for γ=0.73). First run (no previous cache) falls back to tide-only.
 
 **Convergence gate (SWAN-L3-STABILITY-PLAN Phase 4):**
 
@@ -1894,6 +1894,8 @@ The stationary quick update now includes a WLEVEL input (current tide at compute
 | `hrrr_cycle_time` | `str` | HRRR cycle time that forced this SWAN run. |
 
 `fetch()` returns all five keys from `last_good_key`; `data_age_seconds` is computed live from `run_time`.
+
+**On-disk forecast cache persistence (SWAN-L3-STABILITY-PLAN Phase 8):** The in-memory cache is also persisted to `/var/run/weewx-clearskies/swan/forecast_cache.json` after every successful full run and quick update (atomic write via temp+rename). On API startup, `fetch()` loads the on-disk cache if it exists and is less than 12 hours old. This ensures API restarts do not lose surf forecast data — the dashboard immediately serves the last-good forecast without waiting for a new SWAN run.
 
 **Two-tier schedule:**
 
