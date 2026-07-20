@@ -445,7 +445,13 @@ These are pattern matches, not judgment calls. FAIL if any violation is found.
 
 **Why (2026-07-19):** Level 2 used `nest_boundary.dat` for both BOUNDNEST1 and NESTOUT. SWAN overwrote Level 1's 83 MB boundary file with a 3.5 MB file during the run. Level 3 read garbage and produced 0.005 m wave heights.
 
-**Vertical datum offsets are spatially varying — never use constant regional offsets.** The offset between NAVD88 and MSL is -0.764m at San Diego but +0.073m at Sandy Hook NJ. A 0.764m error in 2m of water is 38% depth error, shifting SWAN's breaking criterion by tens of meters. Use the VDatum REST API for per-location corrections.
+**Match datums at source rather than converting locally.** When a data source supports multiple datums as request parameters (e.g., CO-OPS supports NAVD88, MLLW, MHW, MSL), fetch in the datum you need — don't fetch in one datum and convert to another. Local datum conversion introduces spatial error, computational overhead, and failure modes. Two cheap HTTP requests beat one request plus a conversion that can silently fail.
+
+**Why (2026-07-19):** VDatum REST API was supposed to convert bathymetry from NAVD88 to MSL. It returned 412 errors in production and the code fell back to a 0.0m offset. Even if it had worked, the conversion was to MSL while CO-OPS predictions were in MLLW — creating a worse mismatch (0.86m vs the original 0.06m). ADR-098 replaced this with match-at-source: request CO-OPS predictions in the DEM's native datum, eliminating conversion entirely.
+
+**Never silently fall back to 0.0 for datum conversion failure — fail explicitly.** A silent 0.0m fallback produces code that appears to work but has a systematic depth bias. If datum matching cannot be confirmed, the run must fail with an ERROR log. "Proceed with potentially wrong data" is never acceptable for geophysical models.
+
+**Why (2026-07-19):** The VDatum normalization code logged a WARNING when the API returned 412, then applied a 0.0m offset and continued. The INFO log said "Applied NAVD88 to MSL offset: 0.000m" — making it look like the conversion succeeded with a zero offset when it actually failed entirely.
 
 **SWAN physics commands must be per-level — shared blocks only work when all levels have similar dynamics.** A physics command that is safe at 1km resolution can diverge at 10m. SETUP and bare DIFFRACTION are both stable at coarse resolution but numerically unstable at surf-zone resolution. Per-level physics selection is mandatory for any multi-resolution nested SWAN configuration.
 

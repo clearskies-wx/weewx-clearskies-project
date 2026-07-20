@@ -693,7 +693,25 @@ All of the following must be true:
 
 **This gate applies to ANY new or modified SWAN INPUT command in Phase 7.** The only expected new commands are POINTS + TABLE additions to L2's INPUT to extract Hs/TM01 at the L3 boundary. The WLEVEL changes are VALUE changes to an existing grid file, not INPUT command changes — but must still be validated.
 
-**Mandatory verification steps:**
+#### T7.0 — Coordinator extracts SWAN manual sections (PREREQUISITE for T7.1-T7.2)
+
+**Owner:** Coordinator (Opus) — NOT an agent. The coordinator has the context window to parse the SWAN User Manual PDF. Agents cannot.
+
+**Why this step exists:** Agents cannot read the 200-page SWAN User Manual PDF effectively — they either run out of context or miss critical details. The extract at `docs/reference/swan-commands-extract.md` is the ONLY SWAN syntax reference agents are allowed to use (RULE 5). If a command isn't in the extract, agents have no way to verify their syntax. The coordinator MUST extract all needed command documentation BEFORE dispatching any Phase 7 agent.
+
+**Do:**
+1. Read the SWAN User Manual sections for every command Phase 7 will use or modify.
+2. For commands NOT already in `swan-commands-extract.md`, extract the syntax, parameters, defaults, restrictions, and a worked example. Currently missing and needed for Phase 7:
+   - `INPGRID WLEVEL` — the input grid definition for water level (nonstationary and stationary forms)
+   - `READINP WLEVEL` — the file-read command for water level data
+   - The relationship between INPGRID grid dimensions and the WLEVEL.txt file layout
+   - Stationary vs nonstationary INPGRID WLEVEL differences
+3. For commands already in the extract (POINTS, TABLE), verify the extract is complete for the Phase 7 use case (adding output points to L2's INPUT).
+4. Commit the updated extract BEFORE any T7.1/T7.2 agent is dispatched.
+
+**Accept:** Every SWAN command that Phase 7 will emit or modify is documented in `swan-commands-extract.md` with syntax, parameter definitions, and restrictions. No agent needs to read the PDF.
+
+#### Mandatory verification steps (performed by coordinator + QC agent against the extract):
 
 1. **Extract every new/modified INPUT command** that Phase 7 adds. Write them to a scratch file for isolated review.
 
@@ -704,24 +722,23 @@ All of the following must be true:
    - String delimiters are single quotes (not double)
    - Name strings are ≤8 characters (SWAN limit)
    - OUTPUT time specification matches the run mode (NONSTAT for full runs, omitted for stationary)
+   - **The extract is the single source of truth.** If a command isn't in the extract, the coordinator must add it before the agent writes code. Agents must NEVER guess SWAN syntax from training data or general knowledge.
 
-3. **Cross-check against the SWAN User Manual** (PDF at `docs/reference/swan-user-manual.pdf`). For any command not already in `swan-commands-extract.md`, extract the relevant section and add it BEFORE writing code.
+3. **Diff the generated INPUT file** against a known-good INPUT from the current production system. The only differences should be the new POINTS/TABLE commands for L2. Every other line must be identical.
 
-4. **Diff the generated INPUT file** against a known-good INPUT from the current production system. The only differences should be the new POINTS/TABLE commands for L2. Every other line must be identical.
-
-5. **Run the modified SWAN binary on weewx** in a scratch directory (copy of the production working directory) BEFORE deploying. Verify:
+4. **Run the modified SWAN binary on weewx** in a scratch directory (copy of the production working directory) BEFORE deploying. Verify:
    - SWAN exits 0
    - The new TABLE output file exists and contains the expected Hs/TM01 columns
    - All existing TABLE/CURVE outputs are unchanged (no regression)
    - Convergence gate passes
 
-6. **Validate WLEVEL grid values** before SWAN reads them:
+5. **Validate WLEVEL grid values** before SWAN reads them:
    - No NaN values in the grid
    - All values are physically reasonable (tide ± 2m range, setup 0-0.3m)
    - Grid dimensions match the L3 CGRID
    - Time stepping matches the run's time window
 
-**If ANY verification step fails, STOP. Do not deploy. Do not attempt to fix the syntax by guessing — re-read the manual section and the extract.**
+**If ANY verification step fails, STOP. Do not deploy. Do not attempt to fix the syntax by guessing — re-read the extract.**
 
 **Why this gate exists (history):**
 - SWAN-CORRECTIONS-PLAN agents wrote working SWAN INPUT. Then SWAN-FIXES-PLAN Phase 14 agents rewrote parts and broke it — wrong coordinate formats, missing HOTFILE, wrong CURVE syntax, nest file collision. Every bug had to be debugged from cryptic Fortran errors or silent zero-output.
