@@ -920,7 +920,7 @@ The `[swan]` section in `api.conf` controls nearshore wave-model behavior. It is
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `convergence_retry` | bool | `false` | Controls behavior on SWAN numerical divergence — see "SWAN convergence monitoring" below |
+| `convergence_retry` | bool | `false` | Controls behavior on SWAN numerical divergence — see "SWAN convergence monitoring" below. **Note:** Only `false` mode is currently implemented. Setting to `true` has no additional effect until the degradation ladder is implemented (SWAN-L3-STABILITY-PLAN Phase 4 future). |
 
 #### SWAN convergence monitoring
 
