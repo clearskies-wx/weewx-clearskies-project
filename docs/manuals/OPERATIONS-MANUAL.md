@@ -973,6 +973,20 @@ The next full run will cold-start (first 3-6 hours show reduced accuracy, then t
 
 Stationary quick updates (hourly) never save hotstart files. Only full nonstationary runs (every 6 hours) write `level{N}_hotstart.dat`. This prevents a diverged quick-update snapshot from contaminating the nonstationary warm-start chain.
 
+#### Bathymetry vertical datum requirement
+
+SWAN requires bathymetry (BOTTOM input) and water level (WLEVEL input) to use the same vertical datum. Mixing datums produces silently wrong depth calculations — SWAN does not detect or report datum mismatches.
+
+**Automated sources (NCEI regional DEMs, USGS Great Lakes DEMs):** The system handles datum matching automatically. The DEM's native datum is read from the index, and CO-OPS tide predictions are fetched in that datum for SWAN input. No operator action is required.
+
+**CRM/DEM_all fallback:** The NCEI CRM mosaic has mixed or unknown vertical datums — its source DEMs were not normalized to a common datum. Areas served by the CRM fallback have reduced accuracy for wave modeling due to both coarse resolution (~90 m) and datum uncertainty. The coverage endpoint flags CRM-sourced levels as `"degraded"` and includes a `datum_warning` when the datum cannot be confirmed.
+
+**Operator-uploaded bathymetry:** When uploading your own bathymetry file, you must specify its vertical datum. The system fetches CO-OPS tide predictions in the datum you specify to ensure consistency with your bathymetry.
+
+Accepted datums for operator uploads: **NAVD88, MLLW, MHW, MHHW, MSL**. These are the datums directly supported by CO-OPS as prediction request parameters. If your bathymetry file is in a different datum, convert it before uploading using VDatum (vdatum.noaa.gov) or QGIS. The system does not perform local datum conversion for uploaded files.
+
+Accepted formats for upload: GeoTIFF, NetCDF, ASCII XYZ.
+
 ---
 
 ### §4.1 Config Registry

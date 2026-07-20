@@ -1945,6 +1945,7 @@ Predicted tide event from CO-OPS harmonic predictions.
 | `time` | str | — | No | Prediction time (UTC ISO-8601) |
 | `height` | float | `group_water_level` | No | Predicted water level relative to datum |
 | `type` | str | — | Yes | `"high"`, `"low"`, or null for interpolated points |
+| `datum` | str | — | No | Vertical datum of the prediction (default `"MLLW"`). The public display endpoint always returns `"MLLW"`. The SWAN pipeline fetches an additional set of predictions in the DEM's native datum for WLEVEL input — those predictions carry the DEM datum here. |
 
 #### WaterLevel
 
@@ -1956,6 +1957,39 @@ Observed water level from CO-OPS gauges.
 | `height` | float | `group_water_level` | No | Observed water level relative to datum |
 | `datum` | str | — | No | Reference datum (e.g., `"MLLW"`, `"MSL"`, `"NAVD88"`) |
 | `quality` | str | — | Yes | Quality flag from CO-OPS (e.g., `"v"` verified, `"p"` preliminary) |
+
+### Vertical Datum Metadata Contract (ADR-098)
+
+Every geospatial data product the API serves carries its vertical datum as a metadata field. Consumers must not assume a datum — they must read the field. This rule applies to all marine and nearshore data products.
+
+#### Datum fields by data product
+
+| Data product | Field | Value | Notes |
+|---|---|---|---|
+| `TidePrediction` | `datum` | `"MLLW"` (display) | New field added in ADR-098. Public `/api/v1/tides` endpoint always returns `"MLLW"`. The SWAN pipeline fetches a separate set of predictions in the DEM's native datum (never exposed to the dashboard). |
+| `WaterLevel` | `datum` | `"MLLW"` | Existing field. CO-OPS observed water levels returned in MLLW. |
+| Bathymetry cache JSON | `vertical_datum` | DEM native (e.g., `"NAVD88"`) | New field added in ADR-098. Written when the cache file is created. Old cache files without this field are treated as stale and re-downloaded. |
+| DEM index entry | `vertical_datum` | Per DEM | Existing field in `ncei_regional_dem_index.json`. Source of truth for the NCEI and Great Lakes DEMs. |
+| Coverage endpoint response | `vertical_datum` | Per level | Included in each level's response. `datum_warning: true` is added when the source is CRM/DEM_all (mixed or unknown datum). |
+
+#### Dual-datum pattern for tides
+
+The API serves tide predictions to two consumers with different datum requirements:
+
+- **Dashboard display (`/api/v1/tides`):** Always fetches and returns predictions in `"MLLW"` (US chart datum standard). This is what users see. The `datum` field on each `TidePrediction` object will be `"MLLW"`.
+- **SWAN WLEVEL pipeline:** Fetches predictions in the bathymetry DEM's native datum (e.g., `"NAVD88"` for the Orange County NCEI DEM). This fetch is internal — the SWAN datum predictions are never exposed to the dashboard or to API consumers. The SWAN pipeline caches these predictions separately (cache key includes the datum) so MLLW and DEM-native predictions do not collide.
+
+These are two separate CO-OPS requests per SWAN run. The display datum and the SWAN datum are intentionally different and must stay separate.
+
+#### Accepted datums for operator-uploaded bathymetry
+
+Operator-supplied bathymetry files must use one of the datums that CO-OPS supports as a predictions request parameter: **NAVD88, MLLW, MHW, MHHW, MSL**. The system fetches CO-OPS predictions in the operator-specified datum for SWAN input — no local datum conversion is performed. If the operator's data is in a different datum, they must convert it before uploading (using VDatum at vdatum.noaa.gov or QGIS).
+
+The upload endpoint validates the datum against this accepted list and rejects uploads specifying datums outside it.
+
+#### No silent datum fallbacks
+
+If datum matching cannot be confirmed — for example, if a DEM's `vertical_datum` is `"UNKNOWN"` or if CO-OPS does not support the datum as a request parameter — the SWAN level fails explicitly with an ERROR log. The system never proceeds with an unverified datum combination. A `datum_warning` in the coverage endpoint response signals operator attention is needed.
 
 #### MarineForecastPoint
 
