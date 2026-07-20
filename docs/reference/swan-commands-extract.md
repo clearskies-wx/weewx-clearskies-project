@@ -288,6 +288,8 @@ READINP WLEV [fac] 'fname' [idla] [nhedf] FREE
 
 **Water level sign convention:** Positive upward relative to the same datum level as BOTTOM. When BOTTOM uses SWAN convention (positive = depth below datum), WLEVEL positive means water level ABOVE the datum. SWAN computes total depth as `BOTTOM_depth - WLEVEL` (internal sign handling).
 
+**Datum consistency requirement:** SWAN does not detect or report datum mismatches between BOTTOM and WLEVEL. A mismatch produces silently wrong depth calculations — SWAN computes total depth as BOTTOM_depth - WLEVEL, so any datum offset appears as a systematic depth bias across the entire domain. The system ensures consistency by requesting CO-OPS predictions in the DEM's native datum (ADR-098).
+
 **Phase 7 note:** The setup estimate is added to the tide value at each grid point BEFORE writing WLEVEL.txt. SWAN sees one combined water level — it does not know or care that it contains both tide and setup components.
 
 ## Per-level physics summary
