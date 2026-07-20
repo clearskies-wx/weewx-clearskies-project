@@ -708,6 +708,58 @@ All of the following must be true:
 
 ---
 
+## Phase 8 — SWAN Forecast Cache Persistence
+
+**Priority:** CRITICAL — any API restart (deploy, crash, power outage) wipes the in-memory SWAN forecast cache, producing 8-12 hours of degraded surf forecasting until waves propagate through the cold-started model. The hotstarts survive on disk (correct), but the parsed forecast data does not.
+
+**Problem:** The SWAN forecast cache lives only in memory. When the API restarts:
+1. Dashboard immediately shows "no forecast data" — all surf cards empty.
+2. A new SWAN run takes 40+ minutes to compute.
+3. Even after the run completes, the first 8-12 hours have unrealistic wave heights (cold-start spin-up — energy hasn't propagated from boundary through three nested grids).
+4. The operator and visitors see bad/missing surf forecasts for hours after every restart.
+
+This is the same class of problem the hotstart files solve (on-disk state survives restarts) — the forecast cache just wasn't given the same treatment.
+
+### T8.1 — Persist SWAN forecast cache to disk
+
+- Owner: `clearskies-api-dev` (Sonnet)
+- Files:
+  - Modify: `repos/weewx-clearskies-api/weewx_clearskies_api/providers/nearshore/swan.py`
+
+**Do:**
+1. When a SWAN run completes and `spots_cached > 0`, write the full forecast cache dict (the same data structure stored in the in-memory cache) to a JSON file at `/var/run/weewx-clearskies/swan/forecast_cache.json`. Include a `saved_at` ISO timestamp.
+2. On API startup (in `SwanProvider.__init__` or the first `fetch()` call), check for the on-disk cache file. If it exists and is less than 12 hours old, load it into the in-memory cache. Log INFO: `"SWAN: restored forecast cache from disk (saved %s, %d spots)"`.
+3. If the file is older than 12 hours or corrupt, ignore it (stale data is worse than no data after 12h). Log WARNING.
+4. The quick update path should also update the on-disk cache after merging its snapshot.
+5. File format: same JSON structure as the in-memory cache dict, plus `saved_at` metadata.
+
+**Accept:**
+- After a SWAN run, `forecast_cache.json` exists on disk with the full forecast data.
+- After an API restart, the dashboard immediately shows the last-good surf forecast (no "no forecast data" gap).
+- After a restart, the surf endpoint serves cached data with the correct `modelRunTime` from the previous run.
+- A 12+ hour stale cache is not loaded (graceful degradation to empty until a new run).
+- Quick updates also persist to disk.
+
+### T8.2 — Update governing documents
+
+- Owner: Coordinator (Opus)
+- Files: PROVIDER-MANUAL §14.15, OPERATIONS-MANUAL
+
+**Do:**
+- PROVIDER-MANUAL §14.15: Document the on-disk forecast cache (`forecast_cache.json`), its location, TTL (12h), and startup load behavior.
+- OPERATIONS-MANUAL: Document the cache file location and the fact that API restarts no longer lose SWAN forecast data.
+
+### QC Gate 8
+
+- `clearskies-auditor` verifies:
+  - `forecast_cache.json` written after a successful SWAN run.
+  - API restart loads the cache and the surf endpoint immediately returns forecast data.
+  - Cache older than 12 hours is not loaded.
+  - Quick updates also persist to disk.
+  - Docs match implementation.
+
+---
+
 ## Execution Order
 
 ```
@@ -716,14 +768,15 @@ Phase 2 (Physics)    ← COMPLETE — SETUP removal + DIFFRACTION stabilization
 Phase 3 (OBSTACLE)   ← COMPLETE — Finding C + quick update WLEVEL/structures + fishing.py fix
 Phase 4 (Safeguards) ← COMPLETE — Convergence gate + hotstart isolation + metrics
 Phase 5 (Deploy)     ← COMPLETE — Deploy, purge, verify production output
-Phase 6 (Audit)      ← IN PROGRESS — Adversarial verification of every QC gate
+Phase 6 (Audit)      ← COMPLETE — Adversarial verification of every QC gate
 Phase 7 (Setup Est.) ← PENDING — Stage 2: analytic setup via WLEVEL injection
+Phase 8 (Cache)      ← PENDING (CRITICAL) — Persist SWAN forecast cache to disk
 ```
 
 **Sequence constraints:**
-1. Phases 1-6 are the stability fix (mandatory, no deferrals).
-2. Phase 7 is the Stage 2 enhancement — gated on Stage 1 being verified stable (verified 2026-07-19).
-3. Phase 7 is a separate session — do not combine with Phase 6.
+1. Phases 1-6 are the stability fix (complete).
+2. Phase 8 is independent of Phase 7 — can be done first (and should be, given its criticality).
+3. Phase 7 is the Stage 2 enhancement — gated on Stage 1 being verified stable (verified 2026-07-19).
 
 ---
 
