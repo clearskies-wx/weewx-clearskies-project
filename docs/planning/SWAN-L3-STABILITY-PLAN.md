@@ -687,6 +687,47 @@ All of the following must be true:
 - Convergence gate still passes with the enhanced WLEVEL.
 - Break point location shifts by ~1 grid cell compared to Stage 1 (expected).
 
+### ⚠️ T7.GATE — SWAN INPUT Syntax Verification (HARD GATE before deploy)
+
+**Context:** SWAN INPUT is a domain-specific language with exact syntax requirements. A missing space, wrong keyword order, or wrong parameter format produces silent failures (SWAN runs but gives garbage) or cryptic Fortran crashes. This project has a documented history of agents writing syntactically incorrect INPUT commands that pass code review but fail at runtime.
+
+**This gate applies to ANY new or modified SWAN INPUT command in Phase 7.** The only expected new commands are POINTS + TABLE additions to L2's INPUT to extract Hs/TM01 at the L3 boundary. The WLEVEL changes are VALUE changes to an existing grid file, not INPUT command changes — but must still be validated.
+
+**Mandatory verification steps:**
+
+1. **Extract every new/modified INPUT command** that Phase 7 adds. Write them to a scratch file for isolated review.
+
+2. **Cross-check each command against `docs/reference/swan-commands-extract.md`** word by word. Verify:
+   - Command name matches exactly (SWAN is case-sensitive for some keywords)
+   - Parameter count and order match the documented syntax
+   - Coordinate format matches (UTM meters for Cartesian mode, not lon/lat)
+   - String delimiters are single quotes (not double)
+   - Name strings are ≤8 characters (SWAN limit)
+   - OUTPUT time specification matches the run mode (NONSTAT for full runs, omitted for stationary)
+
+3. **Cross-check against the SWAN User Manual** (PDF at `docs/reference/swan-user-manual.pdf`). For any command not already in `swan-commands-extract.md`, extract the relevant section and add it BEFORE writing code.
+
+4. **Diff the generated INPUT file** against a known-good INPUT from the current production system. The only differences should be the new POINTS/TABLE commands for L2. Every other line must be identical.
+
+5. **Run the modified SWAN binary on weewx** in a scratch directory (copy of the production working directory) BEFORE deploying. Verify:
+   - SWAN exits 0
+   - The new TABLE output file exists and contains the expected Hs/TM01 columns
+   - All existing TABLE/CURVE outputs are unchanged (no regression)
+   - Convergence gate passes
+
+6. **Validate WLEVEL grid values** before SWAN reads them:
+   - No NaN values in the grid
+   - All values are physically reasonable (tide ± 2m range, setup 0-0.3m)
+   - Grid dimensions match the L3 CGRID
+   - Time stepping matches the run's time window
+
+**If ANY verification step fails, STOP. Do not deploy. Do not attempt to fix the syntax by guessing — re-read the manual section and the extract.**
+
+**Why this gate exists (history):**
+- SWAN-CORRECTIONS-PLAN agents wrote working SWAN INPUT. Then SWAN-FIXES-PLAN Phase 14 agents rewrote parts and broke it — wrong coordinate formats, missing HOTFILE, wrong CURVE syntax, nest file collision. Every bug had to be debugged from cryptic Fortran errors or silent zero-output.
+- Phase 14 RULES 1-5 exist because of this. Phase 7 inherits them.
+- The bare `DIFFRACTION` command (this plan, Finding B) was syntactically valid but numerically unstable — passed every code review, diverged in production.
+
 ### T7.3 — Update governing documents
 
 - Owner: Coordinator (Opus)
@@ -699,10 +740,12 @@ All of the following must be true:
 ### QC Gate 7
 
 - `clearskies-auditor` verifies:
+  - **T7.GATE passed with evidence** — every new INPUT command cross-checked against extract + manual, scratch SWAN run completed successfully, WLEVEL grid values validated.
   - Setup profile is physically reasonable for HB Pier (shoreline setup 0.15-0.20m for 1m breaker).
   - L3 WLEVEL grid contains tide + setup.
   - Convergence gate still passes.
   - TABLE output unchanged (setup is in WLEVEL, not TABLE).
+  - Diff of generated INPUT against pre-Phase-7 INPUT shows ONLY the expected new commands.
   - Docs match implementation.
   - All test baselines hold.
 
