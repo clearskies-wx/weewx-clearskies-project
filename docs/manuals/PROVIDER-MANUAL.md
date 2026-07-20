@@ -1485,11 +1485,12 @@ The bathymetry resolver (`services/bathymetry_resolver.py`) selects the highest-
 |-------|------|-----------------------|-------|
 | MHW | 80 | YES | Gulf, Atlantic, Pacific, islands |
 | MHHW | 50 | YES | Pacific coast, NE coast |
-| UNKNOWN | 34 | N/A | Must be resolved before use — see below |
+| MLLW | 21 | YES | US coast tsunami DEMs (_P/_G/_S/_N/_F suffix) |
 | NAVD88 | 32 | YES | Scattered nationwide |
-| MSL | 3 | YES | Islands, Pacific |
+| MSL | 15 | YES | Islands, Pacific, Mariana Trench |
+| PRVD02 | 1 | NO (PR only) | San Juan, Puerto Rico |
 
-**UNKNOWN datums:** 34 DEMs in the index have `"vertical_datum": "UNKNOWN"` — the `.das` OPeNDAP metadata for these files does not expose the datum. `find_best_dem()` skips DEMs with UNKNOWN datum. These must be resolved via NCEI landing-page metadata and updated in `ncei_regional_dem_index.json` before those areas can be served.
+**UNKNOWN datums (resolved):** The index previously had 34 DEMs with `"vertical_datum": "UNKNOWN"`. All were resolved in T2.1 by querying NCEI XML metadata (US coast tsunami DEMs → MLLW, EPSG:5866; island DEMs → MSL per NCEI convention). The index now has 0 UNKNOWN entries. `download_bathymetry_for_level()` in `swan.py` rejects DEMs with UNKNOWN datum — it logs an ERROR and falls through to the next source in the resolver chain. `find_best_dem()` returns the finest-resolution DEM regardless of datum; the UNKNOWN guard is downstream in the download function.
 
 **CRM datum limitation:** CRM/DEM_all has no guaranteed datum — the mosaic combines DEMs from multiple sources with mixed vertical datums without normalizing them. Datum uncertainty is an additional quality limitation of the coarse fallback (alongside its ~90m resolution). CRM-sourced areas are flagged as degraded quality in the coverage endpoint.
 
