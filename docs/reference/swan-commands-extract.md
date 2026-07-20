@@ -220,6 +220,76 @@ NUMERIC STOPC dabs=0.005 drel=0.01 curvat=0.005 npnts=99.5 STAT mxitst=50 alfa=0
 
 **Our usage:** Emitted only for L3 stationary (quick update) runs, providing both convergence criteria and the `alfa` under-relaxation that stabilizes DIFFRACTION in the iterative solver.
 
+## INPGRID — define input field grids (WLEVEL, WIND, CURRENT, BOTTOM)
+
+Syntax (regular grid, WLEVEL example):
+```
+INPGRID WLEVEL REG [xpinp] [ypinp] [alpinp] [mxinp] [myinp] [dxinp] [dyinp] NONSTAT [tbeginp] [deltinp] HR [tendinp]
+```
+
+Stationary form (omit NONSTAT and time parameters):
+```
+INPGRID WLEVEL REG [xpinp] [ypinp] [alpinp] [mxinp] [myinp] [dxinp] [dyinp]
+```
+
+- `WLEVEL` — the input field type. Other options: `BOTTOM`, `WIND`, `CURRENT`, `FRICTION`, etc.
+- `REG` — regular (uniform rectangular) grid. Also available: `CURVILINEAR`, `UNSTRUCTURED`.
+- `[xpinp] [ypinp]` — geographic origin of the input grid in problem coordinates (UTM meters for Cartesian mode).
+- `[alpinp]` — direction of positive x-axis of the input grid (degrees, Cartesian convention). Default: 0.
+- `[mxinp] [myinp]` — number of MESHES (not points!) in x and y. Number of grid points = meshes + 1.
+- `[dxinp] [dyinp]` — mesh size in x and y (meters for Cartesian mode).
+- `NONSTAT` — marks the field as time-varying. Omit for stationary (single timestep) runs.
+- `[tbeginp]` — begin time of first field (ISO format: `19870530.153000` → `YYYYMMDD.HHmmss`).
+- `[deltinp]` — time interval between fields, followed by unit (`SEC`, `MIN`, `HR`, `DAY`).
+- `[tendinp]` — end time of last field (same format as `[tbeginp]`).
+
+**Key rules:**
+- `INPGRID BOTTOM` only allows stationary input (no NONSTAT). All other field types allow nonstationary.
+- The INPGRID command must PRECEDE the corresponding READINP command.
+- One INPGRID + READINP pair per field type suffices even with multiple COMPUTE commands.
+- The input grid CAN differ from the computational grid (CGRID) — SWAN interpolates internally.
+
+**Our proven WLEVEL pattern** (from `swan_formats.py` lines 812-818, verified working):
+```
+INPGRID WLEVEL REG {x_sw} {y_sw} 0. {mxc} {myc} {dx} {dy} NONSTAT {t_start} {dt} HR {t_end}
+READINP WLEV 1. 'WLEVEL.txt' 3 0 FREE
+```
+
+Stationary (quick update, single timestep):
+```
+INPGRID WLEVEL REG {x_sw} {y_sw} 0. {mxc} {myc} {dx} {dy}
+READINP WLEV 1. 'WLEVEL.txt' 3 0 FREE
+```
+
+## READINP — read input field values from file
+
+Syntax:
+```
+READINP WLEV [fac] 'fname' [idla] [nhedf] FREE
+```
+
+- `WLEV` — read water level values (meters, positive upward, same datum as BOTTOM).
+- `[fac]` — multiplication factor applied to all values. Default 1.0. Use -1 to flip sign.
+- `'fname'` — filename containing the values.
+- `[idla]` — layout of data in the file:
+  - `1` = left-to-right, top-to-bottom (row 1 = top of grid). New map line = new file line.
+  - `2` = same as 1 but new map lines can continue on same file line.
+  - `3` = left-to-right, bottom-to-top (row 1 = bottom of grid). New map line = new file line. **This is what we use** — matches SWAN's south-to-north internal convention.
+  - `4` = same as 3 but new map lines can continue on same file line.
+- `[nhedf]` — number of header lines at the start of the file to skip. Default: 0.
+- `FREE` — free format (space-separated values).
+
+**WLEVEL.txt file layout** (for our `[idla]=3` convention):
+- One value per grid point, space-separated, free format.
+- Grid order: south-to-north, west-to-east (row 1 = southernmost row).
+- For nonstationary: one complete grid per timestep, in chronological order (no separator between timesteps).
+- Total values per timestep: `(mxinp + 1) × (myinp + 1)`.
+- For stationary: exactly one grid (single timestep).
+
+**Water level sign convention:** Positive upward relative to the same datum level as BOTTOM. When BOTTOM uses SWAN convention (positive = depth below datum), WLEVEL positive means water level ABOVE the datum. SWAN computes total depth as `BOTTOM_depth - WLEVEL` (internal sign handling).
+
+**Phase 7 note:** The setup estimate is added to the tide value at each grid point BEFORE writing WLEVEL.txt. SWAN sees one combined water level — it does not know or care that it contains both tide and setup components.
+
 ## Per-level physics summary
 
 | Command | L1 (1 km) | L2 (100 m) | L3 nonstationary | L3 stationary |
