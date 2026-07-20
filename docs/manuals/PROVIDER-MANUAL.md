@@ -1473,18 +1473,29 @@ The bathymetry resolver (`services/bathymetry_resolver.py`) selects the highest-
 
 **Elevation variable inconsistency:** Older DEMs (pre-~2015) use `Band1`; newer DEMs (post-~2018) use `z`. The index records the correct variable name per file.
 
-#### Vertical datum normalization
+#### Vertical datum consistency
 
-SWAN expects depth relative to MSL (Mean Sea Level). NCEI regional DEMs use different datums (NAVD88, MHW, MHHW, MLLW). The offsets between datums are spatially varying — a constant regional offset is wrong.
+**Requirement:** All bathymetry (BOTTOM) and water level (WLEVEL) inputs to SWAN must be referenced to the same vertical datum. Mixing datums produces depth errors that corrupt wave breaking predictions. SWAN does not detect or report datum mismatches — a mismatch produces silently wrong depth calculations.
 
-**VDatum REST API:** `_query_vdatum_offset()` queries `https://vdatum.noaa.gov/vdatumweb/api/convert` to get the MSL offset at the grid center. No API key required. Rate limit: 1 req/s. Result cached per (rounded lat, rounded lon, datum).
+**Primary strategy — match at source (ADR-098):** The SWAN pipeline reads the DEM's `vertical_datum` from the bathymetry cache and requests CO-OPS tide predictions in that datum for WLEVEL. CO-OPS performs the datum conversion server-side using authoritative tidal datum models. No local VDatum conversion is applied for the common case. Bathymetry stays in its native datum — no spatial conversion error is introduced.
 
-| Location | NAVD88→MSL offset | Impact on 2m depth |
-|----------|------------------|--------------------|
-| San Diego | -0.764m | 38% depth error |
-| Sandy Hook NJ | +0.073m | 3.7% depth error |
+**DEM datum inventory (199 NCEI regional DEMs):**
 
-On VDatum API failure: 0.0m offset applied with a warning log. The SWAN run proceeds with potentially biased bathymetry rather than failing entirely.
+| Datum | DEMs | CO-OPS direct support | Notes |
+|-------|------|-----------------------|-------|
+| MHW | 80 | YES | Gulf, Atlantic, Pacific, islands |
+| MHHW | 50 | YES | Pacific coast, NE coast |
+| UNKNOWN | 34 | N/A | Must be resolved before use — see below |
+| NAVD88 | 32 | YES | Scattered nationwide |
+| MSL | 3 | YES | Islands, Pacific |
+
+**UNKNOWN datums:** 34 DEMs in the index have `"vertical_datum": "UNKNOWN"` — the `.das` OPeNDAP metadata for these files does not expose the datum. `find_best_dem()` skips DEMs with UNKNOWN datum. These must be resolved via NCEI landing-page metadata and updated in `ncei_regional_dem_index.json` before those areas can be served.
+
+**CRM datum limitation:** CRM/DEM_all has no guaranteed datum — the mosaic combines DEMs from multiple sources with mixed vertical datums without normalizing them. Datum uncertainty is an additional quality limitation of the coarse fallback (alongside its ~90m resolution). CRM-sourced areas are flagged as degraded quality in the coverage endpoint.
+
+**Accepted datums for operator-uploaded bathymetry:** NAVD88, MLLW, MHW, MHHW, MSL. These are the datums the configured CO-OPS station supports as prediction request parameters. The operator specifies the datum on upload; the pipeline fetches CO-OPS predictions in that datum. If the operator's data is in a different datum, they convert before uploading.
+
+**Historical note:** `bathymetry_resolver.py:normalize_to_msl()` and `_query_vdatum_offset()` are preserved in the codebase for potential future edge cases (exotic datums CO-OPS does not support, international expansion) but are not called from `download_bathymetry_for_level()`. The match-at-source strategy eliminates the need for local datum conversion in all common US cases.
 
 #### USGS Great Lakes DEMs (Priority 3)
 
@@ -1797,9 +1808,24 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 | Wind forcing (hours 48–72) | GFS wind provider (§14.16) — 0.25° resolution, supplements HRRR | `(gfs, bbox, cycle_time)` |
 | Deep-water boundary | WaveWatch III (§14.3) | `(wavewatch, ...)` |
 | Bathymetry (2-D grid) | Resolver chain: operator file > NCEI regional OPeNDAP > Great Lakes > CRM fallback (§14.7) | Per-level cache: `swan_bathymetry_L{1,2,3}.json`, 180-day TTL |
-| Water level (WLEVEL) | CO-OPS tidal predictions (§14.8) — time-varying, uniform across domain, hourly (ADR-095) | Reuses existing tide fetch |
+| Water level (WLEVEL) | CO-OPS tidal predictions — fetched in the DEM's native datum (not MLLW). Datum-matched to BOTTOM per ADR-098. Display endpoint stays MLLW. | Cache key includes datum |
 | Ocean currents (CURRENT) | OFS surface current U/V (§14.10) — time-varying per grid point. Omitted when unavailable (ADR-095) | `(ofs, ...)` |
 | Coastal structures (OBSTACLE) | Wizard Overpass API discovery — native SWAN OBSTACLE command (ADR-095) | From marine location config |
+
+#### Datum matching
+
+**Rule:** SWAN requires BOTTOM (bathymetry) and WLEVEL (water level) on the same vertical datum. SWAN does not detect or report datum mismatches — a mismatch produces silently wrong depth calculations that corrupt wave breaking predictions.
+
+**Dual CO-OPS fetch:** Each SWAN run makes two separate CO-OPS tide prediction fetches:
+
+1. **Display fetch** (`datum=MLLW`): Serves the `/api/v1/tides` public endpoint. MLLW is the US chart standard. This fetch is unchanged by ADR-098 and is unaffected by any SWAN datum changes.
+2. **SWAN fetch** (`datum={DEM's vertical_datum}`): Used for WLEVEL input to SWAN. The SWAN pipeline reads the DEM's `vertical_datum` from the bathymetry cache and passes it to the CO-OPS request. CO-OPS performs the datum conversion server-side. Both fetches are cached separately; cache keys include the datum parameter.
+
+**What the pipeline does:** After downloading bathymetry, `swan.py:run_all_spots()` reads the `vertical_datum` from the bathymetry cache JSON. It then fetches CO-OPS predictions with `datum={vertical_datum}` and passes them to the SWAN runner for WLEVEL. The display endpoint (`/api/v1/tides`) continues to use `datum=MLLW` — no change to public output.
+
+**Prohibited pattern:** A single-point VDatum query applied uniformly to the entire bathymetry grid is not an acceptable alternative. Vertical datum offsets are spatially varying — tidal datums (MLLW, MHW, MHHW relative to NAVD88) vary in the cross-shore direction, exactly the direction SWAN grids extend. A single center-point offset is increasingly wrong toward the grid edges, which is where breaking and scoring occur. See `docs/planning/briefs/SWAN-DATUM-CONSISTENCY-BRIEF.md` §3.3–§3.5 for the full rationale. The match-at-source strategy avoids this class of error entirely.
+
+**Failure mode:** If the bathymetry DEM's `vertical_datum` is `"UNKNOWN"`, or if CO-OPS does not support the requested datum for the configured station, the SWAN level fails explicitly with an ERROR log. The system never proceeds with an unverified datum mismatch. There is no silent 0.0 m fallback.
 
 **SWAN runner** (`services/swan_runner.py`):
 
@@ -1910,7 +1936,7 @@ The stationary quick update now includes a WLEVEL input (current tide at compute
 
 **Working directory:** SWAN runs in `/var/run/weewx-clearskies/swan/` (fixed path, not tempfile). Subdirectories `level1/`, `level2/`, and `level3_{idx}/` (one per cluster) are cleaned at the start of each run. Hotstart files (`level1_hotstart.dat`, `level2_hotstart.dat`, `level3_{idx}_hotstart.dat`) persist between runs. Nesting file flow: Level 1 writes `nest_out.dat`, runner copies to Level 2 as `nest_in.dat`; Level 2 writes `nest_out.dat`, runner copies to Level 3 as `nest_in.dat`. The fixed path is visible from SSH (unlike `tempfile.mkdtemp` which was hidden by systemd's `PrivateTmp=yes`) and survives service restarts.
 
-**2-D bathymetry grid:** Downloaded lazily on first SWAN run via the bathymetry resolver priority chain (§14.7): operator file → NCEI regional OPeNDAP → Great Lakes → CRM fallback. Per-level caches at `/etc/weewx-clearskies/swan_bathymetry_L{1,2,3}.json` with 180-day TTL. `cudem_to_swan_bottom()` bilinear-interpolates the source grid onto SWAN grid dimensions. Sign convention: CUDEM (negative = ocean) → SWAN (positive = ocean). Vertical datum normalized to MSL via VDatum REST API.
+**2-D bathymetry grid:** Downloaded lazily on first SWAN run via the bathymetry resolver priority chain (§14.7): operator file → NCEI regional OPeNDAP → Great Lakes → CRM fallback. Per-level caches at `/etc/weewx-clearskies/swan_bathymetry_L{1,2,3}.json` with 180-day TTL. `cudem_to_swan_bottom()` bilinear-interpolates the source grid onto SWAN grid dimensions. Sign convention: CUDEM (negative = ocean) → SWAN (positive = ocean). Vertical datum consistency enforced by matching CO-OPS tide prediction datum to the bathymetry DEM's native datum. No local datum conversion for the common case (ADR-098).
 
 **Optional separated service:** When `[swan] service_url` is set to a remote host, `SwanProvider.fetch()` calls the remote HTTP endpoint instead of running SWAN locally. Health check polls `GET {service_url}/health` every 60 seconds. Three consecutive failures → log ERROR, serve last-good cache. See ARCHITECTURE.md for the standalone `weewx-clearskies-swan` package (ADR-096 renamed).
 
