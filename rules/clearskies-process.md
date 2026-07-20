@@ -447,6 +447,16 @@ These are pattern matches, not judgment calls. FAIL if any violation is found.
 
 **Vertical datum offsets are spatially varying — never use constant regional offsets.** The offset between NAVD88 and MSL is -0.764m at San Diego but +0.073m at Sandy Hook NJ. A 0.764m error in 2m of water is 38% depth error, shifting SWAN's breaking criterion by tens of meters. Use the VDatum REST API for per-location corrections.
 
+**SWAN physics commands must be per-level — shared blocks only work when all levels have similar dynamics.** A physics command that is safe at 1km resolution can diverge at 10m. SETUP and bare DIFFRACTION are both stable at coarse resolution but numerically unstable at surf-zone resolution. Per-level physics selection is mandatory for any multi-resolution nested SWAN configuration.
+
+**Why (2026-07-19):** A shared physics block applied SETUP and bare DIFFRACTION identically to all three levels. L1/L2 survived because the surf zone is sub-grid. L3 diverged the moment breaking activated — the exact hour swell arrived and QB > 0.
+
+**Never emit bare `DIFFRACTION` in SWAN — always stabilize with smoothing.** The SWAN manual explicitly warns "diffraction computations often converge poorly or not at all" without stabilization. Smoothing (`DIFFRACTION 1 0.2 [smnum]`) applies to a temporary copy and does not affect outputs. Filter width εx = ½·√(3n)·Δx; for Δx=10m target εx≈45m → smnum=27.
+
+**Silent skipping of configured inputs is a bug pattern — always log what was skipped and why.** When code iterates over configured items (structures, locations, species) and skips some, the skip must produce a WARNING log. Silent skips cause "everything looks fine" while the output is degraded.
+
+**Why (2026-07-19):** HB Pier's structure config (bearing/length/distance format) was silently skipped because the OBSTACLE assembly only handled explicit-coordinate structures. No log, no warning. The pier was absent from every SWAN run since the 3-level redesign.
+
 **Grid sizing must come from actual data (profiles, measurements), not illustrative estimates in briefs.** Research briefs contain approximate numbers for illustration. Implementation code must use real data (cached depth profiles, GSFM shelf distances) to size domains. A brief saying "~1 km offshore" is a rough estimate; the actual 15m depth contour at HB Pier is 2,350m offshore.
 
 **Why (2026-07-19):** Level 3 grid was hardcoded to 1 km offshore based on a brief illustration. The bidirectional profile showed 15m depth at 2,350m. 42% of transect CURVE points fell outside the grid and returned exception values.
