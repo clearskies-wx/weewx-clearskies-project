@@ -1420,8 +1420,18 @@ All 8 tasks done. ADRs 093-097 amended, ARCHITECTURE.md, API-MANUAL §17, PROVID
 - T6.6: directionalExposure config — DONE (verified correct).
 - T6.7: API-MANUAL scoring table — DONE (updated to match Pydantic model).
 
-### Phase 7 — NOT STARTED
-Depends on Phase 5 dashboard work completing.
+### Phase 7 — COMPLETE (2026-07-21, commit 292216e)
+
+- T7.1: HeatMapCard.tsx — custom SVG quasi-2D Hs heat map. Zone overlays (impact/foam/break), structure hatching, breaker-type glyphs, multi-bar splitBreakPoints(). A11y: role=img + aria-labelledby + sr-only data table. New types HeatMapProfileData/HeatMapTransectData; getBeachProfileAll() in client.ts; useBeachProfileAll() hook.
+- T7.2: Peel angle on Card 3 (Conditions at Break) — value, classification, directional chevron, closeout alert (role=alert). 72h forecast peelAngle row.
+- T7.2b: Wave shape indicator on Card 3 + 72h forecast waveShape row.
+- T7.3: Best peak / Avg headline on Card 3 with optional shadow height. 72h forecast bestPeak row.
+- i18n: 54 new keys in all 13 locale files.
+- TypeScript: 0 errors (npx tsc -b --noEmit).
+- Build: npx vite build — success, built in 2.10s.
+- Axe-core: 2 pre-existing violations on splash screen (color-contrast on #splash-text, region on #root) — not introduced by T7 changes.
+
+Deferred / awaiting API: All new SurfForecast fields (peelAngle, peelClassification, bestPeakFaceHeight, spotAverageFaceHeight, shadowFaceHeight, waveShapeClassification, transectCount, openTransectCount) and HeatMapProfileData (/profile?transect_index=all endpoint) render gracefully as "—" / hidden when API does not yet provide them. No blocking changes required in API repo for UI to merge.
 
 ### Phase 8 — NOT STARTED
 Depends on all prior phases.
@@ -1452,6 +1462,7 @@ Depends on all prior phases.
 - ec6ea73 — T6.5: 6 dashboard polish fixes
 - 15cc348 — T6.1: scoring bar redesign
 - 25a0f8d — T6.4: day/night icons
+- 292216e — T7.1-T7.3: heat map, peel angle, wave shape, best peak/average
 
 **Stack repo:**
 - 4c0a8ed — T2.4: wizard segment UI
