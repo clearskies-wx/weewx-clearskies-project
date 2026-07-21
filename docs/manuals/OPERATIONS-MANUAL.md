@@ -778,7 +778,11 @@ Marine locations are configured in the `[marine]` section of `api.conf`. This se
       nws_marine_zone_id = AMZ250
 
       [[[[surf]]]]
-        beach_facing_degrees = 135
+        segment_start_lat = 34.2090
+        segment_start_lon = -77.7970
+        segment_end_lat = 34.2070
+        segment_end_lon = -77.7950
+        transect_spacing_m = 10.0
         bottom_type = sand
         topographic_feature = straight_beach
         directional_exposure = E:true, SE:true, S:true, SW:true
@@ -812,13 +816,21 @@ Marine locations are configured in the `[marine]` section of `api.conf`. This se
 
 | Field | Type | Valid values | Description |
 |---|---|---|---|
-| `beach_facing_degrees` | float | [0, 360) | Compass direction the beach faces |
+| `segment_start_lat` | float | [-90, 90] | Shoreline segment start latitude. Replaces the former single-pin `spot_lat`. |
+| `segment_start_lon` | float | [-180, 180] | Shoreline segment start longitude. Replaces the former single-pin `spot_lon`. |
+| `segment_end_lat` | float | [-90, 90] | Shoreline segment end latitude. |
+| `segment_end_lon` | float | [-180, 180] | Shoreline segment end longitude. |
+| `transect_spacing_m` | float | > 0 (default: 10.0) | Spacing between cross-shore transects along the segment. |
+| `beach_facing_degrees` | float | [0, 360) | **Computed** — perpendicular to the segment line. Not operator-entered. |
+| `transect_count` | int | — | **Computed** — `segment_length_m / transect_spacing_m + 1`. Read-only. |
+| `primary_transect_index` | int | — | **Computed** — midpoint transect index. Used as the default display transect. |
 | `bottom_type` | str | `sand`, `rock`, `coral_reef`, `mixed` | Seabed composition |
 | `beach_slope` | float | — | Computed from CUDEM bathymetric profile at setup |
 | `topographic_feature` | str | `point_break`, `bay_break`, `headland`, `straight_beach` | Coastal morphology classification |
 | `directional_exposure` | dict | 8 compass directions → bool | Which swell directions reach this spot |
 | `bathymetric_profile` | list | — | Stored after CUDEM download: `[(distance_m, depth_m), ...]` |
 | `structures` | list | — | Optional coastal structures (see below) |
+| `l3_enabled` | str | `auto` (default), `on`, `off` | SWAN Level 3 grid control. `auto` enables L3 when structures exist near the spot (structure shadow requires fine-resolution modeling). `on` forces L3 regardless. `off` skips L3 — transects hand off from L2 at ~15m depth. |
 | `breaker_formula` | str | `komar_gaughan` (default), `caldwell` | Breaker height formula used to convert post-supplement Hsig to face height (T2.6). `komar_gaughan` — Komar & Gaughan (1973), general-purpose, all periods and coastlines. `caldwell` — Caldwell & Aucan (2007) H1/10 empirical predictor calibrated to steep volcanic island coasts (Oahu north shore); auto-crossover to Komar-Gaughan below Tp=10s. |
 | `surf_height_display` | str | `face` (default), `hawaiian` | Display convention for the breaking wave height in the surf card. `face` — trough-to-crest face height (Western scale). `hawaiian` — back-of-wave scale (= face height × 0.5). |
 
