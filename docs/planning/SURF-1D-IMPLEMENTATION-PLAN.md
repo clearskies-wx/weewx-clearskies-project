@@ -106,7 +106,7 @@ OBSTACLE TRANSM [kt] LINE [x1] [y1] [x2] [y2]
 4. **Per-partition swell transformation** — decompose spectrum at handoff, run each partition independently through 1D model
 5. **Swell card shows deep-water values** — from SPECOUT decomposition at handoff, not nearshore-transformed
 6. **K-G/Caldwell at actual break point** — eliminate ad-hoc depth correction in `breaker_height.py`
-7. **1D model selection: PENDING** — benchmark analytical, XBeach-1D surfbeat, SWASH-1D; decision after Phase 1
+7. **1D model selection: ANALYTICAL (Option A)** — 0.85ms/transect with numpy, 5.5s for full forecast cycle (30 transects × 3 partitions × 72 timesteps). No LUT needed. XBeach-1D surfbeat deferred to v2 for infragravity waves. Decision made 2026-07-21 after Phase 1 benchmark.
 8. **FUNWAVE-TVD excluded** — no real 1D mode; future scope for 2D structure-dominated spots only
 9. **Pin-based config replaced entirely** — no backwards compatibility needed (no other operators)
 
@@ -1360,3 +1360,87 @@ The beach profile chart becomes the cross-shore equivalent of the heat map — i
 | SURF-22 | K-G at wrong depth | 4 |
 | SURF-23 | Swell display wrong reference | 4 |
 | SURF-24 | No obstacle validation | 2 |
+
+---
+
+## Execution Progress
+
+**Last updated:** 2026-07-21
+
+### Phase 0 — COMPLETE (af14784)
+All 8 tasks done. ADRs 093-097 amended, ARCHITECTURE.md, API-MANUAL §17, PROVIDER-MANUAL §14, OPERATIONS-MANUAL updated. DESIGN-MANUAL §16 bar normalization rule updated. No implementation code changed.
+
+### Phase 1 — COMPLETE (8e28bfb)
+- T1.1: Benchmark inputs extracted from production SWAN L3 (TABLE_1, SPEC_1)
+- T1.3: Analytical 1D model implemented (575 lines, 0.85ms/transect with numpy). Commit 8e28bfb.
+- T1.6: SWAN SurfBeat-1D confirmed AVAILABLE as standard `SURFBeat` command in SWAN 41.45/51. Complements 1D model. Not currently used.
+- T1.7: **Model selected: ANALYTICAL (Option A).** 0.85ms/transect, ~5.5s for full forecast cycle (30 transects × 3 partitions × 72 timesteps). No LUT needed. XBeach-1D surfbeat deferred to v2.
+- T1.2/T1.4/T1.5: XBeach/SWASH install+benchmark DEFERRED to v2.
+
+### Phase 2 — IN PROGRESS (core API + wizard done)
+- T2.1: Segment data model — DONE (abe7c12). SurfSpotConfig uses segment fields, computed beach_facing/transect_count/primary_transect_index.
+- T2.2: Multi-transect generation — DONE (201353c). compute_spot_transects() with obstacle-aware TransectInfo, 359 lines added to swan_formats.py.
+- T2.3: Handoff depth algorithm — DONE (02ea5e7). transect_handoff.py, 742 lines, 4-step algorithm per SURF-ZONE-MODEL-BRIEF §2.3.4.
+- T2.4: Wizard shoreline segment UI — DONE (4c0a8ed, 7ed6b76). Leaflet.draw polyline, transect rendering, OBSTACLE color coding, 17 files changed in stack repo.
+- T2.7: TRANSM correction — DONE (1a3f843). Pier pilings 0.8→0.95.
+- T2.5: Admin segment editing — NOT STARTED.
+- T2.6: Pipeline continuity bridge — folded into T2.1 (primary_transect_index).
+- T2.8: Governing doc updates — NOT STARTED. OPERATIONS-MANUAL line 781/815 needs segment fields.
+- Adversarial Audit + QC Gate 2 — NOT STARTED.
+
+### Phase 3 — NOT STARTED
+**This is the next critical blocker.** T3.3 (SPECOUT extraction) must store raw 2D spectrum in the SWAN cache for the pipeline (T4.4) to activate. Currently the pipeline always returns degraded because the cache only has decomposed components, not raw freq×dir energy data.
+
+### Phase 4 — IN PROGRESS (core pipeline + wiring done)
+- T4.1b: SURF-11 decomposition fix — DONE (3d5a884). Threshold 0.05→0.005, window ±2→±4, greedy exclusion removed.
+- T4.2: Per-partition pipeline — DONE (88e87ca). surf_1d_pipeline.py, 766 lines. RSS combination, depth-limited saturation, H1/10 face height, peel angle.
+- T4.3: K-G/Caldwell fix — DONE (3d5a884). source="break_point" → 1.27×Hs, SHALLOW_DEPTH_THRESHOLD_M and lerp removed.
+- T4.4: Wire pipeline into surf endpoint — DONE (eef56fd). 105 lines added to surf.py. Graceful degradation when pipeline unavailable.
+- T4.5: Fallback/degraded mode — NOT STARTED (partially addressed by T4.4 degradation path).
+- T4.5b: Partition identity across transects — NOT STARTED.
+- T4.6: Governing doc updates — NOT STARTED.
+- Adversarial Audit + QC Gate 4 — NOT STARTED.
+
+### Phase 5 — NOT STARTED
+Depends on Phase 4 pipeline being active (needs Phase 3 T3.3).
+
+### Phase 6 — COMPLETE
+- T6.1: Scoring bar redesign — DONE (15cc348). All 6 SURF-1 points.
+- T6.2: timeOfDay scoring — DONE (87ff2a3). Dawn bonus + afternoon penalty wired.
+- T6.3: Conditions text units — DONE (3f2a151). Operator units via {unit} placeholder in 13 locales.
+- T6.4: Day/night icons — DONE (25a0f8d). Reactive scene + per-timestep isNight.
+- T6.5: Dashboard polish — DONE (ec6ea73). SURF-4,5,8,13,16,18.
+- T6.6: directionalExposure config — DONE (verified correct).
+- T6.7: API-MANUAL scoring table — DONE (updated to match Pydantic model).
+
+### Phase 7 — NOT STARTED
+Depends on Phase 4 pipeline being active.
+
+### Phase 8 — NOT STARTED
+Depends on all prior phases.
+
+### Commit Log (15 commits, 4 repos)
+
+**Meta repo:**
+- af14784 — Phase 0: governing doc updates + planning docs
+
+**API repo:**
+- abe7c12 — T2.1: segment data model
+- 02ea5e7 — T2.3: handoff depth algorithm
+- 201353c — T2.2: multi-transect generation
+- 1a3f843 — T2.7: TRANSM correction
+- 87ff2a3 — T6.2: timeOfDay scoring
+- 3f2a151 — T6.3: conditions text units
+- 8e28bfb — T1.3: analytical 1D model
+- 3d5a884 — T4.1b+T4.3: decomposition fix + K-G fix
+- 88e87ca — T4.2: per-partition pipeline
+- eef56fd — T4.4: wire pipeline into surf endpoint
+
+**Dashboard repo:**
+- ec6ea73 — T6.5: 6 dashboard polish fixes
+- 15cc348 — T6.1: scoring bar redesign
+- 25a0f8d — T6.4: day/night icons
+
+**Stack repo:**
+- 4c0a8ed — T2.4: wizard segment UI
+- 7ed6b76 — T2.4: cleanup fix
