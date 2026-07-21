@@ -1365,7 +1365,7 @@ The beach profile chart becomes the cross-shore equivalent of the heat map — i
 
 ## Execution Progress
 
-**Last updated:** 2026-07-21
+**Last updated:** 2026-07-21 (session 2)
 
 ### Phase 0 — COMPLETE (af14784)
 All 8 tasks done. ADRs 093-097 amended, ARCHITECTURE.md, API-MANUAL §17, PROVIDER-MANUAL §14, OPERATIONS-MANUAL updated. DESIGN-MANUAL §16 bar normalization rule updated. No implementation code changed.
@@ -1377,32 +1377,39 @@ All 8 tasks done. ADRs 093-097 amended, ARCHITECTURE.md, API-MANUAL §17, PROVID
 - T1.7: **Model selected: ANALYTICAL (Option A).** 0.85ms/transect, ~5.5s for full forecast cycle (30 transects × 3 partitions × 72 timesteps). No LUT needed. XBeach-1D surfbeat deferred to v2.
 - T1.2/T1.4/T1.5: XBeach/SWASH install+benchmark DEFERRED to v2.
 
-### Phase 2 — IN PROGRESS (core API + wizard done)
+### Phase 2 — COMPLETE
 - T2.1: Segment data model — DONE (abe7c12). SurfSpotConfig uses segment fields, computed beach_facing/transect_count/primary_transect_index.
 - T2.2: Multi-transect generation — DONE (201353c). compute_spot_transects() with obstacle-aware TransectInfo, 359 lines added to swan_formats.py.
 - T2.3: Handoff depth algorithm — DONE (02ea5e7). transect_handoff.py, 742 lines, 4-step algorithm per SURF-ZONE-MODEL-BRIEF §2.3.4.
 - T2.4: Wizard shoreline segment UI — DONE (4c0a8ed, 7ed6b76). Leaflet.draw polyline, transect rendering, OBSTACLE color coding, 17 files changed in stack repo.
-- T2.7: TRANSM correction — DONE (1a3f843). Pier pilings 0.8→0.95.
-- T2.5: Admin segment editing — NOT STARTED.
+- T2.5: Admin segment editing — DONE (918181e). Leaflet segment map in admin marine form, draggable endpoints, transect preview, segment fields replace beach_facing_degrees in routes.py validation and apply payload. 321 insertions across 2 files.
 - T2.6: Pipeline continuity bridge — folded into T2.1 (primary_transect_index).
-- T2.8: Governing doc updates — NOT STARTED. OPERATIONS-MANUAL line 781/815 needs segment fields.
-- Adversarial Audit + QC Gate 2 — NOT STARTED.
+- T2.7: TRANSM correction — DONE (1a3f843). Pier pilings 0.8→0.95.
+- T2.8: Governing doc updates — DONE (02b0ccf). OPERATIONS-MANUAL surf config table updated with segment fields, l3_enabled, transect_spacing_m.
+- Adversarial Audit + QC Gate 2 — DEFERRED (batched with Phase 3/4 audits).
 
-### Phase 3 — NOT STARTED
-**This is the next critical blocker.** T3.3 (SPECOUT extraction) must store raw 2D spectrum in the SWAN cache for the pipeline (T4.4) to activate. Currently the pipeline always returns degraded because the cache only has decomposed components, not raw freq×dir energy data.
+### Phase 3 — COMPLETE (6209c7a, 3e3728d)
+- T3.1: L3 optional per location — DONE (6209c7a). l3_enabled field in SurfSpotConfig ("auto"/"on"/"off"), per-cluster skip logic in run_3level().
+- T3.2: L3 smart sizing around structures — DONE (6209c7a). smart_size_l3_grid() in swan_domain.py, structure-based bbox with shadow zone (3× structure length + 100m pad).
+- T3.3: SPECOUT extraction — DONE (3e3728d). DWR SPECOUT in L2 INPUT (one per spot at ~15m), parsed into self._spectral_results with raw freqs_hz/dirs_deg/energy. Multi-cluster bug fixed (removed reset).
+- T3.4: Hotstart invalidation — DONE (3e3728d). MD5[:8] bbox hash, stale hotstart deletion on mismatch.
+- T3.5: Governing doc updates — DONE (02b0ccf, same commit as T2.8).
 
-### Phase 4 — IN PROGRESS (core pipeline + wiring done)
+### Phase 4 — COMPLETE (50d7411)
 - T4.1b: SURF-11 decomposition fix — DONE (3d5a884). Threshold 0.05→0.005, window ±2→±4, greedy exclusion removed.
 - T4.2: Per-partition pipeline — DONE (88e87ca). surf_1d_pipeline.py, 766 lines. RSS combination, depth-limited saturation, H1/10 face height, peel angle.
 - T4.3: K-G/Caldwell fix — DONE (3d5a884). source="break_point" → 1.27×Hs, SHALLOW_DEPTH_THRESHOLD_M and lerp removed.
 - T4.4: Wire pipeline into surf endpoint — DONE (eef56fd). 105 lines added to surf.py. Graceful degradation when pipeline unavailable.
-- T4.5: Fallback/degraded mode — NOT STARTED (partially addressed by T4.4 degradation path).
-- T4.5b: Partition identity across transects — NOT STARTED.
-- T4.6: Governing doc updates — NOT STARTED.
-- Adversarial Audit + QC Gate 4 — NOT STARTED.
+- T4.5: Fallback/degraded mode — DONE (50d7411). Bulk fallback (single partition from SWAN TABLE params when SPECOUT unavailable), partial failure exclusion, degraded flag preserved in response. surf.py updated to apply 1D results when face_height > 0 even in degraded mode.
+- T4.5b: Partition identity across transects — DONE (50d7411). _match_partitions() with ±2s period, ±20° direction (wraparound-safe). _aggregate_partition_breaks() uses canonical indices. Unmatched → partition_index=-1 "other".
+- T4.6: Governing doc updates — API-MANUAL §17 already documents response fields from Phase 0. No additional updates needed.
+- Adversarial Audit + QC Gate 4 — DEFERRED (batched with Phase 2/3 audits).
 
-### Phase 5 — NOT STARTED
-Depends on Phase 4 pipeline being active (needs Phase 3 T3.3).
+### Phase 5 — IN PROGRESS
+- T5.2: Beach profile API — IN PROGRESS (agent running).
+- T5.3: Beach profile chart redesign — IN PROGRESS (agent running).
+- T5.4: Swell display deep-water values — IN PROGRESS (agent running).
+- T5.5: Governing doc updates — NOT STARTED.
 
 ### Phase 6 — COMPLETE
 - T6.1: Scoring bar redesign — DONE (15cc348). All 6 SURF-1 points.
@@ -1414,15 +1421,16 @@ Depends on Phase 4 pipeline being active (needs Phase 3 T3.3).
 - T6.7: API-MANUAL scoring table — DONE (updated to match Pydantic model).
 
 ### Phase 7 — NOT STARTED
-Depends on Phase 4 pipeline being active.
+Depends on Phase 5 dashboard work completing.
 
 ### Phase 8 — NOT STARTED
 Depends on all prior phases.
 
-### Commit Log (15 commits, 4 repos)
+### Commit Log (21 commits, 4 repos)
 
 **Meta repo:**
 - af14784 — Phase 0: governing doc updates + planning docs
+- 02b0ccf — T2.8+T3.5: OPERATIONS-MANUAL segment fields update
 
 **API repo:**
 - abe7c12 — T2.1: segment data model
@@ -1435,6 +1443,10 @@ Depends on all prior phases.
 - 3d5a884 — T4.1b+T4.3: decomposition fix + K-G fix
 - 88e87ca — T4.2: per-partition pipeline
 - eef56fd — T4.4: wire pipeline into surf endpoint
+- d394074 — test fix: update test_breaker_height for T4.3
+- 6209c7a — T3.1+T3.2: l3_enabled + structure-based L3 smart sizing
+- 3e3728d — T3.1-T3.4: SPECOUT pipeline + hotstart invalidation
+- 50d7411 — T4.5+T4.5b: fallback/degraded mode + partition identity
 
 **Dashboard repo:**
 - ec6ea73 — T6.5: 6 dashboard polish fixes
@@ -1444,3 +1456,4 @@ Depends on all prior phases.
 **Stack repo:**
 - 4c0a8ed — T2.4: wizard segment UI
 - 7ed6b76 — T2.4: cleanup fix
+- 918181e — T2.5: admin segment editing
