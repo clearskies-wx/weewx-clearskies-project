@@ -1407,9 +1407,9 @@ All 8 tasks done. ADRs 093-097 amended, ARCHITECTURE.md, API-MANUAL §17, PROVID
 
 ### Phase 5 — IN PROGRESS
 - T5.2: Beach profile API — IN PROGRESS (agent running).
-- T5.3: Beach profile chart redesign — IN PROGRESS (agent running).
-- T5.4: Swell display deep-water values — IN PROGRESS (agent running).
-- T5.5: Governing doc updates — NOT STARTED.
+- T5.3: Beach profile chart redesign — DONE (pending commit). 9-element SVG rewrite: seafloor, water column (SURF-20 fix), Hs envelope, wave shapes toggle, surf zone overlays, enhanced break markers, jacking annotations, axis labels with unit+datum, transect selector. All new props optional for graceful degradation.
+- T5.4: Swell display deep-water values — DONE (pending commit). incomingSwellLabel, per-partition break info section, surfHeightLabel/swellHeightLabel rename+add in 72h forecast, new props passed to BeachProfileChart.
+- T5.5: Governing doc updates — DONE (DESIGN-MANUAL §Surf table + DASHBOARD-MANUAL §surfing).
 
 ### Phase 6 — COMPLETE
 - T6.1: Scoring bar redesign — DONE (15cc348). All 6 SURF-1 points.

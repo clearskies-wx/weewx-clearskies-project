@@ -1157,24 +1157,28 @@ Surfaces the surf scoring system (`enrichment/surf_scorer.py`). Data sources fro
    - Organization bar is a single composite score. Sub-factors (wind, swell dominance, directional spread, cross-swell) shown in the explainer modal, not on the main card.
    - All bars + penalties sum to the displayed total.
 3. **Swell Card** — `Card footprint="wide"`:
-   - Top row: 3 stats (not 4) — Swell Height (HSWELL from API), Breaking Face Height (K-G result), Period. Direction removed from top row (redundant with compass below). Swell Height and Breaking Face Height show meaningfully different values (~1.1–1.3× ratio).
+   - Top row ("CONDITIONS AT BREAK" label): 3 stats — Swell Height (HSWELL from API), Breaking Face Height (K-G result), Period. Direction removed from top row (redundant with compass below).
+   - "INCOMING SWELL (offshore)" section (T5.4, replaces old "Swell Components" label): Swell component breakdown from SWAN SPECOUT (via `multiSwell` in API response — per-timestep spectral decomposition, not NDBC broadcast).
+   - "AT BREAK" sub-section (T5.4, when `partitionBreakInfo` present): one line per swell partition showing period + direction + classification → break location + distance + face height + breaker type. Example: "16s SSW groundswell → outer bar (200m), 5ft plunging". Absent when T5.2 API data not available.
    - Compass remains as the sole direction display.
-   - Swell component breakdown from SWAN SPECOUT (via `multiSwell` in API response — per-timestep spectral decomposition, not NDBC broadcast).
 4. **Wind Card** — `Card footprint="wide" rowSpan="half"`:
    - Wind speed, gust, direction (from MarineObservation via useMarineDetail), wind quality label (from SurfForecast)
 5. **Current Conditions Card** — `Card footprint="wide" rowSpan="half"`:
    - 5-column grid: weather icon (WeatherIcon), air temp (Thermometer icon, station observation), dewpoint (Drop icon, station observation), water temp (WaterThermometerIcon, marine observation), UV index (UvIndex icon, station observation)
-6. **Beach Profile** — `Card footprint="full"` (ADR-097):
+6. **Beach Profile** — `Card footprint="full"` (ADR-097; T5.3 rewrite):
    - Cross-shore transect visualization. Data source: `GET /api/v1/surf/{id}/profile`.
-   - Inline SVG (not Recharts). X-axis: distance from shore (right-to-left, shore on right). Y-axis: elevation.
-   - Bathymetric profile line (brown/tan fill), water surface at tidal elevation, wave height envelope (blue fill), break point markers at QB peaks (vertical dashed, wave height label). Multi-break spots show multiple markers.
-   - A11y: `role="img"`, descriptive `aria-label`, sr-only data table with transect values.
+   - Inline SVG (not Recharts). viewBox 820×292 (PAD_LEFT=72, PAD_BOTTOM=72, PAD_TOP=32). Shore on right, offshore on left.
+   - 9 elements: bathymetry fill (tan/brown), water column fill (blue 0.25 opacity — SURF-20 fix), Hs envelope, optional wave shapes, surf zone overlays (impact/foam/reform), enhanced break point markers (face height, breaker type icon, partition label, jacking annotation), Y-axis title (rotated), translated axis labels with unit+datum, transect selector.
+   - Transect selector: `<label>` + `<select>` above SVG (Best Peak / Average / numbered transects). Controlled by `selectedTransect` state in SurfingTab. API re-fetch requires `useBeachProfile` hook extension (deferred).
+   - All new props optional — chart renders with existing data; zones/jacking/wave-shapes only appear when T5.2 API data is present.
+   - A11y: `role="img"`, `aria-labelledby` pointing to embedded `<title>`, sr-only data table with all transect values + break zones. Selector and wave shapes toggle keyboard-reachable.
+   - i18n keys under `marine.surfing.beachProfile.*` (see locale files): `depthAxisLabel`, `distanceAxisLabel`, `impactZone`, `foamZone`, `jackingAnnotation`, `transectSelectorLabel`, `bestPeakLabel`, `averageLabel`, `showWaveShapes`, `breakType.{spilling,plunging,surging}`, sr-only table keys.
 7. **72-Hour Surf Forecast** — `Card footprint="full"`:
    - `HorizontalScrollNav` with sticky row header column (card-glass background, labels for each row section)
    - Three sections separated by horizontal dividers:
      - **Score:** time buttons + 0-100 score (colored by star-tier mapping via `scoreTierColor`, not raw percentage)
      - **Current Conditions:** WeatherIcon + air temp (with unit) + precip % + WindSymbol + wind quality label (text wraps to second line, row height 34px for long labels like "Cross-Offshore") — all time-matched from `useForecast({ hours: 72 })`
-     - **Swells:** water temp (1 decimal, with unit) + swell height area chart (smooth cubic bezier curve, blue fill `#3b82f6`, Y-axis 0–12 ft minimum with auto-scale, gridlines at 3 ft intervals, 140px height) + swell height values row (bold foreground, with unit) + dom direction + period + energy
+     - **Swells (T5.4):** water temp (1 decimal, with unit) + swell height area chart (smooth cubic bezier curve, blue fill `#3b82f6`, Y-axis 0–12 ft minimum with auto-scale, gridlines at 3 ft intervals, 140px height) + **Surf Height row** (bold foreground, face/Hawaiian height from `getDisplayHeight`; label renamed from "Swell Height" in T5.4) + **Swell Height row** (muted foreground, raw offshore SWAN Hsig from `entry.swellHeight`; new row in T5.4) + dom direction + period + energy
    - Swell height chart line is continuous across day boundaries (unified Y-axis scale across all days)
    - Click any time column to expand a detail panel below with chip data and swell component breakdown
 8. **Tide Forecast** — `Card footprint="full"` with `TideChart`
