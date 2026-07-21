@@ -1435,7 +1435,7 @@ Deferred / awaiting API: All new SurfForecast fields (peelAngle, peelClassificat
 
 ### Phase 8 — IN PROGRESS (deployment verification)
 - T8.1: SWASH ground truth — BLOCKED. SWASH not installed (deferred to v2 in Phase 1 T1.2/T1.5).
-- T8.2: Consistency check — IN PROGRESS. Automated test being written (1D model vs linear shoaling theory in QB=0 zone).
+- T8.2: Consistency check — DONE (8064982 test, c987973 fix). Test exposed Battjes-Janssen sign error: `_battjes_janssen()` used raw negative dx, causing energy inflation instead of dissipation. Fix: `np.abs(dx)`. Impact: 20-30% Hs overestimate in pre-breaking zone corrected. Both consistency tests now pass (shoaling-only shore-normal + shoaling+refraction oblique).
 - T8.3: Iribarren validation — DEFERRED. Requires: (a) spot reconfigured with segment via wizard, (b) SWAN cycle with new SPECOUT config, (c) actual swell in the water. Current endpoint returns degraded=True with no swell (Hs=0.01m, Tp=1.97s).
 - T8.4: Webcam/surf report comparison — DEFERRED. Requires 5-10 sessions with live surf conditions over days/weeks.
 - T8.5: Peel angle validation — DEFERRED. Requires live peel angle output + webcam comparison.
@@ -1467,6 +1467,8 @@ Deferred / awaiting API: All new SurfForecast fields (peelAngle, peelClassificat
 - 3e3728d — T3.1-T3.4: SPECOUT pipeline + hotstart invalidation
 - 50d7411 — T4.5+T4.5b: fallback/degraded mode + partition identity
 - 58967d7 — T5.2: beach profile API with 1D model output
+- 8064982 — T8.2: 1D model consistency check tests
+- c987973 — T8.2 fix: correct Battjes-Janssen dissipation sign error
 
 **Dashboard repo:**
 - ec6ea73 — T6.5: 6 dashboard polish fixes
