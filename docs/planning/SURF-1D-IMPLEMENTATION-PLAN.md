@@ -1405,11 +1405,11 @@ All 8 tasks done. ADRs 093-097 amended, ARCHITECTURE.md, API-MANUAL §17, PROVID
 - T4.6: Governing doc updates — API-MANUAL §17 already documents response fields from Phase 0. No additional updates needed.
 - Adversarial Audit + QC Gate 4 — DEFERRED (batched with Phase 2/3 audits).
 
-### Phase 5 — IN PROGRESS
-- T5.2: Beach profile API — IN PROGRESS (agent running).
-- T5.3: Beach profile chart redesign — DONE (pending commit). 9-element SVG rewrite: seafloor, water column (SURF-20 fix), Hs envelope, wave shapes toggle, surf zone overlays, enhanced break markers, jacking annotations, axis labels with unit+datum, transect selector. All new props optional for graceful degradation.
-- T5.4: Swell display deep-water values — DONE (pending commit). incomingSwellLabel, per-partition break info section, surfHeightLabel/swellHeightLabel rename+add in 72h forecast, new props passed to BeachProfileChart.
-- T5.5: Governing doc updates — DONE (DESIGN-MANUAL §Surf table + DASHBOARD-MANUAL §surfing).
+### Phase 5 — COMPLETE (58967d7, c021bc3)
+- T5.2: Beach profile API — DONE (58967d7). 596 insertions. Hs envelope at 3-5m, break points with Iribarren/face height, wave shapes (Stokes/cnoidal/bore), surf zones (impact/foam/reform), jacking factors, per-partition breaks, transect_index query param ("best"/"all"/int), metadata block.
+- T5.3: Beach profile chart redesign — DONE (c021bc3). 9-element SVG rewrite: seafloor, water column 0.25 opacity (SURF-20 fix), Hs envelope, wave shapes toggle, surf zone overlays, enhanced break markers, jacking annotations, axis labels with unit+datum, transect selector.
+- T5.4: Swell display deep-water values — DONE (c021bc3). "INCOMING SWELL (offshore)" label, per-partition break info section, "Surf Height"/"Swell Height" split in 72h forecast.
+- T5.5: Governing doc updates — DONE (6634e3d). DESIGN-MANUAL + DASHBOARD-MANUAL synced.
 
 ### Phase 6 — COMPLETE
 - T6.1: Scoring bar redesign — DONE (15cc348). All 6 SURF-1 points.
@@ -1433,14 +1433,23 @@ All 8 tasks done. ADRs 093-097 amended, ARCHITECTURE.md, API-MANUAL §17, PROVID
 
 Deferred / awaiting API: All new SurfForecast fields (peelAngle, peelClassification, bestPeakFaceHeight, spotAverageFaceHeight, shadowFaceHeight, waveShapeClassification, transectCount, openTransectCount) and HeatMapProfileData (/profile?transect_index=all endpoint) render gracefully as "—" / hidden when API does not yet provide them. No blocking changes required in API repo for UI to merge.
 
-### Phase 8 — NOT STARTED
-Depends on all prior phases.
+### Phase 8 — IN PROGRESS (deployment verification)
+- T8.1: SWASH ground truth — BLOCKED. SWASH not installed (deferred to v2 in Phase 1 T1.2/T1.5).
+- T8.2: Consistency check — IN PROGRESS. Automated test being written (1D model vs linear shoaling theory in QB=0 zone).
+- T8.3: Iribarren validation — DEFERRED. Requires: (a) spot reconfigured with segment via wizard, (b) SWAN cycle with new SPECOUT config, (c) actual swell in the water. Current endpoint returns degraded=True with no swell (Hs=0.01m, Tp=1.97s).
+- T8.4: Webcam/surf report comparison — DEFERRED. Requires 5-10 sessions with live surf conditions over days/weeks.
+- T8.5: Peel angle validation — DEFERRED. Requires live peel angle output + webcam comparison.
+- T8.6: Scoring recalibration — DEFERRED. Requires non-degraded pipeline output with real swell. Current scoring returns 0 due to flat conditions.
+- **Deployment status:** API deployed to weewx (exit 0), dashboard deployed to weather-dev (exit 0). API healthy. No DWR SPECOUT files yet — next SWAN cycle will produce them. Spot needs segment reconfiguration via wizard to activate multi-transect pipeline (currently transectCount=1, openTransectCount=0).
 
-### Commit Log (21 commits, 4 repos)
+### Commit Log (25 commits, 4 repos)
 
 **Meta repo:**
 - af14784 — Phase 0: governing doc updates + planning docs
 - 02b0ccf — T2.8+T3.5: OPERATIONS-MANUAL segment fields update
+- 9828da6 — docs: execution progress update (Phases 2-5)
+- 6634e3d — T5.5: sync DESIGN-MANUAL, DASHBOARD-MANUAL with Phase 5
+- 2f4c158 — docs: Phase 7 COMPLETE
 
 **API repo:**
 - abe7c12 — T2.1: segment data model
@@ -1457,11 +1466,13 @@ Depends on all prior phases.
 - 6209c7a — T3.1+T3.2: l3_enabled + structure-based L3 smart sizing
 - 3e3728d — T3.1-T3.4: SPECOUT pipeline + hotstart invalidation
 - 50d7411 — T4.5+T4.5b: fallback/degraded mode + partition identity
+- 58967d7 — T5.2: beach profile API with 1D model output
 
 **Dashboard repo:**
 - ec6ea73 — T6.5: 6 dashboard polish fixes
 - 15cc348 — T6.1: scoring bar redesign
 - 25a0f8d — T6.4: day/night icons
+- c021bc3 — T5.3+T5.4: beach profile chart redesign + swell display
 - 292216e — T7.1-T7.3: heat map, peel angle, wave shape, best peak/average
 
 **Stack repo:**
