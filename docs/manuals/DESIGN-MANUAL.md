@@ -1340,11 +1340,26 @@ Surf and fishing tabs display scoring factor breakdowns as horizontal bar segmen
 - Star rating: 5 star SVG icons, filled stars use the score tier color, unfilled stars use `--muted-foreground` at 25% opacity
 - Quality label text below stars in the matching tier color
 
-### Score bar normalization rule (ADR-096)
+### Score bar normalization rule (SURF-1, supersedes ADR-096 bar rule)
 
-**Score bars fill relative to each factor's own maximum, not to 100.** Fill width = `(score / factorMax) * 100%`. A Wave Height score of 28/35 renders as 80% fill, not 28% fill. A Wave Organization score of 24/30 renders as 80% fill, not 24% fill. This applies to both surf and fishing score cards.
+**Score bars fill relative to 100 (the total possible score).** Fill width = `Math.min(100, Math.abs(score))%`. A Wave Height score of 35 fills 35% of the bar. A Beach Alignment penalty of −16 fills 16%. This shared scale makes all six items visually proportional and their widths add up to explain the total score.
 
-**Color reflects performance within the factor's range:** green for high relative score, amber for mid, muted for low — all relative to the factor's maximum, not to 100.
+**Two-column layout with headers:**
+- Column 1: **"COMPONENTS"** — the three weighted factors (Wave Height max 35, Wave Period max 35, Wave Organization max 30)
+- Column 2: **"ADJUSTMENTS"** — the three signed modifiers (Beach Alignment, Directional Exposure, Time of Day)
+- Headers use `--text-micro` size, uppercase, `--muted-foreground` color, slight letter-spacing
+
+**Color signals sign:**
+- **Positive factors:** fill color from score tier palette based on relative performance within category
+- **Penalties (negative adjustments):** always `--score-1` (orange)
+- **Bonuses (positive adjustments):** `--score-3` (lime/green)
+- **Zero adjustments:** transparent fill
+
+**Labels state "out of what":**
+- Factors: "35/35", "21/35", "26/30"
+- Adjustments: "−16 pts", "0 pts", "+5 pts"
+
+**Additive identity:** Six displayed values must visibly sum to the total score.
 
 ### Scoring explainer modal (surf tab)
 

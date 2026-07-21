@@ -82,9 +82,25 @@ Five changes to the surf scoring system:
 - **Files affected (Dashboard):** `SurfingTab.tsx`, all 13 locale `marine.json` files.
 - **Files affected (Docs):** `ARCHITECTURE.md`, `API-MANUAL.md`, `PROVIDER-MANUAL.md`, `OPERATIONS-MANUAL.md`, `DASHBOARD-MANUAL.md`, `CLAUDE.md`, `rules/clearskies-process.md`.
 
+## Amendments
+
+### Amendment 1 (2026-07-21): Multi-transect scoring inputs
+
+Per SURF-ZONE-MODEL-BRIEF and SURF-1D-IMPLEMENTATION-PLAN:
+
+**Scoring inputs — amended.** Wave height, period, direction now come from multi-transect best-peak or spot-average (configurable), not single-point reference. Best peak = highest face height among open (non-structure-affected) transects. Spot average = mean face height across open transects.
+
+**Cross-swell scoring — amended.** Input from SPECOUT decomposition at the deep-water reference point (L2 at ~15m), not "at ~10m." Multiple partitions expected — the decomposition fix (SURF-11) ensures all components survive. Cross-swell interference detection operates on the canonical partition list.
+
+**New scoring inputs (planned extensions):**
+- **Peel angle → surfability sub-factor** (within wave organization). Peel angle computed from multi-transect break point spatial variation. Closeouts (<30°) penalize; optimal (45-66°) bonus. Added to scoring weights after validation (Phase 8).
+- **Jacking factor → wave quality sub-factor.** High jacking (>1.5×) indicates steep bars with hollow waves — bonus for experienced surfers. Added after validation (Phase 8).
+
+**Face height input — amended.** `breakingFaceHeight` now comes from H1/10 (1.27× Hs) applied at the 1D model's break point, not full K-G at ~10m. Scoring thresholds (`_WAVE_HEIGHT_RANGES_FT`) must be validated against the new face height values before deployment.
+
 ## References
 
-- Related: ADR-093 (SWAN+TruShore), ADR-095 (SWAN model corrections)
+- Related: ADR-093 (SWAN replaces NWPS), ADR-095 (SWAN model corrections)
 - Amends: ADR-094 windSource field values: `"hrrr_trushore"` → `"hrrr"`, `"gfs_trushore"` → `"gfs"`
 - Precedent: KEWL Mermaid messiness rating (directional spread at 30% of a sub-score)
-- Plan: `docs/planning/SWAN-CORRECTIONS-PLAN.md` Phases 1, 4
+- Plan: `docs/planning/SWAN-CORRECTIONS-PLAN.md` Phases 1, 4, `docs/planning/SURF-1D-IMPLEMENTATION-PLAN.md`

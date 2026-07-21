@@ -2052,19 +2052,20 @@ Surf quality forecast for one spot at one timestep.
 
 #### SurfScoringBreakdown
 
-Per-factor scoring detail returned inside each `SurfForecast` entry.
+Per-factor scoring detail returned inside each `SurfForecast` entry. Three weighted factors (max 100) plus three signed adjustments. Additive identity: `total = waveHeight + wavePeriod + waveOrganization + beachAlignment + directionalExposure + timeOfDay`.
 
 | Field | Type | Description |
 |---|---|---|
-| `waveHeight` | float | Wave height factor score (0–100) |
-| `wavePeriod` | float | Wave period factor score (0–100) |
-| `windQuality` | float | Wind quality factor score (0–100, clamped from raw ≤120) |
-| `swellDominance` | float | Swell dominance factor score (0–100) |
-| `beachAlignment` | float | Beach alignment multiplier × 100 (100 = direct hit, 30 = 70% penalty) |
-| `waveHeightWeight` | int | 35 |
-| `wavePeriodWeight` | int | 35 |
-| `windQualityWeight` | int | 20 |
-| `swellDominanceWeight` | int | 10 |
+| `waveHeight` | int | Wave height factor score (0–35) |
+| `wavePeriod` | int | Wave period factor score (0–35+; multipliers may exceed 35) |
+| `waveOrganization` | int | Wave organization composite score (0–30) |
+| `organizationWind` | float | Wind effect contribution within organization (0–~15; 50% of 30) |
+| `organizationSwellDominance` | float | Swell dominance contribution (0–7.5; 25% of 30) |
+| `organizationDirectionalSpread` | float | Directional spread contribution (0–4.5; 15% of 30). From SWAN DSPR. |
+| `organizationCrossSwell` | float | Cross-swell interference contribution (0–3; 10% of 30). From SPECOUT. |
+| `beachAlignment` | int | Signed; beach angle alignment adjustment (0 = direct hit, negative = misaligned) |
+| `directionalExposure` | int | Signed; 0 when open, negative when blocked by headland/bathymetry |
+| `timeOfDay` | int | Signed; positive at dawn (bonus), negative in afternoon (penalty), 0 otherwise |
 
 #### FishingForecast
 
@@ -2366,19 +2367,48 @@ Four enrichment processors for marine data. Each follows the existing enrichment
 
 **WaveWatch III is NOT a surf forecast source.** WW3 remains the deep-water boundary input to SWAN (via `providers/marine/wavewatch.py`) and continues serving the marine endpoint's offshore forecast. WW3 is never used as a surf endpoint data source. The surf endpoint serves the last successful SWAN cache if the runner fails — no fallback to any other model.
 
-**Data pipeline per forecast timestep (ADR-095 corrected):**
+**Data pipeline per forecast timestep (ADR-095 corrected, amended for 1D model):**
+
+```
+SWAN L2 deep-water SPECOUT at ~15m depth
+  → spectral decomposition → N swell partitions
+  → store as multiSwell (deep-water values, comparable to NDBC buoy)
+
+SWAN handoff SPECOUT (L3 at structure-affected depth, or L2 at 15m for open spots)
+  → spectral decomposition → N partitions for 1D model input
+  → match to canonical partition list from deep-water SPECOUT
+
+Each partition × each transect → independent 1D model run (handoff to shore)
+  → Hs at 3-5m CUDEM resolution
+  → break point: H/d = gamma crossing
+  → breaker type: Iribarren number (xi_0)
+  → wave shapes: Stokes/cnoidal by depth regime
+
+At each transect point: Hs_total = sqrt(sum(Hs_partition_i²))
+  → combined saturation check: Hs_total ≤ γd
+
+At each partition's break point:
+  → face height = 1.27 × Hs (Rayleigh H1/10, source="break_point")
+  → store as breakingFaceHeight
+
+Across open transects:
+  → best peak face height, spot average face height
+  → peel angle from break point spatial variation
+
+surf_scorer.score_surf(bestPeakFaceHeight, DSPR, partitions, ...) → quality score
+```
+
+**Legacy pipeline (fallback when 1D model unavailable):**
 
 ```
 SWAN cross-shore CURVE transect output
   → find ~10m depth point on transect
   → HSWELL at ~10m depth → store as swellHeight
   → HSIGN at ~10m depth → wave_transform.apply_supplements() → corrected Hsig
-  → store as waveHeightAtBreak (backward compatible — post-supplement Hsig)
-  → breaker_height.hsig_to_face_height(corrected_hsig, Tp, depth, formula)
-  → store as breakingFaceHeight (trough-to-crest breaking face height)
-  → breaker_height.hawaiian_height(face_height) → store as breakingHawaiianHeight (×0.5)
-  → SPECOUT at ~10m → spectral decomposition → store as multiSwell
-  → surf_scorer.score_surf(breakingFaceHeight, DSPR, SPECOUT, ...) → quality score
+  → store as waveHeightAtBreak (backward compatible)
+  → breaker_height.hsig_to_face_height(corrected_hsig, Tp, depth, formula, source="deep_water")
+  → store as breakingFaceHeight
+  → degraded: true in response
 ```
 
 **SWAN integration (ADR-095 corrections):**
@@ -2406,16 +2436,23 @@ SWAN cross-shore CURVE transect output
 
 **Two-tier schedule:** Full runs 4× daily on extended HRRR cycles (00/06/12/18Z) — outer + inner grids, 72-hour nonstationary forecast, ~7–12 min runtime. Hourly quick updates between full runs — stationary inner nest only with latest HRRR wind, <1 min runtime, single-snapshot merged into the existing forecast cache. Quick updates keep the "current conditions" entry fresh (< 1 hour old) without re-running the expensive outer grid. Not in the request path. Cache TTL = 6 hours (matches extended cycle interval). On failure, last-good cache retained indefinitely — stale SWAN data is always preferred to no data.
 
-**Four height fields in every `SurfForecast` entry:**
+**Height fields in every `SurfForecast` entry (amended for 1D model):**
 
 | Field | What it is | Source |
 |---|---|---|
-| `swellHeight` | Swell-only wave height at ~10m depth on the cross-shore transect | HSWELL from SWAN TABLE at ~10m depth point (ADR-095) |
-| `waveHeightAtBreak` | Post-supplement total wave height at ~10m (backward compatible) | HSIGN at ~10m → wave_transform.apply_supplements() |
-| `breakingFaceHeight` | Trough-to-crest breaking face height via breaker formula at ~10m | After breaker_height.hsig_to_face_height() applied to ~10m HSIGN |
+| `swellHeight` | Dominant deep-water swell partition height | Deep-water SPECOUT decomposition at ~15m (L2). Comparable to NDBC buoy reports. |
+| `waveHeightAtBreak` | Post-supplement total wave height (backward compatible) | HSIGN at break point from 1D model (or ~10m SWAN fallback) |
+| `breakingFaceHeight` | Trough-to-crest breaking face height at actual break point | 1.27 × Hs at 1D model break point (H1/10 Rayleigh factor). Best peak across open transects. |
 | `breakingHawaiianHeight` | Back-of-wave height (×0.5 of face height) | breakingFaceHeight × 0.5 |
+| `bestPeakFaceHeight` | Highest face height among open transects | Max of breakingFaceHeight across non-structure-affected transects |
+| `spotAverageFaceHeight` | Mean face height across open transects | Mean of breakingFaceHeight across non-structure-affected transects |
+| `peelAngle` | Break line angle relative to wave crest | Computed from break point spatial variation across adjacent open transects (degrees) |
+| `peelClassification` | Peel angle classification | `"closeout"` (<30°), `"fast"` (30-45°), `"good"` (45-66°), `"mellow"` (>66°) |
+| `transectCount` | Total transects in measurement zone | Integer |
+| `openTransectCount` | Transects not crossing any OBSTACLE | Integer |
+| `degraded` | 1D model fallback indicator | `true` when 1D model failed and legacy SWAN pipeline used |
 
-**swellHeight and breakingFaceHeight are meaningfully different values.** At ~10m depth, SWAN has handled refraction but not final shoaling-to-breaking. K-G applies ~60–80% of full amplification. For typical groundswell: breakingFaceHeight ≈ 1.1–1.3× swellHeight.
+**swellHeight and breakingFaceHeight are now from fundamentally different sources.** `swellHeight` is the dominant deep-water partition from SPECOUT decomposition at ~15m — what's arriving at the coast. `breakingFaceHeight` is H1/10 (1.27× Hs) at the actual break point from the 1D model — what surfers see. The ratio varies with bathymetry, swell period, and tide.
 
 All four fields are present in every response regardless of the operator's `surfHeightDisplay` preference. The API returns all representations; the dashboard selects which to show as primary.
 
@@ -2514,13 +2551,13 @@ All physics constants (γ bounds, Kt values, topographic multipliers) defined as
 ### Surf quality scorer (ADR-096 restructure)
 
 **File:** `enrichment/surf_scorer.py`
-**Registration:** Against the surf endpoint — runs after wave_transform and breaker height conversion.
-**Inputs:** `breakingFaceHeight` (from `breaker_height.hsig_to_face_height()` at ~10m depth), DSPR (from SWAN TABLE at ~10m), SPECOUT spectral components (from SWAN at ~10m), spot config (beach facing, directional exposure), wind data (HRRR for forecast timesteps, station hardware for `t=0`).
-**Outputs:** `SurfForecast` with quality_stars (1–5), quality_label, conditions_text, full scoring breakdown.
+**Registration:** Against the surf endpoint — runs after 1D model pipeline (or wave_transform fallback) and breaker height conversion.
+**Inputs:** `breakingFaceHeight` (from H1/10 at 1D model break point, or legacy K-G fallback), DSPR (from SWAN TABLE), SPECOUT spectral components (deep-water reference from L2 at ~15m), spot config (beach facing, directional exposure, measurement zone segment), wind data (HRRR for forecast timesteps, station hardware for `t=0`), multi-transect aggregation (best peak, spot average from open transects).
+**Outputs:** `SurfForecast` with quality_stars (1–5), quality_label, conditions_text, full scoring breakdown, peel angle, wave shape classification.
 
-**All scoring data from SWAN (ADR-096).** NDBC spectral data is NOT passed to the scorer. The `_effective_swell()` NDBC override is removed. The scorer uses SWAN height/period/direction directly. NDBC spectral data is retained in the surf response as reference data but does not feed scoring or multiSwell.
+**All scoring data from SWAN + 1D model (ADR-096, amended).** NDBC spectral data is NOT passed to the scorer. The scorer uses multi-transect 1D model output for wave height (best peak or average from open transects), deep-water SPECOUT for swell composition, and SWAN TABLE for DSPR. NDBC spectral data is retained in the surf response as reference data but does not feed scoring or multiSwell.
 
-**Scorer uses `breakingFaceHeight`, not raw Hsig.** The scoring thresholds (`_WAVE_HEIGHT_RANGES_FT`) are calibrated in face-height feet. This means two timesteps with identical Hsig but different periods produce different height scores — the longer period amplifies face height via the breaker formula.
+**Scorer uses `breakingFaceHeight`, not raw Hsig.** The scoring thresholds (`_WAVE_HEIGHT_RANGES_FT`) are calibrated in face-height feet. **Scoring recalibration required** — the 1D model's break-point H1/10 face heights will differ from the legacy ~10m K-G values. Thresholds must be validated against the new face heights before deployment (Phase 8).
 
 **Wind source for surf quality scoring (HARD RULE):**
 

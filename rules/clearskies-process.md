@@ -73,7 +73,6 @@ Incident history and rationale at [reference/process-rule-history.md](../referen
 
 Use the Nygard format. Template at `docs/decisions/_TEMPLATE.md`. Required: Status, Context, Options considered, Decision, Consequences, Implementation guidance, References.
 
-**Concise, not padded.** ~80 lines standard, ~150 for parent-pattern ADRs. Cut: historical recaps, multi-paragraph option analysis, implementation mockups, trade-off prose restating the obvious. Keep: the decision in 1-2 sentences, one-line verdicts per option, concrete consequences, out-of-scope items.
 
 **Status workflow:** Proposed → Accepted → (rarely) Superseded by ADR-NNN. Pinned = placeholder.
 

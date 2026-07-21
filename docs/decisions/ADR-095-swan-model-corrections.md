@@ -80,10 +80,34 @@ Four corrections to the SWAN integration:
 - **SPECOUT:** At ~10m depth point only (one per spot, not entire transect). 2D directional-frequency spectrum for spectral decomposition.
 - **Files affected:** `services/swan_runner.py`, `services/swan_formats.py`, `enrichment/wave_transform.py` (remove Supplement 2), `endpoints/surf.py` (pass tide data to runner), `config/marine_config.py` (structure → OBSTACLE mapping).
 
+## Amendments
+
+### Amendment 1 (2026-07-21): Multi-transect + 1D model corrections
+
+Per SURF-ZONE-MODEL-BRIEF and SURF-1D-IMPLEMENTATION-PLAN:
+
+**Decision 1 (CURVE transect) — amended.** CURVE is retained for L3-enabled spots as a diagnostic/validation output. The 1D model replaces CURVE as the primary cross-shore data source for the surf endpoint. CURVE spacing change from 50m to 10m (SURF-19) still applies for L3 validation.
+
+**SPECOUT extraction — amended.** Changes from "at ~10m depth point per spot" to two distinct SPECOUT purposes:
+
+1. **Deep-water reference SPECOUT (for swell display card):** One per spot, extracted from L2 at ~15m depth (L2→L3 boundary). This is the truest pre-nearshore spectrum available — before L3's structure interaction, before significant shoaling. The swell card decomposes THIS spectrum and shows the partitions as "incoming swell." At 15m, a 16s swell has shoaled only ~5%, so values are close to true deep-water and comparable to NDBC buoy readings.
+
+2. **Handoff SPECOUT (for 1D model boundary condition):** One per unique grid cell at each transect's handoff depth. For L3-enabled spots: from L3 grid at the structure-affected handoff depth. For L3-disabled spots: same as the deep-water reference (L2 at 15m). This spectrum feeds the 1D model — it includes structure effects when applicable.
+
+Multiple SPECOUT points per spot (one per unique handoff cell). Deduplicated — transects sharing the same grid cell share one SPECOUT.
+
+**K-G/Caldwell — amended.** Applied at the break point from the 1D model output, NOT at the ~10m reference point. Specifically: at `source="break_point"`, only the Rayleigh H1/10 factor (1.27× Hs) is applied for face height — NOT the full K-G deepwater formula — because the 1D model's break-point Hs is already fully shoaled. Full K-G retained as fallback for `source="deep_water"` (legacy path). The ad-hoc depth correction (`SHALLOW_DEPTH_THRESHOLD_M` and lerp logic) is eliminated.
+
+**Swell decomposition reference — amended.** multiSwell components come from SPECOUT decomposition at the deep-water reference point (L2 at ~15m), not from a nearshore ~10m point. The swell card shows what's arriving, comparable to NDBC buoy partitions.
+
+**Break point authority — amended.** 1D model's H/d = gamma crossing is the primary break point. SWAN's QB retained as diagnostic only.
+
+**Acceptance criteria updated** to reflect multi-transect output shape: SPECOUT per unique handoff cell (not one per spot), 1D model break points as primary authority, face height from H1/10 at break point.
+
 ## References
 
-- Related: ADR-093 (SWAN+TruShore replaces NWPS), ADR-094 (HRRR wind source)
-- Research: `docs/planning/briefs/WAVE-BREAKING-CONVERSION-BRIEF.md` §4 (output depth ~10m)
+- Related: ADR-093 (SWAN replaces NWPS), ADR-094 (HRRR wind source)
+- Research: `docs/planning/briefs/WAVE-BREAKING-CONVERSION-BRIEF.md` §4, `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md`
 - SWAN user manual: §4.5.2 (INPGRID WLEVEL/CURRENT), §4.5.4 (OBSTACLE), §4.6.1 (CURVE), §4.6.2 (TABLE/SPECOUT)
 - SWAN technical manual: Battjes-Janssen breaking, triad interactions, obstacle formulas
-- Plan: `docs/planning/SWAN-CORRECTIONS-PLAN.md` Phases 2–3
+- Plan: `docs/planning/SWAN-CORRECTIONS-PLAN.md` Phases 2–3, `docs/planning/SURF-1D-IMPLEMENTATION-PLAN.md`

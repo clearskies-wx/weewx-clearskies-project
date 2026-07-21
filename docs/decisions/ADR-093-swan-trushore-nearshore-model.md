@@ -64,9 +64,27 @@ The four supplements from ADR-084 (γ correction, structure effects, spatial int
 - **Optional separated service:** `weewx-clearskies-trushore` pip package for operators who want SWAN on dedicated hardware. API reads from it via `[trushore] service_url`. See Phase 4 of the implementation plan.
 - **Memory budget:** Total SWAN memory must stay under 300 MB (both grid levels combined) to coexist with the API, MariaDB, Redis, and weewx on a 2 GB host.
 
+## Amendments
+
+### Amendment 1 (2026-07-21): Multi-transect architecture and optional L3
+
+Per SURF-ZONE-MODEL-BRIEF and SURF-1D-IMPLEMENTATION-PLAN:
+
+**1. L3 grid is now optional per location.** L3 is enabled automatically when Overpass API discovers structures near the spot, disabled for open beaches. The operator can override in admin (force L3 on/off per location). Spots with no structures skip L3 entirely — SPECOUT extracted from L2 at ~15m depth.
+
+**2. When L3 is enabled, grid is smart-sized around structures.** L3 bbox is computed from structure positions + shadow zone extent (structure length + 2× structure length downstream in predominant wave direction) + 100m pad. A single pier on a 1km beach produces a ~500m L3 grid, not a 1km+ grid. Transects outside the L3 bbox hand off from L2 at ~15m depth.
+
+**3. Multi-transect architecture replaces single-pin transect.** The operator draws a shoreline segment (not a pin) to define the surfable zone. The system generates transects perpendicular to local isobath orientation at 10m spacing across the segment. Each transect is cross-checked against OBSTACLE structures — transects crossing an OBSTACLE are flagged as "structure-affected" and excluded from headline metrics (best peak, spot average). Structure-affected transects are still rendered on the heat map.
+
+**4. 1D model runs from handoff to shore per transect.** SWAN runs 2D all the way to shore. At the handoff depth (10m default, shallower for structure-shadowed transects, per the pre-model handoff algorithm), the full 2D spectrum is extracted via SPECOUT. A 1D cross-shore wave transformation model then runs independently per transect from the handoff to shore, providing Hs at 3-5m resolution, break points, breaker classification, wave shapes, surf zone widths, jacking factor, and peel angle. Model selection pending Phase 1 benchmark (analytical, XBeach-1D surfbeat, SWASH-1D).
+
+**5. Compute budget updated.** L3 compute is proportional to structure coverage, not beach length. Spots with no structures skip L3 entirely. The 1D analytical model adds ~30-90ms per spot (30 transects × 3 partitions × ~1ms) — negligible relative to SWAN runtime.
+
+**6. Pin-based configuration replaced entirely.** No backwards compatibility needed (no other operators). The shoreline segment replaces `spot_lat`, `spot_lon`, `beach_facing_degrees` with `segment_start_lat/lon`, `segment_end_lat/lon`, and `transect_spacing_m`.
+
 ## References
 
 - Supersedes: ADR-084 (NWPS as primary nearshore source with supplementation)
 - Related: ADR-094 (HRRR forecast wind source for surf scoring)
-- Research: `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md`
-- Plan: `docs/planning/SWAN-TRUSHORE-PLAN.md`
+- Research: `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md`, `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md`
+- Plan: `docs/planning/SWAN-TRUSHORE-PLAN.md`, `docs/planning/SURF-1D-IMPLEMENTATION-PLAN.md`

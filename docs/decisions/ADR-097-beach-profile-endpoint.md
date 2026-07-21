@@ -86,8 +86,36 @@ Response shape:
 - **Card placement:** `footprint="full"` (1×4 horizontal), positioned before the 72-Hour Forecast card on the surf tab.
 - **Out of scope:** Animated wave rendering, interactive time-step scrubbing. Static profile for current timestep only.
 
+## Amendments
+
+### Amendment 1 (2026-07-21): 1D model output replaces SWAN CURVE
+
+Per SURF-ZONE-MODEL-BRIEF and SURF-1D-IMPLEMENTATION-PLAN:
+
+**Beach profile endpoint returns 1D model output.** Hs at every 3-5m resolution (replacing SWAN CURVE at 50m). Break points from 1D model H/d crossing (replacing SWAN QB threshold). Wave shape data from analytical computation (Stokes/cnoidal) at each transect point.
+
+**Multiple transects available.** Endpoint accepts a `transect_index` query parameter (default: best-peak transect for the current timestep). Also accepts `transect_index=all` for the heat map visualization.
+
+**Response includes per-partition break info:** which swell component breaks where along the profile. Each break point annotated with the canonical partition it belongs to (e.g., "16s SSW groundswell breaks at outer bar").
+
+**New response fields:**
+- `waveShapes` — at each profile point, the local wave surface computed from theory (Stokes 2nd order in intermediate water, cnoidal in shallow water, bore/turbulent post-breaking). Represented as discretized wave surface profiles: array of (phase, elevation) pairs relative to local still water level.
+- `surfZones` — classified zones along the transect:
+  - `impact_zone`: outer break to 50% energy loss — `{start_distance, end_distance, start_depth, end_depth}`
+  - `foam_zone`: 50% energy loss to bore minimum — same fields
+  - `total_surf_zone`: outer break to swash — `{width_m, start_distance, end_distance}`
+  - `reform_trough`: gap between outer and inner break zones on multi-bar beaches (if present)
+- `jackingFactor` — per-bar Hs_bar_crest / Hs_approach
+- `perPartitionBreaks` — per-partition break info with canonical partition ID, break location, face height, breaker type
+- `transectBearing` — degrees true north
+- `obstacleFlag` — whether this transect crosses an OBSTACLE
+- `verticalDatum` — DEM vertical datum (e.g., "NAVD88")
+
+**Break detection amended.** 1D model's H/d = gamma crossing is the primary break point (not SWAN QB peaks). Multiple break points for multi-bar beaches.
+
 ## References
 
-- Related: ADR-095 (cross-shore transect output), ADR-093 (SWAN+TruShore)
+- Related: ADR-095 (cross-shore transect output), ADR-093 (SWAN replaces NWPS)
+- Research: `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md`
 - SWAN user manual: §4.6.1 CURVE, §4.6.2 TABLE (QB, DISSURF quantities)
-- Plan: `docs/planning/SWAN-CORRECTIONS-PLAN.md` Phases 5–6
+- Plan: `docs/planning/SWAN-CORRECTIONS-PLAN.md` Phases 5–6, `docs/planning/SURF-1D-IMPLEMENTATION-PLAN.md`
