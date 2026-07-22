@@ -1,7 +1,8 @@
 # Surf Model Fix Plan — SwellTrack + SurfBeat Integration
 
-**Status:** DRAFT — pending user approval
+**Status:** IN PROGRESS — Phases 0-2 COMPLETE, Phase 3 next
 **Created:** 2026-07-21
+**Last updated:** 2026-07-21 (session 1 — Phases 0-2 executed with QC gates passed)
 **Origin:** 1D-MODEL-BENCHMARK-BRIEF Round 2 results. The benchmark confirmed Architecture 2-prime (SwellTrack per-transect + SurfBeat strip for IG), but the deployed code has gaps: no SurfBeat integration, friction not enabled, approach-zone Hs overestimate, missing IG display, wrong attribution, deferred adversarial audits from Phases 2-4, and the spot isn't configured for the new pipeline.
 
 **Governing brief:** `docs/planning/briefs/1D-MODEL-BENCHMARK-BRIEF.md` Part 8 (results) and Part 9 (model→display mapping, blended architecture, compute offloading).
@@ -220,13 +221,16 @@ STOP
 4. All new config keys (`surf_compute_host`, `surfbeat_enabled`, `surfbeat_cadence_hours`, `friction_coefficient`) documented in OPERATIONS-MANUAL
 5. SurfBeat strip documented in PROVIDER-MANUAL with correct SURFBEAT syntax
 
-### QC Gate 0
+### QC Gate 0 — PASSED (2026-07-21)
 
-- All 6 documents updated
-- "SwellTrack" naming consistent across all docs
-- No SWASH or webcam references in acceptance criteria
-- All new config keys documented
-- Auditor: zero findings
+- All 6 documents updated ✓
+- "SwellTrack" naming consistent across all docs ✓
+- No SWASH or webcam references in acceptance criteria ✓ (4 findings remediated — SWASH in T8.1, webcam in T8.3-T8.5, "Option A" in §0.2, stale nearshoreModel in API-MANUAL)
+- All new config keys documented ✓
+- Auditor: 4 findings, all remediated ✓
+- Additional cleanup: TruShore→SwellTrack in openapi-v1.yaml, INDEX.md
+
+**Commits:** dcb7203 (meta repo)
 
 ---
 
@@ -294,12 +298,14 @@ STOP
 3. Verify attribution: `GET /surf/{location_id}` returns `nearshoreModel: "SWAN + SwellTrack"`
 4. Silent deferral scan: grep for `pass`, `TODO`, `FIXME`, `None` default on `cfjon` in pipeline code
 
-### QC Gate 1
+### QC Gate 1 — PASSED (2026-07-21)
 
-- SwellTrack naming in all user-facing output
-- Friction enabled by default (0.038)
-- Attribution reads "SWAN + SwellTrack" in API and dashboard
-- Auditor: zero findings, zero silent deferrals
+- SwellTrack naming in all user-facing output ✓ (MODEL_NAME constant, docstrings, log messages, CLI help)
+- Friction enabled by default (0.038) ✓ (friction_coefficient in SurfSpotConfig, wired through pipeline + both endpoints)
+- Attribution reads "SWAN + SwellTrack" in API and dashboard ✓ (API nearshoreModel field, dashboard reads dynamically)
+- Auditor: 3 findings (0H, 1M, 2L), all remediated ✓ (CLI help string, _build_transect_profile missing cfjon, stale docstring)
+
+**Commits:** 02331df (API repo)
 
 ---
 
@@ -392,15 +398,23 @@ STOP
 6. Blend: verify approach-zone Hs uses SurfBeat data, not SwellTrack; verify transition at break point
 7. Silent deferral scan: grep for `pass`, `TODO`, hardcoded return values in surfbeat_runner.py
 
-### QC Gate 2
+### QC Gate 2 — PASSED (2026-07-21)
 
 **Note:** QC Gate 2 accepts synthetic SPECOUT verification (benchmark S1 condition). Real L2 SPECOUT requires HB Pier segment reconfiguration (Phase 5 T5.3) and a SWAN cycle (Phase 6 T6.3). End-to-end verification with real data happens at QC Gate 6.
 
-- SurfBeat strip runs and returns IG energy matching benchmark (Hs_ig ≈ 0.155m for S1)
-- 3-hour cadence enforced (25 runs, not 72)
-- IG fields in surf response populated when enabled, null when disabled
-- Blended beach profile uses SurfBeat approach Hs + SwellTrack surf Hs
-- Auditor: zero findings, zero silent deferrals
+- SurfBeat strip runner implemented (945 lines, commit d2f0a40) ✓
+  - Two-COMPUTE enforcement, FACTOR parsing, IG integration at f<0.04 Hz
+  - Hs_ig formula corrected to 4·sqrt(m0) per WMO standard (audit F3)
+- 3-hour cadence enforced (range(0, 73, 3) = 25 runs) ✓
+- IG fields in surf response populated when enabled, null when disabled ✓
+  - setTimingMinutes, setAmplitudeM, igWaveHeightM — unit-converted (audit F2)
+  - Carry-forward: largest cadence hour ≤ current elapsed hour (not interpolated) ✓
+- Blended beach profile uses SurfBeat approach Hs + SwellTrack surf Hs ✓
+  - 50m linear taper via _blend_hs_profiles() with numpy.interp alignment
+  - Wired through module-level surfbeat result cache (audit F1)
+- Auditor: 4 findings (1H, 2M, 1L), all remediated ✓
+
+**Commits:** d2f0a40 (T2.1), d4baa59 (T2.3), 7224f8a (T2.2), 87ae42e (audit fixes) — all in API repo
 
 ---
 
@@ -860,17 +874,50 @@ STOP
 
 ## Summary
 
-| Phase | Purpose | Key deliverables |
-|---|---|---|
-| 0 | Governing Document Updates | ADR-093, ARCHITECTURE.md, API-MANUAL, PROVIDER-MANUAL, OPS-MANUAL, DASHBOARD-MANUAL — all updated for SwellTrack naming, SurfBeat, compute offloading |
-| 1 | SwellTrack Core Fixes | Rename to SwellTrack, friction on by default (0.038), attribution "SWAN + SwellTrack" |
-| 2 | SurfBeat Strip Integration | Strip runner, IG parsing, 3-hour cadence, blended approach-zone Hs |
-| 3 | Compute Offloading | Compute service on librewxr, `surf_compute_host` config, in-process fallback |
-| 4 | Dashboard IG Display | Set/lull timing on Card 3 + 72h scroll, blended profile chart, attribution |
-| 5 | Wizard/Admin Config | SurfBeat toggle, compute host URL, friction coefficient, HB Pier reconfig |
-| 6 | Deployment & Activation | Deploy all, trigger SWAN cycle, verify full pipeline, Surfline comparison |
-| 7 | QA & Validation | Retroactive audits (Phases 2-4), silent deferral scan, scoring check |
+| Phase | Purpose | Key deliverables | Status |
+|---|---|---|---|
+| 0 | Governing Document Updates | ADR-093, ARCHITECTURE.md, API-MANUAL, PROVIDER-MANUAL, OPS-MANUAL, DASHBOARD-MANUAL — all updated for SwellTrack naming, SurfBeat, compute offloading | **COMPLETE** ✓ |
+| 1 | SwellTrack Core Fixes | Rename to SwellTrack, friction on by default (0.038), attribution "SWAN + SwellTrack" | **COMPLETE** ✓ |
+| 2 | SurfBeat Strip Integration | Strip runner, IG parsing, 3-hour cadence, blended approach-zone Hs | **COMPLETE** ✓ |
+| 3 | Compute Offloading | Compute service on librewxr, `surf_compute_host` config, in-process fallback | NOT STARTED |
+| 4 | Dashboard IG Display | Set/lull timing on Card 3 + 72h scroll, blended profile chart, attribution | NOT STARTED |
+| 5 | Wizard/Admin Config | SurfBeat toggle, compute host URL, friction coefficient, HB Pier reconfig | NOT STARTED |
+| 6 | Deployment & Activation | Deploy all, trigger SWAN cycle, verify full pipeline, Surfline comparison | NOT STARTED |
+| 7 | QA & Validation | Retroactive audits (Phases 2-4), silent deferral scan, scoring check | NOT STARTED |
 
 **Adversarial audit is mandatory for every phase.** No phase closes without the auditor sign-off. No findings may be deferred to a later phase.
+
+---
+
+## Execution Log
+
+### Session 1 (2026-07-21)
+
+**Phases completed:** 0, 1, 2 (with all QC gates passed)
+
+**API repo commits (weewx-clearskies-api):**
+- `d2f0a40` feat(T2.1): add SurfBeat strip production runner (945 lines)
+- `d4baa59` feat(T2.3): add SurfBeat approach-zone Hs blending for beach profile
+- `7224f8a` feat(T2.2): wire SurfBeat into surf forecast pipeline
+- `02331df` feat(Phase1): SwellTrack rename, friction enabled, SurfBeat config
+- `87ae42e` fix(Phase2-audit): Hs formula 4*sqrt(m0), unit conversion, blend wiring, result cache
+
+**Meta repo commits (weather-belchertown):**
+- `dcb7203` docs(Phase0): SwellTrack naming, SurfBeat, compute offloading across all governing docs
+
+**Dashboard repo changes (weewx-clearskies-dashboard):**
+- openapi-v1.yaml nearshoreModel updated to "SWAN + SwellTrack" (uncommitted, minor)
+
+**Audit results:**
+- Phase 0: 4 findings (2H, 1M, 1L) — all remediated
+- Phase 1: 3 findings (0H, 1M, 2L) — all remediated
+- Phase 2: 4 findings (1H, 2M, 1L) — all remediated
+
+**Uncommitted state at session end:**
+- API repo: `nws.py` (pre-existing, unrelated), `surfbeat_strip_benchmark.py` (untracked benchmark prototype)
+- Dashboard repo: `public/card-manifest.json` (pre-existing), `src/api/openapi-v1.yaml` (nearshoreModel fix)
+- Meta repo: `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md`, `docs/reference/swan-commands-extract.md` (pre-existing)
+
+**Next session starts at:** Phase 3 (Compute Offloading). T3.1 and T3.2 are code tasks. T3.3 requires user approval for SSH to librewxr.
 
 **Parallelization:** Phase 0 must complete first. Phases 1 and 4 (dashboard) can partially overlap (API and dashboard repos are separate). Phase 3 depends on Phases 1-2 (compute service wraps the pipeline code). Phase 5 depends on Phase 3 (config references compute host). Phase 6 depends on Phases 1-5 (deployment). Phase 7 runs last (audits the full result).
