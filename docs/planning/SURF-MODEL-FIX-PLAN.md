@@ -693,15 +693,34 @@ STOP
 7. Config roundtrip: wizard save → api.conf + secrets.env → API reload → admin load → admin save → verify consistency
 8. Silent deferral scan on wizard and admin routes
 
-### QC Gate 5
+### QC Gate 5 — PASSED (2026-07-22)
 
-- Compute service config in provider step (not marine step)
-- Compute secret in secrets.env (not api.conf)
-- Test connection authenticates before reporting success
-- SurfBeat toggle works in wizard and admin
-- Friction coefficient configurable in admin
-- HB Pier reconfigured with segment, SurfBeat enabled, compute host configured
-- Auditor: zero findings
+- Compute service config in provider step (not marine step) ✓ (step_providers.html Wave Modeling fieldset)
+- Compute secret in secrets.env (not api.conf) ✓ (apply handler writes SURF_COMPUTE_SECRET to secrets.env)
+- Test connection authenticates before reporting success ✓ (wizard + admin proxy to POST /setup/providers/test-compute)
+- SurfBeat toggle works in wizard and admin ✓ (step_marine.html checkbox, admin/marine.html toggle)
+- Friction coefficient configurable in admin ✓ (admin/marine.html numeric input, server-side validation > 0)
+- HB Pier reconfigured with segment, SurfBeat enabled, compute host configured ✓
+  - 32 transects at 10m spacing along 315m segment, 0 structure-affected, 32 open
+  - surfbeat_enabled=true, surfbeat_cadence_hours=3, friction_coefficient=0.038
+  - surf_compute_host=https://192.168.7.22:8770, test connection returns {"status":"ok","version":"1.0.0"}
+- Auditor: 3 findings (1H, 2M), all remediated ✓
+  - F1 (H): Admin compute providers section added (f8beb34)
+  - F2 (M): friction_coefficient added to wizard apply payload (e757361)
+  - F3 (M): surf_compute_host added to CurrentConfigResponse + wizard restore (6a0513e, be9b7c4)
+
+**API repo commits:**
+- `fa48126` feat(T5.2): add SurfBeat/compute fields to apply models + test-compute endpoint
+- `6a0513e` fix(Phase5-audit): add surf_compute_host to CurrentConfigResponse (F3)
+
+**Stack repo commits:**
+- `8189932` feat(T5.1,T5.2,T5.3): SurfBeat toggle, compute host config, admin friction
+- `e757361` fix(Phase5-audit): include friction_coefficient in wizard apply payload (F2)
+- `be9b7c4` fix(Phase5-audit): restore surf_compute_host on wizard re-run (F3)
+- `f8beb34` feat(Phase5-audit): add admin Wave Modeling compute providers section (F1)
+
+**Meta repo commits:**
+- `94b3ddb` docs(T5.2): add POST /setup/providers/test-compute to ARCHITECTURE.md
 
 ---
 
@@ -893,9 +912,9 @@ STOP
 | 2 | SurfBeat Strip Integration | Strip runner, IG parsing, 3-hour cadence, blended approach-zone Hs | **COMPLETE** ✓ |
 | 3 | Compute Offloading | Compute service on librewxr, `surf_compute_host` config, in-process fallback | **COMPLETE** ✓ |
 | 4 | Dashboard IG Display | Set/lull timing on Card 3 + 72h scroll, blended profile chart, attribution | **COMPLETE** ✓ |
-| 5 | Wizard/Admin Config | SurfBeat toggle, compute host URL, friction coefficient, HB Pier reconfig | NOT STARTED |
-| 6 | Deployment & Activation | Deploy all, trigger SWAN cycle, verify full pipeline, Surfline comparison | NOT STARTED |
-| 7 | QA & Validation | Retroactive audits (Phases 2-4), silent deferral scan, scoring check | NOT STARTED |
+| 5 | Wizard/Admin Config | SurfBeat toggle, compute host URL, friction coefficient, HB Pier reconfig | **COMPLETE** ✓ |
+| 6 | Deployment & Activation | Deploy all, trigger SWAN cycle, verify full pipeline, Surfline comparison | **IN PROGRESS** — T6.1-T6.2 deployed, T6.3 awaiting next SWAN cycle |
+| 7 | QA & Validation | Retroactive audits (Phases 2-4), silent deferral scan, scoring check | **IN PROGRESS** — T7.1-T7.5 complete (0 findings), T7.6 awaiting SWAN data |
 
 **Adversarial audit is mandatory for every phase.** No phase closes without the auditor sign-off. No findings may be deferred to a later phase.
 
@@ -966,3 +985,50 @@ STOP
   - F3 (L): Fingerprint pinning acknowledged as prose gap, deferred
 
 **Next session starts at:** Phase 4 (Dashboard IG Display). T4.1-T4.3 are dashboard code tasks. T4.4 is already done (T1.4 updated attribution).
+
+### Session 3 (2026-07-22, continued)
+
+**Phases completed:** 4, 5 (with all QC gates passed). Phase 6 T6.1-T6.2 deployed. Phase 7 T7.1-T7.5 complete.
+
+**Dashboard repo commits (weewx-clearskies-dashboard):**
+- `cc35604` feat(T4.1,T4.2): add SurfBeat set timing display to Swell Card and 72h scroll
+- `9603fe6` fix(Phase4-audit): use i18next interpolation in setTiming defaultValue
+
+**API repo commits (weewx-clearskies-api):**
+- `fa48126` feat(T5.2): add SurfBeat/compute fields to apply models + test-compute endpoint
+- `6a0513e` fix(Phase5-audit): add surf_compute_host to CurrentConfigResponse (F3)
+
+**Stack repo commits (weewx-clearskies-stack):**
+- `8189932` feat(T5.1,T5.2,T5.3): SurfBeat toggle, compute host config, admin friction
+- `e757361` fix(Phase5-audit): include friction_coefficient in wizard apply payload (F2)
+- `be9b7c4` fix(Phase5-audit): restore surf_compute_host on wizard re-run (F3)
+- `f8beb34` feat(Phase5-audit): add admin Wave Modeling compute providers section (F1)
+
+**Meta repo commits (weather-belchertown):**
+- `94b3ddb` docs(T5.2): add POST /setup/providers/test-compute to ARCHITECTURE.md
+- `63c7e88` docs: update SURF-MODEL-FIX-PLAN — Phase 4 COMPLETE, QC Gate 4 passed
+
+**Infrastructure changes (T5.4):**
+- HB Pier reconfigured: segment_start (33.6528, -118.0035) to segment_end (33.6504, -118.0017)
+- 32 transects at 10m spacing along 315m segment, 0 structure-affected, 32 open
+- surfbeat_enabled=true, surfbeat_cadence_hours=3, friction_coefficient=0.038
+- Compute host already configured from Session 2: surf_compute_host=https://192.168.7.22:8770
+
+**Audit results:**
+- Phase 4: 2 findings (0H, 0M, 2L) — F2 remediated, F1 pushed back (interface field matches API contract)
+- Phase 5: 3 findings (1H, 2M) — all remediated (F1: admin compute section, F2: friction in payload, F3: current-config restore)
+- Phase 7 T7.1-T7.4: 0 findings — all retroactive audits clean
+
+**Deployment:**
+- API deployed to weewx (health 200 OK, surf endpoint serving SWAN + SwellTrack metadata)
+- Dashboard + config UI deployed to weather-dev (tsc clean, build successful)
+- All repos pushed to GitHub
+
+**Remaining items (depend on next SWAN cycle at ~12Z / 5 AM PDT):**
+- Phase 6 T6.3: Verify full pipeline produces real surf data (SWAN → SPECOUT → SwellTrack → SurfBeat → response)
+- Phase 6 T6.4: Surfline comparison (ongoing, weather-dependent, 14-day window per plan)
+- Phase 6 audit: After T6.3 verification
+- Phase 7 T7.6: Scoring recalibration check with friction-enabled face heights
+- Phase 7 QC Gate: After T7.6
+
+**Next session:** Verify Phase 6 T6.3 after the SWAN cycle runs. Check surf endpoint for populated forecast data. Compare face heights against Surfline. Complete T7.6 scoring recalibration. Close Phase 6 and 7 QC gates.
