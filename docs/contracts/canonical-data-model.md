@@ -300,7 +300,8 @@ One severe-weather alert from the configured alerts provider.
 | `certainty` | string | Yes | NWS CAP vocabulary — Observed / Likely / Possible / Unlikely / Unknown. |
 | `event` | string | No | Provider's event name ("Wind Advisory", "Tornado Warning"). |
 | `effective` | string (date-time UTC) | No | |
-| `expires` | string (date-time UTC) | Yes | |
+| `expires` | string (date-time UTC) | Yes | CAP message expiry — when the alert message text should be refreshed. NOT when the hazard ends. |
+| `ends` | string (date-time UTC) | Yes | Expected event end time — when the hazard conditions are no longer expected. NWS extension to CAP; null for providers that don't distinguish (Aeris, OWM set `ends` = `expires`). Dashboard displays this as the "until" time, falling back to `expires` when null. |
 | `senderName` | string | Yes | "NWS Seattle WA". |
 | `areaDesc` | string | Yes | "King, WA". Free-form provider description of affected area. |
 | `category` | string | Yes | NWS CAP vocabulary — Met / Geo / Safety / Security / etc. |
@@ -570,7 +571,8 @@ Day-1 set: `nws`, `aeris`, `openweathermap`.
 | `certainty` | `properties.certainty` | (not provided) | (not provided) |
 | `event` | `properties.event` | `details.name` (human-readable) | `event` |
 | `effective` | `properties.effective` | `timestamps.issuedISO` (UTC convert) | `start` (epoch s, convert) |
-| `expires` | `properties.expires` | `timestamps.expiresISO` (UTC convert) | `end` (epoch s, convert) |
+| `expires` | `properties.expires` (CAP message expiry) | `timestamps.expiresISO` (UTC convert) | `end` (epoch s, convert) |
+| `ends` | `properties.ends` (expected event end) | = `expires` (no distinction) | = `expires` (no distinction) |
 | `senderName` | `properties.senderName` | `details.emergency` (string only) ⇢ `place.name` | `sender_name` |
 | `areaDesc` | `properties.areaDesc` | `place.name` | (not provided) |
 | `category` | `properties.category` | `details.cat` | (not provided) |
