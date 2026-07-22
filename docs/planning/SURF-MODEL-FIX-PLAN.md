@@ -582,12 +582,18 @@ STOP
 5. i18n: verify all new strings use `t()` — no hardcoded English
 6. Accessibility: new elements have aria-labels, contrast meets AA
 
-### QC Gate 4
+### QC Gate 4 — PASSED (2026-07-22)
 
-- Set timing displays when available, hidden when not
-- Attribution reads "SWAN + SwellTrack"
-- Blended profile renders correctly
-- Auditor: zero findings
+- Set timing displays when SurfBeat data present, hidden entirely (not "—") when null ✓ (commit cc35604)
+- Attribution reads "SWAN + SwellTrack" ✓ (pre-existing from Phase 1, verified pass-through in nearshoreModelDisplayName)
+- Blended profile renders correctly ✓ (T4.3 no-op — API returns blended hsEnvelope, chart renders p.waveHeight)
+- 72h scroll set timing row: shows at every hour with carry-forward values, hidden when no SurfBeat data ✓
+- All new strings use t() ✓ (4 translation keys in all 13 locales)
+- Auditor: 2 findings (0H, 0M, 2L), F2 remediated ✓, F1 pushed back (interface field matches API contract)
+
+**Dashboard repo commits:**
+- `cc35604` feat(T4.1,T4.2): add SurfBeat set timing display to Swell Card and 72h scroll
+- `9603fe6` fix(Phase4-audit): use i18next interpolation in setTiming defaultValue
 
 ---
 
@@ -886,7 +892,7 @@ STOP
 | 1 | SwellTrack Core Fixes | Rename to SwellTrack, friction on by default (0.038), attribution "SWAN + SwellTrack" | **COMPLETE** ✓ |
 | 2 | SurfBeat Strip Integration | Strip runner, IG parsing, 3-hour cadence, blended approach-zone Hs | **COMPLETE** ✓ |
 | 3 | Compute Offloading | Compute service on librewxr, `surf_compute_host` config, in-process fallback | **COMPLETE** ✓ |
-| 4 | Dashboard IG Display | Set/lull timing on Card 3 + 72h scroll, blended profile chart, attribution | NOT STARTED |
+| 4 | Dashboard IG Display | Set/lull timing on Card 3 + 72h scroll, blended profile chart, attribution | **COMPLETE** ✓ |
 | 5 | Wizard/Admin Config | SurfBeat toggle, compute host URL, friction coefficient, HB Pier reconfig | NOT STARTED |
 | 6 | Deployment & Activation | Deploy all, trigger SWAN cycle, verify full pipeline, Surfline comparison | NOT STARTED |
 | 7 | QA & Validation | Retroactive audits (Phases 2-4), silent deferral scan, scoring check | NOT STARTED |
