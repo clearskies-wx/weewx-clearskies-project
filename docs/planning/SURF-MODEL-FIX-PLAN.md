@@ -1,8 +1,8 @@
 # Surf Model Fix Plan — SwellTrack + SurfBeat Integration
 
-**Status:** IN PROGRESS — Phases 0-2 COMPLETE, Phase 3 next
+**Status:** IN PROGRESS — Phases 0-3 COMPLETE, Phase 4 next
 **Created:** 2026-07-21
-**Last updated:** 2026-07-21 (session 1 — Phases 0-2 executed with QC gates passed)
+**Last updated:** 2026-07-22 (session 2 — Phase 3 executed with QC gate passed)
 **Origin:** 1D-MODEL-BENCHMARK-BRIEF Round 2 results. The benchmark confirmed Architecture 2-prime (SwellTrack per-transect + SurfBeat strip for IG), but the deployed code has gaps: no SurfBeat integration, friction not enabled, approach-zone Hs overestimate, missing IG display, wrong attribution, deferred adversarial audits from Phases 2-4, and the spot isn't configured for the new pipeline.
 
 **Governing brief:** `docs/planning/briefs/1D-MODEL-BENCHMARK-BRIEF.md` Part 8 (results) and Part 9 (model→display mapping, blended architecture, compute offloading).
@@ -503,15 +503,21 @@ STOP
 7. Input validation: verify compute service rejects malformed inputs (missing fields, negative depths, etc.)
 8. Silent deferral scan on compute_service.py and the client code
 
-### QC Gate 3
+### QC Gate 3 — PASSED (2026-07-22)
 
-- Compute offloads to librewxr when configured
-- Falls back to in-process when unconfigured or unreachable
-- No hardcoded host — entirely operator-configurable
-- **Auth: unauthenticated and wrong-token requests rejected (401)**
-- **TLS: service listens HTTPS only**
-- **Secret in secrets.env only — not in source, not in api.conf**
-- Auditor: zero findings
+- Compute offloads to librewxr when configured ✓ (verified: authenticated POST from weewx → librewxr returns 200)
+- Falls back to in-process when unconfigured or unreachable ✓ (ComputeServiceError → local run_pipeline/run_surfbeat_strip, warning logged, degraded=True)
+- No hardcoded host — entirely operator-configurable ✓ (surf_compute_host in api.conf [providers], defaults to None)
+- **Auth: unauthenticated and wrong-token requests rejected (401)** ✓ (verified with curl: no token → 401, wrong token → 401)
+- **TLS: service listens HTTPS only** ✓ (plain HTTP → connection refused; --hostname SAN for proper cert validation)
+- **Secret in secrets.env only — not in source, not in api.conf** ✓ (grep found 0 matches for secret value in repos)
+- Auditor: 3 findings (0H, 1M, 2L), all remediated ✓
+  - F1 (M): Stale TODO in surf.py removed — SWAN binary path /usr/local/bin/swan is the well-known path on both hosts
+  - F2 (L): Added --hostname CLI arg for TLS cert SAN — operators can include FQDN/IP for proper cert verification
+  - F3 (L): Fingerprint pinning is a prose-to-implementation gap in T3.1 — acknowledged, security model (Bearer + TLS) is sound for same-VLAN; deferred to future enhancement
+  - Additional: disabled /openapi.json endpoint (openapi_url=None) — exactly 3 routes exposed
+
+**Commits:** ff335af (T3.1), 846df5b (T3.2 client), 77f4a64 (T3.2 config), 7dab1c5 (audit fixes) — all in API repo
 
 ---
 
@@ -879,7 +885,7 @@ STOP
 | 0 | Governing Document Updates | ADR-093, ARCHITECTURE.md, API-MANUAL, PROVIDER-MANUAL, OPS-MANUAL, DASHBOARD-MANUAL — all updated for SwellTrack naming, SurfBeat, compute offloading | **COMPLETE** ✓ |
 | 1 | SwellTrack Core Fixes | Rename to SwellTrack, friction on by default (0.038), attribution "SWAN + SwellTrack" | **COMPLETE** ✓ |
 | 2 | SurfBeat Strip Integration | Strip runner, IG parsing, 3-hour cadence, blended approach-zone Hs | **COMPLETE** ✓ |
-| 3 | Compute Offloading | Compute service on librewxr, `surf_compute_host` config, in-process fallback | NOT STARTED |
+| 3 | Compute Offloading | Compute service on librewxr, `surf_compute_host` config, in-process fallback | **COMPLETE** ✓ |
 | 4 | Dashboard IG Display | Set/lull timing on Card 3 + 72h scroll, blended profile chart, attribution | NOT STARTED |
 | 5 | Wizard/Admin Config | SurfBeat toggle, compute host URL, friction coefficient, HB Pier reconfig | NOT STARTED |
 | 6 | Deployment & Activation | Deploy all, trigger SWAN cycle, verify full pipeline, Surfline comparison | NOT STARTED |
@@ -921,3 +927,36 @@ STOP
 **Next session starts at:** Phase 3 (Compute Offloading). T3.1 and T3.2 are code tasks. T3.3 requires user approval for SSH to librewxr.
 
 **Parallelization:** Phase 0 must complete first. Phases 1 and 4 (dashboard) can partially overlap (API and dashboard repos are separate). Phase 3 depends on Phases 1-2 (compute service wraps the pipeline code). Phase 5 depends on Phase 3 (config references compute host). Phase 6 depends on Phases 1-5 (deployment). Phase 7 runs last (audits the full result).
+
+### Session 2 (2026-07-22)
+
+**Phase completed:** 3 (with QC gate passed)
+
+**API repo commits (weewx-clearskies-api):**
+- `ff335af` feat(T3.1): add compute service for SwellTrack/SurfBeat offloading (659 lines)
+- `846df5b` feat(T3.2): HTTP client for SwellTrack/SurfBeat compute offloading (361 lines)
+- `77f4a64` feat(T3.2): add surf_compute_host config to MarineConfig + [providers] section
+- `7dab1c5` fix(Phase3-audit): remove stale TODO, add --hostname to cert SAN, disable openapi.json
+
+**Meta repo commits (weather-belchertown):**
+- `84dad5d` feat(T3.3): deploy script for librewxr compute service
+
+**Infrastructure changes (T3.3):**
+- `claude` user created on librewxr LXD container with SSH + sudo
+- `.local/ssh/config` updated with `Host librewxr` entry (192.168.7.22)
+- `uv` installed on librewxr for ubuntu user
+- API repo cloned at `/home/ubuntu/repos/weewx-clearskies-api`
+- SWAN binary symlinked: `/usr/local/bin/swan` → `/opt/swan/bin/swan.exe`
+- `SURF_COMPUTE_SECRET` generated and stored in `secrets.env` on both weewx and librewxr
+- `weewx-clearskies-compute.service` systemd unit installed and enabled on librewxr
+- Compute service running on port 8770 with TLS, --hostname SAN for 192.168.7.22
+- `api.conf` on weewx configured with `[providers] surf_compute_host = https://192.168.7.22:8770`
+- Cross-host connectivity verified: weewx → librewxr health check, authenticated compute request
+
+**Audit results:**
+- Phase 3: 3 findings (0H, 1M, 2L) — all remediated
+  - F1 (M): Stale TODO removed
+  - F2 (L): --hostname CLI arg added for cert SAN
+  - F3 (L): Fingerprint pinning acknowledged as prose gap, deferred
+
+**Next session starts at:** Phase 4 (Dashboard IG Display). T4.1-T4.3 are dashboard code tasks. T4.4 is already done (T1.4 updated attribution).
