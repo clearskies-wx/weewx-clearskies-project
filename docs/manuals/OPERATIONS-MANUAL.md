@@ -997,6 +997,39 @@ SWAN requires bathymetry (BOTTOM input) and water level (WLEVEL input) to use th
 
 Accepted datums for operator uploads: **NAVD88, MLLW, MHW, MHHW, MSL**. These are the datums directly supported by CO-OPS as prediction request parameters. If your bathymetry file is in a different datum, convert it before uploading using VDatum (vdatum.noaa.gov) or QGIS. The system does not perform local datum conversion for uploaded files.
 
+### SwellTrack and SurfBeat configuration
+
+#### Per-spot configuration keys (in marine location `[[[[surf]]]]` sub-block)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `friction_coefficient` | float | `0.038` | Bottom friction coefficient (cfjon) for SwellTrack. Swell default 0.038, windsea 0.067. Always enabled — frictionless is not production-valid. Advanced setting, hidden from wizard by default. |
+| `surfbeat_enabled` | bool | `true` | Enable SurfBeat strip for IG/set timing predictions. Adds set timing to the surf card and 72h forecast scroll. Increases compute time by ~12 minutes per full forecast cycle (25 SurfBeat runs × ~28s each). |
+| `surfbeat_cadence_hours` | int | `3` | Hours between SurfBeat strip runs. Intermediate forecast hours carry forward the last result (not interpolated — design decision). Range: 1-6. Lower values increase compute time proportionally. |
+
+#### Compute offloading configuration (global, in `api.conf [providers]`)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `surf_compute_host` | str \| null | `null` | URL of the remote compute service (e.g., `https://librewxr.shaneburkhardt.com:8770`). When set, SwellTrack and SurfBeat computations are POSTed to this service instead of running in-process. When null, all computation runs on the weewx host. |
+| `surf_compute_verify_tls` | bool | `true` | Verify TLS certificate on compute service requests. Set `false` for self-signed certificates on the same VLAN. TLS encryption is always active when URL is `https://`. |
+
+**Compute service secret:** `SURF_COMPUTE_SECRET` in `secrets.env` on both the weewx host and the compute service host. Generated once during setup (e.g., `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`). The API sends this as `Authorization: Bearer {token}` with every compute request. Not in `api.conf` — secrets go in `secrets.env` only.
+
+#### Compute service deployment (on librewxr or dedicated host)
+
+The compute service is an optional lightweight HTTP service that offloads SwellTrack and SurfBeat computation. Useful when the weewx host has limited CPU/RAM.
+
+1. Install: `pip install weewx-clearskies-api` on the compute host
+2. Run: `python -m weewx_clearskies_api.services.compute_service` (systemd unit recommended)
+3. Endpoints: `POST /compute/swelltrack`, `POST /compute/surfbeat`, `GET /health`
+4. Port: 8770 (default, configurable)
+5. Auth: `SURF_COMPUTE_SECRET` in `secrets.env`
+6. TLS: self-signed cert auto-generated on first start (stored in `/etc/weewx-clearskies/compute/`)
+7. SWAN binary required on the compute host for SurfBeat strip runs
+
+**Fallback behavior:** When the compute service is unreachable or returns 5xx, the API falls back to in-process computation. `degraded=true` in the surf response. WARNING log emitted.
+
 Accepted formats for upload: GeoTIFF, NetCDF, ASCII XYZ.
 
 ---

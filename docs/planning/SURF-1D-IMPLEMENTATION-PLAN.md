@@ -1,8 +1,19 @@
 # Surf 1D Model Implementation Plan
 
-**Status:** DRAFT — pending 1D model selection (Phase 1 benchmark)
+**Status:** AMENDED 2026-07-21 — SwellTrack selected (1D-MODEL-BENCHMARK-BRIEF Round 2). SWASH and XBeach ruled out entirely. See SURF-MODEL-FIX-PLAN.md for remaining integration work.
 **Created:** 2026-07-20
-**Origin:** SURF-ZONE-MODEL-BRIEF research + SURF-FIXIT-LIST findings (SURF-11, 19, 21–24). SWAN L3 single-transect architecture produces systematically wrong surf heights: transect through HB Pier OBSTACLE loses 31% energy, K-G/Caldwell applied at wrong depth with ad-hoc correction, swell decomposition masks components, swell display uses nearshore values instead of deep water. The 1D model + multi-transect architecture resolves all of these.
+**Origin:** SURF-ZONE-MODEL-BRIEF research + SURF-FIXIT-LIST findings (SURF-11, 19, 21–24). SWAN L3 single-transect architecture produces systematically wrong surf heights: transect through HB Pier OBSTACLE loses 31% energy, K-G/Caldwell applied at wrong depth with ad-hoc correction, swell decomposition masks components, swell display uses nearshore values instead of deep water. SwellTrack + multi-transect architecture resolves all of these.
+
+**Amendments (2026-07-21 per brief §9.5):**
+1. Model named "SwellTrack" — replaces all "analytical 1D" / "Option A" references
+2. SurfBeat cadence: every 3 hours (25 runs per 72h forecast, carry-forward between)
+3. Compute offloading: SwellTrack/SurfBeat to librewxr via `surf_compute_host` config
+4. Blended Hs: SurfBeat strip for approach zone, SwellTrack for surf zone (50m taper)
+5. Phase 8 T8.1: SWASH ground truth CANCELLED — SWASH ruled out entirely
+6. Phase 8 T8.4: Webcam validation replaced by Surfline comparison
+7. Friction: always on in production (cfjon=0.038 swell default, 0.067 windsea)
+8. IG display: SurfBeat set/lull timing feeds Card 3 and 72h forecast scroll
+9. Attribution: "SWAN + SwellTrack" (not "SWAN" alone)
 
 ## 0. Orientation
 
@@ -20,8 +31,8 @@ Same as MARINE-REMEDIATION-PLAN.md §0 — read those files, use those deploy sc
 
 **SWAN-specific references (coordinator extracts relevant sections for agent briefs):**
 - SWAN User Manual (Fortran INPUT syntax) — coordinator extracts SPECOUT, CURVE, OBSTACLE, POINTS syntax into `swan-commands-extract.md` per RULE 5 (SWAN-L3-STABILITY-PLAN)
-- XBeach Manual — https://xbeach.readthedocs.io/en/latest/xbeach_manual.html
-- SWASH Manual — https://swash.sourceforge.io/
+- XBeach Manual — RULED OUT (2026-07-21). Runtime incompatible with 72-timestep pipeline.
+- SWASH Manual — RULED OUT (2026-07-21). Unvalidated; cannot serve as truth standard.
 
 **Agent reading lists:** Each agent brief includes a READING LIST section per `rules/clearskies-process.md`. Agents read source documents directly — coordinator does NOT paraphrase manuals into prompts.
 
@@ -106,7 +117,7 @@ OBSTACLE TRANSM [kt] LINE [x1] [y1] [x2] [y2]
 4. **Per-partition swell transformation** — decompose spectrum at handoff, run each partition independently through 1D model
 5. **Swell card shows deep-water values** — from SPECOUT decomposition at handoff, not nearshore-transformed
 6. **K-G/Caldwell at actual break point** — eliminate ad-hoc depth correction in `breaker_height.py`
-7. **1D model selection: ANALYTICAL (Option A)** — 0.85ms/transect with numpy, 5.5s for full forecast cycle (30 transects × 3 partitions × 72 timesteps). No LUT needed. XBeach-1D surfbeat deferred to v2 for infragravity waves. Decision made 2026-07-21 after Phase 1 benchmark.
+7. **1D model selection: SwellTrack (analytical, pure Python)** — 0.85ms/transect with numpy, 5.5s for full forecast cycle (30 transects × 3 partitions × 72 timesteps). No LUT needed. XBeach and SWASH ruled out entirely (1D-MODEL-BENCHMARK-BRIEF Round 2, 2026-07-21). SurfBeat strip provides IG energy at 3-hour intervals.
 8. **FUNWAVE-TVD excluded** — no real 1D mode; future scope for 2D structure-dominated spots only
 9. **Pin-based config replaced entirely** — no backwards compatibility needed (no other operators)
 
@@ -1266,11 +1277,9 @@ The beach profile chart becomes the cross-shore equivalent of the heat map — i
 
 **Purpose:** Validate the 1D model output against ground truth. Recalibrate scoring thresholds.
 
-### T8.1 — Validate against SWASH ground truth (R2)
+### T8.1 — CANCELLED (SWASH ruled out entirely — 1D-MODEL-BENCHMARK-BRIEF Round 2, 2026-07-21)
 
-- Owner: Coordinator (Opus) + `clearskies-test-author`
-
-**Do:** Run SWASH-1D as ground truth for 3-5 representative swell conditions at HB Pier. Compare selected 1D model Hs profile against SWASH. Acceptance: Hs within 15% at all points.
+SWASH is unvalidated and ruled out entirely — for production, LUT precomputation, and benchmark referee use. No replacement. See SURF-MODEL-FIX-PLAN T7.5 for disposition.
 
 ### T8.2 — Consistency check (R3)
 
@@ -1282,19 +1291,19 @@ The beach profile chart becomes the cross-shore equivalent of the heat map — i
 
 - Owner: Coordinator (Opus)
 
-**Do:** Compute Iribarren for known surf spots with documented breaker types. Cross-check against webcam/surf-report classification.
+**Do:** Compute Iribarren for known surf spots with documented breaker types. Cross-check against Surfline/BSR breaker type descriptions.
 
-### T8.4 — Webcam / surf report comparison (R10)
+### T8.4 — Surfline comparison (replaces webcam — no webcam at HB Pier)
 
 - Owner: Coordinator (Opus)
 
-**Do:** Compare 1D model wave height and breaker type against live surf reports and webcam observations for 5-10 sessions at HB Pier.
+**Do:** Compare SwellTrack face height and breaker type against Surfline's reported values for HB Pier. Document comparisons for at least 3 different swell conditions. See SURF-MODEL-FIX-PLAN T6.4 for the detailed procedure.
 
 ### T8.5 — Peel angle validation (R11)
 
 - Owner: Coordinator (Opus)
 
-**Do:** Compare peel angle output against webcam observations and Surfline/BSR peel descriptions.
+**Do:** Compare peel angle output against Surfline/BSR peel descriptions when available.
 
 ### T8.6 — Scoring recalibration
 
@@ -1306,10 +1315,10 @@ The beach profile chart becomes the cross-shore equivalent of the heat map — i
 
 ### QC Gate 8 (Final)
 
-- 1D model Hs within 15% of SWASH ground truth
+- T8.1 CANCELLED (SWASH ruled out)
 - Consistency check passes (reproduces SWAN in QB=0 zone)
-- Iribarren classifications match webcam observations
-- Face heights in reasonable range vs Surfline for 5+ sessions
+- Iribarren classifications match Surfline/BSR breaker type descriptions
+- Face heights within ±30% of Surfline for 3+ conditions
 - Scoring produces intuitively correct results for known conditions
 - All governing documents match final implementation
 - All test baselines hold
@@ -1328,7 +1337,7 @@ The beach profile chart becomes the cross-shore equivalent of the heat map — i
 | 5 | Swell Display & Profile | Needs Phase 4 | SURF-11 fix, beach profile chart, swell/surf labels |
 | 6 | Dashboard & Scoring Fixes | Independent | SURF-1,2,4-8,10,13,14,16,18 |
 | 7 | Heat Map & Peel Angle | Needs Phase 4 | Quasi-2D visualization, peel angle, best-peak display |
-| 8 | Validation & Calibration | Needs Phase 4 | SWASH ground truth, webcam comparison, score recalibration |
+| 8 | Validation & Calibration | Needs Phase 4 | Surfline comparison, score recalibration (SWASH cancelled, webcam replaced) |
 
 **Parallelization:** Phase 0 (docs) must complete before any implementation phases. Phase 1 (benchmark) can overlap with Phase 2 (measurement zone) since they don't share code. Phase 6 dashboard-only tasks (T6.1, T6.4, T6.5) can run in parallel with any phase. Phase 6 scoring tasks (T6.2, T6.3) must run either BEFORE Phase 4 starts or AFTER Phase 4 lands — they edit the same files (Fable S2). SURF-11 (T4.1b) must complete before T4.2 starts (Fable S1). T2.3 (handoff algorithm) must complete before T2.2 (transect generation) (Fable S3). SWASH cannot be both the selected model and the Phase 8 ground truth — if SWASH is selected, Phase 8 T8.1 must use a different validation approach (Fable S4).
 

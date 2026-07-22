@@ -2285,7 +2285,7 @@ Source: `endpoints/surf.py`.
 | `zoneForecast` | SurfZoneForecast | Yes | NWS SRF forecast for the covering county zone; `null` if unavailable |
 | `spectralComponents` | list[SpectralWaveComponent] | No | NDBC buoy spectral swell decomposition — **reference data only**. Not used for scoring or `multiSwell` display (T3.5). Empty list if no spectral-capable buoy configured or NDBC fetch failed. |
 | `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions for the surf page's tide overlay (informational, not scored) |
-| `nearshoreModel` | str | No | `"swan"` (ADR-096) |
+| `nearshoreModel` | str | No | `"SWAN + SwellTrack"` (ADR-093/096) |
 | `lastRunTime` | str | Yes | ISO-8601 timestamp of SWAN run completion |
 | `dataAge` | int | Yes | Age of SWAN output in seconds |
 | `breakerFormula` | str | No | `"komar_gaughan"` or `"caldwell"` per spot config |
@@ -2367,7 +2367,7 @@ Four enrichment processors for marine data. Each follows the existing enrichment
 
 **WaveWatch III is NOT a surf forecast source.** WW3 remains the deep-water boundary input to SWAN (via `providers/marine/wavewatch.py`) and continues serving the marine endpoint's offshore forecast. WW3 is never used as a surf endpoint data source. The surf endpoint serves the last successful SWAN cache if the runner fails — no fallback to any other model.
 
-**Data pipeline per forecast timestep (ADR-095 corrected, amended for 1D model):**
+**Data pipeline per forecast timestep (ADR-095 corrected, amended for SwellTrack):**
 
 ```
 SWAN L2 deep-water SPECOUT at ~15m depth
@@ -2375,14 +2375,20 @@ SWAN L2 deep-water SPECOUT at ~15m depth
   → store as multiSwell (deep-water values, comparable to NDBC buoy)
 
 SWAN handoff SPECOUT (L3 at structure-affected depth, or L2 at 15m for open spots)
-  → spectral decomposition → N partitions for 1D model input
+  → spectral decomposition → N partitions for SwellTrack input
   → match to canonical partition list from deep-water SPECOUT
 
-Each partition × each transect → independent 1D model run (handoff to shore)
-  → Hs at 3-5m CUDEM resolution
+Each partition × each transect → independent SwellTrack run (handoff to shore)
+  → Hs at 3-5m CUDEM resolution (friction enabled: cfjon=0.038 swell, 0.067 windsea)
   → break point: H/d = gamma crossing
   → breaker type: Iribarren number (xi_0)
   → wave shapes: Stokes/cnoidal by depth regime
+
+SurfBeat strip (every 3 hours, when surfbeat_enabled=true):
+  → SWAN SURFBEAT stationary 2D strip run
+  → IG spectral analysis: Hs_ig below 0.04 Hz
+  → set timing from IG spectral peak period
+  → approach-zone Hs for blended beach profile
 
 At each transect point: Hs_total = sqrt(sum(Hs_partition_i²))
   → combined saturation check: Hs_total ≤ γd
@@ -2398,7 +2404,7 @@ Across open transects:
 surf_scorer.score_surf(bestPeakFaceHeight, DSPR, partitions, ...) → quality score
 ```
 
-**Legacy pipeline (fallback when 1D model unavailable):**
+**Legacy pipeline (fallback when SwellTrack unavailable):**
 
 ```
 SWAN cross-shore CURVE transect output
@@ -2436,13 +2442,13 @@ SWAN cross-shore CURVE transect output
 
 **Two-tier schedule:** Full runs 4× daily on extended HRRR cycles (00/06/12/18Z) — outer + inner grids, 72-hour nonstationary forecast, ~7–12 min runtime. Hourly quick updates between full runs — stationary inner nest only with latest HRRR wind, <1 min runtime, single-snapshot merged into the existing forecast cache. Quick updates keep the "current conditions" entry fresh (< 1 hour old) without re-running the expensive outer grid. Not in the request path. Cache TTL = 6 hours (matches extended cycle interval). On failure, last-good cache retained indefinitely — stale SWAN data is always preferred to no data.
 
-**Height fields in every `SurfForecast` entry (amended for 1D model):**
+**Height fields in every `SurfForecast` entry (amended for SwellTrack):**
 
 | Field | What it is | Source |
 |---|---|---|
 | `swellHeight` | Dominant deep-water swell partition height | Deep-water SPECOUT decomposition at ~15m (L2). Comparable to NDBC buoy reports. |
-| `waveHeightAtBreak` | Post-supplement total wave height (backward compatible) | HSIGN at break point from 1D model (or ~10m SWAN fallback) |
-| `breakingFaceHeight` | Trough-to-crest breaking face height at actual break point | 1.27 × Hs at 1D model break point (H1/10 Rayleigh factor). Best peak across open transects. |
+| `waveHeightAtBreak` | Post-supplement total wave height (backward compatible) | HSIGN at break point from SwellTrack (or ~10m SWAN fallback) |
+| `breakingFaceHeight` | Trough-to-crest breaking face height at actual break point | 1.27 × Hs at SwellTrack break point (H1/10 Rayleigh factor). Best peak across open transects. |
 | `breakingHawaiianHeight` | Back-of-wave height (×0.5 of face height) | breakingFaceHeight × 0.5 |
 | `bestPeakFaceHeight` | Highest face height among open transects | Max of breakingFaceHeight across non-structure-affected transects |
 | `spotAverageFaceHeight` | Mean face height across open transects | Mean of breakingFaceHeight across non-structure-affected transects |
@@ -2450,9 +2456,12 @@ SWAN cross-shore CURVE transect output
 | `peelClassification` | Peel angle classification | `"closeout"` (<30°), `"fast"` (30-45°), `"good"` (45-66°), `"mellow"` (>66°) |
 | `transectCount` | Total transects in measurement zone | Integer |
 | `openTransectCount` | Transects not crossing any OBSTACLE | Integer |
-| `degraded` | 1D model fallback indicator | `true` when 1D model failed and legacy SWAN pipeline used |
+| `degraded` | SwellTrack fallback indicator | `true` when SwellTrack failed and legacy SWAN pipeline used |
+| `setTimingMinutes` | float \| null | Set wave timing from SurfBeat IG spectral peak (minutes between sets). `null` when SurfBeat disabled or unavailable. |
+| `setAmplitudeM` | float \| null | IG wave height at shoreline (m). `null` when SurfBeat disabled or unavailable. |
+| `igWaveHeightM` | float \| null | Infragravity significant wave height at shoreline (m). `null` when SurfBeat disabled or unavailable. |
 
-**swellHeight and breakingFaceHeight are now from fundamentally different sources.** `swellHeight` is the dominant deep-water partition from SPECOUT decomposition at ~15m — what's arriving at the coast. `breakingFaceHeight` is H1/10 (1.27× Hs) at the actual break point from the 1D model — what surfers see. The ratio varies with bathymetry, swell period, and tide.
+**swellHeight and breakingFaceHeight are now from fundamentally different sources.** `swellHeight` is the dominant deep-water partition from SPECOUT decomposition at ~15m — what's arriving at the coast. `breakingFaceHeight` is H1/10 (1.27× Hs) at the actual break point from SwellTrack — what surfers see. The ratio varies with bathymetry, swell period, and tide.
 
 All four fields are present in every response regardless of the operator's `surfHeightDisplay` preference. The API returns all representations; the dashboard selects which to show as primary.
 
@@ -2467,6 +2476,30 @@ Two formulas supported, configured per-spot via `breaker_formula` in the marine 
 
 **Scorer uses face height.** `surf_scorer.py` scores using `breakingFaceHeight`, not raw Hsig. The scoring thresholds represent what surfers consider good waves — surfers think in face height. `_WAVE_HEIGHT_RANGES_FT` are calibrated in face-height feet.
 
+### SwellTrack configuration
+
+| Config key | Type | Default | Location | Description |
+|---|---|---|---|---|
+| `friction_coefficient` | float | `0.038` | Per-spot (`SurfSpotConfig`) | Bottom friction coefficient (cfjon). Swell default 0.038, windsea 0.067. Always enabled — frictionless propagation is not production-valid. |
+| `surfbeat_enabled` | bool | `true` | Per-spot (`SurfSpotConfig`) | Enable SurfBeat strip for IG/set timing. Increases compute time by ~12 min per cycle. |
+| `surfbeat_cadence_hours` | int | `3` | Per-spot (`SurfSpotConfig`) | Hours between SurfBeat strip runs. Intermediate hours carry forward the last result (not interpolated). |
+| `surf_compute_host` | str \| null | `null` | Global (`api.conf [providers]`) | URL of remote compute service for SwellTrack/SurfBeat offloading (e.g., `https://librewxr:8770`). `null` = in-process. |
+| `surf_compute_verify_tls` | bool | `true` | Global (`api.conf [providers]`) | Verify TLS cert on compute service requests. Set `false` for self-signed on same VLAN. |
+
+### Blended beach profile
+
+The beach profile endpoint (`GET /api/v1/surf/{locationId}/profile`) returns a cross-shore wave height profile. When SurfBeat data is available, the profile blends two sources with a 50m linear taper centered on the break point:
+
+- **Offshore of (break_point + 25m):** 100% SurfBeat strip Hs (approach zone — physically accurate, avoids the 24% SwellTrack overestimate)
+- **Between (break_point ± 25m):** Linear ramp from SurfBeat to SwellTrack
+- **Shoreward of (break_point - 25m):** 100% SwellTrack Hs (surf zone — detailed breaking physics)
+
+When SurfBeat is unavailable: SwellTrack Hs for the entire profile (no blend). The blend affects only the display profile — face height, scoring, and break points always come from SwellTrack.
+
+### Validation method
+
+Surf model output is validated against competing surf forecasts (Surfline, BSR) — comparison of face heights, breaker types, and timing under varied swell conditions. No webcam validation (no webcam at HB Pier). No SWASH ground truth (SWASH is unvalidated and ruled out entirely).
+
 **Per-spot operator config:**
 - `breaker_formula`: `komar_gaughan` (default) or `caldwell`
 - `surf_height_display`: `face` (default) or `hawaiian`
@@ -2477,7 +2510,7 @@ Full research at `docs/planning/briefs/WAVE-BREAKING-CONVERSION-BRIEF.md`.
 
 | Field | Value | Description |
 |---|---|---|
-| `nearshoreModel` | `"swan"` | Always present when SWAN is active (ADR-096) |
+| `nearshoreModel` | `"SWAN + SwellTrack"` | Always present when SWAN + SwellTrack is active (ADR-093/096) |
 | `lastRunTime` | ISO timestamp | When the SWAN run that produced this data completed |
 | `dataAge` | integer (seconds) | Age of the SWAN output |
 | `breakerFormula` | `"komar_gaughan"` or `"caldwell"` | Which formula was used for this spot |
@@ -2551,13 +2584,13 @@ All physics constants (γ bounds, Kt values, topographic multipliers) defined as
 ### Surf quality scorer (ADR-096 restructure)
 
 **File:** `enrichment/surf_scorer.py`
-**Registration:** Against the surf endpoint — runs after 1D model pipeline (or wave_transform fallback) and breaker height conversion.
-**Inputs:** `breakingFaceHeight` (from H1/10 at 1D model break point, or legacy K-G fallback), DSPR (from SWAN TABLE), SPECOUT spectral components (deep-water reference from L2 at ~15m), spot config (beach facing, directional exposure, measurement zone segment), wind data (HRRR for forecast timesteps, station hardware for `t=0`), multi-transect aggregation (best peak, spot average from open transects).
+**Registration:** Against the surf endpoint — runs after SwellTrack pipeline (or wave_transform fallback) and breaker height conversion.
+**Inputs:** `breakingFaceHeight` (from H1/10 at SwellTrack break point, or legacy K-G fallback), DSPR (from SWAN TABLE), SPECOUT spectral components (deep-water reference from L2 at ~15m), spot config (beach facing, directional exposure, measurement zone segment), wind data (HRRR for forecast timesteps, station hardware for `t=0`), multi-transect aggregation (best peak, spot average from open transects).
 **Outputs:** `SurfForecast` with quality_stars (1–5), quality_label, conditions_text, full scoring breakdown, peel angle, wave shape classification.
 
-**All scoring data from SWAN + 1D model (ADR-096, amended).** NDBC spectral data is NOT passed to the scorer. The scorer uses multi-transect 1D model output for wave height (best peak or average from open transects), deep-water SPECOUT for swell composition, and SWAN TABLE for DSPR. NDBC spectral data is retained in the surf response as reference data but does not feed scoring or multiSwell.
+**All scoring data from SWAN + SwellTrack (ADR-096, amended).** NDBC spectral data is NOT passed to the scorer. The scorer uses multi-transect SwellTrack output for wave height (best peak or average from open transects), deep-water SPECOUT for swell composition, and SWAN TABLE for DSPR. NDBC spectral data is retained in the surf response as reference data but does not feed scoring or multiSwell.
 
-**Scorer uses `breakingFaceHeight`, not raw Hsig.** The scoring thresholds (`_WAVE_HEIGHT_RANGES_FT`) are calibrated in face-height feet. **Scoring recalibration required** — the 1D model's break-point H1/10 face heights will differ from the legacy ~10m K-G values. Thresholds must be validated against the new face heights before deployment (Phase 8).
+**Scorer uses `breakingFaceHeight`, not raw Hsig.** The scoring thresholds (`_WAVE_HEIGHT_RANGES_FT`) are calibrated in face-height feet. **Scoring recalibration required** — SwellTrack's break-point H1/10 face heights (with friction enabled) will differ from the legacy ~10m K-G values. Thresholds validated via SURF-MODEL-FIX-PLAN Phase 7 T7.6.
 
 **Wind source for surf quality scoring (HARD RULE):**
 
@@ -2847,7 +2880,7 @@ The NWS SRF text product's `waterTemp` field (a manually-entered forecaster valu
 | `forecast[].setup` | float \| null | Wave-induced setup. Currently always `null` — SWAN SETUP command removed. Field retained for API contract stability. |
 | `forecast[].breakPoints` | list[object] \| null | QB peak locations — break points along the transect (T3.4) |
 | `forecast[].scoring` | object | 3-factor + 3-penalty scoring breakdown (ADR-096) |
-| `nearshoreModel` | str | `"swan"` (ADR-096) |
+| `nearshoreModel` | str | `"SWAN + SwellTrack"` (ADR-093/096) |
 | `lastRunTime` | ISO 8601 | When the SWAN run completed |
 | `dataAge` | int | Age of SWAN output in seconds |
 | `breakerFormula` | str | `"komar_gaughan"` or `"caldwell"` |

@@ -123,7 +123,7 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | ADR | Title | Proposed |
 |---|---|---|
 | [ADR-095](ADR-095-swan-model-corrections.md) | SWAN model corrections — cross-shore transect, WLEVEL, CURRENT, OBSTACLE | 2026-07-18 |
-| [ADR-096](ADR-096-scoring-restructure.md) | Surf scoring restructure — Wave Organization composite, SWAN-only data, TruShore branding removal | 2026-07-18 |
+| [ADR-096](ADR-096-scoring-restructure.md) | Surf scoring restructure — Wave Organization composite, SWAN-only data, SwellTrack branding | 2026-07-18 |
 | [ADR-097](ADR-097-beach-profile-endpoint.md) | Beach profile endpoint — cross-shore transect visualization | 2026-07-18 |
 
 ## Accepted — pending manual consolidation
@@ -133,8 +133,8 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | [ADR-078](ADR-078-geographic-features-overlay.md) | Geographic features overlay (OSM via Overpass API) | 2026-06-29 |
 | [ADR-080](ADR-080-provider-attribution-architecture.md) | Provider attribution architecture | 2026-07-01 |
 | [ADR-081](ADR-081-license-change-polyform.md) | License change — PolyForm Noncommercial 1.0.0 (supersedes ADR-003) | 2026-07-09 |
-| [ADR-093](ADR-093-swan-trushore-nearshore-model.md) | SWAN+TruShore replaces NWPS as nearshore wave model (supersedes ADR-084) | 2026-07-16 |
-| [ADR-094](ADR-094-hrrr-surf-wind-source.md) | HRRR forecast wind as surf quality scoring source for TruShore forecasts | 2026-07-16 |
+| [ADR-093](ADR-093-swan-trushore-nearshore-model.md) | SWAN + SwellTrack replaces NWPS as nearshore wave model (supersedes ADR-084) | 2026-07-16 |
+| [ADR-094](ADR-094-hrrr-surf-wind-source.md) | HRRR forecast wind as surf quality scoring source for SWAN + SwellTrack forecasts | 2026-07-16 |
 
 ## Archived — consolidated into PROVIDER-MANUAL.md (marine)
 

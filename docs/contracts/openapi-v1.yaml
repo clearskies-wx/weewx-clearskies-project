@@ -3451,7 +3451,7 @@ components:
         windQuality:
           type: string
           enum: [offshore, cross_offshore, cross, cross_onshore, onshore]
-        windSource: { type: string, nullable: true, description: "Wind data source for this timestep: 'hrrr_trushore' for forecast timesteps, 'station' or 'forecast_provider' for current-conditions." }
+        windSource: { type: string, nullable: true, description: "Wind data source for this timestep: 'hrrr' for forecast timesteps, 'station' or 'forecast_provider' for current-conditions." }
         swellDominance: { type: number, minimum: 0, maximum: 1, description: "Ratio of primary swell energy to total energy" }
         multiSwell:
           type: array
@@ -3689,7 +3689,7 @@ components:
         forecast:
           type: array
           items: { $ref: '#/components/schemas/SurfForecast' }
-          description: "Up to 144 timesteps of surf forecast data from SWAN+TruShore. Empty array when SWAN is unavailable."
+          description: "Up to 144 timesteps of surf forecast data from SWAN + SwellTrack. Empty array when SWAN is unavailable."
         zoneForecast:
           nullable: true
           allOf: [{ $ref: '#/components/schemas/SurfZoneForecast' }]
@@ -3701,11 +3701,11 @@ components:
           type: array
           items: { $ref: '#/components/schemas/TidePrediction' }
           description: "Informational overlay, not scored."
-        nearshoreModel: { type: string, nullable: true, example: "swan_trushore", description: "Identifies the nearshore model in use. 'swan_trushore' when SWAN+TruShore is active; absent/null when SWAN is not installed." }
+        nearshoreModel: { type: string, nullable: true, example: "SWAN + SwellTrack", description: "Identifies the nearshore model in use. 'SWAN + SwellTrack' when active; absent/null when SWAN is not installed." }
         lastRunTime: { type: string, format: date-time, nullable: true, description: "UTC ISO-8601 timestamp when the last SWAN model run completed." }
         breakerFormula: { type: string, enum: [komar_gaughan, caldwell], nullable: true, description: "Per-spot configured breaker formula used for breakingFaceHeight calculation." }
         surfHeightDisplay: { type: string, enum: [face, hawaiian], nullable: true, description: "Operator-configured height display preference: 'face' for trough-to-crest, 'hawaiian' for back-of-wave scale." }
-        source: { type: string, example: "swan_trushore+wavewatch+ndbc+coops+nws_srf" }
+        source: { type: string, example: "swan+ndbc+coops+nws_srf" }
         generatedAt: { type: string, format: date-time }
       required: [locationId, locationName, coordinates, forecast, waterTemp, spectralComponents, tidePredictions, source, generatedAt]
 

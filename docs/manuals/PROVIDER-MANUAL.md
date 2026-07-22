@@ -1941,7 +1941,7 @@ The stationary quick update now includes a WLEVEL input (current tide at compute
 
 **Optional separated service:** When `[swan] service_url` is set to a remote host, `SwanProvider.fetch()` calls the remote HTTP endpoint instead of running SWAN locally. Health check polls `GET {service_url}/health` every 60 seconds. Three consecutive failures → log ERROR, serve last-good cache. See ARCHITECTURE.md for the standalone `weewx-clearskies-swan` package (ADR-096 renamed).
 
-#### §14.15 Amendment: Multi-transect + 1D model architecture (2026-07-21)
+#### §14.15 Amendment: Multi-transect + SwellTrack architecture (2026-07-21)
 
 Per SURF-1D-IMPLEMENTATION-PLAN and SURF-ZONE-MODEL-BRIEF:
 
@@ -1953,7 +1953,7 @@ Per SURF-1D-IMPLEMENTATION-PLAN and SURF-ZONE-MODEL-BRIEF:
 
 1. **Deep-water reference SPECOUT (L2):** One per spot at ~15m depth along the central transect bearing. SWAN POINTS + SPECOUT syntax. Feeds the swell display card — pre-nearshore spectrum comparable to NDBC buoy readings.
 
-2. **Handoff SPECOUT (L3 or L2):** One per unique L3 grid cell at each transect's handoff depth. When L3 is enabled, extracted from L3 (includes structure effects). When L3 is disabled, same as the deep-water reference (L2 at 15m). Deduplicated: multiple transects sharing the same grid cell share one SPECOUT. Feeds the 1D model as boundary condition.
+2. **Handoff SPECOUT (L3 or L2):** One per unique L3 grid cell at each transect's handoff depth. When L3 is enabled, extracted from L3 (includes structure effects). When L3 is disabled, same as the deep-water reference (L2 at 15m). Deduplicated: multiple transects sharing the same grid cell share one SPECOUT. Feeds SwellTrack as boundary condition.
 
 **OBSTACLE TRANSM correction for pier pilings.** The default TRANSM for `pier` structure type changes from 0.8 to 0.95. Pier pilings are thin relative to wavelength — academic consensus is 5-7% energy loss for pile-supported piers. TRANSM 0.8 treats the pier like a partial breakwater (20% blocked). Corrected TRANSM values by structure type:
 
@@ -1967,7 +1967,22 @@ Per SURF-1D-IMPLEMENTATION-PLAN and SURF-ZONE-MODEL-BRIEF:
 
 **Hotstart invalidation on grid resize.** When the L3 bbox changes (spot added/removed, segment moved, structure discovered/removed), detected by comparing new bbox hash against cached bathymetry hash. On change: delete old hotstart and bathymetry cache for that cluster. L1/L2 hotstarts unaffected.
 
-**1D model provider section:** See §14.17.
+**SwellTrack model section:** See §14.17.
+
+**SurfBeat strip (SWAN SURFBEAT):** A complementary SWAN run type for infragravity energy. Uses the SURFBEAT command in a stationary 2D strip configuration. Runs at 3-hour intervals (configurable via `surfbeat_cadence_hours`). Intermediate forecast hours carry forward the nearest SurfBeat result (not interpolated).
+
+**SurfBeat strip SURFBEAT syntax** (verified against SWAN 41.51AB — see `docs/reference/swan-commands-extract.md` §SURFBEAT):
+- Grid: regular 2D (REG), not 1D or curvilinear
+- Mode: STATIONARY
+- Boundary: west side only (`BOUND SIDE WEST`)
+- Two bare COMPUTEs (not `COMPUTE STAT` — triggers "Illegal keyword: STAT")
+- OBSTACLE on east side with REFL + RDIFF (POWN required — omitting causes severe error)
+- SPECOUT values are integer-scaled: actual density = integer × FACTOR
+
+**Friction per condition type:**
+- Swell (Tp ≥ 10s): cfjon = 0.038 (default)
+- Windsea (Tp < 10s): cfjon = 0.067
+- Friction is always enabled in production — frictionless propagation was a development default only.
 
 ### §14.16 GFS wind provider (Phase 7 — supplements HRRR for 72-hour forecast)
 
@@ -2004,11 +2019,13 @@ Per SURF-1D-IMPLEMENTATION-PLAN and SURF-ZONE-MODEL-BRIEF:
 
 **Rate limiting:** 2 req/s to NOMADS (shared NOAA infrastructure, same rate as HRRR).
 
-### §14.17 1D surf zone model (SURF-1D-IMPLEMENTATION-PLAN)
+### §14.17 SwellTrack — cross-shore wave transformation model
 
-**Not a network provider.** Post-SWAN cross-shore wave transformation. Runs as a Python module within the API process after SWAN output is parsed and SPECOUT is decomposed. Model selection pending Phase 1 benchmark — three candidates: analytical (pure Python), XBeach-1D surfbeat (Fortran subprocess), SWASH-1D (Fortran subprocess).
+**Not a network provider.** Post-SWAN cross-shore wave transformation. Runs as a Python module within the API process (or via compute offloading to a remote service when `surf_compute_host` is configured) after SWAN output is parsed and SPECOUT is decomposed.
 
-**Module:** `services/surf_1d_model.py` (or `services/surf_xbeach.py` / `services/surf_swash.py` depending on selection).
+**Model selection (decided):** SwellTrack (analytical, pure Python — `surf_1d_analytical.py`). SWASH and XBeach are ruled out entirely — for production, LUT precomputation, and referee/benchmark use (1D-MODEL-BENCHMARK-BRIEF Round 2 results, 2026-07-21).
+
+**Module:** `services/surf_1d_analytical.py`.
 
 **Inputs:**
 - Spectrum (from handoff SPECOUT decomposition) or bulk parameters (Hs, Tp, DIR) per partition
@@ -2024,12 +2041,16 @@ Per SURF-1D-IMPLEMENTATION-PLAN and SURF-ZONE-MODEL-BRIEF:
 - Surf zone widths (impact zone, foam zone, total surf zone, reform trough)
 - Wave shape data (Stokes 2nd order / cnoidal / bore by depth regime)
 
-**Per-partition pipeline:** Each swell partition is transformed independently through the 1D model. At each transect point, combined Hs_total = sqrt(sum(Hs_partition_i²)). Combined depth-limited saturation check: Hs_total ≤ γd enforced after combination. If exceeded, Battjes-Janssen dissipation applied to total energy and redistributed proportionally across partitions.
+**Per-partition pipeline:** Each swell partition is transformed independently through SwellTrack. At each transect point, combined Hs_total = sqrt(sum(Hs_partition_i²)). Combined depth-limited saturation check: Hs_total ≤ γd enforced after combination. If exceeded, Battjes-Janssen dissipation applied to total energy and redistributed proportionally across partitions.
 
-**Computational cost (analytical model):** ~1ms per transect run. Full spot: 3 partitions × 30 transects × ~1ms = ~90ms. Negligible relative to SWAN runtime.
+**Bottom friction (always enabled):** cfjon=0.038 (swell, Tp ≥ 10s) or 0.067 (windsea, Tp < 10s). Implemented as cumulative exponential attenuation per the Battjes-Janssen (1978) formulation. Configured per-spot via `friction_coefficient` in `SurfSpotConfig` (default 0.038).
 
-**Error handling:** Model crash → log ERROR, fall back to SWAN CURVE data (legacy path). `degraded: true` in response. Partial failure: if 1D model fails on some transects, exclude those from aggregation but continue with remaining.
+**Computational cost:** ~1ms per transect run. Full spot: 3 partitions × 30 transects × ~1ms = ~90ms. Negligible relative to SWAN runtime.
+
+**Compute offloading:** When `surf_compute_host` is configured (in `api.conf [providers]`), SwellTrack runs on the remote compute service instead of in-process. Per-timestep granularity: `POST /compute/swelltrack` with one timestep's data, returns results in <500ms. Fallback to in-process when compute service unreachable.
+
+**Error handling:** SwellTrack crash → log ERROR, fall back to SWAN CURVE data (legacy path). `degraded: true` in response. Partial failure: if SwellTrack fails on some transects, exclude those from aggregation but continue with remaining.
 
 ### Source ADRs
 
-§14 consolidates prescriptive rules from: ADR-083 (marine domain architecture), ADR-084 (NWPS supplementation — superseded by ADR-093), ADR-085 (eccodes dependency), ADR-087 (NDBC spectral data), ADR-088 (fishing scoring — bathymetry for habitat), ADR-089 (marine zone alerts), ADR-091 (marine card data sources, OFS ocean data, composite water level), ADR-093 (SWAN replaces NWPS — amended for multi-transect + 1D model), ADR-094 (HRRR wind source for surf scoring), ADR-095 (SWAN model corrections — amended for multi-SPECOUT + 1D model break points), ADR-096 (scoring restructure — amended for multi-transect inputs), ADR-097 (beach profile — amended for 1D model output). ADRs are archived in `docs/archive/decisions/` and explain the *why* behind these rules.
+§14 consolidates prescriptive rules from: ADR-083 (marine domain architecture), ADR-084 (NWPS supplementation — superseded by ADR-093), ADR-085 (eccodes dependency), ADR-087 (NDBC spectral data), ADR-088 (fishing scoring — bathymetry for habitat), ADR-089 (marine zone alerts), ADR-091 (marine card data sources, OFS ocean data, composite water level), ADR-093 (SWAN + SwellTrack replaces NWPS — amended for multi-transect, SurfBeat, compute offloading), ADR-094 (HRRR wind source for surf scoring), ADR-095 (SWAN model corrections — amended for multi-SPECOUT + SwellTrack break points), ADR-096 (scoring restructure — amended for multi-transect inputs), ADR-097 (beach profile — amended for SwellTrack + blended SurfBeat output). ADRs are archived in `docs/archive/decisions/` and explain the *why* behind these rules.

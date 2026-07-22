@@ -6,7 +6,7 @@ supersedes: ADR-084
 superseded-by:
 ---
 
-# ADR-093: SWAN+TruShore replaces NWPS as nearshore wave model
+# ADR-093: SWAN+SwellTrack replaces NWPS as nearshore wave model
 
 ## Context
 
@@ -22,11 +22,19 @@ NWPS IS SWAN — it runs the same Fortran spectral wave model we would run ourse
 |---|---|---|
 | Keep NWPS as primary (current) | No new code. Leverages NWS infrastructure. | Human-gated schedule, no guaranteed availability. 404 → cache discard → WW3 fallback. WW3 fallback produces flat-line forecasts. Sole external dependency for surf data quality. |
 | NWPS with extended cache TTL | Mitigates cache discard. No new infrastructure. | Still human-gated. Stale NWPS data can be 12+ hours old. Does not fix the WW3 fallback problem — just delays it. |
-| Own SWAN instance — TruShore (chosen) | Fixed hourly schedule, guaranteed availability. Same physics as NWPS. HRRR at 3km is finer than NWPS's 5km NDFD input. Cache-last-good-run eliminates WW3 fallback for surf. Existing wave_transform.py and surf_scorer.py wire directly. | SWAN Fortran binary dependency. HRRR wind provider needed. NWPS code/docs must be removed. |
+| Own SWAN instance + SwellTrack (chosen) | Fixed hourly schedule, guaranteed availability. Same physics as NWPS. HRRR at 3km is finer than NWPS's 5km NDFD input. Cache-last-good-run eliminates WW3 fallback for surf. Existing wave_transform.py and surf_scorer.py wire directly. SwellTrack proprietary 1D model provides high-resolution surf zone physics. | SWAN Fortran binary dependency. HRRR wind provider needed. NWPS code/docs must be removed. |
 
 ## Decision
 
-Replace NWPS with a locally-run SWAN instance (TruShore). NWPS is eliminated entirely — code, documentation, cache warmer schedule, and config keys are removed. There is no legacy mode and no `nearshore_model` config key. When the `[nearshore]` pip extra is installed, SWAN+TruShore runs as the only nearshore model.
+Replace NWPS with a locally-run SWAN instance paired with SwellTrack (proprietary analytical 1D cross-shore wave transformation model). NWPS is eliminated entirely — code, documentation, cache warmer schedule, and config keys are removed. There is no legacy mode and no `nearshore_model` config key. When the `[nearshore]` pip extra is installed, SWAN+SwellTrack runs as the only nearshore model.
+
+**SwellTrack** is the named 1D analytical wave transformation model that runs per-transect from the SWAN handoff depth to shore. It replaces the generic "analytical 1D" label used during development.
+
+**SurfBeat strip** is a complementary SWAN run (stationary 2D strip with the SURFBEAT command) that produces infragravity (IG) wave energy — set/lull timing that SwellTrack cannot compute (phase-averaged model). SurfBeat runs at 3-hour intervals alongside SwellTrack's hourly cadence. Enabled per-spot via `surfbeat_enabled` config.
+
+**SWASH and XBeach are ruled out entirely** — for production, LUT precomputation, and referee/benchmark use. SWASH is unvalidated itself and cannot serve as a truth standard. XBeach surfbeat's runtime (~2 min for a 30-min simulation) is incompatible with the 72-timestep forecast pipeline.
+
+**Compute offloading** is operator-configurable via `surf_compute_host` in `api.conf`. When set, SwellTrack and SurfBeat computations run on a remote compute service (e.g., librewxr) instead of in-process on the weewx host. Fallback to in-process when unconfigured or unreachable.
 
 The four supplements from ADR-084 (γ correction, structure effects, spatial interpolation, topographic focusing) survive unchanged and apply to SWAN output. Only the primary nearshore source decision changes.
 
@@ -60,7 +68,7 @@ The four supplements from ADR-084 (γ correction, structure effects, spatial int
 - **Nested grid execution:** Two sequential SWAN runs per cycle. Outer grid completes first, producing boundary condition files that feed the inner nest. SWAN natively supports this via its `NESTOUT`/`NGRID` commands. Domain sizing follows NWPS SGX pattern: outer ~200km at ~3km, inner ~20km at ~200–500m.
 - **Wind forcing:** HRRR (3km, hours 0–48) blended with GFS (0.25°, hours 48–72) to fill the 72-hour forecast card. HRRR and GFS wind grids are interpolated onto the SWAN computational grid independently; the SWAN runner stitches them at the 48-hour boundary.
 - **Schedule:** SWAN runs on the HRRR extended cycle schedule (4×/day at 00/06/12/18Z) when the 48-hour HRRR is available. Not in the request path — the surf endpoint reads from cache.
-- **Cache policy:** TTL 6 hours (matching the extended cycle interval). On failure, retain last-good cache indefinitely. Stale TruShore data is always preferred to no data.
+- **Cache policy:** TTL 6 hours (matching the extended cycle interval). On failure, retain last-good cache indefinitely. Stale SwellTrack data is always preferred to no data.
 - **Optional separated service:** `weewx-clearskies-trushore` pip package for operators who want SWAN on dedicated hardware. API reads from it via `[trushore] service_url`. See Phase 4 of the implementation plan.
 - **Memory budget:** Total SWAN memory must stay under 300 MB (both grid levels combined) to coexist with the API, MariaDB, Redis, and weewx on a 2 GB host.
 
@@ -86,5 +94,5 @@ Per SURF-ZONE-MODEL-BRIEF and SURF-1D-IMPLEMENTATION-PLAN:
 
 - Supersedes: ADR-084 (NWPS as primary nearshore source with supplementation)
 - Related: ADR-094 (HRRR forecast wind source for surf scoring)
-- Research: `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md`, `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md`
-- Plan: `docs/planning/SWAN-TRUSHORE-PLAN.md`, `docs/planning/SURF-1D-IMPLEMENTATION-PLAN.md`
+- Research: `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md`, `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md`, `docs/planning/briefs/1D-MODEL-BENCHMARK-BRIEF.md`
+- Plan: `docs/planning/SWAN-TRUSHORE-PLAN.md`, `docs/planning/SURF-1D-IMPLEMENTATION-PLAN.md`, `docs/planning/SURF-MODEL-FIX-PLAN.md`
