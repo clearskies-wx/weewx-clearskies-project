@@ -2487,15 +2487,17 @@ Two formulas supported, configured per-spot via `breaker_formula` in the marine 
 | `surf_compute_host` | str \| null | `null` | Global (`api.conf [providers]`) | URL of remote compute service for SwellTrack/SurfBeat offloading (e.g., `https://librewxr:8770`). `null` = in-process. |
 | `surf_compute_verify_tls` | bool | `true` | Global (`api.conf [providers]`) | Verify TLS cert on compute service requests. Set `false` for self-signed on same VLAN. |
 
-**1D grid resolution (variable, depth-based).** The SwellTrack 1D grid uses variable resolution defined by depth zones, not distance from shore (see SURF-ZONE-MODEL-BRIEF §6.1 for full rationale). Depth zones are computed at wizard setup from the CUDEM bathymetric profile and the spot's `max_hs_m`:
+**1D grid resolution (variable, depth-based).** The SwellTrack 1D grid uses variable resolution defined by depth zones, not distance from shore (see SURF-ZONE-MODEL-BRIEF §6.1 for full rationale). Depth zones are computed at wizard setup from the CUDEM bathymetric profile, the spot's `max_hs_m`, and the L3 SWAN grid extent:
 
 | Zone | Depth range | Grid dx | Why |
 |---|---|---|---|
-| Surf zone | Shore to `max_hs_m / gamma` | 1–2 m | Breaking, dissipation, break point detection. XBeach: dx ≤ 2m eliminates grid influence. |
-| Shoaling zone | `max_hs_m / gamma` to ~15m | 3–5 m | Shoaling, refraction, bar/trough structure. |
+| Fine zone | Shore to `max(1.3 × max_hs_m / gamma, structure_zone_depth)` | 1–2 m | Breaking, dissipation, break point detection, structure interactions. XBeach: dx ≤ 2m eliminates grid influence. 1.3× margin accounts for shoaling amplification before breaking. |
+| Shoaling zone | Fine zone max to ~15m | 3–5 m | Shoaling, refraction, bar/trough structure. |
 | Approach zone | > ~15m | CUDEM native (3–10 m) | Minimal wave transformation. |
 
-The CUDEM source profile is interpolated to the variable-resolution grid using **PCHIP** (Piecewise Cubic Hermite Interpolating Polynomial) — preserves sandbar curvature without overshoot artifacts. The interpolated profile is generated once at spot setup and cached as `bathymetric_profile` in the per-spot config. SwellTrack reads the pre-interpolated profile from the cache on every call.
+The fine zone extends to whichever is deeper: the maximum breaking depth with shoaling margin (`1.3 × max_hs_m / gamma`) or the structure interaction depth (`structure_zone_depth` — deepest structure depth + margin, 0.0 when no structures configured). The 1.3× margin accounts for shoaling amplification before breaking (a 4m offshore swell can break at ~7m depth, not 5.5m). `structure_zone_depth` is 0.0 by default — it only extends the fine zone when structures are present. Structure changes re-trigger profile generation.
+
+The CUDEM source profile is interpolated to the variable-resolution grid using **PCHIP** (Piecewise Cubic Hermite Interpolating Polynomial) — preserves sandbar curvature without overshoot artifacts. The interpolated profile is generated once at spot setup and cached at `/etc/weewx-clearskies/spot_profiles/{spot_id}.json`. SwellTrack reads the pre-interpolated profile from the cache on every call. Structure changes re-trigger profile generation.
 
 ### Blended beach profile
 

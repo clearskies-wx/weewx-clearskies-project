@@ -522,13 +522,26 @@ The 1D cross-shore grid must be fine enough to resolve wave breaking, shoaling o
 
 | Zone | Depth range | Grid dx | Rationale |
 |---|---|---|---|
-| **Surf zone** | Shore to max breaking depth | 1–2 m | Breaking, dissipation, wave shape transitions, break point detection. XBeach documentation: grid influence "almost eliminated for dx ≤ 2m." |
-| **Shoaling zone** | Max breaking depth to ~15m | 3–5 m | Shoaling, refraction, bar/trough structure. Moderate resolution captures sandbar crests without excessive points. |
+| **Fine zone** | Shore to `fine_zone_max_depth` | 1–2 m | Breaking, dissipation, wave shape transitions, break point detection, structure interactions. XBeach documentation: grid influence "almost eliminated for dx ≤ 2m." |
+| **Shoaling zone** | `fine_zone_max_depth` to ~15m | 3–5 m | Shoaling, refraction, bar/trough structure. Moderate resolution captures sandbar crests without excessive points. |
 | **Approach zone** | > ~15m | CUDEM native (3–10 m) | Waves propagating with minimal transformation. No benefit from finer grid. |
 
-**Max breaking depth computation:** `d_break_max = Hs_max / gamma`, where `Hs_max` is the maximum expected significant wave height for the spot (from operator wave climate config or SWAN boundary conditions) and `gamma` is the breaking parameter (default 0.73). For a spot that sees 4m winter swells: `d_break_max = 4.0 / 0.73 ≈ 5.5m`. The surf zone extends from shore to 5.5m depth — covering outer bars, inner bars, and reform troughs between them. This is critical for multi-bar beaches (e.g. Huntington Beach) where waves break, reform, and break again.
+**Fine zone depth threshold — integrated with L3 grid sizing:**
 
-**Computed at wizard setup time:** The depth zone thresholds are derived from the CUDEM bathymetric profile and the spot's wave climate when the spot is configured. Stored in the per-spot config (`SurfSpotConfig`). The 1D model reads them at runtime — no recomputation per call.
+```
+fine_zone_max_depth = max(max_hs_m / gamma, structure_zone_depth)
+```
+
+Two inputs, take the larger:
+- `max_hs_m / gamma`: maximum depth where wave breaking can occur. For a spot seeing 4m winter swells: `4.0 / 0.73 ≈ 5.5m`. Covers outer bars, inner bars, and reform troughs between them (critical for multi-bar beaches like Huntington Beach).
+- `structure_zone_depth`: maximum depth at the L3 SWAN grid boundary for this spot's cluster. L3 grids extend offshore to include coastal structures (piers, breakwaters, jetties) modeled as OBSTACLE commands. An offshore breakwater at 8m depth pushes L3 to ~10m, well into the shoaling zone. The 1D profile needs fine resolution through the entire L3 extent because wave-structure interactions (diffraction, transmission, shadow zones) affect wave transformation there. Computed from structure locations and the L3 sizing logic in `swan_domain.py`.
+
+Examples:
+- HB Pier (no offshore structures): `fine_zone_max_depth = max(5.5, 5.5) = 5.5m` — breaking physics only.
+- Newport Beach (offshore breakwater at 8m): `fine_zone_max_depth = max(5.5, 10.0) = 10.0m` — L3 structure zone dominates.
+- Pipeline, Oahu (steep reef, 6m max Hs): `fine_zone_max_depth = max(8.2, 6.0) = 8.2m` — breaking physics dominates.
+
+**Computed at wizard setup time:** The depth zone thresholds are derived from the CUDEM bathymetric profile, the spot's wave climate (`max_hs_m`), and the L3 grid extent (from structure locations) when the spot is configured. Stored in the per-spot profile cache (`/etc/weewx-clearskies/spot_profiles/{id}.json` metadata). The 1D model reads them at runtime — no recomputation per call. Structure changes re-trigger profile generation because they may change `structure_zone_depth`.
 
 **Interpolation method: PCHIP (Piecewise Cubic Hermite Interpolating Polynomial).** NCEI's own CUDEM program uses spline interpolation internally ("waffles" tool). Cubic splines preserve sandbar curvature that linear interpolation destroys (slope discontinuities at every sample point affect Iribarren number and breaker type). PCHIP avoids the overshoot artifacts of natural cubic splines in sparse regions — it is monotonicity-preserving, so interpolated depths never create phantom bars or troughs between CUDEM samples.
 

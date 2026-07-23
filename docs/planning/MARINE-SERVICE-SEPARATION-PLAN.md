@@ -625,6 +625,298 @@ weewx host
 
 ---
 
+## Phase 4A — Fix SwellTrack Pipeline + Vocabulary Unification
+
+**Purpose:** The SwellTrack 1D model has never produced non-zero output in production. The SWAN CURVE fallback silently degrades the surf endpoint — surfers see face heights from a single-point formula, not from the 1D wave transformation model. The beach profile endpoint returns no data. The dashboard has two parallel type systems for the same data with different field names. All of this must be fixed BEFORE code moves to the marine service (Phase 5) — moving broken code produces a broken service.
+
+**Origin (2026-07-23):** Session investigating "Current Swell Conditions" showing "No swell component data available" and "Beach Profile data unavailable" uncovered a chain of failures:
+
+1. SWAN standalone service dropped `spectral` and `transect` from HTTP responses (fixed this session — `fc5680a`)
+2. SWAN standalone service lost all data on restart — no disk persistence (fixed this session — `fc5680a`)
+3. Beach profile endpoint ran SwellTrack locally instead of via compute service (fixed this session — `099e874`)
+4. Beach profile API response field names (`hsEnvelope`, `distance`, `hs`) don't match dashboard types (`transect`, `distanceFromShore`, `waveHeight`) — two parallel type systems for the same data
+5. SwellTrack produces zero face height on all 32 transects — spot profile has only 50 points at 50m spacing (should be variable-resolution at 1-5m per SURF-ZONE-MODEL-BRIEF §6.1)
+6. Surf endpoint silently falls back to SWAN CURVE K-G/Caldwell formula when SwellTrack returns zero — `degraded=True` but response looks normal with real numbers
+7. Surf scorer always uses SWAN CURVE face height, never SwellTrack face height
+
+**Scratch file:** `c:\tmp\marine-sep-P4A-scratch.md`
+
+### T4A.1 — Unify beach profile vocabulary (API + dashboard)
+
+- **Owner:** `clearskies-api-dev` + `clearskies-dashboard-dev`
+- **Files:**
+  - API: `endpoints/beach_profile.py`
+  - Dashboard: `src/api/types.ts`, `src/components/marine/tabs/BeachProfileChart.tsx`, `HeatMapCard.tsx`, `SurfingTab.tsx`
+  - Dashboard: `src/api/openapi-v1.yaml` (add beach profile schemas — currently missing)
+
+**Problem:** Two parallel type families describe the same cross-shore data with different names:
+
+| Concept | `BeachProfileTransectPoint` | `HeatMapEnvelopePoint` | Model (`Analytical1DResult`) |
+|---|---|---|---|
+| Cross-shore distance | `distanceFromShore` | `distance` | `distances` (array) |
+| Water depth | `depth` | `depth` | `depths` (array) |
+| Wave height | `waveHeight` | `hs` | `hs_profile` (array) |
+| Points array key | `transect` | `hsEnvelope` | — |
+
+**Decision:** Use the model's vocabulary everywhere. The 1D analytical model uses `distance`, `depth`, `hs` — standard oceanographic terms. The API response already uses these names for the `transect_index=all` path. The single-transect response and dashboard types must match.
+
+**Do:**
+1. **API `beach_profile.py`:** Response uses `transect` as the array key (both single and all-transect paths). Each point uses `distance`, `depth`, `hs`. Break points use `distance`, `depth`, `hs`, `faceHeight`, `breakerType`. Revert the `distanceFromShore`/`waveHeight` rename from the earlier (wrong) fix in this session.
+2. **Dashboard `types.ts`:** Merge `BeachProfileTransectPoint` and `HeatMapEnvelopePoint` into one type using `distance`, `depth`, `hs`. Merge `BeachProfileBreakPoint` and `HeatMapBreakPoint` similarly. `BeachProfileData.transect` and `HeatMapTransectData` both use `transect` as the array key (not `hsEnvelope`). Remove the `HeatMapEnvelopePoint` and `HeatMapBreakPoint` types — they become aliases of the unified types.
+3. **Dashboard `BeachProfileChart.tsx`:** Update all field accesses from `p.distanceFromShore` → `p.distance`, `p.waveHeight` → `p.hs`, `bp.distanceFromShore` → `bp.distance`, `bp.waveHeight` → `bp.hs`. (~30 references per the exploration.)
+4. **Dashboard `HeatMapCard.tsx`:** Update `row.hsEnvelope` → `row.transect`. Point field accesses (`pt.distance`, `pt.hs`) already use the correct names — no change needed.
+5. **Dashboard `SurfingTab.tsx`:** `profileData.transect` is already the correct key — verify it works after the type merge.
+6. **OpenAPI spec:** Add beach profile schemas to `openapi-v1.yaml` — currently entirely missing (doc-code sync gap from SURF-1D-IMPLEMENTATION-PLAN Phase 5).
+
+**Accept:**
+- One type definition for cross-shore points: `distance`, `depth`, `hs`.
+- One array key: `transect` (not `hsEnvelope`).
+- API response matches dashboard types for both single-transect and all-transect paths.
+- BeachProfileChart renders without errors.
+- HeatMapCard renders without errors.
+- OpenAPI spec documents the beach profile response.
+
+### T4A.2 — Implement PCHIP variable-resolution profile generation
+
+- **Owner:** `clearskies-api-dev`
+- **Files:** `enrichment/bathymetry.py`, new utility function
+- **Reference:** SURF-ZONE-MODEL-BRIEF §6.1, API-MANUAL §17 SwellTrack configuration
+
+**Problem:** `download_bidirectional_profile()` produces 50 points at ~50m spacing. At this resolution, the Battjes-Janssen dissipation over-attenuates wave energy and SwellTrack finds zero break points. With 5m interpolation from the same source data, SwellTrack correctly finds 3 break points with physically reasonable face heights (confirmed via direct test on librewxr).
+
+**Do:**
+1. Add a `interpolate_profile_pchip()` function that takes a raw CUDEM profile (list of `{distance_m, depth_m}` dicts) and returns a variable-resolution profile:
+   - **Fine zone** (shore to `fine_zone_max_depth`): 1–2m dx
+   - **Shoaling zone** (`fine_zone_max_depth` to ~15m): 3–5m dx
+   - **Approach zone** (>15m): CUDEM native resolution (no interpolation needed)
+2. Use `scipy.interpolate.PchipInterpolator` (Piecewise Cubic Hermite Interpolating Polynomial) — preserves sandbar curvature without overshoot artifacts. Deduplicate x-values (distance_m) before fitting — the adaptive refinement path in `bathymetry.py` can produce near-duplicates.
+3. **Raw profile extraction at native DEM resolution.** The raw transect profile fed to PCHIP must be sampled at the native CUDEM resolution for that location (~10m at HB where 1/3 arc-second is the finest available, ~3m at locations covered by 1/9 arc-second tiles). Extract directly from the downloaded CUDEM grid — NOT from the 50m bidirectional profile stepper or the resampled L3 cache. PCHIP can interpolate between native samples to create finer grid points, but it cannot recreate features the raw sampling missed.
+4. **Fine zone depth threshold** accounts for BOTH breaking physics and structure zones:
+   ```
+   fine_zone_max_depth = 1.3 * max_hs_m / gamma + structure_zone_depth
+   ```
+   - `1.3 * max_hs_m / gamma`: maximum breaking depth with shoaling margin. Shoaling amplifies Hs before breaking (the model's own jacking factor), so a 4m offshore swell can break at ~7m depth, not 5.5m. The 1.3× margin is cheap (adds a few hundred fine-zone points) and prevents break points landing in the coarse zone during big swells — when accuracy matters most.
+   - `structure_zone_depth`: the depth of the deepest structure affecting this spot, plus margin. **Default 0.0** when no structures configured — fine zone covers only the breaking zone. When an offshore breakwater sits at 8m depth: `structure_zone_depth = 10.0` (structure depth + 2m margin), extending the fine zone to cover structure interactions.
+   - Example: HB, no structures, 4m max Hs → `fine_zone_max_depth = 1.3 * 5.5 + 0 = 7.1m`.
+   - Example: Newport, breakwater at 8m, 4m max Hs → `fine_zone_max_depth = max(7.1, 10.0) = 10.0m`.
+5. `max_hs_m` defaults to 4.0m. Per-spot configurable via `SurfSpotConfig.max_hs_m`.
+6. `structure_zone_depth` is computed from the spot's structure config: deepest structure depth + margin. 0.0 when no structures. Required parameter (no default that silently extends the fine zone).
+7. The function signature: `interpolate_profile_pchip(raw_profile, max_hs_m, gamma, structure_zone_depth=0.0) -> list[dict]`.
+
+**Accept:**
+- Raw profile extracted at native DEM resolution (~10m at HB, ~3m where 1/9 arc-second available).
+- Fine zone extends to `max(1.3 * max_hs_m / gamma, structure_zone_depth)` — covers breaking zone with shoaling margin + structure zone when applicable.
+- A spot with no structures gets fine resolution only through the surf zone — no wasteful 1-2m dx through the entire shoaling zone.
+- A spot with an offshore breakwater at 8m depth gets fine resolution to ~10m depth.
+- Per-zone dx bounds verified: fine zone ≤ 2m, shoaling zone 3-5m, approach zone ≥ native DEM resolution.
+- `run_1d_analytical()` with the interpolated profile finds ≥1 break point with non-zero face height for 1.0m Hs / 10.3s Tp input.
+- No phantom bars or troughs in the interpolated profile (PCHIP monotonicity-preserving).
+- No duplicate x-values passed to PchipInterpolator.
+
+### T4A.2b — Fix Battjes-Janssen forward-marching energy integration
+
+- **Owner:** `clearskies-api-dev`
+- **Files:** `services/surf_1d_analytical.py`
+
+**Problem:** `_battjes_janssen()` (lines 153-177) computes dissipation at each grid point independently — each point starts from its own shoaled Hs and subtracts one step of dissipation. The wave doesn't "remember" energy lost at previous points. Consequence: dissipation scales linearly with dx. At 50m dx, one step wipes out the wave. At 2m dx, each step removes almost nothing, and the model degenerates to the `Hs = min(Hs, gamma * d)` depth-limited cap at line 484. Break point detection still works at fine resolution (the gamma×d crossing is the correct criterion), but the post-breaking energy decay in the surf zone is just the depth contour × gamma — not real physics.
+
+The `_roller_model()` (lines 180-216) IS correctly forward-marching (`Er` accumulates from point to point), but it operates on the incorrectly-computed B-J output.
+
+**Do:**
+1. Convert `_battjes_janssen()` from vectorized-independent to a forward-marching loop. At each point i, compute Hs[i] from the energy flux arriving from point i-1 minus the dissipation at point i. Pattern matches `_roller_model` which already does this correctly:
+   ```python
+   for i in range(1, n):
+       # Energy arriving from previous point (with shoaling)
+       E_in = 0.125 * rho * g * Hs[i]**2  # Hs[i] has shoaling applied
+       # B-J dissipation at this point
+       Hmax = gamma * d[i]
+       Qb = ...  # fraction breaking, from Hs[i-1] or Hs[i]
+       Dtot = alpha * Qb * rho * g * (Hmax/sqrt(2))**2 / (4*T)
+       # Subtract dissipation over this step
+       E_out = max(E_in - Dtot * abs(dx[i]) / Cg[i], 0.0)
+       Hs[i] = sqrt(8 * E_out / (rho * g))
+   ```
+2. The `_bottom_friction()` function already uses `np.cumsum` for accumulated friction — use the same forward-marching pattern for B-J.
+3. After this fix, the post-breaking Hs envelope shows realistic energy decay: rapid dissipation at the break point, gradual decay through the surf zone, potential reformation in troughs between bars. This is what the beach profile chart renders.
+4. Run the existing test suite and Surfline comparison to validate that break point locations and face heights remain physically reasonable (they should — the gamma×d crossing criterion is unchanged; only the post-breaking decay shape changes).
+
+**Accept:**
+- `_battjes_janssen()` is forward-marching: `Hs[i]` depends on `Hs[i-1]`.
+- Post-breaking Hs decay is physically realistic (not just `gamma * depth`).
+- Break points at the same locations as before (gamma×d crossing unchanged).
+- Multi-bar profiles show reformation between bars (Hs recovers in troughs).
+- Existing tests pass.
+
+### T4A.3 — Move CUDEM download to apply time
+
+- **Owner:** `clearskies-api-dev`
+- **Files:** `endpoints/setup.py`, `enrichment/bathymetry.py`, `providers/nearshore/swan.py`, `services/swan_domain.py`
+
+**Problem:** The CUDEM download → depth contour identification → L1/L2/L3 grid sizing → profile generation chain currently runs at SWAN runtime inside `_run_all_spots_locked()` (swan.py). This chain already works — grid boundaries are set from actual depth contours. But running at runtime means the first SWAN run takes an extra 5-10 minutes, and the profile generation step (currently producing broken 50-point profiles) is invisible to the operator.
+
+**What changes:** Move the existing chain from runtime to apply time. Same logic, different trigger. The only new code is the PCHIP variable-resolution profile interpolation (T4A.2) — everything else is re-wiring existing functions to run from `/setup/apply` instead of from the SWAN cache warmer.
+
+**Critical constraint:** CUDEM download must wait until ALL surf spots are defined (not per-spot), because the unified bounding box from all spots defines the L1 and L2 SWAN grids. The download is triggered at apply time, after all segments are confirmed.
+
+**Current state of grid sizing (verified 2026-07-23):**
+- L1: Uses GSFM shelf boundary distance (static data) — correct, no CUDEM needed.
+- L2: **Hardcoded 6km offshore** (`_compute_level2`, swan_domain.py line 291: `offshore_km = 6.0`). The `offshore_depth_m=30.0` parameter is accepted but never used to find the actual 30m contour. This is wrong — 6km is a guess that varies wildly by coast (steep Pacific shelf vs gentle Gulf shelf).
+- L3: Reads `offshore_distance_m` from the cached bidirectional CUDEM profile — distance to the 15m contour. This is CUDEM-dependent and correct in principle, but reads from the broken 50-point profile. Falls back to 2.5km when no profile exists (swan_domain.py line 582).
+
+**Correct dependency chain (L1 triggers CUDEM download, L2/L3 sized from actual depth data):**
+
+```
+1. All spots defined (wizard complete)
+      ↓
+2. Size L1 grid from GSFM shelf boundary (static data, no CUDEM needed)
+   - L1 (1km): GSFM shelf edge + 15km margin → shore
+   - L1 bounding box = the CUDEM download area
+      ↓
+3. COARSE download: CUDEM at L1 resolution (1km) for L1 bounding box
+   - CRM/DEM_all (~90m) is sufficient at this resolution
+   - Purpose: locate depth contours for L2/L3 sizing
+      ↓
+4. Size L2 from actual 30m depth contour (FIX: replaces hardcoded 6km)
+   - Search along EACH spot's offshore bearing (not averaged) — a single
+     averaged transect through a submarine canyon (e.g. Newport Canyon)
+     would place the 30m contour at the wrong distance
+   - Take the MAX distance across all spots
+   - L2 (100m): shore → actual 30m contour + margin
+      ↓
+5. MEDIUM download: CUDEM at L2 resolution (100m) for L2 bounding box
+   - CUDEM 1/3 arc-second (~10m) covers this range at most US coasts
+      ↓
+6. Size L3 from actual 15m depth contour (FIX: replaces 2.5km fallback)
+   - Per-cluster, shore → max(15m contour, deepest structure + margin)
+   - Compute structure_zone_depth per spot (deepest structure depth + margin, 0 without structures)
+      ↓
+7. FINE download: CUDEM at L3 resolution (10m) for each L3 cluster bbox
+   - CUDEM 1/9 arc-second (~3m) where available; 1/3 arc-second (~10m) elsewhere
+      ↓  [NEW: T4A.2 PCHIP interpolation — replaces the broken 50-point profile]
+8. Extract raw transect profiles from FINE download at native DEM resolution
+   - Sample at ~10m (1/3 arc-sec) or ~3m (1/9 arc-sec) depending on coverage
+      ↓
+9. Generate per-transect variable-resolution profiles:
+   - fine_zone_max_depth = max(1.3 * max_hs_m / gamma, structure_zone_depth)
+   - PCHIP interpolation per T4A.2 spec
+      ↓
+10. Cache everything:
+    - L1/L2/L3 CUDEM grids at per-level resolution
+    - Per-spot profile JSON with variable resolution + vertical datum metadata
+    - Grid boundary metadata (actual depth contour positions, extents)
+```
+
+**Do:**
+1. In `/setup/apply` handler: after writing marine config to `api.conf`, size the L1 grid from GSFM shelf boundary data (`data/gsfm_shelf_boundary.json`, static). L1 bounding box = the download area (all spots, GSFM shelf distance + 15km margin).
+2. Download CUDEM data in resolution tiers matching each grid level — CUDEM coverage at 1/9 arc-second (~3m) is nearshore only; the outer shelf covered by L1 may only have 1/3 arc-second (~10m) or CRM (~90m). Download strategy:
+   - **L1 area** (full shelf): download at L1's native 1km resolution. CRM/DEM_all fallback is acceptable here — L1 doesn't need fine bathymetry.
+   - **L2 area** (shore to ~30m): download at 100m resolution. CUDEM 1/3 arc-second (~10m) covers this range at most US coasts.
+   - **L3 area** (shore to ~15m): download at 10m resolution. CUDEM 1/9 arc-second (~3m) covers the nearshore zone where it matters most.
+   - Use `download_swan_depth_grid()` with the appropriate bbox and resolution per level. The existing DEM priority chain (operator GeoTIFF → regional OPeNDAP → Great Lakes → CRM fallback) handles coverage gaps.
+   - Depth contour identification (steps 3-4) uses the finest available data for each contour's depth range.
+3. **Fix L2 grid sizing** (`_compute_level2` in `swan_domain.py`): replace the hardcoded `offshore_km = 6.0` with actual 30m depth contour identification from the downloaded CUDEM grid. Find the geographic position where depth reaches 30m along the offshore bearing. This distance varies by coast — the current 6km guess is wrong for steep Pacific shelves (~2km to 30m) and gentle Gulf shelves (~30km to 30m).
+4. **Fix L3 grid sizing** (`_compute_level3_cluster` in `swan_domain.py`): replace the 2.5km fallback with actual 15m depth contour identification from the downloaded CUDEM grid. When structures are present, extend to `max(15m contour, deepest structure depth + margin)`. The `offshore_distance_m` now comes directly from the CUDEM grid query — not from the broken 50-point spot profile.
+5. Compute `structure_zone_depth` per spot — deepest structure depth + margin, or 0.0 when no structures configured.
+6. For each surf spot: extract raw cross-shore profiles along each transect bearing from the FINE download at the DEM's native resolution (~10m at HB, ~3m where 1/9 arc-second available). Then interpolate to variable resolution via `interpolate_profile_pchip(raw_profile, max_hs_m, gamma, structure_zone_depth)` (T4A.2).
+7. Contour search uses each spot's own offshore bearing (not an averaged bearing) — a single averaged transect through a submarine canyon (e.g. Newport Canyon) would mislocate the depth contour. Take the max distance across all spots for the grid boundary.
+8. Store all outputs:
+   - Per-level CUDEM grids: `swan_bathymetry_L1.json` (1km), `swan_bathymetry_L2.json` (100m), `swan_bathymetry_L3_{hash}.json` (10m per cluster) — same cache paths SWAN already reads.
+   - Per-spot profiles: `/etc/weewx-clearskies/spot_profiles/{spot_id}.json` with variable dx. Include metadata: `structure_zone_depth`, `fine_zone_max_depth`, `max_hs_m`, `gamma`, actual depth contour positions (30m and 15m), **vertical datum** (required for the datum consistency check mandated by SURF-ZONE-MODEL-BRIEF §6), generation timestamp.
+   - Grid boundary metadata: L1/L2/L3 extents with actual depth contour positions — SWAN reads these to configure its grid domains. No hardcoded distance fallbacks.
+9. Remove the CUDEM download and grid sizing from `_run_all_spots_locked()` in `swan.py` — SWAN reads from pre-computed caches only. If caches are missing (operator never ran apply), SWAN logs ERROR and skips the run. No silent fallback to runtime download or hardcoded distances.
+10. Admin save and re-apply re-trigger the full chain for any changed spots. Structure changes (adding/removing/moving a structure) also re-trigger because they affect L3 sizing and `structure_zone_depth`. Location coordinate changes re-trigger because they affect the bounding box and depth contour positions.
+11. Add `max_hs_m: float = 4.0` to `SurfSpotConfig` in `marine_config.py`. Passed to profile generation for depth zone computation.
+
+**Accept:**
+- `/setup/apply` executes the full dependency chain: L1 sizing → coarse download → L2 from actual 30m contour → medium download → L3 from actual 15m contour → fine download → profile generation (progress visible to operator).
+- L2 grid boundary set from actual 30m depth contour — not hardcoded 6km.
+- L3 grid boundary set from actual 15m depth contour (or deeper for structures) — not 2.5km fallback.
+- Contour search per-spot-bearing with max distance (not single averaged transect).
+- Raw profiles extracted at native DEM resolution.
+- Profiles are variable-resolution per T4A.2 spec, with fine zone extending to `max(1.3 * max_hs_m / gamma, structure_zone_depth)`.
+- Profile metadata includes vertical datum.
+- SWAN runtime reads from cached grids, profiles, and boundary metadata — zero CUDEM downloads, zero grid sizing, zero hardcoded distance guesses at runtime.
+- Missing caches produce an explicit error, not a silent degradation.
+- Admin location or structure changes re-trigger the full chain.
+
+### T4A.4 — Remove SWAN CURVE fallback from surf endpoint
+
+- **Owner:** `clearskies-api-dev`
+- **Files:** `endpoints/surf.py`
+
+**Problem:** The surf endpoint has a two-phase write pattern. Phase 1 (lines 890-1083) always computes SWAN CURVE K-G/Caldwell face heights. Phase 2 (lines 1136-1181) conditionally overrides with SwellTrack results. When SwellTrack returns zero face height (`_1d_face_m == 0.0`), the `else` branch at line 1172 silently keeps the SWAN CURVE values and sets `degraded=True`. The result: the response contains real-looking numbers that came from a single-point formula approximation, not from the 1D wave transformation model. There is no way for the consumer to distinguish "SwellTrack produced this" from "SWAN CURVE produced this as a silent fallback."
+
+Additionally, `score_surf()` (line 1050) always uses SWAN CURVE `face_height_m`, never the SwellTrack face height. The quality score is always based on the formula approximation.
+
+**Deployment constraint:** T4A.4 and T4A.5 MUST deploy together (or T4A.5 first). Removing the fallback before SwellTrack produces non-zero output = the surf page shows zeros for every timestep. Verify SwellTrack output is non-zero in production BEFORE the fallback removal goes live.
+
+**Do:**
+1. Remove Phase 1 SWAN CURVE face height computation. The 1D pipeline is the sole source of breaking wave heights.
+2. Remove the `else` fallback branch at line 1172. Distinguish two cases:
+   - **Model ran, genuinely no breaking** (e.g., flat conditions, Hs below 0.15m threshold): `breakingFaceHeight = 0.0`, `modelStatus = "no_breaking"`. This is a valid physical result — surfers see flat water.
+   - **Model failed** (exception at line 1035, missing profile, pipeline returned None): `breakingFaceHeight = null`, `modelStatus = "unavailable"`. This is a failure — the dashboard shows "Surf forecast unavailable," not a confident "flat" rating.
+   - Add `modelStatus` field to `SurfForecast` response: `"ok"`, `"no_breaking"`, `"unavailable"`, `"degraded_bulk"`. Replaces the boolean `degraded` flag which can't distinguish these cases.
+3. Change `score_surf()` to use SwellTrack `best_peak_face_height_m` instead of SWAN CURVE `face_height_m`. When face height is null (model failure), the scorer returns null quality score — no rating. When face height is 0.0 (genuinely flat), the scorer rates it as "Flat" / 0 stars.
+4. Recompute `breakingHawaiianHeight` from the SwellTrack face height (`best_peak_face_height_m * 0.5`), not from the removed Phase 1 CURVE value.
+5. Keep `swellHeight` from SWAN SPECOUT (deep-water swell) — this is a display value showing what's arriving offshore, not a breaking height.
+6. Keep SWAN TABLE `HSIGN`, `TM01`, `DIR` for the scorer's period and direction inputs — those don't change between SWAN CURVE and SwellTrack.
+7. The `degraded` field is replaced by `modelStatus` (see step 2). `modelStatus = "degraded_bulk"` covers the T4.5 case (SPECOUT unavailable, bulk Hs/Tp/Dir used). `modelStatus = "ok"` when full spectral pipeline ran.
+
+**Accept:**
+- No SWAN CURVE face height computation in the surf endpoint.
+- `breakingFaceHeight`: SwellTrack value, 0.0 for flat, null for model failure — never a formula guess.
+- `breakingHawaiianHeight`: derived from SwellTrack face height.
+- `modelStatus` distinguishes ok / no_breaking / unavailable / degraded_bulk.
+- `score_surf()` scores SwellTrack face height. Returns null on model failure (not a confident "flat" rating).
+- No silent degradation — failure is visible as null + "unavailable", not masked by formula values.
+- T4A.5 deploys BEFORE or WITH T4A.4 — never after.
+
+### T4A.5 — Regenerate spot profiles on librewxr
+
+- **Owner:** Coordinator (Opus) — with user approval
+- **Files:** `/etc/weewx-clearskies/spot_profiles/huntington-city-beach-pier.json` on librewxr
+
+**Do:**
+1. Run the new `interpolate_profile_pchip()` function on librewxr against the existing CUDEM data for Huntington Beach.
+2. Regenerate the spot profile at variable resolution.
+3. Restart the SWAN standalone service and compute service to pick up the new profile.
+4. Verify: `run_1d_analytical()` with the new profile produces non-zero break points.
+5. Verify: the surf endpoint returns `degraded=false` and face heights from SwellTrack (not SWAN CURVE).
+
+**Accept:**
+- Spot profile has ~400-500 points (variable resolution).
+- SwellTrack produces non-zero face heights.
+- Surf endpoint: `degraded=false`, `breakingFaceHeight` from SwellTrack.
+- Beach profile endpoint returns full transect data.
+
+### Adversarial Audit — Phase 4A
+
+- **Owner:** `clearskies-auditor`
+
+**Scope:**
+1. **Vocabulary:** grep all repos for `hsEnvelope`, `distanceFromShore`, `waveHeight` (in the beach profile context) — zero matches except historical docs. Only `transect`, `distance`, `depth`, `hs` used.
+2. **Profile resolution:** verify HB spot profile has >200 points with variable spacing (1-2m near shore, wider offshore).
+3. **No SWAN CURVE face height in surf endpoint:** grep `surf.py` for `hsig_to_face_height` — zero calls. Face height comes only from pipeline.
+4. **Scorer input:** verify `score_surf()` receives SwellTrack face height, not SWAN CURVE.
+5. **No silent fallback:** when SwellTrack returns zero, response shows zero — not a formula value.
+6. **CUDEM at apply time:** verify `/setup/apply` triggers CUDEM download. Verify SWAN runtime does NOT download CUDEM.
+7. **Disk persistence:** verify all profiles survive service restart (SURF-ZONE-MODEL-BRIEF §6.1 + `rules/coding.md` persistence rule).
+8. Silent deferral scan across all modified files.
+
+### QC Gate 4A
+
+- One vocabulary for beach profile data: `distance`, `depth`, `hs`, `transect`.
+- Dashboard BeachProfileChart and HeatMapCard render without errors.
+- SwellTrack produces non-zero face heights at HB.
+- Surf endpoint: `degraded=false`, face heights from SwellTrack.
+- Beach profile endpoint returns full transect data with variable-resolution envelope.
+- Surf scorer uses SwellTrack face height.
+- CUDEM downloads at apply time, not runtime.
+- Profiles persist across restarts.
+- Auditor: zero unresolved findings.
+
+---
+
 ## Phase 4 — Marine Service Repo + Scaffold
 
 **Purpose:** Create the `weewx-clearskies-marine` repo, scaffold the service structure, and set up the provider module architecture. The scaffold has endpoints, auth, TLS, systemd, and health — but no provider modules yet (those move in Phase 5).
@@ -1402,6 +1694,7 @@ weewx-clearskies-marine/
 | 2 | Fix TLS + Remote Mode | `verify_tls` config, TLS fix, librewxr sync, remote mode activated | PENDING |
 | 3 | Fix Caching + E2E Verify | Caching bug fixed, surf page shows data, Surfline comparison | PENDING |
 | **PART B** | | | |
+| 4A | Fix SwellTrack Pipeline + Vocabulary | Unified vocabulary, PCHIP variable-resolution profiles, CUDEM at apply time, remove SWAN CURVE fallback | PENDING |
 | 4 | Marine Service Scaffold | `weewx-clearskies-marine` repo, provider infra, /health + /manifest + /config, TLS + auth | PENDING |
 | 5 | Move Provider Modules | All 29 modules moved (11+12+3+3), pipeline wired, 6 endpoints serving | PENDING |
 | 6 | API Companion Proxy | Manifest handler, response wrapping, unit conversion, delete ~28K lines from API | PENDING |
@@ -1416,4 +1709,29 @@ weewx-clearskies-marine/
 
 ## Execution Log
 
-*(Empty — ready for session notes. Coordinator appends after every commit, QC gate, and state change.)*
+### 2026-07-23 — Session: Data flow fixes + SwellTrack pipeline investigation
+
+**Part A hot fixes (deployed):**
+- `fc5680a` (weewx-clearskies-swan-swelltrack) — SWAN standalone service: added `spectral` and `transect` to HTTP response cache; added disk→Redis→memory restore on startup. Previously dropped swell decomposition data and lost all data on restart.
+- `099e874` (weewx-clearskies-api) — Beach profile endpoint: routed SwellTrack through compute service (was running locally on weewx with no CUDEM data → always failed).
+- `0d87b28` (weewx-clearskies-api) — Beach profile response: aligned field names with dashboard contract (`hsEnvelope`→`transect`, `distance`→`distanceFromShore`, `hs`→`waveHeight`). NOTE: This rename was wrong — should have used model vocabulary. Will be reverted in Phase 4A T4A.1.
+
+**Repo operations:**
+- Created `clearskies-wx/weewx-clearskies-swan-swelltrack` on GitHub (repo was local-only). All commits pushed.
+- Renamed repo from `weewx-clearskies-swan` to `weewx-clearskies-swan-swelltrack` (local, GitHub, librewxr).
+- Installed `gh` CLI on librewxr, authenticated with GitHub.
+- Updated `.pth` editable install path on librewxr after directory rename.
+- Updated ARCHITECTURE.md, PROVIDER-MANUAL, clearskies-dev.md with new repo name and librewxr repo paths.
+
+**Doc updates:**
+- `rules/coding.md` — Added "Expensive computed data must be persisted to disk" rule (§1, after caching rule). Incident: SWAN service volatile-only cache dropped spectral data and lost everything on restart.
+- `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md` — Added §6.1: variable-resolution 1D grid spec (depth-based zones, PCHIP interpolation, max breaking depth computation). Research-backed: XBeach docs confirm dx ≤ 2m eliminates grid influence.
+- `docs/manuals/API-MANUAL.md` — Added `max_hs_m` config key and depth zone table to §17 SwellTrack configuration.
+
+**SwellTrack pipeline investigation (root cause found, fix planned in Phase 4A):**
+- SwellTrack has NEVER produced non-zero output in production. All 32 transects × all timesteps → `best_peak=0.00 m`.
+- Root cause: spot profile at `/etc/weewx-clearskies/spot_profiles/huntington-city-beach-pier.json` has 50 points at 50m spacing. Battjes-Janssen dissipation over-attenuates at this resolution — wave dies before reaching breaking depth.
+- Confirmed fix: same profile interpolated to 5m resolution → 3 break points found (1.13m Hs spilling at 80m from shore). Model works; resolution was wrong.
+- The "5.5 ft face height" shown on the dashboard comes from SWAN CURVE K-G/Caldwell fallback, NOT from SwellTrack. `degraded=True` on all entries but response looks normal — silent degradation.
+- Surf scorer always uses SWAN CURVE face height, never SwellTrack.
+- Phase 4A created to fix all of this before code moves to marine service.
