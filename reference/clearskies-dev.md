@@ -92,15 +92,16 @@ Do NOT run pytest, uv, docker, or node toolchains on DILBERT. Do NOT edit source
 
 ### DILBERT (local clones)
 
-All five repos live under the meta repo:
+All repos live under the meta repo:
 
 ```
 c:\CODE\weather-belchertown\repos\
-  weewx-clearskies-api\          # default branch: main
-  weewx-clearskies-realtime\     # default branch: main
-  weewx-clearskies-dashboard\    # default branch: main
-  weewx-clearskies-stack\        # default branch: main
-  weewx-clearskies-design-tokens\# default branch: main
+  weewx-clearskies-api\                # default branch: main
+  weewx-clearskies-realtime\           # default branch: main
+  weewx-clearskies-dashboard\          # default branch: main
+  weewx-clearskies-stack\              # default branch: main
+  weewx-clearskies-design-tokens\      # default branch: main
+  weewx-clearskies-swan-swelltrack\    # default branch: master — standalone SWAN + SwellTrack service (librewxr)
 ```
 
 Meta repo (`c:\CODE\weather-belchertown\`) default branch: **master**.
@@ -117,6 +118,16 @@ Meta repo (`c:\CODE\weather-belchertown\`) default branch: **master**.
 ```
 
 Owner: `ubuntu`. Container IP: `192.168.2.113` (DHCP/SLAAC on `br-vlan2`).
+
+### librewxr (compute host)
+
+```
+/home/ubuntu/repos/
+  weewx-clearskies-api/                # API repo (used by SWAN service for provider modules)
+  weewx-clearskies-swan-swelltrack/    # SWAN standalone service (port 8767, systemd: weewx-clearskies-swan)
+```
+
+Owner: `ubuntu`. Host IP: `192.168.7.22`. SSH: `ssh -F .local/ssh/config librewxr`.
 
 ## SSH access
 

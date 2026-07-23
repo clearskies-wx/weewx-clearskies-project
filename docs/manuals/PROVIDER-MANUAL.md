@@ -1951,7 +1951,7 @@ The stationary quick update now includes a WLEVEL input (current tide at compute
 
 **2-D bathymetry grid:** Downloaded lazily on first SWAN run via the bathymetry resolver priority chain (§14.7): operator file → NCEI regional OPeNDAP → Great Lakes → CRM fallback. Per-level caches at `/etc/weewx-clearskies/swan_bathymetry_L{1,2,3}.json` with 180-day TTL. `cudem_to_swan_bottom()` bilinear-interpolates the source grid onto SWAN grid dimensions. Sign convention: CUDEM (negative = ocean) → SWAN (positive = ocean). Vertical datum consistency enforced by matching CO-OPS tide prediction datum to the bathymetry DEM's native datum. No local datum conversion for the common case (ADR-098).
 
-**Optional separated service:** When `[swan] service_url` is set to a remote host, `SwanProvider.fetch()` calls the remote HTTP endpoint instead of running SWAN locally. Health check polls `GET {service_url}/health` every 60 seconds. Three consecutive failures → log ERROR, serve last-good cache. See ARCHITECTURE.md for the standalone `weewx-clearskies-swan` package (ADR-096 renamed).
+**Optional separated service:** When `[swan] service_url` is set to a remote host, `SwanProvider.fetch()` calls the remote HTTP endpoint instead of running SWAN locally. Health check polls `GET {service_url}/health` every 60 seconds. Three consecutive failures → log ERROR, serve last-good cache. See ARCHITECTURE.md for the standalone `weewx-clearskies-swan-swelltrack` package (ADR-096 renamed, ADR-099 re-renamed).
 
 #### §14.15 Amendment: Multi-transect + SwellTrack architecture (2026-07-21)
 
