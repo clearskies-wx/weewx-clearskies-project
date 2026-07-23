@@ -2910,3 +2910,189 @@ SWAN always produces multi-timestep output. The dashboard's 72-hour forecast cha
 | `breakPoints[].waveHeight` | float | Wave height at break point in display units |
 
 Unit conversion applies to `waveHeight` and `swellHeight` fields. Distance and depth are always in meters (physical positions, not display values). Multiple `breakPoints` entries for multi-break spots (outer bar, inner bar).
+
+---
+
+## §19 Marine Service Companion Pattern (target — pending ADR-099 acceptance)
+
+This section documents the target-state architecture for the marine service (`weewx-clearskies-marine`). The patterns described here take effect when the marine service is extracted from the API into a standalone companion service per ADR-099. The current state (SWAN runner, SwellTrack, all marine providers embedded in the API) continues to apply until ADR-099 is accepted and the migration executed.
+
+**Current state:** All marine logic — SWAN runner, SwellTrack, SurfBeat, and all provider modules listed in PROVIDER-MANUAL §14 — runs inside the API process. Marine endpoints (`/surf`, `/marine`, `/tides`, `/fishing`, `/beach-safety`) are hardcoded routes in `endpoints/`.
+
+**Target state:** Marine logic moves to a standalone FastAPI service (`weewx-clearskies-marine`) on port 8780. The API communicates with it over HTTP (authenticated, TLS). Marine endpoints are dynamically mounted from the service's manifest. Zero API code changes are needed to add or modify a marine endpoint after the separation.
+
+### §19.1 Manifest registration
+
+The marine service exposes `GET /manifest` (no auth required). The API fetches this manifest at startup and on each `/setup/apply` call, and mounts the declared routes dynamically under `/api/v1/`.
+
+**Manifest response shape:**
+
+```json
+{
+  "version": "1.0.0",
+  "endpoints": [
+    {
+      "path": "/surf/{locationId}",
+      "method": "GET",
+      "capability": "surf",
+      "description": "Surf forecast and scoring for a configured marine location"
+    },
+    {
+      "path": "/surf/{locationId}/profile",
+      "method": "GET",
+      "capability": "surf",
+      "description": "Cross-shore transect for the current forecast timestep"
+    },
+    {
+      "path": "/marine/{locationId}",
+      "method": "GET",
+      "capability": "marine",
+      "description": "Marine observation bundle for a configured location"
+    },
+    {
+      "path": "/tides/{locationId}",
+      "method": "GET",
+      "capability": "tides",
+      "description": "Tide prediction and composite water level bundle"
+    },
+    {
+      "path": "/fishing/{locationId}",
+      "method": "GET",
+      "capability": "fishing",
+      "description": "Fishing score and species scoring for a configured location"
+    },
+    {
+      "path": "/beach-safety/{locationId}",
+      "method": "GET",
+      "capability": "beach_safety",
+      "description": "Beach safety bundle (rip current risk, surf height, UV, water temp)"
+    }
+  ],
+  "capabilities": [
+    {"id": "surf", "displayName": "Surf Forecast", "requiresConfig": ["swan_grid"]},
+    {"id": "marine", "displayName": "Marine Conditions"},
+    {"id": "tides", "displayName": "Tide Predictions"},
+    {"id": "fishing", "displayName": "Fishing Score"},
+    {"id": "beach_safety", "displayName": "Beach Safety"}
+  ]
+}
+```
+
+**Dynamic route mounting:** At startup, the API fetches the manifest and registers one proxy handler per declared endpoint. Each proxy handler:
+
+1. Forwards the incoming request (including path parameters and query string) to the marine service at `marine_service_url + path`.
+2. Attaches `Authorization: Bearer {MARINE_SERVICE_SECRET}` to the outbound request.
+3. Receives raw SI-unit data from the marine service.
+4. Wraps the response in the standard API envelope (see §19.3).
+5. Returns the wrapped response to the dashboard.
+
+Adding a new marine endpoint requires a manifest update in the marine service only — zero API code changes.
+
+**When marine service is not configured** (`marine_service_url` absent from `api.conf`): no manifest is fetched, no marine routes are mounted, and the API behaves identically to a non-marine installation. The marine endpoint inventory in §18 remains accurate for the current embedded state.
+
+### §19.2 Configuration key
+
+One key in the `[providers]` section of `api.conf` replaces both the current `surf_compute_host` key and the `[swan] service_url` key:
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `marine_service_url` | str or null | `null` | Base URL of the marine service. Same-host example: `https://localhost:8780`. Separate-host example: `https://192.0.2.10:8780` or `https://[2001:db8::1]:8780`. When null, no marine service is connected and no marine endpoints are mounted. |
+
+**IPv6 note:** When using an IPv6 address directly (without a hostname), enclose it in square brackets: `https://[2001:db8::1]:8780`. Both IPv4 and IPv6 addresses are valid values.
+
+`MARINE_SERVICE_SECRET` goes in `secrets.env` (not in `api.conf`). See OPERATIONS-MANUAL §4 for the deployment procedure.
+
+### §19.3 Response envelope wrapping
+
+The marine service returns raw SI-unit data. The API wraps every marine response in the standard envelope before returning it to the dashboard.
+
+**Marine service response (raw):**
+
+```json
+{
+  "locationId": "rincon",
+  "waveHeight": 1.4,
+  "wavePeriod": 12.0,
+  "waveDirection": 280
+}
+```
+
+**API response (wrapped):**
+
+```json
+{
+  "data": {
+    "locationId": "rincon",
+    "waveHeight": {"value": 4.6, "label": "ft", "formatted": "4.6"},
+    "wavePeriod": {"value": 12.0, "label": "s", "formatted": "12"},
+    "waveDirection": {"value": 280, "label": "°", "formatted": "280"}
+  },
+  "stationClock": {"localTime": "...", "utcOffset": "..."},
+  "freshness": {"dataAge": 1240, "refreshInterval": 1800, "isStale": false},
+  "units": {"waveHeight": "ft", "wavePeriod": "s", "waveDirection": "deg"}
+}
+```
+
+Unit conversion from SI to the operator's configured unit system is applied by the API proxy handler — the marine service always returns SI units and the API always converts.
+
+### §19.4 Capability merging
+
+Marine capabilities declared in the manifest (`/manifest` → `capabilities` array) are merged into `GET /api/v1/capabilities` when the marine service is connected. When the marine service is absent or unreachable, the marine capability entries are omitted from the capabilities response. All other (non-marine) capabilities are unaffected by marine service connectivity.
+
+The capabilities merge is live — if the marine service becomes unreachable between API restarts, the next manifest fetch (at each `/setup/apply` call) will detect the absence and remove marine capabilities from the response.
+
+### §19.5 Config push model
+
+Marine service configuration is never read directly from `api.conf`. It is pushed from the API.
+
+**Flow:**
+
+1. Operator saves marine location settings in the wizard or admin UI.
+2. Wizard/admin sends `POST /setup/apply` to the API.
+3. The API writes the validated config to `api.conf [marine]` and then immediately POSTs the marine-relevant config subset to `POST {marine_service_url}/config` with `Authorization: Bearer {MARINE_SERVICE_SECRET}`.
+4. The marine service receives the config, validates it, and begins using it for the next run cycle.
+5. The API returns success to the wizard/admin only after the marine service acknowledges the config push.
+
+**Config push failure handling:** If the marine service is unreachable when the config push is attempted, the API writes the config locally and returns a warning to the wizard. The marine service will receive the config on the next `/setup/apply` call or on marine service restart (the marine service fetches its config from the API on startup via `GET {api_url}/setup/marine/config`).
+
+The marine service never parses `api.conf` directly. This ensures the API remains the single source of truth for all operator-facing configuration.
+
+### §19.6 Marine alerts remain in the API
+
+**Marine alerts (coastal flood, high surf, rip current, marine zone alerts) are NOT part of the marine service. They remain in the unified API alert system regardless of whether the marine service is installed.**
+
+The alert system in the API (§8, ADR-089) handles all alert types through a single provider registry. Marine zone alerts use the NWS marine zone discovery utility (`providers/_common/nws_zones.py`) to discover relevant zones at setup time. These alerts are served from the API's `/api/v1/alerts` endpoint alongside all other alert types.
+
+This is a hard architectural boundary: alerts never move to the marine service. The marine service provides wave physics and environmental data; alert aggregation and deduplication remain centralized.
+
+**Why:** Alert deduplication, priority ordering, and the unified alert banner on the dashboard require a single alert source. Splitting alert sources would produce duplicate suppression failures and ordering inconsistencies. See ADR-089 for the rationale.
+
+### §19.7 Health check
+
+The marine service exposes a health check endpoint that the API polls every 60 seconds:
+
+`GET {marine_service_url}/health` — no auth required.
+
+**Response:**
+
+```json
+{
+  "status": "ok",
+  "version": "0.1.0",
+  "last_run": "2026-07-22T14:00:00Z",
+  "spots": 2,
+  "run_in_progress": false
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `status` | `"ok"` when the service is healthy, `"degraded"` when running but a recent run failed |
+| `version` | Marine service package version |
+| `last_run` | ISO-8601 UTC timestamp of the last successful SWAN run |
+| `spots` | Number of configured surf spots with valid SWAN output |
+| `run_in_progress` | `true` when a SWAN run is currently executing |
+
+**Failure response:** Three consecutive health check failures → API logs ERROR, removes marine capabilities from `/api/v1/capabilities`, and continues serving the last-good cached marine data. When the marine service recovers, the next successful health check re-fetches the manifest and restores capabilities.
+
+The health check does not affect non-marine API functionality. Dashboard pages not using marine data are unaffected by marine service failures.
