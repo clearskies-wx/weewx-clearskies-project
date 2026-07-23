@@ -1032,6 +1032,144 @@ The compute service is an optional lightweight HTTP service that offloads SwellT
 
 Accepted formats for upload: GeoTIFF, NetCDF, ASCII XYZ.
 
+### Marine service deployment (target — pending ADR-099 acceptance)
+
+This section documents the target-state deployment model for the standalone marine service (`weewx-clearskies-marine`). The deployment described here takes effect when the marine service is extracted from the API per ADR-099. The current deployment (SwellTrack, SurfBeat, SWAN runner, and all marine providers running inside the API process) remains in effect until ADR-099 is accepted.
+
+**Current state:** All marine computation runs inside the `weewx-clearskies-api` process on the weewx host. The optional compute offload (`surf_compute_host`, port 8770) handles only SwellTrack and SurfBeat calculations. SWAN runs on the weewx host in all configurations.
+
+**Target state:** All marine computation (SWAN, SwellTrack, SurfBeat, all marine provider fetches) runs in a separate `weewx-clearskies-marine` service on port 8780. The API communicates with it over authenticated HTTPS.
+
+#### Deployment topologies
+
+Two topologies are supported. Choose same-host unless CPU and memory constraints require otherwise.
+
+**Same-host (recommended):** Marine service runs on the weewx host alongside the API.
+
+```
+weewx host
+├── weewx-clearskies-api  (port 8765)
+└── weewx-clearskies-marine  (port 8780, localhost-only TLS)
+```
+
+**Separate-host:** Marine service runs on a dedicated host (for example, a host with more CPU for SWAN computation).
+
+```
+weewx host
+└── weewx-clearskies-api  (port 8765)
+
+compute host
+└── weewx-clearskies-marine  (port 8780, public TLS or VLAN TLS)
+```
+
+#### Port assignment
+
+| Service | Port | Notes |
+|---------|------|-------|
+| `weewx-clearskies-api` | 8765 | Unchanged |
+| `weewx-clearskies-marine` | 8780 | New port, replaces port 8770 (compute service) |
+
+Port 8780 is registered in ARCHITECTURE.md. Port 8770 (the previous compute service) is eliminated in the target state.
+
+#### Installation
+
+**Same-host:**
+
+```bash
+# On the weewx host (Debian/Ubuntu native or LXD container)
+pip install weewx-clearskies-marine
+sudo systemctl enable --now weewx-clearskies-marine
+```
+
+**Separate-host:**
+
+```bash
+# On the compute host
+pip install weewx-clearskies-marine
+sudo systemctl enable --now weewx-clearskies-marine
+```
+
+SWAN 41.45 must be compiled and on PATH (`/usr/local/bin/swan`) on whichever host runs the marine service. Use `scripts/install_swan.sh` or the Docker image. The API startup check that verifies the SWAN binary moves to the marine service in the target state.
+
+#### Configuration
+
+**In `api.conf [providers]` on the weewx host:**
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `marine_service_url` | str or null | `null` | Base URL of the marine service. Same-host: `https://localhost:8780`. Separate-host (IPv4): `https://192.0.2.10:8780`. Separate-host (IPv6): `https://[2001:db8::1]:8780`. When null, no marine service is connected. |
+
+**In `secrets.env` on the weewx host:**
+
+```
+MARINE_SERVICE_SECRET=<generated token>
+```
+
+**In `secrets.env` on the marine service host (same value):**
+
+```
+MARINE_SERVICE_SECRET=<same generated token>
+```
+
+Generate the shared secret once:
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+The secret must be identical on both hosts. The API sends it as `Authorization: Bearer {token}` on all protected marine service endpoints. The `/health` and `/manifest` endpoints do not require auth.
+
+**Marine service TLS:** A self-signed certificate is auto-generated at `/etc/weewx-clearskies/marine/tls/` on first start. For same-host deployments the API accepts this certificate without verification (localhost trust). For separate-host deployments with a self-signed cert, set `marine_verify_tls = false` in `api.conf [providers]` (TLS encryption remains active; only certificate verification is skipped for the internal VLAN connection).
+
+#### Config push model
+
+The marine service never reads `api.conf` directly. All configuration is pushed from the API:
+
+1. Operator saves marine location settings in the wizard or admin UI.
+2. Wizard/admin sends `POST /setup/apply` to the API.
+3. The API writes the validated config to `api.conf [marine]` and then POSTs the marine-relevant config subset to `POST {marine_service_url}/config`.
+4. The marine service validates and applies the config.
+5. The API returns success to the wizard/admin only after the marine service acknowledges the config.
+
+On marine service restart, the service fetches its config from the API via `GET {api_url}/setup/marine/config` (authenticated with `MARINE_SERVICE_SECRET`).
+
+#### Health check
+
+The API polls the marine service health check every 60 seconds:
+
+```
+GET {marine_service_url}/health
+```
+
+No auth required. Response fields: `status`, `version`, `last_run`, `spots`, `run_in_progress`. Three consecutive failures → API removes marine capabilities from `/api/v1/capabilities` and continues serving last-good cached marine data. Non-marine API functionality is unaffected.
+
+Operators can check marine service health directly:
+
+```bash
+# Same-host
+curl https://localhost:8780/health
+
+# Separate-host (IPv4)
+curl https://192.0.2.10:8780/health
+
+# Separate-host (IPv6)
+curl https://[2001:db8::1]:8780/health
+```
+
+#### Supported environments
+
+| Environment | Marine service install path | Notes |
+|-------------|---------------------------|-------|
+| Debian/Ubuntu native | `pip install` + systemd unit | SWAN compiled from source |
+| LXD container | `pip install` + systemd unit inside container | Container needs network access to API on port 8765 |
+| Docker | `docker compose up weewx-clearskies-marine` | Image includes pre-compiled SWAN |
+| Proxmox VM | Same as Debian/Ubuntu native | VM needs network access to API |
+| Raspberry Pi | `pip install` + systemd unit | Pi 4/5 recommended; SWAN compile takes ~30 min |
+
+#### Alerts
+
+Marine alerts (coastal flood, high surf, rip current, marine zone alerts) are NOT hosted by the marine service. They remain in the API's unified alert system and are served from `/api/v1/alerts` regardless of marine service deployment status. See API-MANUAL §19.6 for the rationale.
+
 ---
 
 ### §4.1 Config Registry
