@@ -125,6 +125,7 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | [ADR-095](ADR-095-swan-model-corrections.md) | SWAN model corrections — cross-shore transect, WLEVEL, CURRENT, OBSTACLE | 2026-07-18 |
 | [ADR-096](ADR-096-scoring-restructure.md) | Surf scoring restructure — Wave Organization composite, SWAN-only data, SwellTrack branding | 2026-07-18 |
 | [ADR-097](ADR-097-beach-profile-endpoint.md) | Beach profile endpoint — cross-shore transect visualization | 2026-07-18 |
+| [ADR-099](ADR-099-marine-service-separation.md) | Marine service separation — unified standalone companion service replacing SWAN+compute half-services | 2026-07-22 |
 
 ## Accepted — pending manual consolidation
 
