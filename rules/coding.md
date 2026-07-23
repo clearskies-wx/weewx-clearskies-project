@@ -19,6 +19,16 @@ People make real decisions based on weather data: alerts, conditions, sun positi
 
 **Why (2026-06-23):** The almanac endpoint's sun altitude was stuck at -8.3° for 30+ minutes — it computed once and never refreshed. The sky condition classifier held a stale "Overcast" label from backfill instead of handing off to the provider when the sun was too low. Both bugs trace to the same root cause: treating dynamic weather data as cacheable.
 
+### Expensive computed data must be persisted to disk — never volatile-only
+
+Any data produced by an expensive computation (SWAN runs, SwellTrack pipelines, SurfBeat strips, bathymetry downloads, spectral decomposition — anything that takes more than a few seconds to regenerate) must be persisted to disk, not held only in memory or Redis. In-memory caches and Redis are volatile — they are lost on process restart, Redis restart, or host reboot. A 12-minute SWAN run's output must survive all of those.
+
+**The pattern:** compute → write to disk (atomic temp+rename) → populate in-memory/Redis cache from disk. On startup: load from disk → populate cache → serve immediately. The disk file is the source of truth; memory and Redis are read-through caches of the disk file.
+
+**Every field matters.** When copying data from a backing store into a serving cache (e.g., Redis → HTTP response dict), copy ALL fields. Do not cherry-pick a subset. A forgotten field (like `spectral` or `transect`) means the data exists in the backing store but is invisible to consumers — a silent data loss bug that produces empty UI with no errors.
+
+**Why (2026-07-23):** The SWAN standalone service stored forecast results in a volatile in-memory dict (`_forecast_cache`) and only copied `forecast` + `run_time` — dropping `spectral` (swell decomposition) and `transect` (cross-shore profile). The dashboard's "Current Swell Conditions" card showed "No swell component data available" for days despite SWAN producing the data successfully. On service restart, ALL data was lost because nothing loaded from disk. Two bugs, same root cause: treating volatile memory as the authoritative store for expensive computed data.
+
 ### Treat your own output as untrusted
 
 LLM-generated code (including yours) is unverified until reviewed and tested against the real data shape. Before committing:
