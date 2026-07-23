@@ -514,6 +514,32 @@ The 1D model computes Hs/d at every point — d must be **tide-adjusted, datum-c
 
 **If the DEM datum is UNKNOWN or doesn't match the tide prediction datum, the 1D model must fail explicitly** — same "no silent fallbacks" rule as the SWAN pipeline (SWAN-DATUM-PLAN §T3.2).
 
+### 6.1 Variable-resolution 1D grid (added 2026-07-23)
+
+The 1D cross-shore grid must be fine enough to resolve wave breaking, shoaling over sandbars, and reformation in troughs. A uniform coarse grid (e.g. 50m or even 10m) causes the Battjes-Janssen dissipation to over-attenuate wave energy and miss break points entirely (confirmed: 50m grid at HB produced zero face height; 5m grid found 3 break points with correct physics).
+
+**Grid resolution zones (depth-based, not distance-based):** Distance from shore varies wildly between locations — a steep reef break hits 2m depth at 20m from shore; a gentle shelf like HB hits it at 100m. Resolution zones are defined by depth because the physics depends on depth.
+
+| Zone | Depth range | Grid dx | Rationale |
+|---|---|---|---|
+| **Surf zone** | Shore to max breaking depth | 1–2 m | Breaking, dissipation, wave shape transitions, break point detection. XBeach documentation: grid influence "almost eliminated for dx ≤ 2m." |
+| **Shoaling zone** | Max breaking depth to ~15m | 3–5 m | Shoaling, refraction, bar/trough structure. Moderate resolution captures sandbar crests without excessive points. |
+| **Approach zone** | > ~15m | CUDEM native (3–10 m) | Waves propagating with minimal transformation. No benefit from finer grid. |
+
+**Max breaking depth computation:** `d_break_max = Hs_max / gamma`, where `Hs_max` is the maximum expected significant wave height for the spot (from operator wave climate config or SWAN boundary conditions) and `gamma` is the breaking parameter (default 0.73). For a spot that sees 4m winter swells: `d_break_max = 4.0 / 0.73 ≈ 5.5m`. The surf zone extends from shore to 5.5m depth — covering outer bars, inner bars, and reform troughs between them. This is critical for multi-bar beaches (e.g. Huntington Beach) where waves break, reform, and break again.
+
+**Computed at wizard setup time:** The depth zone thresholds are derived from the CUDEM bathymetric profile and the spot's wave climate when the spot is configured. Stored in the per-spot config (`SurfSpotConfig`). The 1D model reads them at runtime — no recomputation per call.
+
+**Interpolation method: PCHIP (Piecewise Cubic Hermite Interpolating Polynomial).** NCEI's own CUDEM program uses spline interpolation internally ("waffles" tool). Cubic splines preserve sandbar curvature that linear interpolation destroys (slope discontinuities at every sample point affect Iribarren number and breaker type). PCHIP avoids the overshoot artifacts of natural cubic splines in sparse regions — it is monotonicity-preserving, so interpolated depths never create phantom bars or troughs between CUDEM samples.
+
+**The interpolated profile is generated once** (at spot setup or when CUDEM bathymetry is first downloaded for the spot) and cached as the spot's `bathymetric_profile`. Every SwellTrack call reads the pre-interpolated variable-resolution profile from the cache.
+
+**Research basis:**
+- XBeach documentation: dx ≤ 2m eliminates grid influence on breaking ([XBeach Manual](https://xbeach.readthedocs.io/en/latest/xbeach_manual.html))
+- ERDC/CHL CHETN-I-64: nearshore model sensitivity to bathymetric resolution ([ERDC](https://apps.dtic.mil/sti/tr/pdf/ADA588527.pdf))
+- NCEI: spline interpolation most accurate for bathymetric gridding ([CUDEM paper](https://www.researchgate.net/publication/369471727))
+- Battjes-Janssen dissipation: coarse grids over-dissipate energy ([SWAN tech docs](https://swanmodel.sourceforge.io/online_doc/swantech/node16.html))
+
 ---
 
 ## 7. Integration with Existing Modules
@@ -641,14 +667,14 @@ XBeach-1D surfbeat runtime is estimated at 10-120s per transect (see §3 Option 
 | # | Task | Method | Blocks |
 |---|---|---|---|
 | R1 | **Validate handoff algorithm** | Run the pre-model handoff algorithm (§2.3.4) for HB Pier. Compare its assigned depths against the CURVE QB profile. Verify QB ~ 0 at every assigned handoff point across 3-5 representative swell conditions. | Architecture decision |
-| R2 | **Validate 1D model Hs** | Run SWASH-1D as ground truth for 3-5 representative swell conditions at HB Pier. Compare analytical 1D Hs profile against SWASH. Acceptance: Hs within 15% at all points. | Implementation |
+| R2 | **Validate 1D model Hs** | ~~SWASH ground truth~~ — **REVISED 2026-07-21:** SWASH ruled out from all roles including benchmark referee (unvalidated itself). Validation via: (a) SWAN CURVE consistency in QB=0 zone (R3); (b) friction-bracket analysis (with/without bounds the truth); (c) cross-condition physical consistency; (d) webcam comparison (R10). See 1D-MODEL-BENCHMARK-BRIEF Part 7 §7.9. | Implementation |
 | R3 | **Consistency check** | Verify that the 1D model reproduces SWAN's own CURVE Hs values in the QB=0 zone (automatic acceptance test). | Implementation |
 | R4 | **Iribarren validation** | Compute xi_0 for known surf spots with documented breaker types. Cross-check against webcam/surf-report classification. | §5.4 |
 | R5 | **Hold-down calibration** | Source empirical hold-down data from literature or surf safety research. Fit formula coefficients to match. | §5.7 |
-| R6 | **XBeach-1D benchmark** | Build XBeach on weewx or scratch box. Run HB profile with `morfac=0`, ny=0, surfbeat mode. Measure wall-clock time per 30-min simulation. Test at 300m, 1000m, and 2500m domain lengths. | v2 architecture |
-| R7 | **SWAN SurfBeat-1D availability** | Check SWAN 41.5x release notes for mainlined infragravity source term. If available as a flag, re-evaluate Option D cost. | v2 architecture |
+| R6 | ~~**XBeach-1D benchmark**~~ | **COMPLETED / CLOSED 2026-07-21.** Round 1 measured XBeach at 10.3s/run = 93 hr/cycle. User ruled out XBeach for all roles. | — |
+| R7 | ~~**SWAN SurfBeat-1D availability**~~ | **COMPLETED 2026-07-21.** SURFBEAT confirmed available in SWAN 41.45/41.51. Cannot run in 1D mode — requires regular 2D grid, stationary, two-COMPUTE procedure. Viable as SurfBeat strip (1D-MODEL-BENCHMARK-BRIEF §7.3). | — |
 | R8 | **L3 coarsening impact** | Run L3 at 10m vs 15m vs 20m for the same swell event. Compare Hs at SPECOUT points and OBSTACLE shadow patterns. Re-derive DIFFRACTION smoothing parameters for each resolution. | Compute optimization |
-| R9 | **Roller model necessity** | Implement Battjes-Janssen without roller, compare Hs profile to SWASH ground truth at a multi-bar beach. If inner-bar reformation is missing, add Svendsen roller model. | §5.1 accuracy |
+| R9 | **Roller model necessity** | Implement Battjes-Janssen without roller, compare Hs profile with/without roller on a barred profile (Case B from benchmark). If inner-bar reformation is missing without the roller, the roller is confirmed necessary. Validate against SWAN CURVE consistency (R3) and webcam observation (R10). ~~SWASH ground truth~~ removed 2026-07-21. | §5.1 accuracy |
 | R10 | **Webcam/surf-report comparison** | Qualitative validation — compare 1D model wave height and breaker type against live surf reports and webcam observations for 5-10 sessions. | Overall confidence |
 | R11 | **Multi-transect peel angle validation** | Compute peel angle from multi-transect break points for known spots. Compare against webcam observations and Surfline/BSR peel descriptions. | §5.8 |
 
@@ -687,7 +713,7 @@ The user received multi-1D architecture suggestions from Gemini. Fact-check agai
 - Longuet-Higgins, M.S. (1970). "Longshore currents generated by obliquely incident sea waves." Journal of Geophysical Research, 75(33), 6778-6789.
 - Malej, M., et al. (2025). "A Comprehensive Review of Phase-Averaged and Phase-Resolving Wave Models for Coastal Modeling Applications." arXiv:2511.21856.
 - NHESS (2022). "Estimating dune erosion at the regional scale using a meta-model based on neural networks." Natural Hazards and Earth System Sciences, 22, 3897-3915.
-- Rijnsdorp, D.P., Reniers, A.J.H.M., and Zijlema, M. (2022). "SWAN SurfBeat-1D." Coastal Engineering, 172, 104068.
+- Reniers, A.J.H.M. and Zijlema, M. (2022). "SWAN SurfBeat-1D." Coastal Engineering, 172, 104068. (Citation corrected 2026-07-21 — previously mis-attributed to Rijnsdorp. Implementation restrictions verified against the SWAN 41.51 manual: see 1D-MODEL-BENCHMARK-BRIEF Part 7 §7.2.)
 - Roelvink, D., et al. (2025). "SnapWave: fast, implicit wave transformation from offshore to nearshore." Geoscientific Model Development, 18, 9469-9490.
 - Scarfe, B.E., Healy, T.R., and Rennie, H.G. (2003). "Research-based surfing literature for coastal management and the science of surfing." Journal of Coastal Research, 25(3), 539-557.
 - Svendsen, I.A. (1984). "Mass flux and undertow in a surf zone." Coastal Engineering, 8(4), 347-365.

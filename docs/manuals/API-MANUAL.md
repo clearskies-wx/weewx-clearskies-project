@@ -2483,8 +2483,19 @@ Two formulas supported, configured per-spot via `breaker_formula` in the marine 
 | `friction_coefficient` | float | `0.038` | Per-spot (`SurfSpotConfig`) | Bottom friction coefficient (cfjon). Swell default 0.038, windsea 0.067. Always enabled — frictionless propagation is not production-valid. |
 | `surfbeat_enabled` | bool | `true` | Per-spot (`SurfSpotConfig`) | Enable SurfBeat strip for IG/set timing. Increases compute time by ~12 min per cycle. |
 | `surfbeat_cadence_hours` | int | `3` | Per-spot (`SurfSpotConfig`) | Hours between SurfBeat strip runs. Intermediate hours carry forward the last result (not interpolated). |
+| `max_hs_m` | float | `4.0` | Per-spot (`SurfSpotConfig`) | Maximum expected significant wave height (m) for this spot. Used to compute the surf zone depth threshold: `d_break_max = max_hs_m / gamma`. The 1D grid uses 1–2m dx from shore to `d_break_max`. Computed at wizard setup from wave climate or operator input. |
 | `surf_compute_host` | str \| null | `null` | Global (`api.conf [providers]`) | URL of remote compute service for SwellTrack/SurfBeat offloading (e.g., `https://librewxr:8770`). `null` = in-process. |
 | `surf_compute_verify_tls` | bool | `true` | Global (`api.conf [providers]`) | Verify TLS cert on compute service requests. Set `false` for self-signed on same VLAN. |
+
+**1D grid resolution (variable, depth-based).** The SwellTrack 1D grid uses variable resolution defined by depth zones, not distance from shore (see SURF-ZONE-MODEL-BRIEF §6.1 for full rationale). Depth zones are computed at wizard setup from the CUDEM bathymetric profile and the spot's `max_hs_m`:
+
+| Zone | Depth range | Grid dx | Why |
+|---|---|---|---|
+| Surf zone | Shore to `max_hs_m / gamma` | 1–2 m | Breaking, dissipation, break point detection. XBeach: dx ≤ 2m eliminates grid influence. |
+| Shoaling zone | `max_hs_m / gamma` to ~15m | 3–5 m | Shoaling, refraction, bar/trough structure. |
+| Approach zone | > ~15m | CUDEM native (3–10 m) | Minimal wave transformation. |
+
+The CUDEM source profile is interpolated to the variable-resolution grid using **PCHIP** (Piecewise Cubic Hermite Interpolating Polynomial) — preserves sandbar curvature without overshoot artifacts. The interpolated profile is generated once at spot setup and cached as `bathymetric_profile` in the per-spot config. SwellTrack reads the pre-interpolated profile from the cache on every call.
 
 ### Blended beach profile
 
