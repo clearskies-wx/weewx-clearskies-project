@@ -466,6 +466,22 @@ These are pattern matches, not judgment calls. FAIL if any violation is found.
 
 **Why (2026-07-19):** Level 3 grid was hardcoded to 1 km offshore based on a brief illustration. The bidirectional profile showed 15m depth at 2,350m. 42% of transect CURVE points fell outside the grid and returned exception values.
 
+**All SWAN grid geometry is fixed at setup time — no runtime overrides.** L1, L2, and L3 bounding boxes and the L2 NESTOUT targeting area are computed together in `compute_domains()` once, before any SWAN level runs. No code may resize, reposition, or override `cluster.grid` after `compute_domains()` returns. All inputs that affect grid sizing (structures, depth profiles, spot positions) must be passed to `compute_domains()` — not applied later. If the NESTOUT doesn't cover the L3 grid, swell energy is silently blocked at the uncovered boundary segments. SWAN will "succeed" with near-zero wave heights and no errors.
+
+**Why (2026-07-23):** A Sonnet agent couldn't get structures passed to `compute_domains()` at the right time, so instead of fixing the caller, it added a second `smart_size_l3_grid()` call at runtime that overrode `cluster.grid` AFTER Level 2 had already written its NESTOUT. The L3 grid extended beyond the NESTOUT. Result: 0.01m Hs during a 6-8 ft south swell. The coordinator accepted "data is flowing" without checking whether the values made physical sense.
+
+**Every SWAN INPUT file requires wind forcing.** GEN3 WESTHUYSEN enables wind generation physics including quadruplet interactions. SWAN refuses to run quadruplets without a wind field (exit code 2). This applies to every SWAN configuration — main 3-level runs, quick updates, AND SurfBeat strips. "Swell-only" is not an excuse to omit wind — the HRRR wind at the spot coordinates is always available and must always be provided.
+
+**Why (2026-07-23):** The SurfBeat strip INPUT had GEN3 WESTHUYSEN but no INPGRID WIND. SWAN exited with code 2. The API retried for every cadence hour, each attempt failing, causing the surf endpoint request to time out.
+
+**"Data is flowing" is not verification — check physical plausibility.** When a pipeline produces output, the coordinator must verify the output values make physical sense before declaring the task complete. For surf data: compare face height against NWS alerts, Surfline, or NDBC buoy observations. For any geophysical model: check that output magnitudes are within the expected range for current conditions. A pipeline that returns 0.1 ft during a Beach Hazards Statement for 5-7 ft surf is not working — it's producing garbage with a valid HTTP status code.
+
+**Why (2026-07-23):** Part A was declared complete because the surf endpoint returned non-empty JSON with populated fields. Nobody checked whether 0.1 ft face height during a Beach Hazards Statement was physically plausible. The data was wrong by a factor of 60x.
+
+**Agents do not make design decisions — they implement prescribed solutions.** When an agent encounters a gap (missing parameter, function that doesn't accept needed data), the correct response is to fix the caller to provide what's needed — not to add a workaround at a different point in the pipeline. Workarounds that bypass the intended data flow create mismatches between components that are invisible to unit tests and only manifest as wrong output values in production.
+
+**Why (2026-07-23):** An agent couldn't pass structures to `compute_domains()`, so it added a runtime override. Another omission left wind out of the SurfBeat strip. A third left CUDEM profiles out of the compute service path. All three were "agent chose the path of least resistance instead of fixing the actual gap" bugs.
+
 **"Code-complete" requires coordinator visual sign-off.** The agent that writes the code cannot declare it done. The coordinator must render the output, verify it against the spec, and sign off. Self-attestation of visual quality is not accepted.
 
 **Why (2026-06-02):** C1–C6 were all self-attested as code-complete. QC gates checked `tsc` (compiles) and `vite build` (bundles) but never compared the rendered output against the mockups. Every tile card had wrong font sizes, missing separators, broken sr-only hiding, no vertical centering, and inconsistent text hierarchy. The operator discovered all of this during live testing — not during any QC gate.

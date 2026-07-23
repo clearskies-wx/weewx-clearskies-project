@@ -1892,6 +1892,18 @@ Behavior controlled by `convergence_retry` config key (default `false`):
 
 A diverged run NEVER saves a hotstart, NEVER overwrites the last-good cache, and NEVER fails silently.
 
+**Grid geometry immutability (2026-07-23):** All grid bounding boxes (L1, L2, L3) and the L2 NESTOUT targeting area are computed together in `compute_domains()` at domain setup time — BEFORE any SWAN level runs. No code may resize, reposition, or override `cluster.grid` after `compute_domains()` returns. The NESTOUT NGRID written into Level 2's INPUT file must cover the entirety of every Level 3 grid it feeds. If any portion of an L3 grid boundary falls outside the NESTOUT area, those boundary segments receive zero wave energy and swell is blocked. This mismatch is invisible to SWAN convergence checks — the run "succeeds" with near-zero wave heights. Structure-aware sizing (smart sizing from pier shadow zones) must happen INSIDE `compute_domains()`, not as a post-hoc override at runtime.
+
+**Why (2026-07-23):** A runtime `smart_size_l3_grid()` call in `swan_runner.py` resized the L3 grid AFTER Level 2 had already written its NESTOUT. The L3 grid extended 1,383m east and 666m north beyond the NESTOUT boundary. Only ~40% of the southern boundary received swell spectra. SWAN produced Hs=0.01m during a 6-8 ft south swell (Beach Hazards Statement active). The fix: pass structures to `compute_domains()` so L3 grids include structure shadow zones at domain computation time. The runtime override was deleted.
+
+**Wind forcing is mandatory in every SWAN INPUT file (2026-07-23):** GEN3 WESTHUYSEN activates wind generation physics including quadruplet wave-wave interactions. SWAN refuses to run quadruplets with zero-wind conditions (exit code 2: "not recommended to use quadruplets in combination with zero wind conditions"). Every SWAN INPUT file — including the SurfBeat strip — must include an INPGRID WIND + READINP WIND section with actual wind data. The SurfBeat strip uses a uniform wind field from HRRR interpolated to the spot coordinates at the forecast timestep.
+
+**Why (2026-07-23):** The SurfBeat strip INPUT had GEN3 WESTHUYSEN but no wind input. SWAN exited with code 2 on every invocation. The API fell back to a local SWAN binary that didn't exist (disabled during audit), then the request timed out from repeated failures across all cadence hours.
+
+**Compute service data locality (2026-07-23):** The compute service on librewxr loads CUDEM bathymetric profiles from its own local filesystem at `/etc/weewx-clearskies/spot_profiles/`. The API on weewx does NOT replicate or pre-populate these profiles — it sends the `spot_id` in the SwellTrack request, and the compute service loads the profile by spot_id from its local cache. Data that exists on the compute host stays on the compute host.
+
+**Why (2026-07-23):** The CUDEM profiles are downloaded by the SWAN setup phase on librewxr. They do not exist on weewx (where the API runs). The original code tried to load profiles on weewx and stuff them into transect objects before serializing over HTTP — the directory didn't exist, all profiles were empty, SwellTrack degraded every transect to zero.
+
 **Hotstart isolation:**
 
 Stationary quick updates do NOT save hotstart files. The nonstationary chain's persistent hotstarts (`level3_{idx}_hotstart.dat`) are only written by full nonstationary runs. This prevents a diverged stationary snapshot from infecting the next full run's warm-start.
@@ -1975,6 +1987,7 @@ Per SURF-1D-IMPLEMENTATION-PLAN and SURF-ZONE-MODEL-BRIEF:
 - Grid: regular 2D (REG), not 1D or curvilinear
 - Mode: STATIONARY
 - Boundary: west side only (`BOUND SIDE WEST`)
+- Wind: uniform HRRR field (INPGRID WIND + READINP WIND) — mandatory, GEN3 WESTHUYSEN refuses to run without it
 - Two bare COMPUTEs (not `COMPUTE STAT` — triggers "Illegal keyword: STAT")
 - OBSTACLE on east side with REFL + RDIFF (POWN required — omitting causes severe error)
 - SPECOUT values are integer-scaled: actual density = integer × FACTOR
