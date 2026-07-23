@@ -2923,7 +2923,7 @@ This section documents the target-state architecture for the marine service (`we
 
 ### §19.1 Manifest registration
 
-The marine service exposes `GET /manifest` (no auth required). The API fetches this manifest at startup and on each `/setup/apply` call, and mounts the declared routes dynamically under `/api/v1/`.
+The marine service exposes `GET /manifest` (no auth required). The API fetches this manifest at startup, refreshes it periodically (every 5 minutes), and re-fetches on each `/setup/apply` call. Declared routes are mounted dynamically under `/api/v1/`. Endpoint additions in the marine service take effect within 5 minutes without an API restart; endpoint removals de-register the route on the next refresh.
 
 **Manifest response shape:**
 
@@ -2932,38 +2932,50 @@ The marine service exposes `GET /manifest` (no auth required). The API fetches t
   "version": "1.0.0",
   "endpoints": [
     {
-      "path": "/surf/{locationId}",
+      "path": "/surf/{location_id}",
       "method": "GET",
+      "upstream": "/surf/{location_id}",
+      "cache_ttl": 1800,
       "capability": "surf",
       "description": "Surf forecast and scoring for a configured marine location"
     },
     {
-      "path": "/surf/{locationId}/profile",
+      "path": "/surf/{location_id}/profile",
       "method": "GET",
+      "upstream": "/surf/{location_id}/profile",
+      "cache_ttl": 1800,
       "capability": "surf",
       "description": "Cross-shore transect for the current forecast timestep"
     },
     {
-      "path": "/marine/{locationId}",
+      "path": "/marine/{location_id}",
       "method": "GET",
+      "upstream": "/marine/{location_id}",
+      "cache_ttl": 300,
       "capability": "marine",
       "description": "Marine observation bundle for a configured location"
     },
     {
-      "path": "/tides/{locationId}",
+      "path": "/tides/{location_id}",
       "method": "GET",
+      "upstream": "/tides/{location_id}",
+      "cache_ttl": 3600,
       "capability": "tides",
       "description": "Tide prediction and composite water level bundle"
     },
     {
-      "path": "/fishing/{locationId}",
+      "path": "/fishing/{location_id}",
       "method": "GET",
+      "upstream": "/fishing/{location_id}",
+      "cache_ttl": 1800,
       "capability": "fishing",
       "description": "Fishing score and species scoring for a configured location"
     },
     {
-      "path": "/beach-safety/{locationId}",
+      "path": "/beach-safety/{location_id}",
       "method": "GET",
+      "upstream": "/beach-safety/{location_id}",
+      "cache_ttl": 900,
       "capability": "beach_safety",
       "description": "Beach safety bundle (rip current risk, surf height, UV, water temp)"
     }
@@ -3039,7 +3051,7 @@ Unit conversion from SI to the operator's configured unit system is applied by t
 
 Marine capabilities declared in the manifest (`/manifest` → `capabilities` array) are merged into `GET /api/v1/capabilities` when the marine service is connected. When the marine service is absent or unreachable, the marine capability entries are omitted from the capabilities response. All other (non-marine) capabilities are unaffected by marine service connectivity.
 
-The capabilities merge is live — if the marine service becomes unreachable between API restarts, the next manifest fetch (at each `/setup/apply` call) will detect the absence and remove marine capabilities from the response.
+The capabilities merge is live — the manifest is re-fetched every 5 minutes and on each `/setup/apply` call. If the marine service becomes unreachable, the next manifest fetch will detect the absence and remove marine capabilities from the response.
 
 ### §19.5 Config push model
 
