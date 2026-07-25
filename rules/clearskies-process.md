@@ -122,7 +122,7 @@ Use the Nygard format. Template at `docs/decisions/_TEMPLATE.md`. Required: Stat
 
 **Lead = Opus, orchestration + judgment only.** Teammates = Sonnet. The lead does NOT write code, run tests, do code reviews, or fill in templates. Those are delegated tasks. Lead's job: break down work, write focused prompts, spawn agents, monitor, QC output, make judgment calls, commit.
 
-**Sonnet for ALL delegated work.** Implementation, tests, audits, verification, closeout extraction. Opus auditor is not worth the cost — Sonnet auditor validated at 75K tokens with clean results (3b-15 close).
+**Sonnet 5 for ALL delegated work.** Implementation, tests, audits, verification, closeout extraction. Agent definitions are pinned to `claude-sonnet-5`. All agent system prompts include a tone directive (concise, direct, no filler) to counteract Sonnet 5's tendency toward verbosity.
 
 **Lead reads and researches what it needs to understand — delegate what it doesn't need to personally comprehend.** The coordinator cannot coordinate what it doesn't understand. Reading project documents, tracing code paths, running diagnostic commands, checking logs, verifying container state — these are core coordinator activities when they inform judgment calls, agent prompts, QC, or stalemate-breaking. An agent summarizing a file is not the same as the lead understanding it. The lead reads directly when understanding is the point.
 
@@ -199,6 +199,31 @@ This block is mandatory in every implementation agent prompt. Not optional, not 
 **Why (2026-05-11):** 3b-12 api-dev claimed "1762 passed, 0 failed"; lead's independent run returned 103 failed. The lead initially trusted the count and almost closed the round on a false-clean narrative. Additionally, dashboard a11y compliance claims were never independently verified by the lead.
 
 **Lead-direct for small fixes.** When auditor findings or test bugs are mechanical and small (<=50 lines, <=3 files, no judgment calls), the lead fixes directly. Spawning costs 30-60 min; lead-direct is minutes.
+
+## Architectural change block — mandatory agent prompt section
+
+**Every implementation agent prompt must contain this block verbatim.** Not optional, not "when relevant." Same standing as the git-restrictions block. See the HARD BLOCK in `CLAUDE.md` and in the user's global rules for the full rule and its history.
+
+> **Architectural changes — STOP, do not proceed.** You may not make an architectural change. If your task requires one, STOP and report via SendMessage — do not implement it, do not work around it, do not pick an option.
+>
+> A change is architectural if it does ANY of these (mechanical test, not judgment):
+> 1. Changes a physics/mathematical/scientific formula, or a constant, coefficient, threshold or criterion inside one.
+> 2. Deletes, replaces, or rewires a module/component/service, or changes what one is responsible for.
+> 3. Changes a model's domain, grid, boundary, extent, resolution, or handoff point.
+> 4. Changes a data contract between components — field names, shapes, nullability, units crossing a boundary.
+> 5. Changes where a computation happens — host, service, process, or lifecycle stage.
+> 6. Changes a schedule, trigger, or cadence.
+> 7. Adds or removes a dependency, port, endpoint, config key, or persisted file.
+>
+> **These do NOT authorize you:** "my task's acceptance criteria are unreachable without it" (then your task is blocked — say so), or "a plan/manual/ADR says so" (a wrong or stale document is a finding to report, not permission to change code).
+>
+> You MAY still: resolve a contradiction between two statements inside the same document by taking the reading its own examples support (and say so); apply a rule already written in the rules files; fix code that diverges from its own stated contract.
+
+**The coordinator does not have authority to approve these either.** An agent's architectural finding goes coordinator → user → decision → back to the agent. A coordinator that resolves it itself and records a "lead call" has violated the rule as surely as the agent would have.
+
+**Coordinator self-check before writing any instruction to an agent:** run your own instruction against the 7 triggers. If it hits one, you are about to direct an architectural change — stop and take it to the user instead. The 2026-07-25 L3 grid-resizing error was a coordinator *instruction*, not agent initiative, and would have been caught by this check.
+
+**Why (2026-07-25):** Marine Service Separation Phase 4A. Three architectural changes landed or were directed without user approval — a wave-model formula replacement, a component-deletion ruling, and a nested-grid resize instruction that was flatly wrong and contradicted the model handoff the architecture was built around. Each was framed as unblocking a task or enforcing a document. The pre-existing scope-discipline rule did not catch them because it required judging whether something "felt like" re-engineering; the trigger list replaces that judgment with a test.
 
 ## Scope binding before agent dispatch
 

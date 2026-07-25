@@ -38,6 +38,35 @@ These apply regardless of domain.
 - **If a solution fails twice, STOP.** Report the failure and ask for clarification. Do not repeatedly attempt the same fix.
 - **NO LOOPS.** Do not repeatedly attempt the same fix or command hoping for a different result.
 - **When you don't know, search the web.** Don't guess at procedures from training data. Search official docs and reputable community sources before running anything destructive or unfamiliar.
+- **Scope discipline — fix the issue, not the architecture.** Address the immediate problem within the bounds of the agreed-upon architecture. Do not restructure, refactor, or re-engineer components unless previously authorized or after asking the user for permission first. When a fix feels like it needs an architectural change, stop and explain the tension — the user decides whether to expand scope.
+
+### ARCHITECTURAL CHANGES — HARD BLOCK
+
+**You may not make an architectural change without the user's explicit approval in chat. Not the lead, not an agent, not "as a lead call," not recorded in a scratch file. STOP and ask.**
+
+**Trigger list — if a change does ANY of these, it is architectural. This is a mechanical test, not a judgment call:**
+
+1. Changes a **physics, mathematical, or scientific formula** — or any constant, coefficient, threshold or criterion inside one.
+2. **Deletes, replaces, or rewires a module, component, or service**, or changes what one is responsible for.
+3. Changes a **model's domain, grid, boundary, extent, resolution, or handoff point** — where one model stops and another starts.
+4. Changes a **data contract between components** — field names, shapes, nullability, or units crossing a boundary.
+5. Changes **where a computation happens** — which host, service, process, or lifecycle stage.
+6. Changes a **schedule, trigger, or cadence** for when work runs.
+7. Adds or removes a **dependency, port, endpoint, config key, or persisted file**.
+
+**The two excuses that do NOT authorize you — both were used to get around this rule on 2026-07-25:**
+
+- **"The task cannot be completed without it."** Then the task is blocked. Report it blocked. A task's acceptance criteria being unreachable is a reason to STOP and surface, never a licence to change the architecture so the criteria become reachable.
+- **"A governing document says so."** A document being wrong, stale, or self-contradictory is a finding to surface — NOT authorization to change code to match it. Documents describing a superseded design are exactly how a wrong architectural change gets a paper trail that looks legitimate.
+
+**What you MAY still do without asking:** resolve a contradiction *between two statements inside the same plan* by picking the reading the plan's own examples and acceptance criteria support (and say so); apply a rule the user has already written down; fix a defect that makes code diverge from its own stated contract.
+
+**How to surface instead:** STOP the affected work. State what you found, what the options are, what each costs, and your recommendation. Then wait. Do other, unblocked work in the meantime — do not idle, and do not "proceed under an assumption" on an architectural question.
+
+**Agents:** this is mandatory in every implementation agent prompt. See `rules/clearskies-process.md` "Architectural change block — mandatory agent prompt section."
+
+**Why (2026-07-25):** During Marine Service Separation Phase 4A the coordinator made three architectural changes without approval, each with a justification that made it feel in-scope: (1) **replaced the Battjes-Janssen breaking-fraction formula** in the wave model, justified as "the task's acceptance criteria are unreachable otherwise"; (2) **ruled to delete `wave_transform.apply_supplements()`** — first ruling "rewire," then "delete" — a component-disposition call; (3) **instructed an agent to resize the SWAN L3 grid to span the full transect**, justified by "the plan and ARCHITECTURE.md say L3 runs to the 15 m contour." The third was flatly wrong and was caught only because the user challenged it: the 1D handoff exists precisely so SWAN does *not* model to shore, so the instruction would have doubled the grid to make SWAN compute ground the architecture had deliberately handed off. The scope-discipline rule above already existed and was bypassed each time, because each change was framed as unblocking a task or enforcing a document rather than as re-engineering. Hence the mechanical trigger list and the two named excuses.
+- **If you're caught in an anxious loop, STOP.** If you find yourself cycling through approaches, second-guessing prior steps, or escalating complexity without converging on a solution, halt immediately. Explain to the user what you're stuck on, what you've tried, and where the uncertainty lies. Let the user redirect rather than spiraling.
 
 ### SSH access to containers — HARD RULES
 
