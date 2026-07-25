@@ -232,13 +232,33 @@ is not yet completely implemented and that comes first.
 - librewxr: SWAN + compute services active. Was pinned behind origin at `ce4415b` until
   2026-07-25; deploying moved it forward 8 commits and pulled in the Phase 4B per-transect
   work, which is what produced the 21 MB published payload.
-- **Local, committed, NOT pushed and NOT deployed:** API repo `main` at `69b9442`
+- ~~**Local, committed, NOT pushed and NOT deployed:** API repo `main` at `69b9442`
   (6 commits), SWAN service repo at `ca22432` (2 commits), dashboard `main` at `46c9e45`,
-  meta repo `main` carrying the brief and the doc updates.
-- **Deploy order for the above is mandatory and non-obvious** — see
+  meta repo `main` carrying the brief and the doc updates.~~
+- **CORRECTED 2026-07-25, Phase 5 open — the line above is stale. Everything is pushed and
+  deployed, and SURF-PUBLISH-RESULTS-ONLY is live.** Verified by `git fetch` + `status -sb`
+  on every repo and by querying the hosts directly, not from any snapshot:
+
+  | Repo | Branch | Local = origin | Deployed |
+  |---|---|---|---|
+  | weewx-clearskies-api | main | `12f9ddc` | weewx `12f9ddc`, librewxr `12f9ddc` |
+  | weewx-clearskies-swan-swelltrack | master | `ca22432` | librewxr `ca22432` |
+  | weewx-clearskies-marine | main | `51ce31b` | not deployed (Phase 8) |
+  | weewx-clearskies-dashboard | main | `df60297` | — |
+  | weewx-clearskies-stack | main | `f8beb34` | — |
+
+  Live contract check from the weewx host against `librewxr:8767` —
+  `GET /surf/huntington-city-beach-pier/forecast` returns **2.69 MB** (was 21.03 MB) with keys
+  `forecast, hrrr_cycle_time, run_time, spectral, swelltrack, transect`; `swelltrack` has 67
+  entries; `energy`, `freqs_hz`, `dirs_deg` and `handoff_by_transect` are gone. All six API
+  marine endpoints return HTTP 200 with non-empty bodies. **T5.0's prerequisite is met.**
+
+- **Deploy order remains mandatory for any future redeploy of these repos** — see
   `briefs/SURF-PUBLISH-RESULTS-ONLY.md` §6. The `swelltrack` publication fix must go first;
   deploying the API's recompute deletion before it would leave every forecast hour reporting
   `modelStatus: "unavailable"`.
+- **Concerns register:** `docs/planning/MARINE-SEP-CONCERNS.md` carries every item the
+  coordinator flagged during Phases 5–8, with recorded decisions for the blocking ones.
 
 **Superseded snapshot (kept only to show how far it had drifted):** weewx API at `0d87b28`,
 librewxr API repo at `bfff1f7`, local API `main` at `11b5242`, local dashboard at `20c6e50`.
