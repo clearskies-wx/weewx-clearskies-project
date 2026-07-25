@@ -911,11 +911,19 @@ parallel type systems). Each one means a built dashboard feature never renders
 against real data — the same silent-degradation class this phase exists to
 eliminate, one layer down.
 
+Full spec below, read directly from `endpoints/beach_profile.py`
+(`_build_transect_profile()`) by the `clearskies-dashboard-dev` agent during
+T4A.1 and documented faithfully in the new OpenAPI schemas (commit `e90fd43`).
+This is a specification, not a rediscovery exercise.
+
 | # | API emits | Dashboard type expects | Effect |
 |---|---|---|---|
-| a | `waveShapes` — top-level flat array of `{distance, depth, regime, surface}` | `waveShape` nested per transect point; the API never populates the nested form | The chart's wave-shapes toggle is dead against real data |
-| b | `jackingFactors` — top-level array of `{barIndex, distance, factor}` | `jackingFactor` as a per-break-point scalar; never populated | Jacking annotations never render |
-| c | Break points carry `iribarren` plus a nested `partitionInfo` object | Flat `partitionLabel` string only | Mismatched shape; partition annotation degraded |
+| a | `waveShapes` — **top-level** array on the transect result: `{distance, depth, regime, surface: [[phase, eta], …] \| null}` | `waveShape` (singular) array **nested inside each point** — a shape the API has never produced | `hasWaveShapeData = transect.some(p => p.waveShape…)` is always false; the chart's wave-shapes toggle is dead |
+| b | `jackingFactors` — **top-level** array: `{barIndex, distance, factor}` | `jackingFactor` as a **scalar on each break point** | `if (!bp.jackingFactor \|\| bp.jackingFactor <= 1.3) return null` — jacking annotations never render |
+| c | Break points carry nested `partitionInfo: {partitionIndex, periodS, directionDeg, classification, heightM}` plus top-level `iribarren: number` | Neither; only a flat, never-populated `partitionLabel?: string` | Partition annotation degraded to a lossy flat string |
+| d | `_serialize_surf_zones()` per-zone dict can carry `width_m` → `widthM` | `SurfZoneExtent` has no `widthM` field | Zone width unavailable. **Unconfirmed:** which zones populate `width_m` was not verified against `surf_1d_analytical.py`'s `SurfZones` dataclass — verify before fixing |
+| e | Single-transect response includes `perPartitionBreaks` (array of `{partitionIndex, periodS, directionDeg, heightM, classification, meanBreakDistanceM, meanFaceHeightM, peakFaceHeightM, meanBreakDepthM, dominantBreakerType}`) and `metadata` (`{axisUnits, verticalDatum, transectCount, openTransectCount}`) | `BeachProfileData` has **neither property at all** | Both silently dropped — not mis-shaped, absent |
+| f | Vertical datum exists **only** at `metadata.verticalDatum`, and is currently **hardcoded `"NAVD88"`** rather than read from DEM metadata | `BeachProfileData.datum?: string \| null` as a **top-level sibling** of `transect` | `BeachProfileChart`'s `datum` prop is always `undefined`; the datum-qualified Y-axis label ("Depth (m, NAVD88)") never renders in production. **The hardcoded datum is itself a defect** — see T4A.3 lead call LC-13 and the coordinator's finding that HB is covered by DEMs in two different datums (NAVD88 and MHW) |
 
 **Do:**
 1. For each of (a), (b), (c): decide which side is canonical and align the other.
@@ -940,6 +948,96 @@ eliminate, one layer down.
 It was separated from T4A.1 only because it requires a canonical-shape decision
 and T4A.1's two agents were already in flight; injecting it mid-round risked the
 churn the plan's execution rules exist to prevent.
+
+### T4A.7 — Rewire the surviving SWAN supplements into the SwellTrack pipeline
+
+- **Owner:** `clearskies-api-dev`
+- **Added:** 2026-07-24 by the coordinator (lead call LC-27), from a finding
+  surfaced by the `clearskies-api-dev` agent implementing T4A.4.
+- **Files:** `services/surf_1d_pipeline.py`, `endpoints/surf.py`,
+  `enrichment/wave_transform.py` (call site only)
+
+**Problem:** Removing the SWAN CURVE face-height computation (T4A.4) orphaned
+`wave_transform.apply_supplements()`. Investigation found `endpoints/surf.py` held
+its **only** call site in the entire package — `surf_1d_pipeline.py` never called
+it. So the supplements were feeding *only* the formula path T4A.4 deletes.
+
+Two governing documents claim otherwise:
+- `docs/ARCHITECTURE.md` — `wave_transform.py` "Applies bathymetric/structure
+  supplements to SWAN Hs".
+- `SURF-ZONE-MODEL-BRIEF.md` §7 — *"**Feeds the 1D model.** The 1D model receives
+  the post-supplement Hs from SWAN. wave_transform.py continues to operate on
+  SWAN's raw output before the handoff. No overlap."*
+
+**The documents describe the intended design; the code never implemented it.**
+The supplements have been feeding a formula approximation instead of the model
+they were written for.
+
+**Disposition: DELETE.** `wave_transform.py` is pre-1D-model code (its own docstring
+dates it to "Phase 3, T3.1") written to supplement SWAN's bulk Hs before the
+K-G/Caldwell single-point formula. Every one of its supplements is now either
+superseded or dead:
+
+| Supplement | Status |
+|---|---|
+| Sub-grid bilinear interpolation | **Superseded.** The 1D boundary condition is a SPECOUT emitted at the requested handoff coordinates, not a grid-cell value needing interpolation. |
+| Breaker index correction (Battjes 1974 γ tuning) | **Dead at runtime, and superseded in principle.** Its guard requires `spot_config.bathymetric_profile`, but `marine_config.py` explicitly stopped reading that key ("we intentionally do not read it here — runtime CUDEM profiles are cached at `/etc/weewx-clearskies/spot_profiles/`"). `getattr(spot_config, "bathymetric_profile", None)` is therefore always `None` and **the branch has never executed**. Separately, it derives γ from a single configured scalar `beach_slope` and a crude `bathymetric_profile[0].depth_m` proxy, while `run_1d_analytical()` already computes `_local_slope()` at every point and `_iribarren()` at each detected break point from the real profile. Feeding the supplement's γ into the 1D model would inject a **coarser** estimate into a finer one. |
+| Topographic focusing / sheltering | **Superseded.** SWAN's nested 2D grids model focusing and sheltering physically from real bathymetry at L2/L3. An operator-classified multiplier applied on top double-counts. |
+| Coastal structure transmission/reflection | **Already removed** by ADR-095 — handled natively by the SWAN `OBSTACLE` command. |
+
+**Do:**
+1. Delete the `apply_supplements()` call from `endpoints/surf.py`.
+2. Delete `apply_supplements()`, `apply_breaker_correction()`, `compute_iribarren()`,
+   `compute_breaker_gamma()` and the topographic-adjustment helper from
+   `enrichment/wave_transform.py`. **Keep `bilinear_interpolate()`** — `surf.py`
+   still uses it for HRRR wind interpolation, an unrelated live caller.
+   `rules/coding.md` §3: "No dead code."
+3. Update `docs/ARCHITECTURE.md` (the `wave_transform.py` description) and
+   `SURF-ZONE-MODEL-BRIEF.md` §7 (which claims "Feeds the 1D model … The 1D model
+   receives the post-supplement Hs from SWAN"). Both describe a design that was
+   never implemented. Replace with what the code does: the 1D model takes its
+   boundary condition directly from the SWAN handoff SPECOUT.
+
+**Accept:**
+- No `apply_supplements()` call site anywhere; the function and its
+  breaker-correction helpers are gone.
+- `bilinear_interpolate()` retained; `surf.py`'s HRRR wind path still works.
+- Targeted tests for the deleted functions removed; remaining tests pass with no
+  regression against the 2-failure baseline.
+- ARCHITECTURE.md and SURF-ZONE-MODEL-BRIEF §7 describe the implemented design.
+
+**Follow-on question, deliberately NOT answered by this task:** whether
+`run_1d_analytical()`'s fixed `gamma=0.73` should become a per-point value derived
+from the model's own Iribarren number. That is a legitimate physics improvement,
+but it is answered **inside** the 1D model using its own local-slope data — not by
+resurrecting a pre-1D supplement built on coarser inputs. Tracked separately; not
+in Phase 4A scope.
+
+**Not deferrable.** Closes before QC Gate 4A.
+
+### T4A.8 — Fix the latent `NameError` in the SurfBeat IG-strip precomputation
+
+- **Owner:** `clearskies-api-dev`
+- **Files:** `endpoints/surf.py`
+
+**Problem:** A pre-existing F821 defect found during T4A.4 and confirmed present
+at the pre-round commit `0d87b28` via `git stash` (i.e. not introduced this
+round): in the SurfBeat IG-strip precomputation block, `ts_wind_speed` and
+`ts_wind_direction` are referenced **before** their per-timestep-loop definition.
+
+**Impact:** a real `NameError` whenever that path executes — which requires
+`surfbeat_enabled`, available bathymetry, and a valid cadence-hour match
+simultaneously. It has evidently not fired in production yet, which means the
+SurfBeat path has not been exercised under those conditions.
+
+**Do:** fix the reference order. Add a regression test that exercises the
+precomputation block with `surfbeat_enabled=True` and a valid cadence-hour match.
+
+**Accept:**
+- `ruff` reports no F821 in `endpoints/surf.py`.
+- A test exercises the previously-unreachable path and passes.
+
+**Not deferrable.** Closes before QC Gate 4A.
 
 ### Adversarial Audit — Phase 4A
 
@@ -1249,7 +1347,9 @@ unconditional.)*
 
 **Do:** Copy all 3, adapt `marine_config.py` to read from the marine service's own config file (received via `POST /config`), update imports.
 
-**Accept:** Config parsing works from local config file. Location resolver and weather cache operational.
+**Structural note (added 2026-07-24, Phase 4 audit finding — NON-BLOCKING, forced downstream rework):** Phase 4's T4.1 scaffold created `weewx_clearskies_marine/config.py` as a **flat module** (matching T4.1's own literal tree spec), but this task names `config/` — a **package** — as `marine_config.py`'s target. They collide at the same name. Resolve it at the start of this task, before moving 934 lines: convert `config.py` to `config/__init__.py` re-exporting its current public surface (non-breaking for existing importers), then land `marine_config.py` as `config/marine_config.py`. Do not discover this mid-move.
+
+**Accept:** Config parsing works from local config file. Location resolver and weather cache operational. `config.py` converted to a package with no import breakage; the marine service's own config surface still resolves from `weewx_clearskies_marine.config`.
 
 ### T5.9 — Wire the internal pipeline
 
@@ -1270,6 +1370,15 @@ unconditional.)*
 **Accept:**
 - Full SWAN → SwellTrack → SurfBeat pipeline runs end-to-end.
 - All 6 data endpoints return correctly shaped responses.
+- **`GET /health`'s `spots` field populates from configured surf spots.** In the
+  Phase 4 scaffold this is deliberately unwired — `state.py`'s `_spot_ids` is
+  populated only by `set_run_state()`, which nothing in the config path calls,
+  and `state.py`'s docstring says "Phase 5 populates this from the actual run
+  loop." Confirmed as a NON-BLOCKING finding at QC Gate 4 (2026-07-24) and
+  carried here so it is not lost. A service reporting `spots: []` while serving a
+  configured spot is a monitoring-layer instance of the same "looks fine, isn't"
+  failure this plan exists to remove. The Phase 4 test that pins the empty
+  behaviour is provisional and must be updated when this lands.
 
 ### T5.10 — Write marine service provider + pipeline tests
 
@@ -1413,6 +1522,47 @@ unconditional.)*
 - All marine tests moved to marine service repo and passing.
 - API pytest baseline updated (lower count, no regressions in remaining tests).
 - Marine service test baseline established (migrated + new tests).
+
+### T6.4b — Marine service config recovery on restart
+
+- **Owner:** `clearskies-api-dev`
+- **Added:** 2026-07-24, from Phase 4 adversarial audit finding **F5** (reverse
+  check — a documented requirement belonging to no phase).
+- **Files:** `endpoints/setup.py` (API side), marine service `__main__.py` /
+  `config.py` (client side)
+
+**Problem:** `OPERATIONS-MANUAL` described, as current behaviour, a mechanism
+where "on marine service restart, the service fetches its config from the API via
+`GET {api_url}/setup/marine/config`". Neither side of that mechanism exists —
+not the API handler, not the marine service's outbound call — and it was assigned
+to no task in any phase. The manual has been corrected to describe what actually
+happens (local-disk reload) and to mark the fetch as a target pointing here.
+
+**Why it still matters:** a marine service with no local config — a fresh
+install, or one whose config directory was wiped — cannot recover it and serves
+nothing until an operator notices and re-runs apply. Local-disk reload is correct
+and verified (it survives `kill -9`), but it cannot self-heal from an empty disk.
+
+**Do:**
+1. Add `GET /setup/marine/config` to the API, authenticated with
+   `MARINE_SERVICE_SECRET`, returning the same marine config subset that
+   `/setup/apply` pushes (T6.4). One serializer, both paths — do not let the push
+   shape and the pull shape drift.
+2. On marine service startup: if no local config exists **and**
+   `marine_service_url`'s peer API is reachable, fetch and persist it. If local
+   config exists, use it — do not fetch on every start, and never let a fetch
+   overwrite newer local config.
+3. Failure to fetch logs at ERROR and the service starts without config, serving
+   `/health` and `/manifest` only. It must not crash-loop.
+
+**Accept:**
+- A marine service with an empty config directory recovers its config from the
+  API on startup and serves marine endpoints without operator intervention.
+- A marine service with existing local config does not fetch.
+- Push and pull share one serializer.
+- An unreachable API at startup degrades to health-and-manifest, logged at ERROR,
+  with no crash loop.
+- `OPERATIONS-MANUAL`'s "(target — not yet implemented)" annotation is removed.
 
 ### T6.5 — Delete marine endpoints from API (4,245 lines)
 

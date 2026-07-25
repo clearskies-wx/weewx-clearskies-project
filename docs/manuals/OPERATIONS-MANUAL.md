@@ -1119,7 +1119,33 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 
 The secret must be identical on both hosts. The API sends it as `Authorization: Bearer {token}` on all protected marine service endpoints. The `/health` and `/manifest` endpoints do not require auth.
 
-**Marine service TLS:** A self-signed certificate is auto-generated at `/etc/weewx-clearskies/marine/tls/` on first start. For same-host deployments the API accepts this certificate without verification (localhost trust). For separate-host deployments with a self-signed cert, set `marine_verify_tls = false` in `api.conf [providers]` (TLS encryption remains active; only certificate verification is skipped for the internal VLAN connection).
+**Marine service environment and paths (Phase 4).** All marine-service settings
+live on the marine service host, separate from the API's own:
+
+| Knob | Kind | Default | Notes |
+|---|---|---|---|
+| `MARINE_SERVICE_SECRET` | env var, from `secrets.env` via the systemd unit's `EnvironmentFile=` | none — **required** | Bearer token for every endpoint except `/health` and `/manifest`. The process refuses to start if unset; a request arriving while unset returns **500** (a deployment fault), deliberately distinct from the **401** a bad client token gets. |
+| `CLEARSKIES_MARINE_CACHE_URL` | env var | unset → in-process memory cache | Redis URL for provider response caching. **Deliberately distinct from the API's `CLEARSKIES_CACHE_URL`** — same-host deployment is a supported topology, and sharing one Redis database would collide the two services' key namespaces. |
+| `CLEARSKIES_MARINE_BIND_HOST` | env var | `0.0.0.0` | Bind address. Mirrors the API's `CLEARSKIES_BIND_HOST`. Accepts an IPv4 or IPv6 literal, a hostname, or `*` for true dual-stack. |
+| `/etc/weewx-clearskies/marine/secrets.env` | file | — | Holds `MARINE_SERVICE_SECRET` (and optionally `CLEARSKIES_MARINE_CACHE_URL`) on the marine service host. |
+| `/etc/weewx-clearskies/marine/marine.conf` | file | — | Config persisted by `POST /config`, written atomically (temp + rename), mode `0640`. Reloaded at startup. |
+| `/etc/weewx-clearskies/marine/marine-cert.pem` / `marine-key.pem` | files | auto-generated on first start | Ed25519 self-signed TLS cert and key; key mode `0600`. |
+| CLI: `--host`, `--port`, `--cert-dir`, `--hostname`, `--config` | CLI args | port `8780`, cert dir `/etc/weewx-clearskies/marine` | `--hostname` sets the TLS cert's SAN entry, needed for separate-host deployments. |
+
+> **Two `secrets.env` files, one value.** `MARINE_SERVICE_SECRET` must appear in
+> **both** the API's `secrets.env` (so the API can authenticate *to* the marine
+> service) and the marine service's own (so it can verify). They are separate
+> files by design — a dedicated compute host has no API `secrets.env` to read.
+> Nothing enforces that they match, and a mismatch surfaces as a blanket 401
+> with no indication of which side is wrong. This cannot be solved by pushing
+> the secret through `POST /config`: that push itself requires the secret.
+
+> **Request body limit.** The marine service caps request bodies at 1 MiB
+> (413 `application/problem+json` above that), matching the API. `POST /config`
+> persists into the same directory as the TLS private key, so an unbounded body
+> is a disk-fill vector that also breaks the atomic-write guarantee.
+
+**Marine service TLS:** A self-signed Ed25519 certificate and key are auto-generated at `/etc/weewx-clearskies/marine/` on first start, as `marine-cert.pem` and `marine-key.pem` (key mode `0600`). Path corrected 2026-07-24 — this section previously said `/etc/weewx-clearskies/marine/tls/`, which never matched the code (Phase 4 audit finding F1). For same-host deployments the API accepts this certificate without verification (localhost trust). For separate-host deployments with a self-signed cert, set `marine_verify_tls = false` in `api.conf [providers]` (TLS encryption remains active; only certificate verification is skipped for the internal VLAN connection).
 
 #### Config push model
 
@@ -1131,7 +1157,21 @@ The marine service never reads `api.conf` directly. All configuration is pushed 
 4. The marine service validates and applies the config.
 5. The API returns success to the wizard/admin only after the marine service acknowledges the config.
 
-On marine service restart, the service fetches its config from the API via `GET {api_url}/setup/marine/config` (authenticated with `MARINE_SERVICE_SECRET`).
+On marine service restart, the service reloads its config **from its own local
+disk** — `POST /config` persists atomically (temp file + rename) to
+`/etc/weewx-clearskies/marine/marine.conf`, and startup reads that file. This is
+the implemented and tested behaviour (verified against a `kill -9` mid-life, not
+just a graceful shutdown).
+
+> **(target — not yet implemented)** A marine service with no local config —
+> a fresh install, or one whose config directory was wiped — has no way to
+> recover it and will serve nothing until an operator re-runs apply. A
+> pull-on-startup from the API (`GET {api_url}/setup/marine/config`,
+> authenticated with `MARINE_SERVICE_SECRET`) would close that gap and is
+> consistent with ADR-099's "the API is the single source of truth for operator
+> config". Neither side of this mechanism exists yet. Tracked as plan task
+> **T6.4b**; this paragraph previously described it as current behaviour
+> (Phase 4 audit finding F5).
 
 #### Health check
 
