@@ -529,8 +529,16 @@ The 1D cross-shore grid must be fine enough to resolve wave breaking, shoaling o
 **Fine zone depth threshold — integrated with L3 grid sizing:**
 
 ```
-fine_zone_max_depth = max(max_hs_m / gamma, structure_zone_depth)
+fine_zone_max_depth = max(1.3 * max_hs_m / gamma, structure_zone_depth)
 ```
+
+*(Updated 2026-07-24: the `1.3` shoaling margin was added by
+`MARINE-SERVICE-SEPARATION-PLAN.md` T4A.2, which supersedes this section for
+implementation. Shoaling amplifies Hs before breaking, so a 4 m offshore swell
+can break at ~7 m depth rather than 5.5 m; the margin keeps break points out of
+the coarse zone during big swells. The worked examples below predate the margin
+and are illustrative of the `max()` selection only — multiply the first term by
+1.3 for current values.)*
 
 Two inputs, take the larger:
 - `max_hs_m / gamma`: maximum depth where wave breaking can occur. For a spot seeing 4m winter swells: `4.0 / 0.73 ≈ 5.5m`. Covers outer bars, inner bars, and reform troughs between them (critical for multi-bar beaches like Huntington Beach).

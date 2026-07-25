@@ -693,11 +693,18 @@ weewx host
 3. **Raw profile extraction at native DEM resolution.** The raw transect profile fed to PCHIP must be sampled at the native CUDEM resolution for that location (~10m at HB where 1/3 arc-second is the finest available, ~3m at locations covered by 1/9 arc-second tiles). Extract directly from the downloaded CUDEM grid — NOT from the 50m bidirectional profile stepper or the resampled L3 cache. PCHIP can interpolate between native samples to create finer grid points, but it cannot recreate features the raw sampling missed.
 4. **Fine zone depth threshold** accounts for BOTH breaking physics and structure zones:
    ```
-   fine_zone_max_depth = 1.3 * max_hs_m / gamma + structure_zone_depth
+   fine_zone_max_depth = max(1.3 * max_hs_m / gamma, structure_zone_depth)
    ```
+   *(Corrected 2026-07-24, coordinator lead call LC-1. This block previously read
+   `... + structure_zone_depth`, contradicting the two worked examples below it,
+   this task's own Accept bullet, and QC Gate 4A — all of which use `max()`. The
+   two terms are independently-derived depths for the same zone, not additive
+   contributions; addition would put Newport's fine zone at 17.1 m instead of
+   10.0 m. `SURF-ZONE-MODEL-BRIEF.md` §6.1 carries the older pre-1.3-margin form
+   and is superseded by this one.)*
    - `1.3 * max_hs_m / gamma`: maximum breaking depth with shoaling margin. Shoaling amplifies Hs before breaking (the model's own jacking factor), so a 4m offshore swell can break at ~7m depth, not 5.5m. The 1.3× margin is cheap (adds a few hundred fine-zone points) and prevents break points landing in the coarse zone during big swells — when accuracy matters most.
    - `structure_zone_depth`: the depth of the deepest structure affecting this spot, plus margin. **Default 0.0** when no structures configured — fine zone covers only the breaking zone. When an offshore breakwater sits at 8m depth: `structure_zone_depth = 10.0` (structure depth + 2m margin), extending the fine zone to cover structure interactions.
-   - Example: HB, no structures, 4m max Hs → `fine_zone_max_depth = 1.3 * 5.5 + 0 = 7.1m`.
+   - Example: HB, no structures, 4m max Hs → `fine_zone_max_depth = max(1.3 * 5.5, 0) = 7.1m`.
    - Example: Newport, breakwater at 8m, 4m max Hs → `fine_zone_max_depth = max(7.1, 10.0) = 10.0m`.
 5. `max_hs_m` defaults to 4.0m. Per-spot configurable via `SurfSpotConfig.max_hs_m`.
 6. `structure_zone_depth` is computed from the spot's structure config: deepest structure depth + margin. 0.0 when no structures. Required parameter (no default that silently extends the fine zone).
@@ -889,12 +896,57 @@ Additionally, `score_surf()` (line 1050) always uses SWAN CURVE `face_height_m`,
 - Surf endpoint: `degraded=false`, `breakingFaceHeight` from SwellTrack.
 - Beach profile endpoint returns full transect data.
 
+### T4A.6 — Fix beach profile contract mismatches beyond vocabulary
+
+- **Owner:** `clearskies-api-dev` + `clearskies-dashboard-dev`
+- **Added:** 2026-07-24 by the coordinator, from findings surfaced by the
+  `clearskies-dashboard-dev` agent while writing T4A.1's OpenAPI schemas.
+- **Files:** API `endpoints/beach_profile.py`; dashboard `src/api/types.ts`,
+  `BeachProfileChart.tsx`, `src/api/openapi-v1.yaml`
+
+**Problem:** T4A.1 unifies the *names* of the cross-shore fields. Writing the
+OpenAPI schema against the real API response exposed three further API↔dashboard
+mismatches of *shape*, all in the same family as Phase 4A Origin item 4 (two
+parallel type systems). Each one means a built dashboard feature never renders
+against real data — the same silent-degradation class this phase exists to
+eliminate, one layer down.
+
+| # | API emits | Dashboard type expects | Effect |
+|---|---|---|---|
+| a | `waveShapes` — top-level flat array of `{distance, depth, regime, surface}` | `waveShape` nested per transect point; the API never populates the nested form | The chart's wave-shapes toggle is dead against real data |
+| b | `jackingFactors` — top-level array of `{barIndex, distance, factor}` | `jackingFactor` as a per-break-point scalar; never populated | Jacking annotations never render |
+| c | Break points carry `iribarren` plus a nested `partitionInfo` object | Flat `partitionLabel` string only | Mismatched shape; partition annotation degraded |
+
+**Do:**
+1. For each of (a), (b), (c): decide which side is canonical and align the other.
+   Default to the API's shape, matching T4A.1's Decision (the model's vocabulary
+   and structure win) unless the dashboard shape is demonstrably better for
+   rendering — in which case change the API and say why.
+2. Update `src/api/types.ts` and the consuming components so each feature renders
+   against real data.
+3. Update `src/api/openapi-v1.yaml` to document the final agreed shape.
+4. Verify each of the three features renders with real data on the dev
+   dashboard — a passing `tsc` is not evidence that a chart overlay draws.
+
+**Accept:**
+- Wave shapes overlay renders from real API data.
+- Jacking factor annotations render from real API data.
+- Break point partition annotation renders the full API shape (`iribarren` and
+  `partitionInfo`), not a lossy flat string.
+- OpenAPI spec documents the agreed shape for all three.
+- No remaining API↔dashboard shape mismatch in the beach profile response.
+
+**Not deferrable.** This task is inside Phase 4A and must close before QC Gate 4A.
+It was separated from T4A.1 only because it requires a canonical-shape decision
+and T4A.1's two agents were already in flight; injecting it mid-round risked the
+churn the plan's execution rules exist to prevent.
+
 ### Adversarial Audit — Phase 4A
 
 - **Owner:** `clearskies-auditor`
 
 **Scope:**
-1. **Vocabulary:** grep all repos for `hsEnvelope`, `distanceFromShore`, `waveHeight` (in the beach profile context) — zero matches except historical docs. Only `transect`, `distance`, `depth`, `hs` used.
+1. **Vocabulary:** grep all repos for `hsEnvelope`, `distanceFromShore`, `waveHeight` (in the beach profile context) — zero matches except historical docs. Only `transect`, `distance`, `depth`, `hs` used. This includes `endpoints/surf.py`'s own independent `breakPoints` array and the `units_block` label keys in both endpoints (coordinator lead calls LC-20 and LC-21, 2026-07-24).
 2. **Profile resolution:** verify HB spot profile has >200 points with variable spacing (1-2m near shore, wider offshore).
 3. **No SWAN CURVE face height in surf endpoint:** grep `surf.py` for `hsig_to_face_height` — zero calls. Face height comes only from pipeline.
 4. **Scorer input:** verify `score_surf()` receives SwellTrack face height, not SWAN CURVE.
@@ -961,9 +1013,17 @@ weewx-clearskies-marine/
 
 **Accept:**
 - Repo created with all directories.
-- `pyproject.toml` with proper metadata, dependencies (fastapi, uvicorn, httpx, numpy, eccodes, xarray, netCDF4).
+- `pyproject.toml` with proper metadata and the dependency split defined in T4.5 (core stays light; heavyweight geospatial deps live in the `[nearshore]` extra).
 - `pip install -e .` succeeds.
-- `[nearshore]` optional extra for SWAN (adds SWAN binary requirement).
+- `[nearshore]` optional extra for SWAN (eccodes, xarray, netCDF4; the SWAN Fortran binary is an out-of-band system requirement, not a pip dependency).
+
+*(Corrected 2026-07-24, coordinator lead call LC-6. This bullet previously listed
+eccodes/xarray/netCDF4 as core dependencies, contradicting T4.5 Do step 2 and
+ARCHITECTURE.md's repo-layout row ("`pip install -e .` for core;
+`pip install -e ".[nearshore]"` adds SWAN binary support"), and diverging from
+the API repo's own `[marine]`/`[nearshore]` precedent. T4.5's split is
+authoritative. `cryptography` is additionally core because T4.4 makes TLS
+unconditional.)*
 
 ### T4.2 — Set up provider module infrastructure
 
