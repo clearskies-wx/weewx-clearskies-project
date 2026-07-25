@@ -46,18 +46,33 @@ Full evidence in `c:	mp\marine-sep-P4-scratch.md`.
 
 ### Live production state (verified 2026-07-25, librewxr)
 
-**SWAN is running and discarding its own output.** This is the current root cause
-of the empty surf page, and it predates Phase 4A:
+**SWAN is working.** Over the last 5 days: **10 successful runs (1/1 spot cached)
+and 3 convergence failures.** The most recent run — 2026-07-25 01:40, HRRR cycle
+`25T00:00Z` — succeeded. The convergence gate is doing its job: it catches the
+occasional bad run, and the next cycle recovers.
 
-```
-ERROR SWAN convergence FAILED level=level3_0: check=nan_detected, nan_count=1061
-ERROR SWAN L3 cluster 0: skipping hotstart save and cache update
-```
+> **Correction (2026-07-25).** An earlier version of this block claimed SWAN was
+> "running and discarding its own output" and called that the root cause of the
+> empty surf page. **That was wrong** — extrapolated from a single `nan_detected`
+> log line without checking whether surrounding runs succeeded. The operator
+> caught it. The empty surf page is caused by the broken 50-point spot profile
+> starving SwellTrack, which is what T4A.2 fixes and T4A.5 deploys — the
+> diagnosis this plan already carried.
 
-The convergence gate is working correctly — it refuses to cache bad data. The
-NaN cause is **unexplained and unassigned to any task.** Note for T4A.5: success
-cannot be judged by "did SWAN run"; the measure is **whether L3 converges and
-caches.**
+**Tracked observation — not a blocker, do not let it displace Phase 4A work.**
+All three convergence failures fell on the **18Z HRRR cycle**:
+
+| Failure | Check | HRRR cycle |
+|---|---|---|
+| 2026-07-23 01:40 | `low_valid_fraction` 38.8% | `2026-07-22T18:00:00Z` |
+| 2026-07-23 19:31 | `nan_detected` 1567 | `2026-07-23T18:00:00Z` |
+| 2026-07-24 19:33 | `nan_detected` 1061 | `2026-07-24T18:00:00Z` |
+
+Zero failures on 00Z, 06Z or 12Z in the same window. Three data points — 3-for-3
+on one cycle against 0-for-10 on the others is suggestive, not proven. HRRR 404s
+were checked as a confound and occur on succeeding cycles too, so missing GRIB
+files alone do not explain it. **Worth chasing after Phase 4A closes**; the model
+is not yet completely implemented and that comes first.
 
 ### Deployment state — NOTHING DEPLOYED THIS SESSION
 

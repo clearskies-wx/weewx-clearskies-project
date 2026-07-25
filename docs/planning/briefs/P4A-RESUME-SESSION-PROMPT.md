@@ -84,8 +84,16 @@ L3 model.
 - `weewx-clearskies-marine` is complete, pushed, **private** on GitHub at
   `9ab0766` + the audit-fix commit; cloned on weather-dev for verification.
 
-**Live production reality:** SWAN on librewxr is running and **discarding every
-run** — L3 fails convergence with `nan_count=1061` and the gate correctly refuses
-to cache. That, not the vocabulary or the physics work already landed, is why the
-surf page is empty. When T4A.5 eventually runs, "did SWAN run" proves nothing;
-the measure is whether **L3 converges and caches**.
+**Live production reality:** SWAN on librewxr is **working** — 10 successful runs
+and 3 convergence failures over 5 days, most recent run (2026-07-25 01:40)
+successful. The empty surf page is caused by the broken 50-point spot profile
+starving SwellTrack, which T4A.2 fixed and T4A.5 deploys.
+
+A previous coordinator claimed SWAN was "discarding every run" and called that
+the root cause. That was wrong — extrapolated from one log line. Do not repeat
+it. The correction, and the real numbers, are in the plan's status block.
+
+**Tracked, not a blocker:** all 3 convergence failures fell on the 18Z HRRR
+cycle (0 failures on 00Z/06Z/12Z). Suggestive at 3 data points. The operator's
+direction is explicit — **finish implementing the model first**; the 18Z pattern
+is chased after Phase 4A closes.
