@@ -71,3 +71,24 @@ contour. On failure the spot logs at **ERROR**, gets no `shoreward_distance_m`, 
 with an **INFO** log, running L2 → SwellTrack instead. Degraded but defined, and loud at three
 levels — not a silent plausible substitution. **Whether it actually fires at HB is a T4A.5
 question, answerable only against real bathymetry.**
+
+> **ANSWERED 2026-07-25 (T4A.5): it does not fire at HB.** The chain found the 1.8 m contour at
+> **85 m** offshore on the MEDIUM grid and sized L3 from it; no ESTIMATE fallback, no WARNING.
+> The concern was real but does not bite here. It stays on the watch list for spots with flatter
+> or noisier nearshore bathymetry, where a very shallow contour is harder to resolve.
+
+## Found during T4A.5, not by the audit
+
+- **Zero jacking factors at HB.** SwellTrack produces none at Hs = 1/2/3/4 m against the
+  regenerated profile, so **T4A.6 item (b)'s jacking annotations will not render with real
+  data.** This is the concrete form of the auditor's A8 concern: B3 hand-added a jacking value
+  during T4A.6 because a real parameter sweep stayed below the render threshold. The feature is
+  correct; the data does not exercise it. Likely PCHIP through a 10 m DEM not resolving HB's
+  sandbars. Not fixed — recorded.
+- **Every breaker classifies `spilling`** across 1–4 m swell, no plunging anywhere at a pier.
+  Plausible for a sandy beach; recorded as a watch item, not a finding.
+- **`deploy-compute.sh` was destructive to librewxr's shared venv** — `uv sync --frozen` pruned
+  the `[nearshore]` extras and the SWAN package, because `uv.lock` contains zero occurrences of
+  "nearshore". Fixed in `7901a84`. **Underlying issue NOT fixed:** the lockfile genuinely lacks
+  the extras, so `uv sync` can never provision that host correctly. Regenerating it changes
+  dependency resolution for every host.

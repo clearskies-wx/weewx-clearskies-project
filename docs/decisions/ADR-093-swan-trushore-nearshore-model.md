@@ -200,6 +200,14 @@ is sized to reach the shallow end of the breaking range, not the deep end, and a
 reaching ~2 m depth would span the pier end to end. **HB Pier may well be viable.** Do not
 carry the "HB is disabled" conclusion forward — it was an artefact of the fixed-depth error.
 
+> **RESOLVED 2026-07-25 — HB Pier IS viable; L3 is enabled.** Measured by running the real
+> apply-time chain against live NCEI bathymetry on librewxr (T4A.5). The 1.8 m contour sits
+> **85 m** offshore of the coastline anchor; L3 was sized with a shoreward reach of 85 m and an
+> alongshore extent from the 567 m pier; the §4 viability test passed and the chain logged
+> `1 of 1 cluster(s) enabled`. The prediction in this section — "a grid reaching ~2 m depth
+> would span the pier end to end" — held. Evidence and the two recorded deviations are in
+> `docs/planning/MARINE-SERVICE-SEPARATION-PLAN.md` under T4A.5.
+
 **5a. Where L3 earns its keep (guidance, not a rule).** On steep, feature-driven seabed —
 reef ledges, points, canyon rims — the band between clean water and breaking is a few hundred
 metres, so a 10 m grid across it is small and resolves 10–50 m features nothing coarser can

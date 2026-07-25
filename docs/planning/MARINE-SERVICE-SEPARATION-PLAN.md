@@ -43,12 +43,12 @@ Full evidence in `c:	mp\marine-sep-P4-scratch.md`.
 | T4A.8 (SurfBeat `NameError`) | **DONE** `08ce616` — 6 F821 at parent → 0, coordinator-verified |
 | T4A.7 (delete `wave_transform` supplements) | **DONE** `167ad73` + `aef7669`. Gate answered: SWAN interpolates POINTS/SPECOUT output to the requested coordinate (manual §2.6.4/§4.6.1 + `swanout1.ftn` `SWOEXA`/`SWOEXD`). **Both** surviving supplements removed. |
 | T4A.3.0 (reconstruct intended-vs-actual) | **DONE** `ed4613f` — `briefs/P4A-INTENDED-VS-ACTUAL-RECONSTRUCTION.md`. 17 rows, 11 inventory entries, 8 named gaps. **No longer blocks T4A.3.** |
-| T4A.3 (CUDEM at apply time) | **IN PROGRESS.** The earlier "halted, uncommitted, implements a wrong instruction" state is resolved: that work was reviewed and committed as `244ee08`, and the claim that part of it implemented a retracted instruction **was wrong** — see the correction in `briefs/P4A-RESUME-SESSION-PROMPT.md`. `00564b9` adds `max_hs_m`. Remaining steps in flight. |
-| T4A.11 (widen L3 trigger + viability test) | **IN PROGRESS.** Merged with T4A.3 under one agent — both own L3 sizing in `swan_domain.py`. |
-| T4A.9 / T4A.10 (per-hour handoff + QB assertion) | **IN PROGRESS.** |
-| T4A.6 (beach profile shape mismatches a–g) | **IN PROGRESS.** |
-| T4A.5 (regenerate caches on librewxr) | Blocked on T4A.3 — coordinator-owned |
-| Adversarial audit + QC Gate 4A | Not started |
+| T4A.3 (CUDEM at apply time) | **DONE** `8850e7e` + `db33f01` + `47c3d91`. The earlier "halted, uncommitted, implements a wrong instruction" state is resolved: that work was reviewed and committed as `244ee08`, and the claim that part of it implemented a retracted instruction **was wrong** — see the correction in `briefs/P4A-RESUME-SESSION-PROMPT.md`. `00564b9` adds `max_hs_m`. **Gap: "progress visible to operator" is NOT met** — the chain runs via `BackgroundTasks`; see the named gaps in `briefs/P4A-AUDIT-FINDINGS.md`. |
+| T4A.11 (widen L3 trigger + viability test) | **DONE** `ceb8252` + `d90bc88` + `eca80ee`. Merged with T4A.3 under one agent — both own L3 sizing in `swan_domain.py`. Includes the L2 fallback for L3-disabled spots (see the defect note below) and the shoreward-edge criterion (audit F1). |
+| T4A.9 / T4A.10 (per-hour handoff + QB assertion) | **DONE** `a54f2cb` + `a0c45b5` + `69957f7`. The reopen matters: the handoff was computed and then **discarded at the compute-offload wire**, and only 1 of 5 call sites ever passed it. |
+| T4A.6 (beach profile shape mismatches a–g) | **DONE** `8e2710f` + dashboard `452d921`/`923dd0c`, plus audit fixes `dcbe9e4` (F2) and `3c7e993` (F3). **Watch item:** item (b)'s jacking annotations render only when jacking factors exist, and the regenerated HB profile produces **zero** of them — see T4A.5 below. |
+| T4A.5 (regenerate caches on librewxr) | **DONE 2026-07-25** — see the T4A.5 results block below for evidence and two recorded deviations. |
+| Adversarial audit + QC Gate 4A | **Audit DONE** — 3 BLOCKERs (F1/F2/F3), all remediated; findings recorded in `briefs/P4A-AUDIT-FINDINGS.md`. Gate assessment pending final end-to-end run. |
 
 **Defect found 2026-07-25 and folded into T4A.11 — L3-disabled spots currently produce NO data.**
 `swan_runner.py:1525` skips a cluster whose `grid is None`, and the returned result dict is only
@@ -1150,6 +1150,47 @@ Additionally, `score_surf()` (line 1050) always uses SWAN CURVE `face_height_m`,
 - SwellTrack produces non-zero face heights.
 - Surf endpoint: `degraded=false`, `breakingFaceHeight` from SwellTrack.
 - Beach profile endpoint returns full transect data.
+
+**RESULT — run 2026-07-25 on librewxr.** Ran the real `_run_marine_apply_chain()`, not a
+reimplementation, so what landed is exactly what the wizard writes.
+
+| Accept criterion | Outcome |
+|---|---|
+| Profile ~400–500 points, variable resolution | **629 points, uniform 1.5 m spacing.** Deviation — see below. |
+| SwellTrack produces non-zero face heights | **PASS.** Non-zero breaking heights at Hs = 1/2/3/4 m; surf zone widens 72 m → 188 m, breaks move offshore 103 m → 219 m, breaking depths 2.16 m → 4.93 m, runtime 14–17 ms. |
+| Surf endpoint not degraded, heights from SwellTrack | **PASS.** `nearshoreModel: "SWAN + SwellTrack"`, `modelStatus` 66 × `ok` + 1 × `no_breaking` (hour 0 is genuinely flat — 1.6 s period wind chop), face heights max 5.19 m / mean 4.03 m. Note the response has no `degraded` field; `modelStatus` is the live equivalent and the criterion's field name is stale. |
+| Beach profile endpoint returns full transect data | **PASS.** `transectCount: 32`, `openTransectCount: 32`, break points carrying distance/depth/hs. |
+
+**Chain output, for the record:** 30 m contour at 6017 m; 15 m at 2433 m; **1.8 m at 85 m**.
+L3 sized with "struct 567 m (alongshore extent only, Amendment 1 §2), shoreward reach 85 m
+(breaking-depth criterion, Amendment 2 §2)" — the two mechanisms correctly separate. Profile:
+629 points, datum NAVD88, `structure_zone_depth` 12.3 m, `fine_zone_max_depth` 12.3 m.
+
+**This also settles ADR-093 Amendment 2 §5 — HB Pier is VIABLE.** The amendment left its status
+"UNDETERMINED, pending the margin decision" and predicted "a grid reaching ~2 m depth would span
+the pier end to end." The grid reaches 1.8 m at 85 m offshore, the viability test passed, and
+L3 is enabled: `1 of 1 cluster(s) enabled`.
+
+**Two recorded deviations — neither blocking, both real:**
+
+1. **Uniform 1.5 m spacing, not variable, and 629 points not ~400–500.** Cause is arithmetic,
+   not a defect: `fine_zone_max_depth` is 12.3 m (driven by `structure_zone_depth`) while the
+   profile's deepest sample is 10.2 m, so the *entire* profile lies inside the fine zone and the
+   coarse zone never begins. Correct by construction given the inputs. Worth noting that the
+   criterion "~400–500 points (variable resolution)" was written before `structure_zone_depth`
+   entered the fine-zone formula and no longer describes the reachable outcome here.
+2. **Zero jacking factors at every tested Hs.** T4A.6 item (b)'s jacking annotations therefore
+   will not render at HB against real data. This is the concrete form of the audit's A8 concern —
+   B3 had to hand-add a jacking value during T4A.6 because a real parameter sweep stayed below
+   the render threshold; the regenerated profile now confirms there are no jacking factors at all.
+   Likely because PCHIP through a 10 m DEM does not resolve HB's sandbars. **Not fixed here** —
+   feature exists, data does not exercise it.
+
+**Also observed:** every break point at every tested Hs classified `spilling`; no plunging
+anywhere across 1–4 m swell at a pier. Plausible for a sandy beach, but recorded as a watch item.
+
+**Profile coverage confirmed adequate:** deepest handoff needed is `1.3 × 4.0 / 0.73 = 7.12 m`
+and the profile reaches 10.2 m, so every forecast hour's handoff falls inside it.
 
 ### T4A.6 — Fix beach profile contract mismatches beyond vocabulary
 
