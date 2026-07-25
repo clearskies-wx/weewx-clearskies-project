@@ -97,6 +97,34 @@ Commit `03f81db`. Verified by the coordinator: all 10 moved providers import cle
 
 ---
 
+## C-23 — `directional_exposure`'s wire shape is undetermined until T6.4 (OPEN → pin at T6.4)
+
+Found by the coordinator's line-by-line diff of `marine_config.py` against the API's copy —
+the one substantive item among 24 otherwise cosmetic hunks.
+
+In the API, `configobj` turns `N:false, NE:false, …` into a **list of `"DIR:bool"` strings**.
+In the marine service the config arrives as JSON, where the natural shape is a **dict**
+(`{"N": false, "NE": false, …}`). The ported parser now accepts **both**.
+
+That tolerance is defensible — the adaptation cannot work without at least one of the two, and
+which one the API actually sends is not yet decided, because **T6.4 (config push) has not been
+written.** But it means one of the two branches is currently speculative, and
+`rules/coding.md` §3 is against carrying code with no caller.
+
+**Not resolved now — deliberately.** Pinning it requires knowing what T6.4 serialises, and
+guessing would just be a second guess to unwind later.
+
+**Action at T6.4:** decide the wire shape once, make the API's push emit exactly that, then
+either delete the parser's unused branch or make it the primary. Whichever way it goes, the
+config payload's shape is a contract crossing the API↔marine boundary and must be written down
+in `API-MANUAL.md` §19.5 rather than left implicit in a parser's tolerance.
+
+**Everything else in the diff was clean:** the `configobj` → `Mapping[str, Any]` change, the
+api.conf INI examples rewritten as JSON payload examples, two line wraps, one nested-`if`
+combine. No field name, default, nullability or unit changed anywhere.
+
+---
+
 ## C-21 — the moved providers still identify themselves as the API to NOAA (OPEN → Phase 5 close)
 
 Found during the T5.1–T5.5 move, correctly reported rather than silently fixed (the agent's
