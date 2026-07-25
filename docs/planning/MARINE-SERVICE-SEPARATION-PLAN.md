@@ -51,11 +51,20 @@ the API repo and deployed to librewxr; the per-transect handoff work is what pro
 | T4B.5 — SurfBeat stays uniform | **RESOLVED BY READING** — no code needed | — |
 | T4B.6 / T4B.7 / T4B.8 | **NOT DONE** | — |
 
-`ARCHITECTURE.md` separately described Phase 4B as "approved 2026-07-25, not yet
-implemented." That is also wrong on the second half. **Operator: the approval record and the
-implementation record disagree, and Phase 4B carries architectural triggers. T4B.2's
-trigger-1 partitioning swap in particular is still an open decision — the PT* evidence
-gathered 2026-07-25 argues against it. Confirm what was approved before T4B.2 proceeds.**
+**Phase 4B was approved by the operator on 2026-07-25.** The "awaiting operator sign-off"
+text that stood in the status row was written *before* that approval and was simply never
+updated; `ARCHITECTURE.md` recorded the approval correctly at the time. There is no dispute
+about approval — only a stale status line, now corrected here and in `ARCHITECTURE.md`.
+
+**The one Phase 4B decision that remains genuinely open is T4B.2**, the trigger-1
+partitioning swap — and it is open because it has not been executed, not because its
+approval is unclear. The parser and an opt-in path were built; the swap itself was not made.
+The PT* evidence gathered 2026-07-25 argues **against** making it: SWAN's watershed method
+resolved a single partition in 95.2% of rows at this site, where the current
+`decompose_spectrum()` finds 3–5, so swapping would flatten the multi-swell structure the
+spot actually has. The same-timestep comparison that would settle it has not been run, and
+must not be run through `parse_table_pt_partitions()` until that function's absent-partition
+handling is fixed (it treats a real 0.00000 as a present partition — see the brief).
 
 ### Phase 4 — COMPLETE
 
