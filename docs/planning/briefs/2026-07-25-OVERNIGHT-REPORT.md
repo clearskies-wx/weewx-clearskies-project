@@ -197,6 +197,60 @@ It needs the dropped arrays, so a cache lookup there could never hit, and dead c
 reads as working caching to the next person. It was never part of the problem — 1 call per
 request, not 67–72.
 
+### Verified live, and the size estimate was wrong
+
+The precompute works — `swelltrack` is populated with 73 timesteps, 32 transects each, all
+expected fields present. Cycle cost went 1238s → 1488s, so the precompute adds ~4 minutes.
+
+**But the 5.2 KB/timestep estimate was wrong. Real is ~34 KB — a 6.7× miss.** Both the agent's
+measurement and my independent verification of it used *synthetic* transects, and reproduced the
+same error; real `per_partition` and break-point lists are far heavier than the stand-ins. The
+codec is correct — the sizing method wasn't. Actual `swelltrack` cost: **2.48 MB/spot/cycle**,
+not 0.37 MB.
+
+---
+
+## 4b. UNEXPECTED — the forecast cache went 1.3 MB → 27 MB, and it is NOT the caching change
+
+From the persist log:
+
+| Cycle | Deployed | Cache |
+|---|---|---|
+| through 10:14:10 | `ce4415b` | **1.3–1.5 MB** |
+| 10:43:36 | `a1fa14f` | **22.3 MB** |
+| 11:16:20 | `cde804e` | **27.1 MB** |
+
+The 21 MB jump happened *before* the caching change. Per-key at 27.05 MB (one spot):
+
+| Key | Size |
+|---|---|
+| `spectral` | **23.78 MB** — of which `handoff_by_transect` is 310 KB × 73 ≈ 22.6 MB |
+| `swelltrack` | 2.48 MB (the new cache) |
+| `forecast` | 0.61 MB |
+| `transect` | 0.19 MB |
+
+**Cause: librewxr was pinned at `ce4415b`, behind origin.** My deploy pulled 8 commits,
+including Agent A's T4B per-transect handoff work that had been committed locally but never
+deployed (`4492927`, `4dd8964`, `e9a1047`). Each of 32 transects now carries **its own 2D
+spectrum** per timestep (32 freqs × 36 dirs = 8.93 KB). 32 × 73 × 8.93 KB ≈ 20.9 MB.
+
+**This is the feature you approved, working as designed. It is not a defect.** But nobody sized
+it — the same class of problem the agent caught for the swelltrack cache, except this one went
+live unmeasured.
+
+### Operational exposure — measured, currently working, will not scale
+
+- weewx polls `GET /surf/{spot}/forecast` **every ~62 seconds** (`_remote_health_loop`).
+- Each poll now transfers **~27 MB instead of ~1.3 MB**. All 200 OK, inside the 30 s timeout
+  (`swan.py:1051`). That is roughly **39 GB/day of LAN transfer for a single spot.**
+- It scales linearly with spots. **At 5 spots that is ~135 MB per cycle on disk and ~135 MB
+  every 62 seconds over the wire.** That will not hold, and it needs your decision before any
+  more spots are configured.
+
+This is arguably the most consequential thing I found tonight, and I want to be clear I found it
+by accident — I was verifying the caching change's size and the total didn't add up. Nothing was
+watching this.
+
 ---
 
 ## 5. PT* partition data — first real data for the trigger-1 decision
@@ -267,20 +321,26 @@ been empty, which could shift downstream physics. Your call in the morning.
 
 | Item | State |
 |---|---|
-| librewxr repo | `a1fa14f` (`cde804e` pending deploy — see below) |
+| librewxr repo | **`cde804e`** — both services restarted onto it 10:48:19 |
 | weewx repo | `eca80ee`, untouched |
-| `origin/main` (api) | `a1fa14f` |
-| meta repo | `2f349d3` — **local only, NOT pushed** |
+| `origin/main` (api) | **`cde804e`** |
+| meta repo | local commits through `ad2e81d` |
 | `omp_num_threads` | **6** |
-| SWAN service | active |
-| Compute service | active, NOT yet restarted onto `cde804e` |
+| SWAN service | active — last cycle 1488s, 1/1 spot cached |
+| Compute service | active on `cde804e`, health 200 |
 | Caller watcher | running → `/tmp/compute_callers.log` |
 | PT*/SPEC data | preserved at `/home/claude/p4b/` |
+| Forecast cache | **27 MB** (was 1.3 MB) — see §4b |
+
+Two full cycles completed cleanly after the thread fix (1238s, 1488s), both caching
+`1/1 spot(s)`. The model is running and producing output.
 
 ---
 
 ## 8. What I recommend you decide first
 
+0. **The 27 MB forecast cache and the 62-second poll (§4b).** Highest-consequence item. It works
+   today for one spot and will not survive five. Decide before adding spots.
 1. **Hotstart: fix the scheduling, or drop it.** Root cause is established (timestamp, not
    syntax). Either write the hotfile at the next cycle's start time, chain windows forward, or
    remove the feature and stop writing 113 MB/cycle for nothing. Architectural — your call.
