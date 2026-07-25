@@ -119,15 +119,37 @@ Meta repo (`c:\CODE\weather-belchertown\`) default branch: **master**.
 
 Owner: `ubuntu`. Container IP: `192.168.2.113` (DHCP/SLAAC on `br-vlan2`).
 
-### librewxr (compute host)
+### librewxr (compute host) — **this is where SWAN runs**
 
 ```
 /home/ubuntu/repos/
-  weewx-clearskies-api/                # API repo (used by SWAN service for provider modules)
-  weewx-clearskies-swan-swelltrack/    # SWAN standalone service (port 8767, systemd: weewx-clearskies-swan)
+  weewx-clearskies-api/                # API repo — provides the venv BOTH services run from,
+                                       # and the compute service's own code
+  weewx-clearskies-swan-swelltrack/    # SWAN standalone service package
 ```
 
 Owner: `ubuntu`. Host IP: `192.168.7.22`. SSH: `ssh -F .local/ssh/config librewxr`.
+
+**SWAN is split out of the API. It does not run on the weewx host and it does not run on
+weather-dev.** Verified running on librewxr 2026-07-25:
+
+| systemd unit | Port | ExecStart module | What it computes |
+|---|---|---|---|
+| `weewx-clearskies-swan.service` | 8767 | `weewx_clearskies_swan` | SWAN 3-level nested grid |
+| `weewx-clearskies-compute.service` | 8770 | `weewx_clearskies_api.services.compute_service` | SwellTrack + SurfBeat strip |
+
+Both run from the **same interpreter**:
+`/home/ubuntu/repos/weewx-clearskies-api/.venv/bin/python`. The SWAN binary is at
+`/usr/local/bin/swan`. Both load `/etc/weewx-clearskies/secrets.env`, and the SWAN unit reads
+`/etc/weewx-clearskies/api.conf`.
+
+Two consequences that catch people out:
+
+- The **compute service is API-repo code running on librewxr.** A change to
+  `weewx_clearskies_api/services/` that the compute service imports takes effect on librewxr,
+  not on the weewx host. Test it there.
+- Because both services run from the API repo's venv, **the API repo checkout on librewxr is
+  the one that matters for any SWAN, SwellTrack, SurfBeat, or surf-endpoint change.**
 
 ## SSH access
 
@@ -190,27 +212,67 @@ The API cache warmer takes ~2 minutes. `deploy-api.sh` waits 130 seconds after r
 
 ## Common commands
 
-### Run pytest (api repo)
+### Which host runs which tests — check this before running anything
+
+There is **no maintained API-repo checkout on weather-dev.** `sync-to-weather-dev.sh`
+deliberately refuses the API repo (`Unknown repo 'weewx-clearskies-api'`) because the API
+belongs with weewx. A stale, unmanaged clone exists there — **do not use it, and do not
+report a result from it.** It was last seen at `ba3af8f`, unrelated to any current branch.
+
+| Change touches… | Test on | Why |
+|---|---|---|
+| SWAN, SwellTrack, SurfBeat, surf endpoint, beach profile, marine providers | **librewxr** | This is where SWAN and the compute service actually run, and where the SWAN binary is installed |
+| Condition modules (haze, calibration, sky, fog), archive/DB, general API | **weewx** | The API is installed natively here and reads the weewx archive |
+| Dashboard, config UI | **weather-dev** | Dashboard build + Caddy live here |
+
+### Deploy before you test — a container test proves nothing about an unpushed edit
+
+Every deploy path pulls **from GitHub**. Local commits are invisible to every container until
+pushed. A pytest run on a container whose checkout predates your commit is measuring old code,
+and reporting it as verification is a false-clean result.
 
 ```bash
-ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-api && uv run pytest --tb=short -q"
+# Get the code onto weewx WITHOUT restarting the service (safe mid-phase):
+scripts/deploy-api.sh --no-restart
 ```
 
-Quick summary only (pass/skip/fail counts):
+### Run pytest — librewxr (SWAN / SwellTrack / SurfBeat / surf)
+
+Run as `ubuntu` and with `--frozen`. As any other user `uv` tries to rewrite `uv.lock` and
+fails with `Permission denied (os error 13)`.
 
 ```bash
-ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-api && uv run pytest --tb=no -q 2>&1 | tail -3"
+ssh -F .local/ssh/config librewxr "cd /home/ubuntu/repos/weewx-clearskies-api && sudo -u ubuntu /home/ubuntu/.local/bin/uv run --frozen pytest tests/test_surf_endpoint.py -q"
 ```
 
-### Run a specific test file or marker
+### Run pytest — weewx (general API)
+
+Same `sudo -u ubuntu` + `--frozen` requirement, and `uv` is not on `PATH` over
+non-interactive SSH, so give the full path.
 
 ```bash
-# One file:
-ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-api && uv run pytest tests/test_radar_rainviewer.py -v"
+# Specific files (preferred — never run the full suite, see clearskies-process.md):
+ssh -F .local/ssh/config weewx "cd /home/ubuntu/repos/weewx-clearskies-api && sudo -u ubuntu /home/ubuntu/.local/bin/uv run --frozen pytest tests/test_wave_transform.py -q"
 
-# By marker (e.g., integration tests):
-ssh weather-dev "cd /home/ubuntu/repos/weewx-clearskies-api && uv run pytest -m integration --tb=short"
+# By marker:
+ssh -F .local/ssh/config weewx "cd /home/ubuntu/repos/weewx-clearskies-api && sudo -u ubuntu /home/ubuntu/.local/bin/uv run --frozen pytest -m integration --tb=short"
 ```
+
+### Restart the librewxr compute services
+
+```bash
+ssh -F .local/ssh/config librewxr "sudo systemctl restart weewx-clearskies-swan weewx-clearskies-compute && systemctl is-active weewx-clearskies-swan weewx-clearskies-compute"
+```
+
+### Read SWAN run history on librewxr
+
+```bash
+ssh -F .local/ssh/config librewxr "sudo journalctl -u weewx-clearskies-swan --since '5 days ago' --no-pager | grep -E 'cached|nan_detected|low_valid_fraction'"
+```
+
+Get the **whole timeline** before concluding anything systemic from a single log line — a
+`nan_detected` line next to ten successful runs is an intermittent, not a root cause. That
+mistake has been made twice on this project.
 
 ### Run condition module tests (on weewx, NOT weather-dev)
 
