@@ -23,6 +23,10 @@ set -euo pipefail
 
 REPO_URL="https://github.com/clearskies-wx/weewx-clearskies-api.git"
 REPO_PATH="/home/ubuntu/repos/weewx-clearskies-api"
+# The SWAN standalone service package. Installed into the API repo's venv,
+# which both librewxr services share. Note the directory name and the package
+# name differ: the package is weewx-clearskies-swan.
+SWAN_REPO_PATH="/home/ubuntu/repos/weewx-clearskies-swan-swelltrack"
 SERVICE="weewx-clearskies-compute"
 HEALTH_PORT=8770
 STARTUP_WAIT=10   # compute service starts in <5 seconds (no cache warmer)
@@ -67,7 +71,10 @@ if [ "$skip_pull" = "1" ]; then
 else
     echo "--- [1/4] git clone/pull ---"
     # Check if repo exists
-    if $SSH_CMD librewxr "test -d ${REPO_PATH}/.git" 2>/dev/null; then
+    # The check MUST run as ubuntu: /home/ubuntu/repos is not readable by the
+    # `claude` SSH user, so a bare `test -d` here always fails and the script
+    # falls through to a clone that then aborts on "already exists".
+    if $SSH_CMD librewxr "sudo -u ubuntu test -d ${REPO_PATH}/.git" 2>/dev/null; then
         echo "[repo] pulling latest..."
         run_ubuntu "cd ${REPO_PATH} && git pull --ff-only"
     else
@@ -85,8 +92,32 @@ if ! $SSH_CMD librewxr "which uv" >/dev/null 2>&1; then
     echo "[deps] installing uv..."
     run_root "curl -LsSf https://astral.sh/uv/install.sh | sh"
 fi
-run_ubuntu "cd ${REPO_PATH} && uv sync --frozen 2>&1 | tail -3"
-echo "[deps] ok"
+# DO NOT use `uv sync` here. This venv is SHARED by both librewxr services
+# (see ARCHITECTURE.md: weewx-clearskies-swan.service and
+# weewx-clearskies-compute.service both run
+# ${REPO_PATH}/.venv/bin/python). Two things live in it that `uv sync`
+# treats as strays and PRUNES:
+#
+#   1. The [nearshore]/[marine] extras (xarray, netCDF4, cfgrib, eccodes,
+#      pyproj, shapely). uv.lock contains ZERO occurrences of "nearshore" --
+#      the lockfile was generated without the extras, so `uv sync --frozen`
+#      removes them and `--extra nearshore` errors outright.
+#   2. weewx-clearskies-swan, installed from the sibling
+#      weewx-clearskies-swan-swelltrack repo, which uv.lock knows nothing
+#      about.
+#
+# Running `uv sync --frozen` here on 2026-07-25 stripped all of the above and
+# left the SWAN service importless -- it kept reporting `active` only because
+# the running process still held the old code in memory. `uv pip install`
+# installs into the venv without consulting or rewriting uv.lock.
+run_ubuntu "cd ${REPO_PATH} && uv pip install -e '.[nearshore]' 2>&1 | tail -4"
+run_ubuntu "cd ${REPO_PATH} && uv pip install -e ${SWAN_REPO_PATH} 2>&1 | tail -2"
+echo "[deps] ok (nearshore extras + SWAN package)"
+
+# Fail loudly here rather than at the next service restart.
+echo "--- [2b/4] verify shared-venv imports ---"
+run_ubuntu "${REPO_PATH}/.venv/bin/python -c \"import weewx_clearskies_swan, xarray, netCDF4, cfgrib, eccodes, pyproj, shapely\""
+echo "[deps] shared-venv imports verified"
 
 # --- Step 3: Install/update systemd unit ---
 echo "--- [3/4] systemd unit ---"
