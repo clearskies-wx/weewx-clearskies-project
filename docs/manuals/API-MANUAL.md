@@ -2862,6 +2862,7 @@ The NWS SRF text product's `waterTemp` field (a manually-entered forecaster valu
 | `forecast[].setup` | float \| null | Wave-induced setup. Currently always `null` — SWAN SETUP command removed. Field retained for API contract stability. |
 | `forecast[].breakPoints` | list[object] \| null | QB peak locations — break points along the transect (T3.4) |
 | `forecast[].scoring` | object | 3-factor + 3-penalty scoring breakdown (ADR-096) |
+| `forecast[].modelStatus` | str | `"ok"`, `"no_breaking"`, `"degraded_bulk"`, or `"unavailable"` (`_determine_model_status()`). Replaces the old boolean `degraded` field. `"unavailable"` means this timestep's 1D pipeline result could not be produced — in remote SWAN mode (`[swan] service_url` set) this happens when the `swelltrack` cache entry for that timestep is missing or malformed, and the endpoint does NOT recompute locally: it logs, reports the gap via `POST /report/gap` on the model host, and reports `"unavailable"` (SURF-PUBLISH-RESULTS-ONLY §3.5). In bundled single-host mode (`[swan] service_url` unset, SWAN in-process), the same statuses come from the on-demand 1D pipeline call, unchanged. |
 | `nearshoreModel` | str | `"SWAN + SwellTrack"` (ADR-093/096) |
 | `lastRunTime` | ISO 8601 | When the SWAN run completed |
 | `dataAge` | int | Age of SWAN output in seconds |
@@ -2872,26 +2873,75 @@ The NWS SRF text product's `waterTemp` field (a manually-entered forecaster valu
 
 SWAN always produces multi-timestep output. The dashboard's 72-hour forecast chart shows `breakingFaceHeight` (or `breakingHawaiianHeight` per operator config) — not `swellHeight` or `waveHeightAtBreak`.
 
-### Beach profile endpoint (ADR-097)
+### Beach profile endpoint (ADR-097, corrected 2026-07-25)
 
-`GET /api/v1/surf/{location_id}/profile` returns the cross-shore transect for the current forecast timestep (closest to now).
+**This subsection was rewritten, not incrementally patched.** The previous text (a flat `transect`/`breakPoints` shape, "distance and depth are always in meters") described a response the endpoint has never returned in its current form — confirmed stale against `endpoints/beach_profile.py` independently of the SURF-PUBLISH-RESULTS-ONLY changes below. Specifically wrong: (1) the actual response nests everything under the standard envelope (`data`/`stationClock`/`freshness`/`units`/`generatedAt`, §2) and `data` itself, which the old text never mentioned; (2) the real per-transect fields are `transectIndex`/`isStructureAffected`/`transectBearingDeg`/`transect`(an Hs envelope, not the six-field point list documented)/`breakPoints`(different shape)/`waveShapes`/`surfZones`/`jackingFactors`/`handoffDepthM`/`handoffSourceLevel` — none of which the old table listed; (3) the `transect_index` query parameter (`best`/`all`/integer) was undocumented entirely, including the `all`-mode `profiles` array; (4) distance and depth are NOT always meters — they follow the operator's configured display unit (`_distance_unit()`: foot for a `US` operator, meter otherwise), exactly like `waveHeight`.
+
+`GET /api/v1/surf/{location_id}/profile` returns the 1D (SwellTrack) pipeline's cross-shore output for the forecast timestep closest to now.
+
+**Query parameter:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `transect_index` | str (query) | `"best"` | `"best"` (open transect with the highest face height), `"all"` (array of every transect's profile), or a non-negative integer transect index. HTTP 422 on an unparseable or negative value. |
+
+**Response — `data` object, all modes:**
 
 | Field | Type | Description |
 |---|---|---|
 | `locationId` | str | Location slug |
-| `transect` | list[object] | 10+ points ordered from offshore to shore |
-| `transect[].distanceFromShore` | float | Distance from shore in meters (always meters) |
-| `transect[].depth` | float | Water depth in meters (always meters) |
-| `transect[].waveHeight` | float | Total wave height (HSIGN) in display units |
-| `transect[].swellHeight` | float | Swell-only height (HSWELL) in display units |
-| `transect[].breakingFraction` | float | QB (0–1) — fraction of breaking waves |
-| `transect[].breakingDissipation` | float | DISSURF — breaking dissipation rate |
-| `breakPoints` | list[object] | QB peak locations — break points |
-| `breakPoints[].distanceFromShore` | float | Distance from shore in meters |
-| `breakPoints[].depth` | float | Water depth at break point in meters |
-| `breakPoints[].waveHeight` | float | Wave height at break point in display units |
+| `timestep` | str \| null | ISO-8601 forecast time this profile is for (the timestep closest to now); null when no forecast timestep exists at all |
+| `modelStatus` | str | `"ok"` or `"unavailable"` (SURF-PUBLISH-RESULTS-ONLY §3.6) |
+| `perPartitionBreaks` | list[object] \| null | Per-partition break overlay, serialized from the pipeline's `per_partition_breaks`; null when `modelStatus` is `"unavailable"` |
+| `metadata` | object | See below |
 
-Unit conversion applies to `waveHeight` and `swellHeight` fields. Distance and depth are always in meters (physical positions, not display values). Multiple `breakPoints` entries for multi-break spots (outer bar, inner bar).
+**`transect_index=all`:** `data.profiles` is a `list[object]` — one entry per transect, each shaped as the single-transect fields below — or `null` when `modelStatus` is `"unavailable"`.
+
+**`transect_index="best"` or an integer:** the single-transect fields are merged directly into `data` (not nested under a `profiles` key), or all null when `modelStatus` is `"unavailable"`:
+
+| Field | Type | Description |
+|---|---|---|
+| `transectIndex` | int \| null | Zero-based transect index |
+| `isStructureAffected` | bool \| null | True when this transect crosses a discovered OBSTACLE |
+| `transectBearingDeg` | float \| null | Transect bearing in degrees |
+| `transect` | list[object] \| null | RSS-combined Hs envelope from handoff to shore (per-partition combination, depth-limited saturation applied) |
+| `breakPoints` | list[object] \| null | H/d = gamma crossings with Iribarren number, breaker type, and face height |
+| `waveShapes` | list[object] \| null | Stokes 2nd order / cnoidal / bore surface shape samples from `run_1d_analytical()`, computed on the dominant swell partition |
+| `surfZones` | object \| null | Impact / foam / total / reform-trough zone widths |
+| `jackingFactors` | list[object] \| null | Per-bar `barIndex`/`distance`/`factor` (Hs at bar crest ÷ Hs approach) |
+| `handoffDepthM` | float \| null | This transect's per-hour handoff depth (T4A.9 per-hour selection, not the setup-time placeholder) |
+| `handoffSourceLevel` | str \| null | `"L2"` or `"L3"` — which grid level the handoff spectrum came from |
+
+**`metadata` object (present in both modes, fields null when `modelStatus` is `"unavailable"`):**
+
+| Field | Type | Description |
+|---|---|---|
+| `axisUnits` | object | `{"x": <distance symbol>, "y": <distance symbol>}` |
+| `verticalDatum` | str \| null | Read from the per-spot profile cache. **Known, independently-tracked defect, not addressed by SURF-PUBLISH-RESULTS-ONLY:** this is currently always null, including on `modelStatus: "ok"` responses — the value does not yet reach the API. Do not read a null here as evidence the model has no answer. |
+| `transectCount` | int \| null | Total transects computed for this spot |
+| `openTransectCount` | int \| null | Transects not excluded as structure-affected |
+| `handoffDepthM` | float \| null | Representative handoff depth (the "best" transect's) |
+| `handoffSourceLevel` | str \| null | Representative handoff source level |
+
+**`units` object:** `distance` and `depth` use the operator's configured distance display unit (foot or meter — same resolution path as `group_wave_height`'s unit group); `hs` uses the wave-height display unit. Unit conversion is applied to all wave-height and distance/depth fields; nothing in this response is a fixed physical unit.
+
+**HTTP 404 — configuration error, unchanged behavior:**
+- Location does not exist or does not have `surf` enabled.
+- No surf-spot configuration is present for the location.
+- No transects available (spot not configured, or the shoreline segment has zero length).
+- `transect_index` is an integer with no matching transect in the computed set.
+
+**HTTP 200 with `modelStatus: "unavailable"` and a null payload (SURF-PUBLISH-RESULTS-ONLY §3.6) — model gap, NOT a configuration error:**
+- No SWAN data has been cached for the location yet.
+- No forecast timesteps are available.
+- The 1D pipeline produced no usable output for the requested timestep (degraded, no bathymetric profile loaded yet, or — in remote mode — the model host has no answer for that hour).
+
+A missing profile used to raise HTTP 404 for all of the above, which read as "wrong URL" when the truth was "the model has no answer for this hour." The 200/null response keeps the exact key set a success response for the requested `transect_index` mode would have used (nulled), so a client branches on `modelStatus` alone, never on which keys are present.
+
+**Remote vs. bundled mode (SURF-PUBLISH-RESULTS-ONLY §3.2/§3.5) — the topology condition that changes what this endpoint does at the model-gap boundary:**
+
+- **Remote mode** (`[swan] service_url` set — a separate model host exists, e.g. `librewxr`): this endpoint calls that host's own `GET /surf/{spot_id}/profile?time=<timestep>` (PROVIDER-MANUAL §14.15) instead of running the 1D pipeline here. The model host runs the pipeline against its own full internal spectral data (never the trimmed published forecast view) and returns SI units; **this host performs zero unit conversion input processing beyond what it already does for the response** — it converts and shapes the model host's result, it does not build `specout_data`/`handoff_by_transect` or POST them anywhere. A `None` result (no cached data, 503 from the model host, network error, or a malformed body) becomes the 200/null response above, and a `POST /report/gap` is sent to the model host.
+- **Bundled mode** (`[swan] service_url` unset — no separate model host): the existing in-process 1D pipeline / optional `surf_compute_host` offload cascade runs exactly as before this brief — **this IS the model in this topology, not a fallback**, and this case is unaffected by the remote-mode changes above. It can still yield the same 200/null response on a genuine local pipeline failure (degraded, no bathymetric profile).
 
 ---
 
