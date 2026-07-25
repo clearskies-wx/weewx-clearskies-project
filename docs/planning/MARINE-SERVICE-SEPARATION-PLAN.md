@@ -49,6 +49,7 @@ Full evidence in `c:	mp\marine-sep-P4-scratch.md`.
 | T4A.6 (beach profile shape mismatches a–g) | **DONE** `8e2710f` + dashboard `452d921`/`923dd0c`, plus audit fixes `dcbe9e4` (F2) and `3c7e993` (F3). **Watch item:** item (b)'s jacking annotations render only when jacking factors exist, and the regenerated HB profile produces **zero** of them — see T4A.5 below. |
 | T4A.5 (regenerate caches on librewxr) | **DONE 2026-07-25** — see the T4A.5 results block below for evidence and two recorded deviations. |
 | Adversarial audit + QC Gate 4A | **Audit DONE** — 3 BLOCKERs (F1/F2/F3), all remediated; findings recorded in `briefs/P4A-AUDIT-FINDINGS.md`. Gate assessment pending final end-to-end run. |
+| **Phase 4B** (per-transect grid-derived handoff) | **NOT STARTED — awaiting operator sign-off.** Found 2026-07-25 after Phase 4A: the handoff collapses the 2D field to one point per spot and replicates it across all 32 transects, so the alongshore variation L3 computes is discarded. Also: 50 m station spacing cannot hit the handoff depth (all 73 timesteps clamped), and `decompose_spectrum()` does not conserve energy. Carries trigger 1/3/4 changes. See the Phase 4B section. |
 
 **Defect found 2026-07-25 and folded into T4A.11 — L3-disabled spots currently produce NO data.**
 `swan_runner.py:1525` skips a cluster whose `grid is None`, and the returned result dict is only
@@ -1648,6 +1649,283 @@ deleted.
 - Surf scorer uses SwellTrack face height.
 - CUDEM downloads at apply time, not runtime.
 - Profiles persist across restarts.
+- Auditor: zero unresolved findings.
+
+---
+
+## Phase 4B — Per-Transect Grid-Derived Handoff
+
+**Purpose:** SWAN L3 computes a 2D wave field. The handoff to SwellTrack currently collapses it
+to **one point per spot** and replicates that single value across all transects. Phase 4B makes
+each 1D line take its boundary condition from the grid **at its own location**.
+
+**Origin:** found 2026-07-25 during T4A.5 verification, when the operator asked what the CURVE
+transect was for. Not a Phase 4A regression — a pre-existing hole Phase 4A built inside without
+questioning. The adversarial audit missed it too: check A1 asked whether stations *within* the
+one curve were correctly aligned; nobody asked why there was only one curve.
+
+### The finding — evidence, not inference
+
+**1. One CURVE per spot, not per transect.** `swan_formats.py:1394` loops over **spots**:
+
+```python
+for n, (spot_id, (spot_lon, spot_lat)) in enumerate(spots.items(), start=1):
+    ...
+    f"CURVE '{curve_name}'"        # curve_name = f"CV{n}" — n indexes SPOTS
+```
+
+HB is one spot → **one** cross-shore output line, at the spot pin.
+
+**2. All transects receive that same value.** `endpoints/surf.py:1099`:
+
+```python
+_handoff_by_transect = {
+    _idx: (_handoff_selection.handoff_depth_m, _handoff_selection.source_level)
+    for _idx in range(len(_spot_transects))
+}
+```
+
+A dict comprehension assigning **one** `_handoff_selection` to all 32 keys. "Per-transect" in
+shape only. A transect in the pier's shadow is handed the same unshadowed spectrum as one 150 m
+up the beach, and SwellTrack then faithfully propagates a boundary condition that was never true
+at that location. **The alongshore variation the 2D run spent 1200 s computing is discarded at
+the handoff.**
+
+**3. Station spacing cannot hit the handoff depth.** `spacing_m: float = 50.0`
+(`swan_formats.py:778`) — hardcoded, no config key, no caller override. On HB's ~1:50 nearshore
+slope, 50 m horizontal ≈ **1.4 m of depth**. The two shallowest stations are 0.98 m (the grid
+boundary, correctly excluded by T4A.10) and 2.37 m, with nothing between. Measured on the
+2026-07-25 07:06Z run: **all 73 timesteps clamped**, handoff landing at ~2.25× breaking depth
+instead of the intended 1.3×. This is not a small-conditions artefact — Surfline reported 4–6 ft
+with an active Beach Hazards Statement during that run.
+
+**4. L3-disabled spots are worse.** `swan_runner.py:1858` serves them from
+`_l3_fallback_points_from_dwr()` — a **single ~15 m L2 deep-water reference point** per spot, not
+even per-hour. Note the honest ceiling: L2 is 100 m resolution, so 32 transects spanning ~320 m
+cover ~3 L2 cells. Per-transect sampling from L2 yields ~3 distinct values, not 32. Still right
+to do; the limit is L2's grid, not our sampling. Sampling L2 shallower than 15 m is unreliable at
+100 m cells (the whole surf zone is 2–3 cells wide), which is likely why Amendment 2 §4 chose
+15 m.
+
+**5. Our spectral partitioning does not conserve energy.** `swan_spectral.py:731`, verbatim:
+
+```
+# Neighbourhood: ±4 bins in frequency and direction (≈±40° for 10°/bin grids).
+# No greedy cell exclusion — each peak integrates over its full neighbourhood
+# independently so secondary swell systems are not masked by the dominant peak.
+```
+
+Fixed ±4-bin windows with **no cell exclusion**: windows overlap, so a spectral bin is counted
+into multiple partitions, while bins outside every window are counted into none. Partition
+heights do not sum to total Hs. L3 output has 31 directional bins ≈ 11.6°/bin, so ±4 bins ≈
+**±46°** — the 2026-07-25 sea state (2.9 ft @ 12 s @ 184° and 0.7 ft @ 23 s @ 196°, **12° apart**)
+sits well inside one window and gets smeared, with the 23 s energy double-counted.
+
+### Verified SWAN mechanics — read from the manual and the source, not assumed
+
+Checked against `/tmp/swanuse.txt` (SWAN 41.51 user manual) and `/tmp/swan_src/src/` on librewxr.
+
+**`POINTS` — arbitrary output locations** (manual p. 92). `CURVE` is only a convenience that
+auto-generates evenly-spaced points along a straight line; `POINTS` names exact coordinates:
+
+```
+                     |   < [xp] [yp] >    |
+POINts   'sname'   <                        >
+                     |   FILE  'fname'    |
+```
+
+Coordinates are in the problem coordinate system — **degrees** for spherical, metres for
+Cartesian. Minimum abbreviation `POIN`. **No output-point count limit exists in the manual.**
+
+**`SPECOUT` accepts a POINTS set** (manual p. 108): *"for each location of the output location set
+'sname' (see commands **POINTS**, CURVE, FRAME or GROUP) the 1D or 2D … density spectrum … is to
+be written."* So POINTS behaves identically to CURVE for spectral output. Point output is
+**interpolated from the computational grid** (p. 90; `SWOEXA`/`SWOEXD` in `swanout1.ftn`) — so a
+handoff reads the field *at the transect's coordinates*, better than nearest-cell, at no cost.
+
+**`TABLE` accepts SWAN's own spectral partitioning.** Valid parameters include
+`PTHSIGN|PTRTP|PTWLEN|PTDIR|PTDSPR|PTWFRAC|PTSTEEP` (`swanpre2.ftn:1572`). Partitioning uses the
+**watershed algorithm of Hanson and Phillips (2001)** — every bin assigned to exactly one
+partition, energy conserving, boundaries following the spectrum's own topography. Partition 01 is
+**wind sea**; 02–10 are swells in descending Hs. At most 10 partitions. `PARTIT` is BLOCK-only and
+must not appear in TABLE.
+
+**Column layout and exception values** — from `swanmain.ftn:2649+`. Each keyword expands to 10
+columns; individual partition keywords are rejected ("Use PTHSIGN instead"):
+
+| Keyword | Columns | Exception value |
+|---|---|---|
+| `PTHSIGN` | `HsPT01` … `HsPT10` | `-9` |
+| `PTRTP` | `TpPT01` … `TpPT10` | `-9` |
+| `PTWLEN` | `WlPT01` … `WlPT10` | `-9` |
+| `PTDIR` | `DrPT01` … `DrPT10` | **`-999`** |
+| `PTDSPR` | `DsPT01` … `DsPT10` | `-9` |
+| `PTWFRAC` | `WfPT01` … `WfPT10` | `-9` |
+| `PTSTEE` | `StPT01` … `StPT10` | `-9` |
+
+> **Parser trap, flagged deliberately: `PTDIR` uses `-999`, every other PT variable uses `-9`.**
+> A parser assuming one uniform sentinel will mis-handle absent partitions. Absent partitions
+> carry the exception value — **not** zero and **not** blank.
+
+**`SPECOUT … S`** means *"frequencies above the infragravity frequency cut-off f_ig are taken into
+account. Note: only relevant for surfbeat (IEM) modelling"* — the mechanism for the SurfBeat line.
+
+**Why this makes the design cheap.** `run_1d_analytical()` takes scalars — `hs, tp, direction` —
+not a spectrum, and ADR-093 Amendment 2 states SwellTrack "marches bulk parameters per partition
+and reconstructs no surface." SWAN can therefore hand us exactly what SwellTrack consumes, in
+TABLE. Measured on the 2026-07-25 run: `TABLE_1.txt` = **204 KB** vs `SPEC_1.txt` = **7.4 MB** for
+the same 18 stations × 73 timesteps. A TABLE-based per-transect handoff is ~12 MB even at 60× the
+points, against the ~435 MB a SPECOUT-based one would cost. Output lands on `/var/run` (tmpfs,
+9.4 GB total, 8.9 GB free) — the constraint is parse time and RAM, not disk or bandwidth.
+
+### ⚠ Architectural triggers — operator sign-off required before implementation
+
+Per `CLAUDE.md`, these are architectural and **must be approved in chat, not inferred from this
+document existing**:
+
+| Change | Trigger | Why |
+|---|---|---|
+| Handoff moves from one point per spot to one per transect | **3** — a handoff point moves | Where SWAN stops and SwellTrack starts changes location |
+| `handoff_by_transect` carries distinct values per transect | **4** — data contract | Shape is unchanged (already `dict[int, tuple[float, str]]`, threaded in `69957f7`); the *meaning* changes from "one value replicated" to "N real values" |
+| Replace `decompose_spectrum()` with SWAN's watershed partitioning | **1** — algorithm | A different algorithm assigns energy to partitions. **Recommended** on the energy-conservation evidence above, but it is the operator's call |
+| Station spacing 50 m → L3 grid resolution | **3** — resolution | Approved in chat 2026-07-25 ("this needs to be at the same granularity as the L3 grid") |
+
+**ADR-093 Amendment 2 §2 is written entirely in the singular** and becomes wrong under this
+change. It needs Amendment 3 — see T4B.7.
+
+### T4B.1 — Per-transect handoff point sets
+
+- **Owner:** `clearskies-api-dev`
+- **Files:** `services/swan_formats.py`, `services/swan_domain.py`
+
+**Do:**
+1. Replace the one-CURVE-per-spot emission with `POINTS` per transect. Write the coordinate list
+   to a file and reference it as `POINTS 'sname' FILE 'fname'`; do not inline hundreds of `[xp]
+   [yp]` pairs. Coordinates in **degrees** (the L3 run is spherical).
+2. Per transect, place points covering the depth band that transect's handoff can occupy, at the
+   **L3 grid resolution (10 m)**, not 50 m.
+3. Bound the band using **L2's per-hour Hs**, which is available because L2 completes before L3
+   is written. Bracket generously above and below — L2's Hs is at 15 m and the wave shoals
+   shoreward of that, so the estimate is systematically low and must not be treated as exact.
+4. Emit `TABLE` at the same point set with `DEPTH` and `QB` (needed for selection and T4A.10).
+
+**Accept:** L3 input contains one POINTS set per transect. Point count and total output size
+logged. A spot with N transects produces N distinct point sets.
+
+> **Do NOT use L2's Hs for the final selection** — only to decide which points to declare. See
+> T4B.3.
+
+### T4B.2 — SWAN watershed partitioning ⚠ trigger 1, needs sign-off
+
+- **Owner:** `clearskies-api-dev`
+- **Files:** `services/swan_formats.py`, `services/swan_spectral.py`, `services/surf_1d_pipeline.py`
+
+**Do:**
+1. Add `PTHSIGN PTRTP PTDIR PTDSPR` to the L3 `TABLE` output at the handoff point set.
+2. Parse the 10-column blocks per variable. **Treat `-9` as absent for all, and `-999` as absent
+   for `PTDIR`.** Do not assume a uniform sentinel.
+3. Feed partition 02–10 (swells) and 01 (wind sea) into the existing per-partition SwellTrack
+   path in place of `decompose_spectrum()`'s output.
+4. **Before removing `decompose_spectrum()`**, run both on the same spectra and record the
+   difference in partition count, per-partition Hs, and whether Σ partition m0 equals total m0.
+   That comparison is the evidence for the trigger-1 decision, not a formality.
+
+**Accept:** Partition heights sum to total Hs within tolerance. The 12°-separation case from
+2026-07-25 resolves as two partitions, not one smeared. Comparison table recorded in the plan.
+
+### T4B.3 — Per-transect per-hour selection
+
+- **Owner:** `clearskies-api-dev`
+- **Files:** `services/swan_runner.py` (`_select_l3_handoff_spectra`), `services/transect_handoff.py`
+
+**Do:**
+1. Keep the selection **post-run**, against L3's own TABLE Hs at the declared points — the
+   existing `_select_l3_handoff_spectra()` logic, now run per transect rather than once.
+2. Preserve coordinate-based station matching. Do **not** introduce index-order trust; the audit's
+   A1 concern applies with more force at 32× the stations.
+3. Preserve the boundary-station exclusion and the clamp-with-WARNING. With 10 m spacing the clamp
+   should become rare — **log its rate** so a regression is visible.
+4. Preserve T4A.10's QB assertion, per transect.
+
+**Accept:** `handoff_by_transect` contains N distinct values. Clamp rate logged and materially
+below the 73/73 measured on 2026-07-25.
+
+### T4B.4 — L2 fallback per transect
+
+- **Owner:** `clearskies-api-dev`
+- **Files:** `services/swan_runner.py` (`_l3_fallback_points_from_dwr`)
+
+**Do:** Emit L2 output at each transect's own offshore position rather than one point per spot.
+Keep the ~15 m reference depth (Amendment 2 §4). **Log that L2's 100 m resolution bounds this to
+~3 distinct values across a 320 m spot** — do not present it as full 32-way variation.
+
+**Accept:** L3-disabled spots receive per-transect handoffs. The resolution limit is logged, not
+hidden.
+
+### T4B.5 — SurfBeat line
+
+- **Owner:** `clearskies-api-dev`
+
+**Do:**
+1. **First, read how SurfBeat's output is currently structured.** It is not analogous to the L3
+   handoff: per D5 of `L3-1D-BOUNDARY-DECISIONS-BRIEF.md` the SurfBeat strip deliberately runs
+   15 m → shore and spans the surf zone, because IG energy is generated by breaking.
+2. Then decide the point set. `SPECOUT … S` (IG frequencies above the cut-off) is the relevant
+   mechanism.
+
+**Accept:** SurfBeat output is per-transect or a documented reason why it should not be.
+
+> **Do not guess this one.** It was scoped from the operator's instruction ("and the surfbeat
+> line") before its current structure was read.
+
+### T4B.6 — Wire the distinct values through
+
+- **Owner:** `clearskies-api-dev`
+- **Files:** `services/compute_client.py`, `services/compute_service.py`, `endpoints/surf.py`,
+  `endpoints/beach_profile.py`
+
+**Do:** Remove the dict comprehension that replicates one value. The wire format does **not**
+change — `handoff_by_transect: dict[int, tuple[float, str]]` already exists and is already
+threaded across the compute boundary (`69957f7`). Only the values become real.
+
+**Accept:** All 5 call sites pass distinct per-transect values. `handoffDepthM` differs between
+transects in the beach-profile response.
+
+### T4B.7 — ADR-093 Amendment 3
+
+- **Owner:** `clearskies-docs-author`
+
+**Do:** Record that the handoff is per transect and grid-derived. Amendment 2 §2's singular
+phrasing ("*the* handoff", "*which cell* we read the handoff spectrum from") becomes wrong and
+must be superseded, not silently reinterpreted. State the partitioning decision and its evidence.
+Update `ARCHITECTURE.md` and `PROVIDER-MANUAL.md` in the same commit per the doc-code sync rule.
+
+### T4B.8 — Verify against a real swell
+
+- **Owner:** Coordinator
+
+**Do:** Confirm handoff depths differ across transects, that a shadowed transect receives a
+genuinely different spectrum from an unshadowed one, and that face heights still track Surfline.
+Record the clamp rate.
+
+**Accept:** Per-transect variation demonstrated with real data, not synthetic.
+
+> **Known limit, stated up front:** the large-swell handoff path cannot be verified until a real
+> swell arrives. The 2026-07-25 run spanned Hs 0.01–0.77 m at the handoff. This is a genuine
+> testability gap, not something to paper over — see T8.7.
+
+### QC Gate 4B
+
+- Handoff depth differs across transects for the same spot and hour.
+- A pier-shadowed transect and an open transect receive different spectra.
+- Partition heights sum to total Hs; the 12°-separation case resolves as two partitions.
+- `PTDIR`'s `-999` and the other variables' `-9` are both handled; no partition read as a real 0.
+- Clamp rate logged and materially below 73/73.
+- L3-disabled spots receive per-transect L2 handoffs, with the 100 m resolution limit logged.
+- Coordinate-based station matching preserved; no index-order trust at 32× stations.
+- T4A.10's QB assertion holds per transect.
+- ADR-093 Amendment 3 written; ARCHITECTURE.md and PROVIDER-MANUAL.md match.
+- Face heights still track Surfline.
 - Auditor: zero unresolved findings.
 
 ---
