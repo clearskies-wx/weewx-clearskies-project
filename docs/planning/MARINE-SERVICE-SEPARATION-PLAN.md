@@ -720,6 +720,26 @@ weewx host
 6. Surf endpoint silently falls back to SWAN CURVE K-G/Caldwell formula when SwellTrack returns zero — `degraded=True` but response looks normal with real numbers
 7. Surf scorer always uses SWAN CURVE face height, never SwellTrack face height
 
+**Scope extension (2026-07-25) — the L3/1D boundary decisions.** T4A.3.0's reconstruction
+work surfaced that the 1D-model introduction changed L3's *alongshore* extent and its
+*existence* but never its *cross-shore* extent. L3 therefore still carried the pre-1D
+geometry: offshore edge at the 15 m contour, shoreward edge at the shoreline. The operator
+resolved this directly rather than through T4A.3.0. Decisions are in **ADR-093 Amendment 2**
+and **ADR-095 Amendment 2**; the working-out, including several recorded dead ends, is in
+`docs/planning/briefs/L3-1D-BOUNDARY-DECISIONS-BRIEF.md`.
+
+What changed, and where it lands:
+
+| Decision | Task |
+|---|---|
+| L3 stops before shore; grid frozen at setup but the handoff cell moves per forecast hour | T4A.9 |
+| New silent-failure path from the per-hour handoff needs a runtime assertion | T4A.10 |
+| L3 trigger widens to operator classification; viability test with mandatory logging | T4A.11 |
+| Supplement 4's topographic multipliers double-count L2's refraction — removed | T4A.12 |
+| Two research briefs still describe the pre-1D design | T4A.13 |
+
+T4A.3's L3 sizing steps were rewritten to match and are **no longer blocked**.
+
 **Scratch file:** `c:\tmp\marine-sep-P4A-scratch.md`
 
 ### T4A.1 — Unify beach profile vocabulary (API + dashboard)
@@ -838,7 +858,15 @@ The `_roller_model()` (lines 180-216) IS correctly forward-marching (`Er` accumu
 ### T4A.3.0 — RECONSTRUCT: what the 1D-model introduction was supposed to change vs what was actually coded
 
 - **Owner:** `clearskies-api-dev` (research + written diff only — NO code changes)
-- **Added:** 2026-07-25 by operator direction. **T4A.3 does not start until this closes.**
+- **Added:** 2026-07-25 by operator direction.
+- **SCOPE REDUCED 2026-07-25, and no longer blocks T4A.3.** The boundary questions this task
+  was created to surface were resolved directly with the operator — see ADR-093 Amendment 2,
+  ADR-095 Amendment 2, and `briefs/L3-1D-BOUNDARY-DECISIONS-BRIEF.md`. L3 extent, handoff
+  depth selection, the L3 trigger, and SPECOUT placement are **settled — do not re-derive
+  them.** What remains in scope: the intended-vs-actual diff for the SWAN-side changes this
+  task has not already covered (CURVE role, SurfBeat strip domain, per-level bathymetry), and
+  the full inventory of governing-document statements still describing the pre-1D design
+  beyond the ones already corrected.
 
 **Why this exists.** The operator identified that the introduction of the dual 1D
 models (SwellTrack analytical + SWAN SurfBeat strip) was **half-implemented**. The
@@ -862,7 +890,12 @@ Both of those are pre-1D assumptions still written into the docs and the code.
 
 | Doc | Line | Says | Status |
 |---|---|---|---|
-| `ARCHITECTURE.md` | 98 | L3 "extending 250 m each side of the pin cluster **from shore to 15 m depth**" | **STALE (pre-1D)** |
+> **Table status 2026-07-25:** `ARCHITECTURE.md` 98, this plan's T4A.3, PROVIDER-MANUAL
+> §14.15 and API-MANUAL §17 have been corrected per ADR-093 Amendment 2 / ADR-095
+> Amendment 2. The three brief-level rows below are NOT yet corrected and remain live
+> work for this task.
+
+| `ARCHITECTURE.md` | 98 | L3 "extending 250 m each side of the pin cluster **from shore to 15 m depth**" | ~~STALE (pre-1D)~~ **CORRECTED 2026-07-25** |
 | `ARCHITECTURE.md` | 114 | "L3 **optional** per location (auto-detected from structures). L3 smart-sized around structure clusters (**not entire beach**)" | Correct — **contradicts line 98** |
 | `SURF-ZONE-MODEL-BRIEF.md` | 371 | "**SWAN L3 runs to shore** (current architecture, no changes)." | **STALE (pre-1D)** |
 | `SURF-ZONE-MODEL-BRIEF.md` | 578 | "The 1D model **replaces SWAN L3** for the final leg of wave transformation." | Correct |
@@ -890,9 +923,19 @@ Code state: the *conditional-L3* half IS implemented — `l3_enabled`
    deferral, a partial implementation, or an intentional deviation.
 4. List every governing-document statement that must change, with its exact
    location.
-5. Surface the open questions the documents do **not** settle — in particular:
-   what determines L3's **shoreward** boundary once it no longer runs to shore,
-   and what determines the handoff when there is no L3 at all.
+5. Surface the open questions the documents do **not** settle.
+   **PARTIALLY ANSWERED 2026-07-25 — do not re-litigate these two:**
+   - *What determines L3's shoreward boundary?* The SWAN→SwellTrack handoff
+     surface: breaking-onset contour `max(1.3 * max_hs_m / gamma, 5.0)`
+     displaced seaward by a buffer distance. ADR-093 Amendment 2. The buffer
+     magnitude (N wavelengths) remains open and is the one live sub-question.
+   - *What determines the handoff when there is no L3?* L2's ~15 m deep-water
+     reference — unchanged from ADR-093 Amendment 1, and now the majority case
+     because of the L3 viability test.
+   Still open and in scope for this task: whether L3's **offshore** edge should
+   remain the 15 m contour now that L3's job has narrowed to structure
+   interaction (brief D1), and the 10 m vs 15 m handoff inconsistency between
+   SURF-ZONE-MODEL-BRIEF §2.3.4 and ADR-093 Amendment 1 (brief D3).
 
 **Accept:**
 - A written intended-vs-actual diff delivered to the coordinator, every row
@@ -945,9 +988,34 @@ rewrites T4A.3's grid-sizing steps to match, and implementation starts.
 5. MEDIUM download: CUDEM at L2 resolution (100m) for L2 bounding box
    - CUDEM 1/3 arc-second (~10m) covers this range at most US coasts
       ↓
-6. Size L3 from actual 15m depth contour (FIX: replaces 2.5km fallback)
-   - Per-cluster, shore → max(15m contour, deepest structure + margin)
+6. Size L3 — **AMENDED 2026-07-25 per ADR-093 Amendment 2. L3 does NOT run to shore,
+   and the handoff is NOT a fixed depth.**
+   - Trigger: manmade structure discovered **OR** operator classified the spot as
+     point break / headland / bay break. (Structure-only was the old trigger and
+     could never enable L3 at a point break.)
+   - Offshore edge: actual 15m depth contour (FIX: replaces 2.5km fallback)
+   - **Shoreward edge:** size the grid to reach as far shoreward as it is EVER
+     useful — the SHALLOW end of the year's breaking range, not the deep end.
+     Small-swell days break shallow. Do NOT freeze the edge at
+     `1.3 * max_hs_m / gamma`; that is the largest-swell breaking depth and
+     using it as the handoff was the error corrected on 2026-07-25.
+   - **The handoff itself is per forecast hour, not per setup:**
+     `handoff_depth(hour) = 1.3 * Hs(hour) / gamma` — a 30% margin seaward of
+     that hour's breaking depth. Read the spectrum from whichever cell that
+     lands in. Grid geometry stays frozen at setup; only the sampled cell moves.
+     Grid shoreward reach = the smallest value that expression ever produces for
+     this spot (at HB, ~1.8 m — which spans the pier end to end).
+   - **Then run the L3 viability test:** if the grid cannot reach the feature it
+     exists for (structure or headland), DISABLE L3 for the cluster and **log
+     which feature was unreachable and by how much.** Trigger is necessary, not
+     sufficient. HB Pier's status is UNDETERMINED pending the margin decision —
+     the earlier "HB fails" conclusion followed from the frozen-handoff error.
+   - Setup-time calculation scope: depth-based only (contour positions, slope,
+     breaking depths, spans, extents, relief). NO contour curvature, orientation
+     variation, or automatic break-type detection.
    - Compute structure_zone_depth per spot (deepest structure depth + margin, 0 without structures)
+   - Note: `structure_zone_depth` feeds SwellTrack's fine-zone sizing only
+     (step 9). It can deepen the fine zone; it can never move the handoff.
       ↓
 7. FINE download: CUDEM at L3 resolution (10m) for each L3 cluster bbox
    - CUDEM 1/9 arc-second (~3m) where available; 1/3 arc-second (~10m) elsewhere
@@ -974,7 +1042,14 @@ rewrites T4A.3's grid-sizing steps to match, and implementation starts.
    - Use `download_swan_depth_grid()` with the appropriate bbox and resolution per level. The existing DEM priority chain (operator GeoTIFF → regional OPeNDAP → Great Lakes → CRM fallback) handles coverage gaps.
    - Depth contour identification (steps 3-4) uses the finest available data for each contour's depth range.
 3. **Fix L2 grid sizing** (`_compute_level2` in `swan_domain.py`): replace the hardcoded `offshore_km = 6.0` with actual 30m depth contour identification from the downloaded CUDEM grid. Find the geographic position where depth reaches 30m along the offshore bearing. This distance varies by coast — the current 6km guess is wrong for steep Pacific shelves (~2km to 30m) and gentle Gulf shelves (~30km to 30m).
-4. **Fix L3 grid sizing** (`_compute_level3_cluster` in `swan_domain.py`): replace the 2.5km fallback with actual 15m depth contour identification from the downloaded CUDEM grid. When structures are present, extend to `max(15m contour, deepest structure depth + margin)`. The `offshore_distance_m` now comes directly from the CUDEM grid query — not from the broken 50-point spot profile.
+4. **Fix L3 grid sizing** (`_compute_level3_cluster` in `swan_domain.py`) — **AMENDED 2026-07-25, ADR-093 Amendment 2.** L3 is bounded on BOTH cross-shore sides now.
+   - *Offshore edge:* replace the 2.5km fallback with actual 15m depth contour identification from the downloaded CUDEM grid. `offshore_distance_m` comes directly from the CUDEM grid query — not from the broken 50-point spot profile.
+   - *Shoreward edge:* size to the SHALLOW end of the year's breaking range — the smallest value `1.3 * Hs / gamma` ever produces for this spot. Do NOT freeze the edge at `1.3 * max_hs_m / gamma`; that is the largest-swell breaking depth, and using it as the handoff was the 2026-07-25 error. See ADR-093 Amendment 2 §2.
+   - *Handoff is per forecast hour:* `handoff_depth(hour) = 1.3 * Hs(hour) / gamma` — 30% margin seaward of that hour's breaking depth. Sample the spectrum from whichever cell that lands in. Grid geometry stays frozen at setup; only the sampled cell moves. This does not violate the "grid geometry fixed at setup" rule — no bbox, extent, or resolution changes at runtime.
+   - *Trigger:* manmade structure discovered **OR** operator classification of point break / headland / bay break.
+   - *Viability test:* after sizing, verify the grid reaches the feature it exists for. If it does not, set `grid=None` for the cluster (L3 disabled) and **log at INFO which feature was unreachable and by how much** — a too-shallow grid announces itself at runtime, a too-seaward one is silently indistinguishable from "nothing to model." Same disposition as `l3_enabled="off"`, reached by computation rather than config.
+   - *The handoff is a depth contour; the grid is a rectangle.* The shoreward edge must reach the landward-most excursion of the handoff contour across the cluster's transects.
+   - *The previous instruction — "extend to `max(15m contour, deepest structure depth + margin)`" — is void.* It sized L3 by structure depth, which cannot override the depth at which SWAN stops being reliable. A pier reaching the beach does not make SWAN accurate at the beach.
 5. Compute `structure_zone_depth` per spot — deepest structure depth + margin, or 0.0 when no structures configured.
 6. For each surf spot: extract raw cross-shore profiles along each transect bearing from the FINE download at the DEM's native resolution (~10m at HB, ~3m where 1/9 arc-second available). Then interpolate to variable resolution via `interpolate_profile_pchip(raw_profile, max_hs_m, gamma, structure_zone_depth)` (T4A.2).
 7. Contour search uses each spot's own offshore bearing (not an averaged bearing) — a single averaged transect through a submarine canyon (e.g. Newport Canyon) would mislocate the depth contour. Take the max distance across all spots for the grid boundary.
@@ -989,7 +1064,13 @@ rewrites T4A.3's grid-sizing steps to match, and implementation starts.
 **Accept:**
 - `/setup/apply` executes the full dependency chain: L1 sizing → coarse download → L2 from actual 30m contour → medium download → L3 from actual 15m contour → fine download → profile generation (progress visible to operator).
 - L2 grid boundary set from actual 30m depth contour — not hardcoded 6km.
-- L3 grid boundary set from actual 15m depth contour (or deeper for structures) — not 2.5km fallback.
+- L3 offshore boundary set from actual 15m depth contour — not 2.5km fallback.
+- **L3 does not reach shore**, and its shoreward edge is sized to the shallow end of the breaking range — not frozen at the largest-swell breaking depth.
+- **The handoff is computed per forecast hour** from that hour's breaking depth, sampled just seaward of it. Grid geometry is unchanged at runtime.
+- **L3 viability test runs and is honoured:** a cluster whose grid cannot reach the feature it exists for has L3 disabled, with an INFO log naming what was unreachable and by how much. HB Pier's disposition is whatever the test returns — do not hard-code it either way.
+- **L3 enables on structures OR operator classification** (point break / headland / bay break), not structures alone.
+- **Supplement 4's topographic multipliers are gone** from `wave_transform.py`; the operator's classification now feeds the L3 trigger instead.
+- No SPECOUT is extracted at an L3 boundary cell (ADR-095 Amendment 2).
 - Contour search per-spot-bearing with max distance (not single averaged transect).
 - Raw profiles extracted at native DEM resolution.
 - Profiles are variable-resolution per T4A.2 spec, with fine zone extending to `max(1.3 * max_hs_m / gamma, structure_zone_depth)`.
@@ -1205,8 +1286,137 @@ precomputation block with `surfbeat_enabled=True` and a valid cadence-hour match
 7. **Disk persistence:** verify all profiles survive service restart (SURF-ZONE-MODEL-BRIEF §6.1 + `rules/coding.md` persistence rule).
 8. Silent deferral scan across all modified files.
 
+### T4A.9 — Per-hour handoff cell selection (replaces the fixed handoff depth)
+
+- **Owner:** `clearskies-api-dev`
+- **Files:** `services/transect_handoff.py`, `services/surf_1d_pipeline.py`
+- **Governing:** ADR-093 Amendment 2 §2. Read it before coding — do not work from this summary.
+
+**Problem.** The handoff is currently treated as a single depth fixed at setup. ADR-093
+Amendment 2 replaces this: the grid is frozen at setup, but the cell the handoff spectrum is
+read from moves every forecast hour.
+
+**Do:**
+1. Compute `handoff_depth(hour) = 1.3 * Hs(hour) / gamma` per transect per forecast hour,
+   where `Hs(hour)` is that hour's significant wave height at the transect and gamma = 0.73.
+2. Select the L3 grid cell nearest that depth along the transect, seaward side. This is a
+   lookup against the existing grid — **no regrid, no resize, no bbox change.** Grid geometry
+   stays exactly as `compute_domains()` produced it.
+3. Extract the handoff spectrum from that cell. Where a per-hour cell coincides across
+   transects, deduplicate as the existing SPECOUT logic already does.
+4. **Never sample an L3 boundary cell** (ADR-095 Amendment 2). If the computed depth lands on
+   or outside the grid edge, log WARNING and clamp to the nearest interior cell.
+5. Delete any code path that resolves the handoff from `max_hs_m`. That was the frozen-depth
+   error — it uses the year's largest swell for every hour of the year.
+
+**Accept:**
+- Handoff depth varies across the 72 forecast hours for the same transect.
+- A 1 m hour and a 4 m hour at HB resolve to different cells (~1.8 m vs ~7.1 m depth).
+- `compute_domains()` output is byte-identical before and after a forecast cycle.
+- No remaining reference to `max_hs_m` in handoff selection (profile sizing still uses it —
+  that is correct and stays).
+
+### T4A.10 — Runtime assertion: sampled cell must be out of the breaking zone
+
+- **Owner:** `clearskies-api-dev`
+- **Files:** `services/transect_handoff.py`
+
+**Why this exists.** The per-hour handoff introduces a new silent-failure path. If the hourly
+depth is computed wrong, the sampled cell sits in breaking water, SWAN's Hs there has already
+been dissipated, and the surf output looks like an ordinary small day. Same shape as the
+2026-07-23 incident where 0.01 m Hs was served during a 6–8 ft swell with a valid HTTP 200.
+
+**Do:**
+1. After selecting the cell, assert SWAN's breaking fraction (QB) at that cell is ~0.
+2. On violation: log ERROR with transect, hour, computed depth, actual cell depth, and QB —
+   greppable pattern `SWAN handoff`. Move the sample seaward until QB ~ 0, or fail the hour.
+3. Expose a counter on `/metrics` so repeated violations are visible to the operator.
+4. Never fail silently and never serve a sample from a breaking cell.
+
+**Accept:**
+- Forced-violation drill (inject a shallow handoff) produces the ERROR log and the counter
+  increments.
+- Normal cycle produces zero violations at HB.
+
+### T4A.11 — Widen the L3 trigger and implement the viability test
+
+- **Owner:** `clearskies-api-dev`
+- **Files:** `services/swan_domain.py`, `config/marine_config.py`
+- **Governing:** ADR-093 Amendment 2 §3, §4. Read before coding.
+
+**Do:**
+1. L3 enables when Overpass API discovers a structure **OR** the operator's topographic
+   classification is point break / headland / bay break. Structure-only was the old trigger
+   and could never enable L3 at a point break.
+2. Ensure the classification actually reaches `compute_domains()`. Per
+   `rules/clearskies-process.md`, all inputs affecting grid sizing must be passed in, not
+   applied afterwards — an agent previously added a runtime override rather than fixing the
+   caller, and it produced 0.01 m wave heights.
+3. Size the grid's shoreward reach to the smallest value `1.3 * Hs / gamma` ever produces for
+   the spot.
+4. **Viability test:** verify the grid reaches the feature it exists for. If not, set
+   `grid=None` and **log at INFO which feature was unreachable and by how much.** A grid
+   reaching too far shoreward announces itself at runtime (T4A.10); one stopping too far
+   seaward is silently indistinguishable from "nothing here to model" — the log is what makes
+   it visible.
+5. Setup-time calculation is depth-based only: contour positions, slope, breaking depths,
+   spans, extents, relief. **No contour curvature, orientation variation, or automatic
+   break-type detection** — explicitly out of scope.
+
+**Accept:**
+- A spot classified as a point break with no structures enables L3.
+- A cluster failing the viability test has `grid=None` and an INFO log naming the feature and
+  the shortfall distance.
+- HB Pier's disposition is whatever the test returns — not hard-coded either way.
+
+### T4A.12 — Remove Supplement 4 topographic multipliers
+
+- **Owner:** `clearskies-api-dev`
+- **Files:** `enrichment/wave_transform.py`
+- **Governing:** ADR-093 Amendment 2 §5b; API-MANUAL §17 (already updated).
+
+**Do:**
+1. Remove the multiplicative topographic adjustment (point break ×1.1, headland ×1.2, bay
+   break ×0.9, straight beach ×1.0) from `apply_supplements()`. Removed outright — not made
+   conditional on whether L3 is running.
+2. Retain the operator's classification field in spot config. Its job is now the L3 trigger
+   (T4A.11), not a wave-height adjustment.
+3. These multipliers stand in for refraction SWAN computes. Once L2 existed at 100 m they
+   became double-counting.
+
+**Accept:**
+- `apply_supplements()` applies no topographic multiplier.
+- The classification field still round-trips through wizard, admin, and apply.
+- Supplements 1 and 3 still fire (2 was removed by ADR-095; 4 is removed here).
+
+### T4A.13 — Mark superseded research briefs
+
+- **Owner:** `clearskies-docs-author`
+- **Files:** `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md`,
+  `docs/planning/briefs/SWAN-NESTING-RESEARCH-BRIEF.md`
+
+**Do:** Add superseded banners — do **not** rewrite. These are research records and their
+historical reasoning has value.
+1. SURF-ZONE-MODEL-BRIEF §4 and §9 Option 1: "SWAN L3 runs to shore (current architecture, no
+   changes)" — superseded by ADR-093 Amendment 2.
+2. SURF-ZONE-MODEL-BRIEF §9 Option 3: "Truncate L3 at handoff depth… not recommended" — this
+   now *describes the adopted architecture*. Note the reversal and why.
+3. SURF-ZONE-MODEL-BRIEF §2.3.4: the fixed handoff algorithm and the `min(handoff, 15.0)`
+   clamp — superseded by the per-hour handoff.
+4. SWAN-NESTING-RESEARCH-BRIEF lines 190–237: the depth-of-closure derivation of the 15 m
+   figure. Still correct as the *offshore* edge rationale; mark that it does not govern the
+   shoreward edge.
+
+**Accept:** Each location carries a dated banner naming the superseding ADR. No content
+deleted.
+
 ### QC Gate 4A
 
+- Handoff depth varies per forecast hour; grid geometry unchanged across a cycle.
+- Sampled handoff cell has QB ~ 0 on every transect/hour, with the violation drill proven.
+- L3 enables on operator classification as well as structures; viability test logs shortfalls.
+- No topographic multiplier in `apply_supplements()`.
+- Superseded briefs carry dated banners.
 - One vocabulary for beach profile data: `distance`, `depth`, `hs`, `transect`.
 - Dashboard BeachProfileChart and HeatMapCard render without errors.
 - SwellTrack produces non-zero face heights at HB.

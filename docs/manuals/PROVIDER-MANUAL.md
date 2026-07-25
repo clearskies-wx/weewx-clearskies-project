@@ -1961,6 +1961,51 @@ Per SURF-1D-IMPLEMENTATION-PLAN and SURF-ZONE-MODEL-BRIEF:
 
 **L3 smart sizing around structures.** When L3 is enabled, the L3 bbox is computed from structure positions + shadow zone extent (structure length + 2× structure length downstream in predominant wave direction) + 100m pad. Not the entire beach segment. This means a single pier on a 1km beach produces a ~500m L3 grid.
 
+**L3 does not run to shore, and the handoff is not a fixed depth (decided 2026-07-25; margin still open).** See ADR-093 Amendment 2 for the full decision and its rejected alternatives.
+
+Grid geometry is frozen at setup — that rule is unchanged. But *which cell the handoff spectrum is read from* is a sampling choice, not geometry, and it moves per forecast hour.
+
+```
+At setup:  size the L3 grid to reach as far shoreward as it is EVER useful —
+           down to the shallowest depth any forecast hour's handoff could sit at.
+           Small-swell days break shallow, so this is the SHALLOW end of the
+           breaking range, not the deep end.
+
+Per hour:  breaking depth this hour = Hs(hour) / gamma        # gamma = 0.73
+           read the handoff spectrum just SEAWARD of that contour.
+```
+
+> **Do not freeze the handoff at `1.3 * max_hs_m / gamma`.** That is the breaking depth for the spot's *largest* swell. Holding it there all year hands SwellTrack a long leg SWAN could have carried on ordinary days, and shrinks L3 to a band too thin to reach the structures it exists for. At HB Pier the breaking zone moves between ~1.4 m depth (1 m swell) and ~5.5 m (4 m swell) across a year.
+
+**Margin above breaking — decided: the 1.3 factor, applied per hour.**
+
+```
+handoff depth (this hour) = 1.3 * Hs(hour) / gamma
+grid shoreward reach      = smallest value that expression ever produces here
+```
+
+SwellTrack needs enough room to see the `Hs/d = gamma` crossing inside its own domain rather than on its boundary, and to have an approach value seaward of the outer bar for the jacking factor. It does **not** need wavelengths of shoaling run-up — SWAN has already shoaled the wave, and SwellTrack traverses the nonlinear inner zone regardless of where it starts. A 30% margin on the hour's own breaking depth covers both with no new constant.
+
+The 1.3 factor was never the defect. Feeding it `max_hs_m` and freezing the result was. Per hour at HB: 1 m swell → 1.8 m; 2 m → 3.6 m; 4 m → 7.1 m. Grid must reach ~1.8 m, which spans the pier.
+
+**L3 offshore edge stays at the 15 m contour.** Reopened briefly, then closed — the collapse-to-zero-thickness problem that motivated changing it only existed under the frozen 15 m handoff.
+
+**L3 trigger — structures OR operator classification.** L3 turns on when Overpass API discovers a manmade structure **or** the operator has classified the spot as a point break, headland, or bay break. The old structure-only trigger meant a point break could never enable L3 — the case where 2D refraction matters most and where SwellTrack is least able to help. A point break is defined by alongshore geometry (the shoreline bends, contours fan) and a single cross-shore profile cannot detect it; the operator's classification supplies the answer without new analysis.
+
+**Setup-time calculation scope.** IN: everything depth-based from the apply-time bathymetry — contour positions, local slope, breaking depths, horizontal span between offshore edge and handoff, grid extents and cell counts, profile relief. L3 sizing and the viability test are built on these. OUT: contour curvature, orientation variation along the segment, headland detection, automatic break-type classification.
+
+**L3 viability test at setup.** The trigger is necessary, not sufficient. Size L3, then test it: if the grid cannot reach the feature it was created for, L3 is **disabled** for that cluster and the spot runs L1 → L2 → SwellTrack from L2's ~15 m reference. **The test MUST log which feature was unreachable and by how much** — a grid reaching too far shoreward announces itself at runtime as breaking inside L3, but a grid stopping too far seaward is silently indistinguishable from "nothing here to model."
+
+**HB Pier status is UNDETERMINED** pending the margin decision. An earlier revision of this manual recorded HB as failing the test; that followed from the frozen-handoff error above and is void. A grid reaching ~2 m depth would span the pier end to end.
+
+**Where L3 earns its keep (sizing guidance, not pass/fail).** On steep feature-driven seabed — reef ledges, points, canyon rims — the band between clean water and breaking is a few hundred metres, so a 10 m grid across it is small and resolves 10–50 m features nothing coarser sees. On a gentle sand shelf that band is kilometres wide, the grid is enormous, and what it resolves is sandbars SwellTrack already handles from the depth profile.
+
+**Supplement 4 topographic multipliers are REMOVED.** Point break ×1.1, headland ×1.2, bay break ×0.9, straight beach ×1.0 stood in for refraction the model now computes. They predate nesting — once L2 existed at 100 m it began computing that refraction itself, so they have been double-counting since. Removed outright, not made conditional. The operator's classification is retained as the L3 trigger.
+
+**This depth is the SWAN→SwellTrack handoff surface.** L3's shoreward boundary and the handoff depth are one quantity, not two — no configuration can place the handoff outside the grid. It is also, by construction, the top of SwellTrack's fine-resolution zone (`fine_zone_max_depth`, API-MANUAL §17): SwellTrack's 1–2 m grid begins exactly where SWAN stops.
+
+**Structure geometry never sets this boundary.** Structures determine whether L3 exists, and set its alongshore and offshore extent. They cannot push the shoreward edge past the breakdown depth — a pier that reaches the beach does not make SWAN accurate at the beach. Note that the handoff is a depth *contour* while a SWAN grid is a *rectangle*: the grid's shoreward edge must reach the landward-most excursion of that contour across the cluster.
+
 **Multi-SPECOUT extraction.** Two distinct SPECOUT types per spot:
 
 1. **Deep-water reference SPECOUT (L2):** One per spot at ~15m depth along the central transect bearing. SWAN POINTS + SPECOUT syntax. Feeds the swell display card — pre-nearshore spectrum comparable to NDBC buoy readings.

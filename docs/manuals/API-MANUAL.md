@@ -2495,6 +2495,8 @@ Two formulas supported, configured per-spot via `breaker_formula` in the marine 
 | Shoaling zone | Fine zone max to ~15m | 3–5 m | Shoaling, refraction, bar/trough structure. |
 | Approach zone | > ~15m | CUDEM native (3–10 m) | Minimal wave transformation. |
 
+**Relationship to the SWAN→SwellTrack handoff** (decided 2026-07-25, ADR-093 Amendment 2). `1.3 × max_hs_m / gamma` sizes SwellTrack's fine zone for the spot's **largest** swell — that is correct here, because the cached profile must serve every forecast hour including the biggest. Do not reuse this expression as the handoff depth: the handoff moves per forecast hour with that hour's own breaking depth (`Hs(hour) / gamma`), and freezing it at the largest-swell value was an error corrected on 2026-07-25. The fine zone is a static property of the cached profile; the handoff is a per-hour sampling choice. `structure_zone_depth` can only deepen the fine zone — it never moves the handoff.
+
 The fine zone extends to whichever is deeper: the maximum breaking depth with shoaling margin (`1.3 × max_hs_m / gamma`) or the structure interaction depth (`structure_zone_depth` — deepest structure depth + margin, 0.0 when no structures configured). The 1.3× margin accounts for shoaling amplification before breaking (a 4m offshore swell can break at ~7m depth, not 5.5m). `structure_zone_depth` is 0.0 by default — it only extends the fine zone when structures are present. Structure changes re-trigger profile generation.
 
 The CUDEM source profile is interpolated to the variable-resolution grid using **PCHIP** (Piecewise Cubic Hermite Interpolating Polynomial) — preserves sandbar curvature without overshoot artifacts. The interpolated profile is generated once at spot setup and cached at `/etc/weewx-clearskies/spot_profiles/{spot_id}.json`. SwellTrack reads the pre-interpolated profile from the cache on every call. Structure changes re-trigger profile generation.
@@ -2577,18 +2579,13 @@ Replaced by SWAN native OBSTACLE command. Structure physics are now handled with
 
 Bilinear interpolation using the four surrounding SWAN grid nodes. No operator input required — coordinates already configured.
 
-**Supplement 4 — Topographic wave focusing/sheltering:**
+**Supplement 4 — Topographic wave focusing/sheltering: REMOVED 2026-07-25 (ADR-093 Amendment 2).**
 
-Multiplicative adjustment based on operator-classified feature:
+The multipliers (point break ×1.1, headland ×1.2, bay break ×0.9, straight beach ×1.0) stood in for refraction that SWAN now computes. They predate nested grids: once L2 existed at 100 m it began computing that refraction itself, so these have been double-counting since nesting landed. Applying them on top of a modelled refraction field counts the same physics twice.
 
-| Feature | Multiplier | Effect |
-|---|---|---|
-| Point break | × 1.1 | Wave focusing around headland |
-| Headland | × 1.2 | Refraction enhancement |
-| Bay break | × 0.9 | Sheltering, height reduction |
-| Straight beach | × 1.0 | No modification |
+Removed outright — not made conditional on whether L3 is running.
 
-Operator inputs: topographic feature classification from spot config.
+The operator's topographic classification (point break / headland / bay break / straight beach) is **retained in spot config**. Its job changes: it is now the L3 enable trigger (PROVIDER-MANUAL §14.15), not a wave-height adjustment.
 
 **What is NOT supplemented:** Shoaling, refraction, bottom friction, wave-current interaction. SWAN computes these with its own bathymetry and input currents.
 

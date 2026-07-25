@@ -1,5 +1,5 @@
 ---
-status: Proposed
+status: Accepted
 date: 2026-07-18
 deciders: shane
 supersedes:
@@ -103,6 +103,45 @@ Multiple SPECOUT points per spot (one per unique handoff cell). Deduplicated —
 **Break point authority — amended.** 1D model's H/d = gamma crossing is the primary break point. SWAN's QB retained as diagnostic only.
 
 **Acceptance criteria updated** to reflect multi-transect output shape: SPECOUT per unique handoff cell (not one per spot), 1D model break points as primary authority, face height from H1/10 at break point.
+
+### Amendment 2 (2026-07-25): consequences of L3 no longer running to shore
+
+Per ADR-093 Amendment 2 and `docs/planning/briefs/L3-1D-BOUNDARY-DECISIONS-BRIEF.md`. L3's
+shoreward boundary is now the SWAN→SwellTrack handoff surface (breaking-onset contour plus a
+seaward buffer distance), and L3 is disabled entirely when it cannot reach the structures it
+exists for. Three statements in this ADR are affected.
+
+**Decision 1 (CURVE transect) — amended again.** The original text specifies a transect "from
+~15m depth to ~1m depth." **L3 no longer reaches 1 m depth**, so a CURVE cannot span that
+range. Where L3 exists, the CURVE spans L3's actual extent — offshore edge to the handoff
+surface — and remains diagnostic-only per Amendment 1. It is not a cross-shore profile to the
+beach; SwellTrack owns everything shoreward of the handoff. Where L3 is disabled (the majority
+case, and HB Pier specifically), there is no CURVE at all.
+
+**Decision 1 (K-G/Caldwell at the ~10m depth point) — void.** Already superseded by
+Amendment 1 (K-G applies at SwellTrack's break point). Restated here because the original
+Decision 1 text still carries "K-G/Caldwell applied at the ~10m depth point. HSWELL read at
+~10m," which no longer describes any code path. The ~10 m reference point does not exist in
+the current architecture.
+
+**Handoff SPECOUT placement — amended.** Amendment 1 placed the handoff SPECOUT "at each
+transect's handoff depth" inside the L3 grid. That depth is now L3's own shoreward boundary,
+which means the extraction would sit **on the grid edge** — the same defect the architecture
+already accepts reluctantly at the seaward edge (SURF-ZONE-MODEL-BRIEF §2.3.5), and worse
+here because this is the production boundary condition, not a reference value. The buffer
+distance in ADR-093 Amendment 2 exists partly to resolve this: SWAN computes across the
+buffer, and extraction happens at the handoff position with grid on both sides of it. **No
+SPECOUT may be extracted at an L3 boundary cell.**
+
+**Acceptance criteria affected.** "QB = 0 in deep water, 0–1 in surf zone" can no longer be
+satisfied by L3 output — L3 stops before the surf zone by construction, so QB should be ~0
+at *every* L3 point. A non-zero QB anywhere in L3 now indicates the handoff is too shallow
+and is a **failure signal**, not an expected result. The runtime QB refinement
+(SURF-ZONE-MODEL-BRIEF §2.3.4 Step 4) is the mechanism that detects it.
+
+**Note on status.** This ADR sat at `Proposed` from 2026-07-18 despite its decisions being
+implemented and twice amended. Operator approved and moved to `Accepted` 2026-07-25,
+covering the original four decisions and both amendments.
 
 ## References
 

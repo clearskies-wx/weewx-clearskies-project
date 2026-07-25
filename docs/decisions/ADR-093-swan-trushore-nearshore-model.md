@@ -90,6 +90,144 @@ Per SURF-ZONE-MODEL-BRIEF and SURF-1D-IMPLEMENTATION-PLAN:
 
 **6. Pin-based configuration replaced entirely.** No backwards compatibility needed (no other operators). The shoreline segment replaces `spot_lat`, `spot_lon`, `beach_facing_degrees` with `segment_start_lat/lon`, `segment_end_lat/lon`, and `transect_spacing_m`.
 
+### Amendment 2 (2026-07-25): L3 cross-shore extent, the handoff surface, and the L3 viability test
+
+**Why this amendment exists.** Amendment 1 made L3 optional and smart-sized it *alongshore*
+(its worked example — "a single pier on a 1km beach produces a ~500m L3 grid" — is an
+alongshore number). It never addressed L3's *cross-shore* extent. L3 therefore kept the
+pre-1D geometry: offshore edge at the 15 m contour, shoreward edge at the shoreline. Both
+were derived when SWAN modelled to shore by itself. Neither survives the introduction of
+SwellTrack and the SurfBeat strip. Full analysis:
+`docs/planning/briefs/L3-1D-BOUNDARY-DECISIONS-BRIEF.md`.
+
+**1. L3 does not run to shore.** Its shoreward boundary is the SWAN→SwellTrack handoff
+surface. SwellTrack and the SurfBeat strip model from there to the beach. L3's shoreward
+boundary and the handoff depth are **one quantity, not two** — no configuration can place
+the handoff outside the grid.
+
+**2. The handoff is NOT a fixed depth chosen at setup. The grid is fixed; the extraction
+point moves per forecast hour.**
+
+Grid geometry must be frozen at setup — that rule is unchanged and binding
+(`rules/clearskies-process.md`, "All SWAN grid geometry is fixed at setup time"). But *which
+cell we read the handoff spectrum from* is a sampling choice, not geometry, and it can move
+every forecast hour.
+
+```
+At setup:    size the L3 grid to reach as far shoreward as it is EVER useful
+             (i.e. down to the shallowest depth at which any forecast hour's
+             handoff could sit — small-swell days break shallow)
+
+Per hour:    breaking depth this hour = Hs(hour) / gamma
+             read the handoff spectrum from just SEAWARD of that contour
+```
+
+*Why this replaces the earlier fixed-depth rule.* An earlier draft of this amendment set the
+handoff at `1.3 × max_hs_m / gamma` — the breaking depth for the spot's **largest** swell —
+and held it there all year. That is wrong in both directions. On a typical day it hands off
+far seaward of anything breaking, giving SwellTrack (the weaker model) a long leg SWAN could
+have carried. And it shrinks L3 to a thin band that fails to reach the very structures it
+exists for. The breaking zone at HB Pier moves between roughly 1.4 m depth (1 m swell) and
+5.5 m (4 m swell) across a year; freezing the handoff at the deep end throws away the other
+eleven months.
+
+*The margin above breaking — DECIDED: reuse the 1.3 factor, applied per hour.*
+
+```
+handoff depth (this hour) = 1.3 * Hs(hour) / gamma
+grid shoreward reach      = the smallest value that expression ever produces
+                            for this spot's conditions
+```
+
+SwellTrack needs only enough room to (a) observe the `Hs/d = gamma` crossing inside its own
+domain rather than on its boundary, and (b) have an approach value seaward of the outer bar
+for the jacking factor. It does NOT need wavelengths of shoaling run-up — SWAN has already
+shoaled the wave, and SwellTrack traverses the nonlinear inner zone regardless of where it
+starts. A 30% margin on the hour's own breaking depth satisfies both and introduces no new
+constant.
+
+The 1.3 factor was never the defect. Feeding it `max_hs_m` — the year's largest swell — and
+then freezing the result was. Applied to the hour's actual Hs it moves with conditions:
+1 m swell → hand off at 1.8 m; 2 m → 3.6 m; 4 m → 7.1 m. At HB Pier the grid must therefore
+reach ~1.8 m depth, which spans the pier end to end.
+
+*Rejected, for the record — the Deltares `cg/c < 0.9` criterion.* It was briefly adopted here
+and then withdrawn. That condition governs models which reconstruct a water surface from a
+boundary spectrum (XBeach, SWASH), where imposing a linear spectrum in nonlinear water
+produces a wrong wave train from the first step. SwellTrack marches bulk parameters per
+partition and reconstructs no surface, so the failure mode does not apply. Applying it would
+have pushed the handoff to ~15 m and handed almost the entire transformation to the weaker
+model.
+
+**3. L3 trigger — operator classification, not structure discovery alone.** L3 turns on when
+either a manmade structure is discovered **or** the operator has classified the spot as a
+point break, headland, or bay break. The pre-existing trigger looked only for manmade objects
+via Overpass API, which meant a point break — the case where 2D refraction matters most and
+where SwellTrack is structurally least able to help — could never turn L3 on.
+
+*Why operator classification and not automatic detection.* A point break is defined by
+**alongshore** geometry: the shoreline bends and the depth contours fan around the point. A
+single cross-shore profile cannot see this by construction. Detecting it automatically
+requires analysing how contour orientation varies along the shoreline segment — new analysis
+that is specified nowhere and built nowhere (SURF-ZONE-MODEL-BRIEF §2.6 calls for deriving
+contour orientation for transect placement, and flags it as not yet implemented). The
+operator already supplies the classification and knows the answer. **Decision: use it.**
+
+*Scope boundary — what is and is not in.* **IN:** all depth-based calculation from the
+setup-time bathymetry, which the apply-time chain already produces — depth contour positions,
+local seabed slope, breaking depths, the horizontal span between the offshore edge and the
+handoff, grid extents and cell counts, profile relief. These are expected and required; L3
+sizing and the viability test are built on them. **OUT:** anything that infers *shoreline or
+contour shape* — contour curvature, orientation variation along the segment, headland
+detection, automatic classification of break type. That is new analysis, it is specified
+nowhere, and the operator's classification supplies the same answer today.
+
+**4. L3 viability test at setup.** The trigger is necessary but not sufficient. Compute L3's
+extent, then test it: if the grid cannot reach the feature it was created for — structure or
+headland — L3 provides nothing and is **disabled** for that cluster. That spot runs
+L1 → L2 → SwellTrack from L2's ~15 m reference, as an open beach does.
+
+**When the test disables a grid it MUST log why** — which feature was unreachable and by how
+much. The two failure directions are not equally visible: a grid reaching too far shoreward
+shows up at runtime as breaking inside L3, but a grid that stops too far seaward is silently
+indistinguishable from a legitimate "nothing here to model" result. The log is what makes the
+second one visible.
+
+**5. HB Pier status — UNDETERMINED, pending the margin decision.** An earlier draft recorded
+HB as failing the viability test, on the reasoning that the pier tip (~7 m) and the frozen
+handoff depth (~7.1 m) coincided. That reasoning is void: with a per-hour handoff, the grid
+is sized to reach the shallow end of the breaking range, not the deep end, and a grid
+reaching ~2 m depth would span the pier end to end. **HB Pier may well be viable.** Do not
+carry the "HB is disabled" conclusion forward — it was an artefact of the fixed-depth error.
+
+**5a. Where L3 earns its keep (guidance, not a rule).** On steep, feature-driven seabed —
+reef ledges, points, canyon rims — the band between clean water and breaking is a few hundred
+metres, so a 10 m grid across it is small and resolves 10–50 m features nothing coarser can
+see. On a gentle sand shelf that same band is kilometres wide, the grid is enormous, and what
+it would resolve is sandbars that SwellTrack already handles from the depth profile. Cost and
+value both point the same way. This informs the viability test's sizing but is not itself a
+pass/fail criterion.
+
+**5b. Supplement 4's topographic multipliers are removed.** The hand-entered adjustments
+(point break ×1.1, headland ×1.2, bay break ×0.9, straight beach ×1.0 — API-MANUAL §17)
+stand in for refraction the model now computes. They predate nesting: once L2 existed at
+100 m it began computing that refraction itself, so the multipliers have been double-counting
+since. They are removed outright, not made conditional. The operator's classification is
+retained — its job becomes the L3 trigger (§3), not a fudge factor.
+
+**6. Future direction (noted, not scoped).** A ray-tracing add-on to SwellTrack would supply
+2D shadow geometry at 1D cost, restoring modelled structure shadows without a 2D grid. That
+path removes L3 **permanently** rather than conditionally. L3 work should not be
+over-invested in ahead of it.
+
+**L3's offshore (seaward) edge stays at the 15 m contour — question closed.** It was
+briefly reopened on the reasoning that a fixed 15 m handoff would collapse the grid to zero
+thickness (start at 15, hand off at 15). With a per-hour handoff that collapse cannot happen:
+the grid runs from 15 m down to the shallow end of the breaking range and is thick at every
+spot. The reason to change the offshore edge no longer exists, so it does not change.
+
+**Unchanged by this amendment.** Amendment 1's alongshore smart-sizing rule stands.
+
 ## References
 
 - Supersedes: ADR-084 (NWPS as primary nearshore source with supplementation)

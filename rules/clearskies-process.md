@@ -385,6 +385,10 @@ When the task originated from a user prompt (not a plan-internal round), walk th
 
 **Plain English to the user.** Define every technical term the first time it appears in a conversation. One phrase, not a paragraph. If a reply uses 5+ unfamiliar terms, rewrite.
 
+**Term density — keep it to roughly one technical term per sentence.** Defining a term is not enough. A sentence carrying three or four technical terms at once is hard to process even when every term has been defined and even for a reader who knows all of them — this is why dense terminology is discouraged in academic writing too. Break the sentence up, or carry one idea per sentence and let the next sentence carry the next. Prefer the ordinary word where one exists: "where the model stops" over "the handoff surface," "how far offshore" over "the cross-shore extent," "wave length" over "the characteristic length scale."
+
+**Why (2026-07-25):** During the L3/1D boundary discussion the lead wrote sentences like "N sets how far seaward of the break the handoff sits — but only at L3-enabled spots, because there the handoff **is** L3's shoreward edge." Every term had been defined earlier, but four of them landed in one sentence and the meaning did not come through. The user had to ask "what does N govern?" to get a plain answer. Defined-but-dense is still unreadable.
+
 **One decision thread per reply.** Don't interleave multiple topics. Note side-topics briefly at the end.
 
 **Audit decision completeness before claiming a phase done.** Walk through the surface checklist: data model, database, API contract, external integrations, operational, UI/UX, quality bars, deployment, cross-cutting.
