@@ -2552,7 +2552,7 @@ The NDBC buoy wind exclusion (HARD RULE) is unchanged — NDBC buoy wind is neve
 **Inputs:** SWAN wave data (height, period, direction), spot config (bottom type, slope, structures, topographic feature, coordinates), CUDEM bathymetric profile.
 **Outputs:** Corrected wave height, period, direction at the spot location.
 
-Applies four targeted supplements to correct SWAN limitations. All supplements operate on Hsig BEFORE the face height conversion — they are unchanged from ADR-084.
+Applies two targeted supplements to correct SWAN limitations (originally four — Supplements 2 and 4 have since been removed, see below). The surviving supplements operate on Hsig BEFORE the face height conversion and are unchanged from ADR-084.
 
 **Supplement 1 — Breaker index correction (γ tuning):**
 
@@ -2589,7 +2589,7 @@ The operator's topographic classification (point break / headland / bay break / 
 
 **What is NOT supplemented:** Shoaling, refraction, bottom friction, wave-current interaction. SWAN computes these with its own bathymetry and input currents.
 
-All physics constants (γ bounds, Kt values, topographic multipliers) defined as module-level constants with source citations.
+All physics constants (γ bounds, Kt values) defined as module-level constants with source citations.
 
 ### Surf quality scorer (ADR-096 restructure)
 
