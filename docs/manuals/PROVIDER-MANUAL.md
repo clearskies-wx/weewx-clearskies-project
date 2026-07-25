@@ -1927,7 +1927,7 @@ The stationary quick update now includes a WLEVEL input (current tide at compute
 | Key | Type | Description |
 |---|---|---|
 | `forecast` | `list[dict]` | Serialised `MarineForecastPoint` objects — one entry per transect point per timestep (all timesteps, all transect positions). Grouped by time in `surf.py`. |
-| `spectral` | `list[dict]` | Per-timestep SPECOUT spectral decompositions from SWAN SPECOUT at the ~10m depth point (T3.3). Each entry: `{time, components}`. |
+| `spectral` | `list[dict]` | Per-timestep SPECOUT spectra. Each entry: `{time, freqs_hz, dirs_deg, energy, components}` — `components` is SWAN's own watershed partitioning from the companion TABLE's PT* columns (T4B.2), not a decomposition of `energy`; empty when PT* data was unavailable for that point/timestep. |
 | `transect` | `dict[str, list[dict]]` | Full cross-shore transect per timestep, keyed by ISO-8601 time string (T3.4). Each list entry: `{distanceFromShore, depth, waveHeight, swellHeight, breakingFraction, breakingDissipation}` for one transect point. Used by the beach profile endpoint (T5.1). |
 | `swelltrack` | `dict[str, dict]` | Precomputed 1D (SwellTrack) pipeline result per forecast timestep, keyed by ISO-8601 time string (T4B). See "Precomputed SwellTrack cache" below. |
 | `run_time` | `str` | ISO-8601 UTC timestamp when the SWAN run completed. |
@@ -2043,9 +2043,29 @@ breaking depth instead of the intended 1.3× — in 4–6 ft surf, not marginal 
 
 **Partitioning.** SWAN's own `PTHSIGN`/`PTRTP`/`PTDIR`/`PTDSPR` in `TABLE` supply per-partition
 bulk parameters via the Hanson & Phillips (2001) watershed algorithm, which is energy-conserving.
-`run_1d_analytical()` takes scalars, so this is what SwellTrack actually consumes. See
-`docs/reference/swan-commands-extract.md` for column names and the `PTDIR` `-999` exception-value
-trap.
+`run_1d_analytical()` takes scalars, so this is what SwellTrack actually consumes. This replaces
+a bespoke ±4-bin neighbourhood peak-finder (`decompose_spectrum()`, `services/swan_spectral.py`)
+that measurement against 67 real spectra showed reported one swell system two to five times
+rather than distinct systems (energy closure up to 227% of available energy); that function
+remains in the codebase, unchanged, only for `scripts/compare_partitioning.py`'s direct
+measurement of the two algorithms — it has no production caller (T4B.2, operator-approved
+2026-07-25, deployed to librewxr in `12f9ddc`).
+
+This TABLE PT* output is not limited to the L3 CURVE handoff: the L2 deep-water-reference
+baseline (per spot) and every T4B.4 per-transect-cell point carry the same four columns, so spots
+with no L3 grid also read SWAN's own partitions instead of a recomputed approximation. A (point,
+timestep) with no PT* data available — the TABLE file missing entirely, or its rows not matching
+that point's coordinates within tolerance — degrades to empty components plus a WARNING naming
+the spot and timestep; nothing is recomputed to fill the gap. `frequencyRange` on a
+SWAN-partition-sourced `SpectralWaveComponent` is always `[0.0, 0.0]`: TABLE's bulk PT* output
+carries no per-partition frequency-bin bounds, so the field is not derivable on this path (see
+API-MANUAL §17 `SpectralWaveComponent`).
+
+Absence of a partition slot in real output is signalled by an exact `HsPT0k ≈ 0`, not the
+documented `-9`/`-999` exception value (SWAN's own `HSPMIN = 0.05` m partition floor gives this a
+wide, safe margin). See `docs/reference/swan-commands-extract.md` for column names, the measured
+absence signal, and the exception-value sentinel (checked belt-and-braces, but never the sole
+signal relied on — real output has never emitted it).
 
 **L3-disabled spots** get the same treatment against L2, bounded by L2's 100 m resolution: ~3
 distinct cells across a 320 m spot. That is the honest ceiling and is better than one — but it is
@@ -2080,6 +2100,8 @@ also why higher-resolution bathymetry shoreward of 15 m is a standing limitation
 1. **Deep-water reference SPECOUT (L2):** One per spot at ~15m depth along the central transect bearing. SWAN POINTS + SPECOUT syntax. Feeds the swell display card — pre-nearshore spectrum comparable to NDBC buoy readings.
 
 2. **Handoff SPECOUT (L3 or L2):** One per unique L3 grid cell at each transect's handoff depth. When L3 is enabled, extracted from L3 (includes structure effects). When L3 is disabled, same as the deep-water reference (L2 at 15m). Deduplicated: multiple transects sharing the same grid cell share one SPECOUT. Feeds SwellTrack as boundary condition.
+
+Both SPECOUT types are paired with a companion `TABLE` carrying the PT* watershed columns at the same point (T4B.2). The swell partitions attached to each entry (`multiSwell`, and the partitions SwellTrack runs on) come from that companion TABLE, not from decomposing the SPECOUT energy matrix — SPECOUT's `freqs_hz`/`dirs_deg`/`energy` are retained on the same entry as reference data (e.g. for NDBC-comparable display), but partitioning itself is a separate read.
 
 **OBSTACLE TRANSM correction for pier pilings.** The default TRANSM for `pier` structure type changes from 0.8 to 0.95. Pier pilings are thin relative to wavelength — academic consensus is 5-7% energy loss for pile-supported piers. TRANSM 0.8 treats the pier like a partial breakwater (20% blocked). Corrected TRANSM values by structure type:
 

@@ -1933,7 +1933,7 @@ Single swell system from NDBC spectral decomposition.
 | `period` | float | `group_wave_period` | No | Peak period (Tp = 1/fp) |
 | `direction` | float | — | No | Mean wave direction (energy-weighted circular mean, degrees true north) |
 | `energy` | float | — | No | Zeroth spectral moment m₀ (m²) |
-| `frequencyRange` | list[float] | — | No | [min_hz, max_hz] bounds of this spectral partition |
+| `frequencyRange` | list[float] | — | No | [min_hz, max_hz] bounds of this spectral partition. For NDBC (`spectralComponents`), real bounds from that partition's local-maxima boundaries. **For SWAN (`multiSwell`), always `[0.0, 0.0]`** — SWAN's TABLE PT* bulk output (T4B.2) carries no per-partition frequency-bin bounds, so this field is not derivable on the SWAN path and is emitted as `[0.0, 0.0]` rather than a real value. Do not read the zeros as meaningful, and do not rely on this field for SWAN-sourced components. |
 | `classification` | str | — | No | (locale) `"groundswell"` (period ≥ 12s), `"swell"` (8–12s), `"wind_swell"` (< 8s) |
 
 #### TidePrediction
@@ -2039,7 +2039,7 @@ Surf quality forecast for one spot at one timestep.
 | `conditionsText` | str | — | No | (locale) Natural-language conditions summary |
 | `windQuality` | str | — | No | (locale) "glassy", "offshore", "cross_offshore", "cross", "cross_onshore", "onshore" |
 | `swellDominance` | float | — | No | Ratio of primary swell energy to total energy (0.0–1.0) |
-| `multiSwell` | list[SpectralWaveComponent] | — | Yes | Individual swell systems from SWAN SPECOUT decomposition for this timestep (T3.3/T3.5). `null` when SPECOUT is unavailable. Not populated from NDBC. |
+| `multiSwell` | list[SpectralWaveComponent] | — | Yes | Individual swell systems from SWAN's own watershed partitioning — TABLE PT* output, not a decomposition of the SPECOUT energy matrix (T3.3/T3.5, algorithm replaced by T4B.2). `null` when SPECOUT is unavailable for this timestep, **or** when PT* partition data is unavailable for the point/timestep (TABLE file missing, or no coordinate match within tolerance) — neither case is recomputed. Not populated from NDBC. Every component's `frequencyRange` is `[0.0, 0.0]` (see `SpectralWaveComponent` above). |
 | `scoring` | SurfScoringBreakdown | — | Yes | Per-factor scoring breakdown (see below) |
 | `swellHeight` | float | `group_wave_height` | Yes | SWAN HSWELL at the ~10m depth point (swell-only height, display value). `null` when no transect output. |
 | `breakingFaceHeight` | float | `group_wave_height` | Yes | K-G/Caldwell face height (trough-to-crest) at ~10m depth. `null` when unavailable. |
@@ -2370,13 +2370,17 @@ Four enrichment processors for marine data. Each follows the existing enrichment
 **Data pipeline per forecast timestep (ADR-095 corrected, amended for SwellTrack):**
 
 ```
-SWAN L2 deep-water SPECOUT at ~15m depth
-  → spectral decomposition → N swell partitions
-  → store as multiSwell (deep-water values, comparable to NDBC buoy)
+SWAN L2 deep-water reference point at ~15m depth (POINTS + SPECOUT + TABLE PT*)
+  → SWAN's own watershed partitions from TABLE PT* columns (T4B.2) → N swell partitions
+  → store as multiSwell (deep-water values, comparable to NDBC buoy; frequencyRange always [0.0, 0.0])
 
-SWAN handoff SPECOUT (L3 at structure-affected depth, or L2 at 15m for open spots)
-  → spectral decomposition → N partitions for SwellTrack input
-  → match to canonical partition list from deep-water SPECOUT
+SWAN handoff point (L3 CURVE at structure-affected depth, or L2 at 15m for open spots — SPECOUT + TABLE PT*)
+  → SWAN's own watershed partitions from TABLE PT* columns (T4B.2) → N partitions for SwellTrack input
+  → match to canonical partition list from the deep-water reference point
+
+PT* data unavailable for a given (point, timestep) — TABLE missing, or no coordinate match
+within tolerance — → partitions empty, WARNING logged naming spot and timestep, never recomputed
+(no-silent-fallback rule)
 
 Each partition × each transect → independent SwellTrack run (handoff to shore)
   → Hs at 3-5m CUDEM resolution (friction enabled: cfjon=0.038 swell, 0.067 windsea)
@@ -2445,7 +2449,7 @@ SWAN cross-shore CURVE transect output
 
 | Field | What it is | Source |
 |---|---|---|
-| `swellHeight` | Dominant deep-water swell partition height | Deep-water SPECOUT decomposition at ~15m (L2). Comparable to NDBC buoy reports. |
+| `swellHeight` | Dominant deep-water swell partition height | Deep-water reference point at ~15m (L2), SWAN's own watershed partitions from TABLE PT* (T4B.2). Comparable to NDBC buoy reports. |
 | `waveHeightAtBreak` | Post-supplement total wave height (backward compatible) | HSIGN at break point from SwellTrack (or ~10m SWAN fallback) |
 | `breakingFaceHeight` | Trough-to-crest breaking face height at actual break point | 1.27 × Hs at SwellTrack break point (H1/10 Rayleigh factor). Best peak across open transects. |
 | `breakingHawaiianHeight` | Back-of-wave height (×0.5 of face height) | breakingFaceHeight × 0.5 |
@@ -2460,7 +2464,7 @@ SWAN cross-shore CURVE transect output
 | `setAmplitudeM` | float \| null | IG wave height at shoreline (m). `null` when SurfBeat disabled or unavailable. |
 | `igWaveHeightM` | float \| null | Infragravity significant wave height at shoreline (m). `null` when SurfBeat disabled or unavailable. |
 
-**swellHeight and breakingFaceHeight are now from fundamentally different sources.** `swellHeight` is the dominant deep-water partition from SPECOUT decomposition at ~15m — what's arriving at the coast. `breakingFaceHeight` is H1/10 (1.27× Hs) at the actual break point from SwellTrack — what surfers see. The ratio varies with bathymetry, swell period, and tide.
+**swellHeight and breakingFaceHeight are now from fundamentally different sources.** `swellHeight` is the dominant deep-water partition from SWAN's own watershed partitioning at ~15m (TABLE PT*, T4B.2) — what's arriving at the coast. `breakingFaceHeight` is H1/10 (1.27× Hs) at the actual break point from SwellTrack — what surfers see. The ratio varies with bathymetry, swell period, and tide.
 
 All four fields are present in every response regardless of the operator's `surfHeightDisplay` preference. The API returns all representations; the dashboard selects which to show as primary.
 
@@ -2593,7 +2597,7 @@ Wind input for the surf scorer uses HRRR forecast wind for forecast timesteps (`
 | Sub-factor | Weight within Organization | Effective weight | Source | Scoring |
 |---|---|---|---|---|
 | Wind effect | 50% | 15% | HRRR/station wind | Offshore = best, onshore = worst. Same classification as before. |
-| Swell dominance | 25% | 7.5% | SWAN SPECOUT at ~10m | Ratio of primary swell energy to total energy. Computed from SWAN spectral decomposition, not NDBC. |
+| Swell dominance | 25% | 7.5% | SWAN TABLE PT* at ~10m | Ratio of primary swell energy to total energy, computed over the same watershed partitions as `multiSwell` (T4B.2). Not NDBC. |
 | Directional spread | 15% | 4.5% | SWAN TABLE DSPR at ~10m | < 15° → 1.0, 15–25° → 0.7, 25–35° → 0.4, > 35° → 0.2 |
 | Cross-swell interference | 10% | 3% | SWAN SPECOUT at ~10m | No cross-swell → 1.0, secondary system > 50% primary energy at > 30° angle diff → 0.4 |
 

@@ -119,12 +119,24 @@ number. You cannot request an individual partition — SWAN rejects e.g. `PT02HS
 > *undefined* (dry/masked), not to unused partition slots at a wet point. An empty slot is
 > legitimately zero energy.
 >
-> **Consequence — a parser that skips a slot only on the sentinel will emit phantom
-> partitions.** `services/swan_spectral.py`'s `parse_table_pt_partitions()` currently does
-> exactly this (`if hs is None: continue`, reached only via `_is_pt_exception`), so it would
+> **Consequence — a parser that skips a slot only on the sentinel emits phantom
+> partitions.** A version of `services/swan_spectral.py`'s `parse_table_pt_partitions()` did
+> exactly this (`if hs is None: continue`, reached only via `_is_pt_exception`), which would
 > report 6 partitions per row — 5 of them height 0, period 0, direction 0 — where SWAN
-> actually found 1. Filter on `hs > 0`, not on the sentinel alone. Not yet live: that
-> function has no callers as of 2026-07-25, so this is a latent defect, not a production one.
+> actually found 1.
+>
+> **Fixed in `12f9ddc` (T4B.2, operator-approved 2026-07-25, deployed to librewxr).**
+> `parse_table_pt_partitions()` now treats `HsPT0k ≈ 0` (tolerance `0.0005`, comfortably below
+> SWAN's own `HSPMIN = 0.05` m partition floor) as the PRIMARY absence signal for a slot. The
+> documented `-9`/`-999` exception-value check (`_is_pt_exception`) is still applied too,
+> belt-and-braces, for a SWAN build/config that might emit it — but real output never has, so
+> it is never the only signal relied on. This function is no longer latent: it is the live
+> production source of partitions at every call site that used to call `decompose_spectrum()`
+> — the L2 deep-water-reference baseline and the L3 CURVE handoff (see
+> `docs/manuals/PROVIDER-MANUAL.md` §14.15 and `docs/ARCHITECTURE.md`'s SWAN nearshore model
+> note). `decompose_spectrum()` itself still exists, unchanged, for
+> `scripts/compare_partitioning.py`'s direct measurement of the two algorithms against each
+> other — it has no production caller.
 >
 > **Observed partition counts** (rows with Hs > 0.05, n = 1254): 1 partition in 95.2%,
 > 2 in 4.6%, 3 in 0.2%; slots 4–6 never populated. Energy closure
