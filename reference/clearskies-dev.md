@@ -219,11 +219,15 @@ deliberately refuses the API repo (`Unknown repo 'weewx-clearskies-api'`) becaus
 belongs with weewx. A stale, unmanaged clone exists there — **do not use it, and do not
 report a result from it.** It was last seen at `ba3af8f`, unrelated to any current branch.
 
-| Change touches… | Test on | Why |
+| Change touches… | Run its **tests** on | Runs in **production** on |
 |---|---|---|
-| SWAN, SwellTrack, SurfBeat, surf endpoint, beach profile, marine providers | **librewxr** | This is where SWAN and the compute service actually run, and where the SWAN binary is installed |
-| Condition modules (haze, calibration, sky, fog), archive/DB, general API | **weewx** | The API is installed natively here and reads the weewx archive |
-| Dashboard, config UI | **weather-dev** | Dashboard build + Caddy live here |
+| SWAN, SwellTrack, SurfBeat, surf endpoint, beach profile, marine providers | **weewx** (librewxr has no test deps) | **librewxr** — SWAN service 8767, compute service 8770 |
+| Condition modules (haze, calibration, sky, fog), archive/DB, general API | **weewx** | weewx — API installed natively, reads the weewx archive |
+| Dashboard, config UI | **weather-dev** | weather-dev — dashboard build + Caddy |
+
+**Do not conflate those two columns.** Where code *runs* and where its *tests* run are different
+questions here, and getting them backwards wastes a cycle. SWAN executes on librewxr; its tests
+execute on weewx.
 
 ### Deploy before you test — a container test proves nothing about an unpushed edit
 
@@ -236,27 +240,40 @@ and reporting it as verification is a false-clean result.
 scripts/deploy-api.sh --no-restart
 ```
 
-### Run pytest — librewxr (SWAN / SwellTrack / SurfBeat / surf)
+### Run pytest — always on `weewx`, including for SWAN and surf code
 
-Run as `ubuntu` and with `--frozen`. As any other user `uv` tries to rewrite `uv.lock` and
-fails with `Permission denied (os error 13)`.
+**`librewxr` cannot run tests. It has no test dependencies installed** — `uv run pytest` there
+fails with `error: Failed to spawn: pytest`. It is a runtime host: it *runs* SWAN and the
+compute service, it does not test them. So even though SWAN and SwellTrack execute on librewxr,
+their **tests** run on weewx, which has the full dev environment.
 
-```bash
-ssh -F .local/ssh/config librewxr "cd /home/ubuntu/repos/weewx-clearskies-api && sudo -u ubuntu /home/ubuntu/.local/bin/uv run --frozen pytest tests/test_surf_endpoint.py -q"
-```
+Three things all container test runs need, or they fail in confusing ways:
 
-### Run pytest — weewx (general API)
-
-Same `sudo -u ubuntu` + `--frozen` requirement, and `uv` is not on `PATH` over
-non-interactive SSH, so give the full path.
+1. **`sudo -u ubuntu bash -c '...'`** — wrapping the whole command, not just prefixing `uv`.
+   The `claude` SSH user cannot even `cd` into `/home/ubuntu/repos/`
+   (`Permission denied`), so the `cd` has to be inside the `ubuntu` shell.
+2. **`--frozen`** — without it `uv` tries to rewrite `uv.lock` and dies with
+   `Permission denied (os error 13)`.
+3. **The full path to `uv`** — it is not on `PATH` over non-interactive SSH.
 
 ```bash
 # Specific files (preferred — never run the full suite, see clearskies-process.md):
-ssh -F .local/ssh/config weewx "cd /home/ubuntu/repos/weewx-clearskies-api && sudo -u ubuntu /home/ubuntu/.local/bin/uv run --frozen pytest tests/test_wave_transform.py -q"
+ssh -F .local/ssh/config weewx "sudo -u ubuntu bash -c 'cd /home/ubuntu/repos/weewx-clearskies-api && /home/ubuntu/.local/bin/uv run --frozen pytest tests/test_wave_transform.py -q'"
 
-# By marker:
-ssh -F .local/ssh/config weewx "cd /home/ubuntu/repos/weewx-clearskies-api && sudo -u ubuntu /home/ubuntu/.local/bin/uv run --frozen pytest -m integration --tb=short"
+# A whole directory, when you want to catch test files nobody has been running:
+ssh -F .local/ssh/config weewx "sudo -u ubuntu bash -c 'cd /home/ubuntu/repos/weewx-clearskies-api && /home/ubuntu/.local/bin/uv run --frozen pytest tests/services/ -q --tb=no'"
 ```
+
+**Run the directory, not only the files an agent named.** On 2026-07-25 the targeted files all
+passed while `tests/services/test_swan_runner.py` had 15 collection errors that had been there
+for many commits, because nobody ran that file. A per-file run cannot find a test file that is
+not in the list.
+
+**Windows-vs-Linux divergence is real — the local run is not the verification.** Same date: a
+new test file passed on Windows and failed on Linux, because the code under test had an inline
+`Path("/etc/weewx-clearskies/...")` literal. On Windows that POSIX path resolves harmlessly; on
+Linux it hits the real directory and raises `PermissionError`. Any test touching a config path
+must be isolated to `tmp_path`, and a green Windows run proves nothing about Linux.
 
 ### Restart the librewxr compute services
 
