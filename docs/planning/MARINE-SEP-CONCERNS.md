@@ -64,6 +64,45 @@ does not read as lost. Grounds: `rules/coding.md` §3, no code without a current
 
 ---
 
+## C-17 — `surf_pipeline_timestep.py` depends on a module the plan deletes (DECIDED)
+
+Raised by the Round 2 physics agent; verified by the coordinator at
+`services/surf_pipeline_timestep.py:30-32`, used at lines 228 and 253. It imports
+`ComputeServiceError` and `remote_swelltrack` from `services/compute_client.py` — which §0.6
+puts on the **delete** list as "client for the broken half-service."
+
+The module implements a remote-vs-in-process cascade: try the compute host, fall back to
+computing in-process. **In the marine service there is no remote compute host — the marine
+service is the host** — so the remote branch has no meaning there.
+
+**Decision.** Remove it from Round 2's physics set and hand it to Round 3 together with
+`providers/nearshore/swan.py`. It is the same question as C-11's orchestration-half /
+client-half split, and two modules with one question between them should be decided once, by
+whoever is building the run loop, rather than twice by two agents who cannot see each other's
+work. Round 2's physics set is therefore **13 modules, not 14**.
+
+---
+
+## C-18 — hardcoded weewx-host filesystem paths inside the moved physics modules (OPEN → Round 3)
+
+Found by the Round 2 physics agent while tracing imports; flagged and deliberately not changed,
+which was the right call — these are triggers 5 and 7 (where computation happens, which files
+are persisted).
+
+- `services/swan_runner.py:2055` and `services/surfbeat_runner.py:78` — `/var/run/weewx-clearskies/swan`
+- `services/bathymetry_resolver.py` — `/etc/weewx-clearskies/great_lakes`,
+  `/etc/weewx-clearskies/operator_bathymetry`
+
+These assume the API host's filesystem layout. The marine service runs on librewxr with its own
+layout, and T8.5 explicitly removes several of these paths from the weewx host. Round 3 owns
+the resolution; the full list with line numbers comes out of the physics agent's closeout.
+
+Confirmed **not** an issue: the SWAN binary location. `swan_runner.py` takes it from
+caller-supplied config with no hardcoded path in the module, so T5.6's "SWAN runner can locate
+the SWAN binary" criterion survives a pure port unchanged.
+
+---
+
 ## C-16 — two ocean providers have no `CAPABILITY` declaration (OPEN → resolve at QC Gate 5)
 
 Raised by the Round 2 provider agent, verified by the coordinator against the API source:
@@ -213,10 +252,37 @@ its behaviour; Phase 6 deletes it explicitly. Added to both task lists.
 
 ---
 
-## ⛔ C-15 — BLOCKING, AWAITING OPERATOR: the marine service needs `prometheus-client`
+## ⛔ C-15 — BLOCKING, AWAITING OPERATOR: three dependencies the marine service needs
 
-**Status:** escalated to the operator 2026-07-25. Work on `metrics.py` is stopped. Everything
-else in Round 1 proceeds.
+**Status:** escalated to the operator 2026-07-25. Deliberately batched into **one** question
+rather than three — the answer is very likely the same for all three, and three separate
+escalations is the churn the operator asked to avoid. All other work proceeds.
+
+### The full set
+
+| Dependency | Needed by | Import form | API pins |
+|---|---|---|---|
+| `prometheus-client` | `services/swan_runner.py:40`, `services/transect_handoff.py:61` | unguarded | `==0.25.0` |
+| `scipy` | `services/surf_1d_analytical.py:19` (`ellipj`, `ellipk` — cnoidal wave theory), `enrichment/bathymetry.py:59` (`PchipInterpolator` — the PCHIP profile from T4A.2) | unguarded | `==1.18.0` |
+| `shapely` | `services/shelf_boundary.py:20-21` (`Point`, `shape`, `nearest_points` — GSFM shelf-distance polygon query) | unguarded | `>=2.0` |
+
+All five import sites verified by the coordinator in the source, not taken from an agent
+report. All are **unguarded** — no `try/except ImportError` to fall back on. Every one of these
+modules is on the Phase 5 move list, so the move cannot route around any of them.
+
+**Not affected, deliberately:** `rasterio` and `coastalmodeling_vdatum` in
+`bathymetry_resolver.py` are already `try/except ImportError`-guarded in the source. Preserving
+that is a faithful port, not a new dependency ask. Untouched.
+
+**Standing instruction to every agent while this is open:** port the import lines faithfully
+and **write no shim, stub, no-op class, or `try/except ImportError` wrapper** where the source
+has none. Wrapping an unguarded import to make a module load is the same silent-failure trap as
+a metrics shim — and worse for `scipy`, where a missing `PchipInterpolator` would turn into a
+beach profile that quietly stops being generated rather than an error anyone sees. A module that
+fails loudly at import is the correct, honest state until the operator rules.
+
+**Consequence, tracked:** 5 of the 13 physics modules will not import until this resolves.
+Named individually at closeout, never absorbed into a pass.
 
 **Why it is blocking and why the coordinator did not decide it.** Adding a pip dependency is
 **trigger 7** on the architectural-change list. Neither the agent nor the coordinator may
