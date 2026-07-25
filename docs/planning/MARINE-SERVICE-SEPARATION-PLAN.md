@@ -5,6 +5,72 @@
 **Origin:** User-ordered full audit of the marine/surf system. The audit (documented in `docs/planning/briefs/SURF-MODEL-SEPARATION-BRIEF.md`) found that the ~28,000-line marine system was improperly embedded in the API instead of being a standalone companion service. A partial extraction was attempted (SWAN service on librewxr:8767, compute service on librewxr:8770) but left the surf page empty for 24+ hours due to cascading failures: TLS cert rejection, local SWAN fallback producing no cached data, and two-service fragmentation.
 **Governing brief:** `docs/planning/briefs/SURF-MODEL-SEPARATION-BRIEF.md`
 
+---
+
+## CURRENT STATUS — 2026-07-25 (session handoff)
+
+| Phase | State |
+|---|---|
+| **Phase 1** — Governing doc updates | COMPLETE, QC Gate 1 passed |
+| **Phase 2** — TLS + remote mode | Code landed; QC Gate 2 never formally closed |
+| **Phase 3** — SWAN caching + E2E | **NOT closed.** Root cause is live: see below |
+| **Phase 4** — Marine service repo + scaffold | **COMPLETE. QC Gate 4 CLOSED 2026-07-25** |
+| **Phase 4A** — SwellTrack pipeline + vocabulary | **IN PROGRESS — 3 of 8 tasks done, T4A.3 halted** |
+| Phases 5-8 | Not started |
+
+### Phase 4 — COMPLETE
+
+Repo `weewx-clearskies-marine` created, **private** on GitHub
+(`clearskies-wx/weewx-clearskies-marine`), 7 commits. T4.1-T4.6 all PASS,
+independently verified by the coordinator on weather-dev (Linux, Python 3.12)
+with curl — not on the implementer's platform or with its HTTP client.
+Adversarial audit produced 5 findings: 2 BLOCKER (both fixed and re-verified),
+3 NON-BLOCKING (fixed or tracked to named tasks T5.8 note / T6.4b).
+Full evidence in `c:	mp\marine-sep-P4-scratch.md`.
+
+### Phase 4A — task status
+
+| Task | State |
+|---|---|
+| T4A.1 (API side + dashboard side) | **DONE**, independently verified |
+| T4A.2 (PCHIP profile) | **DONE** |
+| T4A.2b (B-J flux marching + LC-22 exact Qb) | **DONE** |
+| T4A.4 (remove SWAN CURVE fallback) | **DONE**, independently verified |
+| **T4A.3.0** (reconstruct intended-vs-actual) | **NEW — not started. Blocks T4A.3.** |
+| **T4A.3** (CUDEM at apply time) | **HALTED by operator mid-implementation.** Zero commits; ~460 lines uncommitted in the API working tree, disposition undecided. Some of it implements a wrong coordinator instruction — see scratch file. |
+| T4A.5 (regenerate caches on librewxr) | Blocked on T4A.3 |
+| T4A.6 (6 API/dashboard shape mismatches) | Not started |
+| T4A.7 (delete `wave_transform` supplements) | Not started |
+| T4A.8 (SurfBeat `NameError`) | Not started |
+| Adversarial audit + QC Gate 4A | Not started |
+
+### Live production state (verified 2026-07-25, librewxr)
+
+**SWAN is running and discarding its own output.** This is the current root cause
+of the empty surf page, and it predates Phase 4A:
+
+```
+ERROR SWAN convergence FAILED level=level3_0: check=nan_detected, nan_count=1061
+ERROR SWAN L3 cluster 0: skipping hotstart save and cache update
+```
+
+The convergence gate is working correctly — it refuses to cache bad data. The
+NaN cause is **unexplained and unassigned to any task.** Note for T4A.5: success
+cannot be judged by "did SWAN run"; the measure is **whether L3 converges and
+caches.**
+
+### Deployment state — NOTHING DEPLOYED THIS SESSION
+
+- weewx: API at `0d87b28` (behind local `11b5242`). SWAN binary disabled.
+- librewxr: API repo at `bfff1f7`. SWAN + compute services active.
+- weather-dev: dashboard at pre-round commit; marine repo cloned at `9ab0766`
+  for verification only.
+- Local API repo `main` at `11b5242`, **not pushed**.
+- Local dashboard `main` at `20c6e50`, **not pushed**.
+
+---
+
+
 **NO DEFERRAL RULE:** Every task in every phase must be completed and verified before the QC gate closes. "Deferred to v2", "batched with later audit", and "blocked on X" are not acceptable outcomes. If a task cannot be completed, the phase fails and work stops until the blocker is resolved. This rule exists because the SURF-1D-IMPLEMENTATION-PLAN deferred adversarial audits for Phases 2, 3, and 4 — exactly the quality gate that would have caught the issues this plan remediates. The only exception is Surfline comparisons (weather-dependent — clock extends until conditions occur naturally).
 
 ---
@@ -753,6 +819,77 @@ The `_roller_model()` (lines 180-216) IS correctly forward-marching (`Er` accumu
 - Break points at the same locations as before (gamma×d crossing unchanged).
 - Multi-bar profiles show reformation between bars (Hs recovers in troughs).
 - Existing tests pass.
+
+### T4A.3.0 — RECONSTRUCT: what the 1D-model introduction was supposed to change vs what was actually coded
+
+- **Owner:** `clearskies-api-dev` (research + written diff only — NO code changes)
+- **Added:** 2026-07-25 by operator direction. **T4A.3 does not start until this closes.**
+
+**Why this exists.** The operator identified that the introduction of the dual 1D
+models (SwellTrack analytical + SWAN SurfBeat strip) was **half-implemented**. The
+1D models were built, but the SWAN-side consequences were never carried through,
+and the governing documents still describe the pre-1D architecture. This is the
+same half-implementation / silent-deferral failure the NO DEFERRAL RULE at the top
+of this plan exists to prevent — so it is remediated, not worked around.
+
+**The operator's statement of intent (2026-07-25):**
+
+> SWAN fell short as a real wave model — that is why the dual 1D models exist.
+> The SWAN SurfBeat and the SwellTrack analytical models should be modelling
+> **from the end of the L3 grid to shore**. There SHOULD still be an L3 grid —
+> it is not just L1/L2 straight to the 1D models — but L3 may only be needed
+> **when there are obstacles**.
+
+So: **L3 does not run to shore, and L3 is not sized to a fixed 15 m contour.**
+Both of those are pre-1D assumptions still written into the docs and the code.
+
+**Known contradictions already located (starting point, not the full list):**
+
+| Doc | Line | Says | Status |
+|---|---|---|---|
+| `ARCHITECTURE.md` | 98 | L3 "extending 250 m each side of the pin cluster **from shore to 15 m depth**" | **STALE (pre-1D)** |
+| `ARCHITECTURE.md` | 114 | "L3 **optional** per location (auto-detected from structures). L3 smart-sized around structure clusters (**not entire beach**)" | Correct — **contradicts line 98** |
+| `SURF-ZONE-MODEL-BRIEF.md` | 371 | "**SWAN L3 runs to shore** (current architecture, no changes)." | **STALE (pre-1D)** |
+| `SURF-ZONE-MODEL-BRIEF.md` | 578 | "The 1D model **replaces SWAN L3** for the final leg of wave transformation." | Correct |
+| `SURF-ZONE-MODEL-BRIEF.md` | 668 | "SWAN L3's value in the nearshore is the **2D spatial wave energy field** — structure interaction and bathymetric refraction, not wave height accuracy." | Correct |
+| `SURF-ZONE-MODEL-BRIEF.md` | 225 | "At 15 m depth (open beaches), the handoff sits at L3's offshore boundary — L3 has not added independent computation at its own edge." | Correct |
+| This plan, T4A.3 | 791, 797, 825, 838 | "L3: per-cluster, **shore → max(15 m contour, deepest structure + margin)**" | **STALE (pre-1D)** |
+
+Code state: the *conditional-L3* half IS implemented — `l3_enabled`
+(`auto`/`on`/`off`) exists in `marine_config.py` (~438, ~495) and
+`endpoints/setup.py` (~495), and `compute_domains()` honours it (`swan_domain.py`
+~170). The *L3-extent* half is NOT — sizing still targets the 15 m contour with a
+2.5 km fallback.
+
+**Do (research and write-up only — do not modify any source file):**
+1. Read `docs/planning/SURF-1D-IMPLEMENTATION-PLAN.md` (and its archived form if
+   it has moved) in full, plus `SURF-ZONE-MODEL-BRIEF.md`,
+   `SWAN-L3-STABILITY-BRIEF.md`, `SWAN-NESTING-RESEARCH-BRIEF.md`,
+   `1D-MODEL-BENCHMARK-BRIEF.md`, and ADR-093 / ADR-095 / ADR-096 / ADR-097.
+2. Produce an **intended-vs-actual table** covering every SWAN-side change the 1D
+   introduction implied: L3 extent, L3 conditionality, handoff depth selection,
+   CURVE transect role, SPECOUT placement, what SurfBeat's strip domain should
+   span, and the per-level bathymetry each of those needs.
+3. For each row: what the plan/brief/ADR said should happen, what the code
+   actually does today (cite file and line), and whether the gap is a silent
+   deferral, a partial implementation, or an intentional deviation.
+4. List every governing-document statement that must change, with its exact
+   location.
+5. Surface the open questions the documents do **not** settle — in particular:
+   what determines L3's **shoreward** boundary once it no longer runs to shore,
+   and what determines the handoff when there is no L3 at all.
+
+**Accept:**
+- A written intended-vs-actual diff delivered to the coordinator, every row
+  citing file + line for the "actual" column.
+- An explicit list of stale statements in `ARCHITECTURE.md`, this plan, and the
+  briefs.
+- The open questions surfaced to the operator, unanswered — this task does not
+  resolve architecture, it establishes the ground truth for a decision.
+- **Zero source files modified.**
+
+**Then, and only then:** the operator decides the target L3 model, the coordinator
+rewrites T4A.3's grid-sizing steps to match, and implementation starts.
 
 ### T4A.3 — Move CUDEM download to apply time
 
