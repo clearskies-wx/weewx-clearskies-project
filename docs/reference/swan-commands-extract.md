@@ -70,6 +70,45 @@ POINTS 'sname' FILE 'fname'
 | `TIME` | Output time | YYYYMMDD.HHmmss |
 | `DIST` | Distance along a CURVE from the first point | m |
 
+## Spectral partitioning output (PT* quantities)
+
+SWAN partitions the 2D spectrum internally using the **watershed algorithm of Hanson and
+Phillips (2001)** — every spectral bin is assigned to exactly one partition, so the result is
+energy-conserving. **Partition 01 is the wind sea**; partitions 02–10 are swells ordered by
+descending significant wave height. At most 10 partitions.
+
+Valid in both `BLOCK` and `TABLE`. Source: manual p. 106 and `swanpre2.ftn:1572`.
+
+**Each keyword expands to 10 columns.** You cannot request an individual partition — SWAN
+rejects e.g. `PT02HS` with *"Invalid partitioning output specification. Use PTHSIGN instead."*
+
+| Keyword | Column names | What it is | Exception value |
+|---|---|---|---|
+| `PTHSIGN` | `HsPT01` … `HsPT10` | Partition significant wave height (m) | `-9` |
+| `PTRTP` | `TpPT01` … `TpPT10` | Partition relative peak period (s) | `-9` |
+| `PTWLEN` | `WlPT01` … `WlPT10` | Partition average wave length (m) | `-9` |
+| `PTDIR` | `DrPT01` … `DrPT10` | Partition peak wave direction (deg) | **`-999`** |
+| `PTDSPR` | `DsPT01` … `DsPT10` | Partition directional spreading (deg) | `-9` |
+| `PTWFRAC` | `WfPT01` … `WfPT10` | Partition wind fraction (dimensionless) | `-9` |
+| `PTSTEE` | `StPT01` … `StPT10` | Partition wave steepness (dimensionless) | `-9` |
+
+> **PARSER TRAP — `PTDIR` uses `-999`; every other PT variable uses `-9`.** Verified in
+> `swanmain.ftn:2649+` (`OVEXCV` per `IVTYPE`: 100→-9, 110→-9, 120→-9, **130→-999**, 140→-9,
+> 150→-9, 160→-9). A parser assuming one uniform sentinel will read absent partitions as real
+> data. Absent partitions carry the exception value — **not** zero, **not** blank.
+>
+> *Possibly normalisable via `QUANTITY PTDIR excv=-9.` — *unverified*, do not rely on it without
+> testing.*
+
+**`PARTIT` is BLOCK-only.** The manual states it "cannot be used as an output parameter in
+TABLE," and it must not be combined with other parameters in BLOCK.
+
+**Why this matters here:** `run_1d_analytical()` takes scalars (`hs`, `tp`, `direction`), and
+ADR-093 Amendment 2 states SwellTrack "marches bulk parameters per partition and reconstructs no
+surface." So TABLE with PT* quantities supplies what SwellTrack consumes directly, without
+writing and re-partitioning full 2D spectra. Measured 2026-07-25 at HB: `TABLE_1.txt` 204 KB vs
+`SPEC_1.txt` 7.4 MB for the same 18 stations × 73 timesteps.
+
 ## QUANTITY — set output parameters
 
 To set the swell frequency cutoff for HSWELL:

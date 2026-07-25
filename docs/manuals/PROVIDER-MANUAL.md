@@ -1996,6 +1996,47 @@ The 1.3 factor was never the defect. Feeding it `max_hs_m` and freezing the resu
 
 **L3 offshore edge stays at the 15 m contour.** Reopened briefly, then closed — the collapse-to-zero-thickness problem that motivated changing it only existed under the frozen 15 m handoff.
 
+#### §14.15 Amendment: the handoff is per transect, not per spot (Phase 4B, approved 2026-07-25)
+
+Everything above describes the handoff in the **singular** — "*the* handoff", "*which cell* the
+spectrum is read from". That phrasing describes the pre-4B implementation and is being superseded.
+
+**What it was.** One `CURVE` was emitted per *spot*, and the per-hour selection from it was
+replicated across every transect (`endpoints/surf.py` built `handoff_by_transect` as a dict
+comprehension assigning one value to all N keys). A transect inside a pier's shadow received the
+same unshadowed spectrum as one 150 m up the beach. **The alongshore variation the 2D L3 grid
+exists to compute was discarded at the boundary.**
+
+**What it becomes.** Each 1D line reads the wave field at **its own coordinates**. Output points
+are declared with `POINTS 'sname' FILE 'fname'` (arbitrary coordinates, degrees for spherical)
+rather than a single `CURVE`, at the **L3 grid's own 10 m resolution** rather than the previous
+hardcoded 50 m. The handoff then varies in two dimensions: **depth per hour, location per
+transect.** Point output is interpolated from the computational grid (manual p. 90;
+`SWOEXA`/`SWOEXD`), so this samples the field at the transect's position — it is not a regrid.
+
+**Why 50 m had to go.** On HB's ~1:50 nearshore slope, 50 m of horizontal spacing is ~1.4 m of
+depth, so the two shallowest stations were 0.98 m (the grid boundary, correctly excluded) and
+2.37 m with nothing between. Measured 2026-07-25: **all 73 timesteps clamped**, landing at ~2.25×
+breaking depth instead of the intended 1.3× — in 4–6 ft surf, not marginal conditions.
+
+**Partitioning.** SWAN's own `PTHSIGN`/`PTRTP`/`PTDIR`/`PTDSPR` in `TABLE` supply per-partition
+bulk parameters via the Hanson & Phillips (2001) watershed algorithm, which is energy-conserving.
+`run_1d_analytical()` takes scalars, so this is what SwellTrack actually consumes. See
+`docs/reference/swan-commands-extract.md` for column names and the `PTDIR` `-999` exception-value
+trap.
+
+**L3-disabled spots** get the same treatment against L2, bounded by L2's 100 m resolution: ~3
+distinct cells across a 320 m spot. That is the honest ceiling and is better than one — but it is
+also why higher-resolution bathymetry shoreward of 15 m is a standing limitation.
+
+> **SurfBeat is deliberately excluded, and this is not an oversight.** The IEM's biphase evolution
+> equation is derived "under the assumption that the bottom slopes are mild and **alongshore
+> uniform**" (SWAN manual p. 80). Per-transect IG strips would model alongshore variation with a
+> module that assumes none. SurfBeat also runs stationary, on its own regular grid with a
+> west-side offshore boundary and two COMPUTEs — it is not part of the L3 nonstationary run and
+> does not share its output geometry. `surfbeat_runner.py` keeps its own 25 m station spacing.
+> **Do not "fix" SurfBeat to match the L3 handoff. They look alike and are not.**
+
 **L3 trigger — structures OR operator classification.** L3 turns on when Overpass API discovers a manmade structure **or** the operator has classified the spot as a point break, headland, or bay break. The old structure-only trigger meant a point break could never enable L3 — the case where 2D refraction matters most and where SwellTrack is least able to help. A point break is defined by alongshore geometry (the shoreline bends, contours fan) and a single cross-shore profile cannot detect it; the operator's classification supplies the answer without new analysis.
 
 **Setup-time calculation scope.** IN: everything depth-based from the apply-time bathymetry — contour positions, local slope, breaking depths, horizontal span between offshore edge and handoff, grid extents and cell counts, profile relief. L3 sizing and the viability test are built on these. OUT: contour curvature, orientation variation along the segment, headland detection, automatic break-type classification.
