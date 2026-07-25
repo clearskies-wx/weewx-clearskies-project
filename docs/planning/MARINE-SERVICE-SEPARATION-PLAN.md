@@ -1897,6 +1897,71 @@ logged. A spot with N transects produces N distinct point sets.
 **Accept:** Partition heights sum to total Hs within tolerance. The 12°-separation case from
 2026-07-25 resolves as two partitions, not one smeared. Comparison table recorded in the plan.
 
+> ### ✅ EVIDENCE 2026-07-25 — measured, and it settles the trigger-1 question
+>
+> Run against 67 real preserved spectra on librewxr, using `decompose_spectrum()` itself
+> (not a reimplementation). Measures energy closure and pairwise separation — needs no real
+> swell and does **not** touch `parse_table_pt_partitions()`, so the PT* parser defect does
+> not block it.
+>
+> ```
+> ENERGY CLOSURE  sum(component m0) / total m0
+>   all timesteps (n=67):   min 0.672   median 1.626   max 2.271
+>   multi-component timesteps exceeding 105% of available energy: 65/65
+>
+> CLOSEST-PAIR DIRECTION SEPARATION (multi-component timesteps)
+>   min 0.6deg   median 1.6deg   max 4.4deg
+>
+> COMPONENT COUNT distribution: {1: 2, 2: 3, 3: 43, 4: 15, 5: 4}
+>
+> WORST ENERGY CLOSURE — spectrum Hs=0.6012 m, closure=2.271
+>   hs=0.5830 m  tp=10.2 s  dir=206.4 deg
+>   hs=0.5120 m  tp=10.2 s  dir=210.1 deg
+>   hs=0.4680 m  tp=10.1 s  dir=201.1 deg
+> ```
+>
+> **`decompose_spectrum()` does not find multiple swells. It finds one swell and reports it
+> several times.** In the worst case three "swells" share a period to within 0.1 s, sit within
+> 9° of each other, and each is nearly as tall as the whole spectrum. Median closest-pair
+> separation across all multi-component timesteps is **1.6°** — narrower than one 10° direction
+> bin.
+>
+> **Mechanism, from source.** `swan_spectral.py` integrates each peak over a fixed ±4-bin
+> window with, in its own words, "no greedy cell exclusion." The live spectrum has 36
+> direction bins at 10° each, so that window spans **80°**. Adjacent peaks therefore integrate
+> almost the same energy. The 2026-07-25 case the plan cites — 12 s @ 184° and 23 s @ 196°,
+> 12° apart — sits entirely inside one window; this method cannot separate it at any wave
+> height.
+>
+> **This reverses the earlier preliminary read.** The "watershed finds 1, ours finds 3–5" gap
+> was recorded as evidence *against* the swap. It is evidence *against `decompose_spectrum()`*:
+> SWAN reporting one partition is the correct answer, and our 3–5 are duplicates. The 95.2%
+> single-partition figure was additionally depressed by SWAN's hardcoded `HSPMIN = 0.05` floor
+> (`SwanSpectPart.ftn:96`, discard at line 1424) acting on a run whose handoff Hs spanned only
+> 0.01–0.77 m — a floor that is irrelevant at surfable heights.
+>
+> **SWAN partitioning facts, verified from primary sources** (`/tmp/swanuse.txt` line 4837+,
+> `/tmp/swan_src/src/SwanSpectPart.ftn`), correcting secondhand claims made earlier:
+>
+> | Constant | Value | Effect |
+> |---|---|---|
+> | `HSPMIN` | 0.05 m | Partitions below this Hs are discarded outright |
+> | `WSCUT` | 0.333 | Wind-sea fraction cutoff for classification |
+> | `WSMULT` | 1.7 | Wind-sea boundary multiplier |
+> | `IHMAX` | 100 | Flooding levels |
+> | `FLCOMB` | **.FALSE.** | Wind-sea combining is **OFF** — SWAN does not merge wind seas by default |
+>
+> All five are compile-time `PARAMETER`s. They appear **nowhere in the user manual** — not
+> operator-tunable without recompiling. Watershed is **not** strictly energy-conserving in its
+> output: bin assignment is exclusive, but sub-`HSPMIN` partitions are then dropped.
+>
+> **Operator-visible consequence, live today:** the dashboard's multi-swell card is showing
+> the same swell two to five times. Median 3 components where there is 1 real system.
+>
+> **Still to check before the swap lands:** whether the per-partition SwellTrack path is
+> running the 1D model once per duplicate (43 of 67 timesteps report 3 components), which
+> would be redundant compute on top of the display error.
+
 ### T4B.3 — Per-transect per-hour selection
 
 - **Owner:** `clearskies-api-dev`
