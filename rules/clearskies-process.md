@@ -207,7 +207,7 @@ This block is mandatory in every implementation agent prompt. Not optional, not 
 > **Architectural changes — STOP, do not proceed.** You may not make an architectural change. If your task requires one, STOP and report via SendMessage — do not implement it, do not work around it, do not pick an option.
 >
 > A change is architectural if it does ANY of these (mechanical test, not judgment):
-> 1. Changes a physics/mathematical/scientific formula, or a constant, coefficient, threshold or criterion inside one.
+> 1. Changes a physics/mathematical/scientific formula, or a constant, coefficient, threshold or criterion inside one. **This does NOT cover changing how the same equation is solved** — iterative vs closed-form, solver tolerance, vectorisation. Test: does it change *which equation is satisfied*, or only *how precisely/efficiently*? Only the first is architectural. An approximation that does not converge to the original equation IS a formula change and is covered.
 > 2. Deletes, replaces, or rewires a module/component/service, or changes what one is responsible for.
 > 3. Changes a model's domain, grid, boundary, extent, resolution, or handoff point.
 > 4. Changes a data contract between components — field names, shapes, nullability, units crossing a boundary.

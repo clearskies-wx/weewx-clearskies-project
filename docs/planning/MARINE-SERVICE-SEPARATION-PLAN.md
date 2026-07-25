@@ -1158,6 +1158,12 @@ This is a specification, not a rediscovery exercise.
 | e | Single-transect response includes `perPartitionBreaks` (array of `{partitionIndex, periodS, directionDeg, heightM, classification, meanBreakDistanceM, meanFaceHeightM, peakFaceHeightM, meanBreakDepthM, dominantBreakerType}`) and `metadata` (`{axisUnits, verticalDatum, transectCount, openTransectCount}`) | `BeachProfileData` has **neither property at all** | Both silently dropped — not mis-shaped, absent |
 | f | Vertical datum exists **only** at `metadata.verticalDatum`, and is currently **hardcoded `"NAVD88"`** rather than read from DEM metadata | `BeachProfileData.datum?: string \| null` as a **top-level sibling** of `transect` | `BeachProfileChart`'s `datum` prop is always `undefined`; the datum-qualified Y-axis label ("Depth (m, NAVD88)") never renders in production. **The hardcoded datum is itself a defect** — see T4A.3 lead call LC-13 and the coordinator's finding that HB is covered by DEMs in two different datums (NAVD88 and MHW) |
 
+**Added 2026-07-25 — item (g), from the per-hour handoff decision (ADR-093 Amendment 2):**
+
+| # | Problem | Fix |
+|---|---|---|
+| g | The response carries no record of **where the handoff was taken from**. Under the old design that was a fixed setup-time depth, so it was implicit in the config. It is now a per-forecast-hour choice (`1.3 × Hs(hour) / gamma`), which means the same spot hands off at different depths across the 72 hours — and nothing in the response says which. | Add the handoff depth actually used, and the source level (`L3` or `L2`), to the per-hour transect data and to `metadata`. Without it, T4A.10's failure mode is undiagnosable from the API alone: a handoff sampled from a breaking cell returns plausible small numbers, and there is no way to tell that from genuinely small surf. |
+
 **Do:**
 1. For each of (a), (b), (c): decide which side is canonical and align the other.
    Default to the API's shape, matching T4A.1's Decision (the model's vocabulary
@@ -1176,6 +1182,7 @@ This is a specification, not a rediscovery exercise.
   `partitionInfo`), not a lossy flat string.
 - OpenAPI spec documents the agreed shape for all three.
 - No remaining API↔dashboard shape mismatch in the beach profile response.
+- Per-hour handoff depth and source level (L3/L2) present in the response and documented in the OpenAPI spec (item g).
 
 **Not deferrable.** This task is inside Phase 4A and must close before QC Gate 4A.
 It was separated from T4A.1 only because it requires a canonical-shape decision
@@ -1206,7 +1213,28 @@ Two governing documents claim otherwise:
 The supplements have been feeding a formula approximation instead of the model
 they were written for.
 
-**Disposition: DELETE.** `wave_transform.py` is pre-1D-model code (its own docstring
+> **BLOCKED 2026-07-25 — NOT OPERATOR-APPROVED. Do not dispatch this task.**
+>
+> The DELETE disposition below was a coordinator lead call (LC-27, 2026-07-24). Deleting
+> a module is trigger 2 of the architectural block — it is not a call the coordinator
+> may make. This task is **named in `CLAUDE.md`** as the second of the three unapproved
+> architectural changes the hard block was written about: *"ruled to delete
+> `wave_transform.apply_supplements()` — first ruling 'rewire,' then 'delete' — a
+> component-disposition call."* It has sat in the plan since as though approved.
+>
+> Nothing has been built, so nothing is broken. It needs an operator ruling before any
+> agent touches `wave_transform.py`.
+>
+> **The topographic-multiplier portion IS approved** (operator, 2026-07-25) and has been
+> split out to **T4A.12**, which is safe to run whatever is decided here. If this task is
+> later approved in full, T4A.12 becomes a subset of it — run T4A.12 first either way,
+> since it is approved and independently correct.
+>
+> The analysis below is retained: its identification of the double-counting and of the
+> never-executing breaker-correction branch is sound and predates the 2026-07-25 review,
+> which reached the same conclusion independently.
+
+**Disposition: DELETE — PENDING OPERATOR APPROVAL.** `wave_transform.py` is pre-1D-model code (its own docstring
 dates it to "Phase 3, T3.1") written to supplement SWAN's bulk Hs before the
 K-G/Caldwell single-point formula. Every one of its supplements is now either
 superseded or dead:
@@ -1374,6 +1402,12 @@ been dissipated, and the surf output looks like an ordinary small day. Same shap
 - **Owner:** `clearskies-api-dev`
 - **Files:** `enrichment/wave_transform.py`
 - **Governing:** ADR-093 Amendment 2 §5b; API-MANUAL §17 (already updated).
+- **Relationship to T4A.7:** T4A.7 proposes deleting `apply_supplements()` entirely and is
+  **blocked pending operator approval** (it is the LC-27 component-deletion call named in
+  CLAUDE.md). This task is the operator-approved **subset** — the topographic multipliers
+  only. It is safe to run regardless of how T4A.7 is decided, and should run first. T4A.7's
+  own analysis reached the same double-counting conclusion on 2026-07-24, independently of
+  the 2026-07-25 review.
 
 **Do:**
 1. Remove the multiplicative topographic adjustment (point break ×1.1, headland ×1.2, bay

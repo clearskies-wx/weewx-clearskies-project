@@ -47,6 +47,8 @@ These apply regardless of domain.
 **Trigger list — if a change does ANY of these, it is architectural. This is a mechanical test, not a judgment call:**
 
 1. Changes a **physics, mathematical, or scientific formula** — or any constant, coefficient, threshold or criterion inside one.
+
+   **Not covered: changing how the same equation is solved.** Swapping an iterative solve for a closed-form approximation, or the reverse; changing solver tolerance or iteration count; vectorising. The mechanical test: *does the change alter which equation is being satisfied, or only how precisely or efficiently it is satisfied?* Only the first is architectural. A fitted approximation that does **not** converge to the original equation is a formula change and is covered. (Operator ruling 2026-07-25, on LC-22 — the Battjes-Janssen breaking-fraction term was moved from an approximation to an iterative solve of the same implicit relation, matching SWAN's own implementation. Same formula, different arithmetic.)
 2. **Deletes, replaces, or rewires a module, component, or service**, or changes what one is responsible for.
 3. Changes a **model's domain, grid, boundary, extent, resolution, or handoff point** — where one model stops and another starts.
 4. Changes a **data contract between components** — field names, shapes, nullability, or units crossing a boundary.
