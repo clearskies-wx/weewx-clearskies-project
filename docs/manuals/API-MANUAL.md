@@ -2164,7 +2164,7 @@ Summary snapshot for one marine location (used by the marine landing page locati
 
 | Card field | Primary source | Fallback | Unit conversion |
 |---|---|---|---|
-| `waveHeight` | SWAN → `wave_transform.apply_supplements()` (for locations with surf activity, ADR-093/095) | Last successful SWAN cache (any age) → null. No WW3 fallback for surf. | meter → operator `group_wave_height` |
+| `waveHeight` | WaveWatch III first forecast point (offshore, deep-water, 50 km resolution) | NDBC buoy Hs (already-fetched observation) → null. Suppressed (null) for harbor-classified locations. Surf forecasts use SWAN via the dedicated surf endpoint, not this card. | meter → operator `group_wave_height` |
 | `windSpeed` | Station hardware via weewx archive (when `is_station_served()` returns True) | Configured forecast provider `fetch_current_conditions(lat, lon)` | Provider handles conversion |
 | `windDirection` | Same as windSpeed | Same as windSpeed | degrees (no conversion) |
 | `airTemp` | Same as windSpeed | Same as windSpeed | Provider handles conversion |
@@ -2410,9 +2410,8 @@ surf_scorer.score_surf(bestPeakFaceHeight, DSPR, partitions, ...) → quality sc
 SWAN cross-shore CURVE transect output
   → find ~10m depth point on transect
   → HSWELL at ~10m depth → store as swellHeight
-  → HSIGN at ~10m depth → wave_transform.apply_supplements() → corrected Hsig
-  → store as waveHeightAtBreak (backward compatible)
-  → breaker_height.hsig_to_face_height(corrected_hsig, Tp, depth, formula, source="deep_water")
+  → HSIGN at ~10m depth → store as waveHeightAtBreak (backward compatible)
+  → breaker_height.hsig_to_face_height(raw HSIGN, Tp, depth, formula, source="deep_water")
   → store as breakingFaceHeight
   → degraded: true in response
 ```
@@ -2545,56 +2544,27 @@ For SWAN surf forecasts, the wind source is HRRR (the same model run that drove 
 
 The NDBC buoy wind exclusion (HARD RULE) is unchanged — NDBC buoy wind is never used for surf quality scoring regardless of source mode.
 
-#### Wave transform supplements (from ADR-084, unchanged)
+#### Wave transform supplements (from ADR-084; REMOVED 2026-07-25, T4A.7)
 
 **File:** `enrichment/wave_transform.py`
-**Registration:** Against the surf scoring pipeline — runs after SWAN fetch, before breaker height conversion and `surf_scorer.py`.
-**Inputs:** SWAN wave data (height, period, direction), spot config (bottom type, slope, structures, topographic feature, coordinates), CUDEM bathymetric profile.
-**Outputs:** Corrected wave height, period, direction at the spot location.
 
-Applies two targeted supplements to correct SWAN limitations (originally four — Supplements 2 and 4 have since been removed, see below). The surviving supplements operate on Hsig BEFORE the face height conversion and are unchanged from ADR-084.
+All four originally-defined supplements are now gone. `apply_supplements()` no longer exists. What remains in the module is `bilinear_interpolate()` alone, kept for an unrelated live caller — `endpoints/surf.py` uses it to interpolate HRRR wind U/V grid components to a spot's coordinates for surf-quality scoring, not for wave height.
 
-**Supplement 1 — Breaker index correction (γ tuning):**
+| Supplement | Status |
+|---|---|
+| 1 — Breaker index correction (γ tuning, Battjes 1974) | **REMOVED 2026-07-25 (T4A.7).** Dead code: its guard required `SurfSpotConfig.bathymetric_profile`, a field the config loader no longer defines, so the branch never executed. Also superseded in principle — the SwellTrack 1D model (`services/surf_1d_pipeline.py`) computes local slope and Iribarren number at every point from the real CUDEM profile, finer than this supplement's single configured `beach_slope` scalar. |
+| 2 — Coastal structure transmission/reflection effects | **REMOVED (ADR-095).** Replaced by the SWAN native OBSTACLE command — see the SWAN integration table above. |
+| 3 — Sub-grid spatial interpolation (bilinear) | **REMOVED 2026-07-25 (T4A.7), verification-gated.** The gate: confirm whether the SWAN handoff spectrum is emitted at the requested coordinate or at a grid-cell centre. Confirmed against the installed SWAN user manual (§2.6.4 "Output grids", §4.6.1 POINTS/CURVE) and SWAN source (`swanout1.ftn` `SWOEXA`/`SWOEXD`) that SWAN bilinearly interpolates POINTS/SPECOUT output to the exact requested coordinate from the four surrounding computational-grid nodes. The handoff SPECOUT is emitted via `POINTS` at explicit coordinates (`services/swan_formats.py`, `services/swan_runner.py`), so there is no leftover grid-cell value for this supplement to refine. Also confirmed already unreachable at its one historical call site — `grid_data`/`grid_lats`/`grid_lons` were never populated. |
+| 4 — Topographic wave focusing/sheltering | **REMOVED (ADR-093 Amendment 2 §5b, 2026-07-25).** The multipliers (point break ×1.1, headland ×1.2, bay break ×0.9, straight beach ×1.0) stood in for refraction that SWAN's nested L2 grid (100 m) now computes physically; applying them on top double-counted. The operator's topographic classification is retained in spot config — its job is now the L3 enable trigger (PROVIDER-MANUAL §14.15), not a wave-height adjustment. |
 
-SWAN uses a constant γ = 0.73. The actual γ varies from ~0.6 (spilling breakers on gentle sand) to ~1.2 (plunging breakers on steep reef).
-
-Formula: **γ = 1.06 + 0.14 ln ξ** (Battjes 1974)
-
-Where ξ = tan α / √(H₀/L₀) is the Iribarren number:
-- tan α = average nearshore bottom slope (from CUDEM bathymetric profile)
-- H₀ = SWAN-provided significant wave height
-- L₀ = deep-water wavelength = g × T² / (2π), where T = SWAN-provided peak period, g = 9.81 m/s²
-
-Application: H_max = γ_corrected × depth (recompute maximum wave height at breaking using site-specific γ instead of SWAN's constant 0.73).
-
-**Validation:** γ output clamped to [0.5, 1.4] (physical bounds from literature). Values outside this range logged as warnings — indicate bad slope or wave data.
-
-Operator inputs: `bottom_type` (sand/rock/coral_reef/mixed), `beach_slope` (computed from CUDEM).
-
-**~~Supplement 2 — Coastal structure effects~~ (REMOVED — ADR-095):**
-
-Replaced by SWAN native OBSTACLE command. Structure physics are now handled within the SWAN model using physics-based formulations (Goda, d'Angremond, transmission/reflection coefficients), which account for diffraction and wave field reorganization behind structures. Structure types mapped from wizard Overpass API discovery: pier → TRANSM, breakwater → DAM DANGremond, jetty → DAM GODA, seawall → REFL, groin → DAM GODA. Structure coordinates from the marine location config.
-
-**Supplement 3 — Sub-grid spatial interpolation:**
-
-Bilinear interpolation using the four surrounding SWAN grid nodes. No operator input required — coordinates already configured.
-
-**Supplement 4 — Topographic wave focusing/sheltering: REMOVED 2026-07-25 (ADR-093 Amendment 2).**
-
-The multipliers (point break ×1.1, headland ×1.2, bay break ×0.9, straight beach ×1.0) stood in for refraction that SWAN now computes. They predate nested grids: once L2 existed at 100 m it began computing that refraction itself, so these have been double-counting since nesting landed. Applying them on top of a modelled refraction field counts the same physics twice.
-
-Removed outright — not made conditional on whether L3 is running.
-
-The operator's topographic classification (point break / headland / bay break / straight beach) is **retained in spot config**. Its job changes: it is now the L3 enable trigger (PROVIDER-MANUAL §14.15), not a wave-height adjustment.
+**What feeds the 1D model now:** the SwellTrack pipeline's boundary condition comes directly from the SWAN handoff SPECOUT — no supplement stage runs between SWAN and the 1D model, and never actually did (the design this section described pre-T4A.7 was never implemented; see `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md` §7).
 
 **What is NOT supplemented:** Shoaling, refraction, bottom friction, wave-current interaction. SWAN computes these with its own bathymetry and input currents.
-
-All physics constants (γ bounds, Kt values) defined as module-level constants with source citations.
 
 ### Surf quality scorer (ADR-096 restructure)
 
 **File:** `enrichment/surf_scorer.py`
-**Registration:** Against the surf endpoint — runs after SwellTrack pipeline (or wave_transform fallback) and breaker height conversion.
+**Registration:** Against the surf endpoint — runs after SwellTrack pipeline (or the legacy CURVE-transect fallback) and breaker height conversion.
 **Inputs:** `breakingFaceHeight` (from H1/10 at SwellTrack break point, or legacy K-G fallback), DSPR (from SWAN TABLE), SPECOUT spectral components (deep-water reference from L2 at ~15m), spot config (beach facing, directional exposure, measurement zone segment), wind data (HRRR for forecast timesteps, station hardware for `t=0`), multi-transect aggregation (best peak, spot average from open transects).
 **Outputs:** `SurfForecast` with quality_stars (1–5), quality_label, conditions_text, full scoring breakdown, peel angle, wave shape classification.
 
@@ -2830,7 +2800,7 @@ When no marine locations are configured (no `[marine]` section in `api.conf`), n
 | `observation.airTemp` | Station hardware | `marine_weather_cache` | °C internal |
 | `observation.pressure` | Station hardware | `marine_weather_cache` | hPa internal |
 | `observation.visibility` | `marine_weather_cache` | null | km internal |
-| `observation.waveHeight` | SWAN + `wave_transform` (surf locations) | Last-good SWAN cache (any age) → null | Meters internal. No WW3 fallback for surf. Null for harbor locations. |
+| `observation.waveHeight` | WaveWatch III first forecast point (offshore, deep-water) | NDBC buoy Hs (already-fetched observation) → null | Meters internal. Surf forecasts use SWAN via the dedicated surf endpoint, not this field. Null for harbor locations. |
 | `observation.waterTemp` | `ocean_data_resolver.resolve()` (OFS → MUR SST → RTOFS) | NDBC buoy | °C internal |
 | `observation.weatherCode` | `marine_weather_cache` | null | WMO code integer |
 | `observation.isDay` | `marine_weather_cache` | null | boolean |
