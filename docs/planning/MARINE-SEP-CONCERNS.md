@@ -64,6 +64,33 @@ does not read as lost. Grounds: `rules/coding.md` §3, no code without a current
 
 ---
 
+## C-16 — two ocean providers have no `CAPABILITY` declaration (OPEN → resolve at QC Gate 5)
+
+Raised by the Round 2 provider agent, verified by the coordinator against the API source:
+
+| Module | `CAPABILITY` | `PROVIDER_ID` |
+|---|---|---|
+| `providers/ocean/ofs.py` | **0** | 1 |
+| `providers/ocean/erddap_ocean.py` | **0** | 1 |
+| `providers/buoy/ndbc.py` | 1 | 1 |
+
+So it is not a convention the repo simply does not use — `ndbc.py` has one. `PROVIDER-MANUAL`
+§14.10/§14.11 describe capabilities these two should declare. Both are reached only through
+`services/ocean_data_resolver.py` rather than being dispatch-registered, which is the likely
+reason nobody noticed.
+
+**QC Gate 5 checks "every provider has a CAPABILITY" and will flag these two. That is the
+correct outcome** — the gate is working.
+
+**Ruling: port faithfully, do not add one during the move.** It is a pre-existing API gap, not
+something the move creates, and fixing it inside a 7,000-line port makes it invisible at audit.
+More importantly, `CAPABILITY` feeds what the service advertises to the API's `/capabilities`
+endpoint — adding one changes the capability surface crossing the host boundary, which is
+trigger 4 and belongs to the operator, not the coordinator. Carried to QC Gate 5 as a known
+exception, named explicitly rather than absorbed into a pass.
+
+---
+
 ## C-13 — §0.6's enrichment section misses three modules (OPEN → folded into T5.9)
 
 Raised by the Round 1 agent, verified by the coordinator against `endpoints/fishing.py:60-62`.
