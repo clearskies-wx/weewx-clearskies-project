@@ -1106,7 +1106,7 @@ Tab/accordion headers show activity-appropriate qualitative labels — not force
 | Activity | Label source | Scale |
 |---|---|---|
 | Boating | Wind/wave/visibility thresholds | Excellent / Good / Fair / Poor / Dangerous |
-| Surfing | Surf quality scorer (1–5 stars) | Star display (★★★☆☆) + `qualityLabel` |
+| Surfing | Surf quality scorer (1–5 stars) | Star display (★★★☆☆) + `qualityLabel` + numeric `XX/100` (both — see §Surf Score Card) |
 | Fishing | Fishing scorer (0–100) | Excellent (80+) / Good (60–79) / Fair (40–59) / Poor (<40) |
 | Beach Safety | Itemized hazards (no overall badge) | Individual hazard indicators — no collapsed "Safe/Dangerous" |
 
@@ -1150,7 +1150,8 @@ Surfaces the surf scoring system (`enrichment/surf_scorer.py`). Data sources fro
 1. **Alerts** — `AlertsPanel` (with per-activity filterTypes)
 2. **Surf Score Card** — `Card footprint="wide" rowSpan={2}`:
    - `conditionsText` as subtitle
-   - Prominent NUMERIC score (qualityStars as digit, e.g., "4") + `qualityLabel` ("Poor"/"Fair"/"Good"/"Very Good"/"Epic") with color-coded badge. No star glyphs.
+   - **Both a star rating and a numeric score** (operator decision, 2026-07-24). The stars give a quick at-a-glance read; the numeric score gives precision. Specifically: `qualityStars` rendered as a 5-star glyph row (`StarRating`, `size="lg"`), `qualityLabel` ("Poor"/"Fair"/"Good"/"Very Good"/"Epic") with color-coded badge, and the `scoring.totalScore` "XX/100" numeral alongside.
+   - **Null handling (T4A.4):** `qualityStars` and `qualityLabel` are nullable — null when the SwellTrack model failed (`modelStatus == "unavailable"`), as distinct from a genuine 0-star rating. When null, **suppress the star row entirely** and render the no-data treatment; do not pass null into `StarRating`, whose `Math.round(score)` coerces null to 0 and would render five muted stars — visually identical to a real 0-star rating. `scoring.totalScore` is suppressed on the same condition rather than defaulting to "0/100".
    - Two-column scoring breakdown (ADR-096):
      - Column 1: Wave Height (35%), Wave Period (35%), Wave Organization (30%). Each bar: label, score, colored fill normalized to each factor's own maximum (not to 100). Wave Height 28/35 = 80% fill.
      - Column 2: Beach Alignment (penalty), Directional Exposure (penalty), Time of Day (bonus/penalty). Signed integers.

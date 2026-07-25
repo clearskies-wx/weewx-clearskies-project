@@ -1383,7 +1383,7 @@ Grid notation `CxR` maps to the `Card` component's `footprint` (column span) and
 | Page | Card | `footprint` | `rowSpan` | Description |
 |---|---|---|---|---|
 | Marine landing | Location card | `wide` | — | Photo alongside wave/wind/temp data |
-| Surf | Surf Score Card (hero) | `wide` | `2` | 2x2 hero: XX/100 total + quality label + conditions text. Two-column scoring breakdown: Col 1 = Wave Height (35%), Wave Period (35%), Wave Organization (30%) with bars normalized to each factor's max. Col 2 = Beach Alignment, Directional Exposure, Time of Day (signed penalties/bonuses). ADR-096. |
+| Surf | Surf Score Card (hero) | `wide` | `2` | 2x2 hero: 5-star rating + XX/100 total + quality label + conditions text. Two-column scoring breakdown: Col 1 = Wave Height (35%), Wave Period (35%), Wave Organization (30%) with bars normalized to each factor's max. Col 2 = Beach Alignment, Directional Exposure, Time of Day (signed penalties/bonuses). ADR-096. |
 | Surf | Swell Card | `wide` | `2` | 2×2: **Row 1 — CONDITIONS AT BREAK**: 3 top-row stats (Swell Height, Breaking Face Height, Period — no Direction in top row). **Row 2**: left 2/3 = "INCOMING SWELL (offshore)" section label + SwellBreakdown component (Type/Dir/Height/Period); if `partitionBreakInfo` present, show "AT BREAK" sub-section: one line per swell partition ("16s SSW groundswell → outer bar (200m), 5ft plunging"). Right 1/3 = Dominant Direction compass (sole direction display). ADR-095/096; T5.4. |
 | Surf | Wind Card | `wide` | `"half"` | 2×half compact strip: wind speed, direction, quality label, gust (from MarineObservation) |
 | Surf | Current Conditions Card | `wide` | `"half"` | 2×half 5-column grid: weather icon, air temp (Thermometer, station), dewpoint (Drop icon, station), water temp (WaterThermometerIcon, marine observation), UV index (UvIndex, station) |
@@ -1398,7 +1398,11 @@ Grid notation `CxR` maps to the `Card` component's `footprint` (column span) and
 | Boating | Waves Card | `full` | — | Wave stats + 72h wave forecast chart |
 | Boating | NWS Marine Forecast | `full` | — | Structured period columns (wind, seas, visibility, weather) |
 
-**Score cards** (surf, fishing) are hero cards with prominent numeric score + scoring breakdown. Numeric scores only — no star ratings in forecast cards.
+**Score cards** (surf, fishing) are hero cards with a prominent numeric score + scoring breakdown.
+
+**Star ratings — scope clarified 2026-07-24 (operator decision).** The **Surf Score Card hero** carries **both** a 5-star glyph row and the numeric "XX/100" score: the stars are the quick at-a-glance read, the numeral is the precise one. This is deliberate, not drift.
+
+The "no star ratings" rule applies to **forecast cards and forecast rows** — the 72-hour scroll, per-timestep chips, and any other repeated per-period element. Those carry numeric scores only. Verified 2026-07-24: `StarRating` has exactly one call site in the dashboard, the Surf Score Card hero, which is the intended state.
 
 **Location cards** on the marine landing page are 2×1 or 1×2 footprint with photo + data. When `photoUrl` is present, display the location photo alongside wave/wind/temp summary data.
 
