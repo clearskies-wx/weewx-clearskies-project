@@ -123,8 +123,20 @@ blocked imports, which point at modules that will exist once C-15 is answered.
 **Disposition — same shape as C-24.** The marine service removes the alerts import and the
 alert-fetch calls entirely. No stub, no placeholder. The API re-merges alerts into the proxied
 response: it owns the unified alert system and produces exactly this data today. **Mandatory
-Phase 6 companion-proxy task, alongside C-24.** The affected response fields and call sites come
-out of the endpoint agent's closeout so the Phase 6 agent restores precisely those.
+Phase 6 companion-proxy task, alongside C-24.**
+
+**Exactly what Phase 6 must restore — narrower than first assumed.** Traced against the API
+source and the marine service's `models/responses.py`:
+
+| Endpoint | Route | Field | Marine service now emits |
+|---|---|---|---|
+| `marine.py` — `_fetch_active_alerts()` defined 356-382, called once at 625 inside `_location_summary()` | **list** `GET /marine` | `MarineLocationSummary.activeAlerts` | `None` |
+| `beach_safety.py` — fetch at 437-450, feeds line 475 | **detail** `GET /beach-safety/{id}` | `assessment["activeAlerts"]` (`list[str]`, non-nullable) | `[]` |
+
+The marine **detail** route is unaffected — `MarineBundle` has no `activeAlerts` field at all, so
+it never carried alerts. The beach-safety **list** route never fetched them either. Both changes
+are value-only; names, shapes and nullability are unchanged, which is exactly why this needed
+writing down rather than trusting a diff to reveal it.
 
 ---
 
