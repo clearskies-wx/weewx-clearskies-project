@@ -142,7 +142,37 @@ work. Round 2's physics set is therefore **13 modules, not 14**.
 
 ---
 
-## C-18 — hardcoded weewx-host filesystem paths inside the moved physics modules (OPEN → Round 3)
+## C-18 — hardcoded filesystem paths in the moved physics modules (CLOSED — no change needed)
+
+**Resolved 2026-07-25 by checking the model host instead of reasoning about it.** The paths are
+not weewx-specific; they are already correct on librewxr, because the model already runs there.
+
+```
+$ ssh librewxr 'ls -ld /var/run/weewx-clearskies/swan ...'
+drwxr-xr-x 6 ubuntu ubuntu 220 Jul 25 23:20 /var/run/weewx-clearskies/swan
+/etc/weewx-clearskies/great_lakes            No such file or directory
+/etc/weewx-clearskies/operator_bathymetry    No such file or directory
+$ ssh librewxr 'sudo ls /etc/weewx-clearskies/'
+api.conf  compute  secrets.env  spot_profiles  swan  swan_bathymetry_L1.json
+swan_bathymetry_L2.json  swan_bathymetry_L3_*.json  swan_grid_sizing.json
+```
+
+- `/var/run/weewx-clearskies/swan` (`swan_runner.py:2055`, `surfbeat_runner.py:78`) **exists on
+  librewxr and is in active use** — owned by `ubuntu`, modified the same day. The SWAN service
+  already runs the same code there.
+- `/etc/weewx-clearskies/great_lakes` and `/etc/weewx-clearskies/operator_bathymetry`
+  (`bathymetry_resolver.py:82`, `:915`) exist on **neither** host. They are optional caches
+  created on demand — a SoCal spot needs no Great Lakes bathymetry — so their absence is the
+  normal state, not a gap the move creates.
+
+**Decision: change nothing.** Rewriting these into config keys would be trigger 7 (adds config
+keys) for zero benefit, and "fix the issue, not the architecture" applies. The agent was right
+to flag and not touch them; the answer just turned out to be that there was nothing to fix.
+Confirmed separately that the SWAN binary path is config-injected at `swan_runner.py:1659`.
+
+---
+
+## ~~C-18 (original text)~~ — superseded by the block above
 
 Found by the Round 2 physics agent while tracing imports; flagged and deliberately not changed,
 which was the right call — these are triggers 5 and 7 (where computation happens, which files
