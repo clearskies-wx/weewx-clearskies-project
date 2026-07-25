@@ -97,6 +97,54 @@ Commit `03f81db`. Verified by the coordinator: all 10 moved providers import cle
 
 ---
 
+## C-24 — station observations are lost from marine responses unless Phase 6 restores them (OPEN → mandatory Phase 6 task)
+
+This is the resolution of C-14, and it is a real quality regression that must not be allowed to
+stand silently.
+
+**The trace** (Round 3 endpoint agent, two call sites, same pattern):
+`endpoints/marine.py:556` in `_location_summary()` and `:844` in `get_marine_location()`:
+
+```python
+if is_station_served(location.id):
+    with Session(get_engine()) as station_db:
+        station_obs = _get_current_observation(station_db, registry)
+    # wind/temp/pressure fields come from the operator's own hardware
+else:
+    # marine_weather_cache / forecast-provider fallback
+```
+
+**Outcome (a): this is API-owned data.** It reads the local weewx archive — which is why the
+API co-locates with weewx in the first place (ADR-034). A marine service on librewxr has no
+local archive to read. `is_station_served()` itself is a pure distance calculation against
+config and ports fine; the DB-reading branch does not.
+
+**Phase 5 disposition: the marine service omits the branch entirely** and always takes the
+cache/forecast path. Giving it a database would be trigger 7 and would defeat the co-location
+rationale.
+
+**The regression that creates, stated plainly.** For any location within `dedup_radius_km` of
+the station, these fields would stop coming from the operator's own instruments and start
+coming from a forecast model:
+
+| Route | Fields affected |
+|---|---|
+| list / card summary (`_location_summary()`) | `windSpeed`, `windDirection`, `airTemp` |
+| detail (`get_marine_location()`) | `windSpeed`, `windDirection`, `windGust`, `airTemp`, `pressure` |
+
+Field names, shapes and nullability are unchanged — so this is **not** trigger 4, and nothing
+in the response would indicate the downgrade. An operator would see plausible wind at their own
+beach, sourced from a model instead of their anemometer, with no signal that anything changed.
+That is the "valid response, wrong answer" failure mode this plan exists to remove.
+
+**Mandatory Phase 6 task — the companion proxy is not complete without it.** The API still has
+the archive, still has `is_station_served()`, and already merges station data into marine
+responses today. Restoring the merge after the proxy keeps the work on the same host, in the
+same service, doing the same job — only the module inside the API changes. Restore exactly the
+fields in the table above, at exactly those two response shapes.
+
+---
+
 ## C-23 — `directional_exposure`'s wire shape is undetermined until T6.4 (OPEN → pin at T6.4)
 
 Found by the coordinator's line-by-line diff of `marine_config.py` against the API's copy —
