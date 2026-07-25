@@ -15,8 +15,47 @@
 | **Phase 2** — TLS + remote mode | Code landed; QC Gate 2 never formally closed |
 | **Phase 3** — SWAN caching + E2E | **NOT closed.** Root cause is live: see below |
 | **Phase 4** — Marine service repo + scaffold | **COMPLETE. QC Gate 4 CLOSED 2026-07-25** |
-| **Phase 4A** — SwellTrack pipeline + vocabulary | **IN PROGRESS — 3 of 8 tasks done, T4A.3 halted** |
+| **Phase 4A** — SwellTrack pipeline + vocabulary | **Tasks complete; QC Gate 4A walked but NOT a clean pass** — see `briefs/P4A-QC-GATE-4A-RESULTS.md`. The "3 of 8 tasks done, T4A.3 halted" text that stood here until 2026-07-25 contradicted this document's own task table below, which records T4A.3 and every other task as DONE. Corrected to match the detail table. |
+| **Phase 4B** — Per-transect grid-derived handoff | **PARTIALLY IMPLEMENTED AND DEPLOYED** — not "not started." See the corrected status block below. |
 | Phases 5-8 | Not started |
+
+### ⚠ Cross-round correction, 2026-07-25 — read before starting ANY remaining phase
+
+A separate round, **SURF-PUBLISH-RESULTS-ONLY** (`briefs/SURF-PUBLISH-RESULTS-ONLY.md`),
+landed between Phase 4B and Phase 5. It changed the data contract between the SWAN service
+and the API, and it deleted the API-side recompute paths. **Several acceptance criteria
+written in Phases 4B, 5 and 6 predate it and, if followed literally, would rebuild exactly
+what it removed.** Each affected task now carries an inline ⚠ correction block. Do not
+treat those blocks as optional context — they override the surrounding original text.
+
+The governing rule that round established, which every later phase must preserve:
+
+> **The model host publishes answers. The API serves answers.** Model working data — raw
+> spectra, per-transect spectra — does not cross the host boundary. In remote mode the API
+> does not recompute; a model gap surfaces as an explicit unavailable state, never as a
+> substituted or locally recomputed value. Bundled single-host mode is a different topology:
+> there SWAN runs in-process, and local computation IS the model, not a fallback.
+
+#### Phase 4B — actual implementation state (verified against git, 2026-07-25)
+
+The row that read "NOT STARTED — awaiting operator sign-off" was wrong. Seven commits are in
+the API repo and deployed to librewxr; the per-transect handoff work is what produced the
+21 MB published payload that SURF-PUBLISH-RESULTS-ONLY then had to address.
+
+| Task | Actual state | Evidence |
+|---|---|---|
+| T4B.1 — per-transect POINTS/TABLE bands | **DONE, deployed** | `4492927`, hardened in `4dd8964` |
+| T4B.2 — watershed partitioning | **PARTIAL — parser and an opt-in path only.** `run_pipeline()`'s `partition_source` still defaults to `"neighbourhood"`; the watershed path is marked in-code as "build-and-measure only, NOT a production path." The trigger-1 swap is NOT made. | `660e3c1`, `95d1e00`, `be78773` |
+| T4B.3 — per-transect per-hour selection | **DONE, deployed** | `4dd8964`, `e9a1047` |
+| T4B.4 — L2 fallback per transect | **DONE, deployed** | `services/swan_runner.py`, `_t4b4_transect_dwr_name` |
+| T4B.5 — SurfBeat stays uniform | **RESOLVED BY READING** — no code needed | — |
+| T4B.6 / T4B.7 / T4B.8 | **NOT DONE** | — |
+
+`ARCHITECTURE.md` separately described Phase 4B as "approved 2026-07-25, not yet
+implemented." That is also wrong on the second half. **Operator: the approval record and the
+implementation record disagree, and Phase 4B carries architectural triggers. T4B.2's
+trigger-1 partitioning swap in particular is still an open decision — the PT* evidence
+gathered 2026-07-25 argues against it. Confirm what was approved before T4B.2 proceeds.**
 
 ### Phase 4 — COMPLETE
 
@@ -97,14 +136,29 @@ were checked as a confound and occur on succeeding cycles too, so missing GRIB
 files alone do not explain it. **Worth chasing after Phase 4A closes**; the model
 is not yet completely implemented and that comes first.
 
-### Deployment state — NOTHING DEPLOYED THIS SESSION
+### Deployment state
 
-- weewx: API at `0d87b28` (behind local `11b5242`). SWAN binary disabled.
-- librewxr: API repo at `bfff1f7`. SWAN + compute services active.
-- weather-dev: dashboard at pre-round commit; marine repo cloned at `9ab0766`
-  for verification only.
-- Local API repo `main` at `11b5242`, **not pushed**.
-- Local dashboard `main` at `20c6e50`, **not pushed**.
+> **⚠ This block is a snapshot and goes stale fast. Verify against the hosts before relying
+> on it — do not plan a deploy from these commit hashes.** The version below stood unchanged
+> through several rounds of work while every hash in it moved.
+
+**Updated 2026-07-25, after SURF-PUBLISH-RESULTS-ONLY:**
+
+- weewx: API deployed and running. SWAN binary disabled there (remote mode —
+  `[swan] service_url = https://192.168.7.22:8767`).
+- librewxr: SWAN + compute services active. Was pinned behind origin at `ce4415b` until
+  2026-07-25; deploying moved it forward 8 commits and pulled in the Phase 4B per-transect
+  work, which is what produced the 21 MB published payload.
+- **Local, committed, NOT pushed and NOT deployed:** API repo `main` at `69b9442`
+  (6 commits), SWAN service repo at `ca22432` (2 commits), dashboard `main` at `46c9e45`,
+  meta repo `main` carrying the brief and the doc updates.
+- **Deploy order for the above is mandatory and non-obvious** — see
+  `briefs/SURF-PUBLISH-RESULTS-ONLY.md` §6. The `swelltrack` publication fix must go first;
+  deploying the API's recompute deletion before it would leave every forecast hour reporting
+  `modelStatus: "unavailable"`.
+
+**Superseded snapshot (kept only to show how far it had drifted):** weewx API at `0d87b28`,
+librewxr API repo at `bfff1f7`, local API `main` at `11b5242`, local dashboard at `20c6e50`.
 
 ---
 
@@ -1918,6 +1972,29 @@ threaded across the compute boundary (`69957f7`). Only the values become real.
 **Accept:** All 5 call sites pass distinct per-transect values. `handoffDepthM` differs between
 transects in the beach-profile response.
 
+> ### ⚠ CORRECTED 2026-07-25 — the "5 call sites" criterion is now wrong
+>
+> SURF-PUBLISH-RESULTS-ONLY deleted the API-host recompute paths. **In remote mode
+> (`[swan] service_url` set — the deployed topology) `endpoints/surf.py` and
+> `endpoints/beach_profile.py` no longer build `handoff_by_transect` at all**, and the
+> published payload no longer carries `handoff_by_transect`, `energy`, `freqs_hz`, or
+> `dirs_deg`. Two of the five original call sites do not exist there any more.
+>
+> **An agent working to the criterion above would re-add the recompute path to satisfy it.
+> Do not.** The corrected criterion:
+>
+> - **Remote mode:** distinct per-transect values are produced and consumed entirely on the
+>   model host — in `swan_runner.py`'s selection, in the SWAN service's
+>   `GET /surf/{spot_id}/profile`, and in the precomputed `swelltrack` results. Verify
+>   `handoffDepthM` differs between transects **in the API's beach-profile response**, which
+>   now originates on the model host. Do NOT verify by inspecting API-host computation —
+>   there is none.
+> - **Bundled single-host mode:** the original criterion still applies unchanged. The
+>   in-process call sites are the model, and they must pass distinct values.
+>
+> Do not re-publish the removed spectral fields to satisfy any part of this task. If T4B.6
+> appears to require them on the API host, the task is blocked — STOP and surface it.
+
 ### T4B.7 — ADR-093 Amendment 3
 
 - **Owner:** `clearskies-docs-author`
@@ -2160,6 +2237,26 @@ unconditional.)*
 - Fixtures committed to `repos/weewx-clearskies-marine/tests/fixtures/`.
 - Each fixture contains a valid, non-empty response from the working Part A API.
 
+> ### ⚠ CORRECTED 2026-07-25 — capture these fixtures AFTER SURF-PUBLISH-RESULTS-ONLY is deployed
+>
+> This is the highest-risk interaction between the two rounds. These fixtures become the
+> regression baseline that Phase 5's acceptance and the Phase 5 audit both check against.
+>
+> **If they are captured before SURF-PUBLISH-RESULTS-ONLY is deployed, they freeze the old
+> beach-profile behaviour** — a 404 where the model has no answer, and the pre-trim response
+> shape. Phase 5 would then flag the corrected 200-with-null-`modelStatus` response as a
+> regression, and an agent would faithfully "fix" it back to the behaviour we deliberately
+> removed. The failure would look like a passing gate.
+>
+> **Prerequisite:** confirm the deploy is live before capturing. The check is that
+> `GET /surf/{spot}/forecast` on the SWAN service returns a payload containing `swelltrack`
+> and NOT containing `handoff_by_transect`, `energy`, `freqs_hz`, or `dirs_deg`. Record the
+> capture date and the deployed commit of both repos alongside the fixtures.
+>
+> `golden_surf_profile.json` must additionally be captured for BOTH cases — a timestep the
+> model answered, and one it did not — or the unavailable contract has no regression cover
+> at all.
+
 ### T5.1 — Move buoy/ndbc.py (1,001 lines)
 
 - **Owner:** `clearskies-api-dev`
@@ -2258,6 +2355,34 @@ unconditional.)*
    - `GET /fishing/{location_id}` — fishing conditions
    - `GET /beach-safety/{location_id}` — beach safety assessment
 
+> ### ⚠ CORRECTED 2026-07-25 — "current response shapes" means POST-SURF-PUBLISH-RESULTS-ONLY, and one endpoint is missing
+>
+> **(a) A seventh endpoint is required.** `POST /report/gap` is missing from the list above
+> and has no home after Phase 8. It exists today on the SWAN service (port 8767); T8.4 stops
+> that service. It is how the API tells the model host "you were asked for a spot/hour you
+> never published," so that every model failure lands in the model's own log in one place.
+> Without it the API's gap reporter POSTs into a void — and because it is deliberately
+> fire-and-forget, **that failure would itself be silent**, which is precisely the class of
+> problem this plan exists to remove. Port it to the marine service: Bearer auth, body
+> `{spot_id, valid_time, endpoint, run_time}`, 204, bounded in-memory dedup, one WARNING per
+> distinct combination. Add it to `GET /manifest` only if the manifest supports non-GET
+> routes; otherwise the API calls it directly and that is documented.
+>
+> **(b) "Same response shapes as current API endpoints" must be read as of AFTER
+> SURF-PUBLISH-RESULTS-ONLY deploys, not before.** Specifically, the marine service must
+> reproduce, not re-litigate:
+> - `GET /surf/{location_id}/profile` returns HTTP 200 with a nulled payload and
+>   `modelStatus: "unavailable"` when the model has no answer for the requested hour.
+>   404 is reserved for configuration and bad-request errors — unknown location, no surf-spot
+>   config, no transects, transect index out of range. **That distinction is load-bearing and
+>   must survive the move.**
+> - The service publishes results, not model working data. Do not reintroduce `energy`,
+>   `freqs_hz`, `dirs_deg`, or `handoff_by_transect` into any response the API consumes. The
+>   service keeps them internally — it needs them to answer profile requests — but they do
+>   not cross the host boundary.
+> - `GET /surf/{location_id}/profile` computes on the model host. The API must never need
+>   model working data in order to build a response.
+
 **Accept:**
 - Full SWAN → SwellTrack → SurfBeat pipeline runs end-to-end.
 - All 6 data endpoints return correctly shaped responses.
@@ -2339,6 +2464,30 @@ unconditional.)*
 - Runtime failure serves cached data (or 503 if no cache).
 - Manifest refreshes periodically; removed endpoints are de-registered.
 - Proxied routes subject to same auth/rate-limiting/CORS as native routes.
+
+> ### ⚠ CORRECTED 2026-07-25 — the proxy's 503 and the model's `modelStatus` are different things
+>
+> Point 5 above says the proxy returns 503 when it has no cache. That is correct for its own
+> failure mode and must NOT be extended to cover the model's.
+>
+> Three states are distinct and must stay distinguishable end to end. Collapsing any two of
+> them re-creates the ambiguity SURF-PUBLISH-RESULTS-ONLY removed:
+>
+> | Situation | Correct response | Meaning to the visitor |
+> |---|---|---|
+> | Marine service unreachable, no cache | **503** (proxy's own) | The system is broken |
+> | Marine service answered; the model has no result for that hour | **200**, null payload, `modelStatus: "unavailable"` | The system works; the model has no answer |
+> | Unknown location / not configured / bad parameter | **404** | You asked for something that does not exist |
+>
+> **The proxy must pass the second case through untouched.** A 200 carrying
+> `modelStatus: "unavailable"` is a successful proxied response, not an upstream failure —
+> the proxy must not rewrite it to 503, must not treat it as a cache miss, and must not
+> suppress caching of it. Equally, the proxy's own 503 must not be dressed up as a
+> `modelStatus` value; a dead service is not a model gap.
+>
+> Add explicit test coverage for all three, in T6.2b. The failure this guards against is
+> silent: every one of these still returns a syntactically valid response, so a proxy that
+> conflates them looks healthy while telling the operator the wrong thing about their model.
 
 ### T6.2 — Implement response envelope wrapping and unit conversion
 
@@ -2492,6 +2641,16 @@ and verified (it survives `kill -9`), but it cannot self-heal from an empty disk
 **Do:** Delete both. Remove imports. Remove `surf_compute_host` and `surf_compute_verify_tls` from config. Remove `SURF_COMPUTE_SECRET` references.
 
 **Accept:** Both deleted. No references to compute service in API code.
+
+> ### ⚠ NOTE 2026-07-25 — deletion ordering within Phase 6
+>
+> `compute_client.py` gained one public alias (`deserialize_pipeline_result`) in
+> SURF-PUBLISH-RESULTS-ONLY. Its only importer is `providers/nearshore/swan.py`'s
+> `fetch_profile()`, which **T6.6 deletes**. So both sides disappear together and this is not
+> a conflict — but the order matters: run T6.5/T6.6 before or with T6.8. Deleting
+> `compute_client.py` first leaves a broken import in a file that is about to be deleted
+> anyway, and an agent that hits it may "repair" it instead of proceeding. If you see that
+> import break, the fix is to continue with T6.6, not to restore anything.
 
 *T6.9 (api.conf cleanup) moved to Phase 8 as T8.2b — the old Part A API code needs `[swan]` and `surf_compute_host` until the new API is deployed in T8.2. Removing them during Phase 6 while the old code is deployed would break the working Part A fix.*
 
