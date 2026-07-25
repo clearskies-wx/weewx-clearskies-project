@@ -64,6 +64,65 @@ does not read as lost. Grounds: `rules/coding.md` §3, no code without a current
 
 ---
 
+## C-20 — DEFECT, FIXED LEAD-DIRECT: the scaffold's `ProviderCapability` lost a field (CLOSED)
+
+Found when the Phase 5 provider move became the first thing to import **real** providers
+against the Phase 4 scaffold's `providers/_common/capability.py`. Five failed at import:
+
+```
+TypeError: ProviderCapability.__init__() got an unexpected keyword argument 'refresh_interval'
+```
+
+The scaffold dropped `refresh_interval` along with the radar-specific fields
+(`tile_url_template`, `wms_*`, `caddy_prefix`, `bounds`, `nowcast_available`, `satellite_*`).
+Dropping the radar fields was correct — they do not apply to a marine service. Dropping this
+one was not: seven moved providers set it (NDBC, CO-OPS, NWS marine, NWS SRF, WaveWatch III,
+HRRR, GFS).
+
+**Seven affected, not five — and the two that are hidden matter most.** HRRR and GFS pass in
+the local dev environment only because `eccodes` is absent, so they take the `CAPABILITY = None`
+branch. On librewxr, where `eccodes` IS installed, both would construct the dataclass and fail.
+`mypy` flags them at `hrrr.py:117` and `gfs.py:120` on the branch that runs with eccodes
+present. This is a bug the dev environment masks and the model host would not.
+
+**Fixed by restoring the field, not by stripping the kwarg from seven call sites.** The
+direction matters. T4.2 states the marine provider pattern is identical to the API's, and the
+API's dataclass has this field — so the scaffold diverged from its own stated contract, which
+is a defect the coordinator may fix. Stripping `refresh_interval=` would have gone the other
+way: removing a field those providers publish into `/capabilities` today, a data-contract
+change across the host boundary (trigger 4) and not something to slip into a bulk move.
+
+Commit `03f81db`. Verified by the coordinator: all 10 moved providers import clean;
+`pytest tests/ -q` still 52 passed, 2 skipped.
+
+---
+
+## C-19 — `i18n.py` and `services/almanac.py` are held, not ported (DECIDED)
+
+Two general (non-marine) API modules that moved enrichment code reaches into:
+
+- `i18n.py` — needed by `surf_scorer.py` and `fishing_scorer.py`; drags in `babel`.
+- `services/almanac.py` — `solunar.py:47` imports **private** helpers from it
+  (`_phase_name_from_angle`, `_station_local_window`, `_to_utc_z`, `get_ts_eph`); drags in
+  `skyfield`. On no phase's move list.
+
+**Decision: do not port either during Phase 5's bulk move.** Both are blocked on a dependency
+that is already with the operator, and reaching across a module's private surface is a coupling
+worth deciding deliberately rather than replicating on autopilot inside a 20,000-line move.
+They land in a follow-up round once C-15 resolves; the import lines in the ported files already
+point at `weewx_clearskies_marine.*` so that round is mechanical.
+
+`FishingForecast` and `SolunarTimes` (`models/responses.py:1686` and `:1716`) are a different
+matter — pure model copies with no dependency — and were authorised into the enrichment agent's
+scope, conditional on being self-contained.
+
+**Also settled here:** `marine_config.py` needs **no** `configobj` dependency. It uses the type
+only as a hint; every operation is generic dict access. Dropping the import and widening the
+hint to `Mapping[str, Any]` is a faithful port that happens to shed a dependency, with zero
+change to the parsed config shape.
+
+---
+
 ## C-17 — `surf_pipeline_timestep.py` depends on a module the plan deletes (DECIDED)
 
 Raised by the Round 2 physics agent; verified by the coordinator at
@@ -265,6 +324,9 @@ escalations is the churn the operator asked to avoid. All other work proceeds.
 | `prometheus-client` | `services/swan_runner.py:40`, `services/transect_handoff.py:61` | unguarded | `==0.25.0` |
 | `scipy` | `services/surf_1d_analytical.py:19` (`ellipj`, `ellipk` — cnoidal wave theory), `enrichment/bathymetry.py:59` (`PchipInterpolator` — the PCHIP profile from T4A.2) | unguarded | `==1.18.0` |
 | `shapely` | `services/shelf_boundary.py:20-21` (`Point`, `shape`, `nearest_points` — GSFM shelf-distance polygon query) | unguarded | `>=2.0` |
+| `babel` | `enrichment/surf_scorer.py:60` and `enrichment/fishing_scorer.py:76` import `i18n`, which imports `babel.numbers.format_decimal` at `i18n.py:24` | unguarded | `==2.18.0` |
+| `pyyaml` | `enrichment/fishing_species.py:49` — loads `data/species.yaml` at import time | unguarded | `>=6.0` |
+| `skyfield` | `enrichment/solunar.py:42-44` (`almanac`, `wgs84`, `ecliptic_frame`) | unguarded | `>=1.48` |
 
 All five import sites verified by the coordinator in the source, not taken from an agent
 report. All are **unguarded** — no `try/except ImportError` to fall back on. Every one of these
