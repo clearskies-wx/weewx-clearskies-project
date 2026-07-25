@@ -45,7 +45,7 @@ the API repo and deployed to librewxr; the per-transect handoff work is what pro
 | Task | Actual state | Evidence |
 |---|---|---|
 | T4B.1 — per-transect POINTS/TABLE bands | **DONE, deployed** | `4492927`, hardened in `4dd8964` |
-| T4B.2 — watershed partitioning | **PARTIAL — parser and an opt-in path only.** `run_pipeline()`'s `partition_source` still defaults to `"neighbourhood"`; the watershed path is marked in-code as "build-and-measure only, NOT a production path." The trigger-1 swap is NOT made. | `660e3c1`, `95d1e00`, `be78773` |
+| T4B.2 — watershed partitioning | **DONE, not yet deployed.** Operator-approved 2026-07-25 after measurement (below). `decompose_spectrum()` has no production caller; SWAN's own PT* watershed partitions are the source at every site, L2 and L3. | `660e3c1`, `95d1e00`, `be78773`, `12f9ddc` |
 | T4B.3 — per-transect per-hour selection | **DONE, deployed** | `4dd8964`, `e9a1047` |
 | T4B.4 — L2 fallback per transect | **DONE, deployed** | `services/swan_runner.py`, `_t4b4_transect_dwr_name` |
 | T4B.5 — SurfBeat stays uniform | **RESOLVED BY READING** — no code needed | — |
@@ -56,15 +56,89 @@ text that stood in the status row was written *before* that approval and was sim
 updated; `ARCHITECTURE.md` recorded the approval correctly at the time. There is no dispute
 about approval — only a stale status line, now corrected here and in `ARCHITECTURE.md`.
 
-**The one Phase 4B decision that remains genuinely open is T4B.2**, the trigger-1
-partitioning swap — and it is open because it has not been executed, not because its
-approval is unclear. The parser and an opt-in path were built; the swap itself was not made.
-The PT* evidence gathered 2026-07-25 argues **against** making it: SWAN's watershed method
-resolved a single partition in 95.2% of rows at this site, where the current
-`decompose_spectrum()` finds 3–5, so swapping would flatten the multi-swell structure the
-spot actually has. The same-timestep comparison that would settle it has not been run, and
-must not be run through `parse_table_pt_partitions()` until that function's absent-partition
-handling is fixed (it treats a real 0.00000 as a present partition — see the brief).
+**T4B.2 is closed. The swap was made, and the earlier reading of the evidence was backwards.**
+
+⚠ **CORRECTION 2026-07-25 — supersedes what this section previously said.** This document
+argued *against* the swap on the grounds that "SWAN's watershed resolved a single partition in
+95.2% of rows, where `decompose_spectrum()` finds 3–5, so swapping would flatten the multi-swell
+structure the spot actually has." That inference is invalid in both of its halves:
+
+1. **The 95.2% figure was an artefact of the parser, not a property of SWAN.**
+   `parse_table_pt_partitions()` looked for `-9`/`-999` sentinel values to mean "no partition
+   here." SWAN never emits those. Measured across real output: **25288 exact-`0.0` fields and
+   5264 real values — zero sentinels.** Absent partitions are encoded as `0.00000`, so the
+   parser counted every absent slot as a present partition and the partition census built on
+   top of it was measuring the parser. Fixed in `12f9ddc`; absence is now detected from a
+   partition significant height of ~0 (tolerance 0.0005).
+
+2. **"Ours finds more components" is evidence against ours, not for it.** A decomposition may
+   not report more energy than the spectrum contains. Measured with
+   `scripts/verify_partition_duplication.py` over 67 real preserved spectra, summing each
+   reported component's m0 against the spectrum's own total m0:
+
+   ```
+   ENERGY CLOSURE (1.00 = exactly the energy present)
+     all timesteps (n=67):        min 0.672   median 1.626   max 2.271
+     multi-component (n=65):      min 1.511   median 1.626   max 2.271
+     multi-component over 105%:   65/65
+   COMPONENT COUNT: {1:2, 2:3, 3:43, 4:15, 5:4}
+   CLOSEST-PAIR DIRECTION SEPARATION: min 0.6°  median 1.6°  max 4.4°  (65/65 under 80°)
+   WORST — spectrum Hs=0.6012 m, closure=2.271:
+     hs=0.5830 tp=10.2 dir=206.4 / hs=0.5120 tp=10.2 dir=210.1 / hs=0.4680 tp=10.1 dir=201.1
+   ```
+
+   Those three "independent swells" are 5° apart at the same 10.2 s period. They are one swell
+   reported three times. **Cause:** the ±4-bin neighbourhood spans roughly 80° on a 10°/bin
+   direction grid, with no exclusion between peaks, so neighbouring peaks integrate over each
+   other's energy. The multi-swell structure being "flattened" was never there.
+
+**Scope executed in `12f9ddc`** (operator-authorized directly in chat, 2026-07-25):
+
+- Parser absence detection corrected (above).
+- Both L3 CURVE handoff call sites source SWAN's PT* partitions; `decompose_spectrum()` is not
+  called on either path.
+- **L2 DWR PT* output added** — operator ruled this an oversight to be fixed in this round, not
+  a new feature. `TABLE ... TIME XP YP PTHSIGN PTRTP PTDIR PTDSPR` is now emitted at the
+  per-spot DWR baseline point and at every T4B.4 per-transect cell, producing
+  `TABLE_DWR_{n}.txt` / `TABLE_{cell}.txt`. Without it, spots with no L3 grid would have kept
+  the broken decomposition. Additive output only — no grid, nesting, or handoff change.
+- `run_pipeline()` reads `specout_data["components"]` instead of recomputing, so the 1D physics
+  and the displayed swell breakdown cannot diverge.
+- No silent fallback: a missing (point, timestep) yields empty components and a WARNING naming
+  spot and timestep. TABLE rows align to output points **by coordinate**, never by row order;
+  unmatched rows are discarded with a WARNING.
+
+**Coordinator QC, independently run — not accepted on the implementer's report:**
+
+- `git show --stat 12f9ddc` — 6 files, matching the declared scope; working tree clean.
+- No production module imports or calls `decompose_spectrum()` or `parse_and_decompose()`;
+  the sole remaining caller is `scripts/compare_partitioning.py`.
+- Coordinate alignment uses metre tolerance against UTM point coordinates built by the same
+  `lonlat_to_utm()` call that writes the `POINTS` line — units are consistent.
+- The new L2 column set is character-for-character the set already running on the L3 CURVE
+  table on librewxr (`swan_formats.py:1459`) — copied from working output, not guessed.
+- `pytest tests/test_swan_spectral_multi.py tests/services/test_swan_runner.py
+  tests/test_surf_1d_pipeline.py tests/test_swan_runner_handoff.py -q` → **117 passed,
+  15 errors**. The 15 are a pre-existing fixture defect (`config requires 'inner_bbox'`);
+  `git blame` puts that line at `46eb8839`, 2026-07-17, eight days before this round.
+
+**⚠ Open QC item — the pass/fail number is NOT yet measured.** The energy-closure figure above
+was computed from the preserved payload at `/tmp/pub.json` on librewxr. That file's
+`components` were themselves produced by `decompose_spectrum()` — verified at both population
+sites in the deployed code, and confirmed by the measurement reproducing the broken baseline to
+three decimal places. **It therefore cannot validate the fix.** Re-run
+`scripts/verify_partition_duplication.py` against a *fresh* model run after deploy; closure
+should sit at ≈1.0 rather than a 1.63 median. The in-repo energy-closure unit test uses a
+self-consistent synthetic spectrum and is a contract test on the parser — it is not a
+substitute for this measurement.
+
+**Known limitation, logged honestly rather than deferred silently:** per-transect alongshore
+variation would require each transect's own TABLE PT* columns, not the shared CURVE's. Not
+done this round and not claimed.
+
+**Doc-code sync:** the implementation round was scope-blocked from editing documentation.
+`PROVIDER-MANUAL.md`, `ARCHITECTURE.md`, the SWAN reference doc and any manual describing SWAN
+TABLE output or the swell-component source are handled in a separate commit.
 
 ### Phase 4 — COMPLETE
 
@@ -97,7 +171,7 @@ Full evidence in `c:	mp\marine-sep-P4-scratch.md`.
 | T4A.6 (beach profile shape mismatches a–g) | **DONE** `8e2710f` + dashboard `452d921`/`923dd0c`, plus audit fixes `dcbe9e4` (F2) and `3c7e993` (F3). **Watch item:** item (b)'s jacking annotations render only when jacking factors exist, and the regenerated HB profile produces **zero** of them — see T4A.5 below. |
 | T4A.5 (regenerate caches on librewxr) | **DONE 2026-07-25** — see the T4A.5 results block below for evidence and two recorded deviations. |
 | Adversarial audit + QC Gate 4A | **Audit DONE** — 3 BLOCKERs (F1/F2/F3), all remediated; findings recorded in `briefs/P4A-AUDIT-FINDINGS.md`. Gate assessment pending final end-to-end run. |
-| **Phase 4B** (per-transect grid-derived handoff) | **NOT STARTED — awaiting operator sign-off.** Found 2026-07-25 after Phase 4A: the handoff collapses the 2D field to one point per spot and replicates it across all 32 transects, so the alongshore variation L3 computes is discarded. Also: 50 m station spacing cannot hit the handoff depth (all 73 timesteps clamped), and `decompose_spectrum()` does not conserve energy. Carries trigger 1/3/4 changes. See the Phase 4B section. |
+| **Phase 4B** (per-transect grid-derived handoff) | **APPROVED 2026-07-25 and largely DONE — this row's "NOT STARTED — awaiting operator sign-off" text was stale and is corrected in the Phase 4B section above, which is authoritative.** T4B.1/3/4 done and deployed; T4B.2 done in `12f9ddc`, not yet deployed; T4B.5 needed no code; T4B.6/7/8 outstanding. The original findings stand as the motivation: the handoff collapsed the 2D field to one point per spot and replicated it across all 32 transects; 50 m station spacing could not reach the handoff depth (all 73 timesteps clamped); and `decompose_spectrum()` did not conserve energy — measured at a 1.626 median and 2.271 worst-case energy closure, now replaced by SWAN's own watershed partitions. |
 
 **Defect found 2026-07-25 and folded into T4A.11 — L3-disabled spots currently produce NO data.**
 `swan_runner.py:1525` skips a cluster whose `grid is None`, and the returned result dict is only
@@ -1879,23 +1953,40 @@ logged. A spot with N transects produces N distinct point sets.
 > **Do NOT use L2's Hs for the final selection** — only to decide which points to declare. See
 > T4B.3.
 
-### T4B.2 — SWAN watershed partitioning ⚠ trigger 1, needs sign-off
+### T4B.2 — SWAN watershed partitioning ✅ DONE (`12f9ddc`), operator-approved 2026-07-25
 
 - **Owner:** `clearskies-api-dev`
-- **Files:** `services/swan_formats.py`, `services/swan_spectral.py`, `services/surf_1d_pipeline.py`
+- **Files as executed:** `services/swan_spectral.py`, `services/swan_runner.py`,
+  `services/surf_1d_pipeline.py` (**not** `services/swan_formats.py` — see step 1 below)
 
-**Do:**
-1. Add `PTHSIGN PTRTP PTDIR PTDSPR` to the L3 `TABLE` output at the handoff point set.
-2. Parse the 10-column blocks per variable. **Treat `-9` as absent for all, and `-999` as absent
-   for `PTDIR`.** Do not assume a uniform sentinel.
-3. Feed partition 02–10 (swells) and 01 (wind sea) into the existing per-partition SwellTrack
-   path in place of `decompose_spectrum()`'s output.
-4. **Before removing `decompose_spectrum()`**, run both on the same spectra and record the
-   difference in partition count, per-partition Hs, and whether Σ partition m0 equals total m0.
-   That comparison is the evidence for the trigger-1 decision, not a formality.
+**Done:**
+1. `PTHSIGN PTRTP PTDIR PTDSPR` on the L3 `TABLE` at the handoff point set — and, added on
+   operator ruling during execution, at the **L2 DWR points** as well: the per-spot baseline and
+   every T4B.4 per-transect cell, producing `TABLE_DWR_{n}.txt` / `TABLE_{cell}.txt`. Without the
+   L2 half, spots with no L3 grid would have kept the broken decomposition. This landed entirely
+   in `swan_runner.py`, where those `POINTS`/`SPECOUT` commands are built as raw strings —
+   `swan_formats.py` needed no change, so the file list above differs from the original plan.
+2. ~~Treat `-9` as absent for all, and `-999` as absent for `PTDIR`.~~ **⚠ This instruction was
+   wrong and was the source of the T4B.2 confusion.** SWAN emits neither sentinel. Measured on
+   real output: **25288 exact-`0.0` fields, 5264 real values, zero sentinels.** Absence is a
+   partition significant height of ~0 (tolerance 0.0005), which is what `12f9ddc` now detects;
+   the sentinel check is retained only as belt-and-braces. Following the original text produced a
+   partition census that measured the parser rather than SWAN, and that census is what made the
+   swap look unwise.
+3. Partitions feed the per-partition SwellTrack path; `decompose_spectrum()` has no production
+   caller. `run_pipeline()` reads `specout_data["components"]` rather than recomputing, so
+   physics and display share one source and cannot diverge.
+4. Comparison run before removal — see EVIDENCE below. Σ partition m0 vs total m0 was the
+   measurement that settled it.
 
-**Accept:** Partition heights sum to total Hs within tolerance. The 12°-separation case from
-2026-07-25 resolves as two partitions, not one smeared. Comparison table recorded in the plan.
+**Accept — status:** ✅ code, tests, and QC complete (117 passed; 15 pre-existing fixture errors
+dated `46eb8839`, 2026-07-17). ⚠ **The Σ-partition-m0-equals-total-m0 acceptance criterion is NOT
+yet verified on real data.** The preserved payload used for the measurement below has
+`components` written by `decompose_spectrum()` itself, so it reproduces the broken baseline and
+cannot grade the fix. Re-run `scripts/verify_partition_duplication.py` against a **fresh** model
+run after deploy and record closure here; it should be ≈1.0 against the 1.626 median below. The
+in-repo unit test uses a synthetic self-consistent spectrum and is a parser contract test, not
+this measurement.
 
 > ### ✅ EVIDENCE 2026-07-25 — measured, and it settles the trigger-1 question
 >
@@ -1961,6 +2052,20 @@ logged. A spot with N transects produces N distinct point sets.
 > **Still to check before the swap lands:** whether the per-partition SwellTrack path is
 > running the 1D model once per duplicate (43 of 67 timesteps report 3 components), which
 > would be redundant compute on top of the display error.
+>
+> ⚠ **ADDENDUM — what this measurement can and cannot be reused for.** The same script was
+> re-run on 2026-07-25 against the `components` already stored in that preserved payload, on the
+> assumption they were SWAN's own PT* output and could therefore grade the replacement without a
+> deploy. It returned the numbers above **identically to three decimal places** — same 1.626
+> median, same 2.271 worst case, same three components at 206.4°/210.1°/201.1°. Inspection of
+> the deployed code on librewxr confirms why: both sites that populate `components`
+> (`swan_runner.py:317` and `:1108` as deployed) call `decompose_spectrum()`. The stored
+> `components` **are** the broken output. So this file establishes the baseline and cannot
+> validate the fix — that requires a fresh run. Recorded because the same shortcut looks
+> reasonable and will be attempted again otherwise.
+>
+> The redundant-compute question above remains open and is the likely explanation for open item
+> 2 (≈1260 unattributed `run_pipeline` calls). Not investigated in this round.
 
 ### T4B.3 — Per-transect per-hour selection
 
