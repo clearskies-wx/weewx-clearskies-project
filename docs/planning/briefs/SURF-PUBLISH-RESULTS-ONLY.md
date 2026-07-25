@@ -31,13 +31,44 @@ whether the model produced anything new. The model cycle is ~25 minutes. That is
 
 Two further findings from tracing:
 
-1. **`handoff_by_transect` has one consumer and it never fires.** The surf endpoint
-   reads it only when a timestep is missing from the precomputed `swelltrack` cache.
-   Live coverage measured at 67 forecast timesteps / 67 precomputed entries / 0 missing.
-2. **When the recompute path does fire, the data round-trips.** The API downloads the
+1. **`handoff_by_transect` has one consumer: the surf endpoint's recompute branch.**
+2. **When the recompute path fires, the data round-trips.** The API downloads the
    spectra from the SWAN service (port 8767), then POSTs them back to the compute
    service (port 8770) on the same host — `compute_client.py:292` sends `specout_data`
    verbatim. The `weewx` host acts as a courier for data that starts and ends on `librewxr`.
+
+### CORRECTION (2026-07-25, after first draft) — the recompute branch is the ONLY live path
+
+The table above was measured from `forecast_cache.json` on librewxr's disk. That is the
+model host's internal state, **not** what the API receives. The published payload measured
+directly:
+
+```
+GET https://192.168.7.22:8767/surf/huntington-city-beach-pier/forecast
+http=200 bytes=21029707
+published keys: ['forecast', 'spectral', 'transect', 'run_time', 'hrrr_cycle_time']
+swelltrack present: False
+```
+
+`service.py` populates its HTTP cache by hand-copying five keys at two sites
+(`service.py:162` disk-restore, `service.py:244` post-run) and **drops `swelltrack`**.
+So the precompute added in API commit `cde804e` reaches disk and Redis on librewxr and
+then never reaches the API at all.
+
+Consequences, all of which supersede the first draft:
+
+- The recompute branch is not dormant. In production it is the **only** path, running the
+  1D pipeline for all 67 timesteps on every `GET /surf` request.
+- Published payload is **21.03 MB**, not 24.88 MB (the disk figure includes `swelltrack`
+  and a wrapper). LAN transfer is **~29 GB/day** for one spot, not ~36 GB/day.
+- This is a plausible full explanation for the ~1,260 unattributed `run_pipeline` calls
+  (67 timesteps × ~19 requests), which §6 previously listed as unconfirmed.
+- Nothing anywhere asserts that the key set the runner produces and the key set the
+  endpoint serves agree. That is why this survived undetected.
+
+**Restoring `swelltrack` to the published payload is a prerequisite for §3.5, not a
+cleanup.** Deleting the API's recompute branch before that fix is live would leave the
+surf endpoint returning `unavailable` for every timestep. See §7 for deploy order.
 
 ## 2. Operator ruling (2026-07-25)
 
@@ -171,12 +202,30 @@ Render the beach-profile unavailable state instead of an error tile (§3.6).
 Check `OPERATIONS-MANUAL.md` and `DASHBOARD-MANUAL.md` and state explicitly whether each
 needs a change.
 
-## 6. Known adjacent issues — NOT in scope
+## 6. Deploy order — mandatory
+
+The correction in §1 makes sequencing load-bearing. Deploying these out of order takes the
+surf endpoint down.
+
+1. **`swelltrack` publication fix** (SWAN service, committed separately and first).
+   Deploy to librewxr. Verify from the weewx host that the published payload now contains
+   `swelltrack` with a non-zero entry count.
+2. **Payload trim + new endpoints** (SWAN service). Deploy to librewxr. Verify published
+   size < 3.5 MB and that both new endpoints answer.
+3. **API changes** (conditional fetch, recompute deletion, beach-profile rewire). Deploy to
+   the weewx host **only after 1 and 2 are verified live.**
+4. **Dashboard** unavailable-state rendering.
+
+Step 3 before step 1 leaves every timestep reporting `modelStatus: "unavailable"`.
+
+## 7. Known adjacent issues — NOT in scope
 
 - The SWAN service's own precompute POSTs to the compute service on the same host
   (`providers/nearshore/swan.py:1526` → port 8770 on librewxr). Wasteful, but internal to
   the model host and generates no LAN traffic.
 - `omp_num_threads = 16` is stale in the weewx host's `/etc/weewx-clearskies/api.conf`.
   Harmless (SWAN does not run there) but misleading.
-- The ~1,260 unattributed `run_pipeline` calls are plausibly explained by the pre-precompute
-  behaviour (67 timesteps × ~19 surf requests). Not confirmed; tracked separately.
+- The ~1,260 unattributed `run_pipeline` calls: see the §1 correction. The dropped
+  `swelltrack` key means every `GET /surf` request runs 67 pipeline invocations *today*,
+  which fits 67 × ~19 requests. Strong lead, still not formally confirmed — closing that
+  question is tracked separately and must not be treated as closed by this brief.
