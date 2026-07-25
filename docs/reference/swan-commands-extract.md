@@ -79,8 +79,10 @@ descending significant wave height. At most 10 partitions.
 
 Valid in both `BLOCK` and `TABLE`. Source: manual p. 106 and `swanpre2.ftn:1572`.
 
-**Each keyword expands to 10 columns.** You cannot request an individual partition — SWAN
-rejects e.g. `PT02HS` with *"Invalid partitioning output specification. Use PTHSIGN instead."*
+**Each keyword expands to a fixed block of columns** — the manual says up to 10, but the
+41.51AB build in use emits **6**. See the measured correction below before relying on either
+number. You cannot request an individual partition — SWAN rejects e.g. `PT02HS` with
+*"Invalid partitioning output specification. Use PTHSIGN instead."*
 
 | Keyword | Column names | What it is | Exception value |
 |---|---|---|---|
@@ -94,11 +96,39 @@ rejects e.g. `PT02HS` with *"Invalid partitioning output specification. Use PTHS
 
 > **PARSER TRAP — `PTDIR` uses `-999`; every other PT variable uses `-9`.** Verified in
 > `swanmain.ftn:2649+` (`OVEXCV` per `IVTYPE`: 100→-9, 110→-9, 120→-9, **130→-999**, 140→-9,
-> 150→-9, 160→-9). A parser assuming one uniform sentinel will read absent partitions as real
-> data. Absent partitions carry the exception value — **not** zero, **not** blank.
+> 150→-9, 160→-9). A parser assuming one uniform sentinel will misread those points.
 >
 > *Possibly normalisable via `QUANTITY PTDIR excv=-9.` — *unverified*, do not rely on it without
 > testing.*
+
+> ### ⚠ CORRECTION 2026-07-25 — measured against real output, supersedes the two claims above
+>
+> Both of the following were wrong in this document and were corrected against a real
+> production `TABLE_1.txt` (SWAN 41.51AB, HB Pier L3, 1273 data rows, run 10:14Z). Raw file
+> preserved at `librewxr:/home/claude/p4b/TABLE_1_20260725T1014Z.txt`.
+>
+> **1. Each PT keyword expands to 6 columns, NOT 10.** The real header is
+> `HsPT01…HsPT06`, `TpPT01…TpPT06`, `DrPT01…DrPT06`, `DsPT01…DsPT06`. A row emitted with
+> `TIME XP YP HSIGN HSWELL TM01 DIR DEPTH QB DISSURF DSPR PTHSIGN PTRTP PTDIR PTDSPR` has
+> **35 columns**, not the 51 that "10 columns per keyword" predicts. Any output-size or
+> column-offset estimate derived from 10 is wrong.
+>
+> **2. Absent partitions at wet points carry `0.00000` — NOT the exception value.** Checked
+> every PT column of all 1273 rows: **zero occurrences of `-9` or `-999`**, and 25,288
+> exactly-zero entries. The exception value applies to points where the variable is
+> *undefined* (dry/masked), not to unused partition slots at a wet point. An empty slot is
+> legitimately zero energy.
+>
+> **Consequence — a parser that skips a slot only on the sentinel will emit phantom
+> partitions.** `services/swan_spectral.py`'s `parse_table_pt_partitions()` currently does
+> exactly this (`if hs is None: continue`, reached only via `_is_pt_exception`), so it would
+> report 6 partitions per row — 5 of them height 0, period 0, direction 0 — where SWAN
+> actually found 1. Filter on `hs > 0`, not on the sentinel alone. Not yet live: that
+> function has no callers as of 2026-07-25, so this is a latent defect, not a production one.
+>
+> **Observed partition counts** (rows with Hs > 0.05, n = 1254): 1 partition in 95.2%,
+> 2 in 4.6%, 3 in 0.2%; slots 4–6 never populated. Energy closure
+> `sqrt(Σ PTHs²)/Hsig` = 1.0161 mean (1.0007–1.0254).
 
 **`PARTIT` is BLOCK-only.** The manual states it "cannot be used as an output parameter in
 TABLE," and it must not be combined with other parameters in BLOCK.
@@ -108,6 +138,37 @@ ADR-093 Amendment 2 states SwellTrack "marches bulk parameters per partition and
 surface." So TABLE with PT* quantities supplies what SwellTrack consumes directly, without
 writing and re-partitioning full 2D spectra. Measured 2026-07-25 at HB: `TABLE_1.txt` 204 KB vs
 `SPEC_1.txt` 7.4 MB for the same 18 stations × 73 timesteps.
+
+## INITIAL HOTSTART — warm-start from a previous run's HOTFILE
+
+```
+INITial < HOTStart < MULTiple > 'fname' < FREE        >
+                    | SINGle  |          | UNFormatted
+```
+
+**`SINGLE` or `MULTIPLE` is REQUIRED.** It sits between `HOTSTART` and the quoted filename.
+There is no `fname=` prefix — the filename is a bare quoted string. `FREE` is the default
+format and may be omitted.
+
+- `SINGLE` — read from one (concatenated) hotfile. This is what a serial/OpenMP run wants.
+- `MULTIPLE` — read the per-process hotfiles produced by a previous **parallel MPI** run.
+
+Source: [SWAN User Manual, Cycle III 41.51 §4.5](https://swanmodel.sourceforge.io/online_doc/swanuse/node27.html).
+
+> **DEFECT 2026-07-25 — `swan_formats.py:1207` emits the keyword-less form.** It writes
+> `INIT HOTSTART 'hotstart.dat'`, omitting `SINGLE`. SWAN rejects it: with a valid hotfile
+> present, L1 crashed 1.4 s after start and L2 in 0.5 s — fast enough to be a parse/format
+> rejection, not numerical divergence. The crash-retry then deletes the hotfile and reruns
+> cold, so the cycle still completes and the symptom is invisible except as a WARNING.
+>
+> This went unnoticed for as long as it did because of a *second*, unrelated bug: the
+> hotstart was never loaded at all (save used `level1`/`level2`/`level3_<idx>`, load used
+> `outer`/`inner`), fixed in `a1fa14f`. Only once the file was actually found did SWAN get
+> the chance to reject it.
+>
+> **This entry did not exist before 2026-07-25** — unlike CURVE/POINTS/TABLE/PT*, the
+> HOTSTART syntax was never checked against the manual, which is how the wrong form shipped.
+> Confirm against the binary before changing the emitted string; manuals and builds disagree.
 
 ## QUANTITY — set output parameters
 
