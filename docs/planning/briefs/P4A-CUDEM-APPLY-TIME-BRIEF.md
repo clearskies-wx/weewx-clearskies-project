@@ -345,6 +345,45 @@ into the scheduler thread and do not partially run. Do not write a hotstart and
 do not touch the forecast cache on a skipped run (the existing convergence-gate
 code already models this behaviour — read it and be consistent).
 
+### LC-42 — Finish the vocabulary rename in `swan.py`, WITH cache-key migration
+
+**Added 2026-07-24, after T4A.1 landed.** T4A.1 unified the beach-profile
+vocabulary to `distance` / `depth` / `hs` across both endpoints' **responses**.
+One producer was left behind because it lives in *your* file:
+`providers/nearshore/swan.py` (~line 1798) builds `transect_by_time` entries as
+`{"distanceFromShore": …, "depth": …, "waveHeight": …}`.
+
+Its consumers: `swan.py` itself (~1673 and ~2230, reading `prev_cache["transect"]`)
+and `endpoints/surf.py` (~765, ~875, ~891, ~897).
+
+I started this as a lead-direct fix and **reverted it before committing**, because
+it is not mechanical: **these dicts are persisted in the SWAN forecast cache.**
+Live cached data on weewx and librewxr uses the old spellings. Renaming the
+producer without a migration path means every read of an existing cache entry
+silently returns `None` — introducing the exact silent-degradation failure this
+phase exists to remove, via the fix for it.
+
+**Do:**
+1. Rename the producer keys to `distance` / `depth` / `hs`.
+2. Update every consumer listed above.
+3. **Handle the migration explicitly.** Your call between: (a) readers accept
+   both spellings for one cycle, with the legacy branch logged at INFO and a
+   comment naming the release it can be deleted in; or (b) bump the cache key /
+   version so stale entries are ignored and regenerated. **State which you chose
+   and why in your closeout.** What is not acceptable is a rename with no
+   migration story — that is the whole reason I reverted mine.
+4. Verify afterwards: `grep -n "distanceFromShore\|waveHeight"
+   weewx_clearskies_api/providers/nearshore/swan.py
+   weewx_clearskies_api/endpoints/surf.py` — remaining hits must be only the
+   `SwanForecastPoint` **attribute** reads (`getattr(pt, "distanceFromShore", …)`,
+   SWAN's own object model, not part of this contract) and the legacy-read branch
+   if you chose (a).
+
+Note `_run_all_spots_locked()`'s `pt.waveHeight` attribute access and the
+`CAPABILITY.supplied_canonical_fields` tuple containing `"waveHeight"` are
+**different things** — canonical field names in the provider registry, unrelated
+to the transect dict vocabulary. Do not touch either.
+
 ### LC-13 — Vertical datum metadata is mandatory and must not default to a guess
 
 Do step 8 requires `vertical datum` in the per-spot profile metadata, citing

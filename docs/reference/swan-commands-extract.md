@@ -292,6 +292,72 @@ READINP WLEV [fac] 'fname' [idla] [nhedf] FREE
 
 **Phase 7 note:** The setup estimate is added to the tide value at each grid point BEFORE writing WLEVEL.txt. SWAN sees one combined water level — it does not know or care that it contains both tide and setup components.
 
+## SURFBEAT — infragravity energy module (Reniers & Zijlema 2022)
+
+**Verified 2026-07-21** against installed SWAN 41.51AB binary (source at `/tmp/swan_src/src/swanpre1.ftn`) and the SWAN 41.51 user manual. The command is recognized by the parser; all restrictions below are enforced at runtime.
+
+Syntax:
+```
+SURFBeat [df] [nmax] [emin] UNIForm|LOGarithmic
+```
+
+- `[df]` — IG frequency bin size (Hz). Default: 0.01.
+- `[nmax]` — maximum short-wave pairs for bichromatic group forcing. Default: 50000.
+- `[emin]` — energy threshold as fraction of spectral peak. Default: 0.05.
+- `UNIForm|LOGarithmic` — IG frequency spacing. Default: UNIForm.
+
+**Two-COMPUTE procedure (mandatory):**
+1. First COMPUTE: sea-swell spectrum + bound infragravity waves.
+2. Second COMPUTE: reflected (free) infragravity waves.
+3. More than 2 COMPUTEs with SURFBEAT triggers error: "command COMPUTE must appear no more than twice."
+
+**Grid restrictions (enforced at runtime):**
+- **1D mode forbidden:** "surfbeat computation not allowed in 1D mode"
+- **Non-rectilinear grids forbidden:** "surfbeat only supported for rectilinear grids" — regular (REG) grids only, not curvilinear or unstructured.
+
+**Mode restriction:** Stationary conditions only.
+
+**Boundary requirement:** "boundary specification is not correct in case of surfbeat -- please only west boundary should be specified." Offshore spectrum imposed on the west boundary only.
+
+**Geometry convention:** Positive x-axis pointing eastward. Mild, alongshore-uniform bottom slopes assumed. Shoreline IG reflection configured via OBSTACLE on the east side.
+
+**OBSTACLE IG reflection setup:**
+The OBSTACLE command's `FIG` sub-command handles shoreline IG generation:
+```
+OBSTACLE ... FIG [alpha1] [hss] [tss] [dss] [dd] [minfr] [shape]
+```
+This is separate from the SURFBEAT command itself — configured on the OBSTACLE line that represents the shoreline.
+
+**OBSTACLE sea-swell reflection:**
+```
+OBSTACLE ... REFLec [reflc] RSPEC|RDIFF [pown]
+```
+- `[reflc]` — reflection coefficient (0.0-1.0)
+- `RSPEC` — specular reflection
+- `RDIFF` — diffuse reflection
+- `[pown]` — power of the cosine in diffuse reflection
+
+**Output:** IG energy appears as explicit low-frequency bins in spectral output (SPECOUT). Extract Hs_ig by integrating below the split frequency (typically 0.04 Hz).
+
+**SurfBeat strip configuration (for benchmark — see 1D-MODEL-BENCHMARK-BRIEF §7.3):**
+```
+PROJECT 'SBstrip' '001'
+MODE STATIONARY
+CGRID REG [xp] [yp] 0. [xlenc] [ylenc] [mxc] [myc] CIRCLE 36 0.004 1.0 60
+$  IG range: 0.004-1.0 Hz, 60 freq bins (captures IG + sea-swell)
+INPGRID BOTTOM REG [xp] [yp] 0. [mxc] [myc] [dx] [dy]
+READINP BOTTOM 1. 'bottom.txt' 3 0 FREE
+BOUND SIDE WEST ...  $ offshore spectrum
+OBSTACLE ... FIG ...  $ shoreline east side with IG reflection
+SURFBEAT
+COMPUTE  $ first: sea-swell + bound IG
+COMPUTE  $ second: reflected free IG
+$ output spectral stations along centerline
+POINTS 'SB1' [x1] [y1]
+SPECOUT 'SB1' SPEC2D ABS 'SPEC_SB1.txt'
+STOP
+```
+
 ## Per-level physics summary
 
 | Command | L1 (1 km) | L2 (100 m) | L3 nonstationary | L3 stationary |
