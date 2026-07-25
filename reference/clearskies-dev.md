@@ -151,6 +151,36 @@ Two consequences that catch people out:
 - Because both services run from the API repo's venv, **the API repo checkout on librewxr is
   the one that matters for any SWAN, SwellTrack, SurfBeat, or surf-endpoint change.**
 
+### librewxr resource budget — `omp_num_threads = 6` is an operator decision
+
+`/etc/weewx-clearskies/api.conf` → `[swan] omp_num_threads = 6`. **Six. Not 16, not 0.**
+This is an operator ruling, not a tuning knob. Do not change it without asking.
+
+Why it matters: the SWAN binary is OpenMP (`ldd /usr/local/bin/swan` → `libgomp.so.1`) and
+allocates private work arrays *per thread*, so the thread count multiplies its resident set,
+not just its core usage. Measured on the same 81×71 L2 grid:
+
+| `omp_num_threads` | SWAN RSS | L2 wall-clock, quiet box |
+|---|---|---|
+| 16 | 627 MB peak, **179 MB into swap** | 6m51s – 7m57s |
+| 6 | **87 MB**, no swap | 9m40s |
+
+Six threads is *slower* in isolation. That is the accepted trade: the box has 5.7 GB total
+with the radar container (`librewxr.main`) holding ~3.2 GB resident, leaving ~1.7 GB. At 16
+threads SWAN only just fit, and on 2026-07-25 08:37 UTC — when the compute service was
+simultaneously working through a batch at 519 MB RSS — it stopped fitting and **L2 took
+50m32s instead of 7m**. Both conditions were necessary; 16 threads alone ran fine for days.
+
+`api.conf` is **not in git** — it is deployed state only, so nothing detects drift in it.
+It drifted once already: `docs/planning/briefs/SWAN-NESTING-RESEARCH-BRIEF.md:382` records
+`omp_num_threads=6→16 now visible`, when renaming the dead `[trushore]` section to `[swan]`
+made the key live and it was written as 16. Check the live value before trusting any
+runtime measurement from this host:
+
+```bash
+ssh -F .local/ssh/config librewxr "grep -A1 '^\[swan\]' /etc/weewx-clearskies/api.conf"
+```
+
 ## SSH access
 
 Direct SSH from DILBERT using the project SSH config at `.local/ssh/config`. Always use `-F .local/ssh/config`.
@@ -221,13 +251,20 @@ report a result from it.** It was last seen at `ba3af8f`, unrelated to any curre
 
 | Change touches… | Run its **tests** on | Runs in **production** on |
 |---|---|---|
-| SWAN, SwellTrack, SurfBeat, surf endpoint, beach profile, marine providers | **weewx** (librewxr has no test deps) | **librewxr** — SWAN service 8767, compute service 8770 |
+| SWAN, SwellTrack, SurfBeat, surf endpoint, beach profile, marine providers | **librewxr** — where the code actually runs | **librewxr** — SWAN service 8767, compute service 8770 |
 | Condition modules (haze, calibration, sky, fog), archive/DB, general API | **weewx** | weewx — API installed natively, reads the weewx archive |
 | Dashboard, config UI | **weather-dev** | weather-dev — dashboard build + Caddy |
 
-**Do not conflate those two columns.** Where code *runs* and where its *tests* run are different
-questions here, and getting them backwards wastes a cycle. SWAN executes on librewxr; its tests
-execute on weewx.
+**Test SWAN/surf code on the host it runs on — librewxr.** Testing it on weewx measures a
+host that does not execute that code in production.
+
+**Corrected 2026-07-25.** This table previously read "run its tests on **weewx** (librewxr has
+no test deps)" for the SWAN/surf row, and the section below asserted librewxr "cannot run
+tests." That was true only before SWAN was split out onto librewxr, and the doc was never
+updated. It cost a session: an agent followed it, deployed SWAN changes to weewx — a host
+that does not run SWAN at all — and ran the test suite there. `pytest`, `pytest-asyncio` and
+`pytest-timeout` were installed into librewxr's venv on 2026-07-25, so the stated blocker no
+longer exists either.
 
 ### Deploy before you test — a container test proves nothing about an unpushed edit
 
@@ -240,12 +277,23 @@ and reporting it as verification is a false-clean result.
 scripts/deploy-api.sh --no-restart
 ```
 
-### Run pytest — always on `weewx`, including for SWAN and surf code
+### Run pytest on the host that runs the code
 
-**`librewxr` cannot run tests. It has no test dependencies installed** — `uv run pytest` there
-fails with `error: Failed to spawn: pytest`. It is a runtime host: it *runs* SWAN and the
-compute service, it does not test them. So even though SWAN and SwellTrack execute on librewxr,
-their **tests** run on weewx, which has the full dev environment.
+- **SWAN, SwellTrack, SurfBeat, surf endpoint, beach profile, marine providers → `librewxr`.**
+  `pytest`, `pytest-asyncio` and `pytest-timeout` are installed in
+  `/home/ubuntu/repos/weewx-clearskies-api/.venv` (added 2026-07-25).
+- **Everything else (conditions, archive/DB, general API) → `weewx`.**
+
+```bash
+# SWAN / surf tests — on librewxr, using the venv python directly:
+ssh -F .local/ssh/config librewxr "sudo -u ubuntu /home/ubuntu/repos/weewx-clearskies-api/.venv/bin/python -m pytest /home/ubuntu/repos/weewx-clearskies-api/tests/services/test_swan_runner.py -q"
+```
+
+**Never run pytest on librewxr while a SWAN cycle is in progress.** A full cycle is 15–30
+minutes and the box has ~1.7 GB free after the radar container's 3.2 GB. Test load during a
+run competes for memory with SWAN and both distorts the run's wall-clock and risks pushing it
+into swap. Check first:
+`ssh -F .local/ssh/config librewxr "systemctl is-active weewx-clearskies-swan; pgrep -x swan"`
 
 Three things all container test runs need, or they fail in confusing ways:
 
