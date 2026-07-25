@@ -1179,15 +1179,69 @@ L3 is enabled: `1 of 1 cluster(s) enabled`.
    coarse zone never begins. Correct by construction given the inputs. Worth noting that the
    criterion "~400–500 points (variable resolution)" was written before `structure_zone_depth`
    entered the fine-zone formula and no longer describes the reachable outcome here.
-2. **Zero jacking factors at every tested Hs.** T4A.6 item (b)'s jacking annotations therefore
-   will not render at HB against real data. This is the concrete form of the audit's A8 concern —
-   B3 had to hand-add a jacking value during T4A.6 because a real parameter sweep stayed below
-   the render threshold; the regenerated profile now confirms there are no jacking factors at all.
-   Likely because PCHIP through a 10 m DEM does not resolve HB's sandbars. **Not fixed here** —
-   feature exists, data does not exercise it.
+2. **The source DEM has no sandbar field — one cause, three symptoms.** Measured, not inferred:
 
-**Also observed:** every break point at every tested Hs classified `spilling`; no plunging
-anywhere across 1–4 m swell at a pier. Plausible for a sandy beach, but recorded as a watch item.
+   | Profile | Sampling | Local depth minima (bar crests) |
+   |---|---|---|
+   | Raw NCEI CUDEM `orange_county_13_navd88_2015.nc` (L3 fine) | 8.57 m native | **1** — 7 cm relief at 6.9 m depth (noise, outside the surf zone) |
+   | Interpolated profile written to cache | 1.5 m | **1** — 5 mm relief, same location |
+
+   At 8.6 m sampling a 30–50 m sandbar would span 4–6 samples and be plainly resolvable. It is
+   not there. The surf zone (0–250 m, 0–5.6 m depth) is a smooth monotonic ramp at ~1:50.
+   **PCHIP is not the cause** — the interpolation faithfully reproduces a smooth slope because
+   the source is a smooth slope. Expected for CUDEM: surf-zone cells are interpolated between
+   topographic LiDAR (dry beach) and offshore bathymetry, and the bar field sits in that seam;
+   it is also a 2015 composite, and bars migrate seasonally.
+
+   Three things first recorded as separate observations are this one finding:
+   - **Zero jacking factors.** `_compute_jacking()` requires a strict local depth minimum
+     (`depths[i] < depths[i±1]`). There is none, so T4A.6 item (b)'s jacking annotations do not
+     render at HB with real data. This is the audit's A8 concern made concrete — B3 hand-added a
+     jacking value during T4A.6 because a real sweep stayed below the render threshold.
+   - **Every breaker classifies `spilling`; no plunging at any swell 1–4 m.** Plunging needs a
+     steep bar face; on a 1:50 plane slope the Iribarren number stays low everywhere.
+   - **Break points smear** across 40–219 m as a continuous dissipation ramp rather than
+     concentrating at a bar crest.
+
+   Face heights are probably under-predicted at the peak, since bar-crest amplification is what
+   the jacking factor represents — **inference from the physics, not measured.**
+
+   **Operator ruling 2026-07-25: accept and note.** No code fix can recover bars absent from the
+   source data, and no better bathymetry is available for this coast. Do NOT change the
+   bathymetry source, add a bar parameterisation, or loosen the `is_bar` test to make the feature
+   appear to work. Recorded as working to the best of available knowledge. Future path:
+   satellite-derived bathymetry — see [FUTURE-ENHANCEMENTS.md](FUTURE-ENHANCEMENTS.md).
+
+**FINDING — the handoff clamped on all 73 timesteps, and station spacing is why.** The full run
+(2026-07-25 07:06Z, 1200 s, `73/73 timestep(s) resolved a per-hour L3 station`) clamped every
+single hour. Target depths were 0.02–1.37 m (Hs 0.01–0.77 m); the transect's two shallowest
+stations are **0.98 m** (the grid boundary, excluded by design) and **2.37 m**, with nothing
+between, so every target in that gap pinned to 2.37 m with a WARNING.
+
+Consequence: the handoff sits at roughly **2.25× the breaking depth instead of the intended
+1.3×** — systematically too deep, on every hour. The grid was sized to reach the 1.8 m contour at
+85 m, but **station placement along the transect is too coarse to sample there**, so grid sizing
+and station density are not consistent with each other.
+
+> **This is NOT a small-conditions artefact — an earlier draft of this block said it was, and
+> that was wrong.** Conditions during this run were good: Surfline reported **4–6 ft, chest to
+> overhead**, with an active Beach Hazards Statement for high surf. The clamp fires in ordinary
+> rideable surf, not marginal seas. The mistaken "flat conditions" reading is recorded here
+> because it nearly buried a real finding behind a false explanation.
+
+**Not urgent, and deliberately not tuned here.** Face heights independently agree with Surfline
+(our max **5.93 ft** / mean 4.24 ft against their 4–6 ft), so SwellTrack absorbs the longer leg
+without visible error. Station density is a sampling choice adjacent to trigger 3, and **T8.7
+(Surfline comparison)** already exists as the plan's task for handoff-accuracy tuning against
+more than one afternoon of data. Routed there.
+
+> **A structural tension in the ADR's rule, surfaced not resolved.** Amendment 2 §2 says to size
+> the grid to "the smallest value [`1.3 × Hs(hour) / gamma`] ever produces for this spot's
+> conditions." That expression is unbounded below — as Hs → 0 the handoff depth → 0 and the grid
+> would run to the shoreline, which §1 forbids outright. A floor is therefore structurally
+> necessary, and `_MIN_DESIGN_HS_M = 1.0` is that floor, taken from the ADR's own worked example.
+> **Whether 1.0 m is the right value is an open question for the operator — trigger 1, not a
+> coordinator call.**
 
 **Profile coverage confirmed adequate:** deepest handoff needed is `1.3 × 4.0 / 0.73 = 7.12 m`
 and the profile reaches 10.2 m, so every forecast hour's handoff falls inside it.
