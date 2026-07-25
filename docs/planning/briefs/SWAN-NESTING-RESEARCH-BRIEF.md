@@ -211,6 +211,14 @@ What we actually need: **a line that represents where the flat continental shelf
 
 **Why 15m depth for the offshore boundary (DECIDED):**
 
+> **⚠ PARTIALLY SUPERSEDED (2026-07-25).** This derivation is still correct as the rationale
+> for L3's *offshore* (seaward) edge. Per ADR-093 Amendment 2: "L3's offshore (seaward) edge
+> stays at the 15 m contour — question closed... The reason to change the offshore edge no
+> longer exists, so it does not change." It does **not** govern L3's *shoreward* edge. Under
+> ADR-093 Amendment 2, the shoreward edge is the SWAN→SwellTrack handoff surface, sampled per
+> forecast hour, and is independent of this 15 m derivation. The 15 m figure itself is not in
+> question.
+
 Three independent lines of evidence converge on 8-10m as the depth where fine-scale features (sandbars, active morphology) exist. The 15m boundary provides a buffer above this.
 
 | Source | Finding |

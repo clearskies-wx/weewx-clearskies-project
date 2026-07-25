@@ -171,6 +171,17 @@ The Deltares recommendation to hand off at 5-8m for structure-affected spots mea
 
 #### 2.3.4 Pre-model handoff determination algorithm
 
+> **⚠ SUPERSEDED (2026-07-25).** This entire fixed, setup-time handoff algorithm — including
+> the `handoff_depth = min(handoff_depth, 15.0)` clamp in Step 3 below — is superseded by
+> ADR-093 Amendment 2. The handoff is no longer a single depth chosen once at setup. Grid
+> geometry is still frozen at setup, but the *cell the handoff spectrum is sampled from* now
+> moves every forecast hour with that hour's breaking depth:
+> `handoff_depth(hour) = 1.3 × Hs(hour) / gamma`, read just seaward of that contour. See
+> ADR-093 Amendment 2 point 2 and `docs/planning/briefs/L3-1D-BOUNDARY-DECISIONS-BRIEF.md`
+> section D2 — note D2 itself carries a superseding box at its top; read that box, not D2's
+> inline "DECIDED" text, which recorded an intermediate, since-withdrawn version of this same
+> idea (a fixed handoff frozen at the year's largest swell).
+
 The handoff depth must be determined during surf spot setup (wizard), before any SWAN run. Wave conditions (Hs, Tp, DIR), wavelength, and QB are NOT available at setup time.
 
 **Available inputs at setup time:**
@@ -369,6 +380,11 @@ Documented by Deltares (creators of both SWAN and XBeach):
 
 **v1: Option A (Analytical 1D) with standard one-way coupling, multi-transect architecture.**
 - SWAN L3 runs to shore (current architecture, no changes).
+
+  > **⚠ SUPERSEDED (2026-07-25).** L3 no longer runs to shore. Per ADR-093 Amendment 2, L3's
+  > shoreward boundary is the SWAN→SwellTrack handoff surface (the extraction cell moves per
+  > forecast hour); SwellTrack and the SurfBeat strip model from there to the beach. "No
+  > changes" no longer describes the architecture.
 - CURVE output at 10m spacing (SURF-19 fix).
 - 30 SPECOUT extraction points per spot at the handoff depth (10m spacing across 300m).
 - Handoff depth per transect determined by the pre-model algorithm (§2.3.4): 10m default, shallower for structure-shadowed transects.
@@ -671,9 +687,23 @@ SWAN L3's value in the nearshore is the **2D spatial wave energy field** — str
 
 **Option 1: Keep L3 to shore + add 1D post-processing.** Zero risk. All 2D interaction preserved. **This is the v1 approach.**
 
+> **⚠ SUPERSEDED (2026-07-25).** No longer the v1 approach. Per ADR-093 Amendment 2, L3 stops
+> at the SWAN→SwellTrack handoff surface, not the shoreline. See Option 3 below, which now
+> describes the adopted architecture.
+
 **Option 2: Coarsen L3 (15-20m instead of 10m).** 2-4x compute savings. OBSTACLE energy blocking and bulk refraction don't need 10m resolution. The 1D model fills in surf zone detail. **Investigation needed** — and must include re-deriving DIFFRACTION smoothing parameters (`smnum=27` was tuned for 10m grid) and re-running the convergence gate validation from SWAN-L3-STABILITY-PLAN.
 
 **Option 3: Truncate L3 at handoff depth.** Loses all nearshore structure interaction. **Not recommended** for structure-affected spots.
+
+> **⚠ REVERSED (2026-07-25).** This option now describes the adopted architecture. Per
+> ADR-093 Amendment 2 point 1: "L3 does not run to shore. Its shoreward boundary is the
+> SWAN→SwellTrack handoff surface. SwellTrack and the SurfBeat strip model from there to the
+> beach." The "not recommended" judgment above assumed L3's pre-1D geometry (offshore edge at
+> 15 m, shoreward edge at the shoreline); per Amendment 2's own framing, that geometry "were
+> derived when SWAN modelled to shore by itself. Neither survives the introduction of
+> SwellTrack and the SurfBeat strip." That is why the recommendation reversed — see Amendment
+> 2 points 3–4 for how the L3 trigger and viability test now bound where structure-interaction
+> loss is accepted for a truncated grid.
 
 ### LUT for expensive models
 
