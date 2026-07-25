@@ -23,7 +23,7 @@ imports these additional API-internal modules, none of which appear in any phase
 |---|---|---|
 | `providers/_common/rate_limiter.py` | 83 | 8 marine provider modules |
 | `providers/_common/nws_zones.py` | 783 | `nws_marine.py` |
-| `providers/_common/datetime_utils.py` | — | marine providers |
+| ~~`providers/_common/datetime_utils.py`~~ | — | ~~marine providers~~ — **wrong, see correction below** |
 | `models/responses.py` | 1,867 | 7 marine modules (marine subset only) |
 | `units/conversion.py` | 158 | 3 marine modules |
 | `metrics.py` | 174 | 2 marine modules |
@@ -42,8 +42,51 @@ changes — copying a shared utility so the new service is self-contained change
 what any piece is responsible for. The API keeps its own copies until Phase 6 deletes only the
 marine-specific ones.
 
+**Correction 2026-07-25 — `datetime_utils.py` does NOT belong on that list.** The row above was
+built from a whole-directory import survey. A per-file check by the Round 1 agent across every
+marine provider, service, enrichment and config module found **zero** importers. `coops.py`'s
+docstring names `to_utc_iso8601_from_offset` only to explain why it does *not* use it (CO-OPS
+timestamps are naive-GMT, so it defines its own `_parse_gmt_naive_to_iso8601`) — which is
+precisely what fooled the survey. Nothing is ported. Kept visible rather than deleted so the
+next reader knows the question was asked and answered.
+
 **Follow-up:** the plan's §0.6 line counts and the "~28,735 lines removed" total will not
 match reality. Corrected counts recorded at QC Gate 5.
+
+### C-01a — `nws_zones.py` is ported trimmed, not whole (DECIDED)
+
+Two marine importers, not one: `nws_marine.py` (`get_wfo_for_zone`) and `nws_srf.py`
+(`get_cwa`). But `discover_marine_zones()` and its apparatus (~430 of the file's 784 lines) is
+called only from `endpoints/setup.py` — wizard-time zone discovery, which stays on the API.
+Ported: `get_cwa`, `get_wfo_for_zone` and shared internals (~350 lines). Left behind: the
+discovery apparatus, with a module-docstring note recording what was omitted and why, so it
+does not read as lost. Grounds: `rules/coding.md` §3, no code without a current caller.
+
+---
+
+## C-13 — §0.6's enrichment section misses three modules (OPEN → folded into T5.9)
+
+Raised by the Round 1 agent, verified by the coordinator against `endpoints/fishing.py:60-62`.
+§0.6 lists three enrichment modules to move (`breaker_height`, `surf_scorer`, `wave_transform`).
+`endpoints/fishing.py` additionally imports **`enrichment/fishing_scorer.py`**,
+**`enrichment/fishing_species.py`** and **`enrichment/solunar.py`**. Same class of omission as
+C-01. They move with the fishing endpoint in T5.9; the `FishingForecast` / `SolunarTimes`
+response models move with them.
+
+---
+
+## C-14 — `endpoints/marine.py` imports `db/session.py` (OPEN)
+
+`endpoints/marine.py:98` does `from weewx_clearskies_api.db.session import get_engine`. The
+marine service has **no database layer** and no access to the weewx archive — the API
+co-locates with weewx precisely because it reads that archive locally (ADR-034). Whatever this
+engine is used for either (a) stays on the API and the marine service returns SI data the API
+merges, or (b) is a genuine coupling that needs an operator decision.
+
+**Not resolved now** — it needs the T5.9 agent to trace the actual call sites first, which is
+cheaper than guessing. Flagged here so it is not discovered halfway through the endpoint port.
+If it turns out the marine service would need its own DB dependency, that is trigger 7 and
+goes to the operator, not to the coordinator.
 
 ---
 
@@ -140,6 +183,116 @@ T6.5's note says "if tides are served by `endpoints/marine.py`, no separate `tid
 deletion is needed — verify before deleting." **Verified: it does exist**, 322 lines, with its
 own imports (`marine_config`, `water_level_compositor`, `ocean_data_resolver`). Phase 5 ports
 its behaviour; Phase 6 deletes it explicitly. Added to both task lists.
+
+---
+
+## ⛔ C-15 — BLOCKING, AWAITING OPERATOR: the marine service needs `prometheus-client`
+
+**Status:** escalated to the operator 2026-07-25. Work on `metrics.py` is stopped. Everything
+else in Round 1 proceeds.
+
+**Why it is blocking and why the coordinator did not decide it.** Adding a pip dependency is
+**trigger 7** on the architectural-change list. Neither the agent nor the coordinator may
+approve it. The agent stopped correctly; the coordinator escalated rather than recording a
+"lead call."
+
+**The facts, verified by the coordinator independently of the agent's report:**
+
+- `weewx_clearskies_api/metrics.py:23` imports `prometheus_client`.
+- `services/swan_runner.py:40` imports `SWAN_CONVERGENCE_FAILURES_TOTAL` and
+  `SWAN_LAST_RUN_VALID_FRACTION` from it.
+- `services/transect_handoff.py:61` imports `HANDOFF_QB_VIOLATIONS_TOTAL` from it.
+- `repos/weewx-clearskies-marine/pyproject.toml` contains **zero** prometheus references.
+- The API pins `prometheus-client==0.25.0`.
+
+Both `swan_runner.py` and `transect_handoff.py` are on the Phase 5 move list, so this is
+unavoidable — it is not a question the move can route around.
+
+**Options, with costs:**
+
+| Option | Cost |
+|---|---|
+| **(a) Add `prometheus-client==0.25.0` to the marine service, port the 3 marine metric definitions + `metrics_response()`** | One pure-Python dependency, already vetted and pinned in the sibling repo. Observability behaves identically after the move. |
+| (b) No-op shim keeping the symbol names, no dependency | Zero dependency cost, but the metrics silently stop existing. Nothing fails; the numbers just never arrive. This is the exact "valid response, wrong answer" failure mode the plan was written to remove. |
+| (c) Strip the metric calls from `swan_runner.py` / `transect_handoff.py` | Honest but it deletes convergence-failure and QB-violation observability from the model host — the host where those failures actually happen. Also edits physics-module call sites during a move that is supposed to be faithful. |
+
+**Coordinator's recommendation: (a).** It is what the API already does; ADR-031 governs
+observability for this stack; the plan's own premise is that the marine service has "the same
+architectural DNA as the API"; and `prometheus-client` is pure Python with no system libraries,
+so it costs nothing at install time. (b) is disqualified on principle — silent loss of signal.
+(c) trades a dependency for a blind spot on the one host where SWAN convergence failures occur.
+
+**Not being done while this is open:** `metrics.py` is not written in any form. In particular
+no shim — an absent module fails loudly at import, a shim fails silently forever.
+
+---
+
+## C-12 — the beach-profile "unavailable" state is unreachable by request (DECIDED)
+
+**Finding** (raised by the T5.0 agent, independently verified by the coordinator against
+`endpoints/beach_profile.py:745`). `GET /api/v1/surf/{id}/profile` takes `location_id` and
+`transect_index` only — **there is no time selector**. The handler always picks `closest_time`
+internally. So the §3.6 `modelStatus: "unavailable"` branch cannot be triggered by any request,
+and with the live system currently answering 67/67 timesteps there is no naturally occurring gap
+to capture either.
+
+This is not a contract defect — 404-vs-200 behaves correctly. It is a **testability** gap: the
+contract T5.0's correction most wants regression cover for is the one that cannot be captured
+live.
+
+**Decision.** `golden_surf_profile_unavailable.json` is built deterministically from
+`_unavailable_profile_response()` (API repo `12f9ddc`) wrapped in the real captured envelope,
+and is marked in `tests/fixtures/README.md` as synthetic-from-source rather than a live capture,
+with a note that it cannot be re-captured live and why. The alternative — shipping without it —
+would leave the 200-with-null contract uncovered, which is exactly how a later agent "restores"
+the 404 that SURF-PUBLISH-RESULTS-ONLY deliberately removed.
+
+**Follow-up for Phase 5's audit:** T5.9's port must preserve the unavailable branch. Note that
+the marine service's own model-host profile endpoint *does* take `?time=` (per
+`SURF-PUBLISH-RESULTS-ONLY.md` §3.2), so on that side the state IS reachable and can be tested
+for real. The manifest-facing endpoint keeps the no-time signature.
+
+---
+
+## C-10 — after T6.6 deletes `providers/nearshore/`, who reports model gaps? (OPEN)
+
+T5.9's correction requires `POST /report/gap` on the marine service so every model gap lands in
+the model's own log. The **client** for it lives today in the API at
+`providers/nearshore/swan.py` (`report_gap()`, `_gap_report_worker()`, line 1277+) — a file
+**T6.6 deletes**. The generic companion proxy (T6.1) is the natural owner of the replacement
+client, but no task assigns it.
+
+**Impact:** none on Phase 5. Must be resolved inside Phase 6 or the gap reporter POSTs into a
+void — and because it is deliberately fire-and-forget, that failure would be silent. Folded
+into the T6.1 brief when Phase 6 is dispatched.
+
+---
+
+## C-11 — the marine service does not carry SWAN's remote-mode client half (DECIDED)
+
+**Finding.** `providers/nearshore/swan.py` (2,307 lines) is two things in one file: model
+**orchestration** (`run_all_spots`, `_run_all_spots_locked`, `run_quick_update`, bathymetry
+download, obstacle building) and a **remote-mode client** that talks to a model host over HTTP
+(`configure_remote_mode`, `_remote_health_loop`, `is_remote_mode`, `fetch_profile`,
+`report_gap`). The marine service **is** the model host, so the client half has no meaning there.
+
+**Decision.** The marine service carries the orchestration half only. The API keeps its whole
+copy until Phase 6 deletes it, so nothing is lost at any point, and the generic companion proxy
+replaces the client half (see C-10).
+
+**Why this is not an architectural change.** §0.6's own disposition row for this file reads
+"SWAN orchestration (**rewritten as internal pipeline in marine service**)" — the split is the
+plan's stated design, not an inference from a stale document, and ARCHITECTURE.md independently
+describes the marine service as the model host. No responsibility moves: the marine service
+runs the model, which is what the orchestration half does.
+
+**Related structural finding, recorded so Phase 5 does not rediscover it.** The existing
+standalone SWAN service (`weewx-clearskies-swan-swelltrack`, 710 lines in `service.py`) is a
+thin wrapper that imports the physics from the installed `weewx_clearskies_api` package — its
+systemd unit runs `python -m weewx_clearskies_swan` out of the **API's** virtualenv. Its
+`_swan_runner_loop()`, its `/surf/{spot_id}/profile` handler, and its `/report/gap` handler are
+the closest working reference for what the marine service's run loop and model-host endpoints
+must do. T5.9 ports from there as well as from the API — it is not a fresh design.
 
 ---
 
