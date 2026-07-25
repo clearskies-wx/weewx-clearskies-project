@@ -97,6 +97,37 @@ Commit `03f81db`. Verified by the coordinator: all 10 moved providers import cle
 
 ---
 
+## C-25 — alerts must be re-merged API-side too, and are NOT an inventory gap (DECIDED)
+
+The Round 3 endpoint agent found that `endpoints/marine.py`'s `_fetch_active_alerts()` (list and
+detail routes) and `endpoints/beach_safety.py`'s alert-filter section both call
+`providers/alerts/nws.py`, which is absent from the marine repo. It proposed treating this as
+another C-01-class inventory gap and porting the import in anticipation.
+
+**That reading is wrong, and the plan settles it.** Alerts staying in the API is explicit and
+unconditional, stated in four places the coordinator checked before answering:
+
+- Plan **T1.1 item 7** — "alerts stay in the API … regardless of whether the marine service is
+  installed."
+- Plan **QC Gate 1** — "Verify alerts are documented as staying in the API, not moving to the
+  marine service."
+- Plan **line 885** — "Alerts are a core feature, not a marine extension. **Alerts never move.**"
+- **`ARCHITECTURE.md:140`** — "They are never moved to the marine service, regardless of whether
+  the marine service is installed or configured. **This is unconditional.**"
+
+So the module is absent **by design**. Porting the import would have created a non-import
+blocker no future round could ever clear, because the module is never arriving — a permanent
+lie in the code, and superficially indistinguishable from the fishing endpoint's *legitimate*
+blocked imports, which point at modules that will exist once C-15 is answered.
+
+**Disposition — same shape as C-24.** The marine service removes the alerts import and the
+alert-fetch calls entirely. No stub, no placeholder. The API re-merges alerts into the proxied
+response: it owns the unified alert system and produces exactly this data today. **Mandatory
+Phase 6 companion-proxy task, alongside C-24.** The affected response fields and call sites come
+out of the endpoint agent's closeout so the Phase 6 agent restores precisely those.
+
+---
+
 ## C-24 — station observations are lost from marine responses unless Phase 6 restores them (OPEN → mandatory Phase 6 task)
 
 This is the resolution of C-14, and it is a real quality regression that must not be allowed to
