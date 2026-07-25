@@ -2500,6 +2500,8 @@ The fine zone extends to whichever is deeper: the maximum breaking depth with sh
 
 The CUDEM source profile is interpolated to the variable-resolution grid using **PCHIP** (Piecewise Cubic Hermite Interpolating Polynomial) — preserves sandbar curvature without overshoot artifacts. The interpolated profile is generated once at spot setup and cached at `/etc/weewx-clearskies/spot_profiles/{spot_id}.json`. SwellTrack reads the pre-interpolated profile from the cache on every call. Structure changes re-trigger profile generation.
 
+**Precomputed SwellTrack cache (T4B).** `GET /api/v1/surf/{locationId}`'s per-timestep loop no longer runs the 1D pipeline on every request — it reads a precomputed result from the SWAN forecast cache (`payload["swelltrack"][validTime]`), falling back to the on-demand call only on a cache miss or a malformed entry. The precompute happens once per forecast timestep per spot at the end of each successful SWAN cycle. See PROVIDER-MANUAL §14.15 "Precomputed SwellTrack cache" for the full design, the measured cache-size tradeoff, and why `GET /api/v1/surf/{locationId}/profile` (the beach-profile endpoint) deliberately stays on its on-demand call rather than reading this cache.
+
 ### Blended beach profile
 
 The beach profile endpoint (`GET /api/v1/surf/{locationId}/profile`) returns a cross-shore wave height profile. When SurfBeat data is available, the profile blends two sources with a 50m linear taper centered on the break point:
