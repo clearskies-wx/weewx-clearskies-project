@@ -30,19 +30,41 @@ Full evidence in `c:	mp\marine-sep-P4-scratch.md`.
 
 ### Phase 4A — task status
 
+**Updated 2026-07-25, resume session Rounds 1 and 2.**
+
 | Task | State |
 |---|---|
 | T4A.1 (API side + dashboard side) | **DONE**, independently verified |
 | T4A.2 (PCHIP profile) | **DONE** |
 | T4A.2b (B-J flux marching + LC-22 exact Qb) | **DONE** |
 | T4A.4 (remove SWAN CURVE fallback) | **DONE**, independently verified |
-| **T4A.3.0** (reconstruct intended-vs-actual) | **NEW — not started. Blocks T4A.3.** |
-| **T4A.3** (CUDEM at apply time) | **HALTED by operator mid-implementation.** Zero commits; ~460 lines uncommitted in the API working tree, disposition undecided. Some of it implements a wrong coordinator instruction — see scratch file. |
-| T4A.5 (regenerate caches on librewxr) | Blocked on T4A.3 |
-| T4A.6 (6 API/dashboard shape mismatches) | Not started |
-| T4A.7 (delete `wave_transform` supplements) | Not started |
-| T4A.8 (SurfBeat `NameError`) | Not started |
+| T4A.13 (superseded brief banners) | **DONE** `25afa30` — 38 insertions, 0 deletions, coordinator-verified |
+| T4A.12 (remove Supplement 4 topographic multipliers) | **DONE** `7dd9899` + `4d58957` (API-MANUAL), coordinator-verified |
+| T4A.8 (SurfBeat `NameError`) | **DONE** `08ce616` — 6 F821 at parent → 0, coordinator-verified |
+| T4A.7 (delete `wave_transform` supplements) | **DONE** `167ad73` + `aef7669`. Gate answered: SWAN interpolates POINTS/SPECOUT output to the requested coordinate (manual §2.6.4/§4.6.1 + `swanout1.ftn` `SWOEXA`/`SWOEXD`). **Both** surviving supplements removed. |
+| T4A.3.0 (reconstruct intended-vs-actual) | **DONE** `ed4613f` — `briefs/P4A-INTENDED-VS-ACTUAL-RECONSTRUCTION.md`. 17 rows, 11 inventory entries, 8 named gaps. **No longer blocks T4A.3.** |
+| T4A.3 (CUDEM at apply time) | **IN PROGRESS.** The earlier "halted, uncommitted, implements a wrong instruction" state is resolved: that work was reviewed and committed as `244ee08`, and the claim that part of it implemented a retracted instruction **was wrong** — see the correction in `briefs/P4A-RESUME-SESSION-PROMPT.md`. `00564b9` adds `max_hs_m`. Remaining steps in flight. |
+| T4A.11 (widen L3 trigger + viability test) | **IN PROGRESS.** Merged with T4A.3 under one agent — both own L3 sizing in `swan_domain.py`. |
+| T4A.9 / T4A.10 (per-hour handoff + QB assertion) | **IN PROGRESS.** |
+| T4A.6 (beach profile shape mismatches a–g) | **IN PROGRESS.** |
+| T4A.5 (regenerate caches on librewxr) | Blocked on T4A.3 — coordinator-owned |
 | Adversarial audit + QC Gate 4A | Not started |
+
+**Defect found 2026-07-25 and folded into T4A.11 — L3-disabled spots currently produce NO data.**
+`swan_runner.py:1525` skips a cluster whose `grid is None`, and the returned result dict is only
+ever populated from L3's own output parse. The L2 deep-water reference SPECOUT **is** computed
+for every spot and then discarded, because the per-spot cache-write loop
+(`providers/nearshore/swan.py:1764`) never reaches those spot ids. ADR-093 Amendment 2 §4 states
+that such a spot "runs L1 → L2 → SwellTrack from L2's ~15 m reference, as an open beach does" —
+**that fallback does not exist in the code.** Because the viability test makes L3-disabled the
+majority case, landing it without the fallback would take working spots to zero data behind a
+valid HTTP 200. Building the fallback is now mandatory in T4A.11 and must land before the
+viability test can return false. Found by T4A.3.0, coordinator-verified in the code. Full
+citations: `briefs/P4A-INTENDED-VS-ACTUAL-RECONSTRUCTION.md` Area 1 row 1.3.
+
+Same root cause also silently disables the SurfBeat strip for those spots
+(`endpoints/surf.py:829–831`, `if not _sb_pts: continue`), which undercuts the premise that the
+strip carries approach-zone wave height once L3 stops early.
 
 ### Live production state (verified 2026-07-25, librewxr)
 
@@ -1164,6 +1186,17 @@ This is a specification, not a rediscovery exercise.
 |---|---|---|
 | g | The response carries no record of **where the handoff was taken from**. Under the old design that was a fixed setup-time depth, so it was implicit in the config. It is now a per-forecast-hour choice (`1.3 × Hs(hour) / gamma`), which means the same spot hands off at different depths across the 72 hours — and nothing in the response says which. | Add the handoff depth actually used, and the source level (`L3` or `L2`), to the per-hour transect data and to `metadata`. Without it, T4A.10's failure mode is undiagnosable from the API alone: a handoff sampled from a breaking cell returns plausible small numbers, and there is no way to tell that from genuinely small surf. |
 
+> **CORRECTED 2026-07-25 — items (a) through (e) need NO API changes.** This task's table is
+> written as though both sides were wrong. They are not: `endpoints/beach_profile.py` already
+> emits `waveShapes`, `jackingFactors`, `iribarren`/`partitionInfo`, `widthM`, `perPartitionBreaks`
+> and `metadata` correctly today. **The mismatch is dashboard-only for (a)–(e).** Item (f) is a
+> dashboard wiring change plus a value fix owned by T4A.3 (the datum). Item (g) is the only one
+> requiring new API code. Verified by the implementing agent and confirmed by the coordinator.
+>
+> **Item (d) resolved:** the plan flagged as unconfirmed which zones populate `width_m`.
+> `_classify_zones()` in `services/surf_1d_analytical.py` populates it **only** on
+> `total_surf_zone` — never impact, foam, or reform.
+
 **Do:**
 1. For each of (a), (b), (c): decide which side is canonical and align the other.
    Default to the API's shape, matching T4A.1's Decision (the model's vocabulary
@@ -1270,6 +1303,22 @@ superseded or dead:
    never implemented. Replace with what the code does: the 1D model takes its
    boundary condition directly from the SWAN handoff SPECOUT.
 
+   > **CORRECTED 2026-07-25 — this step was wrong about `ARCHITECTURE.md`.** That document
+   > carries **no** `wave_transform.py` description to fix. The implementing agent grepped it for
+   > `wave_transform`, `Battjes`, `Iribarren` and `Sub-grid` and found zero matches; the
+   > coordinator confirmed. `ARCHITECTURE.md` was correctly left untouched, and adding a
+   > description of a module reduced to a single wind-interpolation helper would grow that
+   > document with something it deliberately does not track. `SURF-ZONE-MODEL-BRIEF.md` §7 was
+   > the only stale statement and it was fixed (`aef7669`).
+   >
+   > The live stale documentation was in **`docs/manuals/API-MANUAL.md` §17**, which described
+   > Supplements 1 and 3 as active pipeline stages plus five further references routing wave
+   > heights through them. Fixed in the same commit. Two additional pre-existing inaccuracies
+   > were found there and corrected: the marine card `waveHeight` and `observation.waveHeight`
+   > fields both claimed a SWAN → `wave_transform` source, when `endpoints/marine.py` actually
+   > uses WaveWatch III → NDBC buoy for both. Unrelated to this task; real drift; verified against
+   > the code before correcting.
+
 **Accept:**
 - Supplement #3 verification gate answered with evidence (which SWAN command emits the
   handoff spectrum, and whether it interpolates to a requested coordinate), and the
@@ -1341,15 +1390,46 @@ read from moves every forecast hour.
 **Do:**
 1. Compute `handoff_depth(hour) = 1.3 * Hs(hour) / gamma` per transect per forecast hour,
    where `Hs(hour)` is that hour's significant wave height at the transect and gamma = 0.73.
-2. Select the L3 grid cell nearest that depth along the transect, seaward side. This is a
-   lookup against the existing grid — **no regrid, no resize, no bbox change.** Grid geometry
+2. Select the handoff **position** nearest that depth along the transect, seaward side. This is
+   a lookup against the existing grid — **no regrid, no resize, no bbox change.** Grid geometry
    stays exactly as `compute_domains()` produced it.
+
+   > **CORRECTED 2026-07-25 (coordinator lead call LC-R2-1): "position", not "cell".** This step
+   > previously said "select the L3 grid cell." ADR-095 Amendment 2 says extraction "happens at
+   > the handoff position with grid on both sides of it," and the code already emits
+   > `POINTS '{name}' {x} {y}` at explicit UTM coordinates (`swan_formats.py:1424`; same for the
+   > L2 reference at `swan_runner.py:1444`). Per `rules/clearskies-process.md` — "ADR wins on
+   > conflict — fix the plan to match" — the position reading governs, and the plan is corrected
+   > here. This also keeps T4A.7's supplement-#3 gate coherent: SWAN bilinearly interpolates
+   > output to the requested coordinate, which is what made that supplement redundant.
+   >
+   > **Mechanism (verified against the installed SWAN manual, pp. 90 and 108–109):**
+   > `SPECOUT 'sname'` accepts a **CURVE** name, not only a POINTS set, and curve values are
+   > "interpolated from the computational grid." The L3 input already emits
+   > `CURVE 'CVn'` with a `TABLE` on it, so emitting `SPECOUT 'CVn'` yields a spectrum at every
+   > station already inside SWAN's output loop — no new geometry, no candidate-point
+   > construction. Exclude the clipped outermost stations from selection to satisfy the
+   > no-boundary-cell rule.
+   >
+   > **Measured cost (00Z cycle, librewxr):** 36 directions × 31 frequencies = 1,116 bins;
+   > ~5.9 KB per location per timestep; 19 curve stations × 67 timesteps ≈ 7.5 MB, up from
+   > 386 KB. Against 233 MB already moved per L3 run (`nest_in.dat` 126 MB, `hotstart.dat`
+   > 82 MB, `WIND.txt` 19 MB, `WLEVEL.txt` 9.5 MB) and 1387 s of L3 compute. **Under 1%.**
 3. Extract the handoff spectrum from that cell. Where a per-hour cell coincides across
    transects, deduplicate as the existing SPECOUT logic already does.
 4. **Never sample an L3 boundary cell** (ADR-095 Amendment 2). If the computed depth lands on
    or outside the grid edge, log WARNING and clamp to the nearest interior cell.
 5. Delete any code path that resolves the handoff from `max_hs_m`. That was the frozen-depth
    error — it uses the year's largest swell for every hour of the year.
+
+   > **NO-OP as written, confirmed 2026-07-25 by the coordinator and independently by the
+   > implementing agent.** There is no such path. `max_hs_m` appears only in
+   > `enrichment/bathymetry.py` fine-zone sizing (`compute_fine_zone_max_depth`,
+   > `interpolate_profile_pchip`) — which this task itself says correctly stays. Zero occurrences
+   > in `transect_handoff.py`, `swan_formats.py`, `swan_runner.py`, or the standalone SWAN repo.
+   > The frozen-depth error lived in the *documents*, never in the handoff code: the code's fixed
+   > handoff was structure-shadow-driven (`10.0 m` default, `max(5.0, tip_depth − 1.5)` when
+   > shadowed), not `max_hs_m`-driven. **Do not invent a path in order to delete one.**
 
 **Accept:**
 - Handoff depth varies across the 72 forecast hours for the same transect.
