@@ -97,6 +97,45 @@ Commit `03f81db`. Verified by the coordinator: all 10 moved providers import cle
 
 ---
 
+## C-21 — the moved providers still identify themselves as the API to NOAA (OPEN → Phase 5 close)
+
+Found during the T5.1–T5.5 move, correctly reported rather than silently fixed (the agent's
+mandate was "rewrite import paths and nothing else", and these are string literals, not
+dotted import paths):
+
+- **User-Agent headers** in `ndbc.py`, `coops.py`, `nws_marine.py`, `nws_srf.py`,
+  `wavewatch.py`, `erddap_ocean.py` read `weewx-clearskies-api/{version} (...)`. **These go
+  out over the wire to NOAA on every request.** NWS asks for a self-identifying User-Agent with
+  contact details; after separation the requests come from the marine service, and the header
+  should say so.
+- **Install-instruction strings** in `hrrr.py` and `gfs.py`'s `RuntimeError` still say
+  `pip install 'weewx-clearskies-api[nearshore]'` — wrong package for an operator to be told
+  to install.
+
+**Decision: fix at Phase 5 close, in its own commit, not inside a move commit.** Doing it now
+would bury a wire-visible behaviour change in a 7,000-line port where no reviewer would see it.
+Doing it never leaves the marine service lying to NOAA about who it is. Not architectural —
+no contract between our components changes, and the package name in an error message is plainly
+a defect once the package is renamed.
+
+---
+
+## C-22 — ERDDAP dataset `rtofs_2d` has been retired upstream (OPEN)
+
+Found by live fetch during the move: `erddap_ocean.py`'s `rtofs_2d`
+(`ncepRtofsG2DFore3hrlyProg`) now returns **404 "Currently unknown datasetID"** from ERDDAP.
+An upstream rename or retirement, not a defect in our code — and it is **live in production
+today**, since the API runs the same module.
+
+Not fixed during the move (faithful-port rule). Needs a replacement dataset id or explicit
+removal. Recorded here so it is not mistaken for something Phase 5 broke.
+
+Same category, same module family: `nws_srf.py`'s period-label parser does not recognise
+`"THIS AFTERNOON THROUGH SUNDAY"`, seen live in zone CAZ552. It logs a WARNING and skips the
+block rather than crashing — graceful, documented, and a real coverage gap.
+
+---
+
 ## C-19 — `i18n.py` and `services/almanac.py` are held, not ported (DECIDED)
 
 Two general (non-marine) API modules that moved enrichment code reaches into:
