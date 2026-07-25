@@ -113,19 +113,48 @@ divergence.
 
 Thread count is **not** the cause: those files were written at omp=6 and reloaded at omp=6.
 
-**Prime suspect — command syntax.** `swan_formats.py:1207` emits `INIT HOTSTART 'hotstart.dat'`.
-SWAN 41.51's documented form is `INITIAL HOTSTART SINGLE fname='hotstart.dat'`.
-`docs/reference/swan-commands-extract.md` has **no HOTSTART entry** — unlike the PT*/CURVE/POINTS
-commands, this syntax was never verified against the manual.
+### ROOT CAUSE FOUND — it is a timestamp problem, not syntax
 
-**This is safe to leave overnight.** The crash-retry deletes the hotstart and reruns cold, and
-the cycle completes normally. Net effect vs before the fix: identical results, ~2–4 s/cycle
-wasted, extra WARNING noise. **Do not revert** — the fix is correct and exposed a pre-existing
-bug that was invisible while the hotstart was never loaded at all.
+I first suspected the command syntax and wrote that up. **I was wrong, and I tested it rather
+than shipping the guess.** Ran both forms against the real binary on identical L1 inputs:
 
-**I deliberately did not guess at the syntax overnight.** The experiment to run: with a fresh
-hotstart file, run SWAN twice on identical inputs, once with each form, and compare PRINT
-output. Then fix, and add the verified syntax to the reference extract.
+| Variant | Result |
+|---|---|
+| `INIT HOTSTART 'hotstart.dat'` (what we emit) | identical error |
+| `INIT HOTSTART SINGLE 'hotstart.dat'` (manual form) | identical error |
+
+This build accepts the legacy form. Syntax is not the problem.
+
+**The real cause: `HOTFILE` writes the wave field at the END of the forecast window, and every
+cycle restarts that window from its BEGINNING.** The L1 hotfile's own embedded timestamp:
+
+```
+20260728.000000                         date and time
+```
+
+The next cycle runs `COMPUTE NONST 20260725.060000 10 MIN 20260728.000000` — asking to start
+**66 hours before** the state in the file. SWAN, on the real production window:
+
+```
+** Error        : start time [tbegc] before current time
+** Severe error : start time [tbegc] greater or equal end time [tendc]
+```
+
+It reports the first, clamps the start to the hotfile's time, and the clamped start then equals
+the end — hence the second. L1 aborted 1.4 s in, L2 0.5 s, L3 0.6 s.
+
+**Hotstart is unusable with the current run scheduling, regardless of syntax.** Each cycle
+recomputes an overlapping window from a fixed start; the hotfile is always from the far end of
+the previous one.
+
+**This is an architectural decision and I am not making it.** The options are: write the hotfile
+at the *next* cycle's start time, chain the windows forward instead of overlapping them, or drop
+hotstart entirely and stop writing 113 MB/cycle for nothing. Trigger 3/6 — your call.
+
+**Safe to leave as-is.** The crash-retry deletes the hotstart and reruns cold; cycles complete
+normally (verified: 1238s, 1/1 spot cached). Cost is ~10 s/cycle and some WARNING noise.
+**Do not revert `a1fa14f`** — it is correct, and it is what made this visible at all. Before it,
+the hotstart silently never loaded and 113 MB/cycle was thrown away with no signal whatsoever.
 
 ### When it does get fixed, expect your numbers to change
 
@@ -252,10 +281,30 @@ been empty, which could shift downstream physics. Your call in the morning.
 
 ## 8. What I recommend you decide first
 
-1. **The hotstart syntax experiment** — cheap, and it unblocks a real accuracy improvement.
+1. **Hotstart: fix the scheduling, or drop it.** Root cause is established (timestamp, not
+   syntax). Either write the hotfile at the next cycle's start time, chain windows forward, or
+   remove the feature and stop writing 113 MB/cycle for nothing. Architectural — your call.
+   Meanwhile it fails safe.
 2. **`DISSURF` and `valid_fraction`** — both trivial to fix, both change externally visible
    values, neither approved.
 3. **Whether the 95%-single-partition figure is enough** to close trigger 1, or whether you
-   want the same-timestep comparison first.
+   want the same-timestep comparison first. Note the latent parser defect below — the
+   comparison must not be run through `parse_table_pt_partitions()` until it is fixed.
 4. **The cross-host profile cache divergence** — BLOCKER-eligible and architectural. Not
    something I should decide.
+
+### Latent defect that would have corrupted the trigger-1 decision
+
+`docs/reference/swan-commands-extract.md` claimed absent partitions carry the `-9`/`-999`
+exception value, "**not** zero, **not** blank." That is wrong. Checked every PT column of all
+1273 rows of real output: **zero occurrences of either sentinel, and 25,288 exact zeros.**
+
+`services/swan_spectral.py`'s `parse_table_pt_partitions()` skips a slot only when it detects
+the sentinel (`if hs is None: continue`), so on real data it would emit **6 partitions per row —
+5 of them phantom**, height/period/direction all zero, where SWAN actually found 1. Had T4B.2's
+comparison been run through it, watershed partitioning would have appeared to match
+`decompose_spectrum()`'s partition count almost exactly, for entirely spurious reasons.
+
+Not live — that function has no callers yet. My 95.2% figure is unaffected; it came from
+independent `awk` filtering on `> 0.0001`. Doc corrected in `c1a7f04`; the code is T4B.2 scope
+and left for you.

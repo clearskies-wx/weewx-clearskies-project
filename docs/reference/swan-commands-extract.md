@@ -155,20 +155,44 @@ format and may be omitted.
 
 Source: [SWAN User Manual, Cycle III 41.51 §4.5](https://swanmodel.sourceforge.io/online_doc/swanuse/node27.html).
 
-> **DEFECT 2026-07-25 — `swan_formats.py:1207` emits the keyword-less form.** It writes
-> `INIT HOTSTART 'hotstart.dat'`, omitting `SINGLE`. SWAN rejects it: with a valid hotfile
-> present, L1 crashed 1.4 s after start and L2 in 0.5 s — fast enough to be a parse/format
-> rejection, not numerical divergence. The crash-retry then deletes the hotfile and reruns
-> cold, so the cycle still completes and the symptom is invisible except as a WARNING.
+> **`swan_formats.py:1207` emits the keyword-less form `INIT HOTSTART 'hotstart.dat'`, and
+> that is NOT the problem.** Tested directly against the 41.51AB binary on librewxr: both the
+> keyword-less form and the manual's `INIT HOTSTART SINGLE 'hotstart.dat'` parse identically
+> and produce the identical error. This build accepts the legacy form. Do not "fix" the
+> syntax expecting it to help.
 >
-> This went unnoticed for as long as it did because of a *second*, unrelated bug: the
-> hotstart was never loaded at all (save used `level1`/`level2`/`level3_<idx>`, load used
-> `outer`/`inner`), fixed in `a1fa14f`. Only once the file was actually found did SWAN get
-> the chance to reject it.
+> ### ⚠ WHY THE HOTSTART ACTUALLY FAILS — timestamp, not syntax (measured 2026-07-25)
 >
-> **This entry did not exist before 2026-07-25** — unlike CURVE/POINTS/TABLE/PT*, the
-> HOTSTART syntax was never checked against the manual, which is how the wrong form shipped.
-> Confirm against the binary before changing the emitted string; manuals and builds disagree.
+> **`HOTFILE` writes the wave field at the END of the forecast window; every cycle restarts
+> that window from its BEGINNING. SWAN cannot rewind, so it aborts.**
+>
+> Evidence, from the L1 hotfile written by the 10:23Z cycle:
+> ```
+> 20260728.000000                         date and time
+> ```
+> The next cycle's `COMPUTE NONST 20260725.060000 10 MIN 20260728.000000` asks to start
+> **66 hours before** the state in the file. SWAN's PRINT, reproduced on the real production
+> window with a valid 66-hour span:
+> ```
+> ** Error        : start time [tbegc] before current time
+> ** Severe error : start time [tbegc] greater or equal end time [tendc]
+> ```
+> (It reports the first, clamps the start to the hotfile's time, and the clamped start then
+> equals the end — hence the second.) L1 aborted 1.4 s in, L2 0.5 s, L3 0.6 s.
+>
+> **Consequence: hotstart is unusable with the current run scheduling, regardless of syntax.**
+> Each cycle recomputes an overlapping window from a fixed start; the hotfile is always from
+> the far end of the previous window. Making it work requires an architectural decision — write
+> the hotfile at the *next* cycle's start time, chain the windows forward instead of
+> overlapping them, or drop hotstart entirely. **Operator decision, not a code fix.**
+>
+> Two separate defects had to be fixed before this was even visible: the file was never loaded
+> at all (save used `level1`/`level2`/`level3_<idx>`, load used `outer`/`inner` — fixed in
+> `a1fa14f`), so SWAN never got the chance to reject it. 113 MB/cycle of hotfiles have been
+> written and discarded since the feature was added.
+>
+> **This entry did not exist before 2026-07-25.** Unlike CURVE/POINTS/TABLE/PT*, HOTSTART was
+> never checked against the manual or the binary.
 
 ## QUANTITY — set output parameters
 
