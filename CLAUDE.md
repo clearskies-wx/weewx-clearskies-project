@@ -63,6 +63,21 @@ These apply regardless of domain.
 
 **What you MAY still do without asking:** resolve a contradiction *between two statements inside the same plan* by picking the reading the plan's own examples and acceptance criteria support (and say so); apply a rule the user has already written down; fix a defect that makes code diverge from its own stated contract.
 
+**Architecture vs methodology — the distinction the trigger list is testing for.** Architecture is *what each piece is responsible for* — its job, its boundaries, what physics it accounts for. Methodology is *how it does that job*. Finding real holes and errors and fixing them is fine, however large the fix, as long as no piece's responsibility moves. Changing what a piece is responsible for is architectural, however small the edit.
+
+**Size is not the signal.** A 500-line fix can be pure methodology; a one-character change to a coefficient is architectural. Judge the nature of the change, not its weight.
+
+| Change | Which | Why |
+| --- | --- | --- |
+| Solving the breaking-fraction term by iteration instead of an approximation | Methodology | Same equation, different arithmetic |
+| No longer computing breaking waves at all | **Architectural** | A responsibility disappears |
+| Sizing a grid from each spot's own bearing instead of a cluster centroid, after finding it silently clipped 60% of a transect | Methodology | The grid's job is unchanged; it now actually does it |
+| Moving where a grid stops, or where one model hands off to another | **Architectural** | Trigger 3 — a boundary moves |
+| Deleting a module, or moving what it is responsible for onto another | **Architectural** | Trigger 2 |
+| Removing code that provably never executes | Methodology | Nothing was being done; nothing stops being done |
+
+**Why (2026-07-25):** The coordinator repeatedly used *size of change* as its architectural signal, which is wrong in both directions — it waved through a formula swap as "small" and flagged a large bug fix as overreach.
+
 **How to surface instead:** STOP the affected work. State what you found, what the options are, what each costs, and your recommendation. Then wait. Do other, unblocked work in the meantime — do not idle, and do not "proceed under an assumption" on an architectural question.
 
 **Agents:** this is mandatory in every implementation agent prompt. See `rules/clearskies-process.md` "Architectural change block — mandatory agent prompt section."

@@ -198,6 +198,10 @@ This block is mandatory in every implementation agent prompt. Not optional, not 
 
 **Why (2026-05-11):** 3b-12 api-dev claimed "1762 passed, 0 failed"; lead's independent run returned 103 failed. The lead initially trusted the count and almost closed the round on a false-clean narrative. Additionally, dashboard a11y compliance claims were never independently verified by the lead.
 
+**A claim that code is wrong, dead, or should be deleted requires MORE verification than a claim that it is fine — not less.** Open the file before repeating the claim to the user, and before acting on it. This applies to handoff notes, scratch files, resume prompts, and prior sessions' findings as much as to live agents. "Keep this" fails loudly if wrong — someone hits the bug. "Delete this, it's dead" fails silently and permanently: the work is gone, and nobody knows what was lost or why.
+
+**Why (2026-07-25):** A session handoff note recorded that ~200 lines of uncommitted `swan_domain.py` implemented a retracted instruction and "should not survive review." The coordinator repeated that to the operator as fact without opening the file. It was wrong. The code pinned the L3 grid's *offshore* edge to each spot's own depth contour — a correct fix for an observed defect where a live run silently clipped one spot's transect from 2440 m to 950 m. The retracted instruction had been about a different edge entirely. Acting on the note would have discarded a real bug fix and left the bug in place.
+
 **Lead-direct for small fixes.** When auditor findings or test bugs are mechanical and small (<=50 lines, <=3 files, no judgment calls), the lead fixes directly. Spawning costs 30-60 min; lead-direct is minutes.
 
 ## Architectural change block — mandatory agent prompt section

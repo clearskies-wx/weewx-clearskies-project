@@ -73,22 +73,60 @@ Consequences for the task list:
   breaking-zone assertion, the trigger and viability test, Supplement 4 removal, and
   superseded banners on two research briefs.
 
-## Put these to the operator in your first reply, in plain text
+## Open questions for the operator
 
-Do not start implementation until they are answered. AskUserQuestion is banned.
+**None outstanding as of 2026-07-25.** You may begin work. If you find yourself about to
+re-raise something below, read the recorded reasoning first.
 
-1. **The uncommitted T4A.3 work.** The API repo has ~460 uncommitted lines in
-   `enrichment/bathymetry.py` (+264) and `services/swan_domain.py` (+204) from a
-   halted agent. Zero commits. Keep, stash, or discard? **Part of the
-   `swan_domain.py` addition (around lines 733, 750, 870) implements a retracted
-   instruction requiring L3 to contain the full transect. That is wrong and is now
-   also contradicted by ADR-093 Amendment 2. It must not survive review.**
-2. **T4A.7** — deletes `apply_supplements()`. **Blocked, not approved.** It entered the
-   plan as coordinator lead call LC-27 and is the component-deletion call named in
-   `CLAUDE.md` as one of the three 2026-07-25 violations. Nothing is built. It needs an
-   operator ruling before any agent opens `wave_transform.py`. Its approved subset — the
-   topographic multipliers — is split out to T4A.12 and runs regardless.
-**Deferred by operator direction, with a reason — do not assign an owner yet:**
+**Resolved 2026-07-25 — do not re-raise:**
+
+- **The uncommitted T4A.3 work — reviewed and committed** (`244ee08`, API repo, +541/−9:
+  `services/swan_domain.py`, `enrichment/bathymetry.py`). It adds staged sizing entry
+  points so L1 → coarse download → 30 m contour → L2 → medium download → 15 m contour →
+  L3 runs in the right order without any grid being resized after computation; sizes L2
+  from the real 30 m contour instead of a hardcoded 6 km; and makes both estimate
+  fallbacks log that they are estimates.
+
+  **Correction on the record:** an earlier version of this prompt stated that part of
+  `swan_domain.py` implemented a retracted instruction and "must not survive review."
+  **That was wrong and was repeated without opening the file.** The code pins L3's
+  *offshore* edge to each spot's own depth contour, fixing an observed defect where a
+  live run silently clipped one spot's transect from 2440 m to 950 m. The retracted
+  instruction concerned a different edge. See the verification rule added to
+  `rules/clearskies-process.md` — a claim that code is dead needs *more* checking than a
+  claim that it is fine.
+
+  **Known gap:** it sizes L3's offshore edge only. T4A.9/T4A.11 must extend it to the
+  shoreward edge per ADR-093 Amendment 2. They extend it; they do not replace it.
+
+  **Left uncommitted deliberately, for separate review:** a one-line field removal in
+  `providers/alerts/nws.py` (`ends: str | None = None`) with no explanation and no
+  connection to this task, and an untracked `services/surfbeat_strip_benchmark.py`.
+
+- **T4A.7 — approved, with a verification gate.** Read the banner at the top of the task.
+  By 2026-07-25 it is no longer a live-component deletion: supplement #2 went with
+  ADR-095, #4 is operator-approved and split to T4A.12, #1 is a branch that has never
+  executed. **#3 is the only real decision, and it is gated** — confirm the handoff
+  spectrum is emitted at requested coordinates rather than cell centres before removing
+  it. If SWAN does not interpolate to the requested point, #3 stays. Run T4A.12 first.
+
+- **LC-22** (Battjes-Janssen breaking-fraction term moved from an approximation to an
+  iterative solve). Operator approved 2026-07-25 and ruled it **not architectural** —
+  same equation, different arithmetic. SWAN's own source solves it the same way
+  (Newton-Raphson, `swancom2.for`), so this aligns SwellTrack with the model it is
+  benchmarked against. **One review item remains:** confirm the solve clamps as the
+  breaking fraction approaches 1, where the logarithm runs away. Fold into whichever task
+  touches `surf_1d_analytical.py`.
+
+- **T4A.6 and T4A.8** — keep both. T4A.6 gained item (g) on 2026-07-25.
+
+- **Coordinator latitude** — settled. The trigger list, the architecture-vs-methodology
+  table now in `CLAUDE.md`, and the coordinator self-check in
+  `rules/clearskies-process.md` are the standard. Note especially that **size of change
+  is not the signal**: a 500-line bug fix can be pure methodology, and a one-character
+  coefficient edit is architectural.
+
+## Deferred by operator direction, with a reason — do not assign an owner yet
 
 **The `nan_count=1061` L3 convergence failure.** Deferred until Phase 4A's L3 changes are
 implemented, because **the work may remove the cause.** Both recorded L3 divergences
@@ -100,19 +138,6 @@ Amendment 2 it no longer does — it stops seaward of breaking by construction.
 Re-measure after T4A.9/T4A.11 land. If failures persist in an L3 that never contains
 breaking, that is a genuinely different problem and gets an owner then. Do not chase it
 before the boundary work is in. The same applies to the 18Z-cycle correlation below.
-
-**Already resolved — do not re-raise:**
-
-- **LC-22** (Battjes-Janssen breaking-fraction term moved from an approximation to an
-  iterative solve). Operator approved 2026-07-25 and ruled it **not architectural** —
-  same equation, different arithmetic. SWAN's own source solves it the same way
-  (Newton-Raphson, `swancom2.for`), so this aligns SwellTrack with the model it is
-  benchmarked against. The trigger-1 clarification is now in `CLAUDE.md`. **One review
-  item remains:** confirm the solve clamps as the breaking fraction approaches 1, where
-  the logarithm runs away. Fold into whichever task touches `surf_1d_analytical.py`.
-- **T4A.6 and T4A.8** — keep both. T4A.6 gained item (g) on 2026-07-25.
-- **Coordinator latitude** — settled by the 2026-07-25 session. The trigger list plus
-  the coordinator self-check in `rules/clearskies-process.md` is the standard.
 
 ## Ordering suggestion, for the operator to confirm
 

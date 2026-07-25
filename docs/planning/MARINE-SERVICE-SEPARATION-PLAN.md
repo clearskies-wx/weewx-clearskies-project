@@ -1213,28 +1213,39 @@ Two governing documents claim otherwise:
 The supplements have been feeding a formula approximation instead of the model
 they were written for.
 
-> **BLOCKED 2026-07-25 — NOT OPERATOR-APPROVED. Do not dispatch this task.**
+> **APPROVED 2026-07-25 by the operator, with one verification gate (see below).**
 >
-> The DELETE disposition below was a coordinator lead call (LC-27, 2026-07-24). Deleting
-> a module is trigger 2 of the architectural block — it is not a call the coordinator
-> may make. This task is **named in `CLAUDE.md`** as the second of the three unapproved
-> architectural changes the hard block was written about: *"ruled to delete
-> `wave_transform.apply_supplements()` — first ruling 'rewire,' then 'delete' — a
-> component-disposition call."* It has sat in the plan since as though approved.
+> History, because it matters for how this task is read: the DELETE disposition entered
+> the plan as coordinator lead call LC-27 (2026-07-24) and is **named in `CLAUDE.md`** as
+> the second of the three unapproved architectural changes the hard block was written
+> about — *"ruled to delete `wave_transform.apply_supplements()` — first ruling 'rewire,'
+> then 'delete' — a component-disposition call."* It sat in the plan as though approved
+> for a day. It is now genuinely approved. The original ruling was still a violation; the
+> conclusion happening to be right does not retire that.
 >
-> Nothing has been built, so nothing is broken. It needs an operator ruling before any
-> agent touches `wave_transform.py`.
+> **Why the approval is narrow rather than a reversal.** By 2026-07-25 the disposition is
+> no longer "delete a live component." Of the four supplements: #2 was already removed by
+> ADR-095; #4 (topographic multipliers) was approved for removal by the operator on
+> 2026-07-25 and is split out to **T4A.12**; #1 is a branch that has provably never
+> executed. Removing provably-dead code is methodology, not architecture (`CLAUDE.md`,
+> architecture-vs-methodology table). That leaves **#3 as the only supplement whose
+> removal is a real decision.**
 >
-> **The topographic-multiplier portion IS approved** (operator, 2026-07-25) and has been
-> split out to **T4A.12**, which is safe to run whatever is decided here. If this task is
-> later approved in full, T4A.12 becomes a subset of it — run T4A.12 first either way,
-> since it is approved and independently correct.
+> **VERIFICATION GATE — do this before deleting supplement #3.** Confirm that the handoff
+> spectrum is emitted at *requested coordinates* (SWAN `POINTS` at explicit x/y) rather
+> than at grid-cell centres. If SWAN interpolates to the requested point, supplement #3 is
+> genuinely redundant and goes. **If it does not, supplement #3 is doing real work and must
+> stay** — report that and stop, do not delete it anyway. Note this interacts with the
+> per-hour handoff (T4A.9), which selects a cell rather than a coordinate: reconcile the
+> two before concluding.
 >
-> The analysis below is retained: its identification of the double-counting and of the
-> never-executing breaker-correction branch is sound and predates the 2026-07-25 review,
-> which reached the same conclusion independently.
+> **Run T4A.12 first.** It is approved independently and is correct whatever this gate
+> returns.
+>
+> The analysis below predates the 2026-07-25 review and reached the same double-counting
+> and dead-branch conclusions independently. Retained.
 
-**Disposition: DELETE — PENDING OPERATOR APPROVAL.** `wave_transform.py` is pre-1D-model code (its own docstring
+**Disposition: DELETE — approved, subject to the supplement #3 verification gate above.** `wave_transform.py` is pre-1D-model code (its own docstring
 dates it to "Phase 3, T3.1") written to supplement SWAN's bulk Hs before the
 K-G/Caldwell single-point formula. Every one of its supplements is now either
 superseded or dead:
@@ -1260,6 +1271,9 @@ superseded or dead:
    boundary condition directly from the SWAN handoff SPECOUT.
 
 **Accept:**
+- Supplement #3 verification gate answered with evidence (which SWAN command emits the
+  handoff spectrum, and whether it interpolates to a requested coordinate), and the
+  outcome recorded — either #3 removed, or #3 retained with the reason.
 - No `apply_supplements()` call site anywhere; the function and its
   breaker-correction helpers are gone.
 - `bilinear_interpolate()` retained; `surf.py`'s HRRR wind path still works.
