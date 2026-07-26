@@ -3278,3 +3278,74 @@ the log telling the truth about what it knows.
 
 **Not folded into C-77's round** — that work is in `providers/nearshore/swan.py` and this is
 `services/swan_runner.py`; keeping them separate keeps each commit's evidence clean. Same phase.
+
+---
+
+## C-79 — when FINE bathymetry fails for a cluster, L3 keeps running on MEDIUM data instead of taking the architecture's own designed exit (OPEN → NEEDS AN OPERATOR RULING; triggers 2 + 3)
+
+Surfaced by the C-77 implementer while scoping the bathymetry raise, and correctly escalated rather
+than decided — the coordinator's ruling was to leave the behaviour untouched and record it.
+
+**What happens today.** `services/grid_sizing_chain.py` calls `download_bathymetry_for_level()` three
+times. L1 and L2 abort the chain on failure. **L3 does not.** When the FINE (10 m) download fails for
+one cluster it logs ERROR, substitutes the **MEDIUM (100 m)** grid for that cluster's profile, and
+carries on — writing `swan_grid_sizing.json` and every other spot's profile as normal. The cluster's
+L3 grid stays **enabled** and is then run at 10 m resolution off 100 m bathymetry.
+
+**Why this is NOT the same as C-76/C-77 and was deliberately left alone.** MEDIUM bathymetry is
+**real measured seabed at coarser resolution**. The uniform 15 m default that C-77 removes is
+**fabricated**. Treating "lower fidelity" and "made up" as the same thing would make the operator's
+rule unfalsifiable, and the ruling is explicitly about substituting bogus data and omitting data.
+Coarser real data is neither.
+
+**Why it is still a finding.** The architecture already has a sanctioned answer to "we cannot get
+fine bathymetry for this cluster", and this is not it. ADR-093 Amendment 2 §4, as recorded in
+`ARCHITECTURE.md`: the setup-time viability test **disables L3 for that cluster**, which then runs
+**L1 → L2 → SwellTrack from the ~15 m reference, "as an open beach does"** — and that state is
+*recorded*, so an operator can see the spot has no fine grid.
+
+What the code does instead is a **third state nobody designed**: L3 stays enabled, a 10 m
+computational grid is driven by 100 m bathymetry, and nothing in the output says so. It is not the
+designed degradation, it is not a failure, and it is invisible. A 10 m grid cannot resolve features
+its own depth field does not contain, so the spot gets fine-grid *cost* and *apparent* fidelity
+without fine-grid information.
+
+**Not fixed, and not the coordinator's to fix.** Changing how a cluster's grid resolution is sourced,
+or routing the failure into the viability test's L3-disabled path, is **trigger 3** (a model's
+resolution) and **trigger 2** (what a component is responsible for). The operator rules.
+
+**Coordinator's recommendation:** route a FINE-tier failure into the existing L3-disabled path rather
+than inventing a substitution — the machinery, the fallback and the operator-visible state all
+already exist, and it is the answer the architecture already gives. Explicitly **not** recommended:
+aborting the whole apply chain, which would punish every unaffected spot for one cluster's failure.
+
+---
+
+## C-80 — the caches the runtime path trusts are written non-atomically (OPEN → Phase 8, small fix)
+
+Found by the C-77 implementer while verifying that an aborted apply chain cannot leave a partial
+cache. It can.
+
+| Path | Write | Atomic? |
+|---|---|---|
+| `grid_sizing_chain.py:359` — `spot_profiles/{spot_id}.json` | `cache_path.write_text(json.dumps(...))` | **No** |
+| `grid_sizing_chain.py:372` — `swan_grid_sizing.json` | `_SWAN_GRID_SIZING_CACHE_PATH.write_text(...)` | **No** |
+| `swan.py:245, 398, 428, 459, 476` — bathymetry caches | direct `write_text` | **No** |
+| `swan.py:820-824, 893-897` — `_persist_forecast_cache_to_disk` | temp file + `os.replace()` | **Yes** |
+
+**The codebase already knows the right pattern and applies it to the forecast cache — but not to the
+caches the SWAN runtime path reads and trusts.** A process kill mid-write during a `POST /config`
+apply chain (OOM on a 5.7 GB box that already runs 20% over on its radar container, or a restart)
+leaves a truncated `swan_grid_sizing.json` or profile JSON. The runtime path then reads it.
+
+**Why this belongs with C-76/C-77 rather than in a general tidy-up.** Those concerns are about the
+model never running on values it did not really obtain. A truncated cache is exactly that — a
+substituted input arriving by a different route, and a worse one, because it looks like a valid
+cache rather than a failure. The whole point of making the runtime path cache-only (ARCHITECTURE.md:
+*"reads both caches only — zero CUDEM downloads, zero grid sizing, at runtime"*) is that those files
+are trusted; trusted files must not be writable in a torn state.
+
+**Fix:** apply the temp-file + `os.replace()` pattern already used by `_persist_forecast_cache_to_disk`
+in the same file. No behaviour change, no new dependency, no contract change — `os.replace()` is
+atomic within a filesystem and all these paths are under `/etc/weewx-clearskies/`. Kept out of C-77's
+commits so each change's evidence stays clean.
