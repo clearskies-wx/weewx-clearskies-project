@@ -115,7 +115,8 @@ run_ubuntu() {
 
 # --show-secret is a read-only query — handle it before anything else.
 if [ "$show_secret" = "1" ]; then
-    run_root "grep '^MARINE_SERVICE_SECRET=' ${SECRETS} | cut -d= -f2-"
+    # No inner single quotes: run_root already wraps its argument in them.
+    run_root "grep ^MARINE_SERVICE_SECRET= ${SECRETS} | cut -d= -f2-"
     exit 0
 fi
 
@@ -130,7 +131,9 @@ if ! $SSH_CMD librewxr "test -x ${SWAN_BINARY}"; then
     exit 1
 fi
 echo "[prereq] SWAN binary present at ${SWAN_BINARY}"
-if ! $SSH_CMD librewxr "which uv" >/dev/null 2>&1; then
+# The check must run as ubuntu, which is the user that will actually invoke
+# uv below — `claude`'s PATH is not ubuntu's.
+if ! $SSH_CMD librewxr "sudo -u ubuntu bash -lc 'command -v uv'" >/dev/null 2>&1; then
     echo "[prereq] installing uv..."
     run_root "curl -LsSf https://astral.sh/uv/install.sh | sh"
 fi
@@ -172,15 +175,11 @@ echo "[deps] ok (core + nearshore extra)"
 # Fail here with a readable error rather than at the next service restart,
 # where it surfaces as a systemd unit that flaps on Restart=on-failure.
 echo "--- [3/6] verify imports ---"
-run_ubuntu "${VENV}/bin/python -c \"
-import weewx_clearskies_marine
-from weewx_clearskies_marine.service import create_app
-import numpy, scipy, shapely, xarray, netCDF4, eccodes, prometheus_client, defusedxml, yaml
-import weewx_clearskies_marine.providers.nearshore.swan
-import weewx_clearskies_marine.services.swan_runner
-import weewx_clearskies_marine.services.surfbeat_runner
-print('imports ok')
-\""
+# Kept to ONE line deliberately. This string is interpolated through
+# ssh -> sudo -u ubuntu bash -lc '...' -> python -c "..."; a multi-line body
+# does not survive that quoting chain (it fails with "unexpected EOF while
+# looking for matching quote", which reads like a Python error and is not).
+run_ubuntu "${VENV}/bin/python -c \"import numpy, scipy, shapely, xarray, netCDF4, eccodes, prometheus_client, defusedxml, yaml, weewx_clearskies_marine.providers.nearshore.swan, weewx_clearskies_marine.services.swan_runner, weewx_clearskies_marine.services.surfbeat_runner; from weewx_clearskies_marine.service import create_app; print(chr(105)+chr(109)+chr(112)+chr(111)+chr(114)+chr(116)+chr(115)+chr(32)+chr(111)+chr(107))\""
 echo "[deps] import surface verified (core + nearshore + SWAN pipeline)"
 
 # --- Step 4: config dir + secret ---
@@ -189,20 +188,26 @@ run_root "install -d -o ubuntu -g ubuntu -m 0750 ${CONF_DIR}"
 # Generate MARINE_SERVICE_SECRET once and never regenerate: rotating it here
 # would silently break the API's Bearer auth on every redeploy. The API host
 # holds the matching value in its own secrets.env (T8.2b).
-run_root "if ! grep -q '^MARINE_SERVICE_SECRET=' ${SECRETS} 2>/dev/null; then
-    umask 077
-    printf 'MARINE_SERVICE_SECRET=%s\n' \"\$(openssl rand -hex 32)\" > ${SECRETS}
-    chown ubuntu:ubuntu ${SECRETS}
-    chmod 0600 ${SECRETS}
-    echo '[secret] generated'
+# Branch on the client side. run_root wraps its argument in single quotes, so
+# the remote command must contain none of its own — a multi-line if/else with
+# quoted strings inside it dies with "syntax error: unexpected end of file".
+if $SSH_CMD librewxr "sudo grep -q ^MARINE_SERVICE_SECRET= ${SECRETS}" 2>/dev/null; then
+    echo "[secret] already present — left unchanged"
 else
-    echo '[secret] already present — left unchanged'
-fi"
+    run_root "umask 077; echo MARINE_SERVICE_SECRET=\$(openssl rand -hex 32) > ${SECRETS}; chown ubuntu:ubuntu ${SECRETS}; chmod 0600 ${SECRETS}"
+    echo "[secret] generated"
+fi
 run_root "ls -l ${SECRETS}"
 
 # --- Step 5: systemd unit ---
 echo "--- [5/6] systemd unit ---"
-run_root "cat > /etc/systemd/system/${SERVICE}.service << 'UNIT'
+# Staged through a local file and scp, NOT a remote heredoc. run_root wraps
+# its argument in single quotes, so `cat > file << 'UNIT'` closes that wrapper
+# on its own quotes and the rest of the unit is executed as shell commands.
+# deploy-compute.sh carries the same latent bug in its unit-install step.
+UNIT_TMP="$(mktemp)"
+trap 'rm -f "${UNIT_TMP}"' EXIT
+cat > "${UNIT_TMP}" << UNIT
 [Unit]
 Description=Clear Skies Marine Companion Service (SWAN/SwellTrack/SurfBeat, tides, buoy, marine weather)
 Documentation=https://github.com/clearskies-wx/weewx-clearskies-marine
@@ -217,9 +222,16 @@ Type=simple
 User=ubuntu
 Group=ubuntu
 WorkingDirectory=${CONF_DIR}
+# systemd does NOT support shell-style \${VAR:-default} in ExecStart — it
+# substitutes only bare \${VAR} and passes anything else through literally, so
+# the service dies with getaddrinfo("\${CLEARSKIES_MARINE_BIND_HOST:-0.0.0.0}").
+# Declare the default with Environment= FIRST, then let the optional
+# network.env override it: systemd applies these in file order, so a value in
+# network.env wins over the Environment= line above it.
+Environment=CLEARSKIES_MARINE_BIND_HOST=0.0.0.0
 EnvironmentFile=${SECRETS}
 EnvironmentFile=-${CONF_DIR}/network.env
-ExecStart=${VENV}/bin/weewx-clearskies-marine --host \${CLEARSKIES_MARINE_BIND_HOST:-0.0.0.0} --port ${PORT} --cert-dir ${CONF_DIR} --hostname ${HOST_IP}
+ExecStart=${VENV}/bin/weewx-clearskies-marine --host \${CLEARSKIES_MARINE_BIND_HOST} --port ${PORT} --cert-dir ${CONF_DIR} --hostname ${HOST_IP}
 Restart=on-failure
 RestartSec=5
 
@@ -238,7 +250,9 @@ ReadWritePaths=/var/run/weewx-clearskies
 
 [Install]
 WantedBy=multi-user.target
-UNIT"
+UNIT
+scp -F "${SSH_CONFIG}" -q "${UNIT_TMP}" "librewxr:/tmp/${SERVICE}.service"
+run_root "install -o root -g root -m 0644 /tmp/${SERVICE}.service /etc/systemd/system/${SERVICE}.service && rm -f /tmp/${SERVICE}.service"
 run_root "systemctl daemon-reload"
 run_root "systemctl enable ${SERVICE}"
 echo "[svc] unit installed and enabled"
