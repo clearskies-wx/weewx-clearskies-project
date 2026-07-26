@@ -1251,7 +1251,32 @@ config schema had to stay. Exact remaining hits are recorded at the gate walk.
 
 ---
 
-## ⛔ C-41 — AWAITING OPERATOR: the apply-time grid-sizing chain belongs to no task, and its two governing statements disagree
+## C-41 — DECIDED BY OPERATOR: the grid-sizing chain is a marine function and moves (DECIDED)
+
+**Ruling (operator, 2026-07-25):** *"There is NO REASON that SWAN should be depending upon the API for
+this — is this not purely an internal SWAN function?"* It is. The chain's inputs are the operator's
+surf-spot configuration; its outputs (`swan_grid_sizing.json`, `spot_profiles/{id}.json`) are read by
+exactly one consumer, SWAN. Nothing else in the API touches them.
+
+It sat in the API only for historical reasons: SWAN used to run **inside** the API, so "at apply time"
+and "in the API" were the same place. T4A.3 moved it from SWAN runtime to apply time — that changed
+*when* it runs, not *whose job* it is. The coordinator escalated this as an open architectural
+question when the ownership was never actually in doubt.
+
+**Executed:** the marine service runs the grid-sizing and bathymetry chain **on config receipt**
+(`POST /config`) — the post-separation equivalent of the apply-time trigger, and a trigger that
+already exists. Every module it needs (`swan.py`, `swan_domain.py`, `bathymetry.py`) moved in Phase 5;
+only the wiring was missing, and the marine service's `endpoints/config.py` still described itself as
+a "Phase 4 scaffold". The API's copies are deleted with the rest of the wave physics, unblocking the
+held cluster, `compute_client.py`, the `surf_compute_*` keys and the `[nearshore]` extra.
+
+**To verify during implementation:** the chain needs the operator-confirmed coastal structures (the
+Overpass discovery results) as an input. Those are operator configuration and belong in the config
+push payload — confirm they are in it and extend the payload if not.
+
+### Original escalation, superseded
+
+**~~AWAITING OPERATOR~~:** the apply-time grid-sizing chain belongs to no task
 
 Found by the deletion agent at its second halt condition, after being told to verify before cutting.
 Verified independently by the coordinator.
@@ -1299,7 +1324,32 @@ excluded from the Phase 6 deletion until this resolves.
 
 ---
 
-## ⛔ C-42 — AWAITING OPERATOR (bundled with C-41): the wizard's discovery helpers import four marine provider modules
+## C-42 — DECIDED BY OPERATOR: the API proxies wizard discovery to the marine service (DECIDED)
+
+**Ruling (operator, 2026-07-25):** *"The wizard never communicates with the marine service at all. The
+only thing communicating with the marine service is the API. If the wizard needs something from the
+marine service it communicates through the API. You need to build a pass-through in the API for these
+types of queries."*
+
+So neither option the coordinator offered was right. The wizard keeps calling the API exactly as it
+does today — no dashboard change. The API stops **importing** marine provider modules and instead
+**proxies** the query to the marine service, which owns the marine data.
+
+**Executed:**
+- The marine service exposes discovery endpoints for the four questions the wizard asks: nearby NDBC
+  buoy stations, nearby CO-OPS tide stations, the covering OFS model, and GRIB availability.
+- The API's existing wizard endpoints keep their paths and response shapes and are re-implemented as
+  pass-throughs.
+- `providers/{buoy,tides,marine,ocean}/` are then deleted from the API along with `wind/`.
+
+**Consequence to handle honestly:** wizard discovery now requires a reachable marine service. When it
+is unreachable the wizard must say so plainly — not return an empty station list, which reads as
+"there are no buoys near you" and is the exact "valid response, wrong answer" failure this plan
+exists to remove.
+
+### Original escalation, superseded
+
+**~~AWAITING OPERATOR~~:** the wizard's discovery helpers import four marine provider modules
 
 Found by the deletion agent while wiring T6.6's registry removal. Same shape as C-40 and C-41 —
 a third place where "everything marine moves" meets "the API owns the wizard."
