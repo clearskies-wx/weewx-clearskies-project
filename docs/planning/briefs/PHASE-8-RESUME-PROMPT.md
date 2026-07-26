@@ -1,5 +1,34 @@
 # Phase 8 — Resume Prompt (2026-07-26 handoff)
 
+> ## ⚠ PARTLY SUPERSEDED — a later session ran on 2026-07-26. READ THE LIVE SCRATCH FIRST.
+>
+> **`c:\tmp\marine-sep-P8-resume-scratch.md` is the current state of record and wins wherever it and this
+> brief disagree.** Read it before this document, not after.
+>
+> What changed after this brief was written:
+>
+> - **T8.4, T8.4b, T8.5 are DONE**; C-77 (`b7356ae`) is deployed. weewx is clean of SWAN artifacts.
+> - **T8.10a, T8.10b, T8.10c (both rounds), T8.10d are implemented and pushed** — but **NOT deployed**.
+>   The marine service is still running `b7356ae`; newer code sits on disk via `--no-restart`.
+> - **A background job may still be running**: the full ocean WW3 station catalogue build on librewxr
+>   (`/tmp/ocean_cat.log`). ~2 hours, resumable. It is a hard deploy prerequisite. Check it first.
+> - **The brief's "one station, `BOUNDSPEC … CONSTANT FILE`" design is VOID** — operator ruled the boundary
+>   must vary along its length (`BOUNDSPEC … VARIABLE FILE`). See the plan's T8.10c superseding block.
+> - **The depth/distance thresholds are NO LONGER an operator question.** They are computed:
+>   depth ≥ `0.78 × T²`, distance ≤ one WW3 grid cell. Do not re-ask.
+> - **The "one measurement still missing" (GLWU frequency array) is CLOSED** — 32 bins, 0.0500–0.960 Hz.
+> - New concerns since: **C-88** (duplicate NOMADS rate limiters), **C-89** (C-76 closed while a second
+>   calm-boundary fabrication survived — now deleted), **C-90** (C-77's −15 m depth alive at all three DEM
+>   priorities — **NOT yet fixed**), **C-91** (selection geometry — fixed), **C-92** (catalogue never built;
+>   orphaned API data files).
+> - New governing document: **`docs/RELEASE-DATA-REFRESH.md`** — shipped data artifacts and when to refresh
+>   them.
+> - **Only two operator decisions remain open**: C-85's capability surface, and whether `/marine` may gain a
+>   `spectralComponents` field. Everything else previously listed as a question has been answered.
+>
+> Two behavioural notes that cost real time this session: the operator wants **short** replies, and wants
+> physics questions **researched from the SWAN manual and the literature**, never put to them as a choice.
+
 Paste the block below into a new session.
 
 ---
