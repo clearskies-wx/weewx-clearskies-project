@@ -3057,3 +3057,170 @@ on this installation and no bathymetry has been silently ignored. The defect is 
 bitten the first operator to try it — but there is **no data-provenance question to answer and
 nothing to remediate**. Recorded with the commands, because "probably nobody used it" is an
 assumption and this is a measurement.
+
+---
+
+## C-76 — CLOSED (marine `c2461ff`, deployed)
+
+Fixed per the operator's ruling. The WW3 `except` block no longer builds
+`{"forecast": [], "grid": "unavailable", "model_run": ""}`; it logs **ERROR** and **raises**.
+
+**Verified independently by the coordinator, not taken from the implementer's report:**
+
+- The raise sits at swan.py ~1503; `_SWANRunnerWithCleanup` is constructed 300+ lines later (~1811)
+  and cache persistence later still (~1920-2050). Nothing between them can write a hotstart or
+  overwrite `forecast_cache.json`, so the convergence gate's guarantee is preserved.
+- `run_all_spots()` — the only caller of `_run_all_spots_locked()` — wraps it in `try: ... finally:`
+  with **no `except`**. Read directly; the exception propagates.
+- It lands in `service.py:313`'s `except Exception: logger.error(...); time.sleep(300); continue`,
+  which does **not** advance `last_hrrr_cycle`. So the same HRRR cycle is retried every 5 minutes
+  until it succeeds — the operator's requested cadence, from machinery that already existed.
+- `ruff` 0 issues before and after. `mypy` 171 pre-existing errors, byte-identical before and after.
+  `pytest tests/` 52 passed, 2 skipped.
+
+**Why raising beats returning, and why it is recorded:** a substituted calm boundary — or a quiet
+return — lets the function finish "normally", which **advances `last_hrrr_cycle`**. The bad cycle
+would then never be retried until the next HRRR cycle hours later, and the wind-sea-only forecast it
+produced would be published and cached as if valid. The failure looking like success is the whole
+defect, not a side effect of it.
+
+**Coverage gap named, not built around:** no test exercises the new raise path. The repo has no
+tests for `swan.py` or the runner at all. Flagged for T8.9.
+
+**Reset performed after the fix, at the operator's instruction** — the in-flight cycle was running on
+a calm boundary and its output was worthless. Service stopped, `forecast_cache.json` **archived**
+(not deleted) to `/var/run/weewx-clearskies/swan-precleanup-20260726T083936Z/`, all hotstart files
+and L1/L2/L3 work dirs removed, plus a stale `surfbeat_huntington-city-beach-pier` work directory
+dating from 23 July that would have fed carry-forward IG state three days out of date. Bathymetry
+caches, `swan_grid_sizing.json` and `spot_profiles/` deliberately **kept** — expensive to rebuild and
+unaffected by the boundary failure. Service restarted at `c2461ff`, confirmed cold:
+`{"last_run": null, "spots": ["huntington-city-beach-pier"]}` and *"SWAN: no usable on-disk forecast
+cache — starting cold"*.
+
+This also gives **C-08** the genuinely fresh run its energy-closure measurement requires.
+
+---
+
+## C-77 — bathymetry falls back to a fabricated uniform 15 m flat seabed (OPEN → NEEDS AN OPERATOR RULING; same class as C-76)
+
+Found by the C-76 sweep, which the coordinator ordered precisely because the operator's wording —
+*"**again** this is one of those false fallbacks"* — said this was a class rather than an instance.
+It is the one hit that is unambiguously the same class as WW3, and it is arguably worse.
+
+**The behaviour.** `providers/nearshore/swan.py` ~249-485, the per-level CUDEM download chain. When
+**every** bathymetry source fails — operator-supplied file, NCEI regional DEM via OPeNDAP, USGS Great
+Lakes topobathy, NCEI CRM — the function returns `{}` and logs *"SWAN will use uniform 15m depth"*
+(WARNING or ERROR depending on branch). The run then proceeds, executes SWAN, passes the convergence
+gate, **persists hotstart, and overwrites `forecast_cache.json`.**
+
+**Why this is the same shape as C-76 and not an optional-input degradation.** Bathymetry is SWAN's
+`BOTTOM` input. It is what makes a nearshore wave model a nearshore wave model — shoaling,
+refraction, depth-limited breaking and the breaking-depth criterion the entire L3 grid is sized
+around all derive from it. A **flat 15 m seabed is not a missing input; it is a fabricated one.** The
+model runs happily and produces a smooth, plausible-looking forecast for a beach that does not exist.
+Every depth-dependent result — break point, surf-zone width, peel angle, the `1.3 × Hs / 0.73`
+handoff — is then computed against fiction.
+
+Compare the real profile this spot actually has, measured today at 08:25: the 30 m contour 6,017 m
+out, the 15 m contour 2,433 m out, and 1.8 m depth just 85 m off the beach. A uniform 15 m plane
+replaces all of that with a flat floor that never shallows, so waves never feel the bottom and never
+break where they really break.
+
+**It also carries the paper trail CLAUDE.md warns about.** The module docstring at ~32-33 records
+this as a deliberate *"Key design decision"*: *"CUDEM bathymetry: passed as an empty dict... defaults
+to a uniform 15m ocean depth."* Per the named non-excuse, *"a governing document says so"* is not
+authorization — a document describing a superseded or wrong design *"is exactly how a wrong
+architectural change acquires a paper trail that looks legitimate."*
+
+**The right precedent already exists in this codebase, one module away.**
+`enrichment/bathymetry.py`'s `find_depth_contour_distance()` (LC-10) faces the same temptation for a
+closely related quantity and **raises `ValueError` naming the spot, bearing and target depth** rather
+than substituting a hardcoded distance. Two functions, one contour-distance and one depth-grid,
+opposite answers to the same question.
+
+**Not fixed. This needs the operator's ruling, exactly as C-76 did.** Removing a substituted model
+input changes what the model does under a named failure condition — triggers 2 and 4 — and it is a
+physics-behaviour decision about a required input, which is the operator's call and not the
+coordinator's. C-76's ruling was explicitly about the calm boundary; extending it by analogy would be
+the coordinator deciding a physics question on the strength of a phrase.
+
+**Coordinator's recommendation:** treat it exactly as C-76 was treated — log ERROR naming every
+source that was tried and failed, and **raise**, so the runner loop retries the same cycle every
+5 minutes without advancing `last_hrrr_cycle` and without publishing. Bathymetry failures are far
+more likely to be persistent than WW3's transient TLS timeout, but that argues *for* raising, not
+against: a persistent inability to obtain a seabed should stop the model loudly, not fill it in.
+
+**Mitigating fact, so the urgency is judged accurately and not overstated:** this path has almost
+certainly never fired on this installation. All three bathymetry levels are cached on disk and the
+runtime path reads the caches only — verified today, the grid-sizing chain logged
+`CUDEM L1/L2/L3: cached bathymetry datum=NAVD88 source=ncei_regional` for all three levels and
+downloaded nothing. The fallback would bite a **new** spot, or one whose cache was cleared, on a day
+NCEI was unreachable. It is a live landmine rather than a live fire.
+
+### The rest of the sweep — assessed as legitimate, no action recommended
+
+Recorded so the class is closed rather than left half-open, and so nobody re-raises them:
+
+| Site | Substitutes | Assessment |
+|---|---|---|
+| CO-OPS tide / WLEVEL (~1506) | `None` → SWAN runs without WLEVEL | **Legitimate.** Optional input, *omitted* not fabricated, carries an explicit "do NOT fall back to MLLW" comment (ADR-098). |
+| OFS surface currents (~1589) | `None` | **Legitimate.** Optional forcing; absence is a documented SWAN-manual-safe default. |
+| GFS wind hours 48-72 (~1453) | `None` → 0-48 h forecast | **Legitimate.** Produces a *shorter* forecast, visibly — it does not disguise a 48 h answer as 72 h. |
+| Wave-setup profile (~1767) | tide-only WLEVEL | **Legitimate.** Degrades an enhancement, not a required input. |
+| `swan_runner.py:3130-3159` | loud WARNING + degrade to single CURVE | **Already correct** — cites the 2026-07-23 0.01 m Hs and 2026-07-19 VDatum 0.0 m incidents by name and deliberately refuses the silent (0,0) substitution. Good precedent. |
+
+The distinction that separates the two groups: **omitting an optional input is honest; fabricating a
+required one is not.**
+
+### ⚠ SUPERSEDED SAME DAY — OPERATOR RULING 2026-07-26 EXTENDS THIS TO EVERY INPUT
+
+The table immediately above assessed CO-OPS, OFS, GFS and wave-setup as "legitimate optional-input
+degradations." **The operator overruled that assessment in chat**, verbatim:
+
+> "CUDEM failures would be the same issue, we cannot substitute bogus data. Actually none of these
+> are allowed to be quite [quiet] failures... they all need to hold up model runs until they can be
+> fetched correctly. Omission of any of that data results in inaccurate and therefore bogus
+> information."
+
+**The coordinator's distinction — "omitting an optional input is honest; fabricating a required one
+is not" — is rejected.** The operator's position is that there are no optional inputs here: a SWAN
+run missing tide, currents, or the 48-72 h wind is not a degraded-but-honest run, it is an
+inaccurate one, and an inaccurate forecast is bogus regardless of whether the missing value was
+fabricated or merely absent. That is a physics-accuracy judgement and it is the operator's to make.
+
+**New rule for the marine model, applying to all of C-77 and superseding the table above:**
+
+> **SWAN runs only when every one of its inputs is present.** Any input fetch that fails — WW3
+> boundary, CUDEM bathymetry, CO-OPS tide/WLEVEL, OFS currents, GFS wind, wave-setup profile — logs
+> ERROR and raises. Nothing is substituted, nothing is omitted, no partial run is published. The
+> runner loop's existing handler retries the same HRRR cycle every 5 minutes without advancing
+> `last_hrrr_cycle`, until every input is available. C-76's mechanism, applied to all of them.
+
+`enrichment/bathymetry.py`'s `find_depth_contour_distance()` (LC-10) is the in-repo precedent: it
+raises `ValueError` naming the spot, bearing and target rather than substituting.
+
+### One question this raises that the coordinator will NOT decide, and is surfacing instead
+
+**Transient unavailability and structural unavailability are not the same failure, and "hold until
+fetched correctly" only terminates for the first.**
+
+WW3 is global and CUDEM/NCEI covers the US coast, so a failure there is almost always transient — the
+data exists and the fetch will succeed on a retry. That is the case the ruling is plainly aimed at,
+and it is the case on this installation today.
+
+**OFS is different: it is regional.** `WCOFS` covers the US West Coast; other models cover other
+basins; **some coastlines are covered by no OFS model at all.** For such a spot, currents are not
+temporarily unfetchable — they do not exist. The same is true of the USGS Great Lakes topobathy DEM
+outside the Great Lakes. If those are treated as required inputs that hold the run, a spot in an
+uncovered region **never produces a forecast at all**, and the retry loop spins every five minutes
+forever.
+
+This installation is unaffected — both configured locations carry `ofs_model: WCOFS` and are inside
+its domain, verified in the pushed config — so it does not block the work now.
+
+The distinction worth drawing when this is settled is between **"the fetch failed"** (retry, hold the
+run — the ruling as stated) and **"no provider covers this location"**, which is a configuration fact
+knowable at setup time rather than a runtime failure, and which arguably belongs in the wizard's
+viability checks rather than in a retry loop. Recorded for the operator's decision; the implementer
+has been told to report where the two cases are indistinguishable in the current code rather than to
+invent a policy.
