@@ -331,7 +331,8 @@ Same SSH rules, deploy scripts, and filesystem permissions as CLAUDE.md. Additio
 | **Coordinator** | Opus | Architecture, agent briefs, QC gates, doc updates, research. Keeps this plan updated and checks items off as verified. |
 | **clearskies-api-dev** | Sonnet | API code: TLS fix, companion service proxy, marine service scaffold, provider module moves |
 | **clearskies-dashboard-dev** | Sonnet | Dashboard: no changes expected (dashboard is unaware of marine service) |
-| **clearskies-docs-author** | Sonnet | Wizard/admin: rename "Wave Modeling" to "Marine Service", unify URL fields, config push |
+| **clearskies-docs-author** | Sonnet | Documentation only — manuals, the Operator Manual, and the 13 translation files. **Corrected 2026-07-25:** this row previously read "Wizard/admin: rename …, unify URL fields, config push", which is code work this role is hard-scoped against. See the correction block at the head of Phase 7. |
+| **stack implementation agent** | Sonnet | Config UI code in `weewx-clearskies-stack`: wizard and admin routes, state, templates, client-side script. The stack repo has no dedicated dev role; dispatched as general-purpose. |
 | **clearskies-test-author** | Sonnet | Tests: marine service unit tests, proxy integration tests, manifest handler tests |
 | **clearskies-auditor** | Sonnet | Adversarial audit per phase (MANDATORY — no deferral) |
 
@@ -2877,9 +2878,31 @@ and verified (it survives `kill -9`), but it cannot self-heal from an empty disk
 
 **Scratch file:** `c:\tmp\marine-sep-P7-scratch.md`
 
+> ### ⚠ CORRECTED 2026-07-25 — the owner column below is wrong for T7.1–T7.6
+>
+> Every task in this phase names `clearskies-docs-author` as owner. That agent's role is
+> hard-scoped to documentation and explicitly forbids code changes, routing them "to the dev
+> agents via the lead." T7.1–T7.6 are Python route handlers, Jinja templates, HTMX wiring and
+> client-side validation. The assignment was unexecutable as written.
+>
+> **Found at dispatch by the docs-author agent itself, which refused the work rather than
+> stretching its scope — the correct call.** "A document assigns it to me" is not authorization
+> to act outside a stated constraint, by exactly the reasoning the architectural-change block
+> applies to "a plan says so."
+>
+> **Corrected ownership for this phase:**
+>
+> | Work | Owner |
+> |---|---|
+> | Wizard and admin **code** — `wizard/routes.py`, `admin/routes.py`, `state.py`, `state_persistence.py`, `config_writer.py`, all Jinja templates and their client-side script | stack implementation agent (general-purpose; the stack repo has no dedicated dev role) |
+> | The 13 translation files and `OPERATOR-MANUAL.md` | `clearskies-docs-author` — and it runs **after** the code, because the locale files are keyed by English source string and those strings do not exist until the templates are written |
+> | API halves of T7.2 / T7.3 / T7.6 — apply models, `api.conf` writing, `/setup/providers/test-marine`, the apply response's push-outcome field | `clearskies-api-dev` |
+>
+> §0.3's agent-assignment table carried the same error and is corrected there too.
+
 ### T7.1 — Rename "Wave Modeling" to "Marine Service" in wizard
 
-- **Owner:** `clearskies-docs-author`
+- **Owner:** stack implementation agent (was: `clearskies-docs-author` — see the correction above)
 - **Files:** `repos/weewx-clearskies-stack/weewx_clearskies_config/templates/wizard/step_providers.html`, translation files (13 locales)
 
 **Do:** Rename section. Update i18n keys. Update help text.

@@ -1635,3 +1635,111 @@ and cannot decide without them.
 **Also noted, not fixed:** `surf.py` has a separate, pre-existing time-of-day almanac need that
 remains unwired. It could reuse the same solunar fetch in a later round. Left alone deliberately —
 outside C-47's two authorised fetches.
+
+---
+
+## C-52 — Test Connection cannot validate the shared secret against `/health` alone (DECIDED)
+
+Found by the coordinator while pinning the T7.3 contract at Phase 7 dispatch.
+
+T7.3 specifies the wizard's Test Connection as `POST /setup/providers/test-marine` →
+`GET {marine_service_url}/health`. But `/health` is one of exactly two auth-exempt routes on the
+marine service (`auth.py:12-15`; the other is `/manifest`). So the probe the plan names proves
+reachability and nothing about `MARINE_SERVICE_SECRET`. The endpoint it replaces
+(`/setup/providers/test-compute`) **did** send its secret and did validate it — so following T7.3
+literally would be a quiet downgrade in what the button tells the operator, and a wrong secret
+would pass the test and then fail on the first real request.
+
+**Decision (coordinator, 2026-07-25): keep `/health` as the primary probe exactly as T7.3 says,
+and add a second probe against an existing authenticated route** —
+`GET {url}/discovery/grib-availability`, which is bearer-authenticated and costs an
+`importlib.util.find_spec` call. A 401 there is reported to the operator as a rejected secret
+rather than being absorbed into a generic success.
+
+**Why this is not an architectural change.** No endpoint, config key, dependency or contract is
+added — an existing route is called by an existing client for its status code. Trigger 7 is about
+*adding* an endpoint; this adds none. The alternative — a purpose-built authenticated no-op health
+route on the marine service — *would* be trigger 7 and was deliberately not taken.
+
+**Recorded honestly as a compromise, not a clean design.** Using a discovery route as an auth
+probe is a workaround. If Phase 8 wants a proper authenticated liveness route, that is a trigger-7
+question for the operator, not something to slip in here.
+
+---
+
+## C-53 — the marine repo's manifest test pins a 6-entry inventory against 15 real entries (OPEN → fixed in Phase 7 R1a)
+
+`tests/test_manifest.py:21-58` declares `_EXPECTED_ENDPOINTS` as a 6-entry specimen and asserts
+both equality against `_ENDPOINTS` and `len(endpoints) == 6` (lines 71-78 and 156). `_ENDPOINTS`
+has held **15** entries since C-30 completed the manifest (5 list routes) and C-42 added the four
+`/discovery/*` routes. Neither round updated the test.
+
+**Pre-existing, not caused by Phase 7** — but Phase 7 R1a adds two more entries and would trip it,
+so it is corrected there as part of keeping an assertion honest with the change that touches it.
+Recorded because it is the second time a manifest change has outrun its test, and the manifest is
+the only channel by which a route reaches the dashboard (C-30's standing rule).
+
+---
+
+## C-54 — `GET /setup/marine/swan-check` probes for the SWAN binary on the wrong host (OPEN → ⚠ needs an operator decision)
+
+Found by the coordinator's Phase 7 survey of `endpoints/setup.py`. **Not covered by C-42's four
+pinned imports and not covered by C-48's two endpoints**, so no existing ruling reaches it.
+
+`/setup/marine/swan-check` (`endpoints/setup.py:2871`) answers the wizard's "is SWAN installed?"
+question with a **local `shutil.which("swan")`** on the API host. After the separation SWAN runs on
+the marine service host, and `reference/clearskies-dev.md` records the binary at
+`/usr/local/bin/swan` on librewxr while the API runs on weewx. On a correct deployment this
+endpoint therefore reports *SWAN is not installed* to an operator whose SWAN is installed and
+running — a valid HTTP 200 carrying the wrong answer, which is the exact failure class this plan
+exists to remove.
+
+**Why it is not being fixed inside Phase 7 unilaterally.** The C-42 pattern says plainly what the
+shape of the fix is — the API proxies the question to the marine service, which is the host that
+can answer it. But the marine service has no endpoint that answers it, and **adding one is trigger
+7**. C-48's operator-settled authorisation is explicitly scoped to two endpoints
+(compute-estimate, bathymetry-coverage); stretching it to a third would be the coordinator
+extending its own mandate, which is what C-48's own text praises the deletion agent for refusing
+to do.
+
+**Options:**
+
+| Option | Cost |
+|---|---|
+| **(a) Marine service exposes a SWAN-availability check; the API proxies it** | One more endpoint (trigger 7), same shape as C-48's two. The marine service already knows its SWAN binary path from config. Matches the settled pattern and makes the wizard truthful. |
+| (b) Delete the check from the wizard | Removes an endpoint (also trigger 7) and removes a genuinely useful setup-time signal. |
+| (c) Leave it | The wizard keeps telling correctly-deployed operators that SWAN is missing. Not recommended. |
+
+Coordinator's recommendation: **(a)**, sequenced into Phase 7 alongside C-48 if the operator
+authorises it, since the marine-side work is a near-copy of what R1a is already building.
+
+---
+
+## C-55 — four more `/setup/marine/*` endpoints answer marine questions inside the API (OPEN → Phase 8 assessment)
+
+Same survey, lower severity than C-54 — recorded so the next round does not rediscover them and so
+QC Gate 7's "zero marine code in the API" reading is not overclaimed.
+
+| Endpoint | What it uses locally | Assessment |
+|---|---|---|
+| `/setup/marine/species` and `/setup/marine/species-database` | the ported species data set | Reference data, not computation or a provider fetch. Plausibly fine where it is. |
+| `/setup/marine/discover-structures` | Overpass / OpenStreetMap | Not a marine *provider* module — it queries OSM, which the API queries for non-marine purposes too. Needs a reading, not an assumption. |
+| `/setup/marine/bathymetry/upload` | `rasterio` file validation | Survives the C-48 deletion because it validates an uploaded file rather than resolving a DEM. But it is the sole remaining reason `rasterio` is reachable in the API, and it accepts bathymetry — data only the marine service consumes. |
+
+**Not chased in Phase 7.** None of them produces a wrong answer today, unlike C-54. The question
+each raises — *is answering this the API's job or the marine service's?* — is the same one C-40,
+C-41, C-42 and C-48 each answered separately, and it deserves one assessment rather than a fifth
+individual escalation. Carried to Phase 8.
+
+---
+
+## C-56 — C-46 is routed to Phase 8, not Phase 7 (DECIDED)
+
+C-46 (`MARINE_PROVIDER_MODULES` populated but with no consumer) was routed "Phase 7/8". Settling
+it here: **Phase 8.**
+
+The plausible consumer is the manifest's `compute_capabilities()`, which today derives the
+advertised capability list from the pushed config (`manifest.py:167-185`). Rewiring it to derive
+from the provider registry changes where the capability surface crossing the API↔marine boundary
+comes from — a contract question, and one with no wizard content at all. Phase 7 is the wizard
+phase. Recorded rather than absorbed into a pass.
