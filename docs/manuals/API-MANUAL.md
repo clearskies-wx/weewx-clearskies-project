@@ -2373,7 +2373,7 @@ Four enrichment processors for marine data. Each follows the existing enrichment
 
 ### SWAN nearshore model (ADR-093, corrected ADR-095)
 
-**SWAN is the only nearshore wave model.** When the `[nearshore]` pip extra is installed, SWAN runs as a subprocess within the API process on a schedule tied to the extended HRRR cycles (4×/day at 00/06/12/18Z). There is no `nearshore_model` config key — if the extra is installed, SWAN runs. NWPS is eliminated (ADR-093 supersedes ADR-084).
+**SWAN is the only nearshore wave model.** SWAN runs in the marine service on a schedule tied to the extended HRRR cycles (4×/day at 00/06/12/18Z). All SWAN code left the API this phase; there is no `[nearshore]` pip extra in the API. There is no `nearshore_model` config key — SWAN runs when the marine service is configured and has SWAN available. NWPS is eliminated (ADR-093 supersedes ADR-084).
 
 **WaveWatch III is NOT a surf forecast source.** WW3 remains the deep-water boundary input to SWAN (via `providers/marine/wavewatch.py`) and continues serving the marine endpoint's offshore forecast. WW3 is never used as a surf endpoint data source. The surf endpoint serves the last successful SWAN cache if the runner fails — no fallback to any other model.
 
@@ -2430,11 +2430,11 @@ SWAN cross-shore CURVE transect output
   → degraded: true in response
 ```
 
-**SWAN integration (ADR-095 corrections):**
+**SWAN integration (ADR-095 corrections):** All components below run in the marine service.
 
 | Component | Source |
 |---|---|
-| Wave physics engine | SWAN (Fortran subprocess) — two-level nested grid per cycle |
+| Wave physics engine | SWAN (Fortran subprocess in the marine service) — two-level nested grid per cycle |
 | Wind forcing (hours 0–48) | HRRR forecast wind at 3km via NOMADS (`providers/wind/hrrr.py`) — extended cycles only (00/06/12/18Z) |
 | Wind forcing (hours 48–72) | GFS forecast wind at 0.25° (~25km) via NOMADS (`providers/wind/gfs.py`) — supplements HRRR to reach 72h |
 | Deep-water boundary | WaveWatch III directional spectrum via ERDDAP (`providers/marine/wavewatch.py`) |
@@ -2447,7 +2447,7 @@ SWAN cross-shore CURVE transect output
 
 **Blended wind forcing:** HRRR (3km) provides high-resolution wind for hours 0–48 from extended cycles (00/06/12/18Z, 4×/day). GFS (0.25°, ~25km) supplements hours 48–72 to fill the 72-hour surf forecast card. The SWAN runner stitches HRRR and GFS wind grids into a single continuous wind input spanning 72 hours. The resolution transition at hour 48 does not affect nearshore physics — wave refraction, shoaling, and breaking are computed at the SWAN grid resolution, not the wind grid resolution.
 
-**SWAN runner:** `services/swan_runner.py` — executes two SWAN runs per cycle (outer grid + inner nest). Writes input files (computational grid, wind field, boundary spectra, bathymetry, WLEVEL, CURRENT, OBSTACLE, output CURVE transects), spawns SWAN subprocess, parses TABLE output and SPECOUT files. Output: transect data per surf spot per timestep across 72 forecast hours. Working directory: `/var/run/weewx-clearskies/swan/` (fixed path, not tempfile). **Hotstart:** each run writes a hotstart file after `COMPUTE`; the next run reads it via `INIT HOTSTART` so t=0 immediately has the real wave field from the previous run (no cold-start spin-up). Hotstart files persist at `{outer,inner}_hotstart.dat` in the SWAN workdir.
+**SWAN runner:** `services/swan_runner.py` in the marine service — executes two SWAN runs per cycle (outer grid + inner nest). Writes input files (computational grid, wind field, boundary spectra, bathymetry, WLEVEL, CURRENT, OBSTACLE, output CURVE transects), spawns SWAN subprocess, parses TABLE output and SPECOUT files. Output: transect data per surf spot per timestep across 72 forecast hours. Working directory: `/var/run/weewx-clearskies/swan/` (fixed path, not tempfile). **Hotstart:** each run writes a hotstart file after `COMPUTE`; the next run reads it via `INIT HOTSTART` so t=0 immediately has the real wave field from the previous run (no cold-start spin-up). Hotstart files persist at `{outer,inner}_hotstart.dat` in the SWAN workdir.
 
 **Cross-shore CURVE transect output (ADR-095).** Each surf spot gets a CURVE transect perpendicular to the beach, from ~15m depth to ~1m depth, ~50m spacing (10–20 output points). Direction derived from `beach_facing_degrees + 180°`. Replaces the single-point OUTPUT POINTS command. TABLE output at each transect point: `HSIGN HSWELL DIR TM01 DEPTH QB DISSURF DSPR XP YP` (SETUP removed — SWAN SETUP command disabled in parallel OpenMP runs; `setup` field returns `null` in API responses). SPECOUT (2D directional-frequency spectrum) at the ~10m depth point only (one per spot). Break points identified by QB peaks along the transect.
 
