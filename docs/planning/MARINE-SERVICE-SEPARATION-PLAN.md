@@ -3940,6 +3940,122 @@ originally written check only old-architecture cleanup and would pass with T8.10
 9. Dashboard renders all marine tabs.
 10. Silent deferral scan across ALL repos.
 
+### T8.11 — Vertical datum unification on LMSL
+
+**Added to Phase 8 by operator decision, 2026-07-26**, arising from C-90. Governing decision:
+[ADR-098](../decisions/ADR-098-swan-datum-consistency.md), amended the same day with the now/later options.
+**Read the amended ADR before starting any subtask.**
+
+**Why.** ADR-098's original strategy — match datums at source, never convert — assumed one DEM served every
+level. That assumption is now dead, and not by choice:
+
+- **L1 must be ETOPO 2022 (MSL).** Operator ruling: regional DEMs *"have HUGE HOLES IN THEIR COVERAGE
+  regardless"*, so L1 cannot depend on one. **This research is closed — do not re-open it.**
+- **L2/L3 are regional DEMs**, NAVD 88 in the US (665 of 1000 catalogue rasters measured 2026-07-26).
+- **Selection cannot unify them** — the US has no MSL equivalent at 10 m resolution.
+- **Per-level WLEVEL was proposed and DENIED** by the operator.
+
+So two datums exist across the nest and only grid-wise conversion closes the gap. Measured live at HB Pier:
+CO-OPS `NAVD − MSL = 0.799 m`. Under depth-limited breaking `Hb ≈ γ·d` that is **~0.6 m of breaking height**
+and **~40 m of break-point shift on a 1:50 slope** — the difference between a good wave and a closeout, not a
+margin error.
+
+**Why the ADR's deferral of this is reversed:** it was reasoned from a single-point call against the flaky
+VDatum REST API, not from the grid-wise offline capability that exists. `normalize_to_msl()` applies **one
+domain-centre offset to an entire grid**, which is not a valid transformation when separations vary over
+short distances. It is replaced, not enabled.
+
+**Known limitation of the global product, and why the nesting contains it (operator, 2026-07-26).** GEBCO —
+and by extension ETOPO 2022, whose ocean component derives from it with regional DEMs merged in — **mixes
+vertical datums in shallow water**, because that is precisely where heterogeneous coastal surveys get
+stitched in. The global product is therefore not well trusted in the shallows. **The nesting renders this
+moot for the forecast, but for a specific reason worth stating rather than assuming:** ETOPO serves **L1
+only**, and what L1 contributes downstream is the boundary spectrum at **L2's offshore edge (~35–50 m)** —
+deep enough to sit outside the band where the datum mixing lives. The shallow cells of L1 are superseded by
+L2/L3 regional bathymetry in the nest, and no published output is read from L1's nearshore cells (the
+deep-water reference SPECOUT comes from L2 at ~15 m). **This is a reason to keep it that way:** if anything
+ever starts reading L1 near shore, this limitation stops being moot.
+
+**Blocks deployment.** Marine `c97dd73` (ETOPO as L1's primary source) is committed but **must not be
+deployed until T8.11 lands** — it would run L1 with BOTTOM in LMSL against a WLEVEL in NAVD 88. T8.11
+therefore precedes the marine restart, T8.10j and T8.10h.
+
+**Architectural change block applies to every agent prompt in this task.** Triggers 7 (dependency) and 4
+(data contract) are authorized **for T8.11's stated scope only**, by the operator decision above and the
+amended ADR-098. Anything beyond that stops and reports.
+
+#### T8.11a — Prove the transform before building on it
+
+- **Owner:** `clearskies-api-dev` (marine repo)
+- **Do:** install `vyperdatum` in the marine venv on librewxr; obtain NOAA's PROJ separation grids; point
+  `VYPER_GRIDS` at them. Transform a **real array** of L2 depths NAVD 88 → LMSL and compare against the
+  CO-OPS station offset (expect ≈0.8 m at HB, spatially varying, **not** constant).
+- **Accept:** a NAVD 88 → LMSL array transform runs offline and returns per-cell values that vary across the
+  grid. Grid download size and disk footprint recorded.
+- **STOP condition:** if PROJ carries no usable NAVD 88 ↔ LMSL pipeline, or grids cannot be obtained offline,
+  **halt T8.11 and report**. Do not substitute a constant offset — that is the defect being removed.
+
+#### T8.11b — Per-cell conversion in the bathymetry path
+
+- **Owner:** `clearskies-api-dev` (marine repo)
+- **Do:** convert L2/L3 grids to LMSL **per cell** at bathymetry-resolution time, storing the converted grid
+  and `vertical_datum: LMSL` in the cache. **Delete** `normalize_to_msl()` and `_query_vdatum_offset()`
+  (C-90b: the latter silently returns 0.0 in two paths despite its docstring). No single-offset path may
+  remain anywhere.
+- **Accept:** all cached levels report `LMSL`; no code applies a scalar datum offset to a grid; C-90b closed.
+
+#### T8.11c — One WLEVEL fetch, in MSL
+
+- **Owner:** `clearskies-api-dev` (marine repo)
+- **Do:** replace the `"L2 preferred, L1 fallback"` datum selection in `providers/nearshore/swan.py` with a
+  single CO-OPS fetch in MSL, matching the now-uniform bathymetry datum. Public tide display stays MLLW
+  (ADR-098, unchanged).
+- **Accept:** one SWAN-input CO-OPS fetch, `datum=MSL`; display endpoint still MLLW.
+
+#### T8.11d — Cross-level datum guard
+
+- **Owner:** `clearskies-api-dev` (marine repo)
+- **Do:** verify every level's bathymetry datum agrees before a run; refuse the run naming the levels and
+  their datums if not. ADR-098 acceptance criterion 9.
+- **Why it is separate:** the levels agree **today by coincidence, not construction** — all five live caches
+  are NAVD 88, but each level looks its DEM up independently and the same Huntington box offers
+  `socal_1as`/`socal_3as` on **MSL** beside `orange_county_13_navd88_2015` on **NAVD 88**. An L2/L3
+  disagreement puts the full 0.6 m breaking-height error in the surf zone silently.
+- **Accept:** a deliberately mismatched cache set refuses with an actionable message.
+
+#### T8.11e — No invented datum labels
+
+- **Owner:** `clearskies-api-dev` (marine repo)
+- **Do:** remove `UNKNOWN_CRM` entirely. A datum is either published by the source (NCEI mosaic catalogue
+  `VerticalDatum`, operator declaration, or a pinned raster) or that source is unusable. ADR-098 criterion 10.
+- **Note:** `UNKNOWN_CRM` is a *truthy string*, so it passed the existing no-silent-fallback check and was
+  handed to CO-OPS as a datum. It only never bit because L2's NAVD 88 always won the selection.
+- **Accept:** `grep UNKNOWN_CRM` returns nothing; a source with no published datum is skipped, not labelled.
+
+#### T8.11f — Refuse outside separation-grid coverage
+
+- **Owner:** `clearskies-api-dev` (marine repo)
+- **Do:** NOAA's grids are US-only. Outside their coverage, refuse at setup with a message naming the
+  jurisdiction gap rather than running on mixed datums. ADR-098 criterion 11.
+- **Accept:** a non-US spot configuration refuses with an actionable message; no mixed-datum run is possible.
+
+#### T8.11g — Packaging, deployment and doc sync
+
+- **Owner:** `clearskies-api-dev` + `clearskies-docs-author`
+- **Do:** add `vyperdatum` to the `[nearshore]` extra; decide and document where PROJ grids live and how they
+  are obtained (setup-time download vs shipped — **shipped is a `docs/RELEASE-DATA-REFRESH.md` row if
+  chosen**); update ARCHITECTURE.md, OPERATIONS-MANUAL.md, and RELEASE-DATA-REFRESH.md in the same commits.
+- **Accept:** doc-code sync verified; a clean install reproduces the working transform.
+
+#### T8.11h — Verify against reality, not against ourselves
+
+- **Owner:** coordinator (**not** delegated — operator directive for T8.10h applies here too)
+- **Do:** after deploy, confirm (1) fabricated/exception cells remain **0** across L1/L2/L3, (2) every level
+  reports `LMSL`, (3) converted L2 depths differ from the NAVD 88 originals by a **spatially varying** amount
+  of order 0.8 m at HB — a constant difference means the per-cell path silently degraded to a single offset,
+  (4) SWAN still runs and surf output stays physically plausible against an external source.
+- **Accept:** all four confirmed with commands and output in the report, per the evidence-over-assertion rule.
+
 ### QC Gate 8 (Part B Final)
 
 - Marine service standalone on librewxr (one port, one service).
@@ -3951,6 +4067,8 @@ originally written check only old-architecture cleanup and would pass with T8.10
 - Silent deferral scan: zero findings across all repos.
 - Test baselines hold.
 - All governing documents match implementation.
+- **Every SWAN level reports the same vertical datum (`LMSL`), verified from the caches — not assumed
+  (T8.11).**
 
 ---
 
