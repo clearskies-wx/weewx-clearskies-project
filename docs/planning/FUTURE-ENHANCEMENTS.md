@@ -95,7 +95,41 @@ clear-water conditions anywhere that is *ever* clear.
    belongs at the **bottom** of the L3 priority chain — the answer when no real 10 m DEM exists,
    never a replacement for one that does.
 4. Whether breaking-zone turbidity specifically defeats the bar crest (carried over from the
-   original entry, still unassessed).
+   original entry). **Partly answered 2026-07-26 — and it splits SDB into two families.**
+
+**Two SDB families, and the surf-relevant one is not the optical one.**
+
+- **Optical** (Stumpf/Lyzenga blue-green ratio) recovers depth from **seabed reflectance**. Needs
+  clear water; fails precisely where waves break. Everything above about turbidity filtering
+  applies to this family.
+- **Wave-inversion** (cBathy and satellite equivalents) recovers depth from **surface wave
+  celerity** via the dispersion relation, never looking at the bottom. cBathy "was developed to
+  overcome issues faced where the bottom can't be visualized due to turbidity or bubbles in the
+  surf zone", and wave-based methods work "in optically turbid waters and over seafloor with low
+  reflectance". The literature calls the two approaches **complementary**, not competing.
+
+So open question 4 is likely "yes" for optical and "no" for wave-inversion — which makes
+wave-inversion the better fit for a *surf* product, since the breaking zone is the whole point.
+
+**But resolution is the catch.** Satellite wave-inversion (e.g. the S2hores Sentinel-2 toolbox)
+currently produces **100 m – 1 km** grids — fine for L2, useless for L3's 10 m. The 10 m-class
+wave-inversion methods need **shore cameras** (cBathy/Argus), UAV video, or X-band marine radar,
+i.e. an instrument at the spot rather than an orbit. cBathy skill also "deteriorates during
+storms", which is when the forecast matters most.
+
+**Competitive note, stated as inference not fact.** Surfline's public material mentions "satellite
+assimilation" and "high-resolution bathymetry mapping" as *separate* items and never says
+satellite-derived *bathymetry*; in wave forecasting "satellite assimilation" normally means
+altimeter significant-wave-height. What they do disclose is **20 years of camera stream data** —
+which is exactly cBathy's input. Whether they run wave-inversion on it is unknown and should not
+be recorded as fact, but it identifies the capability gap worth thinking about: a camera network
+is a bathymetry sensor, not just a viewing product.
+
+The operator notes the same reticence at surf-forecast.com (2026-07-26): the industry does not
+disclose bathymetry provenance. Two consequences. We cannot benchmark our seabed against theirs,
+so competitive comparison has to be on **output** (predicted surf versus observed) rather than on
+inputs. And provenance is available as a differentiator — we already record the DEM source and
+vertical datum per level, which nobody else appears to publish.
 
 **Data supply vs software supply — the strategic question the operator raised.** Doing this
 centrally would put us **in the data business**: hosting, refreshing and standing behind a global
