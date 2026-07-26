@@ -328,7 +328,15 @@ Replace the broken VDatum-normalize-to-MSL approach with match-at-source: fetch 
 
 The CRM/`DEM_all` fallback has mixed/unknown datums. This phase adds visibility into that limitation without blocking it — CRM is already flagged as degraded quality.
 
-### T4.1 — Query CRM `VerticalDatum` attribute when available
+### T4.1 — Query CRM `VerticalDatum` attribute when available — **SUPERSEDED 2026-07-26 by T8.11e**
+
+> **Steps 3 and the last two accept criteria below are dead.** `UNKNOWN_CRM` no longer exists: a source
+> either publishes a datum or it is unusable, and `download_swan_depth_grid()` now raises instead of
+> labelling a grid with a datum we invented (ADR-098 criterion 10, MARINE-SERVICE-SEPARATION-PLAN.md
+> T8.11e). "Request CO-OPS in MSL as the best-available assumption" is exactly the silent metre-scale
+> substitution the amended ADR forbids. Step 1–2 still describe what the code does, except that the datum
+> is read from the mosaic catalogue for a pinned raster rather than hoped for in the `getSamples`
+> response, which does not echo it.
 
 - Owner: `clearskies-api-dev` (Sonnet)
 - Files:
