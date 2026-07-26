@@ -101,6 +101,13 @@ boundary point.
 'WAVEWATCH III SPECTRA'     32    36     1 'Great Lakes WAVEWATCH III Unst'
 ```
 
+**GLWU frequency array — MEASURED 2026-07-26, closing this brief's one open measurement.** Taken live from
+`glwu.45002.spec`, cycle `glwu.20260726` t01z: **32 bins, lowest 0.0500 Hz (20.00 s), highest 0.960 Hz
+(1.0417 s).** Two consequences, both favourable: the top bin does **not** exceed 1.0 Hz, so §10.3's upper
+bound stays put and the WAM Cycle 4 source-term retuning is untouched; and the lowest bin sits *above* even
+the current 0.0418 Hz cutoff, so GLWU was never truncated at the low end — **the 0.03 Hz widening is driven
+entirely by the ocean product's 0.035 Hz bin.**
+
 **Identical, self-describing format** — the header declares `nfreq`/`ndir`, so **one parser serves both
 products with no format branching.** GLWU *is* a WAVEWATCH III implementation on an unstructured grid.
 `glwu.45002.bull` → `Location : 45002   (45.34N  86.41W)`.

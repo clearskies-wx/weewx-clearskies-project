@@ -3352,10 +3352,16 @@ The SWAN boundary requires station files — gridded physically cannot supply a 
 offshore forecast is bulk by nature and needs coverage at arbitrary spots, which is what gridded is for.
 **Neither is a fallback for the other**, and neither may substitute for the other on failure.
 
-**Also measure and record GLWU's frequency array.** Only its bin counts (`32 36`) have been observed; the
-actual frequency range is unmeasured, so T8.10d's accept cannot be evaluated for GLWU until it is. If
-GLWU's top bin exceeds 1.0 Hz, raise it rather than silently widening `CGRID`'s upper bound — that bound is
-tied to the WAM Cycle 4 source-term retuning and is not ours to move.
+**GLWU's frequency array — MEASURED 2026-07-26, item CLOSED.** Previously only its bin counts (`32 36`)
+were known, which blocked T8.10d's accept for the Great Lakes. Measured live from `glwu.45002.spec`,
+cycle `glwu.20260726` t01z: **32 bins, lowest 0.0500 Hz (20.00 s), highest 0.960 Hz (1.0417 s).**
+
+Two consequences, both favourable:
+1. The top bin (0.960 Hz) does **not** exceed 1.0 Hz, so the contingency in this task does not fire and the
+   `CGRID` upper bound stays at 1.0 Hz, with the WAM Cycle 4 source-term retuning untouched.
+2. The lowest bin (0.0500 Hz) sits **above** even the current 0.0418 Hz cutoff, so GLWU was never being
+   truncated at the low end. **The 0.03 Hz widening in T8.10d is driven entirely by the ocean product's
+   0.035 Hz bin**, not by the Great Lakes.
 
 **Accept:** Both products parse with the same code path; integrated spectral m0 reconciles with the
 `.bull` bulk Hs for the same station/timestep; a malformed or truncated file **raises** (rules/coding.md §1),
@@ -3396,8 +3402,20 @@ frequencies (documented for `BOUNDNEST1`), so both are defensible — but the ch
 left implicit. Runtime cost scales with bin count and `omp_num_threads = 6` is an operator ruling that
 must not be touched to compensate.
 
-**Accept:** No incoming WW3 frequency bin falls outside `CGRID`, for **both** products (ocean and GLWU —
-see T8.10b's measurement item); upper limit still 1.0 Hz; bin-count decision recorded.
+**Accept:** No incoming WW3 frequency bin falls outside `CGRID`, for **both** products; upper limit still
+1.0 Hz; bin-count decision recorded.
+
+**Both products' ranges are now measured, so this accept is fully evaluable** (GLWU measured 2026-07-26 —
+see T8.10b):
+
+| | bins | lowest | longest period | highest | shortest period |
+|---|---|---|---|---|---|
+| Ocean `gfswave` | 50 | 0.035 Hz | 28.6 s | 0.964 Hz | 1.04 s |
+| **GLWU** | 32 | **0.0500 Hz** | **20.00 s** | **0.960 Hz** | 1.0417 s |
+| `CGRID` today | 32 | 0.0418 Hz | 23.9 s | 1.0 Hz | 1.0 s |
+| **`CGRID` target** | TBD | **0.03 Hz** | 33.3 s | **1.0 Hz** | 1.0 s |
+
+0.03–1.0 Hz covers both products with margin at both ends.
 
 #### T8.10e — Great Lakes routing via GLWU
 
@@ -3498,6 +3516,22 @@ is still the ocean model would abort the cycle every 5 minutes without advancing
 **Also needed at configuration time:** the nearest GLWU spectral station to southern Lake Michigan, which
 T8.10a's catalogue will supply (the `.bull` range-request gives each station's `Location : <id> (lat lon)`).
 Do not assume a station id.
+
+**Whiting-area GLWU stations CONFIRMED TO EXIST, 2026-07-26.** Live directory listing of
+`glwu.20260726/bulls.t14z/` returned station IDs including **`WHIBRip001`–`WHIBRip006`**, **`IndDunesNP`**,
+**`IndDunesSP`** and **`WhihalaBch`** — Whihala Beach and Indiana Dunes are the immediate neighbours of the
+Whiting Lakefront Park spot. So the fixture's spectral boundary is served by named local stations, not by a
+distant lake-centre buoy. **Their coordinates must still be resolved from the catalogue before selection** —
+an ID that looks local is not a measured position, and T8.10a's `.bull` range request supplies the real
+lat/lon.
+
+**Station-count correction to the brief.** The brief estimates ~115 GLWU stations (579 files ÷ 5). The live
+listing at `t14z` returned **96 `.bull` files**. Counts vary by cycle and date; treat the catalogue's own
+measured listing as authoritative and never a hardcoded count.
+
+**Note the GLWU ID character set is wider than NDBC's.** Observed IDs contain underscores and run to 10
+characters (`N_GREENBAY`, `IDNPRip001`), so an NDBC-shaped `[A-Za-z0-9]{1,10}` validator would silently
+reject valid Great Lakes stations.
 
 **Accept:** A Great Lakes spot produces a real spectral boundary where it previously produced none; cycle
 selection correct for both cadences. If deferred for the reason above, the deferral is recorded in the plan
