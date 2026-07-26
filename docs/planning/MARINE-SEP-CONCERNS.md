@@ -895,3 +895,29 @@ should be ≈1.0. The fix is deployed on librewxr, so a fresh run now exists —
 measurable and is scheduled into Phase 8 verification.
 
 ---
+
+---
+
+## C-30 — the marine manifest omits all five list routes (DECIDED)
+
+Found by the coordinator opening Phase 6, comparing `endpoints/manifest.py`'s `_ENDPOINTS`
+against the routes the API actually serves today.
+
+The API exposes **eleven** marine routes: `/surf`, `/surf/{id}`, `/surf/{id}/profile`,
+`/marine`, `/marine/{id}`, `/tides`, `/tides/{id}`, `/fishing`, `/fishing/{id}`,
+`/beach-safety`, `/beach-safety/{id}`. The marine service **registers** all eleven (Round 4
+route table). Its `/manifest` advertises **six** — every detail route plus the profile, and
+**not one list route**.
+
+The proxy mounts what the manifest advertises. T6.5 then deletes the API's copies. So after
+Phase 6 the five list routes would 404 — the endpoints that populate every marine card on the
+dashboard. Nothing would report an error; the routes would simply cease to exist.
+
+**Decision: complete `_ENDPOINTS` with the five list entries.** Not architectural — the routes
+already exist and already serve; the manifest is an inventory of them that was written in Phase 4
+before the endpoints were ported, and has been stale since Round 4 registered them. No
+responsibility moves and no shape changes. TTLs mirror each family's detail entry.
+
+**Rule for the future, worth stating once:** the manifest is the *only* channel by which a route
+reaches the dashboard after Phase 6. A route registered on the marine service but absent from the
+manifest is invisible. Any later route addition must land in both places in the same commit.
