@@ -3052,6 +3052,18 @@ Adding a new marine endpoint requires a manifest update in the marine service on
 
 **When marine service is not configured** (`marine_service_url` absent from `api.conf`): no manifest is fetched, no marine routes are mounted, and the API behaves identically to a non-marine installation. The marine endpoint inventory in §18 remains accurate for the current embedded state.
 
+**List routes are also in the manifest.** The example above shows the six `{location_id}`-scoped detail/profile routes; the marine service's actual manifest carries eleven entries — one additional list route per family with no `location_id` (`/surf`, `/marine`, `/tides`, `/fishing`, `/beach-safety`), each returning the configured locations for that activity as metadata (no live provider fetch), cached at the same TTL as its family's detail route. These back the dashboard's marine location-card grids. Omitted from the example JSON above for brevity, not omitted from the manifest itself.
+
+**The three-state rule.** A proxy handler's response falls into exactly one of three states, and they must never be conflated:
+
+| State | HTTP status | Meaning | Cached? |
+|---|---|---|---|
+| Marine service unreachable (network failure, non-JSON body, or any HTTP status other than 200/404 — including 5xx and an auth failure from a misconfigured secret) and no prior successful response is cached for this route | **503** (the proxy's own) | The system is broken | No — this is the failure state itself |
+| Marine service answers HTTP 200 (including a null payload carrying `modelStatus: "unavailable"`) | **200**, passed through untouched | The system works; the model has no answer for this hour | Yes |
+| Unknown `location_id` or bad parameter | **404**, passed through untouched | You asked for something that does not exist | No |
+
+A 200 carrying `modelStatus: "unavailable"` is a successful proxied response — it is never rewritten to 503, never treated as a cache miss, and is cached like any other 200. The proxy's own 503 is likewise never dressed up as a `modelStatus` value. When the marine service is reachable but returns something other than 200 or 404 (5xx, a stale/expired secret, etc.), the proxy falls back to the last successfully-cached response for that route if one exists, and only returns 503 when no such fallback exists — "stale preferred to no data," the same principle applied elsewhere in this manual to provider outages.
+
 ### §19.2 Configuration key
 
 One key in the `[providers]` section of `api.conf` replaces both the current `surf_compute_host` key and the `[swan] service_url` key:
