@@ -19,13 +19,93 @@
 | **Phase 4B** — Per-transect grid-derived handoff | **PARTIALLY IMPLEMENTED AND DEPLOYED** — not "not started." See the corrected status block below. |
 | **Phase 5** — Move provider modules | **CODE COMPLETE.** Adversarial audit run 2026-07-25: C-28 cleared with evidence, one HIGH finding (C-31, dispatch registry held only the scaffold stub) fixed in Phase 6. |
 | **Phase 6** — API companion proxy | **COMPLETE. QC Gate 6 walked and passed with two named exceptions (C-40, C-48), 2026-07-25.** See the Phase 6 closeout below. |
-| **Phase 7** — Wizard/Admin updates | **ALL SIX TASKS CODE-COMPLETE (T7.1–T7.6), 2026-07-25.** Translations, Operator Manual, adversarial audit and QC Gate 7 are **NOT** done. See the Phase 7 status block below. |
+| **Phase 7** — Wizard/Admin updates | **COMPLETE. QC Gate 7 walked and passed with named exceptions, 2026-07-26.** See the Phase 7 closeout below. |
 | Phase 8 | Not started |
 
-### Phase 7 — code complete, gate NOT walked (session ended 2026-07-25)
+### Phase 7 — COMPLETE. QC Gate 7 walked 2026-07-26, passed with named exceptions.
 
-**Do not read this as "Phase 7 complete."** Every task's code has landed and been independently
-verified by the coordinator, but three things remain and the gate has not been walked.
+**ADR-099 was accepted by the operator on 2026-07-26.** Status flipped to `Accepted` (meta
+`b3c5cf5`), and all **10** `(target — pending ADR-099 acceptance)` annotations were cleared from
+`ARCHITECTURE.md` (`66a2769`). They were not removed uniformly: 2 sites describe state the code has
+reached and became plain fact; 8 describe state that is built but **not deployed** (the marine
+service is not running on port 8780; ports 8767 and 8770 are still live on librewxr) and carry
+`(not yet deployed — Phase 8)` instead. Stripping the marker from that second group would have made
+`ARCHITECTURE.md` — the "what IS" document — assert a running service that does not exist.
+Archival of ADR-099 per the consolidation lifecycle is deferred to the Phase 8 closeout so the
+document stays citable while Phase 8 executes against it.
+
+#### QC Gate 7 — result
+
+Walked by the coordinator against final code, every check re-run independently rather than taken
+from any agent report.
+
+| Gate criterion | Result |
+|---|---|
+| "Marine Service" naming throughout | **PASS** — `"Wave Modeling"` = 0 repo-wide, translations included |
+| Single URL field | **PASS** — both second URLs gone (T7.2, C-58) |
+| Test Connection works | **PASS at contract level** — two-probe; 401 surfaces as "Secret rejected" (C-52) |
+| Validation works | **SPLIT — named exception.** Wizard guarded (T7.4 + C-57); admin has no guard (**C-64**) |
+| Secret in `secrets.env` | **PASS** — never written to `api.conf`; mirrored to `os.environ` *before* the config push |
+| Config push works | **NOT LIVE-TESTABLE** — nothing is deployed until Phase 8. Verified by contract inspection only |
+| All 13 locales updated | **PASS** — 28 dead strings pruned, 39+5 added, `help.admin.marine_service.*` in 13/13 |
+| Pydantic models accept new fields | **PASS — but only after C-67**, which was a live defect at the time the gate was requested |
+| Auditor: zero unresolved findings | **1 carried** — F2 → **C-64**, routed to Phase 8 by prior decision |
+
+**Verification evidence (coordinator-run):**
+
+```
+"Wave Modeling" outside translations                 -> 0
+surf_compute_/trushore_service_url/test-compute      -> 0 (1 correct historical docstring)
+apply key: wizard :4175 ["swan"], admin :3122 ["swan"] -> both correct
+marine manifest discovery entries / mounted routes   -> 7 / 7
+uv lock --check                                      -> Resolved 72 packages (exit 0)
+locale parity vs en.json, both directions            -> 40 / 22 (baseline 42 / 22)
+13 locales valid JSON; 5 new C-66 strings            -> 13/13 present, 12/12 translated
+```
+
+#### The gate's real finding — C-67
+
+**The criterion "Pydantic models accept new fields" was not met when this gate was requested, and had
+not been met for many commits.** The API renamed `ApplyRequest.trushore` to `swan` in the
+TruShore→SWAN rename (`0685121`); the config UI never followed. With `extra="forbid"`, every apply
+carrying SWAN config returned 422 and wrote **nothing** — not the SWAN settings, not the marine
+locations, not any other section in the same request. Separately, three admin sites read the old key
+from `/setup/current-config` and silently rendered defaults over the operator's saved settings.
+
+The payload *fields* were always correct; only the enclosing key was wrong, so every inspection that
+checked field names found them right. Found by the adversarial audit (write path) and extended by the
+coordinator (read path). Fixed in stack `e85e174`.
+
+#### Named exceptions — the gate passes with these open, all tracked
+
+| Concern | Disposition |
+|---|---|
+| **C-63** | Same-host URL literal exists twice by design (no cross-router imports). Verified: exactly two, identical. Low priority. |
+| **C-64** | Admin has no blank-URL guard. Sharpened by the audit: clearing the field writes `""`, which Pydantic accepts, so an operator can disconnect the marine service and be told it saved. → Phase 8. |
+| **C-55 / C-59** | Four `/setup/marine/*` endpoints and undeclared `rasterio` → Phase 8 assessment, sequenced together. |
+| **C-68** | The marine service has no install documentation of its own → Phase 8, with T8.1. |
+| **C-69** | Locale drift, inherited: 40/22 key asymmetry **and** ~23–25% untranslated values (`fil` an outlier at ~48%). Phase 7 introduced none of it and reduced the key gap by 2. Own round. |
+| `config_writer.py:513` | The one surviving `surf_compute_` hit. Read and confirmed a correct historical docstring — **not a miss**. |
+
+#### Deploy-readiness items cleared this phase
+
+- **C-60 item 1 — the deploy blocker — CLOSED** (API `0a514f2`). `uv.lock` regenerated: 11 packages
+  pruned, zero added, zero version churn. ⚠ The concern's stated mechanism was **wrong** and is
+  corrected in the register: `deploy-api.sh` runs no `uv` command at all. The real blast radius was
+  `uv run --frozen` (the documented pytest invocation on weewx) and `uv sync --frozen`
+  (`deploy-compute.sh`).
+- **C-60 item 2 — RESOLVED, no operator decision needed.** ADR-085 is already archived, and archived
+  ADRs are not restated to current state. What it actually pointed at was live manual drift, fixed
+  across `ARCHITECTURE.md`, `OPERATIONS-MANUAL.md`, `API-MANUAL.md` and `PROVIDER-MANUAL.md` — the
+  Operations Manual had been telling operators to `apt install libeccodes-dev` and
+  `pip install weewx-clearskies-api[marine]`, an extra that no longer exists.
+- **C-66 — CLOSED** (stack `49b080c` + `b7830bb`). C-54 moved the SWAN answer to the marine host; the
+  copy beside it still said "this host" and named a deleted pip extra. Every instruction pointed at
+  the wrong machine on exactly the split-host topology this plan exists to support.
+
+**Standing lesson from C-66 and C-67 together:** when a change moves *where an answer comes from*,
+every surface that explains that answer moves with it — not just the call sites that fetch it. And
+when a contract is renamed, **the key a payload is filed under is part of that contract too.**
 
 | Task | State |
 |---|---|

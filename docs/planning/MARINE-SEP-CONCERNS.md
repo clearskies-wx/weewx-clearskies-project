@@ -1774,6 +1774,85 @@ individual escalation. Carried to Phase 8.
 
 ---
 
+## C-69 — the locale catalogues carry 62 keys of pre-existing drift (OPEN → tracked, not Phase 7's)
+
+Surfaced when the coordinator independently checked the R4 locale pass. The docs agent reported key
+counts as *"consistent (en=1370, non-en=1352)"*. All twelve non-English files do agree with each
+other — but they do not agree with `en.json`, and the raw count understated it: the real shape is
+**40 keys present in `en.json` and absent from every other locale, plus 22 keys present in every
+other locale and absent from `en.json`.** 62 keys out of step, not an 18-key gap.
+
+**Triaged against the Phase 7 baseline rather than guessed at** (`git show f8beb34:…` vs
+`ac35196:…`, full key-set flattening on both):
+
+| | `en` | `de` (representative) | missing vs `en` | extra vs `en` |
+|---|---|---|---|---|
+| Baseline `f8beb34` (Phase 7 start) | 1356 | 1336 | **42** | **22** |
+| After R4 `ac35196` | 1370 | 1352 | **40** | **22** |
+
+**Introduced by this phase: 0 missing, 0 extra. Fixed by this phase: 2.** The round added 39 strings
+and 3 help keys to all 13 locales symmetrically and pruned 28 from all 13 symmetrically. The drift is
+inherited and the round slightly reduced it.
+
+**What the 40 English-only keys are:** field help text for DNS provider tokens, TLS certificate
+paths, ACME/Let's Encrypt settings, logo uploads, Google Analytics, webcam URLs, seismic page
+settings, sky-classification thresholds, and database credentials. **None is marine.** They are
+`ConfigField.help_text` strings that were added to `en.json` over time without a locale sync — a
+different failure mode from the wizard/admin chrome this phase touched.
+
+**Why it is recorded rather than fixed here.** Translating 40 help strings into 12 languages, and
+adjudicating 22 orphans that may be legitimately dead, is its own round with its own review. Folding
+it into a marine-separation phase would bury it. Under the false-claim protocol, pre-existing
+failures do not block a round that introduced none — and this one introduced none.
+
+**Standing lesson.** "Consistent" is not a parity check. Twelve files can agree perfectly with each
+other and all be wrong against the source of truth. The check that matters is **set difference in
+both directions against `en.json`**, and it must be reported as two numbers, not one. The agent's own
+work was clean; only the word describing it was wrong, which is exactly the kind of claim independent
+verification exists to catch.
+
+### Second dimension, added 2026-07-26 — key parity was measuring the wrong thing
+
+The R7 agent noticed that the four SWAN strings it was replacing **held English text as their value
+in all twelve non-English locales.** They had never been translated. A key-presence check cannot see
+that: the key exists, so it reads as present and correct. The 40/22 figures above therefore
+understate the gap, and the coordinator had been reporting them as the health metric.
+
+Measured (`locale_value == en_value`, raw, no filtering for legitimately-identical values such as
+`SWAN`, `HRRR`, package names and pure-symbol strings — so these are an **upper bound**). Run by the
+agent and independently reproduced by the coordinator; raw counts matched exactly:
+
+| Locale | Untranslated | Locale | Untranslated |
+|---|---|---|---|
+| `zh-CN` | 302 | `de` | 337 |
+| `zh-TW` | 302 | `nl` | 336 |
+| `ja` | 309 | `it` | 332 |
+| `ru` | 311 | `fr` | 326 |
+| `es` | 317 | `pt-BR` | 326 |
+| `pt-PT` | 321 | **`fil`** | **644** |
+
+**Eleven locales cluster at 302–337 untranslated keys (~23–25%). `fil.json` is an outlier at 644
+(~48%) — roughly double every other locale.** That ratio is robust even though the absolute numbers
+are inflated by legitimate identical values, because the inflation applies equally to all twelve.
+
+**This changes the size of the remediation round.** A round scoped as "sync the locales" against the
+40/22 key figures would be sized wrong by an order of magnitude, and would further mis-size Filipino
+by a factor of two against its siblings.
+
+**A methodology trap worth recording, because it produced a plausible wrong answer.** The agent's
+first estimate ("~75% translated") came from testing `value != key`. That is unreliable here:
+`en.json` has **150 keys whose value differs from the key itself** — legacy keys carrying updated
+English copy, e.g. the key `"AQI regional scale for Aeris"` now holding
+`"AQI regional scale for Vaisala Xweather"`. On those 150, `value != key` reports "translated" for
+untranslated text. The correct test is `locale_value == en_value`. The agent found and corrected this
+in its own working and said so, which is why the final figure can be trusted; it coincidentally
+landed near the right answer for the wrong reason.
+
+Those 150 stale keys are themselves a finding for the remediation round: a key whose text no longer
+matches its value is a rename that was never propagated.
+
+---
+
 ## C-68 — the marine service has no installation documentation of its own (OPEN → Phase 8, with T8.1)
 
 Surfaced sideways during the Phase 7 R4 Operator Manual pass. The docs agent, correcting the SWAN
