@@ -19,7 +19,45 @@
 | **Phase 4B** — Per-transect grid-derived handoff | **PARTIALLY IMPLEMENTED AND DEPLOYED** — not "not started." See the corrected status block below. |
 | **Phase 5** — Move provider modules | **CODE COMPLETE.** Adversarial audit run 2026-07-25: C-28 cleared with evidence, one HIGH finding (C-31, dispatch registry held only the scaffold stub) fixed in Phase 6. |
 | **Phase 6** — API companion proxy | **COMPLETE. QC Gate 6 walked and passed with two named exceptions (C-40, C-48), 2026-07-25.** See the Phase 6 closeout below. |
-| Phases 7-8 | Not started |
+| **Phase 7** — Wizard/Admin updates | **ALL SIX TASKS CODE-COMPLETE (T7.1–T7.6), 2026-07-25.** Translations, Operator Manual, adversarial audit and QC Gate 7 are **NOT** done. See the Phase 7 status block below. |
+| Phase 8 | Not started |
+
+### Phase 7 — code complete, gate NOT walked (session ended 2026-07-25)
+
+**Do not read this as "Phase 7 complete."** Every task's code has landed and been independently
+verified by the coordinator, but three things remain and the gate has not been walked.
+
+| Task | State |
+|---|---|
+| T7.1 rename "Wave Modeling" → "Marine Service" | **DONE** — wizard + admin code. `"Wave Modeling"` returns **0** repo-wide outside `translations/`. |
+| T7.2 unify URL fields | **DONE, fully met.** Both second URLs removed — the providers-step compute host and the TruShore/SWAN `service_url` (C-58). |
+| T7.3 Test Connection | **DONE** — `POST /setup/providers/test-marine`, two-probe (C-52); wizard and admin repointed. |
+| T7.4 validation | **DONE** — providers step **and** marine step (C-57; the providers-only check could never fire on a first pass). |
+| T7.5 admin providers section | **DONE** — `marine-service`, plus two save-path defects fixed (C-62, C-65). |
+| T7.6 config push feedback | **DONE** — `marine_config_push` on the apply response, rendered on both surfaces. |
+| Carried concerns C-48 / C-49 / C-54 | **DONE** — three marine `/discovery` endpoints; the last four marine-physics modules deleted from the API (**−5,569 lines**); `[marine]` extra pruned. |
+| **Translations (13 locales) + Operator Manual** | **NOT STARTED** |
+| **Adversarial audit** | **NOT STARTED** |
+| **QC Gate 7** | **NOT WALKED** |
+
+**Full detail, per-round verification evidence and an ordered resume plan are in
+`c:\tmp\marine-sep-P7-scratch.md`.** Read it before resuming — it carries the string lists, the
+exact help-key literals, and the deploy-blocking items below.
+
+**Three findings that must not be lost:**
+
+- **C-65 — the one regression this phase introduced, and it was the coordinator's.** A freeze placed
+  on the admin TruShore section pending C-58 was never lifted when C-58 was decided, so only the
+  wizard half was dispatched and the admin's Save began returning 422. Fixed. The standing lesson: a
+  freeze pending a decision must be lifted **explicitly on every surface it covered**.
+- **C-60 will break the Phase 8 deploy if ignored.** `pyproject.toml` lost the `[marine]` extra and
+  `uv.lock` was not regenerated, while `deploy-api.sh` runs `uv run --frozen` — precisely the mode
+  that fails on that mismatch.
+- **Two escalations in this phase should never have reached the operator** (C-54, C-58); both were
+  answered by documents this project already carries. `rules/clearskies-process.md` gained
+  "Over-triggering is a failure mode too" as the durable fix.
+
+**Nothing is blocked on the operator.**
 
 ### ⚠ Cross-round correction, 2026-07-25 — read before starting ANY remaining phase
 
