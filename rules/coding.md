@@ -29,6 +29,58 @@ Any data produced by an expensive computation (SWAN runs, SwellTrack pipelines, 
 
 **Why (2026-07-23):** The SWAN standalone service stored forecast results in a volatile in-memory dict (`_forecast_cache`) and only copied `forecast` + `run_time` — dropping `spectral` (swell decomposition) and `transect` (cross-shore profile). The dashboard's "Current Swell Conditions" card showed "No swell component data available" for days despite SWAN producing the data successfully. On service restart, ALL data was lost because nothing loaded from disk. Two bugs, same root cause: treating volatile memory as the authoritative store for expensive computed data.
 
+### A model runs on all its inputs or it does not run — never substitute, never omit
+
+**Rule (operator, 2026-07-26).** When a scientific model cannot obtain one of its inputs, it must
+**log ERROR and raise**. It must not substitute a default, a zero, a flat value, or an empty
+collection, and it must not quietly proceed with the input absent. No partial result is published,
+no cache is overwritten, no checkpoint or "done" marker is advanced. The run is retried when the
+input becomes available.
+
+**Omission is not more honest than substitution.** Both produce a wrong answer wearing the
+appearance of a right one. The operator's words: *"none of these are allowed to be quiet failures...
+they all need to hold up model runs until they can be fetched correctly. Omission of any of that
+data results in inaccurate and therefore bogus information."*
+
+**The mechanical test:** would a domain expert, shown the output alongside the fact that this input
+was missing, still call the output usable? If not, it must not be produced. "The run completed" is
+not the goal; a result you can stand behind is.
+
+**Raising beats returning a status, and the reason is specific.** A quiet return lets the caller
+finish normally, which typically **advances whatever marker says this cycle is done** — so the bad
+run is never retried, and its output is cached and served as if valid. Only a propagated exception
+reaches a retry handler. Check what your caller does with a normal return before choosing.
+
+**The failure is loud by design, and that is the point.** A model that stops and says "I could not
+get bathymetry" is doing its job. A model that always produces something is not trustworthy, it is
+just quiet.
+
+**Corollary — never write a fallback into a docstring as a "design decision".** A documented
+substitution is worse than an undocumented one: it gives wrong behaviour a paper trail that looks
+deliberate, and the next reader treats it as settled. If a substitution is genuinely correct, the
+reasoning belongs in an ADR the operator approved, not a module docstring.
+
+**Why (2026-07-26, marine separation Phase 8).** A sweep of one file found six input-failure paths
+that each let a SWAN run proceed: a **calm boundary** substituted for the WaveWatch III deep-water
+spectrum (making a swell-driven surf forecast wind-sea only), a **uniform 15 m flat seabed**
+substituted when every bathymetry source failed (so shoaling, refraction, depth-limited breaking and
+the break point were all computed against a beach that does not exist — and this one was recorded in
+the module docstring as a "Key design decision"), plus tide, currents, 48-72 h wind and wave-setup
+each dropped quietly. Every one had been individually defensible when written. Collectively they
+produced a model that could never say "I don't know" — it always returned a plausible-looking
+forecast, and the failures were, in the operator's words, *"silent deferrals and they were hard to
+catch."* The calm-boundary case was caught only because a coordinator happened to be watching the
+first cycle's logs during a deploy.
+
+The in-repo precedent to copy is `enrichment/bathymetry.py`'s `find_depth_contour_distance()`, which
+raises `ValueError` naming the spot, bearing and target depth rather than substituting a distance.
+
+**Not covered by this rule:** genuinely optional *enhancements* whose absence is visible in the
+output shape rather than hidden in its values, and inputs that are **structurally** unavailable
+rather than temporarily unfetchable — a regional model that does not cover the location at all is a
+configuration fact for setup-time validation, not a runtime failure to retry forever. If you cannot
+tell those two cases apart in the code, that is a finding to surface, not a judgement call to make.
+
 ### Treat your own output as untrusted
 
 LLM-generated code (including yours) is unverified until reviewed and tested against the real data shape. Before committing:
