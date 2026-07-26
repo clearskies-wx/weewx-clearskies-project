@@ -2792,7 +2792,7 @@ Needs operator approval before any of it is written.
 
 ---
 
-## C-76 — a failed WW3 fetch degrades SWAN to a calm boundary and the run is published anyway (OPEN → pre-existing, but it gates T8.6's verification)
+## C-76 — a failed WW3 fetch degrades SWAN to a calm boundary and the run is published anyway (DECIDED BY OPERATOR 2026-07-26 — never substitute; fix dispatched)
 
 Found by the coordinator watching the marine service's **first** SWAN cycle, 2026-07-26 08:26.
 
@@ -2829,6 +2829,43 @@ convergence gate already implements the right pattern for a different failure �
 convergence *never persists hotstart or overwrites the forecast cache*. A run with no boundary
 condition arguably deserves the same treatment, or at minimum a flag on the published payload so the
 surf endpoint can report `modelStatus: "unavailable"` rather than a confident flat forecast.
+
+### DECIDED BY OPERATOR, 2026-07-26 — in chat, verbatim
+
+> "again this is one of those false fallbacks that should not happen... again if we cannot
+> successfully it should retry but in no case substitute bogus data like a calm boundary."
+
+**This supersedes the "recorded, not fixed" disposition below**, which was written before the ruling
+and is kept only to show what the coordinator's reasoning had been and why it needed an operator
+decision rather than a coordinator one. The ruling supplies exactly the authorization that was
+missing: the change is triggers 2 and 4, and the operator has made it.
+
+**Scope of the fix, as dispatched:**
+
+- A failed WW3 fetch produces **no output** for that cycle — no SWAN run on a substituted boundary,
+  no hotstart persisted, no `forecast_cache.json` overwrite. The previous good forecast stays in
+  place with its own older `run_time`: stale but honest.
+- Logged at **ERROR**, not WARNING. It is a failed run, not a degraded one.
+- It follows the **existing convergence-gate precedent in the same file** rather than inventing a
+  mechanism — a run that fails convergence already never persists hotstart or overwrites the cache.
+
+**On the "it should retry" half of the ruling — retry already exists, twice over, and the
+implementer was told not to add a third.** `providers/_common/http.py` gives every provider
+`max_retries=2` (3 total attempts, 0.5 s base, factor 2.0, 5.0 s cap, jittered), and connection-level
+failures — DNS, TCP, TLS — already trigger it, so the fetch that failed had already made three
+attempts. At the cycle level the marine runner re-checks every 300 s, so a skipped cycle retries
+naturally on the next check. Adding a retry loop or changing the interval would be trigger 6 and is
+outside the ruling. So the entire change is the second half: do not substitute.
+
+**Explicitly NOT harmonised with it:** the CO-OPS handling ~20 lines below sets
+`tide_predictions = None` on failure and lets SWAN run without WLEVEL, carrying its own "do NOT fall
+back to MLLW" comment. That is a genuinely optional input; the deep-water boundary spectrum is not.
+The asymmetry is deliberate and now carries a comment saying so, to stop a future reader tidying the
+two into one shape.
+
+**A sweep for sibling patterns was ordered with the fix — report only, fix nothing.** The operator's
+"*again* this is one of those false fallbacks" says this is a class, not an instance. Each hit needs
+its own ruling, because some substitutions are legitimate — the CO-OPS one is the proof.
 
 **Not fixed in Phase 8, and the reasoning is not "no time."** Changing a calm-boundary run from
 *published* to *withheld* changes what the model is responsible for producing under a named failure
