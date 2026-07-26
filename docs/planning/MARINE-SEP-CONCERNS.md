@@ -1017,3 +1017,32 @@ Traced 2026-07-25:
   and `:467`.
 
 No leak, no deviation from the source. The layer split holds. F2 closed with no change.
+
+---
+
+## C-33 — API-MANUAL §19.7 documents a 60-second marine health poll that no task implements (OPEN → Phase 8)
+
+Flagged by the T6.1 agent rather than guessed at, which was correct.
+
+`API-MANUAL.md` §19.7 describes the API polling `GET {marine_service_url}/health` every 60 seconds.
+T6.1's Do list contains no such poll — it specifies a manifest fetch at startup, a 5-minute manifest
+refresh, and a 5-minute retry when the service was unreachable at startup. Nothing polls health.
+
+Same shape as the Phase 4 audit's F5 (a documented mechanism belonging to no task). Two possible
+resolutions and the choice is not the coordinator's: implement the poll (adds a cadence — trigger 6)
+or correct the manual to describe the manifest-refresh cadence that actually exists. **Not chased
+now.** Carried to Phase 8, where deployment will show whether anything actually depends on a health
+signal separate from the manifest refresh.
+
+---
+
+## C-34 — the T6.1 proxy uses sync handlers with a blocking HTTP client (CLOSED — correct as built)
+
+Recorded because it looks wrong at a glance and will be re-raised otherwise.
+
+The proxy's route handlers are `def`, not `async def`, because `_fetch_upstream()` uses a blocking
+`httpx.Client`. That pairing is correct: FastAPI runs sync handlers in a threadpool, so a blocking
+call inside one costs a worker thread. An `async def` handler making a blocking call would stall the
+event loop for every in-flight request for the duration of the marine round trip. The agent found
+this itself and fixed it in `335daa9` before reporting. Matches the API's existing convention —
+`ARCHITECTURE.md` records the API as using sync handlers throughout.
