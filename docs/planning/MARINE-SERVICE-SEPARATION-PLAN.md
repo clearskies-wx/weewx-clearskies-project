@@ -3449,12 +3449,29 @@ because a point can be inside a grid's declared extent and still carry no wave d
 **null** — both points sit well inside the declared global extent. Nothing but a real read distinguishes
 "covered" from "has data".
 
-**What it must catch:**
-- **`9999` is the missing-value sentinel**, per the GRIB `missingValue` key read directly from the message.
-  It must be treated as absent, never ingested. A 9999 m wave height reaching SWAN would be catastrophic.
-- Inland or land-masked cells, and enclosed water bodies the ocean model masks (all Great Lakes spots).
-- A spot outside the resolved tier's latitude band — a Tier 1 probe at 53 N returns nothing, and the
-  selection must land on Tier 2 rather than treating the empty result as "no data anywhere".
+**`9999` means TWO different things and conflating them breaks the probe.** It is the GRIB
+`missingValue` sentinel (read directly off the message header, confirmed `missingValue 9999`), but the reason
+a field is missing differs, and only one of them means "no data at this location":
+
+| Measured 2026-07-26 | `swh` (total) | partition fields | Means |
+|---|---|---|---|
+| Lake Michigan 43.0 N, 87.0 W | **9999** | all 9999 (`shts`/`mpts` 1,2,3) | **point is not in the model's water** — land-masked. Reject the spot. |
+| Huntington 33.5 N, 118.5 W | **0.78** | `shts` 0.61/0.38/0.23 real, but `shww`/`mpww`/`wvdir` **9999** | **valid ocean point**; the wind-sea partition simply does not exist this hour. Accept the spot. |
+
+**Therefore the probe must test `HTSGW` / `swh` — total significant wave height — and nothing else.** It is
+present whenever the point is in the model's water. **Probing a partition field instead would wrongly reject
+valid ocean spots on any hour with no wind swell**, which is most summer mornings at Huntington.
+
+**What the probe must catch:**
+- `swh == missingValue` → the point is not in this model's water. Land-masked cells, and enclosed water
+  bodies the ocean model masks, which is every Great Lakes spot. Reject, or route to GLWU.
+- A spot outside the resolved tier's latitude band — a Tier 1 probe at 53 N returns nothing, and selection
+  must land on Tier 2 rather than reading the empty result as "no data anywhere".
+
+**Separately, in the ingest path:** `missingValue` must never be ingested as data anywhere. A 9999 m wave
+height reaching SWAN's boundary would be catastrophic. Read the sentinel from the GRIB `missingValue` key
+rather than hardcoding 9999, and mask on it. A **missing partition is normal and is reported as absent**; a
+missing **total** during a live cycle is a failure and **raises** (rules/coding.md section 1).
 
 **Cost:** trivial. A `filter_gfswave.pl` subregion subset spanning ~3 deg x 3 deg with nine variables measured
 **4,577 bytes**. Run once per spot at setup, not per cycle.
