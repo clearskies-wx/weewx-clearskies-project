@@ -4317,3 +4317,87 @@ flags for `swh` in the T8.10f probe design. Any replacement must raise on an emp
 Deletion is **in scope for T8.10c round 2** and authorized — it is parametric synthesis in the L1 boundary
 path, exactly what that task removes. Recorded here separately because the *process* failure (a closed
 concern that did not close its class) outlives the code fix.
+
+---
+
+## C-90 — C-77's magic 15 m depth is alive in `bathymetry_resolver.py`, at all three DEM priorities, and C-77's raise gate cannot see it (OPEN → fix dispatched)
+
+**Found by the operator-directed fallback sweep, 2026-07-26** (*"kill any fallbacks that produce bogus data"*).
+**Coordinator-verified by reading the file**, not accepted from the agent's report.
+
+This is the direct answer to the question **C-89** records as owed — *did C-77's one-file sweep leave the same
+gaps elsewhere?* **Yes.** C-77 audited `providers/nearshore/swan.py`. The substitution also lives in
+`services/bathymetry_resolver.py`, which it never opened.
+
+| site | source | priority | code |
+|---|---|---|---|
+| `:367-369` | NCEI regional DEM (OPeNDAP) | 1 | `values[np.isnan(values)] = _DEFAULT_OCEAN_DEPTH_M` (+ two sentinel bounds) |
+| `:856-860` | USGS Great Lakes topobathy | 2 | same, four lines |
+| `:1028` | **operator's own GeoTIFF upload** | **0 — highest trust** | `data[data == nodata] = -15.0` — a bare literal, not even the named constant |
+
+`_DEFAULT_OCEAN_DEPTH_M: float = -15.0` (`:141`) — **the same magic depth C-77 exists to eliminate.**
+
+### Why C-77's gate does not catch it
+
+C-77 makes `download_bathymetry_for_level()` **raise when the fetch fails**. These substitutions happen
+*inside an otherwise-successful fetch*: the download returns 200, the grid parses, and individual cells that
+carry NaN or a nodata sentinel are silently overwritten with an assumed 15 m depth. **Nothing failed, so
+nothing raises.** Exactly C-89's shape — the fix landed on the reported trigger, not the class.
+
+**No log line, no count of patched cells, no provenance flag** distinguishing real seabed from invented
+seabed. The grid is then the `BOTTOM` input to SWAN, so shoaling, refraction, depth-limited breaking and the
+break point are all computed against it.
+
+**The Priority 0 case is the worst of the three.** Operator-uploaded GeoTIFFs commonly carry legitimate
+nodata at tile edges, and this is the *first* source tried — so an operator's own high-quality DEM gets
+silently patched and used ahead of NCEI, USGS and CRM.
+
+**It collides with work in flight.** The Great Lakes site (`:856-860`) feeds T8.10e's Whiting fixture.
+
+### The fix is SWAN's own documented mechanism — not a chosen number, and not a blanket refusal
+
+SWAN User Manual, computational-grid section: a grid point may be *"exceptional, i.e. permanently excluded
+from the computations since it is so defined by the user"*, declared via **`INPGRID BOTTOM … EXCEPTION`**.
+SWAN then filters one-dimensional water features left by the exclusions.
+
+So missing data is **declared missing** rather than invented, and DEMs with ordinary tile-edge nodata remain
+usable — where a blanket raise would reject most real DEMs. A coverage threshold (raise when *too much* of a
+domain is unknown) is a separate, legitimate check and is **not** the same thing as fabricating a depth.
+
+Manual note recorded so it is not rediscovered: an exception value is *required* for MPI parallel runs. This
+installation's SWAN is OpenMP, so that is informational here.
+
+### Also found in the same sweep — lower severity, tracked so they are not lost
+
+- **C-90a** `endpoints/surf.py:739-740` — `float(_sb_wind_speed or 0.0)`, `float(_sb_wind_direction or 0.0)`.
+  `_resolve_timestep_wind()` legitimately returns `None` when HRRR is unavailable, so a failed wind fetch
+  becomes **fabricated dead calm** and the SurfBeat run proceeds. **Three lines above**, the same block
+  correctly uses `is None` and skips the hour for `hs`/`tp`/`dir`. A falsy-check trap, and the correct
+  pattern already exists adjacent to it. Reaches the published `/surf` response.
+- **C-90b** `services/bathymetry_resolver.py::_query_vdatum_offset()` — docstring states *"Never silently
+  returns 0.0. On failure the caller receives an exception"*; the code returns `0.0` twice, once logging text
+  that itself admits *"Proceeding with 0.0m offset — bathymetry WILL have vertical bias… This affects wave
+  breaking predictions."* **Currently dead** (only caller `normalize_to_msl()` has zero call sites), but
+  `rules/clearskies-process.md` records the 2026-07-19 VDatum 0.0 m incident as a real past failure of this
+  exact pattern. Fix the docstring and the returns, or delete the dead pair — **disposition is a scope call,
+  not the implementer's.**
+- **Stale documentation (3):** `swan.py:1900` comment claims a uniform-15 m fallback two lines above code
+  that raises; `ofs.py:~486` docstring claims *"Empty list on any failure — SWAN runs without current input
+  (safe default)"*, which C-77 made false; `bathymetry_resolver.py` C-90b's docstring above.
+- **Dead code (1):** `swan.py:275` `_load_or_download_cudem_grid()` — zero call sites repo-wide. A dead
+  fallback is a loaded landmine: wire it back in and C-77's defect returns.
+
+### Sweep coverage — stated so this is not mistaken for a completeness guarantee
+
+Full reads: `providers/nearshore/swan.py`, `services/bathymetry_resolver.py`, `services/wave_setup.py`,
+`services/water_level_compositor.py`, `services/surf_pipeline_timestep.py`. Targeted reads + keyword greps:
+`swan_runner.py`, `transect_handoff.py`, `ofs.py`, `endpoints/surf.py`, `endpoints/beach_profile.py`.
+**Lighter grep-only pass:** `surf_1d_analytical.py`, `surf_1d_pipeline.py`, `enrichment/`, `providers/wind/*`,
+`providers/buoy/ndbc.py`, remaining `endpoints/`. Those came back clean on the standard fallback vocabulary
+but did not get a line-by-line read.
+
+**Ruled NOT findings** (checked and cleared): `wave_setup.py`'s zero-setup edge cases (real computed values);
+`water_level_compositor.py`'s persistence decay (real observed residual, shape-visible via
+`residualForecastSource`); `transect_handoff.py:597-624` and `swan_runner.py:2597-2624` L2 fallbacks
+(structurally-unavailable carve-out, ADR-093 Amendment 2 §4); `ofs.py:613-615` land-masked currents → 0.0 (a
+land cell structurally has no current).
