@@ -1101,6 +1101,8 @@ The secret must be identical on both hosts. The API sends it as `Authorization: 
 
 **Setting these from the wizard/admin UI (T7.2, 2026-07-25).** All three values above (on the weewx host's side) can be set via `POST /setup/apply`'s top-level `marine_service_url`/`marine_verify_tls`/`marine_service_secret` fields, instead of hand-editing `api.conf`/`secrets.env` — the API writes them to the locations above. The marine service host's own `secrets.env` copy is still a manual step (no automated distribution across hosts). `POST /setup/providers/test-marine` verifies connectivity and, when a secret is supplied, that the secret is accepted, before the operator saves — see API-MANUAL §19 setup-endpoint inventory.
 
+**The admin UI will not let you save a blank marine service URL while marine locations exist, and will not let you add a marine location while the URL is unset (C-64, 2026-07-26).** Either combination produces marine locations that nothing serves, and until this guard the save reported success while doing it. To take a marine service out of service, delete its locations first, or edit `api.conf [providers]` by hand — clearing the URL box on its own leaves the saved value untouched (API-MANUAL §19.2).
+
 **Marine service environment and paths (Phase 4).** All marine-service settings
 live on the marine service host, separate from the API's own:
 
