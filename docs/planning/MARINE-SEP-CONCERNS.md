@@ -1441,3 +1441,52 @@ physical-dimension key the walker does not know.
 **Standing lesson:** the converter's field table is an allow-list, and a field absent from it fails
 **silently and plausibly**. Every response array needs checking against the table, not just the
 top-level objects someone happened to trace.
+
+---
+
+## C-45 — dependency audit results: two fixed, two carried (CLOSED for Phase 6)
+
+Full AST-based import audit of the marine service (every `Import`/`ImportFrom` node in every module,
+diffed against `pyproject.toml`) run after `defusedxml` was found missing by accident. 20 third-party
+imports found; 16 already correctly declared.
+
+**Fixed in `430532a`:**
+
+| Package | Where | Why it mattered |
+|---|---|---|
+| `defusedxml==0.7.1` | `providers/buoy/ndbc.py:104`, unconditional, unguarded | **A clean install could not import the NDBC provider at all.** Never caught because the marine service has never been installed clean. Pin copied from the API. |
+| `coastalmodeling-vdatum>=0.1` | `services/bathymetry_resolver.py:504`, guarded | Never fatal — falls back to the VDatum REST API. But undeclared meant every `[nearshore]` install silently took the REST path instead of the offline-first datum conversion. |
+
+**Carried, not fixed — undeclared in *both* repos, so there is no pin to copy and no evidence the
+port caused it:**
+
+- **`rasterio`** — `services/bathymetry_resolver.py:55-56`, guarded; Great Lakes DEM path only,
+  degrades with a log line. The module's own comment already says "NOT currently in dependencies
+  (added separately)". Pre-existing in the API too. Someone must decide whether the Great Lakes path
+  is supported; until then it is honestly optional.
+- **`pygrib`** — guarded fallback behind `eccodes`, which is declared and is the working primary.
+  Reads as optional by design, not a gap.
+
+**Also confirmed clean:** `starlette` is imported directly and declared nowhere, in both repos —
+relied on transitively through `fastapi`'s pin. Existing convention, left alone. And no core-path
+module imports a `[nearshore]`-only package at module level: `endpoints/surf.py` and
+`beach_profile.py` both import `providers.nearshore.swan` lazily inside functions, so `create_app()`
+never requires the heavy extras at startup even though both routers register unconditionally.
+
+---
+
+## C-46 — `MARINE_PROVIDER_MODULES` is populated but has no consumer (OPEN → Phase 7/8)
+
+Adjacent finding from the same audit, correctly flagged rather than acted on.
+
+C-31 populated the marine dispatch registry with the ten real providers and deleted the scaffold stub,
+because three documents said Phase 5 would do exactly that. **But the registry still has zero
+importers** — nothing calls `get_provider_module()`. The endpoints import provider modules directly.
+
+So `rules/coding.md` §3 ("no code without a current caller") is unsatisfied in the other direction
+now: the registry is correct, documented in `PROVIDER-MANUAL` §15.2, and unused.
+
+**Not chased now.** The likely consumer is the manifest's `compute_capabilities()`, which currently
+derives capabilities from pushed config rather than from the provider registry — the API's own
+`/capabilities` works from its registry. Wiring that is Phase 7/8 work, not a Phase 6 deletion
+question. Recorded so the next round finds it rather than rediscovering it.
