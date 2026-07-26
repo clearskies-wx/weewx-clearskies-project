@@ -3445,9 +3445,41 @@ report what is actually missing rather than building it silently.
 |---|---|
 | Location | **Whiting Lakefront Park**, Whiting, Indiana — southern Lake Michigan |
 | Spot | the **sandy cove on the eastern edge of the park** |
-| Park reference coordinate | 41.6827 N, -87.4874 W (1500 Park Rd, Whiting, IN 46394; 26 acres, ~half-mile shoreline) |
-| Exact cove coordinate | **confirm with the operator at configuration time** — the figure above is a park centroid, and the operator redesigned this lakefront and has intimate knowledge of the cove |
-| Provenance | operator's local knowledge: people surf here when the lake gets churned up |
+| **Spot coordinate** | **41.680447 N, -87.483689 W** — operator-supplied, authoritative |
+| Park reference | 1500 Park Rd, Whiting, IN 46394; 26 acres, ~half-mile shoreline |
+| Provenance | operator's local knowledge: people surf here when the lake gets churned up; operator redesigned this lakefront |
+| **GLWU coverage** | **VERIFIED 2026-07-26** — see below |
+
+**Coverage verified against live GLWU data, not assumed.** Probed `glwu.grlc_2p5km.t13z` (2026-07-26) via
+`filter_glwu.pl` at the exact spot coordinate:
+
+```
+nearest GLWU grid point: 41.6744 N, -87.4852 W   (~0.7 km from the spot)
+ws     2.080 m/s    <- real
+swh    0.000        <- real, PRESENT, and zero
+shts 1/2/3          <- 9999 MISSING
+mpts 1/2/3          <- 9999 MISSING
+```
+
+**The spot is inside GLWU's domain**: `swh` returned `0.000`, **not** `missingValue`. The lake was simply flat
+at that hour — consistent with the operator's description that it breaks only when the lake gets churned up.
+Every partition field is missing because there are no waves to partition, which is the normal
+partition-absent case, not a coverage failure. A `filter_glwu.pl` subset of ~0.4 deg x 0.4 deg with eight
+variables was **544,950 bytes**.
+
+**This validates the T8.10f probe design and exposes one more trap — `0.0` is falsy in Python.** A probe
+written as `if not swh: reject` would discard this valid spot on any calm day. The check must be an explicit
+comparison against the GRIB `missingValue` key:
+
+| `swh` at the spot | Meaning | Probe verdict |
+|---|---|---|
+| `== missingValue` (9999 here) | point is not in this model's water | **reject** / route to the other product |
+| `0.0` | in the water, genuinely flat right now | **accept** |
+| `> 0.0` | in the water, waves present | **accept** |
+
+Confirming the reverse case from the same day: the **ocean** grid `gfswave.global.0p25` at Lake Michigan
+returns `swh == 9999` — correctly reporting no ocean there. So the two products' probes disagree at this
+coordinate exactly as they should, which is what makes the water-body routing testable.
 
 **Why this is a strong test case and not a duplicate of Huntington.** Lake Michigan surf is **fetch-limited
 wind sea** generated locally, with no long-period swell trains arriving from distant storms. Huntington's

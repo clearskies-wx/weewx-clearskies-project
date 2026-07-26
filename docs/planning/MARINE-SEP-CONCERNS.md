@@ -4183,3 +4183,26 @@ needs no further authorization beyond T8.10. "Theoretical" also understated what
 operational, in SWAN's own `'WAVEWATCH III SPECTRA'` format, and at ~2.5 km resolves the lakes roughly **7x
 finer** than `global.0p16` (~18.5 km) resolves the ocean coast. The Great Lakes case is the
 **better**-resolved one.
+
+### GLWU coverage verified at the Whiting test coordinate — and the falsy-zero trap
+
+Operator supplied the exact spot coordinate for the Great Lakes test fixture: **41.680447 N, -87.483689 W**
+(sandy cove, eastern edge of Whiting Lakefront Park, Whiting, Indiana). Probed against live
+`glwu.grlc_2p5km.t13z` on 2026-07-26 rather than assumed:
+
+```
+nearest GLWU grid point: 41.6744 N, -87.4852 W   (~0.7 km)
+ws    2.080 m/s   real        swh   0.000   real, PRESENT, zero
+shts 1/2/3  9999 MISSING      mpts 1/2/3  9999 MISSING
+```
+
+**The spot is in GLWU's domain** — `swh` is `0.000`, not `missingValue`. The lake was flat at that hour,
+matching the operator's account that it breaks only when the lake gets churned up. Partitions are missing
+because there is nothing to partition. The same day, `gfswave.global.0p25` at Lake Michigan returns
+`swh == 9999`, correctly reporting no ocean — so the two products disagree at this coordinate exactly as they
+should, which is what makes water-body routing testable.
+
+**New implementation trap, recorded because it would have silently rejected a valid spot: `0.0` is falsy in
+Python.** A viability probe written `if not swh: reject` discards this spot on any calm day, and the failure
+would look like missing coverage rather than a bad predicate. The check must compare explicitly against the
+GRIB `missingValue` key — `missingValue` means reject, `0.0` means accept.
