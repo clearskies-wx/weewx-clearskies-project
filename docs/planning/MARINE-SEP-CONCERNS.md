@@ -1172,3 +1172,29 @@ A route-agnostic proxy genuinely cannot special-case one route's field to stay b
 **Disposition: keep the conversion, verify at Phase 8** against the dashboard's beach-safety card
 to confirm nothing downstream hardcodes the raw value. Named here so it is not mistaken for a
 proxy defect when someone notices the number move.
+
+---
+
+## C-39 — `i18n.py`, `locales/` and the `babel` pin are now unreferenced in the marine service (OPEN → QC Gate 6)
+
+Consequence of C-29's marine half (`cc2be6a`), anticipated in C-29's own text and now measured.
+
+After the scorers stopped composing text, **zero modules in the marine service import
+`weewx_clearskies_marine.i18n` or `babel`** — verified by grep plus a cold import of both scorers,
+which previously failed on the babel-blocked i18n import. `i18n.py` and `locales/` remain in the
+tree with no caller, and `babel` remains pinned in `pyproject.toml`.
+
+`rules/coding.md` §3 is against carrying code with no caller. But **removing a dependency is
+trigger 7 in plain terms**, and having just been corrected for over-triggering on C-15, the
+coordinator is not going to under-trigger in the opposite direction on the same day by deleting a
+pinned dependency unasked.
+
+**Disposition: carry to QC Gate 6 as a named cleanup item for the operator to wave through in
+passing.** It costs nothing to leave in place until then — an unimported module and an unused pure-
+Python pin have no runtime effect. What must NOT happen is that it goes unrecorded and the marine
+service ships carrying a locale system it no longer uses.
+
+**Note for whoever executes it:** the API keeps its own `i18n.py` and locale catalogue, which is
+where the keys now resolve. The marine service's copy is the redundant one. Confirm the API's
+catalogue contains every key the marine service emits *before* deleting the marine copy — that check
+is assigned to the API-side re-merge agent.
