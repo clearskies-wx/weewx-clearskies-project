@@ -1747,7 +1747,7 @@ to do.
 
 | Option | Cost |
 |---|---|
-| **(a) Marine service exposes a SWAN-availability check; the API proxies it** | One more endpoint (trigger 7), same shape as C-48's two. The marine service already knows its SWAN binary path from config. Matches the settled pattern and makes the wizard truthful. |
+| **(a) Marine service exposes a SWAN-availability check; the API proxies it** | One more endpoint (trigger 7), same shape as C-48's two. ~~The marine service already knows its SWAN binary path from config.~~ **Correction, 2026-07-25:** it does not — the path is the hardcoded `_DEFAULT_SWAN_BINARY` constant in `providers/nearshore/swan.py`, not a config key. Caught by the implementing agent, which reused that constant rather than adding config surface to make the coordinator's claim true. The option was right; this supporting sentence was wrong. Matches the settled pattern and makes the wizard truthful. |
 | (b) Delete the check from the wizard | Removes an endpoint (also trigger 7) and removes a genuinely useful setup-time signal. |
 | (c) Leave it | The wizard keeps telling correctly-deployed operators that SWAN is missing. Not recommended. |
 
