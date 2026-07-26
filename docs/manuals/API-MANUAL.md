@@ -2957,7 +2957,7 @@ This section documents the target-state architecture for the marine service (`we
 
 **Target state:** Marine logic moves to a standalone FastAPI service (`weewx-clearskies-marine`) on port 8780. The API communicates with it over HTTP (authenticated, TLS). Marine endpoints are dynamically mounted from the service's manifest. Zero API code changes are needed to add or modify a marine endpoint after the separation.
 
-**Implementation status (T6.1, 2026-07-25):** `services/companion_proxy.py` is implemented — manifest fetch at startup, dynamic route mounting under `/api/v1/`, 5-minute manifest refresh (same clock as the startup-unreachable retry), and the three-state rule below. The API's hardcoded marine routers described in "Current state" above are still mounted (T6.5–T6.8 delete them later in Phase 6); until then, an operator who configures `marine_service_url` has both a native route and a companion-proxy route registered for the same overlapping paths, and FastAPI resolves to whichever was registered first (the native router — it is registered before `register_companion_proxy()` runs). §19.3 (response envelope wrapping + unit conversion) is **not yet implemented** — the proxy currently returns the marine service's raw SI-unit payload unchanged (T6.2, not yet done).
+**Implementation status (Phase 6 re-merge round, 2026-07-25):** `services/companion_proxy.py` is implemented — manifest fetch at startup, dynamic route mounting under `/api/v1/`, 5-minute manifest refresh (same clock as the startup-unreachable retry), and the three-state rule below. The API's hardcoded marine routers described in "Current state" above are still mounted (T6.5–T6.8 delete them later in Phase 6); until then, an operator who configures `marine_service_url` has both a native route and a companion-proxy route registered for the same overlapping paths, and FastAPI resolves to whichever was registered first (the native router — it is registered before `register_companion_proxy()` runs). §19.3 (response envelope wrapping + unit conversion, T6.2) and §19.8 (post-conversion enrichment, the re-merge round) are both implemented. One item remains open — surf t=0 station wind restoration — see §19.8.
 
 **The three-state rule (proxy failure vs. model gap vs. missing resource).** These three situations must stay distinguishable end to end — collapsing any two of them reintroduces the ambiguity SURF-PUBLISH-RESULTS-ONLY (§18 above) removed:
 
@@ -3252,3 +3252,48 @@ The marine service exposes a health check endpoint that the API polls every 60 s
 **Failure response:** Three consecutive health check failures → API logs ERROR, removes marine capabilities from `/api/v1/capabilities`, and continues serving the last-good cached marine data. When the marine service recovers, the next successful health check re-fetches the manifest and restores capabilities.
 
 The health check does not affect non-marine API functionality. Dashboard pages not using marine data are unaffected by marine service failures.
+
+### §19.8 Post-conversion enrichment — station observations, alerts, locale text
+
+The marine service has no weewx archive and no locale/i18n configuration (ADR-034 co-location; MARINE-SEP-CONCERNS.md C-24/C-29). Four categories of data that lived in the pre-separation API's marine endpoints are therefore restored **on the API side**, after §19.3's unit conversion and before envelope wrapping — `services/marine_enrichment.py`, called from `services/companion_proxy.py`'s `_apply_post_conversion_enrichment()` seam. This is the API's own logic operating on its own data (weewx archive, alert provider, locale files); it is not a second copy of anything the marine service does.
+
+**Station observations (C-24).** Where a marine location is within `dedup_radius_km` of the weewx station (`services/marine_location_resolver.is_station_served()`), the API overwrites the marine service's cache/forecast-sourced wind/temperature/pressure fields with the operator's own instrument reading:
+
+| Route | Fields restored |
+|---|---|
+| `GET /marine` (list) | `windSpeed`, `windDirection`, `airTemp` |
+| `GET /marine/{location_id}` (detail) | `windSpeed`, `windDirection`, `windGust`, `airTemp`, `pressure` |
+
+Values are passed through unconverted (matching the pre-separation endpoint's own documented interim behavior). **Not yet implemented: surf t=0 station wind.** Restoring `windSource: "station"` for the t=0 surf forecast entry requires recomputing every wind-derived scoring field (`windQuality`, `scoring.organizationWind`, and transitively `waveOrganization`/`qualityStars`/`conditionsText`'s wind clause) — doing that in the API would duplicate `score_surf()`'s composite formula across two services. Escalated to the operator; surf entries keep `windSource: "forecast_provider"` at t=0 until a decision lands.
+
+**Active alerts (C-25).** Alerts never move to the marine service (§19.6, unconditional). Restored from `providers/alerts/nws.py`:
+
+| Route | Field | Marine service sends | API restores |
+|---|---|---|---|
+| `GET /marine` (list) | `MarineLocationSummary.activeAlerts` | `null` | classified alert list |
+| `GET /beach-safety/{location_id}` (detail) | `assessment.activeAlerts` | `[]` | filtered headline list (ADR-090 event-type filter) |
+
+`GET /marine/{location_id}` and `GET /beach-safety` (list) never carried alerts and are unaffected.
+
+**Locale text composition (C-29).** The marine service performs all scoring/classification and emits **semantic keys** plus raw SI ingredients; the API resolves keys via `i18n.t()` and composes sentences via `services/marine_enrichment.py`'s relocated `_compose_surf_conditions_text()` / `_compose_fishing_conditions_text()` (ported essentially unchanged from `enrichment/surf_scorer.py` / `enrichment/fishing_scorer.py`, which Phase 6 deletes from the API). No scoring or classification logic is reproduced in the API — only key resolution, unit conversion of the ingredients the marine service sends as raw SI (`heightM`, `windSpeedMps` — outside §19.3's `_FIELD_GROUPS` table, so not converted by that step), and string assembly.
+
+Wire shape (`SurfForecast`, confirmed against the marine service):
+
+```json
+{
+  "qualityKey": "surf.quality.4",
+  "windQualityKey": "surf.wind_quality.offshore",
+  "conditionsTextParts": {
+    "unavailable": false,
+    "heightM": 1.2, "periodS": 13.0, "directionDeg": 260.0,
+    "compass": "W", "windSpeedMps": 3.0,
+    "swellSummaryKey": "surf.conditions.swell_clean"
+  }
+}
+```
+
+resolves to the outward `SurfForecast` shape the dashboard has always seen — `qualityLabel`, `windQuality`, `conditionsText` — with the `*Key`/`conditionsTextParts` fields removed. `qualityKey` is `null` in the unavailable case (`conditionsTextParts.unavailable: true`, every other part field `null`); `windQualityKey` stays populated (wind is an independent observation). `FishingForecast` follows the same pattern: `periodLabelKey` → `periodLabel`, `speciesScores[].statusKey` → `speciesScores[].status`, and a `conditionsTextParts` object of `{overallLabelKey, pressurePhraseKey, tidePhraseKey, solunarClauseKey, activeSpeciesNames}`.
+
+**`currentResidual` (C-37).** The marine service emits `{"valueM": 0.45, "quality": "good", "source": "coops_observed"}` — canonical meters, no description. The API converts `valueM` to the operator's display unit and adds `value` (rounded) and `description` (`"+0.45 m vs prediction"` / `"+1.48 ft vs prediction"`), matching the pre-separation format exactly.
+
+`*Key` field names exist only on the wire between the two services — they never reach the dashboard.
