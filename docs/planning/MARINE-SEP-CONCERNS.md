@@ -4008,3 +4008,32 @@ PROVIDER-MANUAL §14.3 must be rewritten with whatever is approved; it currently
    00/06/12/18z. The runner's cycle logic assumes 6-hourly.
 
 ---
+
+---
+
+## OPERATOR RULING 2026-07-26 — C-86 / C-87 APPROVED INTO PHASE 8; T8.6 ORDERING CONSTRAINT VOID
+
+> *"So this is a test environment. We can take things down. There is no reason to continue these services,
+> especially in light of the fact that it is all bogus data right now, and the surf page does not work
+> anyway with the current arrangement. So it is not like we are blanking out data for existing web traffic.
+> This should get incorporated into Phase 8."*
+
+**What this authorizes:**
+
+1. **C-86 / C-87 are APPROVED** and become **T8.10** in the plan, with the design in
+   `briefs/WW3-SPECTRAL-BOUNDARY-DATA-BRIEF.md`: per-station `gfswave.<ST>.spec` + `glwu.<ST>.spec`,
+   `BOUNDSPEC SIDE ... CONSTANT FILE`, `CGRID` low end to 0.03 Hz, cached station catalogue,
+   configuration-time viability with no silent degradation. Triggers 7, 4, 1, 3 are hereby authorized for
+   this scope only.
+2. **T8.4 / T8.4b / T8.5 are UNBLOCKED.** The rule "T8.6 must pass before T8.4/T8.5" existed because the
+   old services were the rollback path. They reproduce the same defect, so they were never a rollback path
+   for it, and the environment carries no live traffic. Decommissioning proceeds independently of T8.6.
+3. **C-70's stop-not-disable posture is retired** — the services can now be disabled and the old repo
+   archived.
+
+**What this does NOT authorize:** anything outside T8.10's stated scope. New triggers still stop and
+surface.
+
+**C-81 and C-86's recommendations remain superseded** by C-87 (single station via `BOUNDSPEC CONSTANT
+FILE`; `BOUNDNEST3` unusable because station points cannot satisfy the manual's 0.1x-spacing positioning
+rule). Kept in the register for the audit trail, not as guidance.

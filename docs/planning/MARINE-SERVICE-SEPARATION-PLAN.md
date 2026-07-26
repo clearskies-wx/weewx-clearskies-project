@@ -3243,6 +3243,158 @@ proven working, not against behaviour still being designed.
 - Marine repo suite passes; API repo suite passes with no regressions in retained tests.
 - Both baselines recorded in the plan.
 
+### T8.10 — WW3 spectral boundary: stop parameterising a spectrum WW3 already computes
+
+**Added to Phase 8 by operator decision, 2026-07-26.** Origin: C-86 / C-87 and
+[briefs/WW3-SPECTRAL-BOUNDARY-DATA-BRIEF.md](briefs/WW3-SPECTRAL-BOUNDARY-DATA-BRIEF.md), which carries all
+the measured data, the SWAN-manual citations and the resolved design questions. **Read the brief before
+starting any subtask.**
+
+**Operator ruling on scope and on the T8.6 ordering constraint (2026-07-26):** *"So this is a test
+environment. We can take things down. There is no reason to continue these services, especially in light
+of the fact that it is all bogus data right now, and the surf page does not work anyway with the current
+arrangement. So it is not like we are blanking out data for existing web traffic. This should get
+incorporated into Phase 8."* The rule that T8.6 must pass before T8.4/T8.5 existed because the old services
+were the rollback path; they reproduce the same defect, so they were never a rollback path for it. **T8.4 /
+T8.4b / T8.5 are unblocked and proceed independently of T8.6.**
+
+**Why:** `providers/marine/wavewatch.py` fetches a PacIOOS 0.5° republication of legacy `NWW3_Global_Best`
+that reports **one averaged swell**. At the L1 boundary point it gave `sper` **12.73 s** — the weighted mean
+of a 19.11 s groundswell and a 6.39 s wind swell, a period matching no wave in the water. Real WW3 publishes
+the full 2-D directional spectrum. Period governs shoaling and breaking height far more than offshore
+height, so this one substitution produced surf 3.83–4.24 ft (flat for 14 h) against a real 4–6 ft with sets.
+
+#### T8.10a — Station catalogue discovery
+
+- **Owner:** `clearskies-api-dev` (marine repo)
+
+**Do:** Build a cached catalogue of WW3 spectral station locations for both products.
+Directory listing gives IDs (~4,036 ocean, ~115 Great Lakes); an HTTP **range request for bytes 0–120** of
+`<station>.bull` gives `Location : 46222      (33.62N 118.32W)` — ~100 bytes instead of 7.75 MB. Reuse the
+existing discovery-cache pattern (`/discovery/buoy-stations` caches at 86400 s) and the existing NDBC
+lat/lon metadata, since many `gfswave` IDs *are* NDBC IDs. Respect the existing 2 req/s limit; a cold build
+is ~35 min and belongs at configuration/discovery time, **never** in the forecast cycle.
+
+**Accept:** Catalogue persists across restarts; a cold build is resumable; no station probe fetches a
+`.spec`; rate limit honoured.
+
+#### T8.10b — Fetch and parse the WW3 2-D spectrum
+
+- **Owner:** `clearskies-api-dev` (marine repo)
+
+**Do:** Fetch the selected station's `.spec` and parse it. Format is self-describing and **identical for
+both products**, so **one parser, no format branching**:
+
+```
+'WAVEWATCH III SPECTRA'     50    36     1 'spectral resolution for points'
+ <nfreq frequencies>            ocean: 0.035..0.964 Hz (28.6 s .. 1.04 s)
+ <ndir directions>              36 bins
+20260726 060000
+'46222     '  33.62-118.32     487.9   2.20 143.8   0.03 285.6
+ <nfreq x ndir energy densities>
+```
+
+Per-timestep header carries **id, lat, lon, depth (m), wind speed/dir, current speed/dir**.
+Ocean: `/gfs.YYYYMMDD/CC/wave/station/bulls.tCCz/gfswave.<ST>.spec` (7.75 MB).
+Great Lakes: `/glwu.YYYYMMDD/bulls.tCCz/glwu.<ST>.spec` (1.94 MB, `32 36`).
+
+**Never fetch the tarballs** — `spec_tar.gz` is 1.72 GB, `ibp_tar` is 11.37 GB.
+
+**Accept:** Both products parse with the same code path; integrated spectral m0 reconciles with the
+`.bull` bulk Hs for the same station/timestep; a malformed or truncated file **raises** (rules/coding.md §1),
+never returns a partial spectrum.
+
+#### T8.10c — Write a real spectral boundary; delete the synthesised one
+
+- **Owner:** `clearskies-api-dev` (marine repo)
+- **Files:** `services/swan_formats.py`
+
+**Do:** Emit the 2-D spectrum as SWAN's boundary file and drive L1 with
+`BOUNDSPEC SIDE ... CONSTANT FILE` (manual: *"the wave spectra are constant along the side or segment"*).
+**`ww3_to_swan_boundary()`'s synthesised JONSWAP peak and its fixed 30° `DSPR` are both deleted** — nothing
+is synthesised any more. Remove the "prefer swell parameters" overwrite at the old lines 1596–1600.
+
+**`BOUNDNEST3` is NOT usable and must not be attempted.** The manual accepts a WW3 output location *"only
+if the SWAN grid point on the nest boundary lies within a rectangle between two consecutive WAVEWATCH III
+output locations with a width equal to 0.1 times the distance between these output locations"* — station
+points do not lie on our boundary. A uniform offshore spectrum is documented standard practice, with
+peer-reviewed precedent for driving nearshore SWAN from a single directional spectrum (J. Atmos. Ocean.
+Tech. 38(12), 2021). L2/L3 `BOUNDNEST1` nesting is unchanged.
+
+**Accept:** No parametric TPAR path remains for L1; no `DSPR` constant anywhere; SWAN reads the spectral
+file without boundary warnings.
+
+#### T8.10d — Widen `CGRID` low frequency to 0.03 Hz
+
+- **Owner:** `clearskies-api-dev` (marine repo)
+
+**Do:** Our `CGRID` runs 0.0418–1.0 Hz (23.9–1.0 s). WW3's lowest bin is **0.035 Hz**, *below* our cutoff,
+so today we would truncate exactly the long-period energy this task recovers. Set the low end to
+**0.03 Hz**; keep the 1.0 Hz upper (the manual's WAM Cycle 4 source terms are retuned for ~1 Hz, so the
+upper bound must not move).
+
+**Accept:** No incoming WW3 frequency bin falls outside `CGRID`; upper limit still 1.0 Hz.
+
+#### T8.10e — Great Lakes routing via GLWU
+
+- **Owner:** `clearskies-api-dev` (marine repo)
+
+**Do:** Route Great Lakes spots to GLWU. Measured 2026-07-26 at Lake Michigan (43.0 N, 87.0 W):
+`gfswave.global.0p25` returns **9999** for `swh` and every partition, PacIOOS returns **null** — global
+ocean models mask inland water, so Great Lakes spots have **never** had a WW3 boundary. Precedent for the
+water-body decision exists in the bathymetry chain (USGS Great Lakes topobathy vs NCEI/CUDEM).
+**GLWU cadence is hourly** (`bulls.tCCz`, 00–14z observed) against the ocean product's 00/06/12/18z — the
+runner's cycle logic assumes 6-hourly and must branch.
+
+**Accept:** A Great Lakes spot produces a real spectral boundary where it previously produced none; cycle
+selection correct for both cadences.
+
+#### T8.10f — Configuration-time viability, no silent degradation
+
+- **Owner:** `clearskies-api-dev` (marine repo) + `clearskies-docs-author`
+
+**Do:** Station selection is **depth-led**, not distance-led — the `.spec` header supplies depth per
+timestep, and published practice initialises SWAN from buoy data in ~550 m (station 46222 is 487.9 m,
+~20 km offshore). Where no suitable station exists, the spot is **not supportable**: fail at configuration
+time and tell the operator, with the chosen station's id, distance and depth surfaced at setup. Same shape
+as the existing L3 cluster viability test.
+
+**It must never fall back to the gridded bulk product.** That reintroduces the averaged-away groundswell
+with different provenance — per rules/coding.md §1 and the C-76/C-77 rulings.
+
+**Record in the provider docs:** deep water needs d > 1.56 T²/2, so 28.6 s wants **638 m** and 488 m does
+not satisfy it — the longest bins arrive already depth-influenced. True of any buoy on a narrow shelf;
+state it rather than let it be discovered.
+
+**Accept:** No code path substitutes bulk data for a missing spectrum; unsupportable spots are refused at
+config time with an actionable message.
+
+#### T8.10g — Doc sync (mandatory, same phase)
+
+- **Owner:** `clearskies-docs-author`
+
+**Do:** Rewrite **PROVIDER-MANUAL §14.3**, which currently documents the PacIOOS 0.5° bulk republication as
+"WaveWatch III forecasts" — that is how this survived. Update §14.15 (SWAN runner boundary inputs),
+ARCHITECTURE.md, and any capability/field lists touched by the contract change.
+
+**Accept:** No governing document still describes a parametric TPAR boundary or the PacIOOS source.
+
+#### T8.10h — Validate against reality, not against the model
+
+- **Owner:** Coordinator (Opus)
+
+Per `rules/clearskies-process.md` "Validate against reality, never against the model's own output". A
+conservation check **cannot** detect a missing input and did not — see C-83.
+
+**Accept:**
+1. Published swell list contains a **19 s ± 1 s SSW train** on a day WW3 shows one, height within ~30% of
+   the WW3 partition.
+2. Published surf height **overlaps Surfline's stated range** and **varies** across the forecast.
+3. Component count **tracks WW3's** — not pinned at 1, not fabricated as 3.
+4. Component periods are **distinct** (the T4B.2 failure signature was Tp 10.2/10.2/10.1 s).
+5. C-83's fixes land first, so the closure test cannot report PASS on a degenerate sample.
+6. A **Great Lakes** spot produces a real boundary.
+
 ### Adversarial Audit — Phase 8
 
 - **Owner:** `clearskies-auditor`
