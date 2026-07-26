@@ -20,7 +20,7 @@
 | **Phase 5** — Move provider modules | **CODE COMPLETE.** Adversarial audit run 2026-07-25: C-28 cleared with evidence, one HIGH finding (C-31, dispatch registry held only the scaffold stub) fixed in Phase 6. |
 | **Phase 6** — API companion proxy | **COMPLETE. QC Gate 6 walked and passed with two named exceptions (C-40, C-48), 2026-07-25.** See the Phase 6 closeout below. |
 | **Phase 7** — Wizard/Admin updates | **COMPLETE. QC Gate 7 walked and passed with named exceptions, 2026-07-26.** See the Phase 7 closeout below. |
-| Phase 8 | Not started |
+| Phase 8 | IN PROGRESS — T8.1/8.1b/8.2/8.2b/8.3 deployed; T8.6 RUN and FAILED; T8.10 added 2026-07-26 |
 
 ### Phase 7 — COMPLETE. QC Gate 7 walked 2026-07-26, passed with named exceptions.
 
@@ -915,7 +915,7 @@ Draft an ADR documenting:
 - SWAN IS running on librewxr (health check, last_run populated).
 - API connects to librewxr via remote mode (log evidence).
 - Silent deferral scan: zero findings.
-- Test baselines hold.
+- Test baselines recorded as NEW counts (T8.9; they must change — T8.10 adds code).
 
 ---
 
@@ -3160,40 +3160,63 @@ and verified (it survives `kill -9`), but it cannot self-heal from an empty disk
 
 **Accept:** Dashboard and config UI deployed. Surf page renders. Wizard shows "Marine Service."
 
-### T8.6 — E2E verification (BEFORE disabling old services)
+### T8.6 — E2E verification
 
 - **Owner:** Coordinator (Opus)
+- **Status: RUN 2026-07-26 — FAILED.** Findings in C-85 (capability surface empty end to end) and
+  C-81/C-86 (surf output physically wrong: one swell train, 3.83-4.24 ft flat against a real 4-6 ft).
+  **T8.6 must RE-RUN after T8.10 lands** — T8.10 changes the very output T8.6 verifies, so the pre-T8.10
+  result cannot be carried forward. QC Gate 8 requires the re-run to pass.
+
+**Ordering (operator ruling 2026-07-26):** T8.6 is **no longer a gate on T8.4/T8.4b/T8.5**. The gate
+existed because the old services were a rollback path; they reproduce the same defect, so they were never
+a rollback path for it, and this environment carries no live traffic. Decommissioning proceeds
+independently.
 
 **Do:**
-1. Wait for marine service SWAN cycle.
-2. Verify all marine endpoints return data via companion proxy.
-3. Verify dashboard renders all marine tabs with real data.
-4. This MUST pass before T8.4 disables old services — old services remain as a rollback path until verification succeeds.
+1. Wait for a marine service SWAN cycle to complete.
+2. Verify all marine endpoints return data via the companion proxy.
+3. Verify the dashboard renders all marine tabs with real data.
+4. Verify marine capabilities appear in `GET /api/v1/capabilities` (**blocked on C-85 — see the scope
+   note below**).
+5. Verify physical plausibility against reality rather than self-consistency — T8.10h's criteria.
 
-**Accept:** All marine endpoints return data. Dashboard renders complete marine page.
+**Scope note, do NOT bypass:** C-85's capability-surface fix needs its own **trigger-4** ruling on where
+the capability list derives from. The 2026-07-26 ruling authorized T8.10's scope only. "T8.6 cannot pass
+without it" is a **named non-excuse** — surface it and wait; do not implement it under this task.
 
-### T8.4 — Stop and disable old services on librewxr (AFTER E2E verification)
+**Accept:** All marine endpoints return data. Dashboard renders the complete marine page. T8.10h's
+reality checks pass. Any item deferred on a pending ruling is named explicitly, never silently skipped.
+
+### T8.4 — Stop and disable old services on librewxr
 
 - **Owner:** Coordinator (Opus) — with user approval
 
-**Prerequisite:** T8.6 (E2E verification) must pass first.
+**Prerequisite: NONE. Unblocked by operator ruling 2026-07-26** — see T8.6's ordering note. The former
+"T8.6 must pass first" prerequisite is void, and C-70's stop-not-disable posture is retired.
 
 **Do:**
-1. Stop and disable `weewx-clearskies-swan` on 8767.
-2. Stop and disable `weewx-clearskies-compute` on 8770.
-3. Verify ports 8767 and 8770 not listening.
+1. Verify the actual unit names on librewxr first (`systemctl list-units 'weewx-clearskies-*'`) — the old
+   repo was renamed to `weewx-clearskies-swan-swelltrack`, so do not assume unit names.
+2. Stop and disable the old SWAN service on 8767.
+3. Stop and disable the old compute service on 8770.
+4. Verify ports 8767 and 8770 are not listening.
 
-**Rollback:** If E2E verification (T8.6) fails, re-enable old services before investigating.
+**Rollback:** None, and none is needed. The old services reproduce the same boundary defect (C-86), so
+re-enabling them restores nothing. If the marine service fails, fix it forward.
 
-**Accept:** Old services stopped and disabled. Neither port listening.
+**Accept:** Old services stopped and disabled by their verified real unit names. Neither port listening.
 
 ### T8.4b — Archive the old SWAN repo on librewxr
 
 - **Owner:** Coordinator (Opus) — with user approval
 
 **Do:**
-1. After T8.4 disables the old SWAN service, archive the `weewx-clearskies-swan` repo on librewxr.
-2. Move to `/home/ubuntu/repos/archived/weewx-clearskies-swan` to preserve history.
+1. After T8.4 disables the old SWAN service, archive the old SWAN repo on librewxr. **Verify the real
+   directory name before moving anything** — the repo was renamed to `weewx-clearskies-swan-swelltrack`
+   on local, GitHub and librewxr, and the `.pth` install path was updated after the rename, so the old
+   `weewx-clearskies-swan` path may not exist.
+2. Move it under `/home/ubuntu/repos/archived/` preserving its actual directory name.
 3. Create the `archived/` directory if it does not exist.
 
 **Accept:** Old repo moved to archived directory. Git history preserved. No files left at original path.
@@ -3202,7 +3225,7 @@ and verified (it survives `kill -9`), but it cannot self-heal from an empty disk
 
 - **Owner:** Coordinator (Opus) — with user approval
 
-**Prerequisite:** T8.6 (E2E verification) must pass first.
+**Prerequisite: NONE. Unblocked by operator ruling 2026-07-26** — see T8.6's ordering note.
 
 **Do:**
 1. Remove `swan.disabled` from `/usr/local/bin/`.
@@ -3213,22 +3236,32 @@ and verified (it survives `kill -9`), but it cannot self-heal from an empty disk
 
 **Accept:** No SWAN artifacts on weewx. `secrets.env` has `MARINE_SERVICE_SECRET` only.
 
-### T8.7 — Surfline comparison
+### T8.7 — Surfline comparison — **SUPERSEDED by T8.10h; runs after T8.10**
 
 - **Owner:** Coordinator (Opus)
 
-**Do:** Compare face height against Surfline. Document results.
+**Why superseded:** "Face height within +/-30% of Surfline" **passes on the known-defective output**, so it
+cannot gate anything. Measured 2026-07-26: we published 3.83-4.24 ft against Surfline's 4-6 ft — inside
++/-30% of any midpoint reading of that range — while the forecast was flat for 14 hours and carried one
+swell train instead of three. The criterion tests central height only, which was never the failure mode
+(C-81, C-86). It is also ambiguous: +/-30% of *which* number in a range?
 
-**Accept:** Face height within ±30% of Surfline.
+**Do:** Nothing separately. Execute **T8.10h**, which compares period structure, component count and
+temporal variation as well as height, after T8.10 has changed the boundary source.
+
+**Accept:** T8.10h's criteria. This task closes by reference, not by its own measurement.
 
 ### T8.9 — All deferred test work (operator directive, 2026-07-25)
 
 - **Owner:** `clearskies-test-author`
 - **Files:** `repos/weewx-clearskies-marine/tests/`, `repos/weewx-clearskies-api/tests/`
 
-**No test work happens in Phases 5, 6, or 7.** It all lands here, after the code is built,
-deployed, and E2E-verified. Runs after T8.6 so tests are written against behaviour already
-proven working, not against behaviour still being designed.
+**No test work happens in Phases 5, 6, or 7.** It all lands here, after the code is built and deployed.
+
+**Ordering — corrected 2026-07-26.** The original rationale ("runs after T8.6 so tests are written against
+behaviour already proven working") is now false in both directions: T8.6 failed, and T8.10 changes the
+behaviour afterward. **T8.9 runs after T8.10**, otherwise it resets pytest baselines that T8.10
+immediately breaks.
 
 **Do:**
 1. **From T6.4b(i)** — migrate the marine provider / wave physics / enrichment / endpoint tests
@@ -3237,11 +3270,17 @@ proven working, not against behaviour still being designed.
 2. **From T6.2b** — companion proxy tests against a mock marine service, no live dependency:
    manifest parsing, route creation, malformed manifests, envelope wrapping, SI → display unit
    conversion, capability merging.
-3. Reset both repos' pytest baselines to the new counts.
+3. **From T8.10** — tests for the new boundary path, none of which existed when this task was written:
+   the `.spec` parser for both products (ocean `50 36`, GLWU `32 36`); the malformed/truncated-file
+   **raise** path; station-catalogue build and resume; the GLWU hourly vs ocean 6-hourly cycle branch; and
+   the configuration-time viability **refusal** paths. Note the marine repo has **no tests for `swan.py`
+   or the runner at all**, so the C-76/C-77 raise paths are also uncovered and land here.
+4. Reset both repos' pytest baselines to the new counts.
 
 **Accept:**
 - Marine repo suite passes; API repo suite passes with no regressions in retained tests.
-- Both baselines recorded in the plan.
+- Both baselines recorded in the plan as **new** counts — they will change, since T8.10 adds code.
+- Every new failure path from T8.10 and from C-76/C-77 has a test asserting that it raises.
 
 ### T8.10 — WW3 spectral boundary: stop parameterising a spectrum WW3 already computes
 
@@ -3300,6 +3339,24 @@ Great Lakes: `/glwu.YYYYMMDD/bulls.tCCz/glwu.<ST>.spec` (1.94 MB, `32 36`).
 
 **Never fetch the tarballs** — `spec_tar.gz` is 1.72 GB, `ibp_tar` is 11.37 GB.
 
+**Station files vs gridded files — we need BOTH, for different consumers (operator question, 2026-07-26).**
+NOAA publishes two wave families and they are not substitutes:
+
+| | Station `.spec` | Gridded GRIB2 |
+|---|---|---|
+| Carries | **full 2-D spectrum** E(f,theta) | bulk `HTSGW/PERPW/DIRPW` + 3 swell partitions — **no spectrum** |
+| Available | fixed buoy/output points | anywhere on a 0.25 deg / 0.16 deg grid |
+| Consumer | **SWAN L1 boundary** (T8.10c) | **`endpoints/marine.py` offshore forecast** (T8.10i) |
+
+The SWAN boundary requires station files — gridded physically cannot supply a spectrum. The `/marine`
+offshore forecast is bulk by nature and needs coverage at arbitrary spots, which is what gridded is for.
+**Neither is a fallback for the other**, and neither may substitute for the other on failure.
+
+**Also measure and record GLWU's frequency array.** Only its bin counts (`32 36`) have been observed; the
+actual frequency range is unmeasured, so T8.10d's accept cannot be evaluated for GLWU until it is. If
+GLWU's top bin exceeds 1.0 Hz, raise it rather than silently widening `CGRID`'s upper bound — that bound is
+tied to the WAM Cycle 4 source-term retuning and is not ours to move.
+
 **Accept:** Both products parse with the same code path; integrated spectral m0 reconciles with the
 `.bull` bulk Hs for the same station/timestep; a malformed or truncated file **raises** (rules/coding.md §1),
 never returns a partial spectrum.
@@ -3333,7 +3390,14 @@ so today we would truncate exactly the long-period energy this task recovers. Se
 **0.03 Hz**; keep the 1.0 Hz upper (the manual's WAM Cycle 4 source terms are retuned for ~1 Hz, so the
 upper bound must not move).
 
-**Accept:** No incoming WW3 frequency bin falls outside `CGRID`; upper limit still 1.0 Hz.
+**Also state, do not guess:** whether the number of frequency bins changes when the low end widens from
+0.0418 to 0.03 Hz, or whether the existing count is redistributed. SWAN interpolates incoming spectral
+frequencies (documented for `BOUNDNEST1`), so both are defensible — but the choice must be recorded, not
+left implicit. Runtime cost scales with bin count and `omp_num_threads = 6` is an operator ruling that
+must not be touched to compensate.
+
+**Accept:** No incoming WW3 frequency bin falls outside `CGRID`, for **both** products (ocean and GLWU —
+see T8.10b's measurement item); upper limit still 1.0 Hz; bin-count decision recorded.
 
 #### T8.10e — Great Lakes routing via GLWU
 
@@ -3346,8 +3410,15 @@ water-body decision exists in the bathymetry chain (USGS Great Lakes topobathy v
 **GLWU cadence is hourly** (`bulls.tCCz`, 00–14z observed) against the ocean product's 00/06/12/18z — the
 runner's cycle logic assumes 6-hourly and must branch.
 
+**A Great Lakes spot must actually be configured for this to be checkable.** None is configured today, and
+the brief calls Great Lakes support "currently theoretical". Configuring one pulls in the Great Lakes
+bathymetry chain, grid sizing and cluster viability. **If that turns out to be more than a config entry,
+stop and report** — standing up a new water body is not in T8.10's authorized scope, and T8.10e/T8.10h#6
+would then be deferred with that stated explicitly rather than silently skipped.
+
 **Accept:** A Great Lakes spot produces a real spectral boundary where it previously produced none; cycle
-selection correct for both cadences.
+selection correct for both cadences. If deferred for the reason above, the deferral is recorded in the plan
+and in the concerns register, not left implied.
 
 #### T8.10f — Configuration-time viability, no silent degradation
 
@@ -3366,8 +3437,66 @@ with different provenance — per rules/coding.md §1 and the C-76/C-77 rulings.
 not satisfy it — the longest bins arrive already depth-influenced. True of any buoy on a narrow shelf;
 state it rather than let it be discovered.
 
-**Accept:** No code path substitutes bulk data for a missing spectrum; unsupportable spots are refused at
-config time with an actionable message.
+**Thresholds are NOT the implementer's to choose.** The ruling authorized the viability check's
+*existence*, not the numbers in it. A minimum station depth and a maximum station distance are constants
+inside a physics-derived criterion (trigger 1). **Propose values with their basis and wait for the
+operator.** Published precedent is ~550 m; station 46222 is 487.9 m at ~20 km.
+
+**Cross-repo ownership — the operator-facing half is not in this repo.** Surfacing the chosen station's id,
+distance and depth at setup crosses marine → API → config UI, and per the C-42 invariant nothing but the
+API talks to the marine service. **`clearskies-api-dev` (API repo) and the config-UI owner must be
+dispatched for that half**; this subtask alone cannot deliver it.
+
+**Accept:** No code path substitutes bulk data for a missing spectrum. Unsupportable spots are refused at
+config time with an actionable message that names the nearest station, its distance and its depth.
+Depth/distance thresholds carry a recorded operator decision, not an implementer default.
+
+#### T8.10i — Re-source `endpoints/marine.py` off PacIOOS onto gridded WW3
+
+- **Owner:** `clearskies-api-dev` (marine repo)
+- **Files:** `endpoints/marine.py`, `providers/marine/wavewatch.py`
+
+**Found by the Fable review, 2026-07-26 — an unowned consumer of the contract change.**
+`wavewatch.fetch()` has three call sites in `endpoints/marine.py` (~:217/:219, ~:431/:433, ~:570/:572)
+feeding the offshore marine forecast, source-labelled `"wavewatch+ndbc+nws_marine"` (~:645). T8.10b changes
+that function's return shape and T8.10c owns only `swan_formats.py`, so without this subtask the change
+either breaks `/marine` or leaves the misdescribed PacIOOS source alive — the exact thing T8.10g exists to
+eliminate.
+
+**Do:** Point this consumer at **gridded** WW3 (`gfswave.global.0p25`, pole-to-pole +90/-90 at 0.25 deg —
+finer than PacIOOS's 0.5 deg and truly global, unlike `global.0p16` which spans only 52.5N-15.0S) and at
+**GLWU gridded** for Great Lakes. Keep bulk fields bulk; expose the three swell partitions where the
+response shape already has somewhere to put them, and do **not** invent new fields under this task.
+Delete the PacIOOS/ERDDAP fetch path once no consumer remains.
+
+**Authorized by the operator, 2026-07-26:** *"ok the marine forecast fix needs to be included in phase 8 as
+well."* Re-sourcing this consumer is in scope for Phase 8 — it is no longer a scope flag to surface.
+
+**One residual boundary that IS still a ruling:** if serving the three gridded partitions to `/marine`
+requires **new response fields** (as opposed to filling shape the response already has), that is a further
+trigger-4 data-contract decision. Stop and report *that specific case* only; the re-sourcing itself
+proceeds.
+
+**Accept:** No consumer of `wavewatch.fetch()` reads PacIOOS. `/marine` returns data at arbitrary spots
+including the Great Lakes, where it previously returned nulls. No new response fields added without a
+ruling.
+
+#### T8.10j — Invalidate pre-T8.10 model state at deploy
+
+- **Owner:** Coordinator (Opus)
+
+**Found by the Fable review, 2026-07-26.** The marine service persists model output disk → Redis → memory
+and restores it on startup, and SWAN carries hotstart state across runs. Deploying T8.10 without clearing
+that state means T8.10h could validate **pre-fix output** and pass.
+
+**Do:** Before the first post-T8.10 cycle, archive (do not delete) `forecast_cache.json`, clear the Redis
+last-good entry, and remove L1/L2/L3 hotstart files — the procedure already used for the C-76 reset, which
+archived to a timestamped `swan-precleanup-*` directory. **Keep** bathymetry caches, `swan_grid_sizing.json`
+and `spot_profiles/` — expensive to rebuild and unaffected by a boundary-source change. Confirm the service
+logs a cold start.
+
+**Accept:** First post-T8.10 cycle starts cold, with `last_run: null` before it begins. Prior cache
+archived, not destroyed.
 
 #### T8.10g — Doc sync (mandatory, same phase)
 
@@ -3389,13 +3518,39 @@ conservation check **cannot** detect a missing input and did not — see C-83.
 **Accept:**
 1. Published swell list contains a **19 s ± 1 s SSW train** on a day WW3 shows one, height within ~30% of
    the WW3 partition.
-2. Published surf height **overlaps Surfline's stated range** and **varies** across the forecast.
-3. Component count **tracks WW3's** — not pinned at 1, not fabricated as 3.
+2. Published surf height overlaps Surfline's stated range **and its range width is comparable** — not
+   merely touching at one end. The defective output (3.83-4.24 ft vs 4-6 ft) technically overlapped at
+   4.0-4.24 while being wrong, so overlap alone is not a criterion. Variation must **track WW3 partition
+   arrival and tide**, not be satisfied by a single outlier: the pre-fix run had exactly one 6.04 ft step
+   in 67 and was otherwise flat.
+3. Component count **tracks WW3's station partition count within +/-1** across the forecast, neither
+   pinned at 1 nor fixed at 3. State the comparison basis in the result: SWAN's watershed partitioning of
+   its own SPECOUT need not exactly equal the WW3 station partition count even when both are correct, so
+   this is a distribution check, not an equality check.
 4. Component periods are **distinct** (the T4B.2 failure signature was Tp 10.2/10.2/10.1 s).
-5. C-83's fixes land first, so the closure test cannot report PASS on a degenerate sample.
+5. C-83's fixes land first, so the closure test cannot report PASS on a degenerate sample. **This subtask
+   owns them** — no other task does. Specifically, in `scripts/verify_energy_closure_deployed.py`: report
+   the single-vs-multi-component split in the headline, return `INCONCLUSIVE` rather than `PASS` when the
+   multi-component sample is too small (the 2026-07-26 run was n_multi=1 and reported PASS), and add the
+   independent comparison of component count, period and direction against the WW3 station partitions —
+   which would have caught C-86 immediately.
 6. A **Great Lakes** spot produces a real boundary.
 
 ### Adversarial Audit — Phase 8
+
+**Scope extension for T8.10 (added 2026-07-26 after the Fable review).** The audit and QC Gate 8 as
+originally written check only old-architecture cleanup and would pass with T8.10 half-done. Add:
+
+- `grep` the marine repo for `pacioos`, `pae-paha`, `erddap`, `TPAR`, `DSPR`, `ww3_to_swan_boundary`,
+  `JONSWAP` in the boundary path — the first five must be **absent** from live code.
+- Confirm no governing document still describes a parametric boundary or the PacIOOS source (T8.10g's
+  accept is otherwise unverified by any gate).
+- Confirm the station catalogue persists across a service restart and that no forecast-cycle code path
+  builds it.
+- Confirm `CGRID` low frequency is 0.03 Hz and the upper bound is still 1.0 Hz.
+- Confirm T8.6 **re-ran after T8.10 and passed**. A pre-T8.10 T8.6 result does not satisfy the gate.
+- Confirm T8.9 recorded **new** pytest baselines (they must change — T8.10 adds code).
+
 
 - **Owner:** `clearskies-auditor`
 

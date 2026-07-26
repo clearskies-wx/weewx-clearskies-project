@@ -1,6 +1,12 @@
 # WW3 Spectral Boundary — Data Brief
 
-**Status:** research complete, awaiting operator decision. No code changed.
+**Status:** **APPROVED into Phase 8 as T8.10 by operator ruling 2026-07-26.** Research complete; no code
+changed yet. Triggers 7, 4, 1 and 3 are authorized for T8.10's stated scope only.
+
+**Superseded within this brief:** section 12's closing note that "Phase 8's remaining tasks are blocked
+behind T8.6" and that the old services are a rollback path is **void** — the same ruling unblocked
+T8.4/T8.4b/T8.5, because the old services reproduce this same defect and so were never a rollback path for
+it. Read the plan's T8.10 for current task state.
 **Date measured:** 2026-07-26. Every number below was fetched live, not recalled.
 **Concerns:** C-86 (root cause), C-87 (this design). Supersedes C-81's and C-86's recommendations.
 

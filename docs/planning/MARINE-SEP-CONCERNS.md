@@ -4037,3 +4037,27 @@ surface.
 **C-81 and C-86's recommendations remain superseded** by C-87 (single station via `BOUNDSPEC CONSTANT
 FILE`; `BOUNDNEST3` unusable because station points cannot satisfy the manual's 0.1x-spacing positioning
 rule). Kept in the register for the audit trail, not as guidance.
+
+### Second authorization, same day — the marine forecast endpoint
+
+> *"ok the marine forecast fix needs to be included in phase 8 as well."*
+
+This authorizes **T8.10i**: re-sourcing `endpoints/marine.py` off the PacIOOS republication onto **gridded**
+WW3 (`gfswave.global.0p25` for ocean, GLWU gridded for the Great Lakes). It resolves the unowned-consumer
+blocker the Fable plan review found — `wavewatch.fetch()` has three call sites feeding the offshore marine
+forecast, and T8.10b changes that function's return shape.
+
+**Operator question answered in the same exchange — station files vs gridded files.** Both are needed, for
+different consumers, and neither is a fallback for the other:
+
+| | Station `.spec` | Gridded GRIB2 |
+|---|---|---|
+| Carries | full 2-D spectrum E(f,theta) | bulk + 3 swell partitions, **no spectrum** |
+| Available | fixed buoy/output points | anywhere on the grid |
+| Consumer | **SWAN L1 boundary** (T8.10c) | **`/marine` offshore forecast** (T8.10i) |
+
+The SWAN boundary needs the spectrum, which gridded cannot supply. `/marine` is bulk by nature and needs
+arbitrary-spot coverage, which stations cannot supply.
+
+**Still requiring a separate ruling:** whether `/marine` may gain **new response fields** to carry the three
+gridded partitions (trigger 4). Filling existing shape is authorized; adding fields is not.
