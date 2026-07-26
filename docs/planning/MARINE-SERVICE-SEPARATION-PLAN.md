@@ -17,7 +17,9 @@
 | **Phase 4** — Marine service repo + scaffold | **COMPLETE. QC Gate 4 CLOSED 2026-07-25** |
 | **Phase 4A** — SwellTrack pipeline + vocabulary | **Tasks complete; QC Gate 4A walked but NOT a clean pass** — see `briefs/P4A-QC-GATE-4A-RESULTS.md`. The "3 of 8 tasks done, T4A.3 halted" text that stood here until 2026-07-25 contradicted this document's own task table below, which records T4A.3 and every other task as DONE. Corrected to match the detail table. |
 | **Phase 4B** — Per-transect grid-derived handoff | **PARTIALLY IMPLEMENTED AND DEPLOYED** — not "not started." See the corrected status block below. |
-| Phases 5-8 | Not started |
+| **Phase 5** — Move provider modules | **CODE COMPLETE.** Adversarial audit run 2026-07-25: C-28 cleared with evidence, one HIGH finding (C-31, dispatch registry held only the scaffold stub) fixed in Phase 6. |
+| **Phase 6** — API companion proxy | **BUILD COMPLETE; DELETIONS HALF-BLOCKED.** See the Phase 6 closeout below. |
+| Phases 7-8 | Not started |
 
 ### ⚠ Cross-round correction, 2026-07-25 — read before starting ANY remaining phase
 
@@ -2595,20 +2597,15 @@ unconditional.)*
   failure this plan exists to remove. The Phase 4 test that pins the empty
   behaviour is provisional and must be updated when this lands.
 
-### T5.10 — Write marine service provider + pipeline tests
+### ~~T5.10 — Write marine service provider + pipeline tests~~ — CANCELLED 2026-07-25
 
-- **Owner:** `clearskies-test-author`
-- **Files:** `repos/weewx-clearskies-marine/tests/`
+**Cancelled by operator.** Phase 5 does not write new marine-service tests. The Phase 4
+suite (auth, config, health, manifest, TLS) remains the marine service's baseline.
 
-**Do:**
-1. Write tests for each provider module's `fetch()` method — verify CAPABILITY declaration present, verify `fetch()` returns data in the expected shape, verify canonical field mapping.
-2. Write a pipeline integration test: SWAN → SwellTrack → SurfBeat end-to-end with test input data.
-3. Write endpoint response shape tests: verify each of the 6 data endpoints returns a response that matches the golden fixture captured in T5.0 (field names, structure — values may differ).
-
-**Accept:**
-- Provider `fetch()` tests pass for all 11 provider modules.
-- Pipeline integration test passes (SWAN → SwellTrack → SurfBeat).
-- Endpoint response shape matches golden fixtures.
+Coverage for the moved code comes from the tests migrated out of the API repo in T6.4b-tests,
+which already exercise the providers, wave physics, and enrichment — writing a parallel suite
+here duplicated them. The golden fixtures captured in T5.0 are retained and are used for
+end-to-end comparison at T8.6, not for unit-level shape assertions.
 
 ### Adversarial Audit — Phase 5
 
@@ -2702,24 +2699,14 @@ unconditional.)*
 - Proxied responses wrapped in standard envelope.
 - Unit conversion applied correctly.
 
-### T6.2b — Write companion proxy tests
+### ~~T6.2b — Write companion proxy tests~~ — DEFERRED TO PHASE 8 (operator, 2026-07-25)
 
-- **Owner:** `clearskies-test-author`
-- **Files:** `repos/weewx-clearskies-api/tests/`
+**All test-writing happens at the end, in Phase 8. Nothing test-related runs in Phases 5, 6, or 7.**
 
-**Do:**
-1. Write tests for the manifest handler: verify manifest parsing, route creation from manifest entries, handling of malformed manifests.
-2. Write tests for envelope wrapping: verify raw marine service responses are wrapped in the standard API envelope (`data`, `stationClock`, `freshness`, `units`).
-3. Write tests for unit conversion: verify SI → operator display units conversion on proxied responses.
-4. Write tests for capability merging: verify marine capabilities appear in `/api/v1/capabilities` when connected, absent when not.
-5. All tests use a mock marine service (not a live service).
-
-**Accept:**
-- Manifest handler tests pass (parsing, route creation, malformed manifest handling).
-- Envelope wrapping tests pass.
-- Unit conversion tests pass.
-- Capability merging tests pass.
-- Tests run with mock marine service, no live dependency.
+The work itself is not cancelled — manifest parsing/route creation/malformed handling, envelope
+wrapping, SI → display unit conversion, and capability merging all still need covering, against a
+mock marine service with no live dependency. It happens in T8.9 after the code is built and
+deployed, not interleaved with it.
 
 ### T6.3 — Implement capability merging
 
@@ -2746,21 +2733,23 @@ unconditional.)*
 - Wizard apply → API → marine service `/config` push works.
 - Failure does not block apply.
 
-### T6.4b — Migrate marine tests from API repo to marine service repo
+### ~~T6.4b(i) — Migrate marine tests from API repo to marine service repo~~ — DEFERRED TO PHASE 8 (operator, 2026-07-25)
 
-- **Owner:** `clearskies-test-author`
-- **Files:** `repos/weewx-clearskies-api/tests/`, `repos/weewx-clearskies-marine/tests/`
+**All test work happens at the end, in Phase 8.** Renumbered `T6.4b(i)` here because the plan
+had two tasks numbered T6.4b — the other is "Marine service config recovery on restart" below,
+which is unaffected and stays in Phase 6.
 
-**Do:**
-1. Move existing marine-related tests from `repos/weewx-clearskies-api/tests/` to `repos/weewx-clearskies-marine/tests/`. This includes tests for marine providers, wave physics, enrichment, and marine endpoints.
-2. Update imports in moved tests to reference `weewx_clearskies_marine` instead of `weewx_clearskies_api`.
-3. Update the API pytest baseline to reflect the reduced test count (marine tests removed).
-4. Update the marine service test baseline to include the migrated tests plus the new tests from T4.6 and T5.10.
+The migration itself still has to happen: move the marine provider / wave physics / enrichment /
+endpoint tests to `repos/weewx-clearskies-marine/tests/`, repoint imports from
+`weewx_clearskies_api` to `weewx_clearskies_marine`, and reset both repos' pytest baselines.
+It moves to **T8.9**.
 
-**Accept:**
-- All marine tests moved to marine service repo and passing.
-- API pytest baseline updated (lower count, no regressions in remaining tests).
-- Marine service test baseline established (migrated + new tests).
+> **One coupling to respect in Phase 6.** T6.5–T6.8 delete the marine code from the API. Test
+> files that import deleted modules must be removed *with* that code in the same commit —
+> otherwise the API suite errors at collection for the whole of Phases 6–7 and the deletion
+> looks like it broke something it didn't. Deleting orphaned test files alongside their source
+> is part of the deletion, not test-writing, so it does not conflict with this deferral. Phase 8
+> then restores them in the marine repo.
 
 ### T6.4b — Marine service config recovery on restart
 
@@ -3091,6 +3080,28 @@ and verified (it survives `kill -9`), but it cannot self-heal from an empty disk
 
 **Accept:** Face height within ±30% of Surfline.
 
+### T8.9 — All deferred test work (operator directive, 2026-07-25)
+
+- **Owner:** `clearskies-test-author`
+- **Files:** `repos/weewx-clearskies-marine/tests/`, `repos/weewx-clearskies-api/tests/`
+
+**No test work happens in Phases 5, 6, or 7.** It all lands here, after the code is built,
+deployed, and E2E-verified. Runs after T8.6 so tests are written against behaviour already
+proven working, not against behaviour still being designed.
+
+**Do:**
+1. **From T6.4b(i)** — migrate the marine provider / wave physics / enrichment / endpoint tests
+   from the API repo to the marine repo, repointing imports to `weewx_clearskies_marine`.
+   (Phase 6 deleted the ones that pointed at deleted source; those get reinstated here.)
+2. **From T6.2b** — companion proxy tests against a mock marine service, no live dependency:
+   manifest parsing, route creation, malformed manifests, envelope wrapping, SI → display unit
+   conversion, capability merging.
+3. Reset both repos' pytest baselines to the new counts.
+
+**Accept:**
+- Marine repo suite passes; API repo suite passes with no regressions in retained tests.
+- Both baselines recorded in the plan.
+
 ### Adversarial Audit — Phase 8
 
 - **Owner:** `clearskies-auditor`
@@ -3194,3 +3205,55 @@ and verified (it survives `kill -9`), but it cannot self-heal from an empty disk
 - The "5.5 ft face height" shown on the dashboard comes from SWAN CURVE K-G/Caldwell fallback, NOT from SwellTrack. `degraded=True` on all entries but response looks normal — silent degradation.
 - Surf scorer always uses SWAN CURVE face height, never SwellTrack.
 - Phase 4A created to fix all of this before code moves to marine service.
+
+### 2026-07-25 — Phase 6 closeout (API companion service proxy)
+
+**Everything Phase 6 was to *build* is built, committed and audited. Roughly half of what it was to
+*delete* is blocked on one operator decision.**
+
+**Landed — API repo:** `96ea534` `335daa9` (T6.1 companion proxy, C-10 gap client), `ceaf02a`
+(T6.2/T6.3 envelope + SI→display conversion + capability merge), `12ac049` (T6.4/T6.4b config push
+and recovery pull), `d530e45` `4583bec` `1fe737e` (C-24/C-25/C-29/C-37 API-side re-merge and label
+consolidation), `ac7c191` `02fb9d3` `9df764c` `e482bd7` `8fae2be` (T6.5-T6.8 deletions).
+**Marine repo:** `50bccae` (C-30), `242f8d7` (T6.4b), `a464c37` (C-26 canonical units), `10e347a`
+(C-31 registry), `b16e3af` (species profiles to Celsius), `cc2be6a` (C-29/C-37 marine half),
+`26f18fa` (C-39). **Docs:** `a1c6dce` `3d8cfbb` `7ef9d65` `917d312`.
+
+**Deleted: 19,887 lines** — 11,405 from the API (7,340 source + 4,065 orphaned tests) and 8,482 from
+the marine service (unused i18n, 13 locale files, the `babel` pin). The plan's "~28,735 lines removed"
+headline was stale before this phase began and is now wrong by more than 2×; these are the measured
+figures.
+
+**QC Gate 6 — walked, partial.** Met: dynamic manifest-driven route mounting; envelope wrapping and
+unit conversion; runtime failure serving cached data or 503; periodic manifest refresh with
+de-registration; capability merging; config push and pull sharing one serializer; marine-side config
+recovery. **Not yet assessable:** the zero-marine-code and zero-provider-module criteria, blocked on
+C-41/C-42. **Named gate exception (C-40):** the gate's grep lists `marine_config`, which now
+legitimately matches — the API retains the marine config *schema* because it owns the wizard and the
+config push; it sheds marine *computation*. Same handling C-16 received at Gate 5.
+
+**Adversarial audit — 2 findings, no blockers.** F1/C-44 (`totalWaterLevelForecast[].residual`
+reaching the dashboard in raw metres) and F2 (`enrichment/fishing_scorer.py` orphaned in the API).
+Both dispatched for fix with accompanying sweeps, since each was found by accident rather than by
+looking. Everything else verified clean with command-level evidence.
+
+**Blocked on the operator — three decisions, all the same question in different places:**
+
+1. **C-41/C-42** — does wizard-time and apply-time marine support code live in the API or behind the
+   marine service? `endpoints/setup.py`'s apply chain and wizard discovery helpers transitively reach
+   the entire wave-physics cluster and all five provider directories. Held: that cluster,
+   `providers/{buoy,tides,marine,wind,ocean}/`, `marine_location_resolver.py`, `compute_client.py`,
+   the `surf_compute_*` keys and the `[nearshore]` extra. **The current arrangement stops working at
+   T8.5**, which removes the librewxr API — the only reason the apply chain's output file is today
+   visible to the SWAN runtime that reads it.
+2. **Surf t=0 station wind (C-24)** — inject the station observation into the marine service's surf
+   request so scoring happens once with the right inputs, or leave t=0 on forecast wind with
+   `windSource` truthfully reporting it. Recomputing API-side would duplicate `score_surf()` across
+   two services; patching only the wind fields would produce a self-contradictory response.
+3. **Fishing / solunar** — `score_fishing()` consumes solunar and almanac values as scoring inputs
+   worth 31.25% of `overallScore`, so solunar is not a separable output field.
+
+**The pattern worth carrying into Phase 7.** §0.6's inventory was built by listing files with
+"marine" in the path, so it repeatedly put *operator-configuration* code on the deletion list
+alongside *marine computation*. C-40 was resolved on that distinction; C-41 and C-42 are the same
+distinction unresolved. Phase 7 is the wizard phase and will meet it again.
