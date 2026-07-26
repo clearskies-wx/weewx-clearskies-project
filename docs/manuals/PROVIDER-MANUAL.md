@@ -1748,7 +1748,7 @@ Each tier is independently wrapped in try/except — failure at one tier does no
 
 **CAPABILITY:** `geographic_coverage = "us"`, `auth_required = []`. `supplied_canonical_fields` includes U-component and V-component of wind at 10m above ground level, earth-relative.
 
-**Availability:** Active only when the `[nearshore]` pip extra is installed. Not part of the standard provider registry startup — invoked by the SWAN runner (`services/swan_runner.py`), not by the cache warmer directly. The cache warmer fires HRRR warm at startup and on the extended cycle schedule (4×/day at 00/06/12/18Z) when `[nearshore]` is installed.
+**Availability:** Part of the marine service, not the API. Invoked by the marine service's SWAN runner (`services/swan_runner.py`), not by the API cache warmer. The marine service fires HRRR warm at startup and on the extended cycle schedule (4×/day at 00/06/12/18Z) when the marine service's `[nearshore]` pip extra is installed.
 
 **Data source (primary):** NOMADS Grib Filter at `https://nomads.ncep.noaa.gov/cgi-bin/filter_hrrr_2d.pl`. Supports geographic subsetting (bounding box), variable selection (UGRD/VGRD at 10m AGL), and GRIB2 output. Free, no API key.
 
@@ -1799,7 +1799,7 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 
 **Module identity:** `providers/nearshore/swan.py`, `PROVIDER_ID = "swan"`, `DOMAIN = "nearshore"` (ADR-096 renamed from `trushore`).
 
-**SWAN binary:** SWAN 41.45 (Fortran). Compiled from source via `scripts/install_swan.sh` or included in the Docker image. Binary on PATH at `/usr/local/bin/swan`. API startup check: if `[nearshore]` extra is installed but SWAN binary is not found, log CRITICAL with installation instructions. The surf endpoint returns null surf data until SWAN is available — no fallback to any other model.
+**SWAN binary:** SWAN 41.45 (Fortran). Compiled from source via `scripts/install_swan.sh` or included in the Docker image. Binary on PATH at `/usr/local/bin/swan`. Marine service startup check: if `[nearshore]` extra is installed but SWAN binary is not found, log CRITICAL with installation instructions. The surf endpoint returns null surf data until SWAN is available — no fallback to any other model.
 
 **Input sources (all from cache — they run on their own schedules):**
 
@@ -2139,7 +2139,7 @@ Both SPECOUT types are paired with a companion `TABLE` carrying the PT* watershe
 
 **CAPABILITY:** `geographic_coverage = "global"`, `auth_required = []`. `supplied_canonical_fields` includes U-component and V-component of wind at 10m above ground level, earth-relative.
 
-**Availability:** Active only when the `[nearshore]` pip extra is installed. Invoked by the SWAN runner alongside the HRRR wind provider — not by the cache warmer directly. The cache warmer fires GFS warm at startup and on the 6-hour schedule when `[nearshore]` is installed.
+**Availability:** Part of the marine service, not the API. Invoked by the marine service's SWAN runner alongside the HRRR wind provider. The marine service fires GFS warm at startup and on the 6-hour schedule when the marine service's `[nearshore]` pip extra is installed.
 
 **Purpose:** Supplements HRRR wind (which reaches only 48 hours on extended cycles) to fill the 72-hour surf forecast card. GFS provides wind data for forecast hours 48–72. GFS is coarser than HRRR (0.25° / ~25km vs. HRRR's 3km), but the resolution transition at hour 48 does not affect SWAN's nearshore physics — wave refraction, shoaling, and breaking are computed at the SWAN grid resolution (200–500m), not the wind grid resolution.
 
