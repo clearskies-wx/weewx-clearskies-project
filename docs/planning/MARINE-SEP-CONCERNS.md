@@ -346,9 +346,23 @@ Concretely:
 `babel` at all, unless something else needs them. Check at implementation time rather than
 assuming.
 
-**Sweep required, not optional:** `conditionsText` is the instance that was found. Every string
-field composed from a measured value, and every label resolved through `i18n.t()`, has the same
-defect. Enumerate them across all six endpoints before implementing, so this is fixed once.
+### Sweep done by the coordinator, 2026-07-25 — the surface is exactly two files
+
+Grepped `i18n.t(` / `i18n.format_number` / `get_active_locale` across all six moved endpoint
+modules and the moved enrichment modules. **The six endpoint files contain zero i18n usage.**
+Everything localised is produced inside two scorers:
+
+| File | Produces |
+|---|---|
+| `enrichment/surf_scorer.py` | `conditionsText` (composed from height + unit label + period + compass + wind label + wind range + swell summary), the `quality` label (`surf.quality.{stars}`), the `windQuality` label (`surf.wind_quality.{key}`), and the `surf.conditions.unavailable` string |
+| `enrichment/fishing_scorer.py` | `conditionsText`, the species-status label (`fishing.species_status.{key}`), and the period label (`fishing.period.{key}`) |
+
+Also inside `surf_scorer.py`: two `i18n.format_number()` calls, which are locale-aware number
+formatting and move with the rest.
+
+**That bounds the fix tightly.** Both scorers return semantic keys and SI numbers; the API
+resolves the keys and composes the sentences after conversion. No endpoint module changes shape
+beyond passing the keys through. The `_compose_conditions_text()` helper relocates unchanged.
 
 ---
 
