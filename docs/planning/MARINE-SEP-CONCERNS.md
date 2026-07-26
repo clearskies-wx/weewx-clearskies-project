@@ -1358,3 +1358,36 @@ card is localised. Small, real, and cheap to fix — one string, twelve files.
 
 **Disposition: an i18n round, not Phase 6.** Recorded so it is not lost now that the check that found
 it has been satisfied and will not run again.
+
+---
+
+## C-44 — `totalWaterLevelForecast[].residual` reaches the dashboard in raw metres (OPEN → fix with the audit batch)
+
+Phase 6 audit finding, HIGH. A **new** instance of the C-37 defect class, found by looking for it
+rather than by it being reported.
+
+`services/water_level_compositor.py` emits `totalWaterLevelForecast[].residual` in canonical metres —
+correct, that is what C-26's fix made it do. But nothing converts it on the way out:
+
+- `marine_response_conversion.py`'s `_FIELD_GROUPS` has no `residual` key, so the generic walker
+  passes it through.
+- `marine_enrichment.py`'s `_walk_current_residual` only fires on dicts carrying `valueM` + `quality`
+  — the standalone `currentResidual` object. It never visits `totalWaterLevelForecast` entries.
+
+So `residual` sits in raw metres **inside the same object as** `height`, which is correctly converted
+to the operator's display unit. An imperial operator gets feet and metres side by side in one array
+entry, with nothing marking which is which.
+
+**Why the earlier passes missed it:** C-37 was found by chasing `currentResidual`'s baked unit string,
+and the fix was scoped to that object. The forecast array carries a second residual under a different
+key and never came up. Both the T6.2 field inventory and the C-37 fix were reasoning about the fields
+they were looking at, not sweeping for the dimension.
+
+**Fix (with the audit's finding batch): add `residual` to `_FIELD_GROUPS` as `group_water_level`,
+path-anchored** to `totalWaterLevelForecast` so a same-named field elsewhere cannot be converted
+against the wrong group. Verify no other array entry in any marine response carries a bare
+physical-dimension key the walker does not know.
+
+**Standing lesson:** the converter's field table is an allow-list, and a field absent from it fails
+**silently and plausibly**. Every response array needs checking against the table, not just the
+top-level objects someone happened to trace.
