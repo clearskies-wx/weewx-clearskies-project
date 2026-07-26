@@ -129,6 +129,39 @@ SWAN *can* run as a subprocess within the API process on the same host, which is
 
 > **(target — pending ADR-099 acceptance) Marine companion service (`weewx-clearskies-marine`).** A standalone service handling all marine computation — wave physics (SWAN 3-level nested grid, SwellTrack, SurfBeat), tide predictions (CO-OPS), buoy observations (NDBC), marine weather forecasts (NWS, WaveWatch III), ocean currents (OFS, ERDDAP), fishing conditions, beach safety assessments. Same provider module architecture as the API: CAPABILITY declaration, `fetch()` interface, canonical field mapping, cache TTL management, error handling. Repo: `weewx-clearskies-marine`. Port: 8780 (TLS always). One service, one port, one auth token.
 >
+> ### The marine service is an add-on reached only through the API — INVARIANT
+>
+> **Operator ruling, 2026-07-25. This is not a preference and it is not negotiable.**
+>
+> The marine service is an **add-on to the API**. It does **not** necessarily live on the same host.
+> Therefore **every other element of Clear Skies communicates with it through the API, and only
+> through the API** — the dashboard, the config UI wizard, the admin pages, and any third-party
+> client alike. This holds for **security** (one authenticated boundary, one secret, one place where
+> auth and rate limiting are enforced) and for **coordination** (one source of truth for operator
+> config, one place that knows whether the service is even installed).
+>
+> Concretely:
+>
+> | Component | Talks to the marine service |
+> |---|---|
+> | Dashboard | **No.** Calls the API's `/api/v1/*` routes, which the companion proxy mounts. |
+> | Config UI / wizard | **No.** Calls API endpoints. Where the wizard needs marine data — nearby buoy or tide stations, the covering OFS model, GRIB availability — the API **proxies** the query to the marine service. |
+> | Admin pages | **No.** Same as the wizard. |
+> | Any third-party client | **No.** |
+> | The API | **Yes — the only one.** |
+>
+> **The corollary that keeps getting missed:** when the API needs marine data for something that is
+> not a dashboard route — a wizard lookup, a setup-time question, an operational check — the answer is
+> a **pass-through in the API**, never a marine provider module imported into the API and never a
+> direct call from another component. If a new need arises, the shape is always the same: the marine
+> service exposes it, the manifest or an explicit proxy route carries it, the API fronts it.
+>
+> **Why this is written down (2026-07-25):** during Phase 6 the coordinator twice proposed
+> alternatives that violated it — keeping marine provider modules in the API "because the wizard needs
+> them", and having the wizard call the marine service directly. Both were rejected. The invariant was
+> implicit in ADR-099 and in the companion-proxy design but was never stated as a rule, so each new
+> case was re-argued from scratch.
+
 > **Manifest registration pattern.** The marine service exposes `GET /manifest` (no auth) returning a JSON endpoint manifest listing all marine endpoints with their upstream paths, HTTP methods, and cache TTLs. At API startup, the companion proxy (`services/companion_proxy.py`) fetches the manifest and dynamically registers routes under `/api/v1/`. The manifest refreshes every 5 minutes — endpoint additions take effect without an API restart. Removing an endpoint from the manifest de-registers its route on the next refresh. Adding a new marine endpoint to the marine service requires zero API code changes. When `marine_service_url` is not configured, no marine routes are mounted and marine capabilities are absent from `GET /api/v1/capabilities`.
 >
 > **Marine service environment (Phase 4).** `MARINE_SERVICE_SECRET` (required, no default — process refuses to start if unset; a request while unset returns 500, deliberately distinct from a client's 401). `CLEARSKIES_MARINE_CACHE_URL` (optional; unset = in-process memory cache) — **distinct from the API's `CLEARSKIES_CACHE_URL`** because same-host deployment is supported and a shared Redis database would collide the two services' key namespaces. `CLEARSKIES_MARINE_BIND_HOST` (default `0.0.0.0`, mirrors the API's `CLEARSKIES_BIND_HOST`). Files under `/etc/weewx-clearskies/marine/`: `secrets.env`, `marine.conf` (atomic write, mode 0640), `marine-cert.pem` / `marine-key.pem` (Ed25519 self-signed, key mode 0600). CLI: `--host`, `--port`, `--cert-dir`, `--hostname`, `--config`. Request bodies capped at 1 MiB (413 problem+json), matching the API — `POST /config` persists next to the TLS private key, so an unbounded body is a disk-fill vector. See OPERATIONS-MANUAL "Marine service environment and paths".
