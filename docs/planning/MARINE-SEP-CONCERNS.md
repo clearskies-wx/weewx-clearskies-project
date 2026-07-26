@@ -1774,6 +1774,54 @@ individual escalation. Carried to Phase 8.
 
 ---
 
+## C-67 — the config UI has been sending an apply key the API renamed away (CLOSED — fixed at QC Gate 7, stack `e85e174`)
+
+**The most serious defect found in Phase 7, and it predates Phase 7 entirely.** Write path found by
+the Phase 7 adversarial audit (F1, HIGH) under plan audit item 7; read path found by the coordinator
+when verifying the finding.
+
+**Cause.** API commit `0685121` ("Phase 0+1 — SWAN corrections ADRs, doc updates, TruShore→SWAN
+rename") renamed `ApplyRequest.trushore: TrushoreApplyConfig` to `swan: SwanApplyConfig`. The config
+UI was never updated. Both directions of the contract have been broken since.
+
+**Write path — hard failure, nothing saved.** `ApplyRequest` is `extra="forbid"`, so an unknown key
+is rejected outright:
+
+| Site | Sent | API expects |
+|---|---|---|
+| `wizard/routes.py:4171` | `api_payload["trushore"]` | `swan` |
+| `admin/routes.py:3115` | `apply_payload["trushore"]` | `swan` |
+
+`/setup/apply` returned 422 and **nothing in the payload was written** — not the SWAN settings, not
+the marine locations, not any other section travelling in the same request. The wizard site fires
+whenever marine is enabled and at least one location carries a `surf` activity. That is the exact
+configuration this plan exists to make work.
+
+**Read path — a valid response carrying the wrong answer.** `/setup/current-config` emits the section
+under `swan` (`_serialize_swan_section`, `setup.py:1640`). Three admin sites read `trushore`, each
+resolving to `{}`:
+
+`admin/routes.py:2988`, `:3133`, `:3141` — so the admin TruShore page rendered **defaults on top of
+whatever the operator had actually saved**, silently, with no error anywhere.
+
+**Why it survived this long.** The payload *fields* were always correct — `omp_num_threads`,
+`outer_grid_resolution_km`, `inner_nest_resolution_m` match `SwanApplyConfig` exactly. Only the
+enclosing key was wrong. Every inspection that looked at field names found them right. This is the
+third instance of the same class in this project (`marine_alert_radius_miles`, `nwps_wfo`, now this),
+and the first where the mismatch was the *section* key rather than a leaf field.
+
+**Not architectural.** The API's model and API-MANUAL are the contract and are untouched; the config
+UI was the side diverging from it. `rules/clearskies-process.md` §"Wizard ↔ API apply contract sync"
+mandates this fix, and "code that diverges from its own stated contract" is explicitly inside what
+may be fixed without escalation. Internal `trushore_*` state attributes and form field names are left
+alone — they never cross the API boundary.
+
+**Standing lesson.** Plan audit item 7 says "Pydantic model sync — no 422 errors." Walking the leaf
+fields is not enough: **the key the payload is filed under is part of the contract too.** A renamed
+section key looks identical to a correct one at every level below it.
+
+---
+
 ## C-66 — C-54 moved where the SWAN answer comes from; the copy explaining it stayed behind (OPEN → fix before QC Gate 7 closes)
 
 Found by the coordinator's own QC Gate 7 walk, 2026-07-25. Not reported by any agent — the R3 agent
@@ -1869,6 +1917,27 @@ design question, not a port of the wizard's check.
 not, so the same misconfiguration is caught or silent depending on which screen the operator used.
 That is worth closing, and it is worth closing deliberately rather than by copying a check that does
 not fit.
+
+**Sharpened 2026-07-25 by the Phase 7 adversarial audit (F2, MEDIUM) — the consequence is worse than
+this entry originally described, but the routing does not change.** The audit traced what actually
+happens when an operator clears the field on the admin Marine Service page and saves:
+
+`marine_url = str(form.get("marine_service_url", "")).strip()` yields `""`, which goes into the apply
+payload as an empty string. `ApplyRequest.marine_service_url` is `str | None = None`, and Pydantic
+accepts `""` as a valid `str` — so there is **no 422 to catch it**. The API writes
+`marine_service_url = ` to `api.conf`, and every later marine request fails against an empty URL.
+Nothing warns the operator at save time. So this is not only "no guard when adding locations": an
+operator can *disconnect the marine service entirely* by clearing a field, and the UI reports success.
+
+**Still routed to Phase 8, for the original reason.** A real guard needs a definition of what
+"enabled" means on the admin surface, which has no wizard-session equivalent — a design question, not
+a port of the wizard's check.
+
+**One cheap half is separable, and Phase 8 should consider it first:** normalising `""` to `None`
+before building the payload requires no definition of "enabled" at all. `ApplyRequest` already treats
+`None` as "not configured", so an empty field would mean what the operator plainly intends instead of
+persisting a URL that cannot resolve. Recorded as an option, not a decision — it changes what is
+persisted, so it belongs to whoever takes C-64, not to Phase 7.
 
 ---
 
