@@ -4499,3 +4499,49 @@ copies must be updated together.
 
 **Disposition:** delete the two orphans from the API repo. Mechanical, but it touches what a package ships,
 so it is recorded rather than done silently.
+
+---
+
+## C-93 — meteor shower peaks are hardcoded calendar dates while the correct astronomical input sits unused in the same file (OPEN → needs an operator ruling; **NOT a marine concern — re-home at closeout**)
+
+> **Filing note.** This register is scoped to the marine separation. This entry is an **almanac** finding,
+> recorded here because it is the only concern register that exists and it was raised by the operator during
+> Phase 8. **Re-home it when Phase 8 closes** — to `docs/planning/FUTURE-ENHANCEMENTS.md` if it is accepted
+> as unscheduled work, or to whichever almanac plan picks it up. Do not let it die with the marine plan.
+
+**Found 2026-07-26** while compiling `docs/RELEASE-DATA-REFRESH.md` at the operator's request. The first
+draft of that document asserted meteor showers need an annual refresh "because peak dates shift year to
+year". The operator challenged it (*"so wait the meteor showers has the dates built in? We do not compute
+those?"*). Checked rather than defended — and the assertion was half right with the wrong conclusion.
+
+**What the code does.** `compute_meteor_showers()` (`weewx_clearskies_api/services/almanac.py:1430`) builds
+each peak as:
+
+```python
+peak_date = date(year, shower.peak_month, shower.peak_day)
+```
+
+A hardcoded calendar date. The Quadrantids are pinned to 3 January in every year, forever.
+
+**What the data already has.** Every one of the 26 entries in `data/meteor_showers.json` carries a
+populated **`solar_longitude_max`** (283.16° for the Quadrantids). That is the astronomically correct
+driver: a shower peaks when Earth reaches a given solar longitude in its orbit, and the *calendar date* of
+that longitude drifts by roughly a day across the leap-year cycle.
+
+**`grep` confirms `solar_longitude_max` has ZERO readers anywhere in the codebase** — the field is
+populated, shipped, and dead.
+
+**Impact.** The fixed dates are right in most years and about a day out in others — enough to name the wrong
+night for a peak. Visible to any visitor who goes outside to look, which is the entire point of the feature.
+
+**Why it is worth more than its size.** Fixing it would **delete a maintenance item rather than schedule
+one.** As written, `meteor_showers.json` is a standing annual chore on the release checklist, and
+re-curating fixed dates by hand each year is the same manual work the refresh was meant to schedule.
+Deriving the peak from solar longitude makes the table genuinely static reference data — radiant
+coordinates, ZHR, parent bodies, descriptions — with the timing computed per year.
+
+**Why it is not being done unilaterally.** Swapping a fixed date for a solar-longitude computation changes
+**which quantity determines the answer**, so it is trigger 1 (a formula/criterion change), not a refactor.
+Recorded in `docs/RELEASE-DATA-REFRESH.md` under the meteor-shower note as well.
+
+**Disposition:** operator ruling. Small, self-contained, blocks nothing.
