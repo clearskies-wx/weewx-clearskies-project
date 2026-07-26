@@ -2004,7 +2004,7 @@ surfaces to revisit when X resolves.
 
 ---
 
-## C-64 — the admin has no equivalent of the wizard's blank-URL guard (OPEN → Phase 8)
+## C-64 — the admin has no equivalent of the wizard's blank-URL guard (CLOSED 2026-07-26 — see the C-64 closure entry below; residual gap split out as C-75)
 
 Raised by the Phase 7 admin agent, which correctly declined to invent one.
 
@@ -2047,7 +2047,7 @@ persisted, so it belongs to whoever takes C-64, not to Phase 7.
 
 ---
 
-## C-63 — the same-host URL literal now exists twice, by design (OPEN → low priority)
+## C-63 — the same-host URL literal now exists twice, by design (CLOSED 2026-07-26 — see the C-63 closure entry below)
 
 `https://localhost:8780` is defined in `wizard/routes.py` and again in `admin/routes.py`.
 
@@ -2508,7 +2508,7 @@ a later round.
 
 ---
 
-## C-72 — the companion proxy ignores `marine_verify_tls`, re-introducing the Part A TLS failure (OPEN -> fixed in Phase 8, dispatched)
+## C-72 — the companion proxy ignores `marine_verify_tls`, re-introducing the Part A TLS failure (CLOSED 2026-07-26 — api `994b4e4`, verified live)
 
 Found by the coordinator immediately after C-71, still reading the API's marine surface against its
 own contract before deploying it. **This one would have taken the entire marine surface down on
@@ -2561,6 +2561,25 @@ contract."* The secure default `True` is unchanged.
 **Dispatched to `clearskies-api-dev`** with the secure default preserved and a startup WARNING
 required when verification is disabled, so an unverified TLS connection is visible in the journal
 rather than silent.
+
+**CLOSED 2026-07-26 — fixed in api `994b4e4` and proven live, not on the agent's report.** All four
+call sites now read `state.verify_tls`; `grep -n "verify=" companion_proxy.py` returns four hits, all
+`verify=state.verify_tls`, zero literals. Default remains `True` when the key is absent
+(`_bool(section.get("marine_verify_tls", True))`). The API's own startup journal on weewx is the
+evidence that matters:
+
+```
+WARNING companion_proxy: marine_verify_tls=false - TLS certificate verification is DISABLED
+        for requests to https://192.168.7.22:8780 (encryption stays active; only certificate
+        verification is skipped)
+INFO    httpx: HTTP Request: GET https://192.168.7.22:8780/manifest "HTTP/1.1 200 OK"
+INFO    companion_proxy: registered /api/v1/surf -> /surf (cache_ttl=1800s)          [x18]
+```
+
+Before the fix that manifest line would have been `CERTIFICATE_VERIFY_FAILED` and the 18 route
+registrations would not exist. A proxied `GET /api/v1/tides` now returns the marine service's own
+404 body with `"instance": "https://192.168.7.22:8780/tides"` — the upstream URL in the response is
+proof the answer came from the marine service rather than from anything left in the API.
 
 **How this survived Phase 6's audit and QC Gate 6.** The gate criterion was *"proxy mounts routes
 from manifest"*, verified against a mock. Nothing had ever pointed the proxy at the real
@@ -2770,3 +2789,90 @@ led into C-64's defect; that sentence is gone.
 **Recommendation when this is taken up:** option B, a separate explicit boolean. It is the only one
 that does not overload an existing value's meaning, and overloading `""` is what produced C-64.
 Needs operator approval before any of it is written.
+
+---
+
+## C-76 — a failed WW3 fetch degrades SWAN to a calm boundary and the run is published anyway (OPEN → pre-existing, but it gates T8.6's verification)
+
+Found by the coordinator watching the marine service's **first** SWAN cycle, 2026-07-26 08:26.
+
+```
+WARNING weewx_clearskies_marine.providers.nearshore.swan:
+        SWAN: WW3 boundary data unavailable; SWAN will use calm boundary
+  caused by: httpcore.ConnectTimeout: _ssl.c:983: The handshake operation timed out
+  at providers/marine/wavewatch.py:527  ww3_boundary = wavewatch.fetch(...)
+```
+
+**First, the part that is NOT a problem — measured before concluding anything, per the standing rule
+about not diagnosing a systemic fault from one log line.** WaveWatch III is fetched from PacIOOS's
+ERDDAP server in Hawaii (`pae-paha.pacioos.hawaii.edu`), a long-haul TLS connection. On the old 8767
+service it has worked consistently — successful fetches at 22:52, 01:02 and 07:03 today, *"WaveWatch
+III forecast fetched: 25 timestep(s) for grid=ww3_global"* each time — and across its **entire**
+journal it has logged the calm-boundary warning **zero** times. So this was a transient handshake
+timeout on one attempt, not a broken endpoint and not something the move to the marine service
+caused. The provider code is byte-identical to what has been running for weeks.
+
+**The actual concern is what happens next, and it is pre-existing.** WW3 supplies SWAN's **deep-water
+boundary spectrum** — the swell arriving from offshore. When the fetch fails, the run does not fail:
+it substitutes a **calm boundary**, meaning zero incident swell energy, and continues. The cycle then
+completes normally, writes `forecast_cache.json`, and is served through the API to the dashboard.
+Nothing in the published payload records that the run had no swell boundary.
+
+The result is a forecast that is **wind-sea only**. At a spot like Huntington Beach Pier, whose surf
+is overwhelmingly swell-driven, that is not a degraded answer — it is a wrong one, and it is
+presented with the same confidence as a good one.
+
+**This is the shape the operator has already ruled against** (SURF-PUBLISH-RESULTS-ONLY §2): *"the
+model either works, or it doesn't... these fallbacks are not fallbacks, they are smoke and mirrors
+that should never have existed. They were never discussed in planning, hide problems."* The
+convergence gate already implements the right pattern for a different failure — a run that fails
+convergence *never persists hotstart or overwrites the forecast cache*. A run with no boundary
+condition arguably deserves the same treatment, or at minimum a flag on the published payload so the
+surf endpoint can report `modelStatus: "unavailable"` rather than a confident flat forecast.
+
+**Not fixed in Phase 8, and the reasoning is not "no time."** Changing a calm-boundary run from
+*published* to *withheld* changes what the model is responsible for producing under a named failure
+condition, and adds a state to the payload contract the API reads — **triggers 2 and 4.** It is also
+squarely a physics-behaviour decision about what the model should do when an input is missing, which
+is the operator's to make, not a deploy phase's. Recorded here with the evidence so it can be decided
+on its merits.
+
+**It does, however, gate T8.6 right now.** Any end-to-end verification must confirm that the run
+whose data is being checked had a **successful** WW3 fetch. Verifying the marine surface against a
+calm-boundary cycle would reproduce, exactly, the mistake C-08 exists to prevent — measuring a
+payload the broken path produced and concluding the path works. Added to the T8.6 checklist as a
+precondition, not an afterthought.
+
+**Recommendation when taken up:** carry a boolean on the run record (something like
+`boundary_source: "ww3" | "calm"`), let the existing `modelStatus: "unavailable"` machinery surface
+it, and do not invent a second reporting mechanism. The plumbing for an honest "no answer" already
+exists from SURF-PUBLISH-RESULTS-ONLY; this failure mode simply never got wired into it.
+
+---
+
+### Two live confirmations recorded here because this is where they were observed
+
+**C-71 is proven end-to-end.** The marine service's own SWAN runner logged, on its first real cycle:
+
+```
+INFO weewx_clearskies_marine.services.swan_runner: SWAN runner: OMP_NUM_THREADS=6
+```
+
+That value travelled `api.conf [swan]` → `_serialize_swan_section()` → `POST /config` →
+`marine.conf` → `SwanConfig` → the SWAN process environment. Had T8.2b deleted the `[swan]` section
+as written, this line would read `OMP_NUM_THREADS=16` and the box would be in swap.
+
+**The stale-hotstart recovery works, and is worth noting because C-70 predicted this exact
+interaction.** The marine service inherited `/var/run/weewx-clearskies/swan/level2_hotstart.dat` from
+the old 8767 service and logged:
+
+```
+INFO    SWAN level2: using hotstart from previous run
+WARNING SWAN level2: crashed with hotstart loaded — deleting stale hotstart and retrying cold
+INFO    SWAN runner: OMP_NUM_THREADS=6
+```
+
+It detected the incompatible inherited state, discarded it, and restarted cold — loudly, and without
+publishing anything from the crashed attempt. This is the handover working as designed. It also
+retroactively justifies C-70's decision to stop the old service *before* the first marine cycle: had
+both been writing that file concurrently, this recovery would have been racing a live writer.
