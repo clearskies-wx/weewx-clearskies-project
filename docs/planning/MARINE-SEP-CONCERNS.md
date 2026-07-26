@@ -262,11 +262,51 @@ in the response would indicate the downgrade. An operator would see plausible wi
 beach, sourced from a model instead of their anemometer, with no signal that anything changed.
 That is the "valid response, wrong answer" failure mode this plan exists to remove.
 
+**The surf endpoint hits the same seam — third endpoint, same branch.** Named by the Round 3b
+agent for the t=0 wind lookup in `surf.py`:
+
+| Route | Field | Effect |
+|---|---|---|
+| surf detail/list, **t=0 entry only** | `forecast[].windSource` | reports `"forecast_provider"` where it should report `"station"` |
+| surf detail/list, **t=0 entry only** | `forecast[0].windQuality`, `forecast[0].scoring.organizationWind`, and every wind-derived field inside `score_surf()`'s output | computed from `marine_weather_cache` instead of station hardware |
+
+Entries at t>0 are unaffected — those always used HRRR, never station hardware, in the API
+source too.
+
 **Mandatory Phase 6 task — the companion proxy is not complete without it.** The API still has
 the archive, still has `is_station_served()`, and already merges station data into marine
 responses today. Restoring the merge after the proxy keeps the work on the same host, in the
 same service, doing the same job — only the module inside the API changes. Restore exactly the
-fields in the table above, at exactly those two response shapes.
+fields in the tables above, at exactly those response shapes.
+
+**Note the harder sub-case:** `windSource` is a *provenance* field. Restoring the wind value
+without restoring `windSource` would leave the response asserting the wrong origin for a correct
+number — and restoring `windSource` alone would assert station provenance for a forecast value.
+They must be restored together, and the wind-derived scoring fields recomputed, not patched.
+
+---
+
+## C-29 — `conditionsText` bakes units into a string the API cannot convert (OPEN → T6.2)
+
+Found by the Round 3b agent while porting `surf.py`, and it is a genuine hole in the layer
+split rather than a porting artefact.
+
+The API converts **numbers**. `conditionsText` is a human-readable sentence composed inside
+`score_surf()` with the unit values already interpolated into it. The marine service now calls
+`score_surf(height_unit="meter", wind_unit="meter_per_second")` — correct for SI output — so the
+sentence comes out in metres and metres per second, and **there is nothing the API's unit
+conversion can do about it.** An imperial operator would see converted numbers everywhere and a
+metric sentence.
+
+Same family as C-26: the layer split converts numeric fields cleanly, and silently fails to
+reach anything expressed as a **string** — a label, a sentence, a headline.
+
+**Not resolved here — it is a T6.2 design question**, and two shapes are plausible:
+compose the text on the API after conversion, or have the marine service return the sentence's
+components and let the API assemble it. Either is a contract decision, not a port decision.
+
+**Worth a deliberate sweep at T6.2:** `conditionsText` is the one instance found so far, but
+nobody has looked for others. Any string field composed from a measured value has this problem.
 
 ---
 
