@@ -2831,7 +2831,7 @@ When no marine locations are configured (no `[marine]` section in `api.conf`), n
 
 ### GRIB2 temporal awareness requirement
 
-GRIB2 files (used by HRRR wind provider and WaveWatch III boundary conditions) contain multiple hourly forecast timesteps. The GRIB reader (`providers/marine/grib_processor.py`) MUST select messages by forecast hour using the `endStep` key — it must NOT iterate all messages and let the last one win.
+GRIB2 files (used by HRRR wind provider and WaveWatch III boundary conditions) contain multiple hourly forecast timesteps. The GRIB reader (`providers/marine/grib_processor.py` in the marine service) MUST select messages by forecast hour using the `endStep` key — it must NOT iterate all messages and let the last one win.
 
 **The `endStep` key** is an integer representing the forecast hour. It is available in both GRIB backends:
 - eccodes: `eccodes.codes_get(msgid, "endStep")` → integer
