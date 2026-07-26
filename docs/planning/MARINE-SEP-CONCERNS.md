@@ -3632,3 +3632,211 @@ does and requires **no** auth token. `weewx`'s address is **not** 192.168.7.21; 
 host or via the correct address.
 
 ---
+
+---
+
+## C-86 — ROOT CAUSE: we are not using WaveWatch III. We use a regional server's 0.5° republication that averages the swell partitions into one number, destroying the groundswell (OPEN → BLOCKER, NEEDS AN OPERATOR RULING)
+
+**Supersedes the recommendation in C-81, which was wrong.** C-81 correctly identified that the SWAN
+boundary carries one swell train, but recommended feeding "WW3's partitioned swell trains" while also
+concluding the source could not supply them. Both halves were based on reading code and one dataset.
+The operator ordered actual research into the data. The data says something different and much simpler.
+
+### What we are actually fetching
+
+`providers/marine/wavewatch.py` → `https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ww3_global`.
+
+**PacIOOS is the Pacific Islands Ocean Observing System** — a regional observing programme. The dataset
+is a republication of the legacy `NWW3_Global_Best` product. PROVIDER-MANUAL §14.3 records how this
+happened: the originally documented base (`erddap.aoml.noaa.gov`) and its 7-grid table *"were never
+live-verified"* and were *"found completely unreachable,"* so this republication was substituted and
+documented as "WaveWatch III forecasts."
+
+Verified live 2026-07-26 — the dataset has exactly **9** wave variables and **no partition dimension**:
+
+| Group | Variables |
+|---|---|
+| Total | `Thgt` `Tper` `Tdir` |
+| Swell | `shgt` `sper` `sdir` — **one, averaged** |
+| Wind sea | `whgt` `wper` `wdir` |
+
+Resolution **0.5°** (~55 km), per both the manual and the dataset metadata.
+
+### The measurement that identifies the defect
+
+Same location (33.5 N, 118.5 W — the SWAN L1 boundary point), same day, two sources:
+
+**NOAA WaveWatch III via Unidata THREDDS, 2026-07-26T15:00Z** —
+`thredds.ucar.edu/thredds/ncss/grid/grib/NCEP/WW3/Global/Best`, `ordered_sequence_of_data` dimension:
+
+| | Hs | Period | Direction |
+|---|---|---|---|
+| Swell partition 1 | 0.58 m | **6.26 s** | 273.4° (W wind swell) |
+| Swell partition 2 | 0.40 m (1.31 ft) | **19.05 s** | **214.6° (SSW)** |
+| `Primary_wave_mean_period_surface` | — | **19.06 s** | 215.0° |
+| Combined Hs | 0.80 m | | |
+
+**PacIOOS `ww3_global`, same point:** `Thgt 1.06 m`, `Tper 12.66 s`, `Tdir 195°`,
+`shgt 0.93 m`, `sper 12.73 s`, `sdir 192°`, wind sea `null/null/null`.
+
+**Surfline for the spot:** 1.5 ft **19 s** SSW **197°** / 1.4 ft 12 s S 187° / 1.5 ft 9 s S 181°;
+surf height **4–6 ft, chest to overhead**.
+
+**Read the three together.** Real WW3 resolves a **19-second, 214.6° groundswell** — the train Surfline
+leads with, matching it closely on height (1.31 ft vs 1.5 ft), period (19.05 s vs 19 s) and direction
+(214.6° vs 197°). Our source reports **one swell at 12.73 s**, a weighted average of the 19.05 s
+groundswell and the 6.26 s wind swell — **a number that corresponds to no wave in the water.** The
+disagreement is not confined to the partitions: real WW3's own bulk primary period is **19.06 s** where
+PacIOOS's `Tper` is **12.66 s**. These are different products, not different views of one.
+
+### Why this single number explains everything observed tonight
+
+Peak period governs shoaling and breaking face height far more strongly than offshore height does. A
+1.3 ft 19 s groundswell breaks substantially larger than a 3 ft 12.7 s sea, which is exactly why
+Surfline forecasts 4–6 ft from a *smaller* combined swell (2.54 ft) than our boundary carries (3.05 ft).
+Feeding SWAN 12.7 s instead of 19 s accounts for all three published symptoms at once:
+
+- **surf height low** — 3.83–4.24 ft against 4–6 ft, at or below the bottom of the real range;
+- **surf height flat** — a single averaged train has no arriving/departing structure, so the forecast
+  barely moves (~4 ft across 14 h while `Tper` swung 5.2→10.0 s);
+- **no long-period sets** — nothing in the input has a 19 s envelope to produce them.
+
+It also explains why every check in Phase 8 passed. The energy in the average is roughly conserved
+(0.93 m vs a 0.80 m combined), so closure, convergence and plausibility screens are all satisfied. The
+**distribution** is wrong, and no conservation test can see that (C-83).
+
+### This reframes C-81 and C-08
+
+- `ww3_to_swan_boundary()`'s single JONSWAP peak is **not** the root cause. It is a faithful rendering
+  of a source that only ever supplies one swell. Fixing the boundary writer alone changes nothing.
+- T4B.2 was **correct** on its own terms and remains so: `decompose_spectrum()` really was reporting one
+  swell as three (67 spectra; closest-pair direction separation median **1.6°**, worst case three
+  components at Tp 10.2/10.2/10.1 s). It was splitting one averaged peak, not finding real trains. The
+  pre-T4B.2 display was not better — it showed three copies of the wrong swell instead of one.
+- So the surf output has **never** carried the real multi-train sea, before or after any Part B work.
+  This is not a marine-separation regression; it is a data-source defect that predates it and would
+  exist identically in the pre-Phase-5 API.
+
+### Two replacement sources, both global — the operator chooses
+
+Global coverage is a hard requirement (operator, 2026-07-26: *"THIS NEEDS TO WORK GLOBALLY WE CANNOT BE
+USING REGIONAL MODELS, THAT WAS NEVER THE INTENT"*). Both options below are global NCEP WaveWatch III.
+
+| | **A. Unidata THREDDS** | **B. NOMADS `gfswave.global.0p16`** |
+|---|---|---|
+| Endpoint | `thredds.ucar.edu/thredds/ncss/grid/grib/NCEP/WW3/Global/Best` | `nomads.ncep.noaa.gov/cgi-bin/filter_gfswave.pl` |
+| Wire format | OPeNDAP / NetCDF Subset Service → **CSV or NetCDF** | GRIB2 |
+| Resolution | 0.5° | **0.16°** (~3× finer) |
+| Swell partitions | **2** (`ordered_sequence_of_data = 2`) | **3** (`SWELL/SWPER/SWDIR 1,2,3`) |
+| Correct primary period | **yes** — 19.06 s, verified | yes |
+| Parsing burden | **none** | GRIB2 — but `eccodes 2.48.0` is already installed on librewxr,
+`GRIB_AVAILABLE` is `True`, and the repo already fetches NOMADS GRIB via the filter CGI for HRRR
+(`filter_hrrr_2d.pl`) and GFS (`filter_gfs_0p25.pl`), so `filter_gfswave.pl` is the same pattern |
+| Verified live | 2026-07-26, values above | 2026-07-26 00z and 06z `.idx` inventories |
+
+Both were confirmed reachable and populated today. **Note NOAA retired NOMADS OPeNDAP** (Service Change
+Notice 25-81), which is why option B is GRIB2 and not `.ascii` — that retirement is also a standing risk
+to option A's longevity worth weighing.
+
+**Coordinator's recommendation: B**, because it carries three partitions rather than two and is 3× finer,
+and because the GRIB machinery it needs already exists and is already relied on for wind. Take **A** if
+avoiding GRIB entirely is worth losing the third partition and the resolution — it still fixes the
+19-second groundswell, which is the defect that matters.
+
+Either way the boundary writer must then emit a **multi-train** boundary (one TPAR-equivalent per
+partition, or superposed spectra) instead of one synthesised JONSWAP peak, and stop discarding the
+wind-sea partition and the total-vs-swell difference.
+
+### Why this was NOT implemented tonight
+
+Architectural on four counts, and the operator's approval is required before any of it:
+
+- **Trigger 7** — replaces the provider's endpoint and data source; option B adds a GRIB dependency to
+  this provider's path.
+- **Trigger 4** — `wavewatch.fetch()`'s return shape must carry per-partition arrays across the provider
+  boundary; `MarineForecastPoint`'s single `swellHeight/swellPeriod/swellDirection` triple no longer
+  expresses the data.
+- **Trigger 1** — the boundary specification and its fixed 30° `DSPR` change; what the model is asked to
+  solve changes.
+- **Trigger 3, possibly** — a finer source grid may affect L1 boundary sampling.
+
+Per the named non-excuse, PROVIDER-MANUAL §14.3 documenting the PacIOOS dataset as "WaveWatch III
+forecasts" is **not** authorization to leave it — it is the paper trail that let a regional
+republication stand in for the operational model for months. §14.3 must be corrected as part of whatever
+fix is approved (doc-code sync).
+
+### Verification the fix must pass — not a conservation check
+
+Per the new rule in `rules/clearskies-process.md`, "Validate against reality, never against the model's
+own output." Acceptance for this work is:
+
+1. The published swell list contains a **19 s ±1 s train from the SSW** on a day WW3 shows one, with
+   height within ~30% of the WW3 partition.
+2. Published surf height **overlaps Surfline's stated range**, and **varies** across the forecast.
+3. Published component count tracks WW3's partition count — not fixed at 1, not fabricated as 3.
+4. Component periods are **distinct** (the T4B.2 failure signature was Tp 10.2/10.2/10.1 s).
+5. C-83's fixes are in place first, so the closure test can no longer report PASS on a degenerate sample.
+
+---
+
+### GRIB2 verified by direct parse — option B confirmed, and it is the better source
+
+Operator direction 2026-07-26: *"eh, let's parse the GRIB2 to see what it provides."* Done —
+downloaded a NOMADS `filter_gfswave.pl` subset and decoded it with the already-installed `eccodes`
+on librewxr. Read-only; nothing installed, no service touched.
+
+`gfswave.t06z.global.0p16`, 2026-07-26, nearest point to (33.5 N, −118.5):
+
+| f-hour | partition | `shts` Hs | `mpts` period | `swdir` direction |
+|---|---|---|---|---|
+| f000 | 1 / 2 / 3 | 0.45 / 0.34 / 0.18 m | 6.09 / **20.22** / 11.76 s | 268.6 / **218.3** / 207.0° |
+| f003 | 1 / 2 / 3 | 0.54 / 0.35 / 0.17 m | 6.18 / **19.57** / 11.75 s | 269.8 / **217.2** / 208.0° |
+| f006 | 1 / 2 / 3 | 0.61 / 0.38 / 0.23 m | 6.39 / **19.11** / 11.70 s | 272.6 / **216.9** / 199.0° |
+
+Bulk at f006: `swh` 0.78 m, `perpw` **19.10 s**, `dirpw` 219.2°. Wind speed `ws` 1.76 m/s.
+
+**Three partitions with genuinely distinct periods** — 6.4 / 19.1 / 11.7 s — which is the property
+`decompose_spectrum()` never had (its worst case was Tp 10.2/10.2/10.1 s) and the PacIOOS source cannot
+have (one averaged `sper`).
+
+Against Surfline for the spot:
+
+| Surfline | gfswave partition | Verdict |
+|---|---|---|
+| 1.5 ft **19 s** SSW 197° | lev 2 — 1.25 ft, **19.11 s**, 216.9° | period exact, height within 17%, direction 20° off |
+| 1.4 ft **12 s** S 187° | lev 3 — 0.75 ft, **11.70 s**, 199.0° | period within 3%, direction 12° off, height low |
+| 1.5 ft 9 s S 181° | — (lev 1 is 6.4 s from 272°, a W wind swell) | not matched |
+
+Two of three trains recovered, **including the 19 s groundswell that governs the surf**. The residual
+direction bias (~12–20° clockwise) and the unmatched 9 s train are separate, smaller questions to
+examine after the source is fixed — and are plausibly why Surfline's is a licensed nearshore model and
+ours is a global one.
+
+**Energy consistency:** √(0.61² + 0.38² + 0.23²) = 0.755 m against `swh` 0.78 m. The partitions account
+for the total, so a multi-train boundary built from them will not double-count (C-83's failure mode) nor
+lose energy.
+
+**Two implementation facts that must not be missed:**
+
+1. **`9999` is the missing-value sentinel.** At this point `shww`, `mpww` and `wvdir` (wind-wave fields)
+   are all `9999.000` — there are no wind waves, matching THREDDS reporting `NaN` for the same fields.
+   This must be masked as missing, never ingested. A 9999 m wave height reaching SWAN's boundary would be
+   catastrophic, and per `rules/coding.md` §1 a missing input must halt the run, not be substituted.
+2. **Bandwidth is better than today's.** Each forecast hour's regional subset is **~8 KB**, so a 25-step
+   cycle is ~200 KB — cheaper than the current ERDDAP JSON fetch, not more expensive. The
+   `filter_gfswave.pl` CGI accepts the same `subregion`/`leftlon`/`rightlon`/`toplat`/`bottomlat`
+   parameters the HRRR and GFS wind providers already use.
+
+**Revised recommendation: option B, `gfswave.global.0p16` via `filter_gfswave.pl` + `eccodes`.** It is
+global (0.16°, ~3× finer than the 0.5° we use now), carries three partitions rather than THREDDS's two,
+gives the correct primary period, is energy-consistent, costs less bandwidth, needs no new dependency,
+and reuses the NOMADS-GRIB pattern already in the repo for wind. It also avoids depending on a
+third-party academic mirror at a time when NOAA has just retired NOMADS OPeNDAP (SCN 25-81).
+
+Research script kept at `/tmp/ww3_partitions.py` on librewxr and in the session scratchpad; it should be
+committed to `scripts/` as the reproducible source-comparison measurement if this work is approved.
+
+**Still requires the operator's approval before any code changes** — the trigger analysis above is
+unchanged by this measurement. What the measurement settles is *which* source, not *whether* to switch.
+
+---
