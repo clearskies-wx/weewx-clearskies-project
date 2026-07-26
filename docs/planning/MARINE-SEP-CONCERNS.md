@@ -1248,3 +1248,51 @@ now legitimately match `config/marine_config.py` and `endpoints/setup.py`. **Thi
 named exception, not a gate failure** — same handling as C-16 received at QC Gate 5. The gate's
 intent is zero marine *physics* in the API; the term list was written before anyone noticed the
 config schema had to stay. Exact remaining hits are recorded at the gate walk.
+
+---
+
+## ⛔ C-41 — AWAITING OPERATOR: the apply-time grid-sizing chain belongs to no task, and its two governing statements disagree
+
+Found by the deletion agent at its second halt condition, after being told to verify before cutting.
+Verified independently by the coordinator.
+
+**What the chain is.** `endpoints/setup.py`'s `_run_marine_apply_chain()` runs at `POST /setup/apply`
+as a `BackgroundTasks` job: sizes L1 from GSFM shelf data, downloads COARSE bathymetry, finds the
+30 m contour, sizes L2, downloads MEDIUM, finds the 15 m contour, sizes L3 (trigger + viability
+test), downloads FINE per cluster, extracts the native transect and PCHIP-interpolates it. It writes
+`/etc/weewx-clearskies/swan_grid_sizing.json` and `spot_profiles/{spot_id}.json`.
+
+**It is not dead code, and the failure mode if deleted is silent.** The marine service's
+`load_grid_sizing_cache()` reads that file and has **no fallback** — on a miss it logs ERROR and
+returns `None`, with "SWAN cannot run without it. Run /setup/apply to generate it." Deleting the
+producer removes SWAN's ability to run at all, surfacing only as a runtime ERROR pointing back at an
+endpoint that no longer does anything.
+
+**The two statements that disagree:**
+
+| Source | Says |
+|---|---|
+| `ARCHITECTURE.md:100` "(target — pending ADR-099)" | SWAN moves entirely into the marine service; **"the API contains zero SWAN code in the target architecture."** → the chain moves. |
+| The marine service's own `load_grid_sizing_cache()` docstring, written in Phase 5 | Names the API's `_run_marine_apply_chain()` as the producer, and duplicates the path constant "because the two live in different repos post-separation." → the chain stays. |
+
+No task in any phase moves it. A requirement belonging to no task — the same shape as the Phase 4
+audit's F5, which became T6.4b.
+
+**The fact that decides it, and the reason this cannot be deferred to Phase 8.** The chain works today
+only because the API is *also* deployed on librewxr, so the file it writes is on the same filesystem
+as the SWAN runtime that reads it. **T8.5 removes the librewxr API.** After that, a cache written by
+the weewx-host API is on the wrong host entirely. The current arrangement is not merely untidy
+post-separation — it stops working.
+
+**Options:**
+
+| Option | Cost |
+|---|---|
+| **(a) The chain moves to the marine service, triggered on config receipt (`POST /config`)** | All three modules it needs (`swan.py`, `swan_domain.py`, `bathymetry.py`) are **already in the marine repo** from Phase 5 — only the wiring is missing, and the marine service's `endpoints/config.py` still describes itself as a "Phase 4 scaffold". Adds a trigger (trigger 6) and moves where a computation happens (trigger 5). Matches ARCHITECTURE's stated target. |
+| (b) The chain stays in the API and ships its artifacts inside the config-push payload | Keeps CUDEM download and SWAN grid sizing in the API — contradicts "zero SWAN code in the API", and the `[nearshore]` extra and its dependencies must stay in the API permanently. |
+| (c) Leave as-is | Works only while the API is deployed on librewxr. T8.5 breaks it. Not viable. |
+
+Coordinator's recommendation: **(a)**. The code is already where it needs to be; what is missing is
+one trigger. Held pending the operator: `providers/nearshore/swan.py`, `services/swan_domain.py`,
+`enrichment/bathymetry.py`, `_run_marine_apply_chain()`, and the `[nearshore]` pip extra are all
+excluded from the Phase 6 deletion until this resolves.
