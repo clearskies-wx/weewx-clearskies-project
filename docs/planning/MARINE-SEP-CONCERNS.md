@@ -1068,3 +1068,29 @@ an implementer's call.
 the API's `/capabilities` response already has its own richer `CapabilityDeclaration` type for
 display metadata — the manifest does not need to carry it. If a later phase wants display
 names in the manifest, that is a contract change and goes to the operator.
+
+---
+
+## C-36 — API-MANUAL §19.3's envelope example does not match the API's actual envelope (DECIDED — manual corrected)
+
+Third instance today of an illustrative JSON block in a manual disagreeing with the code it
+illustrates. Found by the T6.2 agent, surfaced rather than silently diverged from.
+
+§19.3 showed each converted field wrapped as `{"value": 4.6, "label": "ft", "formatted": "4.6"}`
+inside `data`. The API's actual envelope — `units/response_conversion.py:8-9`, implemented at
+`:153` (Shape 2) and `:203` (Shape 2b) — puts **raw scalars** in `data` and a flat
+`{fieldName: label}` block in a top-level `units` key. That is what `/current`, `/archive`,
+`/forecast` and the marine endpoints being replaced all emit today, and what the dashboard
+consumes.
+
+**Decision: the implementation is right, the example was wrong, the manual is corrected.**
+Adopting the example's shape would have introduced a new response shape on exactly the routes
+being migrated — a data-contract change across the dashboard boundary (trigger 4) arrived at by
+following an illustration. The dashboard's marine cards would have broken at Phase 8 with no
+change on their side to explain it.
+
+**Pattern worth naming, now that it has happened three times in one phase** (C-35 manifest
+`capabilities`, `OPERATIONS-MANUAL`'s config-recovery text, and this): when a manual's example
+JSON conflicts with the implementation plus a second corroborating source, the example is the
+outlier and gets corrected. An example is not a contract. The contract is the code plus whatever
+the plan and the other manuals independently agree on.
