@@ -921,3 +921,54 @@ responsibility moves and no shape changes. TTLs mirror each family's detail entr
 **Rule for the future, worth stating once:** the manifest is the *only* channel by which a route
 reaches the dashboard after Phase 6. A route registered on the marine service but absent from the
 manifest is invisible. Any later route addition must land in both places in the same commit.
+
+---
+
+## C-31 — the marine dispatch registry still contains only the Phase 4 scaffold stub (OPEN → Phase 6 remediation)
+
+Phase 5 adversarial audit finding F1. Not previously tracked by anyone.
+
+`providers/_common/dispatch.py`'s `MARINE_PROVIDER_MODULES` contains exactly one entry at
+Phase 5 close: `{("_scaffold", "stub"): _stub}`. **None** of the ten real ported providers
+(ndbc, coops, nws_marine, nws_srf, wavewatch, hrrr, gfs, ofs, erddap_ocean, swan) was ever
+registered.
+
+Three documents say this should already have happened:
+
+- `providers/_stub.py` line 1 — "Scaffold-only stub provider — **DELETED in Phase 5**… this
+  module and its dispatch registry entry are deleted in the same Phase 5 change that starts
+  moving real provider modules in."
+- `dispatch.py`'s own docstring — same claim, and it lists the ten providers that should
+  replace the stub.
+- `PROVIDER-MANUAL.md:2253` (§15.2) — "The marine service maintains its own
+  `MARINE_PROVIDER_MODULES` dispatch registry… populated at import time exactly as the API's
+  registry is." It is not populated.
+
+**Not live-breaking today**, which is why nothing caught it: the endpoints import provider
+modules directly and nothing calls `get_provider_module()`. QC Gate 5's "all providers load"
+check exercises direct imports, so it passes without touching the registry.
+
+**Disposition: remediate in Phase 6, before QC Gate 6.** Register the ten real providers,
+delete `_stub.py` and its entry. Not architectural — this is code diverging from its own
+stated contract in three places, which the standing block explicitly permits fixing. The
+alternative (documenting the registry as deferred) is worse: it leaves a scaffold placeholder
+registered as a provider in a service about to be deployed.
+
+---
+
+## C-32 — audit finding F2: the two `_convert_unit()` calls are internal, not a layer-split leak (CLOSED)
+
+Phase 5 audit flagged `endpoints/fishing.py:304` and `endpoints/beach_safety.py:314` as
+possible SI-only violations and asked the coordinator to trace where the Fahrenheit value goes.
+Traced 2026-07-25:
+
+- `fishing.py` — `water_temp_f` is passed only to `score_fishing(water_temp_f=…)` at `:401`.
+  Fahrenheit is that function's own input contract; the species temperature profiles are
+  authored in °F.
+- `beach_safety.py` — `water_temp_f` is passed only to `classify_water_comfort()` at `:318`,
+  whose thresholds (`_COMFORT_*_MIN_F`) are Fahrenheit constants.
+- **Neither value reaches a response.** Both endpoints emit `"waterTemp": water_temp_c` —
+  Celsius — at `beach_safety.py:284` and `:350`, byte-identical to the API original's `:375`
+  and `:467`.
+
+No leak, no deviation from the source. The layer split holds. F2 closed with no change.
