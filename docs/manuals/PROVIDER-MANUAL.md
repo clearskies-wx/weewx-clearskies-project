@@ -84,10 +84,9 @@ weewx_clearskies_api/providers/
 ├── seeing/          # 7Timer seeing forecast (§6 exception — see below)
 ├── marine/          # Marine domain modules (§14): wavewatch, nws_marine, nws_srf
 ├── tides/           # Tides domain modules (§14): coops
-├── buoy/            # Buoy domain modules (§14): ndbc
-├── wind/            # Wind domain modules (§14): hrrr ([nearshore] extra)
-└── nearshore/       # Nearshore domain modules (§14): swan ([nearshore] extra)
+└── buoy/            # Buoy domain modules (§14): ndbc
 ```
+
 
 ### Capability declaration fields
 
