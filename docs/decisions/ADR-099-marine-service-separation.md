@@ -1,6 +1,7 @@
 ---
-status: Proposed
+status: Accepted
 date: 2026-07-22
+accepted: 2026-07-26
 deciders: shane
 supersedes:
 superseded-by:
