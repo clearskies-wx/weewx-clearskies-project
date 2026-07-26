@@ -1204,3 +1204,47 @@ API-side re-merge agent and its result gates this deletion.
 where the keys now resolve. The marine service's copy is the redundant one. Confirm the API's
 catalogue contains every key the marine service emits *before* deleting the marine copy — that check
 is assigned to the API-side re-merge agent.
+
+---
+
+## C-40 — T6.7 deletes the marine config schema that T6.4/T6.4b require (DECIDED — schema stays in the API)
+
+**Severity:** would have broken the API at import. Caught by the deletion agent at its halt condition
+rather than by a failing import after the fact.
+
+**The contradiction, inside one phase.** T6.7 lists `config/marine_config.py` for deletion. T6.4 and
+T6.4b — landed hours earlier in the same phase — require the API to validate, serve and push marine
+config. `endpoints/setup.py` (4,827 lines, on no deletion list) imports `MarineConfig`,
+`load_marine_config` and the `_VALID_*` vocabulary constants and uses them in four places: the
+apply-time `MarineSurfSpotApplyConfig` validator, `_run_marine_apply_chain()`, `current_config()`,
+and the `marine_compute_estimate()` endpoint. Deleting the module breaks `import
+weewx_clearskies_api.app` outright.
+
+**Decision (coordinator, 2026-07-25): the schema stays in the API.** Resolving a contradiction
+between two statements in one plan by taking the reading its own acceptance criteria support is
+explicitly permitted, and the criteria are unambiguous here:
+
+- T6.4b's acceptance criterion is `GET /setup/marine/config` returning the marine config subset.
+  You cannot serve what you cannot model.
+- The API owns the wizard. **Phase 7 is titled "Wizard/Admin Updates"** and is entirely about marine
+  configuration in the config UI.
+- ADR-099 — cited by T6.4b itself — makes the API the single source of truth for operator config.
+
+**The distinction Phase 6 is actually drawing:** the API sheds marine **computation**, not the marine
+**config schema**. Operator configuration is API territory; wave physics is not. §0.6's inventory
+lumped the two together because it was built by listing files with "marine" in the path.
+
+**What is deleted from `setup.py`:** only `_run_marine_apply_chain()`'s obstacle-structure building,
+grid sizing and bathymetry/CUDEM prep — the parts calling physics modules T6.7 removes. **Gated on
+confirming the marine service does the equivalent on config receipt** (C-11 records it carrying
+SWAN's orchestration half including bathymetry download and obstacle building). If it does not, the
+deletion stops: removing a responsibility with no new home is the silent-loss failure mode this plan
+exists to prevent.
+
+### QC Gate 6 — named exception
+
+The gate's grep lists `marine_config` among terms that must return zero matches in the API. It will
+now legitimately match `config/marine_config.py` and `endpoints/setup.py`. **This is an expected,
+named exception, not a gate failure** — same handling as C-16 received at QC Gate 5. The gate's
+intent is zero marine *physics* in the API; the term list was written before anyone noticed the
+config schema had to stay. Exact remaining hits are recorded at the gate walk.
