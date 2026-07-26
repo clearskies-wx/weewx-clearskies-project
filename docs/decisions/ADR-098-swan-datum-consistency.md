@@ -2,8 +2,9 @@
 
 **Status:** Proposed
 **Date:** 2026-07-19
+**Amended:** 2026-07-26 — grid-wise conversion to LMSL adopted for the US (reversing the CMVD deferral), worldwide path enumerated, cross-level datum guard added. Amendments are marked inline.
 **Supersedes:** None
-**Related:** ADR-093 (SWAN nearshore model), ADR-095 (SWAN model corrections)
+**Related:** ADR-093 (SWAN nearshore model), ADR-095 (SWAN model corrections), C-90 (fabricated bathymetry / datum findings, `docs/planning/MARINE-SEP-CONCERNS.md`)
 
 ## Context
 
@@ -27,6 +28,8 @@ Full diagnosis: `docs/planning/briefs/SWAN-DATUM-CONSISTENCY-BRIEF.md` (§1–§
 
 Request CO-OPS predictions in the DEM's native datum for SWAN input. No local datum conversion for the common case.
 
+> **Amended 2026-07-26.** Match-at-source stands, but it can no longer produce a single datum by itself. It assumed one DEM served every level. Once L1 is a **global** product (ETOPO 2022, MSL — chosen because regional coastal DEMs cannot be relied on to span L1's shelf-edge-to-shore extent) and L2/L3 remain regional (predominantly NAVD 88 — 665 of 1000 catalogue rasters), two datums exist across the nest regardless of how sources are selected. Measured at HB Pier: CO-OPS NAVD − MSL = **0.799 m**. In the surf zone, depth-limited breaking `Hb ≈ γ·d` turns that into ~0.6 m of breaking height and shifts the break point ~40 m on a 1:50 slope — not a rounding error. The common datum is therefore established by **grid-wise conversion to LMSL** (below), with match-at-source then supplying WLEVEL in MSL.
+
 - Bathymetry stays in its native datum (no VDatum conversion, no spatial error).
 - The SWAN pipeline reads the DEM's `vertical_datum` from the bathymetry cache and passes it to the CO-OPS fetch: `datum={DEM's vertical_datum}`.
 - CO-OPS does the conversion server-side using authoritative tidal datum models.
@@ -47,13 +50,47 @@ Every data product (bathymetry, tide predictions, water levels) carries its vert
 
 If datum matching cannot be confirmed (DEM datum is UNKNOWN, CO-OPS doesn't support the datum), the SWAN level fails explicitly with an ERROR log. The system never proceeds with an unverified datum mismatch.
 
+> **Amended 2026-07-26 — cross-level guard.** This clause was never enforced *between* levels, and the code reads one datum for the whole run ("L2 preferred, L1 fallback"), stamping it on every level. Nothing verifies that L1, L2 and L3 agree. They happen to agree today (all five live caches are NAVD 88) but by coincidence, not construction: the same Huntington box offers `socal_1as`/`socal_3as` on **MSL** alongside `orange_county_13_navd88_2015` on **NAVD 88**, and each level looks a DEM up independently. An L2/L3 disagreement would put the full 0.6 m breaking-height error in the surf zone silently. **Every level's datum must be verified to agree before a run; disagreement refuses.** Note that `UNKNOWN_CRM` is a truthy string and so passed this clause's existing check — the label was assigned by us, not published by the source, and is itself removed (the mosaic catalogue publishes `VerticalDatum` per raster).
+
 ### Operator uploads
 
 Operator specifies the datum from the CO-OPS-supported list: NAVD88, MLLW, MHW, MHHW, MSL. No local conversion in v1. If the operator's data is in a different datum, they convert before uploading.
 
-### CMVD deferred
+### Grid-wise datum conversion — NOW (US) and LATER (worldwide)
 
-`coastalmodeling-vdatum` is not a v1 dependency. The VDatum code in `bathymetry_resolver.py` is preserved but not called in the primary code path. Revisit for international expansion or edge-case datums CO-OPS doesn't support.
+**Amended 2026-07-26.** The original text deferred `coastalmodeling-vdatum` as "not a v1 dependency," on the grounds recorded in Context §2: the library was not installed and the VDatum **REST API** returned 412s. That reasoning was sound about the implementation we had and wrong about the capability that exists. Two facts found on re-examination:
+
+- `normalize_to_msl(depths, datum, center_lat, center_lon)` collapses the whole grid to its **domain centre** and applies one scalar. Tidal-datum separations vary over short distances, so a single offset is not a valid transformation of a grid — which is the real reason the deferred path looked unusable.
+- The published libraries convert **entire grids offline**. `vdatum.convert(vd_from, vd_to, lat, lon, z, ...)` accepts arrays, and offline mode reads local separation GeoTIFFs — no REST API, no per-point call.
+
+So the deferral rested on a single-point call against a flaky web service, not on the grid-wise offline capability. It is reversed.
+
+**NOW — United States.** Unify every SWAN input on **LMSL**:
+
+- L1 (ETOPO 2022 15 arc-sec) is natively MSL — no conversion.
+- L2/L3 regional DEMs convert **per cell** from NAVD 88 (or MHW/MHHW) to LMSL using NOAA's separation grids through PROJ.
+- One CO-OPS WLEVEL fetch in MSL, matching all levels.
+
+Library: **`vyperdatum`** (`noaa-ocs-hydrography`) in preference to `coastalmodeling-vdatum`. Both are open and grid-capable, but `coastalmodeling-vdatum` hardcodes NOAA S3 paths in `_path.py` with no configurable base directory, whereas `vyperdatum` resolves grids via the `VYPER_GRIDS` environment variable and transforms through PROJ. That difference is what makes adding a jurisdiction a tweak rather than a fork. NOAA's desktop VDatum application is **not** a candidate: distributed without source, and its terms of use prohibit reverse engineering.
+
+**LATER — worldwide.** Adding a jurisdiction is a deliberate per-market code change, not per-install configuration. Each requires: that jurisdiction's **geoid** model (orthometric↔ellipsoid; OSGM15 for the UK where the US uses G2018/xGEOID20B), its **tidal separation** grids (ellipsoid↔chart datum), a **PROJ pipeline** declaring its datum pairs (LAT/Chart Datum rather than MLLW), a jurisdiction detector, and licensing clearance.
+
+The surfaces already exist as authority-published models, so this is integration rather than research:
+
+| Authority | Model | Coverage | Stated accuracy (1σ) |
+|---|---|---|---|
+| NOAA | VDatum | US | — |
+| UKHO | VORF | UK + Ireland | ±10 cm inshore, ±15 cm offshore |
+| SHOM | BATHYELLI | France | — |
+| CHS | CCVD/CCDCW | Canada | ±10 cm |
+| AHS | AusCoastVDT | Australia | — |
+| NL/BE | NEVREF | Netherlands, Belgium | — |
+
+For coastlines with no authority model, tidal datums can be derived from a global tide model (FES2022 via PyFES, or TPXO) — the same method applied globally, at lower nearshore accuracy. That is the fallback, not the primary.
+
+**Licensing is the gate, not availability.** VDatum is public domain. VORF is UKHO-licensed; SHOM and AHS terms are unverified. A jurisdiction may therefore require the operator to supply their own licensed grids rather than us redistributing them.
+
+**Implementation risk, recorded rather than hidden:** whether PROJ already carries a given jurisdiction's vertical pipelines, or we must define them, has not been verified hands-on. PROJ separation-grid downloads become a deployment dependency.
 
 ## Consequences
 
@@ -63,7 +100,7 @@ Operator specifies the datum from the CO-OPS-supported list: NAVD88, MLLW, MHW, 
 
 3. `TidePrediction` model gains a `datum` field. Display endpoint returns `"MLLW"`. SWAN pipeline receives the DEM-native datum internally.
 
-4. VDatum normalization code (`normalize_to_msl()` in `bathymetry_resolver.py`) is preserved but not called from `download_bathymetry_for_level()`. Kept for future edge cases.
+4. ~~VDatum normalization code (`normalize_to_msl()` in `bathymetry_resolver.py`) is preserved but not called from `download_bathymetry_for_level()`. Kept for future edge cases.~~ **Superseded 2026-07-26:** `normalize_to_msl()` as written is not fit for use at all — it applies a single domain-centre offset to an entire grid. It is replaced by per-cell conversion through PROJ separation grids, not un-deferred as-is. `_query_vdatum_offset()` additionally returns 0.0 silently in two paths despite its docstring claiming otherwise (C-90b), which must be fixed or removed with it.
 
 5. 34 UNKNOWN DEMs in `ncei_regional_dem_index.json` must be resolved before those areas are served. `find_best_dem()` skips DEMs with `"UNKNOWN"` datum.
 
@@ -71,9 +108,10 @@ Operator specifies the datum from the CO-OPS-supported list: NAVD88, MLLW, MHW, 
 
 ## Out of Scope
 
-- Installing `coastalmodeling-vdatum` on production — deferred, not needed for v1.
-- International datum support (LAT, CD) — future, when international tide sources are added.
-- Grid-based VDatum conversion — the code exists but is not called; not deleted, not enhanced.
+- ~~Installing `coastalmodeling-vdatum` on production — deferred, not needed for v1.~~ **Superseded 2026-07-26** — a VDatum-grid dependency (`vyperdatum`) is now in scope for the US; see "Grid-wise datum conversion" above.
+- International datum support (LAT, CD) — still future, but no longer open-ended: the per-jurisdiction path, the authority models, and the four integration steps are enumerated above.
+- ~~Grid-based VDatum conversion — the code exists but is not called; not deleted, not enhanced.~~ **Superseded 2026-07-26** — grid-based conversion is now the mechanism that establishes the common datum. The single-point code that stood in for it is not what gets enabled.
+- Authoring our own separation grids for a jurisdiction that has none. The GTX format is documented and horizontal registration to NAD 83 (2011) is a routine reprojection, so the plumbing is not the barrier — but producing the surfaces needs a validated regional tide model plus a geoid, which is a modelling project per coastline. Use an authority model, or the global-tide-model fallback.
 - Changing the public display datum from MLLW.
 
 ## Acceptance Criteria
@@ -81,11 +119,17 @@ Operator specifies the datum from the CO-OPS-supported list: NAVD88, MLLW, MHW, 
 1. SWAN WLEVEL uses predictions in the DEM's native datum (not hardcoded MLLW).
 2. Display endpoint (`/api/v1/tides`) still uses MLLW — no change.
 3. Bathymetry cache files contain a `vertical_datum` field.
-4. `normalize_to_msl()` is not called from `download_bathymetry_for_level()`.
+4. ~~`normalize_to_msl()` is not called from `download_bathymetry_for_level()`.~~ **Replaced 2026-07-26:** bathymetry is converted to LMSL **per cell** via PROJ separation grids. No single-offset conversion is applied to a grid anywhere, and a code path that would do so is a defect.
 5. CO-OPS datum fetch failure produces ERROR, not silent fallback to 0.0m.
 6. `TidePrediction` model has a `datum` field.
 7. Zero DEMs in the index have `"UNKNOWN"` datum.
 8. All test baselines hold.
+
+Added 2026-07-26:
+
+9. Every SWAN level's bathymetry datum is verified to agree before a run; disagreement refuses rather than stamping one level's datum on another.
+10. No datum label is invented by us. A datum is either published by the source (the NCEI mosaic catalogue's `VerticalDatum` field, an operator declaration, or a pinned raster) or the source is unusable. `UNKNOWN_CRM` no longer exists.
+11. Outside the coverage of an available separation model, the install refuses rather than running on mixed datums.
 
 ## Implementation
 
