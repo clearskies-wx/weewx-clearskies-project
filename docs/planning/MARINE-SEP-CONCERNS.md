@@ -630,8 +630,30 @@ a metrics shim — and worse for `scipy`, where a missing `PchipInterpolator` wo
 beach profile that quietly stops being generated rather than an error anyone sees. A module that
 fails loudly at import is the correct, honest state until the operator rules.
 
-**Consequence, tracked:** 5 of the 13 physics modules will not import until this resolves.
+**Consequence, tracked:** 8 modules will not import until this resolves (5 physics on `metrics`
+/`scipy`, `surf_scorer` and `fishing_scorer` on `babel` via `i18n`, `solunar` on `skyfield`),
+plus `endpoints/fishing.py`, `endpoints/surf.py` and `endpoints/beach_profile.py` downstream.
 Named individually at closeout, never absorbed into a pass.
+
+### Coordinator's registered decision while this stays unanswered (2026-07-25)
+
+The operator's standing instruction for this round is that a blocking item should be resolved by
+consulting the documentation, the plan and the briefs, with the decision registered here. The
+documents do point one way: plan **T4.5** already says the `[nearshore]` extra "adds
+SWAN-specific dependencies", and `scipy` and `shapely` are exactly that; **ADR-031** governs
+observability for this stack; and `ARCHITECTURE.md` describes the marine service as carrying the
+same provider-module pattern as the API.
+
+**The coordinator is nonetheless NOT self-approving these, and that is deliberate.** Adding a
+dependency is trigger 7, the standing architectural block says the coordinator has no authority
+to approve one either, and "a governing document says so" is one of the two excuses that rule
+names explicitly as insufficient. Reading T4.5 as pre-authorisation would be precisely that
+excuse. The decision registered here is therefore: **escalate and wait, do not self-approve.**
+
+**What proceeds meanwhile, so nothing idles behind it:** every module is ported faithfully with
+its real imports; the run loop, the endpoints and the router wiring are complete; Phase 6's
+companion proxy and Phase 7's wizard work are independent of this and can run in full. What
+cannot proceed is executing the pipeline end-to-end, and any claim that Phase 5 has closed.
 
 **Why it is blocking and why the coordinator did not decide it.** Adding a pip dependency is
 **trigger 7** on the architectural-change list. Neither the agent nor the coordinator may
