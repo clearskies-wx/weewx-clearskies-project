@@ -97,6 +97,59 @@ Commit `03f81db`. Verified by the coordinator: all 10 moved providers import cle
 
 ---
 
+## ⛔ C-26 — HIGH, AWAITING OPERATOR: storm-surge classification compares metres against foot thresholds
+
+**Status:** escalated to the operator 2026-07-25. Not blocking Phase 5 — the port inherits the
+bug faithfully, which is correct. But it needs a decision before Phase 8 deploys.
+
+**The defect**, verified by the coordinator in `services/water_level_compositor.py`:
+
+```python
+_SURGE_THRESHOLDS_FT = {"minor": 0.15, "moderate": 0.5, "major": 1.0}   # line 37
+...
+residual_ft = _meters_to_target(current_residual_m, target_unit)        # line 101
+result["stormSurgeLevel"] = _classify_surge(abs(residual_ft), residual_ft)  # line 111
+...
+def _classify_surge(abs_residual_ft: float, signed_residual_ft: float) -> str | None:  # line 260
+    if abs_residual_ft < _SURGE_THRESHOLDS_FT["minor"]: ...
+```
+
+`residual_ft` is named for feet but holds **whatever `target_unit` is**. Nothing checks the
+unit. In metre mode the classifier under-triggers by a factor of 3.28 — the correct metre
+thresholds would be ≈0.046 / 0.152 / 0.305 m. A 0.20 m residual returns `"elevated"` when it
+should be `"significant"`.
+
+**Phase 5 escalates this from a preset-specific bug to a universal one.** Today it affects only
+METRIC/METRICWX installations, because imperial presets pass `target_unit="foot"` and land on
+the right numbers by luck. **`stormSurgeLevel` is a label, not a number** — it is computed once
+and the API's unit conversion does not touch strings. Since the marine service always works in
+SI, after separation **every** installation gets the metre-mode classification, including the
+imperial ones that are correct today.
+
+**Why the port must inherit it rather than dodge it:** the ported `tides.py` has to call
+`compute_composite(target_unit="meter")`. Passing `"foot"` to sidestep the bug would leak a
+display unit into canonical output and get double-converted by T6.2. Inheriting faithfully is
+the correct behaviour for the move.
+
+**Why neither the agent nor the coordinator fixed it.** The values in `_SURGE_THRESHOLDS_FT` are
+a classification criterion in a physical model — trigger 1. There is a reasonable argument that
+correcting the comparison is a pure defect fix: it changes no threshold value and only makes the
+code do what its own variable names say. **That argument is exactly the reasoning that has gone
+wrong on this project before**, and it is not the coordinator's call to make unilaterally.
+
+**Options:**
+
+| Option | Effect |
+|---|---|
+| **(a) Convert the residual to feet before classifying** | Thresholds keep their declared values and meaning; the comparison happens in the units the constants are named for. Fixes metric installs today and prevents the universal regression. Smallest change. |
+| (b) Add metre thresholds and select on `target_unit` | Same outcome, more surface; two threshold tables to keep in step. |
+| (c) Leave it | Every installation gets under-triggered storm-surge labels after Phase 5. Not recommended. |
+
+Coordinator's recommendation: **(a)**, in its own commit, applied to **both** repos (the API's
+copy is live today), with a test pinning a metre-mode residual to the correct label.
+
+---
+
 ## C-25 — alerts must be re-merged API-side too, and are NOT an inventory gap (DECIDED)
 
 The Round 3 endpoint agent found that `endpoints/marine.py`'s `_fetch_active_alerts()` (list and
