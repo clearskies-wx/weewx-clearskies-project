@@ -1532,3 +1532,70 @@ not need them, because it no longer computes anything that requires them.
 Unreachable API means **no answer, stated as such** — never a silently substituted default. A UTC
 fallback for sunrise/sunset, or forecast wind quietly labelled `"station"`, is precisely the
 "valid response, wrong answer" failure this plan exists to remove.
+
+---
+
+## C-48 — two more wizard endpoints compute marine physics in the API (OPEN → Phase 7)
+
+Surfaced by the deletion agent, correctly not resolved unilaterally. Same class as C-42, but not
+covered by its four pinned imports, so it stopped rather than extending its own mandate.
+
+| Endpoint | Imports | Purpose |
+|---|---|---|
+| `GET /setup/marine/compute-estimate` | `services/swan_domain.compute_domains` | wizard's before/after compute-cost display |
+| `GET /setup/marine/coverage` | `services/bathymetry_resolver.find_best_dem` / `is_great_lake` | wizard's bathymetry-coverage panel |
+
+These are why `swan_domain.py`, `shelf_boundary.py`, `bathymetry_resolver.py` and
+`enrichment/bathymetry.py` survive in the API after Phase 6 — they are the last four marine-physics
+modules left, and only these two wizard endpoints hold them.
+
+**No new decision is needed; the pattern is settled.** `ARCHITECTURE.md`'s invariant and the C-42
+ruling both say it: the wizard asks the API, the API proxies to the marine service. Both endpoints
+become pass-throughs, the marine service exposes the two computations (it already has every module),
+and the four modules leave the API.
+
+**Deliberately routed to Phase 7, not squeezed into Phase 6.** Phase 7 is the wizard phase; these are
+wizard endpoints; and the marine side needs two new endpoints, which is real work rather than a
+deletion. Recorded here as named Phase 7 tasks so the modules are not mistaken for a Phase 6 miss.
+
+**Live bug found in passing, pre-existing:** `marine_compute_estimate` calls `get_settings()` without
+importing it — a `NameError` at runtime, confirmed present before this round via `git show`. The
+endpoint cannot currently work. Fix it when the endpoint is reworked.
+
+---
+
+## C-49 — leftovers from the compute-service removal (OPEN → Phase 7/8)
+
+Two loose ends the deletion agent named rather than cutting, both correct to leave.
+
+- **`POST /setup/providers/test-compute` is orphaned.** It tested connectivity using
+  `surf_compute_host`/secret, which T6.8 removed from `ApplyRequest` and `CurrentConfigResponse`.
+  The endpoint still exists but the wizard has no field left to populate it. Removing an endpoint is
+  trigger 7 and was not in the agent's mandate. **Phase 7** — the wizard's marine connection test
+  should target `marine_service_url` instead, which T7 covers anyway.
+- **The `[marine]` pyproject extra is partly orphaned.** `eccodes` now has zero importers in the API;
+  `xarray` and `netCDF4` are still needed by the retained `bathymetry_resolver.py`. So the extra
+  cannot be dropped wholesale, and `eccodes` alone can be pruned — but only after C-48 removes
+  `bathymetry_resolver.py`, at which point the whole extra may go. **Sequence it after C-48**, not
+  before, or the pruning has to be done twice.
+
+---
+
+## C-50 — a docstring asserted the opposite of the code and caused a live double-conversion (CLOSED)
+
+Found and fixed inside the C-44 sweep (`ee25fdb`), and worth recording as a pattern rather than an
+incident.
+
+`marine_enrichment.py`'s docstring stated that `conditionsTextParts.heightM` was **outside**
+`marine_response_conversion.py`'s `_FIELD_GROUPS` and therefore arrived unconverted, so the module
+converted it itself. `heightM` **is** in the table (`group_wave_height`). The value arrived already
+converted to display units and was converted a second time — so an imperial operator's surf sentence
+carried a wave height wrong by a factor of 3.28, while every number around it was right.
+
+`API-MANUAL.md` repeated the same false claim, because the manual was written from the docstring.
+
+**The pattern:** a comment asserting what another module does is a claim that is never checked by
+anything. Three separate readers — the implementer, the auditor, and the manual — trusted this one.
+It survived because the sentence it corrupted is prose, so no schema, type or test could contradict
+it, and it looked plausible in every review. **Trust the measured behaviour, not the comment**, and
+prefer asserting cross-module facts in code (or not at all) over asserting them in prose.
