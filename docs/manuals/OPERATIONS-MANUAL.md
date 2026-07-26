@@ -158,18 +158,18 @@ The `[ClearSkiesTruesun]` config stanza in `weewx.conf`:
 
 Verification: after weewx restarts, check that `maxSolarRad` values at sunrise are > 10 W/m² at 6:00 AM (vs R-S's ~1.4 W/m²). Check the weewx log for `clearskies_truesun: CAMS AOD fetch` messages.
 
-### eccodes native dependency (marine feature)
+### eccodes native dependency (marine service)
 
-eccodes is ECMWF's C library for GRIB/BUFR encoding and decoding. It is required for the marine feature (GRIB2 processing for wave data and HRRR wind). This is the first native (non-pure-Python) dependency in Clear Skies API.
+eccodes is ECMWF's C library for GRIB/BUFR encoding and decoding. It is required for GRIB2 processing (wave data and HRRR wind) in the **marine service** — not in the API. The API has no eccodes dependency; `pip install weewx-clearskies-api` never installs or requires it.
 
-**How it's provided depends on the deployment method:**
+**How eccodes is provided depends on how the marine service is deployed:**
 
 | Deployment | How eccodes is provided | Operator action |
 |---|---|---|
-| Docker compose | Baked into the API Dockerfile (`apt install libeccodes-dev` in build stage) | None — marine-capable by default |
-| Native pip install | Operator installs the system library, then `pip install weewx-clearskies-api[marine]` | Install system library + pip extra |
+| Docker compose | Must be available in the marine service image | None if the image is built with eccodes baked in |
+| Native install on marine service host | Operator installs the system library, then `pip install "weewx-clearskies-marine[nearshore]"` | Install system library + pip extra |
 
-**Platform-specific system library install (native path only):**
+**Platform-specific system library install (native path only, on the marine service host):**
 
 | Platform | Command |
 |---|---|
@@ -178,19 +178,15 @@ eccodes is ECMWF's C library for GRIB/BUFR encoding and decoding. It is required
 | macOS | `brew install eccodes` |
 | Alpine | `apk add eccodes-dev` |
 
-After the system library is installed: `pip install weewx-clearskies-api[marine]`
+After the system library is installed on the marine service host: `pip install "weewx-clearskies-marine[nearshore]"`
 
 **Detection and error handling:**
 
-When an operator enables marine features (adds a `[marine]` section to `api.conf` or completes the marine wizard step) but eccodes is not installed:
+The wizard's marine step calls `GET /setup/marine/eccodes-check` on the API. That endpoint is a pass-through to the marine service's `GET /discovery/grib-availability` — the marine service probes its own process for a working GRIB2 backend (eccodes primary, pygrib fallback) and reports the result. A marine service outage or an unconfigured `marine_service_url` returns a 503 distinct from "unavailable" so the wizard never instructs the operator to install eccodes on the API host.
 
-1. At API startup, the marine provider module attempts `import eccodes` (fallback: `import pygrib`).
-2. If both fail, the API logs a clear error with platform-specific install instructions and raises a startup error for the marine feature only — the rest of the API continues to function normally.
-3. The wizard's marine step checks eccodes availability before allowing marine configuration. If absent, it displays install instructions and blocks the marine setup step (not the entire wizard).
+Operators who do not configure a marine service never encounter this dependency. `pip install weewx-clearskies-api` does not require or install eccodes.
 
-Operators who never enable marine features never encounter this dependency. `pip install weewx-clearskies-api` (without `[marine]`) does not require or install eccodes.
-
-**Precedent:** This establishes the pattern for future native dependencies: pip extras for opt-in features, Docker always includes them, clear detection with actionable error messages at feature-enable time.
+**Precedent:** This establishes the pattern for native dependencies in companion services: pip extras for opt-in features, clear detection with actionable error messages at feature-enable time, detection performed by the service that owns the dependency.
 
 ---
 
