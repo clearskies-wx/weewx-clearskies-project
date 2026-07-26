@@ -2913,3 +2913,147 @@ It detected the incompatible inherited state, discarded it, and restarted cold �
 publishing anything from the crashed attempt. This is the handover working as designed. It also
 retroactively justifies C-70's decision to stop the old service *before* the first marine cycle: had
 both been writing that file concurrently, this recovery would have been racing a live writer.
+
+---
+
+## C-55 / C-59 — the Phase 8 assessment (DELIVERED 2026-07-26). One endpoint is broken today, one should move, two stay.
+
+C-55 asked for **one assessment** of the four remaining `/setup/marine/*` endpoints rather than a
+fifth individual escalation, and C-59 was sequenced with it because `rasterio`'s dependency question
+travels with whichever way the upload endpoint lands. This is that assessment, by the coordinator,
+from reading the code on both sides.
+
+**The governing pattern is already settled** — C-40, C-41, C-42, C-48 and C-54 each answered a
+version of "is answering this the API's job or the marine service's?", and ARCHITECTURE.md now
+carries the result as a standing invariant: *"when the API needs marine data for something that is
+not a dashboard route — a wizard lookup, a setup-time question, an operational check — the answer is
+a pass-through in the API... the marine service exposes it, the manifest or an explicit proxy route
+carries it, the API fronts it."* So no new principle is needed here, only its application, and per
+`rules/clearskies-process.md` §"Over-triggering is a failure mode too" applying a settled ruling to
+the next instance is not a new decision.
+
+### Verdicts
+
+| Endpoint | Verdict | Basis |
+|---|---|---|
+| `POST /setup/marine/bathymetry/upload` | **MOVE — and it is broken today, not merely misplaced** | below |
+| `POST /setup/marine/discover-structures` | **MOVE** | below |
+| `GET /setup/marine/species` | **STAY** | reference data for the wizard's picker |
+| `GET /setup/marine/species-database` | **STAY** | same |
+
+### 1. `bathymetry/upload` — a live defect in split-host deployment, not a tidiness question
+
+This is the finding that changes C-55 from a cleanup item into a defect report.
+
+```
+weewx-clearskies-api/weewx_clearskies_api/endpoints/setup.py:4259
+    _OPERATOR_BATHY_DIR: Path = Path("/etc/weewx-clearskies/operator_bathymetry")
+    _OPERATOR_BATHY_TIF: Path = _OPERATOR_BATHY_DIR / "operator.tif"
+:4421
+    _OPERATOR_BATHY_DIR.mkdir(parents=True, exist_ok=True)
+
+weewx-clearskies-marine/weewx_clearskies_marine/services/bathymetry_resolver.py:915
+    _OPERATOR_BATHY_DIR = Path("/etc/weewx-clearskies/operator_bathymetry")
+:964
+    tif_path = _OPERATOR_BATHY_DIR / "operator.tif"
+```
+
+**Same path string, two different machines.** The API writes the uploaded GeoTIFF to
+`/etc/weewx-clearskies/operator_bathymetry/operator.tif` on the **weewx host**. The only code that
+reads it is the marine service's bathymetry resolver, running on **librewxr**. Nothing copies the
+file between them.
+
+So on the split-host topology this plan exists to support, operator-supplied bathymetry — priority
+(1) in the resolver's documented source chain, ahead of NCEI and USGS — is written where nothing will
+ever read it. The upload returns success. The operator is told their bathymetry was accepted, and the
+model silently uses NCEI instead. **Same failure family as C-64 and C-72: the UI reports success for
+something that did not happen.**
+
+This was invisible until today because SWAN used to run inside the API process, on the same host that
+received the upload. The paths were correct when they were written. **C-66's lesson for the fourth
+time this phase** — the computation moved hosts and a surface that depended on co-location did not
+move with it.
+
+Moving the endpoint to the marine service resolves it structurally: the file is then written by the
+process that reads it, on the host that reads it, and no cross-host copy has to be invented.
+
+**C-59 dissolves rather than being answered.** C-59 asked whether `rasterio` should be declared in
+the API. If the endpoint moves, the dependency moves with it — and per
+`rules/clearskies-process.md` §"Moving a module moves its dependencies", carrying an existing import
+along with the code that requires it *"is the mechanical consequence of a move"* and needs no
+separate approval. `rasterio` is declared in the marine service's `[nearshore]` extra as part of the
+move, and the API declares nothing. This is exactly why C-59 was sequenced behind C-55 rather than
+decided first — deciding the dependency first would have declared a package into a repo that is
+about to stop needing it.
+
+**C-59's separable half is fixed regardless of when the move lands.** `endpoints/setup.py:4370-4371`
+tells the operator to *"Install rasterio (add to `[nearshore]` extra)"* — an extra Phase 6 deleted
+from the API repo, so the instruction cannot be followed. Same defect class as C-66 and C-74:
+install guidance naming a component that no longer exists.
+
+### 2. `discover-structures` — moves, and C-55's own stated doubt resolves against staying
+
+C-55 recorded this one as *"Not a marine provider module — it queries OSM, which the API queries for
+non-marine purposes too. **Needs a reading, not an assumption.**"*
+
+**The reading was done and it says the opposite.** Every OSM/Overpass reference in the API:
+
+```
+grep -rniE "overpass|openstreetmap|nominatim|osm" weewx_clearskies_api/ --include=*.py -l
+  weewx_clearskies_api/config/marine_config.py
+  weewx_clearskies_api/endpoints/setup.py          (_OVERPASS_URL, :3260)
+```
+
+Two files, both marine. **The API has no non-marine OSM consumer at all**, so the reason offered for
+leaving it in place does not exist. Recorded plainly because the concern explicitly asked not to
+assume it.
+
+On substance the case is stronger than "not disproven": the structures this endpoint discovers exist
+to become SWAN `OBSTACLE` commands and to size the L3 alongshore shadow zone. The consumer is the
+wave model, wholly inside the marine service. It is a setup-time marine question answered by an
+outbound query — the exact shape of `/discovery/buoy-stations`, `/discovery/tide-stations` and
+`/discovery/ofs-model`, which C-42 already moved and the API already proxies.
+
+### 3. `species` and `species-database` — stay, with a duplication flagged
+
+C-55's own read holds: reference data, not computation and not a provider fetch. The wizard needs a
+species list to render a picker; that is operator-configuration support, which C-40 already
+established the API keeps.
+
+**But `data/species.yaml` now exists in both repos** — the API's copy feeds the wizard picker, the
+marine service's feeds `score_fishing()`. Two copies of a reference dataset with no mechanism keeping
+them in step: an operator could pick a species in the wizard that the scorer does not know. Not
+urgent, not a Phase 8 item, and **not** grounds to move the endpoint — recorded so it is found rather
+than rediscovered.
+
+### Disposition — assessment delivered now, implementation sequenced after T8.6
+
+C-55 asked Phase 8 for an **assessment**; that is what this is, and it is complete. On the
+implementation:
+
+- Both moves are **setup-time** endpoints. Neither is on the runtime dashboard path, so neither
+  affects T8.6's end-to-end verification, and doing them before T8.6 would add risk to the deploy
+  without advancing it.
+- **They land in Phase 8, after T8.6** — not deferred out of it. The plan's NO DEFERRAL RULE applies
+  and there is no reason to invoke an exception.
+- The `rasterio` error-message half of C-59 is separable and can be fixed with the move.
+
+**One point genuinely needs the operator, and it is not the move.** The move is settled by C-42's
+pattern. What is not settled is **what to do about bathymetry an operator already uploaded** before
+this was found — on this installation, `/etc/weewx-clearskies/operator_bathymetry/` on weewx should
+be checked, and if a file is there it has never been used by the model and the operator has been
+running on NCEI data believing otherwise. That is a data-provenance question, not an engineering one.
+Checked and reported separately.
+
+**Checked immediately, and the answer is reassuring: nothing was lost.**
+
+```
+weewx:    ls /etc/weewx-clearskies/operator_bathymetry/  -> No such file or directory
+librewxr: ls /etc/weewx-clearskies/operator_bathymetry/  -> No such file or directory
+```
+
+The directory has never been created on either host, so no operator has ever used the upload feature
+on this installation and no bathymetry has been silently ignored. The defect is real and would have
+bitten the first operator to try it — but there is **no data-provenance question to answer and
+nothing to remediate**. Recorded with the commands, because "probably nobody used it" is an
+assumption and this is a measurement.
