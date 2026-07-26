@@ -1346,6 +1346,27 @@ Variables (all 9 are `[time][depth][latitude][longitude]`): `Thgt` (significant 
 
 **Rate limiting:** 2 req/s (ERDDAP is a shared resource).
 
+### §14.3a WW3 station spectral boundary fetch (T8.10b)
+
+**Module identity:** `services/ww3_spectrum.py` (marine repo), `PROVIDER_ID = "ww3_spectrum"`, `DOMAIN = "marine"`. **Not a dispatch-registered provider module** — same placement rationale as `services/bathymetry_resolver.py`: it fetches remote data over HTTP but feeds a model boundary condition (the SWAN L1 spectral boundary, T8.10c) rather than a canonical `MarineForecastPoint` field. It is a separate module from `providers/marine/wavewatch.py` (§14.3 above) — different host (NOMADS, not ERDDAP), different NOAA product (full 2-D directional spectrum, not the PacIOOS bulk republication), different return shape. `providers/marine/wavewatch.py` is unmodified by this addition.
+
+**What it fetches:** NOAA WaveWatch III's own per-station `.spec` files — the full 2-D directional spectrum `E(f,theta)` at a fixed output point, in the exact format SWAN's `BOUNDNEST3`/`BOUNDSPEC ... FILE` boundary commands are built to read. Two products, **one parser, no format branching** — the file's own header self-describes `nfreq`/`ndir`:
+
+| Product | URL pattern (live-verified 2026-07-26) | Header | Size |
+|---|---|---|---|
+| Ocean (`gfswave`) | `https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.YYYYMMDD/CC/wave/station/bulls.tCCz/gfswave.<STATION>.spec` | `50 36`, freq 0.035–0.964 Hz (28.6 s–1.04 s) | 7.75 MB |
+| Great Lakes (`glwu`) | `https://nomads.ncep.noaa.gov/pub/data/nccf/com/glwu/prod/glwu.YYYYMMDD/bulls.tCCz/glwu.<STATION>.spec` — note: no `/CC/` directory level, unlike the ocean product | `32 36`, freq 0.050–0.960 Hz (20.0 s–1.04 s), measured live 2026-07-26 | 1.94 MB |
+
+Per-station files only — **never** the tarballs (`spec_tar.gz` 1.72 GB, `ibp_tar` 11.37 GB). `fetch_station_spectrum(station_id, product, cycle)` takes an explicit `cycle: datetime`; it makes no cadence assumption (ocean is 00/06/12/18Z, GLWU is hourly — brief §10.5) — cycle selection belongs to the runner (T8.10e).
+
+**Wire format and the one non-obvious parsing fact:** the per-timestep header line carries station id, lat, lon, depth (m), wind speed/dir, current speed/dir — lat/lon can appear glued together with no separating space when longitude is negative (Fortran fixed-width output), parsed by extracting all `-?\d+\.\d+` tokens rather than splitting on whitespace. **The energy matrix is direction-major, frequency-minor** (`energy[i_dir][i_freq]`) — the opposite axis order from SWAN's own SPECOUT format. This was live-verified, not assumed: reading it frequency-major (matching SWAN's own format by unexamined analogy) reproduces the correct bin counts and "looks" fine, but integrates to a significant wave height ~24% too high against the station's own `.bull` bulk Hs. Direction-major integration reconciles to within 1–3% across six independent ocean timesteps (station 46222) and five Great Lakes timesteps (station 45002). The direction axis is in radians, spans the full circle, and is not guaranteed monotonic (wraps through zero mid-array on real files) — m0 integration uses a circular (wrap-aware) bin-width calculation for direction, not the plain midpoint spacing SWAN's own (monotonic 0–360) direction axis uses. Longitude in the per-timestep header is -180..180 for the ocean product but 0..360 for the Great Lakes product; both are normalized to -180..180 in the parsed output.
+
+**No `missingValue` sentinel applies here** — that GRIB2 concept (T8.10b/T8.10f's "9999" guidance) belongs to the gridded WW3 products read via `grib_processor.py`'s eccodes backend. The station `.spec` files are plain ASCII WW3 point output with no `missingValue` key; this module instead raises `WW3SpectrumParseError` on any malformed or truncated file (empty file, unparseable header, an axis array or energy matrix cut short by EOF, an unparseable per-timestep header) — it never returns a partial spectrum, per rules/coding.md §1.
+
+**Rate limiting:** 2 req/s against `nomads.ncep.noaa.gov`, via a dedicated `RateLimiter` instance (`ww3-spectrum-nomads`) independent of the WW3 station-catalogue discovery module's own NOMADS client (T8.10a). Two independent in-process limiters against the same host can double the real request rate if both run concurrently — flagged for a possible future shared-limiter consolidation, not yet implemented.
+
+**Error handling:** `ProviderHTTPClient` exceptions (`QuotaExhausted`, `KeyInvalid`, `TransientNetworkError`, `ProviderProtocolError`) propagate unwrapped from `fetch_station_spectrum()` — a 404 (cycle not yet published) surfaces as `ProviderProtocolError` with `status_code=404` for the caller to branch on.
+
 ### §14.4 NWS marine zone text forecasts
 
 **Module identity:** `providers/marine/nws_marine.py`, `PROVIDER_ID = "nws_marine"`, `DOMAIN = "marine"`.
