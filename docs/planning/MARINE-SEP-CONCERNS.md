@@ -1774,6 +1774,37 @@ individual escalation. Carried to Phase 8.
 
 ---
 
+## C-65 — Phase 7 broke the admin's TruShore save, and the coordinator's freeze is why (CLOSED — fixed in R2b)
+
+**The only regression Phase 7 introduced.** Found by the coordinator running the repo-wide greps at
+R2 close rather than by any agent report — the admin agent had been told this area was frozen, so it
+correctly never looked.
+
+R1b removed `service_url` from `SwanApplyConfig`, which uses `extra="forbid"` (T7.2, API-MANUAL
+§19.2). `admin/routes.py:3092` still sent `"service_url"` in that section. **The admin's TruShore
+Save therefore 422s** — a break created by this phase, not inherited, and precisely the failure the
+"Wizard ↔ API apply contract sync" rule exists to catch: the API model and a caller drifted apart,
+invisible to every unit test because it only fires on the real HTTP path.
+
+**Root cause is a coordination error, not an agent error.** The coordinator froze
+`templates/admin/trushore.html` and its routes in the admin agent's brief while C-58 was open, then
+decided C-58 and dispatched **only the wizard half**, never lifting the freeze. Both agents did
+exactly as instructed; the instruction was incomplete. The admin agent additionally flagged the
+concurrent working-tree changes it saw and changed nothing — the correct response — which is why the
+gap stayed a gap rather than becoming a collision.
+
+**Fixed in R2b** by applying the same C-58 ruling to the admin surface: the deployment-mode radio,
+the service-URL field, the `"service_url"` emission and the orphaned
+`POST /admin/trushore/test-service` route all go; every other TruShore/SWAN field stays.
+
+**Standing lesson.** A freeze placed on one surface while a decision is pending must be **lifted
+explicitly on every surface it covered** when the decision lands. A ruling dispatched to one of two
+surfaces is not a ruling applied — and the half left behind is the half nobody is looking at,
+because it was declared out of scope. Pair every "frozen pending X" instruction with the list of
+surfaces to revisit when X resolves.
+
+---
+
 ## C-64 — the admin has no equivalent of the wizard's blank-URL guard (OPEN → Phase 8)
 
 Raised by the Phase 7 admin agent, which correctly declined to invent one.
