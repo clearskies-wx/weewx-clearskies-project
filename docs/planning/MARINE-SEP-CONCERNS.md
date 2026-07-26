@@ -1490,3 +1490,45 @@ now: the registry is correct, documented in `PROVIDER-MANUAL` §15.2, and unused
 derives capabilities from pushed config rather than from the provider registry — the API's own
 `/capabilities` works from its registry. Wiring that is Phase 7/8 work, not a Phase 6 deletion
 question. Recorded so the next round finds it rather than rediscovering it.
+
+---
+
+## C-47 — DECIDED BY OPERATOR: the marine service queries the API for data the API owns (DECIDED)
+
+**Ruling (operator, 2026-07-25):** if the marine service needs station wind, or solunar, **it queries
+the API** — like any other Clear Skies service. This resolves C-24's surf t=0 question and the
+fishing/solunar coupling in one line, and both were escalated when they should not have been.
+
+**This is the other half of the add-on invariant, and the coordinator kept missing it.**
+`ARCHITECTURE.md`'s invariant says every component reaches the marine service *through the API*. That
+is about traffic **inbound** to the marine service. **Outbound** is the mirror image: the API owns
+station data, almanac and solunar, so the marine service asks the API for them. The API is the hub in
+both directions. Nothing else was ever needed.
+
+The channel already exists — `CLEARSKIES_MARINE_API_URL` plus `MARINE_SERVICE_SECRET`, built at
+T6.4b for config recovery.
+
+### What this settles
+
+**Surf wind at t=0 (was C-24's open fork).** The marine service fetches the current station
+observation from the API and scores with it. `score_surf()` stays in one place, runs once, with the
+right inputs; `windSource` reports `"station"` truthfully because the value genuinely is the
+station's. Both rejected options — recomputing API-side (duplicating the scoring formula across two
+services) and patching only the wind fields (a self-contradictory response) — existed only because
+the coordinator never considered that the marine service could simply ask.
+
+**Fishing solunar (was C-27 / the C-41-adjacent coupling).** `score_fishing()` consumes solunar
+intensity, the major/minor period flags and almanac sunrise/sunset — 31.25% of `overallScore`. The
+marine service fetches those from the API's existing `/almanac/solunar` and almanac data rather than
+computing them. Its ported `enrichment/solunar.py` and `services/almanac.py` are deleted and
+`skyfield` dropped, which is what the operator directed earlier today; the coupling that appeared to
+block it was never a blocker, only a missing call.
+
+**Station timezone and elevation (C-27's original question) stay dissolved.** The marine service does
+not need them, because it no longer computes anything that requires them.
+
+### Required behaviour
+
+Unreachable API means **no answer, stated as such** — never a silently substituted default. A UTC
+fallback for sunrise/sunset, or forecast wind quietly labelled `"station"`, is precisely the
+"valid response, wrong answer" failure this plan exists to remove.
