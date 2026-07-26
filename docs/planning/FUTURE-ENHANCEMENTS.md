@@ -111,6 +111,31 @@ clear-water conditions anywhere that is *ever* clear.
 So open question 4 is likely "yes" for optical and "no" for wave-inversion — which makes
 wave-inversion the better fit for a *surf* product, since the breaking zone is the whole point.
 
+**Operator ruling 2026-07-26: wave-inversion is out of reach — "we cannot do the wave-inversion,
+we do not have that ability, we have to depend upon optical."** The 10 m-class wave-inversion
+methods all require an instrument at the spot (shore camera, UAV, X-band radar), and we have no
+camera network. Optical it is.
+
+**The consequence, and the mitigation that makes it survivable.** Optical cannot see the bar
+*while it is breaking* — so the naive reading is that it cannot deliver the sandbar field this
+entry was originally raised to fix. But that reading assumes we must image the surf zone during
+surf. We do not: **sample on flat days, forecast on big days.** The bar is still there when
+nothing is breaking, and Sentinel-2's revisit over a multi-year archive supplies ample low-energy,
+low-turbidity windows at most spots. Selection should therefore filter on **wave energy at
+acquisition time** — which we can evaluate, since we hold the hindcast — as well as on cloud,
+glint and turbidity.
+
+What that costs: **periodic snapshots rather than continuous tracking.** The bar position is
+current as of the last usable calm window, not as of today. That is a reasonable trade, since bars
+reshape *during* swell events and a post-event calm-day image is the bar as it now stands. It does
+mean a spot that has just been reworked by a big swell carries a stale bar until the next clear
+calm day — a known, bounded staleness that should be surfaced rather than hidden, in the same
+spirit as the datum and provenance work.
+
+Unresolved: whether a genuinely flat day still leaves enough water clarity at a high-energy beach
+(persistent suspended sediment can outlast the swell by days), and how long after an event the
+first usable image typically arrives. Both are measurable from the archive before committing.
+
 **But resolution is the catch.** Satellite wave-inversion (e.g. the S2hores Sentinel-2 toolbox)
 currently produces **100 m – 1 km** grids — fine for L2, useless for L3's 10 m. The 10 m-class
 wave-inversion methods need **shore cameras** (cBathy/Argus), UAV video, or X-band marine radar,
