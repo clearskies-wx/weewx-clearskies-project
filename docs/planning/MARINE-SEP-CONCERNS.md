@@ -1296,3 +1296,41 @@ Coordinator's recommendation: **(a)**. The code is already where it needs to be;
 one trigger. Held pending the operator: `providers/nearshore/swan.py`, `services/swan_domain.py`,
 `enrichment/bathymetry.py`, `_run_marine_apply_chain()`, and the `[nearshore]` pip extra are all
 excluded from the Phase 6 deletion until this resolves.
+
+---
+
+## ⛔ C-42 — AWAITING OPERATOR (bundled with C-41): the wizard's discovery helpers import four marine provider modules
+
+Found by the deletion agent while wiring T6.6's registry removal. Same shape as C-40 and C-41 —
+a third place where "everything marine moves" meets "the API owns the wizard."
+
+`endpoints/setup.py` imports from four of T6.6's five non-nearshore provider directories,
+independent of the apply chain:
+
+| Import | Used for |
+|---|---|
+| `providers.ocean.ofs.find_ofs_model` | wizard OFS-model lookup (`:1104`, `:4217`, `:4220`) |
+| `providers.buoy.ndbc.discover_stations` | "nearby buoy stations" wizard helper (`:3302`, `:4234`) |
+| `providers.tides.coops.discover_stations` | "nearby tide stations" wizard helper (`:3302`, `:4250`) |
+| `providers.marine.grib_processor` | GRIB-availability check for a wizard error message (`~:3102-3119`) |
+
+Only `providers/wind/` is free of setup.py imports and is being deleted this round.
+
+**Why this is not simply C-40 again.** C-40 was about a config *schema* — plainly operator
+configuration, plainly the API's. These are provider modules that call NOAA endpoints. They sit
+exactly on the line: the *question they answer* is a configuration question ("which stations are near
+this location?"), but the *way they answer it* is marine provider code, which the plan's headline
+says the API contains none of.
+
+**Two readings, and they resolve the same way C-41 does:**
+
+- Wizard-time discovery is operator configuration → the four modules stay in the API, and the plan's
+  "zero marine provider modules" criterion gains a named exception for discovery helpers.
+- The API contains no marine provider code → the wizard asks the marine service, which needs
+  discovery endpoints it does not have (trigger 7), and Phase 7 gains that work.
+
+**Bundled with C-41 deliberately** rather than escalated separately. Both are the same question —
+*does wizard-time marine support code live in the API or behind the marine service?* — and answering
+them together avoids settling one in a way that contradicts the other. Held out of the Phase 6
+deletion meanwhile: `providers/buoy/`, `providers/tides/`, `providers/marine/`, `providers/ocean/`
+and their dispatch registry rows.
