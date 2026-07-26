@@ -1774,6 +1774,51 @@ individual escalation. Carried to Phase 8.
 
 ---
 
+## C-66 — C-54 moved where the SWAN answer comes from; the copy explaining it stayed behind (OPEN → fix before QC Gate 7 closes)
+
+Found by the coordinator's own QC Gate 7 walk, 2026-07-25. Not reported by any agent — the R3 agent
+was scoped to the endpoint and the templates were nobody's assignment.
+
+**What C-54 changed.** `GET /setup/marine/swan-check` used to run `shutil.which("swan")` in the API
+process. After C-54 (API `3fcdf8b`, marine `ee61174`) it is a pass-through to the marine service's
+`/discovery/swan-check`, so `available`, `version`, `path` and `cpu_cores` now describe **the marine
+service host** — a different machine in any split deployment.
+
+**What did not change.** Both surfaces render that result next to prose that still assumes the old
+answer. Verified by reading the files, not inferred:
+
+| Site | Text | Why it is now wrong |
+|---|---|---|
+| `templates/wizard/step_trushore.html:27` | "…not installed **on this host**." | `swan_info` describes the marine host, not this one. |
+| `templates/wizard/step_trushore.html:28` | "install SWAN and the `clearskies[nearshore]` Python extra, then **restart the setup wizard**" | `[nearshore]` was deleted from the API in Phase 6 and does not exist. Restarting the wizard would not change a binary on another host; the marine service is what would need restarting. |
+| `templates/wizard/step_trushore.html:33`, `:41` | `pip install clearskies[nearshore]` (twice, in the copyable install block) | Same nonexistent extra, in the block an operator is most likely to paste. |
+| `templates/admin/trushore.html:72` | "Install SWAN to enable nearshore wave modeling." | Silent on *where*, which is the whole point after C-54. |
+| `wizard/state.py:264` | comment: "Shown only when the `[nearshore]` pip extra is detected (swan-check passes)" | swan-check no longer detects a pip extra at all. |
+
+**Consequence, stated concretely.** An operator running the marine service on a second host — the
+topology this entire plan exists to support — is told SWAN is missing "on this host", handed a
+`pip install` for an extra that no longer exists, and told to restart the wrong process. Every
+instruction points at the wrong machine. This is a valid-looking response carrying the wrong answer,
+the exact failure mode the plan was written to remove.
+
+**Same shape as C-65, and that is the point.** C-65 was a freeze that was lifted on one surface and
+not the other. This is a responsibility that moved hosts while the text explaining it stayed put.
+The standing lesson generalises: **when a change moves where an answer comes from, every surface that
+explains that answer moves with it** — not just the call sites that fetch it. The R3 close verified
+the three wizard and five admin *call sites* and stopped there.
+
+**Not architectural.** Nothing here changes a formula, module, boundary, data contract, computation
+location, cadence, or dependency. `swan-check`'s path and response shape are untouched. This is
+user-facing prose being corrected to describe what the code already does — and per CLAUDE.md
+§"Doc-code sync", it is mandatory, not optional.
+
+**Sequencing (coordinator, 2026-07-25):** the fix is held until the R4 locale pass finishes. These
+are translatable strings, and changing them mid-pass would strand a freshly rebuilt catalogue against
+strings that no longer exist. Fix the templates, then add the replacement strings, in that order, in
+one locale pass rather than two.
+
+---
+
 ## C-65 — Phase 7 broke the admin's TruShore save, and the coordinator's freeze is why (CLOSED — fixed in R2b)
 
 **The only regression Phase 7 introduced.** Found by the coordinator running the repo-wide greps at
@@ -1922,15 +1967,57 @@ verified independently by the coordinator — the only remaining hits are a stal
 
 1. **`uv.lock` was not regenerated.** `pyproject.toml` lost an extra; the lock file still describes
    the old dependency set. The agent correctly declined to hand-edit it — regenerating needs a live
-   `uv lock` against PyPI. But `deploy-api.sh` and the documented test invocations use
+   `uv lock` against PyPI. ~~But `deploy-api.sh` and the documented test invocations use
    `uv run --frozen`, which is precisely the mode that fails when the lock and the manifest
-   disagree. **Regenerate before Phase 8's deploy, not during it.**
+   disagree.~~ **Regenerate before Phase 8's deploy, not during it.**
+
+   **CLOSED 2026-07-25 — API `0a514f2`.** Regenerated with `uv` 0.11.32. Pure prune: 11 packages
+   removed (`attrs`, `cfgrib`, `cftime`, `coastalmodeling-vdatum`, `eccodes`, `findlibs`,
+   `h5netcdf`, `netcdf4`, `pyproj`, `shapely`, `xarray`), zero added, zero version changes to any
+   retained package, 72 packages resolving. Evidence:
+
+   ```
+   uv lock --check   before: error: The lockfile at `uv.lock` needs to be updated  (exit 1)
+   uv lock --check   after:  Resolved 72 packages                                  (exit 0)
+   ```
+
+   ⚠ **Correction to this concern as originally filed — the stated mechanism was wrong.**
+   `scripts/deploy-api.sh` does **not** run `uv run --frozen`, or any `uv` command at all. It runs
+   `git pull --ff-only` as `ubuntu`, restarts the systemd unit, waits, and curls the health port —
+   it never touches dependencies. Verified by reading the script (`grep -i 'uv\|frozen'` returns
+   only two prose mentions of "uvicorn"). The real blast radius was: `uv run --frozen`, which
+   `reference/clearskies-dev.md:303-312` prescribes as the way to run pytest on the weewx host, and
+   `uv sync --frozen`, which `scripts/deploy-compute.sh` uses — and which has a recorded history of
+   pruning a host's venv (P4A-AUDIT-FINDINGS.md:90). So the fix was genuinely needed and the
+   urgency was real, but it would have broken **verification**, not the deploy. Recorded because a
+   concern that names the wrong failing component sends the next reader to the wrong file.
 2. **`Dockerfile` cited ADR-085 for the `libeccodes-dev` / `libeccodes0` system packages**, which
    were installed solely to serve the `[marine]` extra. Removing them was required — leaving the
    build pointing at a now-nonexistent extra would have failed outright — and the evidence supports
-   it, since GRIB2 processing moved to the marine service. But **ADR-085 now describes a dependency
-   the API no longer has.** That is an ADR-status question, not a doc-sync fix, and belongs to the
-   phase-boundary ADR compliance sweep.
+   it, since GRIB2 processing moved to the marine service. ~~But **ADR-085 now describes a dependency
+   the API no longer has.** That is an ADR-status question…~~
+
+   **RESOLVED 2026-07-25 — there is no ADR-status question, and no operator decision is needed.**
+   ADR-085 is **already archived**: `status: Archived — consolidated into OPERATIONS-MANUAL.md`,
+   archived 2026-07-09. Under `rules/clearskies-process.md` §"All ADRs follow the manual
+   consolidation lifecycle", an archived ADR is a historical record of *why* a decision was made and
+   is **not** restated to match current state — "the archived ADR explains why; the manual is where
+   you follow it." Nothing about ADR-085 needs to change.
+
+   **What the question actually pointed at is live doc-code drift in the manuals**, which is
+   mandatory under CLAUDE.md §"Doc-code sync" and was created by this phase's own commits:
+
+   | Document | Location | Defect |
+   |---|---|---|
+   | `OPERATIONS-MANUAL.md` | §"eccodes native dependency (marine feature)" (~161-193) | Tells the operator eccodes is an **API** dependency, that the **API** Dockerfile bakes in `libeccodes-dev`, and to run `pip install weewx-clearskies-api[marine]`. All three false. The platform install table points at the wrong host. |
+   | `ARCHITECTURE.md` | ~695 | Same eccodes claim, in a blockquote. |
+   | `ARCHITECTURE.md` | ~689 | Presents `services/bathymetry_resolver.py` as a live API service. Deleted from the API this phase. |
+   | `API-MANUAL.md` | ~2833-2850 | Presents `providers/marine/grib_processor.py` as the API's GRIB reader, with its eccodes/pygrib backends. Deleted from the API. |
+
+   Routed to R5 as documentation work. **ADR-099 is deliberately excluded** — it is still
+   `status: Proposed`, so every `(target — pending ADR-099 acceptance)` annotation in
+   `ARCHITECTURE.md` is *correct* and must survive untouched. Removing them is contingent on
+   operator approval per Phase 1 T1.1 item 9, which has not happened.
 
 ---
 
@@ -1952,6 +2039,21 @@ outside Phase 7's authorisation.
 is that it moves to the marine service, the dependency question moves with it and never needs
 answering here. Deciding the dependency first would risk declaring a package into a repo that is
 about to stop needing it.
+
+**Reaffirmed 2026-07-25 at QC Gate 7 — sequencing unchanged, with one separable part named.**
+The concern has two halves and only one of them is blocked on C-55:
+
+- *The dependency question* — should `rasterio` be declared, and in which repo — genuinely waits for
+  C-55. Declaring it is trigger 7, and doing so into a repo that may be about to shed the endpoint
+  is the wrong order. Unchanged.
+- *The error message* is separable and is not blocked on anything. `endpoints/setup.py:4370-4371`
+  tells the operator to "Install rasterio (add to `[nearshore]` extra)" — an extra Phase 6 deleted,
+  so the instruction cannot be followed regardless of how C-55 lands. This is the **same defect
+  class as C-66**: install guidance naming a component that no longer exists. Noted here so the
+  Phase 8 assessment fixes both halves rather than only the interesting one; if C-55 concludes the
+  endpoint moves, the message travels with it and is corrected there instead.
+
+Neither half is a Phase 7 item. Recorded rather than absorbed.
 
 ---
 
