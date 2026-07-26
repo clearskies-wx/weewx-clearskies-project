@@ -301,12 +301,54 @@ metric sentence.
 Same family as C-26: the layer split converts numeric fields cleanly, and silently fails to
 reach anything expressed as a **string** — a label, a sentence, a headline.
 
-**Not resolved here — it is a T6.2 design question**, and two shapes are plausible:
-compose the text on the API after conversion, or have the marine service return the sentence's
-components and let the API assemble it. Either is a contract decision, not a port decision.
+### DECIDED 2026-07-25 — operator directed this be fixed. Composition moves to the API.
 
-**Worth a deliberate sweep at T6.2:** `conditionsText` is the one instance found so far, but
-nobody has looked for others. Any string field composed from a measured value has this problem.
+**Units are only half the problem, and the other half settles the design.** Reading
+`_compose_conditions_text()` (`enrichment/surf_scorer.py:482-534`) and its call site at `:729`:
+
+```python
+wave_part = i18n.t("surf.conditions.wave_summary", locale).format(
+    range=_format_range(height_low, height_high, locale),
+    unit=height_unit_label,
+    period=i18n.format_number(period_s, 0, locale),
+    compass=compass,
+)
+```
+
+The sentence depends on **three** presentation inputs: the operator's display **units**, the
+operator's **locale**, and locale-aware **number formatting**. The marine service has none of
+them. It has no locale config either — `i18n.get_active_locale()` reads API-side operator
+configuration. So composing this text on the model host was never going to be right; it would
+have produced English metric sentences for a French imperial operator.
+
+The same applies to the sibling label fields resolved through `i18n.t()` in the same function:
+`quality` (`surf.quality.{stars}`) and `windQuality` (`surf.wind_quality.{key}`), and to
+`fishing_scorer.py`'s equivalents.
+
+**Decision: presentation is the API's job — all three axes of it.** `ARCHITECTURE.md`'s "Layer
+Responsibilities" already makes the API the single unit-conversion authority; locale resolution
+and text composition belong in the same layer for the same reason. The marine service emits
+**semantic keys and SI numbers**; the API resolves keys to localised labels, converts the
+numbers, and composes the sentence.
+
+Concretely:
+
+- Marine service returns the *ingredients* — SI height, period, direction, SI wind speed, the
+  wind-quality **key**, the quality **key**, and the swell-dominance score.
+- The API composes `conditionsText` and resolves `quality` / `windQuality` after conversion, in
+  the operator's locale. `_compose_conditions_text()` moves there essentially unchanged — it
+  already takes display values and unit labels as parameters, so it needs no rework, only
+  relocation.
+- The dashboard's response is **byte-identical** to today. Nothing user-visible changes; the
+  work simply happens where the inputs exist.
+
+**Consequence worth noting:** this removes the marine service's reason to carry `i18n` and
+`babel` at all, unless something else needs them. Check at implementation time rather than
+assuming.
+
+**Sweep required, not optional:** `conditionsText` is the instance that was found. Every string
+field composed from a measured value, and every label resolved through `i18n.t()`, has the same
+defect. Enumerate them across all six endpoints before implementing, so this is fixed once.
 
 ---
 
