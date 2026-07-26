@@ -3840,3 +3840,171 @@ committed to `scripts/` as the reproducible source-comparison measurement if thi
 unchanged by this measurement. What the measurement settles is *which* source, not *whether* to switch.
 
 ---
+
+---
+
+## C-87 — The correct boundary source is WW3's own 2-D spectra, not any bulk product. Design measured end to end; needs an operator ruling to implement (OPEN → BLOCKER)
+
+**Supersedes C-86's recommendation as well.** C-86 concluded "use `gfswave.global.0p25` for its three swell
+partitions." That is still better than what we run today, but it is not what the SWAN manual says to do,
+and the operator was right to push past it: *"you need to figure out what oceanographers and engineers
+say is the best data source of the WW3 datasets to use to plug into SWAN."*
+
+### What the SWAN manual actually specifies (not a coordinator judgement)
+
+SWAN User Manual, "Boundary and initial conditions" — SWAN provides a **dedicated WAVEWATCH III nesting
+command**:
+
+| Command | Parent model | Data it expects |
+|---|---|---|
+| `BOUNDSPEC ... PAR` / TPAR | none | parametric bulk parameters — **what we use today** |
+| `BOUNDSPEC ... FILE` | none | 1-D or 2-D spectra from measurements or other models |
+| `BOUNDNEST1` | a coarser SWAN run | full 2-D spectra |
+| `BOUNDNEST2` | WAM Cycle 4.5 | full spectra (manual marks it *"not fully tested"*) |
+| **`BOUNDNEST3`** | **WAVEWATCH III** | **full 2-D spectra** |
+
+The manual's exact wording for `BOUNDNEST3`:
+
+> *"The output files of WAVEWATCH III have to be created with the post-processor of WAVEWATCH III as
+> output transfer files (formatted or unformatted) with WW_3 OUTP (output type 1 sub type 3) at the
+> locations along the nest boundary."*
+
+The literature agrees on the principle: SWAN nesting in WW3 uses *"oceanic boundary conditions in the
+form of two-dimensional wave spectra supplied by the WAVEWATCH III model."* Bulk parameters are what you
+*validate* against, not what you drive a nested model with — and the intercomparison work notes that
+models disagree on **peak period** near the coast by up to ~1.4 s even when Hs agrees, which is exactly
+the quantity our bulk source gets wrong by 6.4 s.
+
+**So the defect is one level deeper than C-86 said.** It is not "we get one partition instead of three."
+It is *"we parameterise a spectrum that WW3 already computed and publishes in SWAN's own nesting
+format."* Feeding three partitions instead of one would still be a synthesised approximation of a
+spectrum we can simply read.
+
+### The data exists, operationally, and was verified live 2026-07-26
+
+**Ocean — `gfswave.<STATION>.spec`**
+`/pub/data/nccf/com/gfs/prod/gfs.YYYYMMDD/CC/wave/station/bulls.tCCz/`
+
+```
+'WAVEWATCH III SPECTRA'     50    36     1 'spectral resolution for points'
+...frequency array (0.035 -> 0.964 Hz, i.e. periods 28.6 s -> 1.04 s)...
+...direction array (36 bins)...
+20260726 060000
+'46222     '  33.62-118.32     487.9   2.20 143.8   0.03 285.6
+...50 x 36 = 1800 energy density values...
+```
+
+Per-timestep header carries **station id, lat, lon, depth (m), wind speed/direction, current
+speed/direction**. Station 46222 is San Pedro Channel — 33.62 N, 118.32 W, **487.9 m depth**, ~20 km off
+Huntington. A textbook deep-water L1 boundary point.
+
+**Great Lakes — `glwu.<STATION>.spec`**
+`/pub/data/nccf/com/glwu/prod/glwu.YYYYMMDD/bulls.tCCz/`
+
+```
+'WAVEWATCH III SPECTRA'     32    36     1 'Great Lakes WAVEWATCH III Unst'
+```
+
+**Identical format.** GLWU *is* a WAVEWATCH III implementation (unstructured grid). The header is
+self-describing — it declares `nfreq` and `ndir` — so **one parser serves both products**, no branching
+on format.
+
+**Why the Great Lakes need their own product, confirmed by measurement, not assumption:** at Lake
+Michigan (43.0 N, 87.0 W) `gfswave.global.0p25` returns **9999** (missing) for `swh` and every
+partition, and PacIOOS `ww3_global` returns **null**. Global ocean wave models mask inland water. Any
+Great Lakes surf spot has therefore been running with no WW3 boundary at all — and now that C-76 makes a
+missing boundary raise instead of substituting calm, a Great Lakes spot would fail loudly rather than
+publish fiction. That is the correct behaviour but it means **Great Lakes spots are currently
+unsupported in practice**, which should be stated rather than discovered.
+
+### Sizes — practical, and the trap to avoid
+
+| Object | Size | Verdict |
+|---|---|---|
+| `gfswave.tCCz.spec_tar.gz` (all stations) | **1.72 GB** | do not fetch |
+| `gfswave.tCCz.ibp_tar` (all boundary points) | **11.37 GB** | do not fetch |
+| **`gfswave.<STATION>.spec`** (one station) | **7.75 MB** | **fetch this** |
+| **`glwu.<STATION>.spec`** (one station) | **1.94 MB** | **fetch this** |
+| `gfswave.<STATION>.bull` | 52 KB | station discovery |
+| `gfswave.<STATION>.cbull` | 27 KB | — |
+
+The per-station files are individually addressable, so the tarballs are a trap, not a requirement. 7.75 MB
+per cycle is less than the 21 MB/60 s the system was moving before SURF-PUBLISH-RESULTS-ONLY.
+
+There is also an `ibp` (Interpolated Boundary Points) family — WW3 output produced specifically for
+downstream nesting. It is only published as an 11 GB tarball, so per-station `.spec` is the practical
+equivalent. **Worth a follow-up question to NCEP** whether IBP points are individually addressable
+anywhere, since they are the purpose-built answer.
+
+### Station discovery — the operator-location problem, solved cheaply
+
+~4,036 ocean stations (12,108 files ÷ 3) and ~115 Great Lakes stations (579 ÷ 5). We must not probe
+7.75 MB files to find out where they are. Measured solution:
+
+1. **One directory listing per product** yields the full station-ID list.
+2. **An HTTP range request for bytes 0–120 of `<station>.bull`** yields the location line —
+   `Location : 46222      (33.62N 118.32W)` for ocean, `Location : 45002   (45.34N  86.41W)` for GLWU.
+   ~100 bytes per station instead of 7.75 MB.
+3. Build a **station catalogue once and cache it long-term.** The repo already has this exact pattern:
+   `/discovery/buoy-stations` and `/discovery/tide-stations` carry `cache_ttl 86400`, and NDBC station
+   discovery with lat/lon already exists (§14.1). Many `gfswave` station IDs *are* NDBC IDs (46222,
+   45002), so that existing metadata covers a large fraction; the range-request path covers the rest
+   (e.g. `3FYT`, `0Y2W3`).
+4. At 2 req/s (the existing ERDDAP-era rate limit) a full cold catalogue build is ~35 min, once, cached.
+   It belongs in configuration/discovery time, not in the forecast cycle.
+
+**Station selection per spot** then needs, and the `.spec` header supplies, everything required:
+- **water body** — Great Lakes vs ocean, choosing the catalogue. Precedent exists: the bathymetry chain
+  already distinguishes Great Lakes (USGS Great Lakes topobathy) from ocean (NCEI/CUDEM).
+- **depth** — the per-timestep header carries it (487.9 m at 46222), so "is this a deep-water boundary
+  point" is checkable from the data rather than assumed.
+- **distance and bearing** — nearest station, seaward of the spot, within a maximum distance.
+
+### The honesty requirement that follows, and it is not optional
+
+Global station coverage is **uneven**. Some coastlines will have no station within any defensible
+distance. Per `rules/coding.md` §1 and the C-76/C-77 rulings, that must **not** silently degrade to the
+gridded bulk product — that would reintroduce exactly the averaged-away groundswell this concern is
+about, just with a different provenance. The correct shape is a **configuration-time viability check**:
+a spot is supportable only if a suitable spectral boundary source exists for it, and the operator is
+told so at setup, in the wizard, with the distance and depth of the station chosen. Same pattern as the
+existing L3 cluster viability test.
+
+### What changes in the code — smaller than C-86 implied
+
+`swan_formats.py` already emits file-based boundary commands for the nested levels
+(`BOUNDSPEC SIDE W CCW CONSTANT FILE 'BOUND_W.txt' 1`) alongside `BOUNDNEST1` for L2/L3. The change at L1
+is to make the boundary file a **2-D spectrum** rather than a TPAR parametric table, and to select
+`BOUNDNEST3` or `BOUNDSPEC ... FILE` per the manual depending on whether one station or several points
+along the boundary are used. **`ww3_to_swan_boundary()`'s single synthesised JONSWAP peak and its fixed
+30° `DSPR` both disappear** — nothing is synthesised any more.
+
+Note a resolution consequence worth flagging: WW3 ocean spectra are **50 freq × 36 dir out to 28.6 s**,
+while our SWAN spectral grid is **32 × 36 out to 23.9 s**. The incoming spectrum is finer and reaches
+longer periods than our grid currently represents, so SWAN's `CGRID` frequency range is part of this
+decision (SWAN will interpolate, per `BOUNDNEST1`'s documented behaviour, but truncating at 23.9 s would
+discard exactly the long-period energy we are trying to recover).
+
+### Still not implemented — the trigger analysis is unchanged and the operator decides
+
+Triggers **7** (new endpoints/products, GRIB and spectral file fetching, a new cached catalogue),
+**4** (`wavewatch.fetch()` must return 2-D spectra, not a bulk `MarineForecastPoint` triple), **1** (the
+boundary specification changes and the fixed 30° `DSPR` is removed), and **3** (SWAN's `CGRID` frequency
+range may need to widen to accept 28.6 s energy).
+
+PROVIDER-MANUAL §14.3 must be rewritten with whatever is approved; it currently documents a PacIOOS
+0.5° bulk republication as "WaveWatch III forecasts", which is how this survived.
+
+### Open questions the operator should decide, stated rather than assumed
+
+1. **One station or several along the L1 boundary?** `BOUNDNEST3` is designed for multiple points
+   ("locations along the nest boundary"); a single station implies `BOUNDSPEC ... FILE`. Several points
+   is more faithful and costs 7.75 MB each.
+2. **Are the IBP files individually addressable?** They are the purpose-built nesting product; only the
+   11 GB tarball was found.
+3. **`CGRID` frequency range** — widen to 28.6 s or accept truncation.
+4. **Max acceptable station distance**, and what the wizard tells an operator whose spot has none.
+5. **GLWU cadence differs** — hourly `bulls.tCCz` for 00–14z observed, versus the ocean product's
+   00/06/12/18z. The runner's cycle logic assumes 6-hourly.
+
+---
