@@ -2416,3 +2416,306 @@ on librewxr, where both existing Clear Skies units run as `ubuntu` and every fil
 which CLAUDE.md §"Filesystem permissions on containers" forbids and which would break the old
 services mid-transition. This belongs in the install documentation C-68 asks for: the shipped unit
 states a default, and a host where Clear Skies already runs as another user matches that user.
+
+---
+
+## C-71 — T8.2b's "remove the `[swan]` section" would silently discard the operator's `omp_num_threads` ruling (DECIDED — named gate exception, C-40 precedent)
+
+Found by the coordinator opening T8.2b, tracing what the API's marine config push actually carries
+before rewriting `api.conf`. The C-67 lesson applied deliberately: walk the payload against the
+model, not the field list.
+
+**What T8.2b says.** *"1. Remove `[swan]` section."* Accept criterion: *"`api.conf` has
+`marine_service_url`, no `[swan]`, no `surf_compute_host`."* The Part B QA table repeats it as
+`grep -E "swan|surf_compute" api.conf` → *"No matches."*
+
+**What `[swan]` actually carries.** Four keys, of two entirely different kinds:
+
+| Key | Kind | Superseded by `marine_service_url`? |
+|---|---|---|
+| `service_url` | connection | **Yes** — this is what T7.2 replaced |
+| `verify_tls` | connection | **Yes** |
+| `omp_num_threads` | SWAN model tuning | **No** |
+| `outer_grid_resolution_km`, `inner_nest_resolution_m` | SWAN model tuning | **No** |
+
+The model-tuning keys are not legacy residue. They are operator-facing settings written by the
+config UI (`templates/admin/trushore.html:146`, `templates/wizard/step_trushore.html:152`
+-> `setup.py:1948` `cfg["swan"]["omp_num_threads"]`), and the API pushes them to the marine service:
+`_build_marine_service_config_payload()` (`endpoints/setup.py:1638-1640`) attaches
+`payload["swan"] = _serialize_swan_section(swan_section)` **only if `[swan]` exists in api.conf**,
+and `_serialize_swan_section()` reads `omp_num_threads` with a default of `0`.
+
+**So deleting the section does not remove a dead key — it changes a live value.** With no `[swan]`
+section there is no `swan` key in the push; the marine side constructs `SwanConfig({})`, which sets
+`omp_num_threads = 0`, documented in its own source as *"0 = let OpenMP use all cores"*. On librewxr
+that is **16**.
+
+**Why that specific number is not a tuning detail.** `reference/clearskies-dev.md` §"librewxr
+resource budget": *"`omp_num_threads = 6`. **Six. Not 16, not 0.** This is an operator ruling, not a
+tuning knob. Do not change it without asking."* With measurements, on the same 81x71 L2 grid:
+
+| `omp_num_threads` | SWAN RSS | L2 wall-clock |
+|---|---|---|
+| 16 | 627 MB peak, **179 MB into swap** | 6m51s - 7m57s |
+| 6 | **87 MB**, no swap | 9m40s |
+
+and on 2026-07-25, at 16 threads with the compute service also busy, one L2 run took **50m32s
+instead of 7m**. Following T8.2b literally would reinstate exactly the condition T8.1b exists to
+prevent, on a box with 1,355 MB available.
+
+**A second, sharper problem — the ruling currently lives in the wrong file.** `omp_num_threads = 6`
+is set in **librewxr's** `/etc/weewx-clearskies/api.conf`, which is read by the old 8767 SWAN
+service. The value in **weewx's** `api.conf` — the one the API pushes from — is **16**.
+`briefs/SURF-PUBLISH-RESULTS-ONLY.md` §7 already noticed this and called it *"harmless (SWAN does
+not run there) but misleading."* **It stops being harmless the moment the API begins pushing it to
+the host that does run SWAN.** This is C-66's lesson exactly: when a change moves where an answer
+comes from, every surface carrying that answer moves with it. T8.4 retires librewxr's `api.conf` as
+a SWAN input; if the ruling is not migrated first, it is simply lost.
+
+**Decision (coordinator).**
+
+1. **Keep `[swan]` in weewx's `api.conf`, carrying the model-tuning keys only.** Remove
+   `service_url` and `verify_tls` — those are the keys `marine_service_url` genuinely replaces, and
+   removing them is what T8.2b's own step 2 is about.
+2. **Migrate the operator ruling: set `omp_num_threads = 6`** in weewx's `api.conf`, replacing the
+   stale `16`. This does not change the ruling; it moves it to the file that now enforces it. The
+   effective value on the SWAN host before and after this phase is 6 either way.
+3. **Record a named gate exception** for the Part B QA `grep -E "swan|surf_compute"` check and the
+   QC Gate 8 "api.conf matches target state" criterion.
+
+**Why this is not an escalation.** Three governing statements, read together, settle it without a
+new decision: `reference/clearskies-dev.md` forbids changing `omp_num_threads` without asking;
+`ARCHITECTURE.md` states the marine service never reads `api.conf` and the API is the single source
+of truth for operator config, so `api.conf [swan]` is the *only* place this value can come from;
+and the shipped API code already reads it from there and pushes it. Per
+`rules/clearskies-process.md` §"Over-triggering is a failure mode too" — the responsibility is
+already settled and this is the next instance of it, not a new design question. And per CLAUDE.md's
+named non-excuse, *"a governing document says so"* is not authorization to make a change that
+breaks an operator ruling: a plan step that is wrong is a finding to surface, which is what this
+entry is.
+
+**Precedent for the gate exception: C-40 at QC Gate 6**, where the gate's grep listed `marine_config`
+and legitimately matched, because the API keeps the marine config *schema* while shedding marine
+*computation*. Identical shape here: the gate's grep term `swan` predates the distinction between
+`[swan]`'s connection keys (gone) and its model-tuning keys (retained by design, because the API
+owns operator config and pushes it). The grep is over-broad, not the config.
+
+**Follow-up, not blocking:** the section name `[swan]` is now the only thing in `api.conf` still
+implying the API knows about SWAN, when what it actually holds is "marine model tuning the operator
+sets and the API forwards." Renaming it is a config-key change (trigger 7) with a wizard, admin,
+serializer and migration surface, and is deliberately NOT bundled into a deploy phase. Recorded for
+a later round.
+
+---
+
+## C-72 — the companion proxy ignores `marine_verify_tls`, re-introducing the Part A TLS failure (OPEN -> fixed in Phase 8, dispatched)
+
+Found by the coordinator immediately after C-71, still reading the API's marine surface against its
+own contract before deploying it. **This one would have taken the entire marine surface down on
+first start.**
+
+**The defect.** `services/companion_proxy.py` hardcodes `verify=True` on every outbound request to
+the marine service — four sites:
+
+```
+257:  httpx.Client(timeout=_MANIFEST_FETCH_TIMEOUT_S,    verify=True)   manifest fetch
+399:  httpx.Client(timeout=_DISCOVERY_REQUEST_TIMEOUT_S, verify=True)   /discovery/* proxy
+433:  httpx.Client(timeout=_PROXY_REQUEST_TIMEOUT_S,     verify=True)   mounted-route proxy
+767:  httpx.post(..., verify=True, ...)                                 POST /report/gap
+```
+
+The marine service's certificate is **self-signed by default** — Ed25519, auto-generated on first
+start. Verified live on librewxr 2026-07-26: `subject=CN = clearskies-marine`, self-signed, SAN
+carrying `192.168.7.22`.
+
+**Consequence.** The manifest fetch fails certificate verification, so **zero marine routes are
+mounted** and every marine page is dead — while `api.conf` says `marine_verify_tls = false`. This is
+the same `SSL: CERTIFICATE_VERIFY_FAILED certificate verify failed: self-signed certificate` that
+the plan's §0.2 records as the Part A root cause and that Phase 2 fixed on the old path. The new
+path re-introduces it.
+
+**And the diagnostic lies.** `POST /setup/providers/test-marine` (`setup.py:~2818`, `~4498`) **does**
+honour `marine_verify_tls`, as does the config push (`_push_marine_service_config()`:
+`httpx.AsyncClient(timeout=10.0, verify=verify_tls)`). So the wizard's Test Connection reports
+success, the config push succeeds, and the proxy silently mounts nothing. Same family as C-64 — the
+operator is told it worked.
+
+**The contract this violates is explicit in three governing documents**, none of which scopes the
+key to the config-push path:
+
+- `API-MANUAL.md:3082` — *"Verify TLS certificate **on marine service requests**. Set `false` for a
+  self-signed cert on the same VLAN (TLS encryption stays active either way)."*
+- `OPERATIONS-MANUAL.md:1080` — the same table row.
+- `OPERATIONS-MANUAL.md:1131` — *"For separate-host deployments with a self-signed cert, set
+  `marine_verify_tls = false` in `api.conf [providers]`."*
+
+`config/settings.py` parses only `marine_service_url` from `[providers]` (`settings.py:1319-1332`),
+never `marine_verify_tls`, which is why the proxy had nothing to read.
+
+**Not an architectural change, so not escalated.** No config key is added: `marine_verify_tls`
+already exists, is already written by the wizard, already parsed by
+`_read_marine_service_connection()`, and already honoured at three call sites. Making four more
+honour it is CLAUDE.md's explicitly-permitted *"fix a defect where code diverges from its own stated
+contract."* The secure default `True` is unchanged.
+
+**Dispatched to `clearskies-api-dev`** with the secure default preserved and a startup WARNING
+required when verification is disabled, so an unverified TLS connection is visible in the journal
+rather than silent.
+
+**How this survived Phase 6's audit and QC Gate 6.** The gate criterion was *"proxy mounts routes
+from manifest"*, verified against a mock. Nothing had ever pointed the proxy at the real
+self-signed marine service, because — per the Phase 7 closeout — *"nothing is deployed until Phase
+8"* and config push was recorded as **NOT LIVE-TESTABLE**, verified by contract inspection only.
+Contract inspection reads the code's stated contract; it does not read the TLS material the code
+will meet. Worth carrying: the class of defect that survives a mock is the one where the mock's
+transport is not the real transport.
+
+---
+
+## C-73 — the marine service's config-recovery pull has C-72's defect, mirrored (OPEN → Phase 8, low priority)
+
+Found by the coordinator at T8.2, immediately after C-72, while choosing how to get the first config
+into the marine service. Same defect class, opposite direction, different repo.
+
+`weewx_clearskies_marine/config/__init__.py` `fetch_config_from_api()` (line ~162) calls:
+
+```python
+resp = httpx.get(
+    url,
+    headers={"Authorization": f"Bearer {secret}"},
+    timeout=timeout,
+)
+```
+
+No `verify=` argument, so httpx defaults to `verify=True`. The API it is fetching from presents a
+**self-signed** certificate — `ARCHITECTURE.md`'s container inventory: *"TLS always enabled (Ed25519
+self-signed by default)"*. So on the documented default deployment the T6.4b startup recovery pull
+fails certificate verification, logs
+`Failed to fetch marine config from ...: ConnectError`, and the service starts serving `/health` and
+`/manifest` only.
+
+**Why it is much less severe than C-72, and is not being fixed in the same breath.**
+
+- C-72 broke the **primary** path — the API's manifest fetch, on every start, taking the entire
+  marine surface down.
+- C-73 breaks a **recovery** path that only runs when the marine service starts with no local
+  `marine.conf`. The normal path — the API's `POST /config` push — is unaffected, and a local config
+  file always wins over this fetch. On this installation `CLEARSKIES_MARINE_API_URL` is not set at
+  all, so the fetch is never even attempted.
+- Its failure is already loud: the caller logs ERROR naming the URL, and `__main__.py` follows with
+  *"serving /health and /manifest only until POST /config"*. Nothing is silently wrong.
+
+**Not fixed in Phase 8's deploy round, deliberately.** Unlike C-72 there is no existing config key to
+honour: the marine service has no `verify_tls` setting of its own for its outbound call to the API,
+and the connection is described by a single environment variable (`CLEARSKIES_MARINE_API_URL`).
+Deciding how the marine service should be told whether to verify the API's certificate — a new
+setting, or trust derived from the URL, or an explicit CA path — **adds a config key, which is
+trigger 7.** That is a design question, and this deploy phase is the wrong place to answer it.
+
+**What was done instead, and why it is sufficient for now.** The first config was delivered by
+`POST /config` — byte-identical to what the API's push sends, since `GET /setup/marine/config` and
+the push are built by the same `_build_marine_service_config_payload()` (API-MANUAL §19.5, *"one
+serializer, both paths"*). The payload was fetched from that endpoint and posted verbatim. Verified
+landed: `marine.conf` written (4,031 bytes, mode 0640), grid-sizing chain ran to completion, runner
+started.
+
+**The standing lesson, third instance this phase.** C-72, C-73 and the same-host trust claim in
+`OPERATIONS-MANUAL.md:1131` (*"For same-host deployments the API accepts this certificate without
+verification (localhost trust)"* — also not implemented) are all the same shape: **TLS verification
+was decided per-call-site rather than per-connection, and every site that was not the one someone
+tested got the library default.** A connection between two Clear Skies services should have exactly
+one place that decides whether its certificate is verified. Worth an ADR rather than a third
+point-fix.
+
+---
+
+## C-63 — CLOSED (stack `eda8fdd`)
+
+`MARINE_SAME_HOST_URL = "https://localhost:8780"` now lives once, in a new
+`weewx_clearskies_config/constants.py`. Both routers import it and neither imports the other, so the
+house rule the duplication existed to protect still holds. The comment in `admin/routes.py`
+explaining the deliberate duplication is removed — a comment describing a reversed decision is worse
+than none. The two *other* local-copy comments in that file (the `_()` helper, the photo-sidecar
+helper) are untouched; those duplications are real and still deliberate.
+
+Full `8780` sweep after the change: one Python definition, plus a docstring example in
+`wizard/state.py:251-252` (accepted URL formats, not a same-host default) and
+`https://marine.example.com:8780` placeholders in two templates and a translatable help sentence.
+The placeholders are operator-facing copy and the help sentence is a translation key — folding
+either into the constant would break 13 locale files for no gain. Left, and named, rather than
+absorbed.
+
+---
+
+## C-64 — CLOSED for what was in scope, with one limitation recorded rather than papered over (stack `e573a7e`, `0287950`; meta `d8c7c93`)
+
+**Part 1 — the empty string no longer reaches the API.** `marine_service_save` sends
+`marine_service_url` (and `marine_verify_tls`) only when the field is non-empty; omission is the
+API's documented "leave it alone" signal. The wizard already did exactly this
+(`wizard/routes.py:4177`) — checked, not assumed, so no wizard change was needed.
+
+**Part 2 — both directions guarded**, using the saved marine locations from the
+`GET /setup/current-config` response the section already fetches. No new endpoint, no new config key,
+no new error mechanism. Blank URL with ≥1 saved location is blocked; adding a *new* location with no
+`marine_service_url` is blocked. **Editing an existing location is deliberately not blocked**, so a
+config already in that state — say from a hand-edited `api.conf` — stays repairable.
+
+**The limitation, stated because it matters and was not in the original concern.** The API writes the
+URL under `if apply.marine_service_url is not None:`, so **`None` means "leave the existing value
+alone", not "clear it."** After this fix, clearing the field no longer persists a broken empty URL —
+but it also cannot clear a saved one, and the operator sees the old value reappear on re-read. A true
+"disconnect" needs an API-side sentinel distinguishing *omitted* from *explicitly cleared*, which is
+a change to the `ApplyRequest` data contract — **trigger 4, not authorised here.** Documented in
+API-MANUAL §19.2 and both operator-facing manuals rather than left as a surprise. **The half C-64
+actually described — "an operator can disconnect the marine service and be told it saved" — is
+closed:** nothing false is persisted and nothing false is reported.
+
+**Verification** (baseline from a read-only worktree at `b7830bb`): ruff 174 errors before and after,
+mypy 93 before and after, pytest **309 passed / 6 failed / 12 xfailed before AND after** — the same
+six pre-existing failures (`test_registry` ×1, `test_wizard_earthquake_config` ×4,
+`test_wizard_topology` ×1), none marine. Six behaviour smoke checks through a real `TestClient` with
+the API client mocked all passed, including an explicit confirmation that the **pre-fix** payload
+still validates with `marine_service_url=''` — the defect itself, reproduced before being fixed.
+
+The apply payload was walked against the **real** `ApplyRequest` imported from the API repo, not
+inferred from the template (C-67's lesson applied): `database`, `station`, `column_mapping`,
+`column_units`, `marine`, `marine_service_url`, `marine_verify_tls`, `marine_service_secret` all
+confirmed accepted under `extra="forbid"`.
+
+**Two new English strings** were added and no locale files were touched — they belong to the C-69
+round and are listed there.
+
+**Adjacent finding not fixed, deliberately:** a blocked *add* can leave an orphaned
+`marine-photos/<slug>.*` file and sidecar row, because the photo is written before the API is
+contacted. Overwritten on a successful retry with the same name. Moving the guard earlier would
+reverse the section's deliberate "photo upload must not be gated on API reachability" ordering — a
+behaviour change, correctly declined.
+
+---
+
+## C-74 — the admin help text advertises port 8766 for the marine service, in all 13 locales (OPEN → C-69's round)
+
+Found by the C-64 agent while rewriting adjacent operator copy, and correctly named rather than
+silently fixed.
+
+`help.admin.marine_service.body` tells the operator that the same-host marine service address is
+**`https://localhost:8766`**. It is `8780` everywhere else — the port registry, `api.conf`, the
+wizard, the admin's own placeholder text, and the running service.
+
+**8766 is not a typo for 8780. It is a real port that was deleted.** ARCHITECTURE.md's port registry:
+*"Removed ports (ADR-058, 2026-06-14): Port 8766 (Realtime BFF main) and 8082 (Realtime BFF health)
+are eliminated. The realtime service has been merged into the API."* So the help text hands the
+operator the address of a service that has not existed since June, and an operator who follows it
+gets a connection refused with no clue why.
+
+**C-66's pattern for the third time this phase** — an answer moved and one surface explaining it did
+not follow. Same family as C-72 (the proxy that ignored the key three manuals documented) and C-73.
+
+**Routed to C-69's locale round, not fixed here.** The string lives in all 13 locale catalogues; the
+C-69 round is the one that touches them, and the operator directive is explicit that locale work is
+its own round and must not be folded into a deploy phase. The same wrong port in
+`docs/OPERATOR-MANUAL.md` **was** fixed (stack `0287950`), because it is not a locale file and sat
+inside a sentence that had to be rewritten anyway.
+
+**Also fixed in `0287950`:** `docs/OPERATOR-MANUAL.md` told the operator *"Leave blank to
+disconnect."* That was never true — it is the exact instruction that leads into C-64's defect.
