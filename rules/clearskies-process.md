@@ -553,3 +553,29 @@ deciding wrongly: it burns the operator's time *and* signals the docs are option
 **How to apply.** When a units or ownership question surfaces: grep the manuals first, cite the
 section, and implement. Escalate only if the manuals genuinely conflict with each other — and
 then escalate the *conflict*, with both citations, not the underlying question.
+
+## Moving a module moves its dependencies — that is not a new dependency
+
+**Rule.** When a plan directs you to move a module to another service, its existing imports move with
+it. Adding `scipy` to the target service's `pyproject.toml` because you moved a module that has
+always imported `scipy` is **not** trigger 7 and does not need approval. Trigger 7 is about a
+service *acquiring a dependency it did not previously need* — a design decision. Carrying an
+existing one along with the code that requires it is the mechanical consequence of a move that was
+already authorised when the file was named on the move list.
+
+**The test:** would this dependency exist if the code had stayed where it was? If yes, it travels
+with the code and needs no approval. If no — the module is being changed to need something new —
+that is trigger 7 and stops.
+
+**Why (2026-07-25):** Phase 5 of the marine separation named ~29 modules to move. The coordinator
+treated their unguarded imports (`scipy`, `shapely`, `prometheus-client`, `babel`, `pyyaml`,
+`skyfield`) as six trigger-7 additions, escalated them as one blocking item (C-15), and registered a
+decision to "escalate and wait, do not self-approve." The result: eight modules left unimportable,
+three routers unregistered, and the operator asked to authorise what the plan had already authorised
+by naming the files. The operator's response: *"this was specifically outlined in the plan phase 5
+TO MOVE — why did you defer?"* Over-triggering has a real cost; it is not the safe default it feels
+like.
+
+**Corollary — do not leave a resolved item wearing a blocking marker.** C-15 was answered and its
+code landed, but its heading still read "⛔ BLOCKING, AWAITING OPERATOR" hours later, so it read as
+live work. Close the entry in the same action that closes the work.

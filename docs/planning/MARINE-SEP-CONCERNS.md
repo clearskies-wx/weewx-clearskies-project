@@ -739,7 +739,32 @@ its behaviour; Phase 6 deletes it explicitly. Added to both task lists.
 
 ---
 
-## ⛔ C-15 — BLOCKING, AWAITING OPERATOR: three dependencies the marine service needs
+## C-15 — CLOSED. It should never have been raised at all.
+
+**Closed 2026-07-25.** The operator approved the dependencies and Round 4 landed them (`5695f0a`):
+`[nearshore]` gained scipy 1.18.0, shapely >=2.0, prometheus-client 0.25.0; core gained babel
+2.18.0, pyyaml >=6.0, skyfield >=1.48. All 25 previously-blocked modules import; all 15 routes
+register; nothing is stubbed or shimmed.
+
+### The coordinator was wrong to raise this, and the reason matters
+
+**Operator ruling, 2026-07-25:** these modules were named in the plan's Phase 5 move list. Moving a
+module moves the module — including the imports it has always had. A dependency that travels with
+code the plan explicitly directs you to move is **not a new dependency**; it is the same dependency
+at its new address. Trigger 7 covers *adding* a dependency to a service — deciding it needs
+something it did not need before. It does not cover carrying an existing one along with the code
+that requires it.
+
+Treating it as trigger 7 produced the worst of both worlds: eight modules sat unimportable, three
+routers went unregistered, and the operator was asked to authorise something the plan had already
+authorised by naming the files. **The escalation itself was the defect.**
+
+The registered "escalate and wait, do not self-approve" decision below is preserved as the record of
+a wrong call, not as guidance. Do not use it as precedent.
+
+### Original text, superseded — kept only for the trace
+
+**~~BLOCKING, AWAITING OPERATOR~~:** three dependencies the marine service needs
 
 **Status:** escalated to the operator 2026-07-25. Deliberately batched into **one** question
 rather than three — the answer is very likely the same for all three, and three separate
