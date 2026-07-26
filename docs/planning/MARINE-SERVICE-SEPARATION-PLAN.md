@@ -3692,6 +3692,34 @@ reject valid Great Lakes stations.
 selection correct for both cadences. If deferred for the reason above, the deferral is recorded in the plan
 and in the concerns register, not left implied.
 
+**STATUS 2026-07-26 — PARTIALLY DELIVERED, remainder blocked on an operator ruling (C-94).**
+
+Landed:
+
+- **GLWU catalogue built and shipped** — 96 stations, complete, cycle `20260726/23`, ~80 s at 2 req/s. The
+  count is the live listing's, not the brief's estimated ~115. Shipped as package data alongside the ocean
+  product (C-92a).
+- **Product routing** — `select_boundary_stations_with_cycle_fallback()` classifies the L1 extent's *centre*
+  (not its corners) with `enrichment/bathymetry.py`'s existing `classify_region()` and routes a
+  `REGION_GREAT_LAKES` domain to GLWU. Routing lives in the shared wrapper, so the runtime path and the
+  config-time check cannot disagree, and neither call site chooses a product any more.
+- **Cadence branch** — GLWU is hourly, the ocean product 6-hourly; the cycle rounding and the up-to-3
+  fallbacks now step by the routed product's own interval.
+- **Mis-routes are loud** — the routed product's own distance criterion (2.5 km for GLWU) is applied against
+  its own catalogue, so a wrongly routed spot refuses rather than producing a boundary from the wrong water
+  body.
+
+**Not landed, and not to be attempted without a ruling: C-94.** The L1 boundary can only be entered from the
+**W and S** sides — hardcoded in `ww3_station_selection.py` and `swan_formats.py:1921`, and
+`BoundaryNotViableError` is raised unless *both* have a station. Measured against the built catalogue, all
+21 GLWU stations within 40 km of the Whiting spot lie **north or east** of it; none west or south. Whiting
+therefore routes correctly and then refuses. This is a Pacific-coast assumption that also excludes every
+Atlantic and Gulf spot, and changing which sides the spectrum enters through is **trigger 3**. Options,
+costs and a recommendation are in C-94.
+
+**Whiting stays unconfigured** until that ruling lands — the T8.10e ordering constraint above is unchanged
+and a boundary failure aborts the cycle for Huntington too.
+
 #### T8.10f — Configuration-time viability, no silent degradation
 
 - **Owner:** `clearskies-api-dev` (marine repo) + `clearskies-docs-author`

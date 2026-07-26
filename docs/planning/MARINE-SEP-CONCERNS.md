@@ -4545,3 +4545,76 @@ coordinates, ZHR, parent bodies, descriptions — with the timing computed per y
 Recorded in `docs/RELEASE-DATA-REFRESH.md` under the meteor-shower note as well.
 
 **Disposition:** operator ruling. Small, self-contained, blocks nothing.
+
+---
+
+## C-94 — the L1 spectral boundary can only enter from the W and S sides, so a Great Lakes spot still cannot be fed (BLOCKS T8.10e accept → **needs an operator ruling, trigger 3**)
+
+**Found 2026-07-26** while implementing T8.10e. The product routing half of that task is done and
+committed: `select_boundary_stations_with_cycle_fallback()` now classifies the L1 extent's centre with
+`enrichment/bathymetry.py`'s existing `classify_region()` and sends a `REGION_GREAT_LAKES` domain to GLWU
+at its hourly cadence instead of the ocean product at 6-hourly. That closes the "fetched a boundary from an
+ocean model with no water there" half of the defect.
+
+**What it does not close.** Which *sides* of L1 carry the incoming spectrum is hardcoded to **W and S** in
+two places — `ww3_station_selection.py` (`by_side = {"W": [], "S": []}`, the nearest-side assignment, and
+the `len_deg` formula) and `swan_formats.py:1921` (`for side in ("W", "S")`, which emits the `BOUNDSPEC
+SIDE <s> CCW VARIABLE FILE` lines). Both were written for Huntington, where offshore genuinely is west and
+south. `select_boundary_stations()` raises `BoundaryNotViableError` unless **both** W and S end up with at
+least one station.
+
+**Measured against the real catalogue, not reasoned from a map.** Every GLWU station within 40 km of the
+operator-supplied Whiting spot (41.680447 N, -87.483689 W) lies north or east of it:
+
+| distance | bearing | station |
+|---|---|---|
+| 1.1 km | 016° | `WHIBRip005`, `WHIBRip006` |
+| 1.2 km | 334° | `WHIBRip002`–`004` |
+| 2.6 km | 328° | `WHIBRip001` |
+| 8.9 km | 351° | `WhihalaBch` |
+| 22.6–24.2 km | 103–104° | `IndDunesNP`, `IDNPRip001`–`006` |
+| 34.3–35.1 km | 92–94° | `IndDunesSP`, `IDSPRip001`–`006` |
+
+21 stations within 40 km, **none of them west or south**. Whiting sits at the southwest corner of Lake
+Michigan: an L1 box centred there has inland Indiana on its S side and inland Illinois on its W side. So a
+Whiting configuration routes correctly to GLWU and then refuses, because the two sides it is allowed to use
+face away from the water.
+
+**This is not a Great Lakes quirk.** Any east-coast or Gulf spot has the same problem — offshore is E or S
+on the Atlantic, S or E on the Gulf. The W/S pair is a Pacific-coast assumption that has never been tested
+because Huntington is the only configured spot.
+
+**Why this is not being fixed unilaterally.** Choosing which domain sides the incoming wave spectrum enters
+through is **trigger 3** — it is where WW3 hands off to SWAN, and it changes the model's boundary
+definition. The plan's own T8.10e text anticipates exactly this: *"if it turns out otherwise, report what is
+actually missing rather than building it silently."*
+
+**The options, with what each costs:**
+
+1. **Derive the offshore sides from the coastline orientation already computed per spot.** The grid-sizing
+   chain already computes a shore-normal bearing for each spot (it is what sizes the transect and the L3
+   cluster). The two sides whose outward normals are within 90° of that bearing are the offshore pair. Costs
+   a change in both modules and a re-verification of the `[len]` CCW geometry for the N and E sides, which
+   is currently derived and documented only for W and S.
+2. **Derive them from the bathymetry** — the sides whose cells are water rather than land, which is now
+   knowable per cell since C-90 made unknown depths explicit `EXCEPTION` values rather than a fabricated
+   −15 m.
+3. **Keep W/S and restrict configuration to west-facing coasts.** Honest, but it makes the Great Lakes
+   support that already exists throughout the codebase unreachable, and silently excludes the entire east
+   and Gulf coasts.
+
+**Recommendation: option 1**, because the shore-normal bearing is already computed, already trusted for grid
+sizing, and gives one answer per spot that cannot disagree with the geometry the rest of the chain uses.
+
+**A second question sits behind it, not to be decided now either.** The deep-water criterion
+`depth >= 0.78 · T_max²` is applied identically to both products. The Whiting-area GLWU stations are
+~1 km-spaced rip-current output points in shallow nearshore water, so they may fail that criterion even once
+the side geometry allows them — and "deep water" for a fetch-limited 4–5 s lake wind sea is a different
+depth from a 19 s Pacific groundswell's. Whether the same coefficient is right for both is a physics
+question (trigger 1), and it should be answered from the literature rather than by tuning until Whiting
+passes.
+
+**Disposition:** operator ruling on the side-selection option. Until then T8.10e is **partially delivered** —
+routing and cadence land, the Great Lakes accept criterion does not. Whiting must NOT be configured
+meanwhile: per T8.10e's own ordering constraint, a spot whose boundary cannot be fed aborts the SWAN cycle
+for **every** spot, including Huntington.
