@@ -1334,3 +1334,27 @@ says the API contains none of.
 them together avoids settling one in a way that contradicts the other. Held out of the Phase 6
 deletion meanwhile: `providers/buoy/`, `providers/tides/`, `providers/marine/`, `providers/ocean/`
 and their dispatch registry rows.
+
+---
+
+## C-43 — `surf.conditions.unavailable` is untranslated in 12 of 13 locales (OPEN → i18n round, not Phase 6)
+
+Found by the deletion agent running C-39's all-locales precondition. Verified by the coordinator.
+
+`surf.conditions.unavailable` ("Surf forecast unavailable — model data incomplete.") exists in
+`en.json` and is **absent from all 12 other locale files** — de, es, fil, fr, it, ja, nl, pt-BR,
+pt-PT, ru, zh-CN, zh-TW. The other 49 marine-emitted keys are present in all 13.
+
+**Pre-existing, and not caused by anything in this separation.** The marine service's locale files are
+a byte-level copy of the API's: a flattened key-set diff of `fr.json` shows **zero** keys present in
+the marine copy and missing from the API's. The gap is identical on both sides and predates Phase 5.
+
+**Consequence for C-39: none.** The precondition on that deletion existed to prevent losing
+translations that lived only in the marine copy. There are none. C-39 proceeds.
+
+**Consequence for operators: a non-English operator whose model has no result for an hour sees an
+English sentence** (or the raw key, depending on the i18n fallback) where every other string on the
+card is localised. Small, real, and cheap to fix — one string, twelve files.
+
+**Disposition: an i18n round, not Phase 6.** Recorded so it is not lost now that the check that found
+it has been satisfied and will not run again.
