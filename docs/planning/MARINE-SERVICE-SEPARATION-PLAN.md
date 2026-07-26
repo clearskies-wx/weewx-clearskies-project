@@ -3438,6 +3438,35 @@ A Great Lakes spot still needs to be **configured** to verify against, since non
 support above, that should be a configuration entry rather than new machinery — but if it turns out otherwise,
 report what is actually missing rather than building it silently.
 
+**Great Lakes test fixture — Whiting, Indiana (operator, 2026-07-26).** Configure at **final testing only**
+(T8.10h), not before — see the ordering constraint below.
+
+| | |
+|---|---|
+| Location | **Whiting Lakefront Park**, Whiting, Indiana — southern Lake Michigan |
+| Spot | the **sandy cove on the eastern edge of the park** |
+| Park reference coordinate | 41.6827 N, -87.4874 W (1500 Park Rd, Whiting, IN 46394; 26 acres, ~half-mile shoreline) |
+| Exact cove coordinate | **confirm with the operator at configuration time** — the figure above is a park centroid, and the operator redesigned this lakefront and has intimate knowledge of the cove |
+| Provenance | operator's local knowledge: people surf here when the lake gets churned up |
+
+**Why this is a strong test case and not a duplicate of Huntington.** Lake Michigan surf is **fetch-limited
+wind sea** generated locally, with no long-period swell trains arriving from distant storms. Huntington's
+defining case is the opposite — a 19 s austral groundswell. So this fixture exercises a different physical
+regime and a different part of the model: short-period growth and dissipation over limited fetch rather than
+long-period shoaling and refraction. It also tests the GLWU cadence branch (hourly vs the ocean product's
+6-hourly) and the `32 36` spectral shape against the ocean's `50 36`.
+
+**ORDERING CONSTRAINT — do NOT configure this spot before the GLWU pull works.** Spot failures are **not
+isolated**: a raise in the SWAN setup path aborts the run for **every** spot, by design and by its own comment
+(`providers/nearshore/swan.py:2004-2011` — *"aborting this SWAN run rather than silently substituting ... for
+all spots"*). Since C-76/C-77 make a missing boundary raise, adding a Great Lakes spot while its wave source
+is still the ocean model would abort the cycle every 5 minutes without advancing `last_hrrr_cycle`, and
+**Huntington would stop producing forecasts too**. Configure Whiting only once T8.10e can actually fetch GLWU.
+
+**Also needed at configuration time:** the nearest GLWU spectral station to southern Lake Michigan, which
+T8.10a's catalogue will supply (the `.bull` range-request gives each station's `Location : <id> (lat lon)`).
+Do not assume a station id.
+
 **Accept:** A Great Lakes spot produces a real spectral boundary where it previously produced none; cycle
 selection correct for both cadences. If deferred for the reason above, the deferral is recorded in the plan
 and in the concerns register, not left implied.
