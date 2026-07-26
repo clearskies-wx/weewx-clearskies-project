@@ -1681,7 +1681,48 @@ the only channel by which a route reaches the dashboard (C-30's standing rule).
 
 ---
 
-## C-54 — `GET /setup/marine/swan-check` probes for the SWAN binary on the wrong host (OPEN → ⚠ needs an operator decision)
+## C-54 — DECIDED BY OPERATOR: the API answers the SWAN question by asking the marine service (DECIDED)
+
+**Ruling (operator, in chat, 2026-07-25):** *"You work it just like any other query to the API — the
+API needs to handle the query. The API will know whether SWAN is installed as it will have to have
+registered with the API."*
+
+Option (a). The marine service exposes `GET /discovery/swan-check`; the API's
+`/setup/marine/swan-check` becomes a pass-through and drops its local `shutil.which("swan")`. The
+API-facing path, parameters and response shape do not change, so the three wizard call sites
+(`wizard/routes.py:3126`, `:3637`, `:3698`) and any admin consumer keep working untouched. Error
+policy is a hard 503 on an unreachable marine service — never "SWAN not installed", which would
+replace one wrong answer with another. The host CPU core count in the response must describe the
+**marine service** host, since that is the host that runs SWAN.
+
+**The escalation was the defect, and the reason is worth recording — it is the third time.**
+
+This question was already answered by the C-42 ruling and by `ARCHITECTURE.md`'s add-on invariant:
+a component that needs marine data asks the API, and the API fronts the marine service. Two
+instances of that exact pattern had landed **the same morning** (C-48's compute-estimate and
+bathymetry-coverage). The coordinator nevertheless framed it as an open architectural question on
+the grounds that answering it needs a third marine endpoint, and that adding an endpoint is trigger
+7 outside C-48's authorisation.
+
+That framing was wrong in the same way C-15 and C-26 were wrong. **Trigger 7 governs deciding that a
+service needs a new interface — a design choice. It does not govern applying an already-ruled
+pattern to the next instance of the same question.** Counting endpoints is not the test; whether the
+responsibility is already settled is the test. It was settled, twice over.
+
+There is a second miss underneath the first: the coordinator never asked *how the API would know*,
+and the answer was structural rather than a matter of adding a probe. **The marine service registers
+with the API** — manifest at startup, refreshed every five minutes, plus `/health`. The registration
+channel already exists and is the thing that makes this a routine query rather than a new
+capability.
+
+**Cost of the error:** operator time and patience, for a question the project's own documents had
+answered before it was asked. Same lesson as the units and ownership doctrine already recorded in
+`rules/clearskies-process.md`: escalating a documented answer is not caution, it is a failure to
+read.
+
+### Original escalation, superseded
+
+**~~AWAITING OPERATOR~~:** `GET /setup/marine/swan-check` probes for the SWAN binary on the wrong host
 
 Found by the coordinator's Phase 7 survey of `endpoints/setup.py`. **Not covered by C-42's four
 pinned imports and not covered by C-48's two endpoints**, so no existing ruling reaches it.
@@ -1883,7 +1924,46 @@ about to stop needing it.
 
 ---
 
-## C-58 — removing the TruShore service URL strands the deployment-mode control and a route (⚠ AWAITING OPERATOR)
+## C-58 — DECIDED BY COORDINATOR: the stranded deployment-mode control is deleted with the URL (DECIDED)
+
+**Decision (coordinator, 2026-07-25): option (a).** Delete the "Deployment mode" fieldset,
+`trushore_deployment_mode`, the orphaned `POST /wizard/trushore/test-service` route, and the
+`service_url` emission in `build_trushore_payload`, together with the URL field itself. T7.2's
+"single URL field" criterion is then genuinely met.
+
+**This should not have been escalated, and CLAUDE.md answers it directly.** Its own
+architecture-vs-methodology table has the row:
+
+> Removing code that provably never executes — **Methodology** — *Nothing was being done; nothing
+> stops being done.*
+
+That is exactly this case, and the "provably" was already established by measurement rather than
+assumed: the radio's `onchange` handlers toggle the service-URL row **and nothing else**, and
+`build_trushore_payload` consults the mode **only** to decide whether to emit `service_url`. Once
+T7.2 removes that field — which the plan directs and API-MANUAL §19.2 independently states — the
+control has no effect on the UI and no effect on the written config. It is inert, and removing inert
+code is methodology. `rules/coding.md` §3 (no code without a current caller) is a rule already
+written down, and applying a written rule is explicitly inside what may be done without asking.
+
+**Why the coordinator got it wrong:** it pattern-matched "delete a component" to trigger 2 and to the
+Phase 4A `wave_transform.apply_supplements()` incident, without applying the test that distinguishes
+them. In that incident a component with **live behaviour** was deleted — a responsibility
+disappeared. Here nothing is being done in the first place, because the thing the control existed to
+reveal is gone. **Trigger 2 asks whether a responsibility moves or vanishes. A control whose only
+responsibility was revealing a deleted field has no responsibility left to lose.**
+
+Recorded because this is the second escalation in one session that the project's own documents
+already answered (see C-54), and both were over-triggering, not under-triggering. Over-triggering
+has a real cost and is not the safe default it feels like — the same conclusion `rules/clearskies-process.md`
+already draws from C-15.
+
+**Not covered by this decision, and deliberately so:** every other field on the TruShore step — SWAN
+grid bbox, nested-grid resolutions, OMP thread count, the per-spot breaker and display settings — is
+live and untouched. Only the deployment-mode control and the URL it revealed are removed.
+
+### Original escalation, superseded
+
+**~~AWAITING OPERATOR~~ — the stranded control**
 
 **Severity:** blocks T7.2's "single URL field" acceptance criterion. Nothing else.
 

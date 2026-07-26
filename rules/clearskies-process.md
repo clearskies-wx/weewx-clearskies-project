@@ -554,6 +554,44 @@ deciding wrongly: it burns the operator's time *and* signals the docs are option
 section, and implement. Escalate only if the manuals genuinely conflict with each other — and
 then escalate the *conflict*, with both citations, not the underlying question.
 
+## Over-triggering is a failure mode too — apply the settled pattern, do not re-escalate it
+
+**Rule.** Before escalating anything as architectural, ask two questions in this order:
+
+1. **Has this responsibility already been ruled on?** If a ruling exists and this is simply the next
+   instance of the same question, applying it is not a new decision. Trigger 7 governs deciding that
+   a service needs a new interface — a design choice. It does **not** govern applying an
+   already-settled pattern to the next case. Counting endpoints, config keys or dependencies is not
+   the test; whether the responsibility is settled is the test.
+2. **Does the code in question still do anything?** CLAUDE.md's own table says removing code that
+   provably never executes is methodology, not architecture — *nothing was being done; nothing stops
+   being done*. Trigger 2 asks whether a responsibility moves or vanishes. A control whose only job
+   was revealing a field that is being deleted has no responsibility left to lose. "Provably" means
+   measured — trace every caller and every effect — not assumed.
+
+**The asymmetry that makes this hard, stated plainly:** under-triggering is loud and
+over-triggering is quiet, so over-triggering *feels* safe. It is not. It costs the operator time and
+money, it stalls work behind questions the project's own documents already answer, and — as C-15
+demonstrated — it can leave whole modules unimportable and routers unregistered while everyone waits
+for an approval that was never needed.
+
+**When you do escalate, escalate the conflict, not the question.** If two governing documents
+genuinely disagree, bring both citations. If one document answers it, cite the section and implement.
+
+**Why (2026-07-25, marine separation Phase 7):** the coordinator escalated two items in one session
+that the documents already settled. **C-54** — how should the wizard learn whether SWAN is installed,
+now that it does not run on the API host? — was answered by the C-42 ruling and ARCHITECTURE.md's
+add-on invariant (the wizard asks the API; the API fronts the marine service), and two instances of
+that exact pattern had landed *the same morning*. The coordinator framed it as open because answering
+it needed a third marine endpoint. It also never asked *how the API would know*, whose answer was
+structural: the marine service registers with the API, so the channel already existed. **C-58** — may
+a control be deleted once the field it existed to reveal is gone? — was answered by the
+architecture-vs-methodology table above; the coordinator pattern-matched it to the Phase 4A
+`wave_transform.apply_supplements()` incident without applying the test that distinguishes them (in
+that incident, a component with **live behaviour** was deleted). The operator's response to both was
+that they should never have been asked. Both were over-triggers. Compare C-15, where the same
+instinct left eight modules unimportable.
+
 ## Moving a module moves its dependencies — that is not a new dependency
 
 **Rule.** When a plan directs you to move a module to another service, its existing imports move with
