@@ -17,7 +17,7 @@ it. Read the plan's T8.10 for current task state.
 We are not using WaveWatch III. `providers/marine/wavewatch.py` fetches
 `pae-paha.pacioos.hawaii.edu/erddap/griddap/ww3_global` — a **PacIOOS** (Pacific Islands Ocean Observing
 System) republication of the legacy `NWW3_Global_Best` product at **0.5°**, carrying **one averaged swell
-triple**. NOAA's operational WaveWatch III publishes **full 2-D directional spectra** in the exact file
+triple**. **Its coverage is global — the defects are resolution and the averaging, not extent.** NOAA's operational WaveWatch III publishes **full 2-D directional spectra** in the exact file
 format SWAN's `BOUNDNEST3` command reads. We take a spectrum WW3 already computed, throw away its
 structure, and synthesise a single JONSWAP peak from the leftovers.
 

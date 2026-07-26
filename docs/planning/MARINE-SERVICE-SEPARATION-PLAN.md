@@ -3463,9 +3463,8 @@ that function's return shape and T8.10c owns only `swan_formats.py`, so without 
 either breaks `/marine` or leaves the misdescribed PacIOOS source alive — the exact thing T8.10g exists to
 eliminate.
 
-**Do:** Point this consumer at **gridded** WW3 (`gfswave.global.0p25`, pole-to-pole +90/-90 at 0.25 deg —
-finer than PacIOOS's 0.5 deg and truly global, unlike `global.0p16` which spans only 52.5N-15.0S) and at
-**GLWU gridded** for Great Lakes. Keep bulk fields bulk; expose the three swell partitions where the
+**Do:** Point this consumer at **gridded** WW3 using the two-tier selection below, and at **GLWU gridded**
+for Great Lakes. Keep bulk fields bulk; expose the three swell partitions where the
 response shape already has somewhere to put them, and do **not** invent new fields under this task.
 Delete the PacIOOS/ERDDAP fetch path once no consumer remains.
 
@@ -3480,6 +3479,44 @@ proceeds.
 **Accept:** No consumer of `wavewatch.fetch()` reads PacIOOS. `/marine` returns data at arbitrary spots
 including the Great Lakes, where it previously returned nulls. No new response fields added without a
 ruling.
+
+**Grid resolution tiering — operator direction, 2026-07-26.** Verbatim: *"the current source we are using IS
+GLOBAL, we just need to specify the right files. If we have the ability to get more accurate and detailed
+grid files for large parts of the world, which would be the mid latitude areas, then let's do that... and we
+use the .25 degree files for the remaining parts of the world (well other than Great Lakes which as its own
+files)."*
+
+**Correction to the record:** the PacIOOS source **is** global. Its defects are **resolution** (0.5 deg) and
+**averaging the swell partitions into one triple** — not coverage. Earlier plan/brief wording that framed the
+finer NOAA grids as "regional models we ruled out" was a coordinator mischaracterisation; tiering resolution
+by location is not substituting a regional model for global coverage.
+
+All extents below measured live from the GRIB messages on 2026-07-26:
+
+| Grid | Type | Latitude | Longitude | Increment | Use |
+|---|---|---|---|---|---|
+| `gfswave.global.0p16` | regular_ll | 52.5 N .. 15.0 S | all | **0.1667 deg** | **Tier 1** |
+| `gfswave.global.0p25` | regular_ll | **+90 .. -90** | all | 0.25 deg | **Tier 2 (baseline)** |
+| `glwu.grlc_2p5km` | unstructured | Great Lakes | — | ~2.5 km | **Great Lakes** |
+| `gfswave.gsouth.0p25` | regular_ll | -10.5 .. -79.5 | all | 0.25 deg | **not used** — same resolution as Tier 2 |
+| `gfswave.wcoast.0p16` | regular_ll | 50 .. 25 N | 210-250 E | 0.1667 deg | **not used** — wholly inside Tier 1 |
+| `gfswave.atlocn.0p16` | regular_ll | 55 .. 0 N | 260-310 E | 0.1667 deg | deferred — gains only +2.5 deg latitude, Atlantic only |
+| `gfswave.epacif.0p16` | regular_ll | 30 N .. 20 S | 130-215 E | 0.1667 deg | deferred — gains only +5 deg latitude, Pacific only |
+| `gfswave.arctic.9km` | **polar_stereographic** | Arctic | — | ~9 km | deferred — finer than Tier 2 but a different projection; needs its own decision |
+
+**Selection rule:** a spot at latitude within 52.5 N .. 15.0 S uses **Tier 1**; anything outside uses
+**Tier 2**; Great Lakes spots use **GLWU**. Tier 1 is ~1.5x finer than Tier 2 and ~3x finer than the PacIOOS
+source it replaces.
+
+**This is tiering, NOT a runtime fallback — the distinction is load-bearing.** The tier is resolved
+**deterministically from the spot's coordinates at configuration time** and recorded. If the chosen grid's
+fetch fails at runtime it **raises**; it must never quietly fall through to a coarser grid. A silent
+coarse-grid substitution is the same class of defect as C-76's calm boundary and C-86's averaged swell — the
+answer would change without anyone being told. See `rules/coding.md` section 1.
+
+**`atlocn` / `epacif` / `arctic` are deferred, not rejected.** Each is genuinely finer than Tier 2 in its
+area. They are held back because two grids cover the requirement and each addition costs another fetch path
+(and, for `arctic`, projection handling). Revisit if a configured spot falls in one of their exclusive areas.
 
 #### T8.10j — Invalidate pre-T8.10 model state at deploy
 
