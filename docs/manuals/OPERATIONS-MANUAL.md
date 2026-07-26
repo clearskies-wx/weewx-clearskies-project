@@ -1007,28 +1007,11 @@ Accepted datums for operator uploads: **NAVD88, MLLW, MHW, MHHW, MSL**. These ar
 | `surfbeat_enabled` | bool | `true` | Enable SurfBeat strip for IG/set timing predictions. Adds set timing to the surf card and 72h forecast scroll. Increases compute time by ~12 minutes per full forecast cycle (25 SurfBeat runs × ~28s each). |
 | `surfbeat_cadence_hours` | int | `3` | Hours between SurfBeat strip runs. Intermediate forecast hours carry forward the last result (not interpolated — design decision). Range: 1-6. Lower values increase compute time proportionally. |
 
-#### Compute offloading configuration (global, in `api.conf [providers]`)
+#### Compute offloading — removed (T6.8, 2026-07-25)
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `surf_compute_host` | str \| null | `null` | URL of the remote compute service (e.g., `https://librewxr.shaneburkhardt.com:8770`). When set, SwellTrack and SurfBeat computations are POSTed to this service instead of running in-process. When null, all computation runs on the weewx host. |
-| `surf_compute_verify_tls` | bool | `true` | Verify TLS certificate on compute service requests. Set `false` for self-signed certificates on the same VLAN. TLS encryption is always active when URL is `https://`. |
+The standalone compute-offload service described in earlier revisions of this manual (`surf_compute_host`/`surf_compute_verify_tls` in `api.conf [providers]`, `SURF_COMPUTE_SECRET` in `secrets.env`, a service on port 8770 running `python -m weewx_clearskies_api.services.compute_service`) **no longer exists.** `ApplyRequest` and `CurrentConfigResponse` stopped accepting `surf_compute_host`/`surf_compute_secret`/`surf_compute_verify_tls` in Phase 6 (T6.8); the API has no code path left that reads or writes them, and `services/compute_service.py`/`services/compute_client.py` were deleted from the API repo in the same phase.
 
-**Compute service secret:** `SURF_COMPUTE_SECRET` in `secrets.env` on both the weewx host and the compute service host. Generated once during setup (e.g., `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`). The API sends this as `Authorization: Bearer {token}` with every compute request. Not in `api.conf` — secrets go in `secrets.env` only.
-
-#### Compute service deployment (on librewxr or dedicated host)
-
-The compute service is an optional lightweight HTTP service that offloads SwellTrack and SurfBeat computation. Useful when the weewx host has limited CPU/RAM.
-
-1. Install: `pip install weewx-clearskies-api` on the compute host
-2. Run: `python -m weewx_clearskies_api.services.compute_service` (systemd unit recommended)
-3. Endpoints: `POST /compute/swelltrack`, `POST /compute/surfbeat`, `GET /health`
-4. Port: 8770 (default, configurable)
-5. Auth: `SURF_COMPUTE_SECRET` in `secrets.env`
-6. TLS: self-signed cert auto-generated on first start (stored in `/etc/weewx-clearskies/compute/`)
-7. SWAN binary required on the compute host for SurfBeat strip runs
-
-**Fallback behavior:** When the compute service is unreachable or returns 5xx, the API falls back to in-process computation. `degraded=true` in the surf response. WARNING log emitted.
+All marine computation — including what this service used to offload — now runs in the standalone `weewx-clearskies-marine` service, configured via `marine_service_url` in `api.conf [providers]` and `MARINE_SERVICE_SECRET` in `secrets.env`. See "Marine service deployment" below for the current connection, secret, and deployment topology; this replaces the compute-offload section that previously appeared here. This is not marked "target — pending ADR-099 acceptance" like the rest of that section's heading — the removal of `surf_compute_host` itself is already executed and does not depend on ADR-099's status; only the further collapse of `[swan]` into `marine_service_url` alone is still pending.
 
 Accepted formats for upload: GeoTIFF, NetCDF, ASCII XYZ.
 
@@ -1098,6 +1081,7 @@ SWAN 41.45 must be compiled and on PATH (`/usr/local/bin/swan`) on whichever hos
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `marine_service_url` | str or null | `null` | Base URL of the marine service. Same-host: `https://localhost:8780`. Separate-host (IPv4): `https://192.0.2.10:8780`. Separate-host (IPv6): `https://[2001:db8::1]:8780`. When null, no marine service is connected. |
+| `marine_verify_tls` | bool | `true` | Verify TLS certificate on marine service requests. Set `false` for a self-signed cert on the same VLAN (see "Marine service TLS" below). |
 
 **In `secrets.env` on the weewx host:**
 
@@ -1118,6 +1102,8 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
 The secret must be identical on both hosts. The API sends it as `Authorization: Bearer {token}` on all protected marine service endpoints. The `/health` and `/manifest` endpoints do not require auth.
+
+**Setting these from the wizard/admin UI (T7.2, 2026-07-25).** All three values above (on the weewx host's side) can be set via `POST /setup/apply`'s top-level `marine_service_url`/`marine_verify_tls`/`marine_service_secret` fields, instead of hand-editing `api.conf`/`secrets.env` — the API writes them to the locations above. The marine service host's own `secrets.env` copy is still a manual step (no automated distribution across hosts). `POST /setup/providers/test-marine` verifies connectivity and, when a secret is supplied, that the secret is accepted, before the operator saves — see API-MANUAL §19 setup-endpoint inventory.
 
 **Marine service environment and paths (Phase 4).** All marine-service settings
 live on the marine service host, separate from the API's own:
