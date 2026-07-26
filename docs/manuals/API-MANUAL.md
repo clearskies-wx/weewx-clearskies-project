@@ -165,6 +165,14 @@ Note: `GET /api/v1/surf[/{locationId}]`, `GET /api/v1/fishing[/{locationId}]`, a
 {"value": 22.5, "label": "°C", "formatted": "22.5"}
 ```
 
+**`GET /current?units=si` — canonical SI mode for companion services (C-47, 2026-07-25).** Additive: absent the parameter, `/current` is byte-for-byte unchanged. Exists so the marine service — which works in canonical SI only and deliberately has no unit-conversion path of its own (C-29) — can query the API for the live station observation (surf scoring's t=0 wind/temperature/pressure input) without round-tripping through the operator's display unit and back, a precision loss and a needless reintroduction of conversion logic into a repo that intentionally has none. Scoped to `windSpeed`, `windGust` (m/s), `outTemp` (°C), `barometer` (hPa), `windDir`, `windGustDir` (degrees, unconverted — a single unit regardless of system) — not the full observation shape; extending it further would need a canonical-SI target for every weewx unit group, which nothing has asked for yet. Response shape in this mode is **raw scalars**, not the `{value, label, formatted}` wrapper shown above — a machine client gains nothing from a `formatted` display string or an operator-overridable `label` for a value that is, by contract, always in a fixed SI unit:
+
+```json
+{"data": {"timestamp": "2026-07-26T04:11:14Z", "windSpeed": 4.47, "windDir": 180.0, "windGust": 6.71, "windGustDir": 190.0, "outTemp": 21.11, "barometer": 1015.92}, "units": {"windSpeed": "m/s", "windGust": "m/s", "outTemp": "°C", "barometer": "hPa", "windDir": "°", "windGustDir": "°"}, "source": "weewx", "generatedAt": "...", "stationClock": {...}, "freshness": {...}}
+```
+
+Source values are converted from the archive's actual native weewx unit system (read via a dedicated `usUnits` lookup — `services/archive.py`'s `get_current_us_units()` — not inferred from the operator's display-unit labels, which can legitimately differ from the archive's native system when the operator has overridden per-group display targets) to SI using the same `units/conversion.py` `convert()` every other unit conversion in this API uses. An unknown `?units=` value is rejected with 422 problem+json (`ConfigDict(extra="forbid")`, security-baseline §3.5) — `si` is the only accepted value.
+
 **Archive endpoints** (`/archive`, `/archive/grouped`) return flat scalars except for `beaufort`, which retains its `ConvertedValue` dict to allow dashboard-side wind rose binning without recomputing Beaufort from wind speed.
 
 Both endpoint classes carry a `units` envelope (see below).
@@ -2103,6 +2111,8 @@ Solunar major/minor feeding periods for one date at one location. Computed via S
 | `moonset` | str | — | Yes | Moonset time (UTC ISO-8601, null if moon doesn't set) |
 | `moonTransit` | str | — | No | Moon transit (highest point) time (UTC ISO-8601) |
 | `moonUnderfoot` | str | — | No | Moon underfoot (opposite transit) time (UTC ISO-8601) |
+| `sunrise` | str | — | Yes | Sunrise time (UTC ISO-8601) **for this request's `lat`/`lon`**, not the operator's weewx station — added C-47 (2026-07-25) so a caller needing sun times for an arbitrary coordinate (the marine service's fishing period/scoring math for a fishing spot) never has to substitute the station's sun times for a spot that may be far away. Null on polar day/night, same convention as `moonrise`/`moonset`. |
+| `sunset` | str | — | Yes | Sunset time (UTC ISO-8601), same lat/lon and nullability notes as `sunrise` |
 | `majorPeriods` | list[object] | — | No | Two per day, centered on transit and underfoot. Each: `{start, end}` (UTC ISO-8601) |
 | `minorPeriods` | list[object] | — | No | Two per day, centered on moonrise and moonset. Each: `{start, end}` (UTC ISO-8601) |
 | `intensity` | float | — | No | 0.0–1.0, driven by moon phase (new/full = 1.0, quarter = 0.7, between = 0.5) |
@@ -2487,8 +2497,8 @@ Two formulas supported, configured per-spot via `breaker_formula` in the marine 
 | `surfbeat_enabled` | bool | `true` | Per-spot (`SurfSpotConfig`) | Enable SurfBeat strip for IG/set timing. Increases compute time by ~12 min per cycle. |
 | `surfbeat_cadence_hours` | int | `3` | Per-spot (`SurfSpotConfig`) | Hours between SurfBeat strip runs. Intermediate hours carry forward the last result (not interpolated). |
 | `max_hs_m` | float | `4.0` | Per-spot (`SurfSpotConfig`) | Maximum expected significant wave height (m) for this spot. Used to compute the surf zone depth threshold: `d_break_max = max_hs_m / gamma`. The 1D grid uses 1–2m dx from shore to `d_break_max`. Computed at wizard setup from wave climate or operator input. |
-| `surf_compute_host` | str \| null | `null` | Global (`api.conf [providers]`) | URL of remote compute service for SwellTrack/SurfBeat offloading (e.g., `https://librewxr:8770`). `null` = in-process. |
-| `surf_compute_verify_tls` | bool | `true` | Global (`api.conf [providers]`) | Verify TLS cert on compute service requests. Set `false` for self-signed on same VLAN. |
+
+**`surf_compute_host` / `surf_compute_verify_tls` removed from the API (T6.8, 2026-07-25).** `marine_service_url` (`api.conf [providers]`, §19.2) is the single key that replaced them — the API no longer accepts, persists, or forwards these two keys, and `POST /setup/providers/test-compute` (which tested connectivity using them) is now an orphaned endpoint pending removal in a future round. SwellTrack/SurfBeat compute offloading is entirely internal to the marine service now; this table row is historical.
 
 **1D grid resolution (variable, depth-based).** The SwellTrack 1D grid uses variable resolution defined by depth zones, not distance from shore (see SURF-ZONE-MODEL-BRIEF §6.1 for full rationale). Depth zones are computed at wizard setup from the CUDEM bathymetric profile, the spot's `max_hs_m`, and the L3 SWAN grid extent:
 
@@ -2660,6 +2670,8 @@ Species data is loaded from `data/species.yaml` (an operator-editable reference 
 **Outputs:** `SolunarTimes` model.
 
 Computed locally via Skyfield — no external API call. Skyfield is already a project dependency (almanac feature).
+
+**Sunrise/sunset (C-47, 2026-07-25).** `SolunarTimes.sunrise`/`.sunset` are computed for the request's own `lat`/`lon` — not the operator's weewx station — using the same lightweight `almanac.risings_and_settings()` + `find_discrete()` pattern this function already uses for moonrise/moonset, applied to the sun instead of the moon, over the same station-local day window. This exists because no other almanac endpoint returns sunrise/sunset for an arbitrary coordinate: `GET /almanac` and `GET /almanac/sun-times` are station-location-only, and `GET /almanac/solunar` itself previously carried moon events only. The marine service's fishing endpoint needs sun times for the fishing spot's own coordinates (period-window and scoring inputs) and consumes this field rather than falling back to the station's sun times, which would be a real accuracy regression for any spot far from the station. Deliberately not routed through `services/almanac.py`'s `_compute_sun_for_date()` — that function is heavier (civil twilight, solar transit, next-equinox/solstice search up to two years out) and none of that is needed here; duplicating its overhead across up to 30 days per request (`days` query parameter) would cost more than it's worth for two fields already obtainable from the same technique this function uses elsewhere in its own body.
 
 **Major periods:** Centered on moon transit (highest point) and moon underfoot (opposite side). Duration: ± 1.5 hours from event time. Two per day.
 
@@ -3197,10 +3209,6 @@ The marine service never parses `api.conf` directly. This ensures the API remain
     "omp_num_threads": 0,
     "outer_grid_resolution_km": 3.0,
     "inner_nest_resolution_m": 200
-  },
-  "providers": {
-    "surf_compute_host": "https://192.168.7.22:8770",
-    "surf_compute_verify_tls": true
   }
 }
 ```
@@ -3208,9 +3216,9 @@ The marine service never parses `api.conf` directly. This ensures the API remain
 Notes:
 
 - **`directional_exposure` wire shape is pinned to the JSON-native dict** (`{"N": false, ...}`) — never the list-of-`"DIR:bool"`-strings form `configobj` uses internally for api.conf's own on-disk storage (MARINE-SEP-CONCERNS.md C-23). The API's serializer converts api.conf's on-disk list form to this dict on the way out; the marine service's parser accepts the dict form only — the list-tolerance branch it carried before this was pinned has been deleted (no caller, per rules/coding.md §3).
-- Every top-level key (`marine`, `swan`, `providers`) is present only when the corresponding api.conf section exists — an installation with no marine locations and no `[swan]`/compute-offload config sends `{}`.
+- Every top-level key (`marine`, `swan`) is present only when the corresponding api.conf section exists — an installation with no marine locations and no `[swan]` config sends `{}`.
 - `[[weather]]` (marine forecast/observation TTLs) is never sent — the API never writes it to api.conf, and the marine service's `MarineWeatherConfig` defaults apply.
-- `swan` and `providers.surf_compute_host` / `surf_compute_verify_tls` are included because the marine service's ported config loader still reads them today; ADR-099's plan to fold these into `marine_service_url` alone is a later phase, not this one.
+- `swan` is included because the marine service's ported config loader still reads it today; ADR-099's plan to fold it into `marine_service_url` alone is a later phase, not this one. **`providers.surf_compute_host` / `surf_compute_verify_tls` are removed as of T6.8 (2026-07-25)** — the API no longer has these config fields to send (superseded entirely by `marine_service_url`); a payload example showing them was stale as of this edit and is corrected here.
 - **Station timezone and elevation are deliberately excluded.** The marine service's fishing endpoint has no consumer for either field yet (MARINE-SEP-CONCERNS.md C-27, awaiting an operator decision on whether to add them here or derive them another way). Attach point once decided: `_serialize_marine_locations_section()` in `endpoints/setup.py` (add `"station_tz"` / `"station_elevation_m"` to the per-location `loc` dict), and the corresponding read in `config/marine_config.py`'s `MarineLocation.__init__` on the marine side.
 
 ### §19.6 Marine alerts remain in the API
@@ -3275,7 +3283,7 @@ Values are passed through unconverted (matching the pre-separation endpoint's ow
 
 `GET /marine/{location_id}` and `GET /beach-safety` (list) never carried alerts and are unaffected.
 
-**Locale text composition (C-29).** The marine service performs all scoring/classification and emits **semantic keys** plus raw SI ingredients; the API resolves keys via `i18n.t()` and composes sentences via `services/marine_enrichment.py`'s relocated `_compose_surf_conditions_text()` / `_compose_fishing_conditions_text()` (ported essentially unchanged from `enrichment/surf_scorer.py` / `enrichment/fishing_scorer.py`, which Phase 6 deletes from the API). No scoring or classification logic is reproduced in the API — only key resolution, unit conversion of the ingredients the marine service sends as raw SI (`heightM`, `windSpeedMps` — outside §19.3's `_FIELD_GROUPS` table, so not converted by that step), and string assembly.
+**Locale text composition (C-29).** The marine service performs all scoring/classification and emits **semantic keys** plus raw SI ingredients; the API resolves keys via `i18n.t()` and composes sentences via `services/marine_enrichment.py`'s relocated `_compose_surf_conditions_text()` / `_compose_fishing_conditions_text()` (ported essentially unchanged from `enrichment/surf_scorer.py` / `enrichment/fishing_scorer.py` — both deleted from the API by Phase 6, `fishing_scorer.py` as orphaned dead code, audit finding F2, 2026-07-25). No scoring or classification logic is reproduced in the API. **Corrected (C-44 sweep, 2026-07-25):** `conditionsTextParts.heightM` IS a `§19.3` `_FIELD_GROUPS` entry (`group_wave_height`) and is therefore already display-unit converted by the generic proxy conversion step by the time `marine_enrichment.py` reads it — that module uses it directly, with no second conversion. Only `windSpeedMps` is genuinely outside `_FIELD_GROUPS` (by design — a bare `Mps`-suffixed field would collide with nothing, but is left out so the generic converter never touches it) and is converted once, here, from raw SI. An earlier version of this paragraph and of `marine_enrichment.py`'s own docstring both claimed `heightM` was also outside `_FIELD_GROUPS`; that was wrong and had caused `marine_enrichment.py` to convert `heightM` a second time — a live double-conversion defect, fixed in the same change as this correction.
 
 Wire shape (`SurfForecast`, confirmed against the marine service):
 

@@ -118,13 +118,36 @@ paths:
       description: |
         Returns the most recent archive record from the weewx database
         (the latest record within a small look-back window).
+
+        `?units=si` (C-47, 2026-07-25): returns canonical SI values for a
+        fixed field set (windSpeed, windGust in m/s; outTemp in °C;
+        barometer in hPa; windDir/windGustDir in degrees, unconverted)
+        instead of the operator's configured display units — for companion
+        services (the marine service) that work in SI only and must not
+        round-trip through a display unit. Response shape in this mode is
+        `data: {timestamp, windSpeed, windDir, windGust, windGustDir,
+        outTemp, barometer}` with raw scalar values (not the default
+        `{value, label, formatted}` wrapper) plus a `units` block of fixed
+        SI labels. Absent the parameter, the response is unchanged.
       operationId: getCurrent
+      parameters:
+        - name: units
+          in: query
+          required: false
+          description: >-
+            "si" returns canonical SI values for a fixed field set instead
+            of the operator's display units (C-47). Omit for the default,
+            unchanged behaviour.
+          schema:
+            type: string
+            enum: [si]
       responses:
         '200':
           description: Current observation
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ObservationResponse' }
+        '422': { $ref: '#/components/responses/Problem' }
         '503': { $ref: '#/components/responses/ProviderUnavailable' }
         default: { $ref: '#/components/responses/Problem' }
 
@@ -3497,6 +3520,8 @@ components:
         moonset: { type: string, format: date-time, nullable: true, description: "null if the moon doesn't set this day" }
         moonTransit: { type: string, format: date-time, description: "Highest point" }
         moonUnderfoot: { type: string, format: date-time, description: "Opposite transit" }
+        sunrise: { type: string, format: date-time, nullable: true, description: "C-47: for this request's lat/lon, not the station's; null on polar day/night" }
+        sunset: { type: string, format: date-time, nullable: true, description: "C-47: for this request's lat/lon, not the station's; null on polar day/night" }
         majorPeriods:
           type: array
           description: "2/day, on transit/underfoot"
