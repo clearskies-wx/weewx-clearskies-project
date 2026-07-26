@@ -3498,13 +3498,34 @@ run **after round 2**, not after round 1.
 > time — never a hardcoded count, and never sized from the current single-spot case.** Any measurement or
 > design validated only against today's one-spot L1 is measuring the most favourable case.
 >
-> #### Open implementation question for T8.10c round 2
+> #### Station availability — MEASURED 2026-07-26, question ANSWERED: the design is feedable
 >
-> Station `.spec` files supply full 2-D spectra but sit at fixed buoy locations, not on our boundary. The
-> `VARIABLE FILE` design needs several spectra placed along the boundary by `[len]`. Determine, from
-> T8.10a's catalogue, **how many suitable stations actually bracket a realistic L1 boundary**, and report
-> the count before implementing. If the answer is one, say so plainly rather than silently degrading to a
-> uniform boundary the operator has rejected.
+> Realistic L1 (Seal Beach → The Wedge, sized with `_compute_level1()`'s own arithmetic) is
+> **61.6 km N–S × 73.7 km E–W** — versus ~21 × 27 km for the single-spot case. That is **3.3 WW3 cells**
+> across the W edge and **4.8** across the S edge.
+>
+> Probing all 129 Pacific stations in the live ocean catalogue:
+>
+> | Station | lat | lon | → W edge | → S edge | inside L1 |
+> |---|---|---|---|---|---|
+> | 46221 | 33.86 | -118.64 | 11.7 km | 61.0 km | – |
+> | 46223 | 33.46 | -117.77 | 68.7 km | **15.5 km** | **YES** |
+> | 46222 | 33.62 | -118.32 | **17.9 km** | 33.2 km | **YES** |
+> | 46253 | 33.58 | -118.18 | 30.8 km | 28.8 km | **YES** |
+> | 46256 | 33.70 | -118.20 | 29.0 km | 42.1 km | **YES** |
+> | 46224 / 46242 | 33.18–33.22 | -117.44/-117.47 | ~98 km | ~28 km | – |
+>
+> **4 stations fall inside a realistic L1 footprint, a 5th sits 11.7 km off the W edge, and 27 lie within
+> 120 km of an offshore edge.** `BOUNDSPEC … VARIABLE FILE` needs ≥2 to vary at all, so the design is
+> comfortably feedable and does **not** degrade to the rejected uniform boundary here.
+>
+> **Two constraints that still bind selection, and must not be skipped:**
+> 1. **Depth.** Several of the in-bbox stations are inshore (46253/46256 are Long Beach Channel area) and
+>    will likely fail the `depth ≥ 0.78 × T²` deep-water criterion. The `.spec` per-timestep header carries
+>    depth, so this is checkable per station — **filter on it, do not assume proximity implies suitability.**
+> 2. **Coverage is regional, not global.** This density is a SoCal result. A sparse coastline elsewhere may
+>    yield fewer than 2 suitable stations, and T8.10f's configuration-time viability check must refuse such a
+>    spot rather than silently falling back to a single uniform spectrum.
 
 **Do:** Emit the 2-D spectrum as SWAN's boundary file and drive L1 with
 `BOUNDSPEC SIDE ... CONSTANT FILE` (manual: *"the wave spectra are constant along the side or segment"*).
