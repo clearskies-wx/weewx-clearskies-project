@@ -1733,6 +1733,156 @@ individual escalation. Carried to Phase 8.
 
 ---
 
+## C-61 — 19 Phase-4 brief files were deleted from the meta repo working tree mid-session (CLOSED — restored, nothing lost)
+
+**Found by the coordinator, not reported by any agent**, while running the routine post-round
+`git status` on the meta repo during Phase 7 Round 1.
+
+Nineteen files were missing from disk, all of them `docs/planning/briefs/P4*.md` — the entire
+Phase 4 / 4A / 4B round-brief set, including three the plan **actively cites**:
+`P4A-QC-GATE-4A-RESULTS.md`, `P4A-INTENDED-VS-ACTUAL-RECONSTRUCTION.md` and
+`P4A-AUDIT-FINDINGS.md`. Deletions were unstaged and uncommitted.
+
+**They were present at Phase 7 pre-flight** — the coordinator's pre-flight `git status` on the meta
+repo showed a clean tree — so the loss happened during this session, not before it.
+
+**Restored** with `git checkout -- docs/planning/briefs/`; 39 briefs back, working tree otherwise
+clean. **Nothing was lost and nothing was ever committed as deleted.**
+
+**Two things went right and are worth recording, because they are why this was harmless:**
+
+1. Both agents that committed to the meta repo this round (`84a27fd`, `6d4bb29`) staged **named
+   files**. Had either used `git add -A` or `git commit -a`, the 19 deletions would have ridden
+   along inside a doc-sync commit, and the plan would now cite three briefs that no longer exist.
+   The house rule against blanket staging is exactly what contained this.
+2. The coordinator runs `git status` on every repo at every round close rather than only checking
+   the commits an agent reports. The agent reports were all accurate; the damage was not in any of
+   them.
+
+**Cause not determined, and not guessed at.** Two candidates, neither confirmed: a stray filesystem
+operation by one of the four agents (none reported one, and none was asked to touch `briefs/`), or
+a Nextcloud replication artefact — this repo replicates through Nextcloud, and an alphabetically
+contiguous `P4*` block disappearing at once has the shape of a partial sync as much as of a
+deliberate cleanup. Reading the agent transcripts to settle it would cost more than the answer is
+worth now that the files are back.
+
+**Standing lesson, and the reason this entry exists at all:** the round-close check must be
+`git status` on the **whole repo**, never just `git log` of the commits an agent names. An agent
+reporting its own work accurately says nothing about what else moved in the tree. A deletion is the
+one class of damage that looks like nothing at all in a commit list.
+
+---
+
+## C-60 — the `[marine]` prune left two deploy-readiness loose ends (OPEN → before Phase 8 deploy)
+
+Both surfaced by the C-49 prune in Phase 7 R1b. Neither is a defect in the prune, which is
+well-evidenced (zero source importers of `eccodes`, `xarray` or `netCDF4` anywhere in the API,
+verified independently by the coordinator — the only remaining hits are a stale `__pycache__`
+`.pyc` for the already-deleted `grib_processor.py`).
+
+1. **`uv.lock` was not regenerated.** `pyproject.toml` lost an extra; the lock file still describes
+   the old dependency set. The agent correctly declined to hand-edit it — regenerating needs a live
+   `uv lock` against PyPI. But `deploy-api.sh` and the documented test invocations use
+   `uv run --frozen`, which is precisely the mode that fails when the lock and the manifest
+   disagree. **Regenerate before Phase 8's deploy, not during it.**
+2. **`Dockerfile` cited ADR-085 for the `libeccodes-dev` / `libeccodes0` system packages**, which
+   were installed solely to serve the `[marine]` extra. Removing them was required — leaving the
+   build pointing at a now-nonexistent extra would have failed outright — and the evidence supports
+   it, since GRIB2 processing moved to the marine service. But **ADR-085 now describes a dependency
+   the API no longer has.** That is an ADR-status question, not a doc-sync fix, and belongs to the
+   phase-boundary ADR compliance sweep.
+
+---
+
+## C-59 — `rasterio` is imported by a live API endpoint and declared nowhere (OPEN → Phase 8, with C-55)
+
+Found by the Phase 7 R1b agent during the `[marine]` prune census and correctly flagged rather than
+fixed; verified independently by the coordinator at `endpoints/setup.py:4384`.
+
+`POST /setup/marine/bathymetry/upload` lazily imports `rasterio` to validate an uploaded GeoTIFF.
+`rasterio` appears in **no** extra in `pyproject.toml`, and the endpoint's own error message tells
+the operator to *"add to `[nearshore]` extra"* — an extra Phase 6 deleted from this repo. So the
+guidance points at something that cannot be done.
+
+**Pre-existing and orthogonal to C-49** — a different library from the three being pruned, and
+undeclared before this round began. Not fixed because declaring a dependency is trigger 7 and
+outside Phase 7's authorisation.
+
+**Sequence it with C-55**, which asks whether this endpoint belongs in the API at all. If the answer
+is that it moves to the marine service, the dependency question moves with it and never needs
+answering here. Deciding the dependency first would risk declaring a package into a repo that is
+about to stop needing it.
+
+---
+
+## C-58 — removing the TruShore service URL strands the deployment-mode control and a route (⚠ AWAITING OPERATOR)
+
+**Severity:** blocks T7.2's "single URL field" acceptance criterion. Nothing else.
+
+Found by the Phase 7 wizard agent at its halt condition, correctly refused rather than decided.
+
+T7.2 folds the TruShore/SWAN `service_url` into `marine_service_url`. But that field is not
+standalone. `templates/wizard/step_trushore.html:86-128` carries a **"Deployment mode" radio group**
+(`trushore_deployment_mode` = bundled | separated) whose only effect is to show or hide the Service
+URL row; `config_writer.build_trushore_payload` uses the mode only to decide whether to emit
+`service_url`. Remove the URL and the radio becomes a control that does nothing, and the wizard's
+`POST /wizard/trushore/test-service` (`routes.py:3718-3765`) is orphaned with it.
+
+**The step is not emptied** — SWAN grid bbox, nested-grid resolutions, OMP thread count and the
+per-spot breaker/display settings all remain and are untouched.
+
+**Why the coordinator is not ruling on it.** Deleting the fieldset, its state field and its route is
+trigger 2 — a component disposition. The standing block says the coordinator has no authority to
+approve one either, and this project has a recorded incident (Phase 4A, `wave_transform.apply_supplements()`)
+where a coordinator ruled "rewire" and then "delete" on exactly this shape of question and it counted
+as a violation. Not repeating it.
+
+**The substantive point, offered as input rather than as a decision.** Post-separation the question
+"is SWAN bundled or on another host?" no longer has meaning in the wizard's terms: the API contains
+zero SWAN code, so SWAN is always in the marine service, and "same host" versus "another host" is
+exactly what T7.2's new **Same host checkbox** on the marine service URL expresses. The deployment
+radio and the checkbox are two controls asking one question.
+
+| Option | Cost |
+|---|---|
+| **(a) Delete the deployment-mode fieldset, `trushore_deployment_mode` state, and the orphaned `test-service` route with the URL field** | T7.2's criterion is met. One control for one question. Trigger 2. |
+| (b) Leave them this round | A radio button that changes nothing, and a second URL field, so T7.2 closes with a named exception rather than a pass. |
+| (c) Keep the radio, repoint it at the marine URL | Two controls for the same question, permanently. Not recommended. |
+
+Coordinator's recommendation: **(a)**. Held meanwhile — `step_trushore.html` and
+`build_trushore_payload` are untouched, and the wizard round reports T7.2 as **not met**, not as
+done.
+
+---
+
+## C-57 — T7.4's validation could not fire on the path an operator actually takes (DECIDED)
+
+Found by the Phase 7 wizard agent while implementing T7.4. It is a real hole in the task as written,
+not a porting artefact.
+
+T7.4 requires an error when the marine service URL is blank and marine features are enabled. The
+signal for "marine features enabled" is `WizardState.marine_enabled` (`state.py:218`), set by the
+**marine step, which is step 13**. The URL lives on the **providers step, which is step 8**. On a
+straight first pass `marine_enabled` is still `False` when the operator submits providers, so a
+blank URL passes, and the operator meets the error only if they navigate backwards — which nothing
+prompts them to do.
+
+As written, T7.4 would have shipped as a validation rule that cannot fire on the normal path. That is
+worse than no rule, because the gate reads as covered.
+
+**Decision (coordinator, 2026-07-25): validate on the marine step as well.** When the operator sets
+`marine_enabled` true and `marine_service_url` is blank, the marine step re-renders with the error.
+
+**Why this is not scope expansion.** It is the only place T7.4's own acceptance criterion can be
+enforced, and enforcing a criterion the plan already states is explicitly permitted. The agent used
+the existing `marine_enabled` signal rather than inventing a flag, which is what the brief asked for.
+
+**Not done, deliberately:** no apply-time backstop in the API's `ApplyRequest`. That would mean
+rejecting applies for a wizard-side omission — a different decision with a different blast radius,
+and not one T7.4 asks for.
+
+---
+
 ## C-56 — C-46 is routed to Phase 8, not Phase 7 (DECIDED)
 
 C-46 (`MARINE_PROVIDER_MODULES` populated but with no consumer) was routed "Phase 7/8". Settling
