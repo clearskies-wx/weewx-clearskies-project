@@ -1599,3 +1599,39 @@ anything. Three separate readers — the implementer, the auditor, and the manua
 It survived because the sentence it corrupted is prose, so no schema, type or test could contradict
 it, and it looked plausible in every review. **Trust the measured behaviour, not the comment**, and
 prefer asserting cross-module facts in code (or not at all) over asserting them in prose.
+
+---
+
+## C-51 — `is_station_served()` always returns False, so the station-wind restoration is dead in practice (OPEN → close in Phase 6)
+
+Found by the C-47 agent after wiring the t=0 station-wind fetch exactly as instructed, and flagged
+rather than papered over.
+
+`services/marine_location_resolver.py`'s `is_station_served()` reads distances populated by
+`resolve_station_distances()`. **Nothing in the marine service ever calls
+`resolve_station_distances()`**, and `MarineConfig` carries no `station_lat` / `station_lon` to call
+it with. So `is_station_served()` returns `False` for every location, and the new station-wind branch
+in `surf.py` — and the equivalent restoration path generally — never executes.
+
+The wiring is correct against the interface; the interface is simply never initialised. This is the
+last piece of C-24 and without it the whole station-observation restoration is a branch that cannot
+run: dead code by `rules/coding.md` §3, and a silently missing feature rather than a visible failure.
+
+**Disposition: close it inside Phase 6.** Shipping a phase whose headline restoration is unreachable
+is worse than the extra hour. Two small halves:
+
+1. **API** — the config push payload gains the station's latitude and longitude. They are operator
+   configuration and the API already holds them (`services/station.py`). Same serializer as T6.4, so
+   push and pull cannot drift.
+2. **Marine** — `MarineConfig` parses them, and `resolve_station_distances()` is called at config
+   load with the station coordinates and the configured `dedup_radius_km`.
+
+**This is not C-27 returning.** C-27 asked for station *timezone and elevation* to feed a solunar
+computation that has since left the marine service entirely. This is station *coordinates* to answer
+a pure distance question — "is this location close enough to the station that the operator's own
+instruments are the better source?" — which is exactly what `is_station_served()` exists to decide
+and cannot decide without them.
+
+**Also noted, not fixed:** `surf.py` has a separate, pre-existing time-of-day almanac need that
+remains unwired. It could reuse the same solunar fetch in a later round. Left alone deliberately —
+outside C-47's two authorised fetches.
