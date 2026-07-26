@@ -4101,3 +4101,43 @@ answer would change without anyone being told. See `rules/coding.md` section 1.
 **`atlocn` / `epacif` / `arctic` are deferred, not rejected.** Each is genuinely finer than Tier 2 in its
 area. They are held back because two grids cover the requirement and each addition costs another fetch path
 (and, for `arctic`, projection handling). Revisit if a configured spot falls in one of their exclusive areas.
+
+### Fourth direction, same day — setup-time grid probe
+
+**Setup-time grid probe — operator direction, 2026-07-26:** *"I think we need to do a grid fetch at setup,
+just to verify we have data for that location."*
+
+Do a **real fetch** of the resolved tier grid at the spot's coordinates during setup and confirm the value is
+**not the missing sentinel**. This is not a coverage calculation from a bounding box — it is an actual read,
+because a point can be inside a grid's declared extent and still carry no wave data.
+
+**Proof the check is necessary and that it works** (measured 2026-07-26): at Lake Michigan (43.0 N, 87.0 W),
+`gfswave.global.0p25` returns **9999** for `swh` and every swell partition, and the PacIOOS source returns
+**null** — both points sit well inside the declared global extent. Nothing but a real read distinguishes
+"covered" from "has data".
+
+**What it must catch:**
+- **`9999` is the missing-value sentinel**, per the GRIB `missingValue` key read directly from the message.
+  It must be treated as absent, never ingested. A 9999 m wave height reaching SWAN would be catastrophic.
+- Inland or land-masked cells, and enclosed water bodies the ocean model masks (all Great Lakes spots).
+- A spot outside the resolved tier's latitude band — a Tier 1 probe at 53 N returns nothing, and the
+  selection must land on Tier 2 rather than treating the empty result as "no data anywhere".
+
+**Cost:** trivial. A `filter_gfswave.pl` subregion subset spanning ~3 deg x 3 deg with nine variables measured
+**4,577 bytes**. Run once per spot at setup, not per cycle.
+
+**Where it belongs:** the marine service already advertises **`GET /discovery/grib-availability`** with
+`cache_ttl: 0` in its manifest. **Extend that endpoint** rather than adding a new one — check what it does
+today before writing anything, since reusing it keeps this inside the authorized scope instead of adding an
+endpoint (trigger 7).
+
+**Both halves of viability are checked at setup, and both can refuse a spot:**
+
+| Probe | Confirms | Feeds |
+|---|---|---|
+| **Gridded fetch** (this item) | the tier grid has non-missing data at the spot | `/marine` offshore forecast (T8.10i) |
+| **Station lookup** (above) | a suitable deep-water station exists within range | SWAN L1 boundary (T8.10c) |
+
+A spot that fails **either** probe is refused at setup with a message naming which probe failed and why. A
+spot may legitimately pass one and fail the other — e.g. gridded data present but no station near enough —
+and the message must say which, because the remedies differ.
