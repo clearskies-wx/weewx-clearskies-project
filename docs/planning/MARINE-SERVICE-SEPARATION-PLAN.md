@@ -3411,6 +3411,42 @@ never returns a partial spectrum.
 
 - **Owner:** `clearskies-api-dev` (marine repo)
 - **Files:** `services/swan_formats.py`
+- **Status: SPLIT INTO TWO ROUNDS 2026-07-26 — round 1 in progress, round 2 blocked on the operator.**
+
+**ORDERING DISCOVERY — T8.10c cannot fully complete before station selection exists, which means the
+T8.10f threshold decision is on the CRITICAL PATH, not a side question.**
+
+Call chain traced 2026-07-26: `ww3_to_swan_boundary()` has **exactly one** call site,
+`swan_runner.py:3064`, reached from `providers/nearshore/swan.py:1574` where the boundary originates as
+`wavewatch.fetch(lat=center_lat, lon=center_lon)` — **a single centroid coordinate with no station concept
+at all.** Switching that call site to real WW3 station spectra requires picking a station, and station
+selection is governed by the minimum-depth and maximum-distance thresholds that T8.10f reserves for an
+operator ruling (trigger 1). No selection layer exists in the repo yet.
+
+**Two escapes were considered and both rejected:**
+- *Build selection now* — would encode the very thresholds that are reserved for the operator.
+- *Hardcode station 46222 as an interim bridge* — **worse.** Huntington would appear to work while every
+  other spot silently received a boundary from the wrong water. That is precisely the "selectable
+  configuration that silently cannot work" defect T8.10e exists to fix, reintroduced deliberately.
+
+**Round 1 (in progress, unblocked):** the new spectral boundary writer as a pure function
+(`WW3Spectrum` in, SWAN 2-D spectral file text out) with an explicit, cited WW3→SWAN direction-convention
+conversion; plus T8.10d's `CGRID` widening.
+
+**Round 2 (blocked on the T8.10f threshold ruling):** delete `ww3_to_swan_boundary()`, the JONSWAP
+synthesis, the fixed 30° `DSPR` and the "prefer swell parameters" overwrite, and rewire
+`swan_runner.py:3064` / `swan.py:1574` onto station-selected spectra.
+
+**Why the deletion and the rewiring must land together, atomically:** the moment the parametric path is
+removed, the runtime path needs a real station spectrum. Landing the deletion alone takes the SWAN cycle
+down until T8.10e and T8.10f land. That is survivable in this environment — no live traffic, and the
+current output is known-bad — but it is a cost for the operator to choose, not for the coordinator to spend
+silently, and it buys nothing in round 1.
+
+**Consequence for T8.10c's accept criteria:** "no parametric TPAR path remains for L1" and "no `DSPR`
+constant anywhere" are **round-2** criteria. They will still read as failing after round 1, by design. The
+Phase 8 adversarial audit's `grep` for `TPAR` / `DSPR` / `ww3_to_swan_boundary` / `JONSWAP` must therefore
+run **after round 2**, not after round 1.
 
 **Do:** Emit the 2-D spectrum as SWAN's boundary file and drive L1 with
 `BOUNDSPEC SIDE ... CONSTANT FILE` (manual: *"the wave spectra are constant along the side or segment"*).
