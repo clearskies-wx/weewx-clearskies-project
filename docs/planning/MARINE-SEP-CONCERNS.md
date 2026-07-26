@@ -1094,3 +1094,56 @@ change on their side to explain it.
 JSON conflicts with the implementation plus a second corroborating source, the example is the
 outlier and gets corrected. An example is not a contract. The contract is the code plus whatever
 the plan and the other manuals independently agree on.
+
+---
+
+## C-37 — `currentResidual` is a second C-29: a baked unit string AND an unconvertible value (OPEN → re-merge round)
+
+Found by the coordinator following up the T6.2 agent's flag that it could not verify
+`currentResidual`'s shape. Read at `services/water_level_compositor.py:115-126`:
+
+```python
+result["currentResidual"] = {
+    "value": round(residual_display, 2),
+    "quality": residual_quality,
+    "source": "coops_observed",
+    "description": f"{sign}{residual_display:.2f} {_unit_label(target_unit)} vs prediction",
+}
+```
+
+Two defects, both of the family this phase exists to remove:
+
+1. **`value` is a bare key with no unit group**, so the proxy's converter leaves it alone. The
+   marine service emits metres; an imperial operator gets a metre number sitting beside converted
+   feet everywhere else in the same response, with nothing marking it.
+2. **`description` bakes the unit into a sentence** — `"+0.23 meter vs prediction"` — which the
+   API's numeric conversion cannot reach. Identical in kind to C-29's `conditionsText`.
+
+**C-29's sweep missed it**, and the reason is worth recording: that sweep grepped for `i18n.t(` /
+`i18n.format_number` / `get_active_locale`. This string is a plain f-string with no i18n at all, so
+it did not match. **The C-29 rule is therefore broader than the C-29 sweep**: any *string* composed
+from a numeric value behind the API is unconvertible, whether or not it goes through i18n.
+
+**Disposition: fold into the C-24/C-25/C-29 re-merge round.** The marine service returns the
+ingredients (`valueM`, `quality`, `source`); the API converts and composes. Also re-run the sweep
+for f-string and `%`-format composition of numeric values across the marine service, not just i18n
+calls.
+
+---
+
+## C-38 — the proxy converts `assessment.waterTemp`, which the live API leaves raw (OPEN → Phase 8 verification)
+
+Reported by the T6.2 agent rather than silently absorbed, which was right.
+
+The new proxy converter is route-agnostic: it converts a field by name wherever that name appears.
+`endpoints/beach_safety.py:467` in the **live** API leaves `assessment.waterTemp` unconverted today,
+while converting the same-named field elsewhere. So after Phase 6 that field starts arriving in the
+operator's display units where today it arrives raw.
+
+This is a **behaviour change that fixes a live bug**, not a regression — but it is still a change,
+and it is exactly the kind that surfaces as "the beach-safety card now reads 64 where it read 18."
+A route-agnostic proxy genuinely cannot special-case one route's field to stay broken.
+
+**Disposition: keep the conversion, verify at Phase 8** against the dashboard's beach-safety card
+to confirm nothing downstream hardcodes the raw value. Named here so it is not mistaken for a
+proxy defect when someone notices the number move.
