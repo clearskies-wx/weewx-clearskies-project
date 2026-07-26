@@ -2349,3 +2349,70 @@ advertised capability list from the pushed config (`manifest.py:167-185`). Rewir
 from the provider registry changes where the capability surface crossing the API↔marine boundary
 comes from — a contract question, and one with no wizard content at all. Phase 7 is the wizard
 phase. Recorded rather than absorbed into a pass.
+
+---
+
+## C-70 — the marine service and the old SWAN service share one working directory (DECIDED — sequencing, not architecture)
+
+Found by the coordinator opening Phase 8, while measuring librewxr for T8.1b — before any deploy,
+which is the point at which it was still cheap.
+
+**Finding.** The marine service's moved SWAN code writes to exactly the paths the old standalone
+SWAN service on port 8767 writes to *right now*, because the code was moved verbatim and its path
+constants travelled with it:
+
+| Path | Written by marine service | Written by old 8767 service |
+|---|---|---|
+| `/var/run/weewx-clearskies/swan/` (work dirs `level1/ level2/ level3_0/`) | `swan_runner.py:2055`, `providers/nearshore/swan.py:1027,2117`, `surfbeat_runner.py:78` | yes — live, 585 MB on disk |
+| `/var/run/weewx-clearskies/swan/forecast_cache.json` | `providers/nearshore/swan.py:197` | yes — 24.7 MB, rewritten each cycle |
+| `{level1,level2,level3_N}_hotstart.dat` | same dir | yes — `level2_hotstart.dat` 31.6 MB |
+| `/etc/weewx-clearskies/swan_bathymetry_L*.json`, `spot_profiles/`, `swan_grid_sizing.json` | `providers/nearshore/swan.py:169-192` | yes |
+
+Two processes running SWAN cycles against one working directory would interleave INPUT file
+writes, overwrite each other's hotstart state, and race on `forecast_cache.json`. Hotstart
+corruption is the serious one: each cycle starts from the previous cycle's wave field, so a
+corrupted hotstart poisons subsequent runs rather than failing loudly once.
+
+**This is not an architectural finding and was not escalated.** The paths are the moved code's own
+pre-existing paths — `rules/clearskies-process.md` §"Moving a module moves its dependencies"
+applies directly: they exist because the code has always used them, they travel with it, and after
+T8.4 disables the old service the marine service is their sole owner, which is the end state the
+plan already authorises. Nothing's responsibility moves. The only question is operational: do not
+run two SWAN cycles against one directory during the overlap window.
+
+**Decision (coordinator).** **Stop — not disable — the old `weewx-clearskies-swan` and
+`weewx-clearskies-compute` units after the API is repointed to port 8780 and before the marine
+service's first model cycle.**
+
+This is consistent with the plan's own rollback design rather than a departure from it. T8.4's
+prerequisite is that **T8.6 (E2E) must pass before the old services are *disabled***, because they
+are the rollback path. A `systemctl stop` leaves both units `enabled`; rollback stays one
+`systemctl start` away, and `/etc/weewx-clearskies/api.conf` is backed up before T8.2b rewrites it.
+T8.4 still runs where the plan puts it, after E2E, and is what makes the removal permanent.
+
+**It also resolves T8.1b's memory question in the same action** — the 8767 service's 366 MB
+resident cache and the 8770 service's 27 MB are freed exactly when the marine service starts
+needing headroom for its own cache and a SWAN binary. Peak projected marine footprint is ~450 MB
+against 1,355 MB available; running both stacks' caches and both SWAN binaries concurrently is what
+would have been tight, and this avoids it.
+
+**Resulting Phase 8 order** (T8.6-before-T8.4/T8.5 preserved exactly):
+
+1. T8.1b — assessment. *(done)*
+2. T8.1 — marine service up on 8780 with **no config pushed**: it serves `/health` + `/manifest`
+   only and the runner loop idles, so it touches none of the shared paths. Old services untouched.
+3. T8.2 / T8.2b — API deployed and repointed to `marine_service_url`. Nothing reads 8767 any more.
+4. **Stop (reversible) the 8767 and 8770 units.** ← this decision
+5. Push marine config → grid-sizing chain → first SWAN cycle, sole owner of the working directory.
+6. T8.3 — dashboard + config UI.
+7. T8.6 — E2E verification.
+8. T8.4 (disable, permanent) / T8.4b (archive repo) / T8.5 (weewx filesystem cleanup).
+
+**Adjacent fact recorded while here, not acted on.** The shipped unit
+`packaging/weewx-clearskies-marine.service` specifies `User=clearskies`. That user does not exist
+on librewxr, where both existing Clear Skies units run as `ubuntu` and every file under
+`/etc/weewx-clearskies/` and `/var/run/weewx-clearskies/` is `ubuntu`-owned. The deploy uses
+`User=ubuntu` to match the host. Creating a `clearskies` user would require re-owning those trees,
+which CLAUDE.md §"Filesystem permissions on containers" forbids and which would break the old
+services mid-transition. This belongs in the install documentation C-68 asks for: the shipped unit
+states a default, and a host where Clear Skies already runs as another user matches that user.

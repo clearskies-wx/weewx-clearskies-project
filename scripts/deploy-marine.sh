@@ -1,0 +1,289 @@
+#!/usr/bin/env bash
+# deploy-marine.sh — Deploy the unified marine companion service to librewxr.
+#
+# The marine service (weewx-clearskies-marine, ADR-099) is the standalone
+# companion that owns ALL marine computation: wave physics (SWAN 3-level
+# nested grid, SwellTrack, SurfBeat), tides (CO-OPS), buoy observations
+# (NDBC), marine weather (NWS, WaveWatch III), ocean currents (OFS, ERDDAP),
+# fishing conditions and beach safety. One service, one port (8780), one
+# auth token. It replaces BOTH old librewxr services:
+#
+#   weewx-clearskies-swan.service     port 8767  (SWAN standalone)
+#   weewx-clearskies-compute.service  port 8770  (SwellTrack/SurfBeat)
+#
+# Performs, in order:
+#   1. Clone or pull weewx-clearskies-marine on librewxr (as ubuntu)
+#   2. Create/refresh its OWN venv and install -e '.[nearshore]'
+#   3. Verify the nearshore import surface (fail here, not at restart)
+#   4. Provision /etc/weewx-clearskies/marine/ + MARINE_SERVICE_SECRET
+#   5. Install/update the systemd unit
+#   6. Restart and verify /health + /manifest
+#
+# SSH config: project-local at .local/ssh/config. Direct SSH to librewxr.
+#
+# Usage:
+#   ./scripts/deploy-marine.sh                # full deploy
+#   ./scripts/deploy-marine.sh --skip-pull    # skip the git pull step
+#   ./scripts/deploy-marine.sh --no-restart   # install only, no restart
+#   ./scripts/deploy-marine.sh --show-secret  # print MARINE_SERVICE_SECRET and exit
+#
+# ---------------------------------------------------------------------------
+# Host-specific notes — these are deployment facts, not preferences
+# ---------------------------------------------------------------------------
+#
+# USER=ubuntu, NOT clearskies. The shipped unit in the repo
+# (packaging/weewx-clearskies-marine.service) declares User=clearskies as its
+# documented default. That user does not exist on librewxr, where both
+# existing Clear Skies units run as `ubuntu` and every file under
+# /etc/weewx-clearskies/ and /var/run/weewx-clearskies/ is ubuntu-owned.
+# Creating a clearskies user would mean re-owning those trees, which
+# CLAUDE.md "Filesystem permissions on containers" forbids and which would
+# break the old services mid-transition. Match the host's existing user.
+#
+# ReadWritePaths must cover THREE directories, not one. The shipped unit
+# lists only /etc/weewx-clearskies/marine, which was correct for the Phase 4
+# scaffold (TLS cert + marine.conf) but not after Phase 5 moved the SWAN code
+# in. Under ProtectSystem=strict the service also needs:
+#   /etc/weewx-clearskies      — swan_bathymetry_L*.json, swan_grid_sizing.json,
+#                                spot_profiles/, great_lakes/, operator_bathymetry/
+#   /var/run/weewx-clearskies  — SWAN work dirs, hotstart files, forecast_cache.json
+# Without them every SWAN cycle fails on a read-only filesystem error.
+#
+# ITS OWN VENV, not the API repo's. deploy-compute.sh installs into the API
+# repo's venv because both old services run from that interpreter. The marine
+# service is self-contained by design (ADR-099) and gets its own, so that
+# T8.4b archiving the old SWAN repo and any later removal of the API checkout
+# on this host cannot strip its dependencies.
+#
+# `uv pip install`, never `uv sync`. Recorded in deploy-compute.sh and worth
+# repeating: `uv sync --frozen` on 2026-07-25 pruned a host venv down to the
+# lockfile's core set and left the service importless while systemd still
+# reported `active`, because the running process held the old code in memory.
+# There is no uv.lock in this repo; `uv pip install -e` resolves against
+# pyproject.toml directly and prunes nothing.
+#
+# SWAN BINARY is a prerequisite, not a pip dependency. /usr/local/bin/swan
+# must already exist on this host (it does — the old SWAN service uses it).
+# Checked, not installed, by this script.
+
+set -euo pipefail
+
+REPO_URL="https://github.com/clearskies-wx/weewx-clearskies-marine.git"
+REPO_PATH="/home/ubuntu/repos/weewx-clearskies-marine"
+VENV="${REPO_PATH}/.venv"
+CONF_DIR="/etc/weewx-clearskies/marine"
+SECRETS="${CONF_DIR}/secrets.env"
+SERVICE="weewx-clearskies-marine"
+PORT=8780
+HOST_IP="192.168.7.22"
+SWAN_BINARY="/usr/local/bin/swan"
+STARTUP_WAIT=15   # no cache warmer; TLS keygen on first start is the slow part
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SSH_CONFIG="${PROJECT_ROOT}/.local/ssh/config"
+
+if [ ! -f "$SSH_CONFIG" ]; then
+    echo "SSH config not found at ${SSH_CONFIG}" >&2
+    exit 1
+fi
+
+SSH_CMD="ssh -F ${SSH_CONFIG}"
+
+skip_pull="0"
+no_restart="0"
+show_secret="0"
+for arg in "$@"; do
+    case "$arg" in
+        --skip-pull)   skip_pull="1" ;;
+        --no-restart)  no_restart="1" ;;
+        --show-secret) show_secret="1" ;;
+        *)
+            echo "Unknown argument: '${arg}'" >&2
+            echo "Usage: $0 [--skip-pull] [--no-restart] [--show-secret]" >&2
+            exit 1
+            ;;
+    esac
+done
+
+run_root() {
+    $SSH_CMD librewxr "sudo bash -lc '$1'"
+}
+run_ubuntu() {
+    $SSH_CMD librewxr "sudo -u ubuntu bash -lc '$1'"
+}
+
+# --show-secret is a read-only query — handle it before anything else.
+if [ "$show_secret" = "1" ]; then
+    run_root "grep '^MARINE_SERVICE_SECRET=' ${SECRETS} | cut -d= -f2-"
+    exit 0
+fi
+
+echo "=== Clear Skies Marine Service deploy → librewxr:${PORT} ==="
+
+# --- Step 0: prerequisites ---
+echo "--- [0/6] prerequisites ---"
+if ! $SSH_CMD librewxr "test -x ${SWAN_BINARY}"; then
+    echo "SWAN binary not found at ${SWAN_BINARY} on librewxr." >&2
+    echo "The nearshore wave model cannot run without it. See the marine repo's" >&2
+    echo "docs/INSTALL.md 'SWAN binary' section." >&2
+    exit 1
+fi
+echo "[prereq] SWAN binary present at ${SWAN_BINARY}"
+if ! $SSH_CMD librewxr "which uv" >/dev/null 2>&1; then
+    echo "[prereq] installing uv..."
+    run_root "curl -LsSf https://astral.sh/uv/install.sh | sh"
+fi
+echo "[prereq] uv present"
+
+# --- Step 1: clone or pull ---
+if [ "$skip_pull" = "1" ]; then
+    echo "--- [1/6] git pull: SKIPPED (--skip-pull) ---"
+else
+    echo "--- [1/6] git clone/pull ---"
+    # The check MUST run as ubuntu: /home/ubuntu/repos is not readable by the
+    # `claude` SSH user, so a bare `test -d` always fails and the script would
+    # fall through to a clone that then aborts on "already exists".
+    if $SSH_CMD librewxr "sudo -u ubuntu test -d ${REPO_PATH}/.git" 2>/dev/null; then
+        echo "[repo] pulling latest..."
+        run_ubuntu "cd ${REPO_PATH} && git pull --ff-only"
+    else
+        # weewx-clearskies-marine is a PRIVATE repo. `gh` is installed and
+        # authenticated on librewxr as ubuntu (done 2026-07-23); it supplies
+        # the credential an anonymous https clone would be refused.
+        echo "[repo] cloning (private repo — via gh)..."
+        run_ubuntu "mkdir -p /home/ubuntu/repos"
+        run_ubuntu "cd /home/ubuntu/repos && gh repo clone clearskies-wx/weewx-clearskies-marine"
+    fi
+    run_ubuntu "cd ${REPO_PATH} && git log --oneline -1"
+    echo "[pull] ok"
+fi
+
+# --- Step 2: venv + dependencies ---
+echo "--- [2/6] venv + dependencies ---"
+if ! $SSH_CMD librewxr "sudo -u ubuntu test -x ${VENV}/bin/python" 2>/dev/null; then
+    echo "[deps] creating venv..."
+    run_ubuntu "cd ${REPO_PATH} && uv venv --python 3.12"
+fi
+run_ubuntu "cd ${REPO_PATH} && VIRTUAL_ENV=${VENV} uv pip install -e '.[nearshore]' 2>&1 | tail -5"
+echo "[deps] ok (core + nearshore extra)"
+
+# --- Step 3: verify the import surface ---
+# Fail here with a readable error rather than at the next service restart,
+# where it surfaces as a systemd unit that flaps on Restart=on-failure.
+echo "--- [3/6] verify imports ---"
+run_ubuntu "${VENV}/bin/python -c \"
+import weewx_clearskies_marine
+from weewx_clearskies_marine.service import create_app
+import numpy, scipy, shapely, xarray, netCDF4, eccodes, prometheus_client, defusedxml, yaml
+import weewx_clearskies_marine.providers.nearshore.swan
+import weewx_clearskies_marine.services.swan_runner
+import weewx_clearskies_marine.services.surfbeat_runner
+print('imports ok')
+\""
+echo "[deps] import surface verified (core + nearshore + SWAN pipeline)"
+
+# --- Step 4: config dir + secret ---
+echo "--- [4/6] config dir + secret ---"
+run_root "install -d -o ubuntu -g ubuntu -m 0750 ${CONF_DIR}"
+# Generate MARINE_SERVICE_SECRET once and never regenerate: rotating it here
+# would silently break the API's Bearer auth on every redeploy. The API host
+# holds the matching value in its own secrets.env (T8.2b).
+run_root "if ! grep -q '^MARINE_SERVICE_SECRET=' ${SECRETS} 2>/dev/null; then
+    umask 077
+    printf 'MARINE_SERVICE_SECRET=%s\n' \"\$(openssl rand -hex 32)\" > ${SECRETS}
+    chown ubuntu:ubuntu ${SECRETS}
+    chmod 0600 ${SECRETS}
+    echo '[secret] generated'
+else
+    echo '[secret] already present — left unchanged'
+fi"
+run_root "ls -l ${SECRETS}"
+
+# --- Step 5: systemd unit ---
+echo "--- [5/6] systemd unit ---"
+run_root "cat > /etc/systemd/system/${SERVICE}.service << 'UNIT'
+[Unit]
+Description=Clear Skies Marine Companion Service (SWAN/SwellTrack/SurfBeat, tides, buoy, marine weather)
+Documentation=https://github.com/clearskies-wx/weewx-clearskies-marine
+After=network.target
+
+[Service]
+Type=simple
+# librewxr runs every Clear Skies service as ubuntu and owns
+# /etc/weewx-clearskies and /var/run/weewx-clearskies as ubuntu. The repo's
+# shipped unit documents User=clearskies as the default; this host matches
+# its own existing user instead. See scripts/deploy-marine.sh header.
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=${CONF_DIR}
+EnvironmentFile=${SECRETS}
+EnvironmentFile=-${CONF_DIR}/network.env
+ExecStart=${VENV}/bin/weewx-clearskies-marine --host \${CLEARSKIES_MARINE_BIND_HOST:-0.0.0.0} --port ${PORT} --cert-dir ${CONF_DIR} --hostname ${HOST_IP}
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+# THREE paths, not one. TLS cert + marine.conf live in ${CONF_DIR}; the SWAN
+# pipeline moved in at Phase 5 also writes bathymetry caches, grid sizing and
+# spot profiles under /etc/weewx-clearskies, and its work dirs, hotstart files
+# and forecast cache under /var/run/weewx-clearskies. Under
+# ProtectSystem=strict, omitting either makes every SWAN cycle fail on a
+# read-only filesystem.
+ReadWritePaths=${CONF_DIR}
+ReadWritePaths=/etc/weewx-clearskies
+ReadWritePaths=/var/run/weewx-clearskies
+
+[Install]
+WantedBy=multi-user.target
+UNIT"
+run_root "systemctl daemon-reload"
+run_root "systemctl enable ${SERVICE}"
+echo "[svc] unit installed and enabled"
+
+# --- Step 6: restart + verify ---
+if [ "$no_restart" = "1" ]; then
+    echo "--- [6/6] restart: SKIPPED (--no-restart) ---"
+    echo "=== Deploy complete (no restart) ==="
+    exit 0
+fi
+
+echo "--- [6/6] restart + verify ---"
+run_root "systemctl restart ${SERVICE}"
+echo "[svc] restart issued, waiting ${STARTUP_WAIT}s..."
+sleep "$STARTUP_WAIT"
+
+if ! run_root "systemctl is-active --quiet ${SERVICE}"; then
+    echo "[svc] ${SERVICE} is NOT active" >&2
+    $SSH_CMD librewxr "sudo journalctl -u ${SERVICE} --since '2 min ago' --no-pager | tail -40" >&2
+    exit 1
+fi
+echo "[svc] ${SERVICE} active"
+
+# /health and /manifest are the two unauthenticated endpoints (ARCHITECTURE.md
+# port registry, port 8780). Everything else requires the Bearer token.
+for ep in health manifest; do
+    code=$($SSH_CMD librewxr "curl -sk -o /dev/null -w '%{http_code}' https://localhost:${PORT}/${ep}")
+    if [ "$code" = "200" ]; then
+        echo "[verify] GET /${ep}: ${code} OK"
+    else
+        echo "[verify] GET /${ep} returned ${code} (expected 200)" >&2
+        echo "[verify] logs: ssh -F .local/ssh/config librewxr 'sudo journalctl -u ${SERVICE} --since \"2 min ago\" --no-pager'" >&2
+        exit 1
+    fi
+done
+
+# Auth must actually be enforced — a service that 200s an unauthenticated
+# marine request has its auth wired wrong, and that is worth catching at
+# deploy time rather than in an audit.
+code=$($SSH_CMD librewxr "curl -sk -o /dev/null -w '%{http_code}' https://localhost:${PORT}/discovery/swan-check")
+if [ "$code" = "401" ]; then
+    echo "[verify] unauthenticated /discovery/swan-check: 401 — auth enforced"
+else
+    echo "[verify] unauthenticated /discovery/swan-check returned ${code} (expected 401)" >&2
+    exit 1
+fi
+
+echo "=== Marine service deploy complete → https://${HOST_IP}:${PORT} ==="
