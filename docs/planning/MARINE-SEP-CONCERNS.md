@@ -97,7 +97,28 @@ Commit `03f81db`. Verified by the coordinator: all 10 moved providers import cle
 
 ---
 
-## ⛔ C-27 — AWAITING OPERATOR: the fishing endpoint has no source for station timezone or elevation
+## C-27 — DISSOLVED BY OPERATOR RULING: solunar leaves the marine service entirely (DECIDED)
+
+**Ruling (operator, in chat, 2026-07-25).** Solunar is not a marine function. The API already
+computes it — `endpoints/almanac.py:904` serves `GET /almanac/solunar`, backed by
+`enrichment/solunar.py` and `services/almanac.py`, using the station timezone and elevation the
+API already owns. There must not be two implementations of the same computation, and there must
+not be a second call for it.
+
+So the question below — *where does the marine service get station timezone and elevation?* — was
+the wrong question. The answer is that the marine service never needed them, because it should
+never have been computing solunar. The three options weighed below are all moot; the config push
+carries neither field.
+
+**Executed in Phase 6:** the marine service deletes its ported `solunar.py` and `almanac.py`
+copies and drops `skyfield`; `endpoints/fishing.py` stops calling `compute_almanac()`; the API
+recomposes the solunar fields into the proxied fishing response using the machinery it already
+has. **Coordinator error recorded honestly:** this was escalated to the operator when it should
+have been answered by reading the manuals, which document API ownership of almanac and solunar.
+
+### Original finding, kept for the trace
+
+**Superseded.** Found by the Round 3 endpoint agent:
 
 Found by the Round 3 endpoint agent; **not previously flagged by anyone.**
 
@@ -126,7 +147,31 @@ payload, so the payload's shape is settled once rather than twice.
 
 ---
 
-## ⛔ C-26 — HIGH, AWAITING OPERATOR: storm-surge classification compares metres against foot thresholds
+## C-26 — DECIDED BY OPERATOR RULING: thresholds are canonical, never display-unit (DECIDED)
+
+**Ruling (operator, in chat, 2026-07-25).** Everything works in canonical units regardless of the
+operator's display preference, and the API converts to whatever the operator asked for. A
+threshold table calibrated in a display unit is wrong by design — the question is not *which
+unit should we compare in*, it is *why does a `_FT` constant exist at all*. This is doctrine
+already written down in `ARCHITECTURE.md` §Layer Responsibilities (the API is the single
+conversion authority) and `API-MANUAL.md:1332`, which names this exact class of defect.
+
+**Executed in Phase 6, and broader than this one site.** `_SURGE_THRESHOLDS_FT` becomes canonical
+metre constants derived by exact conversion, so no classification criterion changes. The same
+sweep covers `beach_safety.py`'s `_COMFORT_*_MIN_F` water-comfort thresholds and
+`fishing_scorer.score_fishing()`'s Fahrenheit species profiles — both of which existed only to be
+fed by a `_convert_unit()` call inside a service that is supposed to emit SI. Those conversion
+calls disappear rather than being redirected. After the sweep the marine service contains zero
+display-unit conversions; the only permitted calls into `units/conversion.py` are provider ingest
+normalisations from an upstream unit into SI.
+
+**Coordinator error recorded honestly:** escalated as a units question when the doctrine already
+answered it, and the audit's related finding (C-32) was passed along as a "spot-check" instead of
+being recognised as the same defect class.
+
+### Original finding, kept for the trace
+
+**Superseded — the fix is canonical constants, not a better-placed conversion.**
 
 **Status:** escalated to the operator 2026-07-25. Not blocking Phase 5 — the port inherits the
 bug faithfully, which is correct. But it needs a decision before Phase 8 deploys.
