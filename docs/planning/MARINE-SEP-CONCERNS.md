@@ -4401,3 +4401,101 @@ but did not get a line-by-line read.
 `residualForecastSource`); `transect_handoff.py:597-624` and `swan_runner.py:2597-2624` L2 fallbacks
 (structurally-unavailable carve-out, ADR-093 Amendment 2 §4); `ofs.py:613-615` land-masked currents → 0.0 (a
 land cell structurally has no current).
+
+---
+
+## C-91 — station selection rejected stations by corner geometry, not by distance (**FIXED** — `c40ab64`)
+
+**Found 2026-07-26** when the T8.10c round-2 agent predicted that deploying would stall the Huntington
+forecast indefinitely: only **1** station qualified, below the 2 the varying-boundary design requires, so
+`select_boundary_stations_with_cycle_fallback()` would raise every cycle without advancing
+`last_hrrr_cycle`. **Coordinator-verified independently** by recomputing the geometry by hand against the
+live L1 extent from `/etc/weewx-clearskies/swan_grid_sizing.json` — the prediction was correct.
+
+**Root cause.** Selection measured the perpendicular distance to the **infinite line** through each L1 side,
+then applied a *separate* span test rejecting any station whose latitude (W side) or longitude (S side) fell
+outside that side's extent. That double-counts the geometry and gets it wrong at the corners: a station just
+past an endpoint has a tiny perpendicular distance and was rejected outright even when its true distance to
+the boundary was well inside the limit.
+
+Measured at the live single-spot Huntington L1, cycle 06Z:
+
+| station | lat/lon | depth | deep water to | distance | verdict |
+|---|---|---|---|---|---|
+| 46222 | 33.62, -118.32 | 487.9 m | 25.0 s | 7.7 km (W) | qualifies |
+| **46223** | 33.46, -117.77 | **461.6 m** | 24.3 s | **16.9 km (S)** | **was rejected for being past the corner** |
+| 46253 | 33.58, -118.18 | 291.5 m | 19.3 s | 5.2 km | correctly fails depth |
+| 46256 | 33.70, -118.20 | 114.7 m | 12.1 s | 3.4 km | correctly fails depth |
+| 46221 | 33.86, -118.64 | 515.0 m | 25.7 s | 41.2 km | correctly fails distance |
+
+**Researched, not escalated.** The operator's standing position is that questions of this kind are to be
+answered from the manual and the literature, not put to them:
+
+- **SWAN imposes no positional requirement on a `BOUNDSPEC` source.** The `0.1×`-spacing tolerance quoted
+  earlier in this register belongs to **`BOUNDNEST3`**. `BOUNDSPEC … VARIABLE FILE` takes only a distance
+  `[len]` along the boundary and never learns where the buoy physically was.
+- **The literature is far more permissive.** Published SWAN assimilation drives an entire nearshore domain
+  from a **single** buoy directional spectrum applied uniformly across the whole offshore boundary, at
+  10–20% RMS error on Hs (J. Atmos. Ocean. Tech. 38(12), 2021).
+
+So rejecting a station 6 km from the boundary line for sitting past a corner had no basis in either.
+
+**Fix:** true point-to-segment distance, which handles corners correctly by construction (measuring to the
+nearest endpoint). The span test is redundant where it is right and wrong where it bites, so it was deleted
+rather than tuned. **This is a geometry defect fix, not a relaxed criterion** — the one-grid-cell distance
+limit and the `0.78 × T²` deep-water depth criterion are both unchanged, and the two shallow stations still
+fail exactly as they should.
+
+**Still to confirm:** the fix has been verified by hand but **not yet by running the real selection code**,
+because that needs the ocean station catalogue, which had never been built (see C-92).
+
+---
+
+## C-92 — the ocean station catalogue was never built, and 2 MB of orphaned data still ships in the API (OPEN)
+
+Two separate findings from the same 2026-07-26 survey.
+
+### C-92a — the catalogue is a hard deploy prerequisite nobody had surfaced
+
+Running the real `select_boundary_stations_with_cycle_fallback()` against the live L1 refused cleanly with:
+
+> `no 'ocean' station catalogue is built yet -- run ww3_station_catalogue.build_catalogue() at setup time`
+
+T8.10a built the **Great Lakes** catalogue in full (96 stations) but only ever ran **capped** ocean builds
+plus a kill/resume test — its closeout said so explicitly, and the plan records it. Nothing downstream
+noticed that the full ocean catalogue therefore did not exist.
+
+**The refusal was correct behaviour** — an actionable message rather than silent degradation, which is what
+C-76/C-77/C-90 exist to produce. The defect is that it was discovered at deploy time rather than being a
+tracked prerequisite.
+
+**Measured cost:** ~0.6 stations/second against NOAA's 2 req/s courtesy limit, so **~2 hours** for 4,036
+stations — not the ~35 minutes the brief estimated from the theoretical rate.
+
+**Disposition (operator-approved 2026-07-26):** ship the built catalogue as package data
+(`weewx_clearskies_marine/data/ww3_station_catalogue.json`, ~290 KB), load it as the default, and let an
+on-disk rebuild supersede it. Direct precedent exists in the same directory —
+`ncei_regional_dem_index.json` is described in code as committed to the repo and changing "only when this
+service is redeployed with an updated index". Recorded in **`docs/RELEASE-DATA-REFRESH.md`**, created for
+this purpose at the operator's request.
+
+**Must be verified before shipping:** a station NOAA has retired must degrade to a **rejection** (try the
+next candidate), never a raised cycle. A shipped index will drift; that drift must be harmless.
+
+### C-92b — orphaned data files in the API repo
+
+`repos/weewx-clearskies-api/weewx_clearskies_api/data/` still contains, with **zero code references in the
+API**:
+
+| file | size | API refs | marine refs |
+|---|---|---|---|
+| `gsfm_shelf_boundary.json` | **2.0 MB** | **0** | 2 |
+| `ncei_regional_dem_index.json` | 62 KB | **0** | 3 |
+
+Phase 6 deleted the wave-physics code that used them but left the data behind, so ~2 MB of dead payload
+ships in every API build. **`species.yaml` is NOT orphaned** — 89 references in the API against 114 in
+marine, a genuine shared dependency; deleting it would break the API, and if it is ever refreshed both
+copies must be updated together.
+
+**Disposition:** delete the two orphans from the API repo. Mechanical, but it touches what a package ships,
+so it is recorded rather than done silently.
