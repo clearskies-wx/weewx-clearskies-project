@@ -3209,6 +3209,10 @@ The marine service never parses `api.conf` directly. This ensures the API remain
     "omp_num_threads": 0,
     "outer_grid_resolution_km": 3.0,
     "inner_nest_resolution_m": 200
+  },
+  "station": {
+    "lat": 34.2075,
+    "lon": -77.7980
   }
 }
 ```
@@ -3216,10 +3220,11 @@ The marine service never parses `api.conf` directly. This ensures the API remain
 Notes:
 
 - **`directional_exposure` wire shape is pinned to the JSON-native dict** (`{"N": false, ...}`) — never the list-of-`"DIR:bool"`-strings form `configobj` uses internally for api.conf's own on-disk storage (MARINE-SEP-CONCERNS.md C-23). The API's serializer converts api.conf's on-disk list form to this dict on the way out; the marine service's parser accepts the dict form only — the list-tolerance branch it carried before this was pinned has been deleted (no caller, per rules/coding.md §3).
-- Every top-level key (`marine`, `swan`) is present only when the corresponding api.conf section exists — an installation with no marine locations and no `[swan]` config sends `{}`.
+- Every top-level key (`marine`, `swan`, `station`) is present only when the corresponding data exists — an installation with no marine locations and no `[swan]` config sends `{}`; `station` is attached only alongside `marine` (it exists to serve marine locations) and only when the API's station metadata is loaded at the time the payload is built.
 - `[[weather]]` (marine forecast/observation TTLs) is never sent — the API never writes it to api.conf, and the marine service's `MarineWeatherConfig` defaults apply.
 - `swan` is included because the marine service's ported config loader still reads it today; ADR-099's plan to fold it into `marine_service_url` alone is a later phase, not this one. **`providers.surf_compute_host` / `surf_compute_verify_tls` are removed as of T6.8 (2026-07-25)** — the API no longer has these config fields to send (superseded entirely by `marine_service_url`); a payload example showing them was stale as of this edit and is corrected here.
-- **Station timezone and elevation are deliberately excluded.** The marine service's fishing endpoint has no consumer for either field yet (MARINE-SEP-CONCERNS.md C-27, awaiting an operator decision on whether to add them here or derive them another way). Attach point once decided: `_serialize_marine_locations_section()` in `endpoints/setup.py` (add `"station_tz"` / `"station_elevation_m"` to the per-location `loc` dict), and the corresponding read in `config/marine_config.py`'s `MarineLocation.__init__` on the marine side.
+- **`station.lat` / `station.lon` (C-51, DECIDED 2026-07-25):** the weewx station's own coordinates, sourced from `services/station.py`'s `get_station_info()`. Added so the marine service's `is_station_served()` spatial test (C-47's t=0 station-wind fetch, `endpoints/surf.py`) has something to compare a marine location's distance against — before this, `resolve_station_distances()` was never called and every location was unconditionally treated as not station-served. **Absence is a normal state, not an error.** If station metadata isn't loaded when the payload is built, `station` is simply omitted — never defaulted to `0,0` or any other placeholder. The marine side (`config/marine_config.py`) treats a missing `station` key exactly like every location being outside `dedup_radius_km`: `is_station_served()` returns `False` for every location and every location takes the forecast-provider wind path, same behavior as before C-51.
+- **Station timezone and elevation are deliberately excluded.** The marine service's fishing endpoint has no consumer for either field — sunrise/sunset moved to the API's `GET /almanac/solunar` (C-47, DECIDED 2026-07-25), which resolves them for whatever lat/lon it's given, dissolving the station-timezone question C-27 raised. Elevation remains unattached — no marine-service consumer as of this writing.
 
 ### §19.6 Marine alerts remain in the API
 
