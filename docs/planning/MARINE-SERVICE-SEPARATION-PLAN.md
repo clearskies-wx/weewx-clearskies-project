@@ -3410,11 +3410,33 @@ water-body decision exists in the bathymetry chain (USGS Great Lakes topobathy v
 **GLWU cadence is hourly** (`bulls.tCCz`, 00–14z observed) against the ocean product's 00/06/12/18z — the
 runner's cycle logic assumes 6-hourly and must branch.
 
-**A Great Lakes spot must actually be configured for this to be checkable.** None is configured today, and
-the brief calls Great Lakes support "currently theoretical". Configuring one pulls in the Great Lakes
-bathymetry chain, grid sizing and cluster viability. **If that turns out to be more than a config entry,
-stop and report** — standing up a new water body is not in T8.10's authorized scope, and T8.10e/T8.10h#6
-would then be deferred with that stated explicitly rather than silently skipped.
+**This is a DEFECT FIX, not a new capability — the Great Lakes are already first-class in this codebase.**
+`REGION_GREAT_LAKES` is a region constant with its own depth-contour ladder `[15, 12, 9, 6, 4, 2, 1]` and its
+own coordinate-based region detection (`enrichment/bathymetry.py:228, 250, 274`); `usgs_great_lakes` is a
+discovery bathymetry source (`endpoints/discovery.py:315, 359, 384`); and the USGS Great Lakes DEM is
+**priority 2 in the SWAN bathymetry chain** (`providers/nearshore/swan.py:500, 514, 517`).
+
+So the product already accepts a Great Lakes location, detects the region, and sizes SWAN grids from Great
+Lakes bathymetry — then feeds that grid a boundary fetched from an ocean model that has no water there.
+**Great Lakes selection was implemented; the Great Lakes wave-data pull never was.** Fixing code that
+diverges from its own stated contract needs no further authorization.
+
+**Operator-selectable already — this is the crux (operator, 2026-07-26: *"it was included.... you were able to
+enable marine for the great lakes"*).** Marine location entry accepts arbitrary `lat`/`lon`
+(`admin/routes.py:2036`, `_marine_to_float(raw.get("lat"))`) with **no ocean or coast gate**. An operator could
+enable marine at a Great Lakes location through the normal admin flow and nothing stopped them. Everything
+downstream then handled it correctly — region detection, contour ladder, Great Lakes DEM — right up to the
+wave boundary, which was fetched from an ocean model with no water there.
+
+**A selectable, fully-supported configuration that silently could not work.** That is the defect.
+
+**Nor is the Great Lakes case degraded — it is the better-resolved one.** GLWU is ~2.5 km against
+`global.0p16`'s 0.1667 deg (~18.5 km), roughly **7x finer**, and its `.spec` format is byte-identical in
+structure to the ocean product.
+
+A Great Lakes spot still needs to be **configured** to verify against, since none is today. Given the region
+support above, that should be a configuration entry rather than new machinery — but if it turns out otherwise,
+report what is actually missing rather than building it silently.
 
 **Accept:** A Great Lakes spot produces a real spectral boundary where it previously produced none; cycle
 selection correct for both cadences. If deferred for the reason above, the deferral is recorded in the plan
@@ -3480,6 +3502,11 @@ missing **total** during a live cycle is a failure and **raises** (rules/coding.
 `cache_ttl: 0` in its manifest. **Extend that endpoint** rather than adding a new one — check what it does
 today before writing anything, since reusing it keeps this inside the authorized scope instead of adding an
 endpoint (trigger 7).
+
+**Where the probe result should surface:** the config UI already renders per-location data-coverage status —
+`"Full coverage (OFS coastal model)"`, `"No ocean data coverage"`, `"No OFS coastal model coverage"`
+(`admin/routes.py:2888-2923`). **Extend that existing coverage display** rather than inventing a new
+surface, so wave-data coverage is reported exactly where OFS coverage already is.
 
 **Both halves of viability are checked at setup, and both can refuse a spot:**
 

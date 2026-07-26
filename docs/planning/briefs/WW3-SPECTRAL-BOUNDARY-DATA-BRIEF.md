@@ -114,9 +114,47 @@ At Lake Michigan (43.0 N, 87.0 W):
 | `gfswave.global.0p25` | **9999** (missing) for `swh` and all three partitions |
 | PacIOOS `ww3_global` | **null** |
 
-Global ocean wave models mask inland water. **Great Lakes spots have never had a WW3 boundary.** Now that
-C-76 makes a missing boundary raise instead of substituting calm, such a spot fails loudly — correct, but
-it means Great Lakes support is currently theoretical and should be stated as such.
+Global ocean wave models mask inland water — that `9999` is `gfswave` giving the **correct** answer, since as
+far as it is concerned there is no ocean at that cell.
+
+**This is a defect, not a missing feature. The Great Lakes are already first-class in this codebase:**
+
+| Evidence | Where |
+|---|---|
+| `REGION_GREAT_LAKES` is a region constant | `enrichment/bathymetry.py:228` |
+| Its own depth-contour ladder `[15, 12, 9, 6, 4, 2, 1]` | `enrichment/bathymetry.py:250` |
+| Region detection returns it from coordinates | `enrichment/bathymetry.py:274` |
+| `usgs_great_lakes` DEM is a discovery bathymetry source | `endpoints/discovery.py:315, 359, 384` |
+| USGS Great Lakes DEM is **priority 2 in the SWAN bathymetry chain** | `providers/nearshore/swan.py:500, 514, 517` |
+
+So the product accepts a Great Lakes location, detects the region, and sizes SWAN grids from Great Lakes
+bathymetry — then hands that grid a wave boundary fetched from an ocean model that has no water there.
+**Great Lakes selection was implemented; the Great Lakes wave-data pull never was.** Code diverging from its
+own stated contract.
+
+**Operator-selectable already — this is the crux (operator, 2026-07-26: *"it was included.... you were able to
+enable marine for the great lakes"*).** Marine location entry accepts arbitrary `lat`/`lon`
+(`admin/routes.py:2036`, `_marine_to_float(raw.get("lat"))`) with **no ocean or coast gate**. An operator could
+enable marine at a Great Lakes location through the normal admin flow and nothing stopped them. Everything
+downstream then handled it correctly — region detection, contour ladder, Great Lakes DEM — right up to the
+wave boundary, which was fetched from an ocean model with no water there.
+
+**A selectable, fully-supported configuration that silently could not work.** That is the defect.
+
+**And the data has been there the whole time, at better resolution than anything offshore.** Measured
+2026-07-26:
+
+| | Great Lakes (GLWU) | Best ocean grid |
+|---|---|---|
+| Spectra | `glwu.<ST>.spec`, `'WAVEWATCH III SPECTRA' 32 36`, ~115 stations, 1.94 MB | `gfswave.<ST>.spec`, `50 36`, 7.75 MB |
+| Gridded | `glwu.grlc_2p5km` — **~2.5 km**, full `SWELL/SWPER/SWDIR 1,2,3` | `global.0p16` — 0.1667 deg (~18.5 km) |
+| Format | **identical and self-describing** — one parser, no branching | — |
+
+At ~2.5 km, GLWU resolves the lakes roughly **7x finer** than the finest ocean grid resolves the coast. Great
+Lakes spots are not a degraded case; they are the better-resolved one.
+
+Now that C-76 makes a missing boundary raise rather than substitute calm, a Great Lakes spot fails loudly
+instead of publishing fiction — the correct behaviour while T8.10e is outstanding.
 
 ---
 

@@ -4158,3 +4158,28 @@ endpoint (trigger 7).
 A spot that fails **either** probe is refused at setup with a message naming which probe failed and why. A
 spot may legitimately pass one and fail the other — e.g. gridded data present but no station near enough —
 and the message must say which, because the remedies differ.
+
+### Correction, same day — Great Lakes was never "theoretical"; it was a selectable configuration that could not work
+
+The coordinator wrote that Great Lakes support was "currently theoretical". That was wrong, and the operator
+corrected it twice. Verified in the code:
+
+| Evidence | Where |
+|---|---|
+| Marine location entry accepts arbitrary lat/lon, **no ocean/coast gate** | `admin/routes.py:2036` |
+| `REGION_GREAT_LAKES` region constant | `enrichment/bathymetry.py:228` |
+| Its own depth-contour ladder `[15, 12, 9, 6, 4, 2, 1]` | `enrichment/bathymetry.py:250` |
+| Coordinate-based region detection returns it | `enrichment/bathymetry.py:274` |
+| `usgs_great_lakes` DEM as a discovery bathymetry source | `endpoints/discovery.py:315, 359, 384` |
+| USGS Great Lakes DEM = **priority 2 in the SWAN bathymetry chain** | `providers/nearshore/swan.py:500, 514, 517` |
+| Per-location coverage UI already exists ("No ocean data coverage") | `admin/routes.py:2888-2923` |
+
+An operator could enable marine for a Great Lakes location through the normal flow. Region detection, the
+contour ladder and the Great Lakes DEM all handled it. The **only** unimplemented piece was the wave-data
+pull: the boundary was fetched from an ocean model that returns `missingValue` there.
+
+**So this is a defect — code diverging from its own stated contract — not a new capability**, and fixing it
+needs no further authorization beyond T8.10. "Theoretical" also understated what was known: GLWU is
+operational, in SWAN's own `'WAVEWATCH III SPECTRA'` format, and at ~2.5 km resolves the lakes roughly **7x
+finer** than `global.0p16` (~18.5 km) resolves the ocean coast. The Great Lakes case is the
+**better**-resolved one.
