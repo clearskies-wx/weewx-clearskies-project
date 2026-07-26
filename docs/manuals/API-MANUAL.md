@@ -2957,6 +2957,20 @@ This section documents the target-state architecture for the marine service (`we
 
 **Target state:** Marine logic moves to a standalone FastAPI service (`weewx-clearskies-marine`) on port 8780. The API communicates with it over HTTP (authenticated, TLS). Marine endpoints are dynamically mounted from the service's manifest. Zero API code changes are needed to add or modify a marine endpoint after the separation.
 
+**Implementation status (T6.1, 2026-07-25):** `services/companion_proxy.py` is implemented — manifest fetch at startup, dynamic route mounting under `/api/v1/`, 5-minute manifest refresh (same clock as the startup-unreachable retry), and the three-state rule below. The API's hardcoded marine routers described in "Current state" above are still mounted (T6.5–T6.8 delete them later in Phase 6); until then, an operator who configures `marine_service_url` has both a native route and a companion-proxy route registered for the same overlapping paths, and FastAPI resolves to whichever was registered first (the native router — it is registered before `register_companion_proxy()` runs). §19.3 (response envelope wrapping + unit conversion) is **not yet implemented** — the proxy currently returns the marine service's raw SI-unit payload unchanged (T6.2, not yet done).
+
+**The three-state rule (proxy failure vs. model gap vs. missing resource).** These three situations must stay distinguishable end to end — collapsing any two of them reintroduces the ambiguity SURF-PUBLISH-RESULTS-ONLY (§18 above) removed:
+
+| Situation | Response |
+|---|---|
+| Marine service unreachable (network failure, non-JSON body, or any HTTP status other than 200/404) and no cached response exists for the route | The proxy's own **503**, with a `detail` naming the unreachable route. Never dressed up as a `modelStatus` value. |
+| Marine service answers HTTP 200, including a null payload with `modelStatus: "unavailable"` | Passed through **untouched** as 200 — a successful proxied response, cached like any other 200. There is no `modelStatus`-specific branch in the proxy; it does not inspect the body to decide how to respond. |
+| Unknown location / bad parameter | The marine service's own **404**, passed through untouched, never cached. |
+
+If the marine service is reachable but returns something other than 200/404 (5xx, or 401/403 from a misconfigured `MARINE_SERVICE_SECRET`), the proxy treats it the same as "unreachable": serve the last cached response if one exists, else its own 503.
+
+**Gap reporting client (C-10).** `POST {marine_service_url}/report/gap` is intentionally **not** in the manifest — it is a fire-and-forget POST with no cacheable resource and no TTL, so the manifest schema (path/method/upstream/cache_ttl) has nothing to describe for it. `services/companion_proxy.py`'s `report_gap()` calls it directly, with the same bounded dedup/queue/single-worker semantics as the legacy `providers/nearshore/swan.py` client it succeeds. `swan.py` itself is unaffected; T6.6 removes it later in Phase 6 and its call sites move to `companion_proxy.report_gap()` at that point — nothing calls the new function yet.
+
 ### §19.1 Manifest registration
 
 The marine service exposes `GET /manifest` (no auth required). The API fetches this manifest at startup, refreshes it periodically (every 5 minutes), and re-fetches on each `/setup/apply` call. Declared routes are mounted dynamically under `/api/v1/`. Endpoint additions in the marine service take effect within 5 minutes without an API restart; endpoint removals de-register the route on the next refresh.
@@ -3097,13 +3111,95 @@ Marine service configuration is never read directly from `api.conf`. It is pushe
 
 1. Operator saves marine location settings in the wizard or admin UI.
 2. Wizard/admin sends `POST /setup/apply` to the API.
-3. The API writes the validated config to `api.conf [marine]` and then immediately POSTs the marine-relevant config subset to `POST {marine_service_url}/config` with `Authorization: Bearer {MARINE_SERVICE_SECRET}`.
-4. The marine service receives the config, validates it, and begins using it for the next run cycle.
-5. The API returns success to the wizard/admin only after the marine service acknowledges the config push.
+3. The API writes the validated config to `api.conf [marine]` and then POSTs the marine-relevant config subset to `POST {marine_service_url}/config` with `Authorization: Bearer {MARINE_SERVICE_SECRET}`.
+4. The marine service receives the config, validates it, persists it to local disk, and begins using it for the next run cycle.
+5. The API returns success to the wizard/admin whether or not the push succeeded (see failure handling below) — `/setup/apply`'s own success reflects api.conf having been written, not the marine service's reachability.
 
-**Config push failure handling:** If the marine service is unreachable when the config push is attempted, the API writes the config locally and returns a warning to the wizard. The marine service will receive the config on the next `/setup/apply` call or on marine service restart (the marine service fetches its config from the API on startup via `GET {api_url}/setup/marine/config`).
+**Config push failure handling (T6.4):** The push is attempted once, synchronously, at the end of `/setup/apply`. If `marine_service_url` is not configured, nothing is attempted. If the marine service is unreachable, returns a non-2xx status, or `MARINE_SERVICE_SECRET` is not set in the API's own environment, the failure is logged at **ERROR** and `/setup/apply` still returns success — a marine service outage never blocks the rest of setup. The marine service picks the config up on the next `/setup/apply` call, or recovers it itself on restart via the pull described below (T6.4b).
+
+**Config recovery pull (T6.4b):** `GET /setup/marine/config`, authenticated with `Authorization: Bearer {MARINE_SERVICE_SECRET}`, returns exactly the payload the push above sends — both are built by one serializer (`_build_marine_service_config_payload()` in `endpoints/setup.py`) so the push and pull shapes cannot drift apart. The marine service calls this only at startup, and only when it has no local config on disk (an existing local config always wins — the pull never overwrites it). See OPERATIONS-MANUAL.md "Config push model" for the marine-side trigger conditions (`CLEARSKIES_MARINE_API_URL`) and failure/degradation behaviour.
 
 The marine service never parses `api.conf` directly. This ensures the API remains the single source of truth for all operator-facing configuration.
+
+**Payload shape.** Every field below has a live consumer in the marine service's `config/marine_config.py` loader (`load_marine_config()` / `load_swan_config()`), verified by reading that file directly — no field is sent without a reader, and no field the loader reads is omitted.
+
+```json
+{
+  "marine": {
+    "locations": {
+      "<location_id>": {
+        "name": "Wrightsville Beach",
+        "lat": 34.2085,
+        "lon": -77.7964,
+        "activities": ["surf", "beach_safety", "fishing"],
+        "ndbc_station_ids": ["41110", "41037"],
+        "coops_station_ids": ["8658163"],
+        "nws_marine_zone_id": "AMZ250",
+        "nws_srf_zone_id": "CAZ552",
+        "nws_srf_wfo": "sgx",
+        "ofs_model": "cbofs",
+        "ofs_fallback": "ngofs2",
+        "surf": {
+          "segment_start_lat": 34.0262, "segment_start_lon": -118.0010,
+          "segment_end_lat": 34.0265, "segment_end_lon": -118.0040,
+          "transect_spacing_m": 10.0,
+          "bottom_type": "sand",
+          "beach_slope": 0.02,
+          "topographic_feature": "straight_beach",
+          "directional_exposure": {
+            "N": false, "NE": false, "E": true, "SE": true,
+            "S": true, "SW": true, "W": false, "NW": false
+          },
+          "breaker_formula": "komar_gaughan",
+          "surf_height_display": "face",
+          "l3_enabled": "auto",
+          "friction_coefficient": 0.038,
+          "surfbeat_enabled": true,
+          "surfbeat_cadence_hours": 3,
+          "max_hs_m": 4.0,
+          "bathymetric_profile": {"0": {"distance_m": 0.0, "depth_m": 0.0}},
+          "structures": {
+            "0": {
+              "type": "jetty", "material": "impermeable",
+              "length_m": 120.0, "bearing_degrees": 45.0, "distance_m": 300.0,
+              "bearing_to_spot_degrees": 90.0,
+              "coordinates": [[-77.7964, 34.2085], [-77.7960, 34.2090]]
+            }
+          }
+        },
+        "fishing": {
+          "target_categories": ["saltwater_inshore", "bottom_fish"],
+          "biogeographic_region": "carolinian",
+          "species": ["red_drum", "spotted_seatrout"]
+        },
+        "beach_safety": {
+          "external_links": {
+            "water_quality": {"label": "NC Beach Water Quality", "url": "https://ncdeq.gov/beach-water-quality"}
+          }
+        }
+      }
+    }
+  },
+  "swan": {
+    "service_url": "http://localhost:swan",
+    "omp_num_threads": 0,
+    "outer_grid_resolution_km": 3.0,
+    "inner_nest_resolution_m": 200
+  },
+  "providers": {
+    "surf_compute_host": "https://192.168.7.22:8770",
+    "surf_compute_verify_tls": true
+  }
+}
+```
+
+Notes:
+
+- **`directional_exposure` wire shape is pinned to the JSON-native dict** (`{"N": false, ...}`) — never the list-of-`"DIR:bool"`-strings form `configobj` uses internally for api.conf's own on-disk storage (MARINE-SEP-CONCERNS.md C-23). The API's serializer converts api.conf's on-disk list form to this dict on the way out; the marine service's parser accepts the dict form only — the list-tolerance branch it carried before this was pinned has been deleted (no caller, per rules/coding.md §3).
+- Every top-level key (`marine`, `swan`, `providers`) is present only when the corresponding api.conf section exists — an installation with no marine locations and no `[swan]`/compute-offload config sends `{}`.
+- `[[weather]]` (marine forecast/observation TTLs) is never sent — the API never writes it to api.conf, and the marine service's `MarineWeatherConfig` defaults apply.
+- `swan` and `providers.surf_compute_host` / `surf_compute_verify_tls` are included because the marine service's ported config loader still reads them today; ADR-099's plan to fold these into `marine_service_url` alone is a later phase, not this one.
+- **Station timezone and elevation are deliberately excluded.** The marine service's fishing endpoint has no consumer for either field yet (MARINE-SEP-CONCERNS.md C-27, awaiting an operator decision on whether to add them here or derive them another way). Attach point once decided: `_serialize_marine_locations_section()` in `endpoints/setup.py` (add `"station_tz"` / `"station_elevation_m"` to the per-location `loc` dict), and the corresponding read in `config/marine_config.py`'s `MarineLocation.__init__` on the marine side.
 
 ### §19.6 Marine alerts remain in the API
 

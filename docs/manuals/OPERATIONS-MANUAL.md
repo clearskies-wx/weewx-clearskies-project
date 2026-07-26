@@ -1127,6 +1127,7 @@ live on the marine service host, separate from the API's own:
 | `MARINE_SERVICE_SECRET` | env var, from `secrets.env` via the systemd unit's `EnvironmentFile=` | none — **required** | Bearer token for every endpoint except `/health` and `/manifest`. The process refuses to start if unset; a request arriving while unset returns **500** (a deployment fault), deliberately distinct from the **401** a bad client token gets. |
 | `CLEARSKIES_MARINE_CACHE_URL` | env var | unset → in-process memory cache | Redis URL for provider response caching. **Deliberately distinct from the API's `CLEARSKIES_CACHE_URL`** — same-host deployment is a supported topology, and sharing one Redis database would collide the two services' key namespaces. |
 | `CLEARSKIES_MARINE_BIND_HOST` | env var | `0.0.0.0` | Bind address. Mirrors the API's `CLEARSKIES_BIND_HOST`. Accepts an IPv4 or IPv6 literal, a hostname, or `*` for true dual-stack. |
+| `CLEARSKIES_MARINE_API_URL` | env var | unset → no recovery fetch attempted | Base URL of the Clear Skies API (e.g. `https://weewx.example.com:8765`), used only for T6.4b startup config recovery (below). Unset is a normal, silent state — not an error — for operators who don't need it. |
 | `/etc/weewx-clearskies/marine/secrets.env` | file | — | Holds `MARINE_SERVICE_SECRET` (and optionally `CLEARSKIES_MARINE_CACHE_URL`) on the marine service host. |
 | `/etc/weewx-clearskies/marine/marine.conf` | file | — | Config persisted by `POST /config`, written atomically (temp + rename), mode `0640`. Reloaded at startup. |
 | `/etc/weewx-clearskies/marine/marine-cert.pem` / `marine-key.pem` | files | auto-generated on first start | Ed25519 self-signed TLS cert and key; key mode `0600`. |
@@ -1153,25 +1154,31 @@ The marine service never reads `api.conf` directly. All configuration is pushed 
 
 1. Operator saves marine location settings in the wizard or admin UI.
 2. Wizard/admin sends `POST /setup/apply` to the API.
-3. The API writes the validated config to `api.conf [marine]` and then POSTs the marine-relevant config subset to `POST {marine_service_url}/config`.
-4. The marine service validates and applies the config.
-5. The API returns success to the wizard/admin only after the marine service acknowledges the config.
+3. The API writes the validated config to `api.conf [marine]` and then POSTs the marine-relevant config subset to `POST {marine_service_url}/config` with `Authorization: Bearer {MARINE_SERVICE_SECRET}`.
+4. The marine service validates, persists, and applies the config.
+5. `/setup/apply` returns success to the wizard/admin whether or not the push reached the marine service (T6.4) — a marine service outage never blocks the rest of setup. A failed push is logged at **ERROR** on the API side; nothing is retried automatically before the next apply.
 
 On marine service restart, the service reloads its config **from its own local
 disk** — `POST /config` persists atomically (temp file + rename) to
 `/etc/weewx-clearskies/marine/marine.conf`, and startup reads that file. This is
 the implemented and tested behaviour (verified against a `kill -9` mid-life, not
-just a graceful shutdown).
+just a graceful shutdown). Local disk always wins: if `marine.conf` exists,
+startup uses it and nothing is fetched.
 
-> **(target — not yet implemented)** A marine service with no local config —
-> a fresh install, or one whose config directory was wiped — has no way to
-> recover it and will serve nothing until an operator re-runs apply. A
-> pull-on-startup from the API (`GET {api_url}/setup/marine/config`,
-> authenticated with `MARINE_SERVICE_SECRET`) would close that gap and is
-> consistent with ADR-099's "the API is the single source of truth for operator
-> config". Neither side of this mechanism exists yet. Tracked as plan task
-> **T6.4b**; this paragraph previously described it as current behaviour
-> (Phase 4 audit finding F5).
+**Config recovery on an empty config directory (T6.4b).** A marine service
+with no local config — a fresh install, or one whose config directory was
+wiped — recovers automatically at startup, *if* `CLEARSKIES_MARINE_API_URL`
+is set: it calls `GET {CLEARSKIES_MARINE_API_URL}/setup/marine/config`
+(authenticated with `MARINE_SERVICE_SECRET`), which returns exactly what the
+push above sends (API-MANUAL.md §19.5 — one serializer, both paths), and
+persists the result the same way a `POST /config` would. If
+`CLEARSKIES_MARINE_API_URL` is unset, no fetch is attempted — that is a
+normal, silently-accepted state (an operator relying solely on
+`POST /config` doesn't need it set), logged at INFO, not ERROR. If the fetch
+is attempted and fails (unreachable API, non-200, bad auth, malformed body),
+it is logged at **ERROR** and the service starts anyway, serving `/health`
+and `/manifest` only — it does not crash-loop and does not retry until the
+next process restart.
 
 #### Health check
 
