@@ -518,3 +518,38 @@ These are pattern matches, not judgment calls. FAIL if any violation is found.
 **"Code-complete" requires coordinator visual sign-off.** The agent that writes the code cannot declare it done. The coordinator must render the output, verify it against the spec, and sign off. Self-attestation of visual quality is not accepted.
 
 **Why (2026-06-02):** C1–C6 were all self-attested as code-complete. QC gates checked `tsc` (compiles) and `vite build` (bundles) but never compared the rendered output against the mockups. Every tile card had wrong font sizes, missing separators, broken sr-only hiding, no vertical centering, and inconsistent text hierarchy. The operator discovered all of this during live testing — not during any QC gate.
+
+## Units and layer ownership are settled doctrine — read them before escalating
+
+**Rule.** Before escalating anything that touches units, or asking who should compute something,
+read `docs/ARCHITECTURE.md` §Layer Responsibilities and the units sections of
+`docs/manuals/API-MANUAL.md`. Both questions are already answered there. An escalation that the
+manuals answer is not caution — it is a failure to read, and it costs the operator time and money.
+
+**The two answers, so there is no excuse for asking again:**
+
+1. **The API is the single conversion authority.** Every service behind it works in canonical SI
+   and emits SI. The API converts to the operator's display units. It follows that **no threshold,
+   constant, or function parameter anywhere behind the API may be calibrated in a display unit.**
+   A constant named `_FT`, `_F`, `_MPH`, `_IN` compared against a canonical value is the defect —
+   the fix is canonical constants, never a conversion call to feed the display-unit-calibrated
+   comparison. The only legitimate conversion behind the API is provider **ingest** normalisation
+   from an upstream unit into SI, and you must be able to name the upstream unit.
+
+2. **A computation lives where its inputs already live, and exists once.** The API owns station
+   metadata — timezone, elevation, location — and owns almanac and solunar. A companion service
+   that finds itself needing station timezone is not missing a config key; it is computing
+   something that was never its job. Two implementations of the same computation is the defect,
+   not a missing input.
+
+**Why (2026-07-25):** during Phase 6 of the marine separation the coordinator escalated two
+questions to the operator — "where should the marine service get station timezone for solunar?"
+and "which unit should storm-surge thresholds compare in?" — and passed a third along as a
+"spot-check" (Fahrenheit water-comfort thresholds behind a conversion call). All three are the
+same two doctrines above, both already documented repeatedly. The operator's response was that
+this proved the documentation had not been read. Escalating a documented answer is worse than
+deciding wrongly: it burns the operator's time *and* signals the docs are optional.
+
+**How to apply.** When a units or ownership question surfaces: grep the manuals first, cite the
+section, and implement. Escalate only if the manuals genuinely conflict with each other — and
+then escalate the *conflict*, with both citations, not the underlying question.
