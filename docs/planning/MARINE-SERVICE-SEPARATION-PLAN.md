@@ -18,7 +18,7 @@
 | **Phase 4A** — SwellTrack pipeline + vocabulary | **Tasks complete; QC Gate 4A walked but NOT a clean pass** — see `briefs/P4A-QC-GATE-4A-RESULTS.md`. The "3 of 8 tasks done, T4A.3 halted" text that stood here until 2026-07-25 contradicted this document's own task table below, which records T4A.3 and every other task as DONE. Corrected to match the detail table. |
 | **Phase 4B** — Per-transect grid-derived handoff | **PARTIALLY IMPLEMENTED AND DEPLOYED** — not "not started." See the corrected status block below. |
 | **Phase 5** — Move provider modules | **CODE COMPLETE.** Adversarial audit run 2026-07-25: C-28 cleared with evidence, one HIGH finding (C-31, dispatch registry held only the scaffold stub) fixed in Phase 6. |
-| **Phase 6** — API companion proxy | **BUILD COMPLETE; DELETIONS HALF-BLOCKED.** See the Phase 6 closeout below. |
+| **Phase 6** — API companion proxy | **COMPLETE. QC Gate 6 walked and passed with two named exceptions (C-40, C-48), 2026-07-25.** See the Phase 6 closeout below. |
 | Phases 7-8 | Not started |
 
 ### ⚠ Cross-round correction, 2026-07-25 — read before starting ANY remaining phase
@@ -3257,3 +3257,62 @@ looking. Everything else verified clean with command-level evidence.
 "marine" in the path, so it repeatedly put *operator-configuration* code on the deletion list
 alongside *marine computation*. C-40 was resolved on that distinction; C-41 and C-42 are the same
 distinction unresolved. Phase 7 is the wizard phase and will meet it again.
+
+### 2026-07-25 — Phase 6 FINAL closeout, QC Gate 6 walked
+
+The operator's rulings on C-41, C-42 and C-47 unblocked everything that was held. All Phase 6 code
+work is complete.
+
+**The three rulings, because they shaped the rest of the phase:**
+
+1. **C-41** — the apply-time grid-sizing/bathymetry chain is a marine function. It moved to the marine
+   service and runs on config receipt (`aa40379`). It had only ever lived in the API because SWAN
+   used to run *inside* the API.
+2. **C-42** — the wizard never talks to the marine service; nothing does except the API. The API
+   proxies wizard discovery queries (`09f0577` + marine `7fb111a`). Now recorded as a standing
+   invariant in `ARCHITECTURE.md`.
+3. **C-47** — when the marine service needs data the API owns, it queries the API. That resolved both
+   the surf t=0 station wind and the fishing/solunar coupling in one line (`f75c927`, `5b52ede`,
+   plus `20e0c54` adding `GET /current?units=si` and `sunrise`/`sunset` on `/almanac/solunar`).
+
+**Final deletion figures.** ~30,800 net lines removed from the API across 63 files in the held-cluster
+round alone, on top of the 11,405 removed earlier and 8,482 from the marine service. The plan's
+"~28,735 lines removed" headline was stale from the outset; the measured total is substantially
+larger.
+
+**QC Gate 6 — walked by the coordinator, not accepted on agent reports:**
+
+| Criterion | Result |
+|---|---|
+| Zero marine endpoint files in the API | **PASS** — `ls endpoints/` matches nothing marine |
+| Zero marine provider modules | **PASS** — `providers/{buoy,marine,nearshore,ocean,tides,wind}/` contain no source, only untracked `__pycache__` |
+| Zero live imports of deleted physics modules | **PASS** — the gate grep, filtered to actual import statements, returns two hits, both `bathymetry_resolver` (see exceptions) |
+| API imports clean | **PASS** — `import weewx_clearskies_api.app` succeeds |
+| Proxy mounts routes from manifest; envelope + unit conversion; runtime failure serves cache or 503; periodic refresh; capability merging; config push/pull one serializer; marine config recovery | **PASS** — audited with command-level evidence |
+| Adversarial audit: zero unresolved findings | **PASS** — 2 findings (C-44 `residual`, orphaned `fishing_scorer.py`), both fixed in `ee25fdb` |
+
+**Two named exceptions, both recorded rather than absorbed into a pass:**
+
+- **C-40** — `config/marine_config.py` stays. The API owns the wizard and the config push, so it keeps
+  the marine config *schema*; it sheds marine *computation*. The gate's grep term list predates that
+  distinction.
+- **C-48** — `swan_domain.py`, `shelf_boundary.py`, `bathymetry_resolver.py` and
+  `enrichment/bathymetry.py` remain, held solely by two wizard endpoints
+  (`/setup/marine/compute-estimate`, `/setup/marine/coverage`) that still compute marine physics in
+  the API. No new decision is needed — the C-42 pattern settles it — but the marine service needs two
+  new endpoints, which is work rather than a deletion. **Routed to Phase 7**, which is the wizard
+  phase.
+
+**Bugs found and fixed that were not on any task list:** every display-unit-calibrated threshold in
+the marine service made canonical (C-26; two were live per-request bugs); the provider dispatch
+registry populated (C-31 — it had only ever held the Phase 4 scaffold stub); the manifest completed
+from 6 routes to 11 (C-30 — the five list routes would have 404'd silently); `defusedxml` declared
+(C-45 — a clean install could not import the NDBC provider); a `heightM` double-conversion caused by a
+docstring asserting the opposite of the code (C-50); and `is_station_served()` initialised so the
+station-observation restoration is actually reachable (C-51).
+
+**Carried into Phase 7:** C-48 (two wizard endpoints), C-49 (orphaned `test-compute` endpoint, partly
+orphaned `[marine]` extra — sequence after C-48), C-46 (`MARINE_PROVIDER_MODULES` has no consumer).
+**Carried into Phase 8:** C-43 (one untranslated locale key), C-33 (documented health poll no task
+implements), C-38 (`assessment.waterTemp` now converts where it did not before), plus all previously
+recorded Phase 8 items.
