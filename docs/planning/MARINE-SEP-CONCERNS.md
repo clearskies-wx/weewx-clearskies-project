@@ -2660,7 +2660,7 @@ no new error mechanism. Blank URL with ≥1 saved location is blocked; adding a 
 `marine_service_url` is blocked. **Editing an existing location is deliberately not blocked**, so a
 config already in that state — say from a hand-edited `api.conf` — stays repairable.
 
-**The limitation, stated because it matters and was not in the original concern.** The API writes the
+**The limitation, stated because it matters and was not in the original concern. Promoted to its own entry at the operator's instruction — see C-75, because an open item recorded inside a closed entry does not get found.** The API writes the
 URL under `if apply.marine_service_url is not None:`, so **`None` means "leave the existing value
 alone", not "clear it."** After this fix, clearing the field no longer persists a broken empty URL —
 but it also cannot clear a saved one, and the operator sees the old value reappear on re-read. A true
@@ -2719,3 +2719,54 @@ inside a sentence that had to be rewritten anyway.
 
 **Also fixed in `0287950`:** `docs/OPERATOR-MANUAL.md` told the operator *"Leave blank to
 disconnect."* That was never true — it is the exact instruction that leads into C-64's defect.
+
+---
+
+## C-75 — there is still no way to *disconnect* the marine service; `None` means "leave alone", not "clear" (OPEN → needs an operator decision, data-contract change)
+
+Split out of C-64's closure at the operator's instruction, 2026-07-26, because it is an **open** item
+and was recorded inside a **closed** entry, where it would not be found by anyone scanning for open
+work.
+
+**The finding, in the C-64 agent's own words:**
+
+> The API writes the URL under `if apply.marine_service_url is not None:` — **`None` means "leave the
+> existing value alone", not "clear it"**. So after the fix, clearing the box no longer writes a
+> broken URL, but it also does not clear a saved one; the operator sees the old URL reappear on
+> re-read. A real "disconnect" needs an API-side sentinel — a data-contract change, out of scope and
+> not authorized. Documented explicitly in API-MANUAL §19.2 and both operator-facing manuals rather
+> than left as a surprise.
+
+**What C-64 did and did not close.** C-64's stated defect was *"an operator can disconnect the marine
+service entirely by clearing a field, and the UI reports success."* That is closed: the empty string
+no longer reaches the API, nothing false is persisted, and nothing false is reported. What is **not**
+closed is the capability the operator was reaching for when they cleared the field. Clearing it is
+now correctly a no-op — but it is a *silent* no-op with respect to the saved value, and the old URL
+reappears on the next read.
+
+**Why it was not fixed.** `ApplyRequest.marine_service_url` is `str | None = None`, and every consumer
+reads `None` as "not supplied — leave the persisted value untouched". Distinguishing *omitted* from
+*explicitly cleared* requires a third state on the wire. Every option changes the contract:
+
+| Option | Cost |
+|---|---|
+| A sentinel value (e.g. `""` meaning "clear") | Reverses today's meaning of `""`, which is precisely what C-64 just stopped. Any other client sending `""` by accident would now disconnect the service. |
+| A separate boolean (`marine_service_disconnect: bool`) | A new field on `ApplyRequest`, and a new state the wizard, admin and `GET /setup/current-config` all have to agree on. |
+| `Unset` sentinel / `model_fields_set` | Least invasive on the wire, but changes how *every* optional apply field is interpreted, not just this one. |
+
+All three are **trigger 4** — a change to a data contract between components, in field names,
+shapes or nullability. Not authorised, and deliberately not decided by the coordinator.
+
+**Current operator workaround, which does work:** edit `marine_service_url` out of
+`/etc/weewx-clearskies/api.conf [providers]` directly and restart the API. The companion proxy then
+mounts no marine routes and marine capabilities drop out of `GET /api/v1/capabilities`, which is the
+documented unconfigured state. So the capability is not *absent* from the system, only from the UI.
+
+**Documented rather than left as a surprise** — API-MANUAL §19.2 and both operator-facing manuals now
+state the blank-field semantics explicitly (stack `0287950`, meta `d8c7c93`). The Operator Manual
+previously said *"Leave blank to disconnect,"* which was never true and is the exact instruction that
+led into C-64's defect; that sentence is gone.
+
+**Recommendation when this is taken up:** option B, a separate explicit boolean. It is the only one
+that does not overload an existing value's meaning, and overloading `""` is what produced C-64.
+Needs operator approval before any of it is written.
