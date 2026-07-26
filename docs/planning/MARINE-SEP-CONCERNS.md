@@ -3224,3 +3224,57 @@ knowable at setup time rather than a runtime failure, and which arguably belongs
 viability checks rather than in a retry loop. Recorded for the operator's decision; the implementer
 has been told to report where the two cases are indistinguishable in the current code rather than to
 invent a policy.
+
+---
+
+## C-78 — the convergence gate's own log fabricates the numbers an operator uses to judge a run (OPEN → Phase 8, small fix, disproportionate value)
+
+Found by the coordinator reading the first clean marine SWAN cycle's journal, 2026-07-26 08:44. Two
+lines, three seconds apart, describing the same L1 run:
+
+```
+SWAN convergence level1: overflow_count=0, accuracy=0.0%,   nan_count=0, valid_fraction=100.0%
+SWAN convergence OK level=level1: accuracy=100.0%, valid_fraction=0.0%,  nan_count=0
+```
+
+The same run is reported as **0.0% accuracy** and **100.0% accuracy**, and as **100.0%
+valid_fraction** and **0.0% valid_fraction**. Read either line alone and you would draw the opposite
+conclusion from the other.
+
+**Cause — `services/swan_runner.py`, and it is not a transposition.** The same unmeasured quantity is
+given two different fabricated defaults:
+
+```
+3669:   accuracy_pct if accuracy_pct is not None else 0.0      # the detail line
+3713:   accuracy_pct if accuracy_pct is not None else 100.0    # the "convergence OK" line
+3698:   _frac_pct = (valid_fraction * 100.0) if valid_fraction is not None else 0.0
+```
+
+`accuracy_pct` is only populated for **stationary** runs (`3533: if is_stationary and accuracy_pct is
+not None`). L1 is nonstationary, so it is `None` — and the two call sites invent opposite values for
+it. `100.0` is the more damaging of the two: it prints **perfect convergence accuracy for a quantity
+that was never measured**, inside the line whose whole purpose is to tell the operator the gate
+passed.
+
+**And `nan_count=0` at line 3711 is a hardcoded string literal, not a variable.** That line always
+reports zero NaNs regardless of the actual count. The detail line above it reports the real one.
+
+**Why this is the same class as C-76 and C-77, not a cosmetic nit.** The rule the operator set —
+`rules/coding.md` §1 "A model runs on all its inputs or it does not run" — is that an unavailable
+value must be reported as unavailable, never substituted. Here the substitution has moved from the
+model's inputs into the model's **observability**, which is arguably worse: these are the exact lines
+an operator reads to decide whether to trust a forecast, and they are the lines this project has
+already misdiagnosed from twice. `reference/clearskies-dev.md` records the standing warning: *"Get the
+whole timeline before concluding anything systemic from a single log line — a `nan_detected` line
+next to ten successful runs is an intermittent, not a root cause. That mistake has been made twice on
+this project."* Fabricated values in those same lines make that failure mode considerably easier to
+fall into.
+
+**Fix (small, no behaviour change):** report unmeasured quantities as unmeasured — `accuracy=n/a`
+when `accuracy_pct is None`, `valid_fraction=n/a` when `valid_fraction is None` — rather than
+inventing `0.0` or `100.0`; and make `nan_count` read the actual variable. No change to the gate's
+pass/fail logic, which uses the real values and is not affected by any of this. Purely a matter of
+the log telling the truth about what it knows.
+
+**Not folded into C-77's round** — that work is in `providers/nearshore/swan.py` and this is
+`services/swan_runner.py`; keeping them separate keeps each commit's evidence clean. Same phase.
