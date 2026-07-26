@@ -20,7 +20,7 @@ Last surveyed: 2026-07-26.
 | `ww3_station_catalogue.json` | ~290 KB | marine `weewx_clearskies_marine/data/` | NOAA NOMADS WW3 station output points (~4,036 ocean + ~96 Great Lakes) | When NOAA adds or retires WW3 output points. Check **annually**, or when a spot cannot find a boundary station it should have. | See the dedicated note below — this is the one with a real failure mode. |
 | `species.yaml` | 44 KB | marine **and api** (both use it) | Curated fish species by biogeographic region | Rarely — editorial content. | Fishing suggestions omit or misname species. Cosmetic. |
 | `gem_active_faults.geojson` | **12 MB** | api `weewx_clearskies_api/data/` | GEM Global Active Faults Database | On a GEM release. Check **annually**. | Fault map slightly out of date. Cosmetic. |
-| `meteor_showers.json` | 11 KB | api `weewx_clearskies_api/data/` | Meteor shower peak dates | **Annually** — peak dates shift year to year. | Almanac shows wrong shower peaks. Visible to visitors. |
+| `meteor_showers.json` | 11 KB | api `weewx_clearskies_api/data/` | Curated table of 26 major showers | **See the note below** — currently the peak dates are hardcoded calendar dates, so they drift. Radiant coordinates and rates are genuinely static. | Almanac names the wrong night for a peak in some years. Visible to anyone who goes outside to look. |
 | `charts.conf.default` | 9 KB | api `weewx_clearskies_api/data/` | Ours — default chart definitions | When chart defaults change. | Not external; no staleness risk. |
 | UI translation catalogues | ~36–60 KB each | stack `weewx_clearskies_config/translations/`, dashboard `public/locales/` | Ours | When UI strings change. Covered by the existing i18n sync rule, not by this table. | Missing strings fall back to English. |
 
@@ -63,6 +63,32 @@ and a stale index taking a forecast down.
 **Coverage is uneven by design.** Station density is a regional fact, not a global guarantee. A sparse
 coastline may have too few suitable deep-water stations, and the correct behaviour there is to refuse the
 spot at configuration time with a message saying so — not to degrade to a coarser or uniform boundary.
+
+---
+
+## `meteor_showers.json` — this refresh item could be deleted rather than maintained
+
+**Verified 2026-07-26 by reading the code, after an initial guess in the first draft of this document
+turned out to be only half right.**
+
+`compute_meteor_showers()` (`services/almanac.py:1430`) builds each peak as
+`date(year, shower.peak_month, shower.peak_day)` — a **hardcoded calendar date**. The Quadrantids are
+pinned to 3 January in every year, forever.
+
+**But the data already carries the astronomically correct driver, and nothing reads it.** Every one of the
+26 entries has a populated `solar_longitude_max` (283.16° for the Quadrantids). A shower peaks when Earth
+reaches a given solar longitude in its orbit, not on a fixed calendar date; the calendar date of that
+longitude shifts by roughly a day across the leap-year cycle. `grep` confirms `solar_longitude_max` has
+**zero readers** in the codebase.
+
+So the fixed dates are correct in most years and a day out in others — enough to name the wrong night.
+
+**Recommendation (needs operator approval — changing which quantity determines the peak is a formula
+change, not a refactor):** derive the peak from `solar_longitude_max` per year. That would **remove this
+row's maintenance burden entirely** — the table becomes genuinely static reference data (radiant
+coordinates, ZHR, parent bodies, descriptions) with the timing computed. Until then, the peak dates are a
+standing annual-accuracy caveat rather than something a refresh can really fix, since re-curating fixed
+dates each year is the same manual work.
 
 ---
 
