@@ -579,3 +579,36 @@ like.
 **Corollary — do not leave a resolved item wearing a blocking marker.** C-15 was answered and its
 code landed, but its heading still read "⛔ BLOCKING, AWAITING OPERATOR" hours later, so it read as
 live work. Close the entry in the same action that closes the work.
+
+## The marine service is an add-on reached only through the API
+
+**Rule (operator, 2026-07-25).** The marine service is an add-on to the API and does not necessarily
+run on the same host. **Every other element of Clear Skies communicates with it through the API, and
+only through the API** — dashboard, config UI wizard, admin pages, third-party clients alike. This is
+for **security** (one authenticated boundary, one secret, one place enforcing auth and rate limiting)
+and for **coordination** (one source of truth for operator config, one place that knows whether the
+service is installed at all).
+
+**When the API needs marine data for something that is not a dashboard route** — a wizard lookup, a
+setup-time question, an operational check — the answer is always a **pass-through in the API**. Never
+a marine provider module imported into the API. Never a direct call from another component. The
+marine service exposes it; the API fronts it.
+
+**Two shapes that look reasonable and are wrong:**
+
+- *"The wizard needs nearby buoy stations, so the API keeps `providers/buoy/`."* No — the API proxies
+  the query. Keeping the module puts marine provider code back in the API, which the separation
+  exists to remove.
+- *"The wizard can call the marine service directly for discovery."* No — that is a second component
+  holding the secret and a second network path to secure.
+
+**Why (2026-07-25):** during Phase 6 the coordinator proposed both of the above and put them to the
+operator as an open choice. The invariant was implicit in ADR-099 and in the companion-proxy design
+but had never been stated as a rule, so each case was re-argued from scratch instead of being decided
+once. Now written in `docs/ARCHITECTURE.md` under "The marine service is an add-on reached only
+through the API — INVARIANT"; cite it rather than re-deriving it.
+
+**Corollary for anything unreachable.** Because the API is the only client, a marine-service outage
+surfaces in exactly one place. Handle it honestly there: a wizard discovery query that cannot reach
+the marine service must say so, never return an empty list. "There are no buoys near you" is a wrong
+answer wearing a valid response's clothes.
