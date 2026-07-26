@@ -4618,3 +4618,34 @@ passes.
 routing and cadence land, the Great Lakes accept criterion does not. Whiting must NOT be configured
 meanwhile: per T8.10e's own ordering constraint, a spot whose boundary cannot be fed aborts the SWAN cycle
 for **every** spot, including Huntington.
+
+---
+
+## C-95 — T8.11e effectively retires the unpinned `DEM_all` mosaic as a bathymetry source (intended, but say so out loud)
+
+**Found 2026-07-26** as a consequence of implementing T8.11e, recorded so it is a known outcome rather than
+a surprise later.
+
+`_try_crm()` — last in the source chain for every level — calls `download_swan_depth_grid()` with no
+`lock_raster_id`, so its datum can only come from a `VerticalDatum` attribute echoed per sample in the
+`getSamples` response. **The mosaic does not echo that attribute**; that is the documented reason the code
+used to fall back to an invented placeholder label. Now that the placeholder is gone and the function
+raises instead, `_try_crm()` will raise essentially every time it is reached, so the chain moves on and, if
+nothing else covered the domain, the level refuses.
+
+**This is what ADR-098 criterion 10 asks for** — a source that publishes no datum is unusable, and the
+mosaic's real defect is worse than the missing label: `DEM_all` selects per point and can assemble one grid
+from DEMs on different vertical datums (NAVD 88, MHW and MSL all overlap in US coastal boxes), which is
+precisely the mixing C-90 and T8.11 exist to eliminate.
+
+**But the practical effect is that the chain is one source shorter than it reads.** L1 has ETOPO pinned and
+global, so it is unaffected. L2/L3 now rest on the regional DEM index plus ETOPO plus operator uploads, with
+no working last resort.
+
+**Two options, neither taken unilaterally:** delete `_try_crm()` (trigger 2 — a source disappears), or pin
+the mosaic per request the way ETOPO already is, via `find_catalogue_raster()`, which would recover both the
+datum and single-raster consistency and make it a real source again. **Recommendation: pin it**, since the
+machinery already exists and was written for exactly this.
+
+**Disposition:** operator ruling. Blocks nothing today — Huntington's L2/L3 are served by
+`orange_county_13_navd88_2015` and never reach the mosaic.
