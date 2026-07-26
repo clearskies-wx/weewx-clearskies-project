@@ -97,6 +97,35 @@ Commit `03f81db`. Verified by the coordinator: all 10 moved providers import cle
 
 ---
 
+## ⛔ C-27 — AWAITING OPERATOR: the fishing endpoint has no source for station timezone or elevation
+
+Found by the Round 3 endpoint agent; **not previously flagged by anyone.**
+
+`endpoints/fishing.py` calls `compute_almanac(station_tz=…, alt_m=…)` to build sunrise/sunset
+day boundaries for solunar periods. In the API those come from `services/station.py`'s
+`get_station_info()` — weewx-host configuration. **The marine service has no equivalent:
+`MarineLocation` carries no timezone and no elevation field.**
+
+The agent used the function's own literal defaults (`station_tz="UTC"`, `alt_m=0.0`) with an
+inline comment rather than inventing a value — the right call. But `compute_almanac()`'s own
+docstring says defaulting to UTC is "wrong for EDT/PDT etc.", so **day boundaries will be wrong
+for every operator outside UTC** once C-19 unblocks the module.
+
+**This one cannot be fixed by an API-side re-merge, unlike C-24 and C-25.** Those restore a
+*field* after the fact. This feeds a *computation* inside the marine service — the day boundary
+determines which solunar periods are generated at all, so there is nothing to merge back.
+
+| Option | Cost |
+|---|---|
+| **(a) The config push carries station timezone and elevation** | Adds config keys — trigger 7. But the push payload is being defined at T6.4 anyway (see C-23), so it is the natural place to settle it, and the API already has both values. |
+| (b) Marine service derives the timezone from the location's lat/lon | A new dependency (trigger 7) and a new failure mode, to re-derive something the API already knows. |
+| (c) Leave it at UTC | Silently wrong sunrise/sunset day boundaries for every non-UTC operator. Not recommended. |
+
+Coordinator's recommendation: **(a)**, decided together with C-23 when T6.4 defines the config
+payload, so the payload's shape is settled once rather than twice.
+
+---
+
 ## ⛔ C-26 — HIGH, AWAITING OPERATOR: storm-surge classification compares metres against foot thresholds
 
 **Status:** escalated to the operator 2026-07-25. Not blocking Phase 5 — the port inherits the
@@ -238,6 +267,23 @@ the archive, still has `is_station_served()`, and already merges station data in
 responses today. Restoring the merge after the proxy keeps the work on the same host, in the
 same service, doing the same job — only the module inside the API changes. Restore exactly the
 fields in the table above, at exactly those two response shapes.
+
+---
+
+## C-28 — the tides port drops a duplicate CO-OPS fetch (OPEN → auditor must confirm)
+
+The Round 3 endpoint agent reports that `endpoints/tides.py` in the API makes **two identical
+CO-OPS calls**: one for display-unit values and a second for the compositor's raw-metre values.
+Since the marine service never converts, its port makes **one** call serving both.
+
+The reasoning is sound and the saving is real — one fewer round trip to CO-OPS per request. But
+this is the only place in Phase 5 where a port deliberately changed the number of upstream calls
+rather than only rewriting imports, so it should not pass on reasoning alone.
+
+**Explicitly assigned to the Phase 5 adversarial audit:** confirm that the single fetch returns
+the same data both former call sites consumed, and that no caller depended on the second call's
+separate cache entry or its timing. If it does not hold, it is a defect introduced by the move —
+the one candidate this phase has.
 
 ---
 
