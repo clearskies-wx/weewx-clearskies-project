@@ -3207,6 +3207,21 @@ re-enabling them restores nothing. If the marine service fails, fix it forward.
 
 **Accept:** Old services stopped and disabled by their verified real unit names. Neither port listening.
 
+**STATUS 2026-07-26 — DONE, verified on librewxr:**
+
+```
+$ systemctl is-active  weewx-clearskies-swan.service weewx-clearskies-compute.service
+inactive
+inactive
+$ systemctl is-enabled weewx-clearskies-swan.service weewx-clearskies-compute.service
+disabled
+disabled
+$ ss -tlnp | grep -E '876[0-9]|8770|8780'
+LISTEN 0  2048  0.0.0.0:8780  0.0.0.0:*
+```
+
+Only the marine service listens, on 8780. Neither 8767 nor 8770 is bound.
+
 ### T8.4b — Archive the old SWAN repo on librewxr
 
 - **Owner:** Coordinator (Opus) — with user approval
@@ -3220,6 +3235,17 @@ re-enabling them restores nothing. If the marine service fails, fix it forward.
 3. Create the `archived/` directory if it does not exist.
 
 **Accept:** Old repo moved to archived directory. Git history preserved. No files left at original path.
+
+**STATUS 2026-07-26 — DONE, verified on librewxr:**
+
+```
+$ ls /home/ubuntu/repos/
+archived  weewx-clearskies-api  weewx-clearskies-marine
+$ ls /home/ubuntu/repos/archived/
+weewx-clearskies-swan-swelltrack
+```
+
+Moved under its real (renamed) directory name; nothing left at the original path.
 
 ### T8.5 — Clean up weewx filesystem (AFTER E2E verification)
 
@@ -3235,6 +3261,20 @@ re-enabling them restores nothing. If the marine service fails, fix it forward.
 5. Remove `SURF_COMPUTE_SECRET` from `secrets.env`.
 
 **Accept:** No SWAN artifacts on weewx. `secrets.env` has `MARINE_SERVICE_SECRET` only.
+
+**STATUS 2026-07-26 — DONE, verified on weewx (all five items, nothing left to delete):**
+
+```
+$ ls /usr/local/bin/swan.disabled          -> No such file or directory
+$ ls -d /var/run/weewx-clearskies/swan     -> No such file or directory
+$ sudo ls /etc/weewx-clearskies/swan_bathymetry_*.json  -> No such file or directory
+$ sudo ls -d /etc/weewx-clearskies/spot_profiles        -> No such file or directory
+$ sudo grep -o 'SURF_COMPUTE_SECRET\|MARINE_SERVICE_SECRET' /etc/weewx-clearskies/secrets.env | sort -u
+MARINE_SERVICE_SECRET
+```
+
+Note the bathymetry and spot-profile caches DO still exist on **librewxr**, which is correct — that is where
+SWAN now runs. Only the weewx copies were in scope here.
 
 ### T8.7 — Surfline comparison — **SUPERSEDED by T8.10h; runs after T8.10**
 
