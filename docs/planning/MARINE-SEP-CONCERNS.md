@@ -4241,3 +4241,58 @@ no responsibility and adds no dependency — it consolidates duplicate enforceme
 
 **Sequencing:** fold into the round that lands T8.10f, when the third consumer appears and the
 consolidation can be done once against all of them rather than twice.
+
+---
+
+## C-89 — C-76 was closed and deployed while a SECOND calm-boundary substitution survived it, and has been live in production since (OPEN → being fixed inside T8.10c round 2)
+
+**Found 2026-07-26 during T8.10c round 2 scoping; coordinator-verified by reading the file, not accepted from
+the agent's report.**
+
+`services/swan_runner.py:3063-3076`:
+
+```python
+boundary_text = ww3_to_swan_boundary(ww3_boundary)
+if not boundary_text:
+    # Calm boundary fallback
+    grids = wind_field.get("grids", [])
+    if grids:
+        ...
+        boundary_text = (
+            "TPAR\n"
+            f"{_swan_time(t0)}  0.500  8.000  270.0  30.0\n"
+            f"{_swan_time(t1)}  0.500  8.000  270.0  30.0\n"
+        )
+(run_dir / "BOUND_W.txt").write_text(boundary_text, encoding="ascii")
+(run_dir / "BOUND_S.txt").write_text(boundary_text, encoding="ascii")
+```
+
+A **fabricated 0.5 m / 8.0 s / 270° / 30°-spread** boundary, written to **both** offshore sides.
+
+### Why this is a process finding, not just a bug
+
+**C-76 — "a failed WW3 fetch degrades SWAN to a calm boundary and the run is published anyway" — was ruled on
+by the operator, fixed, deployed (`c2461ff`), and CLOSED.** This site survived it.
+
+The reason is instructive: C-76's fix addressed the path where the **fetch fails** (in
+`providers/nearshore/swan.py`). It never addressed the path where the fetch **succeeds but yields nothing
+usable**, which is what `ww3_to_swan_boundary()` returning falsy means. So the exact defect C-76 exists to
+prevent — a swell-driven surf forecast silently computed against a calm sea — remained reachable in
+production the entire time C-76 was marked closed.
+
+**The lesson for closing any no-silent-fallback concern:** fixing the *reported* substitution site is not the
+same as eliminating the *class*. C-76 should have closed with a sweep for every writer of the boundary files,
+not just the fetch path named in the report. The same question should be asked of C-77's all-inputs-required
+sweep: it audited one file.
+
+### Second defect in the same three lines
+
+The trigger is `if not boundary_text` — a **falsy** test, the same class as the `0.0`-is-falsy trap the plan
+flags for `swh` in the T8.10f probe design. Any replacement must raise on an empty or unusable boundary per
+`rules/coding.md` §1 and the `find_depth_contour_distance()` precedent, not swap one falsy check for another.
+
+### Disposition
+
+Deletion is **in scope for T8.10c round 2** and authorized — it is parametric synthesis in the L1 boundary
+path, exactly what that task removes. Recorded here separately because the *process* failure (a closed
+concern that did not close its class) outlives the code fix.
