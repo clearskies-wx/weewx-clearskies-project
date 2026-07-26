@@ -1448,11 +1448,11 @@ NWPS is eliminated. The nearshore wave model is SWAN (§14.15). The `providers/m
 
 ### §14.7 Bathymetry data sources
 
-**Not a dispatch-registered provider module.** Bathymetry is accessed through two components: `services/bathymetry_resolver.py` (2-D grid resolution for SWAN) and `enrichment/bathymetry.py` (1-D profile extraction for surf/fishing spots). Both run at SWAN run time, not per-request.
+**Not a dispatch-registered provider module.** Bathymetry is accessed through two components: `services/bathymetry_resolver.py` (2-D grid resolution for SWAN) and `enrichment/bathymetry.py` (1-D profile extraction for surf/fishing spots), both now in the marine service. Both run at SWAN run time, not per-request.
 
 #### Data source priority chain
 
-The bathymetry resolver (`services/bathymetry_resolver.py`) selects the highest-resolution available data source for each SWAN grid level:
+The bathymetry resolver (`services/bathymetry_resolver.py` in the marine service) selects the highest-resolution available data source for each SWAN grid level:
 
 | Priority | Source | Resolution | Access method | Coverage |
 |----------|--------|-----------|---------------|----------|
@@ -1496,7 +1496,7 @@ The bathymetry resolver (`services/bathymetry_resolver.py`) selects the highest-
 
 **Accepted datums for operator-uploaded bathymetry:** NAVD88, MLLW, MHW, MHHW, MSL. These are the datums the configured CO-OPS station supports as prediction request parameters. The operator specifies the datum on upload; the pipeline fetches CO-OPS predictions in that datum. If the operator's data is in a different datum, they convert before uploading.
 
-**Historical note:** `bathymetry_resolver.py:normalize_to_msl()` and `_query_vdatum_offset()` are preserved in the codebase for potential future edge cases (exotic datums CO-OPS does not support, international expansion) but are not called from `download_bathymetry_for_level()`. The match-at-source strategy eliminates the need for local datum conversion in all common US cases.
+**Historical note:** `bathymetry_resolver.py:normalize_to_msl()` and `_query_vdatum_offset()` are preserved in the marine service's codebase for potential future edge cases (exotic datums CO-OPS does not support, international expansion) but are not called from `download_bathymetry_for_level()`. The match-at-source strategy eliminates the need for local datum conversion in all common US cases.
 
 #### USGS Great Lakes DEMs (Priority 3)
 
@@ -1617,7 +1617,7 @@ The response's `osm_type` field carries the raw OSM tag value (e.g. `groyne`, `d
 
 **Module identity:** `providers/ocean/ofs.py`, `PROVIDER_ID = "ofs"`, `DOMAIN = "ocean"`.
 
-**CAPABILITY:** `geographic_coverage = "us_coastal"` (major coasts — see coverage table below), `auth_required = []`. Supplies: water temperature (full column), salinity (full column), ocean currents (u/v components, full column), sea surface elevation (vs MSL and MLLW), seafloor depth, forecast time series. New dependency: `xarray` + `netCDF4` in the `[marine]` pip extra.
+**CAPABILITY:** `geographic_coverage = "us_coastal"` (major coasts — see coverage table below), `auth_required = []`. Supplies: water temperature (full column), salinity (full column), ocean currents (u/v components, full column), sea surface elevation (vs MSL and MLLW), seafloor depth, forecast time series. Dependencies: `xarray` + `netCDF4`, now in the marine service's `[nearshore]` pip extra (the API's `[marine]` extra is removed).
 
 **Data source:** NOAA Operational Forecast Systems — 15 physics-based coastal ocean models (ROMS, FVCOM) at 34m–4km resolution, served via THREDDS/OPeNDAP at `opendap.co-ops.nos.noaa.gov/thredds/`. Updated 1–4 times daily depending on the model. Full research, verified OPeNDAP metadata, grid structure details, and code examples in `docs/planning/briefs/WATER-TEMPERATURE-DATA-SOURCE-BRIEF.md` §"Technical Detail: THREDDS/OPeNDAP Data Extraction".
 
@@ -2236,7 +2236,7 @@ Supporting components that also move:
 | Component | Current API path | Notes |
 |-----------|-----------------|-------|
 | CUDEM bathymetry | `enrichment/bathymetry.py` | Profile extraction for surf/fishing spots |
-| Bathymetry resolver | `services/bathymetry_resolver.py` | 2-D grid resolution for SWAN |
+| Bathymetry resolver | `services/bathymetry_resolver.py` | 2-D grid resolution for SWAN (moved — Phase 7, C-48) |
 | NWS zone discovery utility | `providers/_common/nws_zones.py` | Shared by nws_marine and nws_srf |
 | Ocean data resolver | `services/ocean_data_resolver.py` | OFS → ERDDAP fallback chain |
 | Water level compositor | `services/water_level_compositor.py` | CO-OPS predictions + OFS residual |
