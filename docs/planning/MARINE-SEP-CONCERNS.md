@@ -1175,7 +1175,7 @@ proxy defect when someone notices the number move.
 
 ---
 
-## C-39 — `i18n.py`, `locales/` and the `babel` pin are now unreferenced in the marine service (OPEN → QC Gate 6)
+## C-39 — `i18n.py`, `locales/` and the `babel` pin are now unreferenced in the marine service (DECIDED → deletion round)
 
 Consequence of C-29's marine half (`cc2be6a`), anticipated in C-29's own text and now measured.
 
@@ -1189,10 +1189,16 @@ trigger 7 in plain terms**, and having just been corrected for over-triggering o
 coordinator is not going to under-trigger in the opposite direction on the same day by deleting a
 pinned dependency unasked.
 
-**Disposition: carry to QC Gate 6 as a named cleanup item for the operator to wave through in
-passing.** It costs nothing to leave in place until then — an unimported module and an unused pure-
-Python pin have no runtime effect. What must NOT happen is that it goes unrecorded and the marine
-service ships carrying a locale system it no longer uses.
+**Decision (operator, 2026-07-25): remove it in the deletion round**, alongside T6.5-T6.8. Delete
+`weewx_clearskies_marine/i18n.py`, the marine service's `locales/` directory, and the `babel` pin in
+`pyproject.toml`.
+
+**Precondition, and it is not optional:** the API's own locale catalogue must be confirmed to contain
+every key the marine service now emits — `surf.quality.*`, `surf.wind_quality.*`, `surf.conditions.*`,
+`fishing.period.*`, `fishing.species_status.*` — **before** the marine copy is deleted. A key that
+resolves on one side and not the other renders a literal key string into the response instead of a
+sentence: a failure that looks like data rather than like an error. That check is assigned to the
+API-side re-merge agent and its result gates this deletion.
 
 **Note for whoever executes it:** the API keeps its own `i18n.py` and locale catalogue, which is
 where the keys now resolve. The marine service's copy is the redundant one. Confirm the API's
