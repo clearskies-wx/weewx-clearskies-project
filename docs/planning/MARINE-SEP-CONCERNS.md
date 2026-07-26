@@ -1046,3 +1046,25 @@ call inside one costs a worker thread. An `async def` handler making a blocking 
 event loop for every in-flight request for the duration of the marine round trip. The agent found
 this itself and fixed it in `335daa9` before reporting. Matches the API's existing convention —
 `ARCHITECTURE.md` records the API as using sync handlers throughout.
+
+---
+
+## C-35 — the manifest's `capabilities` shape differs between the manual and the code (OPEN → T6.3 close)
+
+Found by the T6.2/T6.3 agent while implementing capability merging.
+
+`API-MANUAL.md` §19.1's example manifest shows `capabilities` as a list of **objects**
+(`{id, displayName, requiresConfig}`). The marine service's implemented
+`endpoints/manifest.py` returns a flat **`list[str]`** — and the plan's own example manifest
+(line 2328) agrees with the code: `"capabilities": ["surf", "tides", "marine_weather",
+"fishing", "beach_safety"]`.
+
+So the manual is the outlier, and two of three sources agree on the string list. The agent is
+implementing against the real shape and flagging rather than changing either side, which is
+right — the manifest's shape is a contract crossing the host boundary (trigger 4) and is not
+an implementer's call.
+
+**Disposition: correct the manual at T6.3 close**, not the code. Two sources against one, and
+the API's `/capabilities` response already has its own richer `CapabilityDeclaration` type for
+display metadata — the manifest does not need to carry it. If a later phase wants display
+names in the manifest, that is a contract change and goes to the operator.
