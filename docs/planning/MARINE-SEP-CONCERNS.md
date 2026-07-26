@@ -3101,7 +3101,28 @@ This also gives **C-08** the genuinely fresh run its energy-closure measurement 
 
 ---
 
-## C-77 — bathymetry falls back to a fabricated uniform 15 m flat seabed (OPEN → NEEDS AN OPERATOR RULING; same class as C-76)
+## C-77 — bathymetry falls back to a fabricated uniform 15 m flat seabed (**CLOSED** — fixed `b7356ae`, deployed to librewxr 2026-07-26, runtime completeness independently verified)
+
+> **STATUS CORRECTION, 2026-07-26.** This heading read "OPEN → NEEDS AN OPERATOR RULING" long after the
+> concern was fixed and deployed. That stale heading caused a real cost the same day: an auditor agent
+> acknowledged its scope on the premise that the flat-15 m fallback was a known-open item, and had to be
+> corrected before it started. A closed concern wearing an open marker is the mirror of the C-15 lesson in
+> `rules/clearskies-process.md` ("do not leave a resolved item wearing a blocking marker") — close the entry
+> in the same action that closes the work.
+>
+> **Verified complete, not merely claimed.** Unlike C-76 — whose fix left a second substitution site alive
+> (see **C-89**) — C-77's runtime path was traced end to end on 2026-07-26 and genuinely raises:
+>
+> | site | verdict |
+> |---|---|
+> | `swan.py:275` "SWAN will use uniform 15m depth" | **dead code** — `_load_or_download_cudem_grid()` has **zero call sites** repo-wide (only docstring references at :300, :352). Delete it; a dead fallback is a loaded landmine. |
+> | `swan.py:424` | **legitimate** — inside the ERROR+`raise` branch; the wording describes what it no longer does. |
+> | `swan.py:543` | **legitimate** — the documented apply-time carve-out. Reachable only with `allow_download=True`, and only `grid_sizing_chain.py` (setup-time) passes it. |
+> | `swan.py:1900` comment | **stale** — claims the level "falls back to uniform 15m depth for this cycle", but line 1904 calls `download_all_bathymetry(domains, allow_download=False)`, which raises. Comment describes pre-fix behaviour. |
+>
+> Runtime entry points confirmed passing `allow_download=False` at `:1904` and `:2313`; the raise confirmed
+> at `:430-433`. **Two follow-ups queued** (deferred only because another agent is editing this file for
+> T8.10c round 2): delete the dead function, and correct the stale comment.
 
 Found by the C-76 sweep, which the coordinator ordered precisely because the operator's wording —
 *"**again** this is one of those false fallbacks"* — said this was a class rather than an instance.
