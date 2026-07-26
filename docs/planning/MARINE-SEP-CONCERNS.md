@@ -3397,3 +3397,238 @@ multi-component timesteps over 105% (n=67, 2026-07-25).
 two algorithms against each other, which is what it was written for and what
 `scripts/compare_partitioning.py` still uses `decompose_spectrum()` for. It is simply not the tool
 for this question.
+
+---
+
+## C-81 — The SWAN boundary collapses a multi-swell sea into ONE parametric train, so the surf forecast can never show more than one swell (OPEN → BLOCKER, NEEDS AN OPERATOR RULING)
+
+**Found by the operator, 2026-07-26, from a Surfline screenshot** — not by any check in this plan. Every
+automated check in Phase 8 passed while this was live, which is the most important fact about it.
+
+### What reality says vs what we publish
+
+Surfline, Huntington City Beach Pier, same day:
+
+| | Surfline | Ours (`data.spectralComponents`) | Verdict |
+|---|---|---|---|
+| Surf height | **4–6 ft, "chest to overhead"** | **3.83–4.24 ft, essentially flat for 14 h** (max 6.04 ft once in 67 steps) | **FAIL** — at/below the bottom of the range, never reaches overhead, and does not vary |
+| Swell 1 | 1.5 ft **19 s** SSW **197°** | 1.68 ft 20.0 s **279.6° (W)** | period ✓, **direction 82° wrong** |
+| Swell 2 | 1.4 ft **12 s** S 187° | 0.38 ft 12.5 s 177.1° | period+dir ✓, **height 3.7× low** |
+| Swell 3 | 1.5 ft **9 s** S 181° | 0.49 ft 10.5 s 205.6° | **height 3× low** |
+| — | (not listed) | **2.26 ft 7.7 s 262.6° wind_swell — our LARGEST component** | Surfline does not see it |
+
+A 20 s groundswell from **279° (due west)** at Huntington is physically implausible on its face — that
+window is shadowed by Catalina and Palos Verdes. Surfline has it at 197° SSW, which is the real austral
+swell window.
+
+### The mechanism
+
+`services/swan_formats.py:1555–1631`, `ww3_to_swan_boundary()`. Its own docstring states it plainly:
+
+> *"Converts WW3 **scalar** wave parameters (Hs, Tp, Dir) into SWAN's TPAR boundary spectrum file. WW3
+> data is available as scalar parameters (**not a full 2-D directional spectrum**) from
+> wavewatch.fetch(); this function **synthesises a JONSWAP-shape parametric spectrum** with a fixed
+> directional spreading of 30°."*
+
+And lines 1596–1600 narrow it further — having taken the bulk sea state, it **overwrites** it with a
+single swell train:
+
+```python
+# Prefer swell parameters (lower-frequency energy that dominates breaking)
+if pt.swellHeight is not None and pt.swellPeriod is not None:
+    hs = pt.swellHeight
+    tp = pt.swellPeriod
+    mwd = pt.swellDirection if pt.swellDirection is not None else mwd
+```
+
+So **one** Hs/Tp/Dir triple, **one** JONSWAP peak, **one** fixed 30° spread, per timestep. SWAN's
+incident spectrum is unimodal *by construction*. Everything downstream is then correct and useless:
+SWAN faithfully propagates one swell, the PT\* watershed partitioner faithfully finds one partition,
+and the published `multiSwell` faithfully reports one component.
+
+### The decisive evidence that this is input loss, not partitioning
+
+Two swell-decomposition products exist in the *same* response payload, from *different* sources:
+
+- `data.spectralComponents` ← decomposition of the **real NDBC buoy spectrum** (`providers/buoy/ndbc.py:992`) → **4 components**, real `frequencyRange` values
+- `forecast[].multiSwell` ← decomposition of the **SWAN** deep-water SPECOUT (`services/surf_1d_pipeline.py:23`, emitted `endpoints/surf.py:909`) → **1 component** in 65 of 67 timesteps, `frequencyRange: [0.0, 0.0]`
+
+**A real buoy at the same place and time resolves four swell trains; SWAN resolves one.** The ocean is
+multi-modal, our model input is not. That is conclusive.
+
+### Why the dashboard shows the worse of the two
+
+`repos/weewx-clearskies-dashboard/src/components/marine/tabs/SurfingTab.tsx:40–41`:
+
+```
+// Swell rule (FAIL CONDITION): NEVER use data.spectralComponents. Only
+// forecast[0].multiSwell. If null/empty → "No model swell data available".
+```
+
+The dashboard is *explicitly forbidden* from displaying the 4-component buoy decomposition and must
+show only `multiSwell`. **The rule's intent is right** — do not pass observed buoy data off as a model
+forecast (SURF-23). But it trusts a model that structurally cannot produce what it is being asked for.
+The four-component answer is sitting in the payload, banned from display, while the card shows one.
+
+### Why the surf height is low AND flat — same root cause
+
+Our two largest components are groundswell 1.68 ft @ 20.0 s and **wind_swell 2.26 ft @ 7.7 s**. Our
+largest single component is short-period wind sea. Total Hs comes out near Surfline's combined swell
+(≈2.7 ft vs ≈2.54 ft) — which is exactly the coincidence that made the coordinator initially and
+wrongly call it a match — but the energy sits at **the wrong place in the spectrum**. The same Hs at
+7.7 s breaks much smaller and weaker than at 12–19 s, and carries no set structure. Hence: face height
+pinned at ~4 ft, flat across 14 hours while Tp swings 5.2→10.0 s, and no "overhead" sets.
+
+Dropping Surfline's 12 s (1.4 ft) and 9 s (1.5 ft) trains alone removes ~40% of swell Hs:
+√(1.5²+1.4²+1.5²) = 2.54 ft → 1.5 ft.
+
+### Why this needs an operator ruling and was NOT fixed
+
+Changing how WW3 enters SWAN is architectural on two counts:
+
+- **Trigger 1** — the boundary condition is a model input specification; replacing a synthesised
+  JONSWAP with partitioned or full 2-D spectra changes what the model is being asked to solve, and the
+  fixed 30° `DSPR` is a coefficient inside it.
+- **Trigger 4** — `wavewatch.fetch()`'s return shape would have to carry per-partition or 2-D spectral
+  data across the provider boundary; `BOUNDSPEC ... VARIABLE PAR` would likely become file-based 2-D
+  spectra. Field names, shapes and units all change.
+- Plausibly **trigger 7** as well, if a different WW3 product/endpoint must be fetched.
+
+Per the named non-excuse, the docstring recording this as the current design is **not** authorization —
+it is the paper trail that made it look intentional and survivable.
+
+### Coordinator's recommendation (for the operator to accept or reject)
+
+1. **Feed WW3's partitioned swell trains, not its bulk scalars.** NOAA's WW3 output carries multiple
+   wave partitions (typically up to 3 swell partitions plus wind sea) as separate Hs/Tp/Dir sets.
+   Emitting one TPAR-equivalent boundary per partition, or a superposed multi-peak boundary spectrum,
+   restores multi-modality without leaving the parametric world.
+2. **Better, if the source supports it: fetch WW3 2-D spectra** at the boundary nodes and use
+   `BOUNDSPEC ... FILE` with real directional spectra. The `domain_boundary_nodes` parameter at
+   `swan_formats.py:1557` is already reserved for exactly this and is currently `# noqa: ARG001`
+   unused — the design anticipated it.
+3. **Do not "fix" this by pointing the dashboard at `spectralComponents`.** That would show real buoy
+   observations in a forecast card and would be a genuine regression against SURF-23, trading a wrong
+   number for a dishonest one.
+4. **Stop publishing a 279° groundswell at a west-shadowed spot** — investigate whether the direction
+   error is in the NDBC decomposition, the swell-window/shadowing logic, or the buoy-to-spot transfer,
+   *after* the boundary question is settled, since the boundary may be feeding it.
+
+**Scope warning, stated plainly:** this is not a Phase 8 clean-up item. It is a defect in the physics
+input path that predates the marine separation and would have existed identically in the pre-Phase-5
+API. Phase 8's job is deploy + clean up. This should almost certainly become its own phase or an ADR,
+not be absorbed into a closeout.
+
+---
+
+## C-82 — Two contradictory swell decompositions ship in one payload with no provenance marking (OPEN)
+
+`GET /surf/{id}` returns both `data.spectralComponents` (NDBC-observed, 4 components) and
+`forecast[].multiSwell` (SWAN-modelled, 1 component). They disagree on component count, on period
+(20.0 s vs 13.42 s) and on `frequencyRange` (real ranges vs `[0.0, 0.0]`). Nothing in the payload marks
+which is observed and which is modelled; the only thing preventing a consumer from mixing them is a
+comment in one dashboard file (`SurfingTab.tsx:40`).
+
+**Consequence:** any second consumer — the config UI, a future mobile client, an operator reading JSON —
+will reasonably read `spectralComponents` and get a different, better-looking answer than the dashboard
+shows, with no way to know why.
+
+**Recommendation:** mark provenance explicitly on both fields (e.g. `source: "ndbc_observed"` /
+`"swan_model"`) so the constraint lives in the contract rather than in a comment. **Data contract change
+— trigger 4, needs a ruling.** Depends on C-81's outcome; if the boundary fix makes `multiSwell`
+trustworthy, the right answer may instead be to drop `spectralComponents` from this response entirely.
+
+---
+
+## C-83 — The C-08 energy-closure test cannot detect under-partitioning, and passed while C-81 was live (OPEN, method defect)
+
+`scripts/verify_energy_closure_deployed.py` measures `sum(component m0) / spectrum m0`. When the model
+emits **one** component, that ratio is ~1.0 *by definition* — the single partition contains the whole
+spectrum. The test is only meaningful on multi-component timesteps.
+
+Measured this cycle: **median 1.022, min 0.998, max 1.051**, with **65 of 66 timesteps single-component**.
+The lone 2-component timestep closed at 1.0164. Against the 1.626 median / 2.271 max baseline that is a
+real improvement and the original duplication defect **is** genuinely fixed — but the headline "PASS"
+carried far more assurance than the measurement supports, and the coordinator reported it that way
+before the operator challenged it.
+
+**This is the same failure C-08 exists to prevent, one level up:** measuring self-consistency of a model
+and reading the result as physical validation.
+
+**Fixes required:**
+1. The script must **refuse to report PASS when the multi-component sample is too small** — report
+   `INCONCLUSIVE (n_multi=1)` rather than PASS, and state the single/multi split in the headline, not
+   three lines down.
+2. Add the **complementary** check it lacks: compare published component **count, period and direction**
+   against an independent source (NDBC decomposition at the same timestep is already in the payload —
+   free, and would have caught C-81 immediately: 4 vs 1).
+3. Two real bugs in the script were found and fixed while running it today, both of which had produced
+   confidently wrong numbers on first execution:
+   - the component height field is **`height`**, not `hs_m`/`hs`/`significant_height_m` — the first run
+     reported "NO MEASURABLE TIMESTEPS," which would have read as a total model failure;
+   - SWAN writes 2-D variance density in **m²/Hz/degree**, so the direction bin width must be used in
+     **degrees**; converting to radians understated m0 by 180/π and the first run reported a closure of
+     **58.5**. Both fixed and documented in the script's docstrings.
+
+---
+
+## C-84 — First forecast timestep publishes 0.0 ft surf with `modelStatus: "degraded_bulk"` (OPEN, small)
+
+The 06:00Z timestep of every cycle publishes `breakingFaceHeight: 0.0`, `period: 1.6 s`,
+`direction: 121.4°`, `conditionsText: "0-1 ft at 2 seconds from the SE. Wind chop dominates."`, and
+`modelStatus: "degraded_bulk"`. Its cache entry has `components: []` and a spectrum Hs of **0.01 m**.
+
+This is the SWAN cold-start timestep, before the boundary energy has propagated into the grid — a
+spin-up artifact, not a forecast. It is nonetheless published as a normal forecast hour and would render
+on the dashboard as flat calm.
+
+**Recommendation:** either drop the spin-up timestep from the published forecast, or surface
+`modelStatus: "degraded_bulk"` in the UI so it is not read as a real 0 ft hour. **Consult the operator
+before dropping a timestep** — trimming published output is a contract change (trigger 4). Related to
+C-83's honesty principle: an artifact should be labelled, not rendered as data.
+
+---
+
+## C-85 — T8.6 findings: the marine capability surface is empty end-to-end (see C-46/C-56), plus route and provider gaps (OPEN)
+
+Recorded from the T8.6 E2E sweep so none of it is lost.
+
+**Confirmed working:**
+- marine `/health` on librewxr:8780 responds; cycle completed 09:04:55Z, L1+L2+L3, real WW3 boundary.
+- marine `/manifest` advertises **18 endpoints**; the API mounts them. Verified live: a request to
+  `GET /api/v1/surf/spots` returned a 404 whose body was
+  `{"type":"https://clearskies.weewx.org/errors/marine/404", ..., "instance":"https://192.168.7.22:8780/surf/spots"}`
+  — i.e. the API **proxied to the marine service** and the marine service answered. The companion proxy
+  works.
+- `GET /api/v1/surf/{id}` returns a full payload: 67 forecast hours, tide predictions, water temp,
+  beach profile, `breakerFormula: komar_gaughan`, `surfHeightDisplay: face`, units in ft/°F.
+
+**Empty or missing:**
+- **`GET /api/v1/capabilities` advertises ZERO marine providers.** Domains are exactly
+  `[alerts, almanac, aqi, earthquakes, forecast, radar, seeing]`. marine `/manifest` returns
+  `"capabilities": []` and `"locations": []`. This is **C-46/C-56 confirmed live, not a tidy-up** — the
+  API's config push payload has no `capabilities` and no top-level `locations` key (top-level keys are
+  exactly `marine`, `station`, `swan`), so marine's `compute_capabilities()` (`endpoints/manifest.py:215`)
+  and `compute_locations()` (:236) read absent keys and always return `[]`. Their docstrings still say
+  *"Phase 4 scaffold: no config has ever been pushed."* `MARINE_PROVIDER_MODULES` /
+  `get_provider_module()` still have **zero importers** outside `dispatch.py`. This contradicts
+  ARCHITECTURE.md, which says marine capabilities are absent from `/api/v1/capabilities` **only when
+  unconfigured** — it is configured and they are absent. Needs a ruling on where the capability list
+  derives from (trigger 4).
+- **`GET /api/v1/surf/{id}/forecast` is not mounted** — 404 from the API itself, not proxied. The
+  manifest exposes `/surf`, `/surf/{location_id}`, `/surf/{location_id}/profile` only. **Assessed as
+  benign:** the dashboard calls `/surf/{id}` and `/surf/{id}/profile` (`api/client.ts:478,485,494`) and
+  never `/forecast`. `briefs/SURF-PUBLISH-RESULTS-ONLY.md` references `/forecast`; the brief is stale on
+  this point. Flagged for doc correction, not a code change.
+- **NDBC 404 for station `prjc1`** on huntington-harbor during the cycle. Station ID appears invalid or
+  retired. Needs verification against NDBC's active station list.
+- **NDBC self-rate-limit** logged at 08:47 ("1 calls per 1s"). Cosmetic if the limiter is working as
+  designed; worth confirming it is not serialising a burst that then times out.
+
+**API operational notes discovered while testing, for the runbook:** the API serves **HTTPS** on 8765
+(self-signed) — `http://` yields a connection failure, not a redirect; `openapi.json` and `/docs` are
+**disabled in production** (404); `/api/v1/health` does **not** exist (404) while `/api/v1/capabilities`
+does and requires **no** auth token. `weewx`'s address is **not** 192.168.7.21; probes must run from the
+host or via the correct address.
+
+---

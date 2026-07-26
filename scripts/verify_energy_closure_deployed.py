@@ -53,7 +53,7 @@ unavailable.)  A run where most timesteps are unmeasurable is not a pass.
 from __future__ import annotations
 
 import json
-import math
+
 import sys
 from pathlib import Path
 
@@ -61,7 +61,13 @@ CACHE = Path("/var/run/weewx-clearskies/swan/forecast_cache.json")
 
 
 def spectrum_m0(freqs: list[float], dirs: list[float], energy: list) -> float:
-    """Integrate E(f, theta) over frequency and direction -> m0 (variance)."""
+    """Integrate E(f, theta) over frequency and direction -> m0 (variance).
+
+    SWAN writes 2D variance density in **m^2/Hz/degree** (VaDens), so the
+    direction bin width is used in degrees.  Converting it to radians here
+    understates m0 by a factor of 180/pi = 57.3 and was the reason the first
+    run of this script reported a closure of 58.5 rather than ~1.0.
+    """
     nf, nd = len(freqs), len(dirs)
     df = [0.0] * nf
     for i in range(nf):
@@ -84,13 +90,19 @@ def spectrum_m0(freqs: list[float], dirs: list[float], energy: list) -> float:
     for i in range(nf):
         row = energy[i]
         for j in range(nd):
-            total += float(row[j]) * df[i] * math.radians(dd[j])
+            total += float(row[j]) * df[i] * dd[j]
     return total
 
 
 def component_m0(comp: dict) -> float | None:
-    """m0 of a reported component from its significant height: Hs = 4*sqrt(m0)."""
-    hs = comp.get("hs_m", comp.get("hs", comp.get("significant_height_m")))
+    """m0 of a reported component from its significant height: Hs = 4*sqrt(m0).
+
+    The published field is `height` (metres).  Components also carry their own
+    `energy` field, which was verified on 2026-07-26 to equal (height/4)**2
+    exactly — so `height` is the single source and `energy` is not consulted,
+    to avoid measuring a derived value against itself.
+    """
+    hs = comp.get("height")
     if hs is None:
         return None
     return (float(hs) / 4.0) ** 2

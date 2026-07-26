@@ -650,3 +650,55 @@ through the API — INVARIANT"; cite it rather than re-deriving it.
 surfaces in exactly one place. Handle it honestly there: a wizard discovery query that cannot reach
 the marine service must say so, never return an empty list. "There are no buoys near you" is a wrong
 answer wearing a valid response's clothes.
+
+## Validate against reality, never against the model's own output
+
+A physical model's own output is **never** evidence that the model is right. It is evidence about the
+input file. Every internal-consistency check — energy closure, mass balance, partition sums, "the
+numbers add up" — measures whether the code is self-consistent, which a model that discarded reality at
+its input will pass perfectly.
+
+**The rule:** before declaring any physics output correct, compare it to something that did not come out
+of the model. In this project, in order of preference:
+
+1. **An independent observation of the same quantity at the same place and time** — an NDBC buoy, a tide
+   gauge, a station reading. Often already in the payload.
+2. **A commercial or governmental forecast a user would compare us to** — Surfline, NWS, PredictWind.
+   Not ground truth, but a sanity envelope; a large disagreement is a finding, not noise.
+3. **What a person standing there would see**, stated in the units they would use. "Chest to overhead"
+   and "4–6 ft" are checkable claims. "Hs = 0.82 m with closure 1.02" is not.
+
+**Corollaries, each earned the hard way on 2026-07-26:**
+
+- **A conservation check cannot detect a missing input.** Energy closure of 1.02 means the components sum
+  to the spectrum. It says nothing about whether the spectrum is the right spectrum. If the input threw
+  away two of three swell trains, closure is *still* 1.02.
+- **A conservation check over a degenerate sample is not a pass.** Sum-of-one-partition ÷ spectrum ≡ 1.0
+  identically. Report the sample split in the headline and refuse to say PASS when the meaningful
+  subsample is n=1.
+- **Do not compare the two quantities that happen to agree.** Surfline's *swell heights* combined to
+  2.54 ft and our *spectrum Hs* was 2.7 ft, so the coordinator announced a match — while Surfline's
+  actual headline, **surf height 4–6 ft**, was a different and much larger quantity we never checked.
+  Pick the comparison quantity *before* looking at the numbers, and pick the one the user cares about.
+- **"Close" is a number, not an adjective.** 3.8–4.2 ft against 4–6 ft is not agreement: it sits at or
+  below the bottom of the range and never reaches the top. State the gap as a percentage or a range
+  overlap and let it be judged, rather than characterising it.
+- **Flat output is a symptom.** A forecast that barely moves while its drivers swing (face height pinned
+  at ~4 ft across 14 h while Tp went 5.2→10.0 s) is reporting something insensitive to its inputs. Treat
+  invariance as a defect signal, not as stability.
+- **Total right, distribution wrong is the hard failure mode.** Getting Hs approximately right while
+  putting the energy at 7.7 s instead of 12–19 s produces plausible-looking numbers and wrong surf.
+  Aggregate agreement never licenses skipping the spectral/temporal comparison.
+
+**Why (2026-07-26, Phase 8 T8.6/T8.7):** every automated check in Phase 8 passed while the surf model was
+publishing one swell train where a buoy in the same payload resolved four, a 20 s groundswell from a
+direction the coastline shadows, and surf height flat at the bottom of the real range. The defect was
+found by the **operator**, from a **screenshot**, after the coordinator had reported energy closure as a
+PASS. The coordinator then twice characterised clear disagreement as agreement before being corrected.
+The cause was upstream and structural — `ww3_to_swan_boundary()` synthesises a single JONSWAP peak from
+scalar WW3 parameters — and no self-consistency test could ever have found it. See C-81, C-83.
+
+**Anti-pattern:** running the project's own verification script, reading its PASS, and reporting the
+physics validated. The script measures what it measures. Ask what it *cannot* see, and go look at that
+with something external.
+
