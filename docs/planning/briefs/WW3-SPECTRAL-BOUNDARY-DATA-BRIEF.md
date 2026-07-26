@@ -201,16 +201,104 @@ unreachable,"* so the republication was substituted.
 
 ---
 
-## 10. Open questions for the operator
+## 10. Design questions — resolved by research, not by judgement
 
-1. **One station, or several points along the L1 boundary?** `BOUNDNEST3` is designed for multiple
-   locations; a single station implies `BOUNDSPEC ... FILE`. Several is more faithful, 7.75 MB each.
-2. **Are IBP files individually addressable anywhere?** They are the purpose-built nesting product; only
-   the 11 GB tarball was found. Worth asking NCEP.
-3. **`CGRID` frequency range** — widen to 28.6 s, or accept truncation?
-4. **Maximum acceptable station distance**, and what the wizard tells an operator whose spot has none.
-5. **GLWU cadence differs** — hourly `bulls.tCCz` (00–14z observed) versus the ocean product's
-   00/06/12/18z. The runner's cycle logic assumes 6-hourly.
+These were originally posed as operator questions. The literature and the SWAN manual answer four of the
+five outright, so they are recorded as findings rather than decisions.
+
+### 10.1 One station applied uniformly — RESOLVED, and `BOUNDNEST3` is not usable
+
+Two independent facts settle this.
+
+**`BOUNDNEST3` cannot be driven by public station files.** The manual's acceptance rule:
+
+> *"Note that SWAN will accept output of a WAVEWATCH III output location only if the SWAN grid point on
+> the nest boundary lies within a rectangle between two consecutive WAVEWATCH III output locations with a
+> width equal to 0.1 times the distance between these output locations on either side of the line between
+> these WAVEWATCH III output locations."*
+
+WW3 output locations must lie **along our nest boundary**, within a tolerance of 0.1× their spacing.
+NDBC/WW3 station points are wherever the buoys are. `BOUNDNEST3` is for operators who run WW3 themselves,
+or who use IBP points generated for one specific nest — which is precisely what NOAA's `ibp` family is,
+and precisely why an 11 GB tarball of *someone else's* boundary points cannot help us. **Question 10.2
+below is therefore moot.**
+
+**A spatially uniform offshore spectrum is documented standard practice, not a compromise.** SWAN applies
+*"a spatially uniform spectrum at the offshore boundary [assuming] a uniform incident wave spectrum at the
+offshore boundary for nearshore regions"*, and there is peer-reviewed precedent for driving a nearshore
+SWAN domain from a **single** directional spectrum — Estimating Nearshore Waves by Assimilating Buoy
+Directional Spectrum Data in SWAN, J. Atmos. Ocean. Tech. 38(12), 2021.
+
+**Decision: one station, `BOUNDSPEC SIDE ... CONSTANT FILE` with the 2-D spectrum.** The manual defines
+`CONSTANT` as *"the wave spectra are constant along the side or segment"*, which is the intended mechanism.
+This also keeps the change close to what `swan_formats.py` already emits.
+
+*(The coordinator's original argument for one station — WW3 grid coarser than the L1 domain, so extra
+stations add bandwidth not information — was speculation and is not the reason. The reason is the
+positioning tolerance and the documented uniform-boundary practice.)*
+
+### 10.2 IBP files — MOOT
+
+Superseded by 10.1. Only the 11 GB tarball exists, and IBP points would not lie on our boundary anyway.
+
+### 10.3 `CGRID` frequency range — RESOLVED: widen the low end to ~0.03 Hz
+
+| | lowest freq | longest period | highest freq |
+|---|---|---|---|
+| Our `CGRID` today | 0.0418 Hz | 23.9 s | 1.0 Hz |
+| WW3 ocean `.spec` | **0.035 Hz** | **28.6 s** | 0.964 Hz |
+| Published practice (swell-focused) | **0.03 Hz** | 33 s | ~1.0 Hz |
+
+**WW3's lowest frequency (0.035 Hz) sits below our current cutoff (0.0418 Hz)** — we would truncate its
+longest-period bins, discarding exactly the energy this work exists to recover. Swell-focused nearshore
+SWAN studies use **0.03 Hz** as the low cutoff (one uses 41 bins over 0.03–1.5 Hz; another 40 bins over
+0.02–1.0 Hz; a 500 m nearshore model 33 bins over 0.046–1 Hz).
+
+Our **upper** limit of 1.0 Hz already matches the manual's guidance: the WAM Cycle 4 source terms in SWAN
+were retuned for a highest prognostic frequency of ~1 Hz, which is recommended when wind generation
+matters.
+
+**Decision: lowest frequency to 0.03 Hz, keep 1.0 Hz upper.** 0.03 Hz covers WW3's 0.035 Hz with margin
+and needs no re-tuning of the source terms.
+
+### 10.4 Station distance and depth — RESOLVED: depth-based, ~500 m is the published precedent
+
+Practitioner guidance is that *"it takes some distance from the model boundary for the SWAN model physics
+to take effect, and model results near the edge of the model domain reflect the boundary conditions more
+than the SWAN prediction — especially where the model boundary enters shallow water."* A published SWAN
+application initialised from directional buoy observations in **550 m** water depth.
+
+**Station 46222 is at 487.9 m depth, ~20 km offshore — directly comparable to that precedent.** The
+selection criterion should therefore be **depth-led** (the `.spec` header supplies depth per timestep), not
+distance-led, with distance as a secondary sanity bound.
+
+**One caveat to record rather than gloss:** the deep-water condition is d > L₀/2, and L₀ = 1.56 T². At
+20 s that needs d > 312 m — 488 m satisfies it. At WW3's longest bin, 28.6 s, it needs **d > 638 m**, which
+488 m does **not** satisfy. So the very longest bins arrive already depth-influenced at this station. Not a
+blocker (WW3 accounts for depth on its own grid, and this is true of any real buoy site on a narrow shelf),
+but it should be stated in the provider docs rather than discovered later.
+
+### 10.5 GLWU cadence — CONFIRMED DIFFERENT, needs handling
+
+GLWU publishes **hourly** `bulls.tCCz` directories (00–14z observed on 2026-07-26) plus
+`grlc_2p5km` gridded at t01z/t07z/t13z, against the ocean product's 00/06/12/18z. The runner's cycle
+determination assumes 6-hourly. Straightforward to handle, but it is real branching in cycle logic and
+must not be assumed symmetric.
+
+---
+
+## 13. The one genuine decision left for the operator
+
+Everything above is measured or cited. What remains is not a technical question:
+
+**Scope.** This is a defect in the physics input path that predates the marine separation and would have
+existed identically in the pre-Phase-5 API. It is not Phase 8 clean-up work. It needs its own phase or an
+ADR, with the source swap, the multi-partition/spectral contract change, the `CGRID` widening, the station
+catalogue, and the Great Lakes path sequenced deliberately.
+
+Phase 8's remaining tasks (T8.4/T8.5 decommissioning, T8.9 tests, QC Gate 8) are **blocked behind T8.6**,
+which fails on this. The old services remain stopped-but-enabled, so the rollback path is intact and
+nothing is at risk while this is decided.
 
 ---
 
