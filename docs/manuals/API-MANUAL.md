@@ -3030,15 +3030,11 @@ The marine service exposes `GET /manifest` (no auth required). The API fetches t
       "description": "Beach safety bundle (rip current risk, surf height, UV, water temp)"
     }
   ],
-  "capabilities": [
-    {"id": "surf", "displayName": "Surf Forecast", "requiresConfig": ["swan_grid"]},
-    {"id": "marine", "displayName": "Marine Conditions"},
-    {"id": "tides", "displayName": "Tide Predictions"},
-    {"id": "fishing", "displayName": "Fishing Score"},
-    {"id": "beach_safety", "displayName": "Beach Safety"}
-  ]
+  "capabilities": ["surf", "marine", "tides", "fishing", "beach_safety"]
 }
 ```
+
+`capabilities` is a flat list of capability id strings (matching the marine service's own `endpoints/manifest.py` `compute_capabilities()` and the plan's example manifest) — not a list of `{id, displayName, requiresConfig}` objects. An earlier draft of this section showed the richer object shape; that was never implemented on either side and is corrected here (C-35, MARINE-SEP-CONCERNS.md).
 
 **Dynamic route mounting:** At startup, the API fetches the manifest and registers one proxy handler per declared endpoint. Each proxy handler:
 
@@ -3097,15 +3093,17 @@ The marine service returns raw SI-unit data. The API wraps every marine response
 {
   "data": {
     "locationId": "rincon",
-    "waveHeight": {"value": 4.6, "label": "ft", "formatted": "4.6"},
-    "wavePeriod": {"value": 12.0, "label": "s", "formatted": "12"},
-    "waveDirection": {"value": 280, "label": "°", "formatted": "280"}
+    "waveHeight": 4.6,
+    "wavePeriod": 12.0,
+    "waveDirection": 280
   },
   "stationClock": {"localTime": "...", "utcOffset": "..."},
   "freshness": {"dataAge": 1240, "refreshInterval": 1800, "isStale": false},
-  "units": {"waveHeight": "ft", "wavePeriod": "s", "waveDirection": "deg"}
+  "units": {"waveHeight": "ft", "wavePeriod": "s"}
 }
 ```
+
+Raw scalar values in `data`, with a flat `{fieldName: label}` map in `units` — this is `units/response_conversion.py`'s "Shape 2" envelope (`{data: dict, units: label_dict, ...}`, the same one `/current` and `/archive` already emit), not a per-field `{value, label, formatted}` wrapper. An earlier draft of this example showed the wrapped form; it was never implemented anywhere in this codebase and is corrected here (C-36, MARINE-SEP-CONCERNS.md). `waveDirection` carries no entry in `units` because direction fields are unconverted (compass degrees, a single universal unit — see the field inventory in `services/marine_response_conversion.py`).
 
 Unit conversion from SI to the operator's configured unit system is applied by the API proxy handler — the marine service always returns SI units and the API always converts.
 
@@ -3113,7 +3111,9 @@ Unit conversion from SI to the operator's configured unit system is applied by t
 
 Marine capabilities declared in the manifest (`/manifest` → `capabilities` array) are merged into `GET /api/v1/capabilities` when the marine service is connected. When the marine service is absent or unreachable, the marine capability entries are omitted from the capabilities response. All other (non-marine) capabilities are unaffected by marine service connectivity.
 
-The capabilities merge is live — the manifest is re-fetched every 5 minutes and on each `/setup/apply` call. If the marine service becomes unreachable, the next manifest fetch will detect the absence and remove marine capabilities from the response.
+The capabilities merge is live — the manifest is re-fetched every 5 minutes and on each `/setup/apply` call. If the marine service becomes unreachable, the next manifest fetch will detect the absence and remove marine capabilities from the response — capabilities are removed, not served stale, on a failed refresh; this differs deliberately from proxied routes, which keep serving their last-cached response on the same failure (§19.1's three-state table) because a route with no fresher data is still useful, but a capability list is a live "is this connected" signal.
+
+Each capability id is represented in `CapabilityRegistry.providers` as its own `CapabilityDeclaration` (`providerId: "marine:{id}"`, `domain: "marine"`, `geographicCoverage: "us_coastal"`, `suppliedCanonicalFields: []`) — the existing capability model, not a new response field.
 
 ### §19.5 Config push model
 
