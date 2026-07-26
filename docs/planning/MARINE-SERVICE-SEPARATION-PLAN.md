@@ -3448,6 +3448,64 @@ constant anywhere" are **round-2** criteria. They will still read as failing aft
 Phase 8 adversarial audit's `grep` for `TPAR` / `DSPR` / `ww3_to_swan_boundary` / `JONSWAP` must therefore
 run **after round 2**, not after round 1.
 
+> ### ⚠ SUPERSEDED BY OPERATOR RULING, 2026-07-26 — one uniform station spectrum is REJECTED
+>
+> **Operator:** *"YOU CANNOT JUST PICK ONE STATION POINT… YOU ARE MANDATED TO USE THE WWIII GRID! YOU ARE
+> TO PROVIDE THE DIFFERENT VALUES AT THE BOUNDARY BASED UPON THE WWIII DATA FROM THAT GRID!"*
+>
+> The brief's §10.1 decision (one station, `BOUNDSPEC … CONSTANT FILE`) is **void**. The boundary must
+> **vary along its length**. Read this block, not the superseded `CONSTANT` text below it.
+>
+> #### What SWAN actually provides — three mechanisms, and why only one works
+>
+> | Mechanism | Spatially varying? | Keeps all swell partitions? | Usable by us? |
+> |---|---|---|---|
+> | `BOUNDSPEC … CONSTANT FILE` | ❌ one spectrum for the whole side | ✅ | superseded — rejected by the operator |
+> | `BOUNDSPEC … VARIABLE PAR` | ✅ | ❌ **`PAR` carries ONE parametric train per point** | **NO — reintroduces C-86** |
+> | **`BOUNDSPEC … VARIABLE FILE`** | ✅ | ✅ spectra carry every partition | **YES — this is the design** |
+> | `BOUNDNEST3` | ✅ | ✅ | **NO — see below** |
+>
+> **The decision: `BOUNDSPEC SIDE <s> CCW VARIABLE FILE <len1> 'f1' <len2> 'f2' …`.** Manual: *"with this
+> option the wave spectra can vary along the side or segment. The incident wave field is prescribed at a
+> number of points of the side or segment, these points are characterized by their distance from the begin
+> point"*; SWAN then interpolates between them (§2.6.3). `[len]` points **need not coincide with grid
+> points**.
+>
+> **Why NOT `VARIABLE PAR` even though it reads straight off the WW3 grid.** `PAR` takes a single
+> `[hs] [per] [dir] [dd]` — **one** parametric train per boundary point. Feeding the gridded product
+> through `PAR` would collapse its three swell partitions back into one train at every point. That is
+> **exactly C-86's defect** — a single averaged swell — merely distributed along the boundary. Position
+> accuracy is not worth destroying the spectrum for.
+>
+> **Why `BOUNDNEST3` remains unusable — the correct reason, replacing the brief's.** The brief said station
+> points don't lie on our boundary. True, but it answers the wrong question: `BOUNDNEST3` was never meant to
+> be driven by buoy stations. The manual requires WW3 output *"at the locations along the nest boundary…
+> equal to the corner points of the SWAN nested grid"*, produced by WW3's own post-processor. **Those points
+> must be generated for OUR boundary, by whoever runs WW3.** NOAA's `ibp` (Interpolated Boundary Points)
+> family — confirmed to exist on NOMADS 2026-07-26 as `gfswave.tCCz.ibp_tar` — is generated for **NCEP's own
+> nests**, not ours. So the blocker is not the 11 GB packaging the brief cited; it is that the data is
+> boundary-specific and ours does not exist. Packaging was a red herring.
+>
+> #### L1's boundary length is NOT fixed — it scales with the operator's spot configuration
+>
+> `_compute_level1()` in `services/swan_domain.py` sizes the alongshore extent as
+> `lateral_km = max(lat_spread_km, lon_spread_km) / 2 + margin_km`. **With one spot the spread is zero**, so
+> today's L1 is the **minimum possible** size (~21 km W edge, ~27 km S edge — about 2 WW3 cells each).
+> A realistic configuration spanning Seal Beach to The Wedge (~21 km of spread) roughly **doubles** L1 to
+> ~50 km, about 4 WW3 cells.
+>
+> **Therefore the number of boundary spectra must be derived from the actual L1 extent at configuration
+> time — never a hardcoded count, and never sized from the current single-spot case.** Any measurement or
+> design validated only against today's one-spot L1 is measuring the most favourable case.
+>
+> #### Open implementation question for T8.10c round 2
+>
+> Station `.spec` files supply full 2-D spectra but sit at fixed buoy locations, not on our boundary. The
+> `VARIABLE FILE` design needs several spectra placed along the boundary by `[len]`. Determine, from
+> T8.10a's catalogue, **how many suitable stations actually bracket a realistic L1 boundary**, and report
+> the count before implementing. If the answer is one, say so plainly rather than silently degrading to a
+> uniform boundary the operator has rejected.
+
 **Do:** Emit the 2-D spectrum as SWAN's boundary file and drive L1 with
 `BOUNDSPEC SIDE ... CONSTANT FILE` (manual: *"the wave spectra are constant along the side or segment"*).
 **`ww3_to_swan_boundary()`'s synthesised JONSWAP peak and its fixed 30° `DSPR` are both deleted** — nothing
