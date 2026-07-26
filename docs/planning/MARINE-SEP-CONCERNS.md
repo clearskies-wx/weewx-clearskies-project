@@ -1733,6 +1733,74 @@ individual escalation. Carried to Phase 8.
 
 ---
 
+## C-64 — the admin has no equivalent of the wizard's blank-URL guard (OPEN → Phase 8)
+
+Raised by the Phase 7 admin agent, which correctly declined to invent one.
+
+C-57 closed the wizard's hole: enable marine features with no marine service URL and the operator now
+gets an error instead of silence. **The admin has the same hole and no fix.** An operator who adds
+marine locations through the admin section with `marine_service_url` unconfigured gets marine
+locations that no marine service will ever serve, and nothing says so.
+
+**Deliberately not fixed in Phase 7.** T7.4 is scoped to the wizard's files in the plan. More
+substantively, the wizard's guard keys off `state.marine_enabled` — wizard **session** state that has
+no admin counterpart, because the admin edits marine locations in a separate section from the marine
+connection. Building an admin equivalent needs a rule for what "enabled" means there, which is a
+design question, not a port of the wizard's check.
+
+**Note the asymmetry this leaves**: after Phase 7, the wizard path is guarded and the admin path is
+not, so the same misconfiguration is caught or silent depending on which screen the operator used.
+That is worth closing, and it is worth closing deliberately rather than by copying a check that does
+not fit.
+
+---
+
+## C-63 — the same-host URL literal now exists twice, by design (OPEN → low priority)
+
+`https://localhost:8780` is defined in `wizard/routes.py` and again in `admin/routes.py`.
+
+**This duplication is deliberate and was flagged rather than committed silently.** `admin/routes.py`
+states twice in its own source that it keeps local copies rather than importing from the wizard
+router, so neither router has a module-scope import dependency on the other. The Phase 7 admin agent
+followed that house rule and named the wizard as the twin in a comment — the right call over quietly
+breaking the file's stated convention.
+
+**The risk is real but small:** two literals for one URL will eventually disagree, and the failure
+would be an admin "same host" checkbox filling in a different port from the wizard's. Consolidating
+them into a shared constants module is a follow-up, not something to bolt onto the wizard phase.
+
+---
+
+## C-62 — the admin's marine save path has never worked (CLOSED — fixed in Phase 7 R2)
+
+Found by the Phase 7 admin agent while reading the section it was about to replace, before writing
+any code. Two defects, both pre-dating this phase.
+
+1. **`compute_save()` sent a two-key body as the entire `/setup/apply` payload.** `ApplyRequest`
+   declares `database` with no default and `model_config = ConfigDict(extra="forbid")`, so
+   `{"surf_compute_host": …, "surf_compute_secret": …}` **422s on both counts** — a missing required
+   section and two unknown fields. It failed this way before Phase 7 touched anything.
+2. **It also violated `admin/routes.py`'s own module-level "NOTE on write path" (`:1858`)**, which
+   states that `database`, `station`, `column_mapping` and `column_units` are always-rewritten fields
+   that must be re-sent faithfully from a freshly fetched current-config — exactly as the
+   marine-locations section's `_build_marine_apply_payload()` already does. The admin compute section
+   (added as Phase 5 audit finding F1) shipped without it.
+
+**Fixed in place rather than carried forward or logged-and-deferred.** The section's save path is
+being rewritten wholesale by T7.5; delivering a replacement whose Save button 422s would not be
+delivering T7.5. Reusing the existing in-file always-rewritten block adds no field, key or endpoint
+beyond LC-P7-3's three, and "code diverging from its own stated contract" is explicitly inside what
+may be fixed without escalation — the contract here is written in the same file, twelve hundred lines
+above the violation.
+
+**Recorded in the commit message as pre-existing**, so a later reader diffing this does not conclude
+Phase 7 broke it or invented a fix for a problem that never existed.
+
+**Worth noting how it survived:** the admin Test button was visibly broken, and the Save button was
+invisibly broken. Only one of them gets clicked during a demo.
+
+---
+
 ## C-61 — 19 Phase-4 brief files were deleted from the meta repo working tree mid-session (CLOSED — restored, nothing lost)
 
 **Found by the coordinator, not reported by any agent**, while running the routine post-round
