@@ -1774,6 +1774,33 @@ individual escalation. Carried to Phase 8.
 
 ---
 
+## C-68 — the marine service has no installation documentation of its own (OPEN → Phase 8, with T8.1)
+
+Surfaced sideways during the Phase 7 R4 Operator Manual pass. The docs agent, correcting the SWAN
+install instructions, proposed pointing the operator at "the marine service documentation" — and the
+coordinator checked whether that documentation exists. **It does not.**
+
+The `weewx-clearskies-marine` repo contains `README.md`, `LICENSE`, `pyproject.toml` and
+`.gitignore`. No `docs/` directory. The README has zero mentions of `pip`, the `nearshore` extra,
+eccodes, or the SWAN binary. Every other Clear Skies repo carries install and config documentation;
+this one does not, because it was scaffolded in Phase 4 and has been growing code ever since.
+
+**Why it matters now.** Phase 7 moved the *operator-facing* consequences of the separation into the
+manuals: eccodes, SWAN, and the GRIB2 stack are now described as belonging to the marine service
+host. Those passages can state the facts (verified from `pyproject.toml`: package
+`weewx-clearskies-marine`, extra `nearshore`, eccodes system library first, SWAN binary on PATH on
+that host) — but there is no per-repo document to hand the operator for anything deeper.
+
+**Not a Phase 7 item and deliberately not absorbed.** Phase 7 is the wizard phase, and writing a new
+repo's documentation set is not a translation or an Operator Manual correction. It sequences
+naturally with **T8.1**, which creates `scripts/deploy-marine.sh` and stands the service up on
+librewxr — that is the task that will establish the install steps this document would record.
+
+**Standing note for whoever takes it:** the facts are already verified and written down here and in
+`OPERATIONS-MANUAL.md`; the gap is a document, not a discovery.
+
+---
+
 ## C-67 — the config UI has been sending an apply key the API renamed away (CLOSED — fixed at QC Gate 7, stack `e85e174`)
 
 **The most serious defect found in Phase 7, and it predates Phase 7 entirely.** Write path found by
