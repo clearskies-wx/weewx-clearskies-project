@@ -1876,7 +1876,7 @@ The shared physics block is differentiated per level. Common commands emitted at
 | DIFFRACTION | Removed (sub-grid at 1 km) | Removed (sub-grid at 100 m) | `DIFFRACTION 1 0.2 27` (smoothed; filter εx≈45m) |
 | NUMERIC alfa | — | — | Stationary only: `NUMERIC STOPC dabs=0.005 drel=0.01 curvat=0.005 npnts=99.5 STAT mxitst=50 alfa=0.01` |
 
-The SETUP physical effect (~10–15 cm near shore) is delivered via the WLEVEL input grid. Stage 2 (current): tide + analytic radiation-stress-balance setup estimate (`services/wave_setup.py`). The setup profile is computed from the previous run's cached Hs using Green's law shoaling to find breaking, then Longuet-Higgins & Stewart (1964) radiation-stress integration (K ≈ 0.167 for γ=0.73). First run (no previous cache) falls back to tide-only.
+The SETUP physical effect (~10–15 cm near shore) is delivered via the WLEVEL input grid. Stage 2 (current): tide + analytic radiation-stress-balance setup estimate (`services/wave_setup.py`). The setup profile is computed from the previous run's cached Hs using Green's law shoaling to find breaking, then Longuet-Higgins & Stewart (1964) radiation-stress integration (K ≈ 0.167 for γ=0.73). First run (no previous cache), or genuinely flat offshore conditions (Hs < 0.1m), falls back to tide-only WLEVEL — both are a real computed value, not a caught failure. A genuine computation failure inside the setup pipeline instead aborts the SWAN run as of C-77 (2026-07-26, rules/coding.md §1) rather than silently substituting tide-only WLEVEL for every spot.
 
 **Convergence gate (SWAN-L3-STABILITY-PLAN Phase 4):**
 
@@ -2163,7 +2163,7 @@ Both SPECOUT types are paired with a companion `TABLE` carrying the PT* watershe
 
 **Cache:** Key = `(provider_id, bbox_hash, cycle_time)`. TTL = 21600s (6 hours) — matches the GFS cycle cadence.
 
-**Error handling:** 404 on all attempted cycles → `ProviderUnavailableError`. Network errors → canonical taxonomy. GRIB2 parse error → `ProviderProtocolError`. On GFS failure, SWAN produces a shortened forecast (HRRR hours 0–48 only) rather than no forecast.
+**Error handling:** 404 on all attempted cycles → `ProviderUnavailableError`. Network errors → canonical taxonomy. GRIB2 parse error → `ProviderProtocolError`. Required as of C-77 (2026-07-26, rules/coding.md §1 "A model runs on all its inputs or it does not run"): on GFS failure, the SWAN run aborts (raise, caught by the marine runner loop's retry-same-cycle handling) rather than publishing a forecast silently shortened to HRRR hours 0–48. Supersedes the prior "shortened forecast rather than no forecast" behavior.
 
 **Rate limiting:** 2 req/s to NOMADS (shared NOAA infrastructure, same rate as HRRR).
 
