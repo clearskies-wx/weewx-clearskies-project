@@ -88,6 +88,12 @@ The surfaces already exist as authority-published models, so this is integration
 
 For coastlines with no authority model, tidal datums can be derived from a global tide model (FES2022 via PyFES, or TPXO) — the same method applied globally, at lower nearshore accuracy. That is the fallback, not the primary.
 
+**Prefer selecting a source already on the target datum over converting one (operator direction, 2026-07-26).** Conversion machinery is a last resort for regions that leave no choice — which, counter-intuitively, is the **United States**: its regional DEMs are overwhelmingly NAVD 88 (665 of 1000 catalogue rasters) with no MSL equivalent at 10 m resolution.
+
+Europe is the opposite case. The **EMODnet Bathymetry DTM (2024)** publishes the same coverage in **both LAT and MSL** — the ESRI ASCII tiles are downloadable in either — at 1/16 × 1/16 arc-minute (≈115 m), under **CC BY 4.0** (redistributable with attribution, unlike VORF's UKHO licensing). Its regions are geographic rather than political, so the **British Isles are covered** (Greater North Sea, English Channel, Celtic Seas). For European L1/L2 the correct action is therefore to *select the MSL product* and skip datum conversion entirely.
+
+Residual gap: ≈115 m suits L2 (100 m) but not L3 (10 m), so a European L3 still needs a national high-resolution DEM, and those carry national datums — meaning the conversion path is needed at L3 only, not across the whole nest.
+
 **Licensing is the gate, not availability.** VDatum is public domain. VORF is UKHO-licensed; SHOM and AHS terms are unverified. A jurisdiction may therefore require the operator to supply their own licensed grids rather than us redistributing them.
 
 **Implementation risk, recorded rather than hidden:** whether PROJ already carries a given jurisdiction's vertical pipelines, or we must define them, has not been verified hands-on. PROJ separation-grid downloads become a deployment dependency.
