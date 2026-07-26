@@ -3306,6 +3306,14 @@ height, so this one substitution produced surf 3.83–4.24 ft (flat for 14 h) ag
 #### T8.10a — Station catalogue discovery
 
 - **Owner:** `clearskies-api-dev` (marine repo)
+- **Status: DONE 2026-07-26** — marine `cd792dd`, `services/ww3_station_catalogue.py`. Coordinator-verified
+  independently (not from the agent's report): station 46222 → 33.62 N/118.32 W by direct range request;
+  GLWU listing = 96 stations; ocean listing = 4,036 ids of which **2,775 contain a hyphen**, confirming the
+  agent's self-caught regex defect that would have silently dropped ~70% of stations. Resumability
+  demonstrated with a real `SIGKILL` mid-build and a restart that skipped the 15 already-resolved ids.
+  **Full 4,036-station ocean cold build was NOT run to completion this session** — capped and kill/resume
+  runs only; that belongs at real configuration time. Recorded so a sampled run is not read as a complete
+  one. See also **C-88** (duplicate NOMADS rate limiters).
 
 **Do:** Build a cached catalogue of WW3 spectral station locations for both products.
 Directory listing gives IDs (~4,036 ocean, ~115 Great Lakes); an HTTP **range request for bytes 0–120** of
@@ -3320,6 +3328,38 @@ is ~35 min and belongs at configuration/discovery time, **never** in the forecas
 #### T8.10b — Fetch and parse the WW3 2-D spectrum
 
 - **Owner:** `clearskies-api-dev` (marine repo)
+- **Status: DONE 2026-07-26** — marine `5cbf71a`, `services/ww3_spectrum.py`; doc meta `271ae05`
+  (PROVIDER-MANUAL §14.3a, new module only — §14.3's PacIOOS text deliberately left for T8.10g, since
+  PacIOOS still has live consumers until T8.10i).
+
+**THE FINDING THIS TASK TURNED UP — record it, it is a trap for anyone touching the spectrum.**
+WW3's `.spec` energy matrix is **direction-major, frequency-minor** (`energy[i_dir][i_freq]`) — the
+**opposite** axis order from SWAN's own SPECOUT. Assuming frequency-major parses cleanly, raises nothing,
+and produces a plausible-looking spectrum that **overstates Hs by 22–34%**.
+
+Coordinator-verified independently, without importing the agent's module, against **NOAA's own published
+bulk Hs** in the `.bull` file (station 46222, cycle `20260726` 06Z):
+
+| timestep | dir-major | freq-major | `.bull` Hst | error dir / freq |
+|---|---|---|---|---|
+| 06:00 | 0.564 | 0.702 | 0.57 | **1.0%** / 23.2% |
+| 08:00 | 0.571 | 0.705 | 0.57 | **0.2%** / 23.7% |
+| 10:00 | 0.609 | 0.789 | 0.61 | **0.1%** / 29.3% |
+| 11:00 | 0.631 | 0.845 | 0.63 | **0.1%** / 34.1% |
+
+Two more measured properties that are easy to get wrong:
+- The **direction axis is in radians and is NOT monotonic** — it wraps through zero mid-array (0.0873 →
+  6.2000 rad). Direction bin widths need circular, wrap-aware spacing; a plain midpoint reads the wrap as
+  one huge bin and inflates m0 further. Frequency is not periodic and uses plain midpoint spacing.
+- **GLWU's header longitude is 0..360, the ocean product's is -180..180.** Both are normalised to
+  -180..180 on output so downstream code never branches on product to read a coordinate.
+
+**This is exactly what "validate against reality, never against the model's own output" is for.** The wrong
+axis order was invisible to every internal check; only reconciling integrated m0 against an externally
+published bulk Hs exposed it.
+
+**Corroboration of C-86 from the same external file:** NOAA publishes **5** partitions at 46222 including
+**20.3 s** and **20.2 s** trains — the groundswell PacIOOS was averaging into one 12.73 s number.
 
 **Do:** Fetch the selected station's `.spec` and parse it. Format is self-describing and **identical for
 both products**, so **one parser, no format branching**:

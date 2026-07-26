@@ -4206,3 +4206,38 @@ should, which is what makes water-body routing testable.
 Python.** A viability probe written `if not swh: reject` discards this spot on any calm day, and the failure
 would look like missing coverage rather than a bad predicate. The check must compare explicitly against the
 GRIB `missingValue` key — `missingValue` means reject, `0.0` means accept.
+
+---
+
+## C-88 — Two independent 2 req/s NOMADS rate limiters now exist in one process, and a third is coming (OPEN → small, fix when T8.10f lands)
+
+**Found during T8.10a/T8.10b closeout, 2026-07-26.** Both new modules correctly honour the documented
+2 requests/second courtesy limit against `nomads.ncep.noaa.gov`, but each enforces it with its **own**
+limiter instance:
+
+| Module | Limiter | Host |
+|---|---|---|
+| `services/ww3_station_catalogue.py` (T8.10a) | `ww3-station-catalogue` / `ww3_stations` | `nomads.ncep.noaa.gov` |
+| `services/ww3_spectrum.py` (T8.10b) | `ww3-spectrum-nomads` | `nomads.ncep.noaa.gov` |
+
+Two limiters at 2 req/s each permit **4 req/s** against the same host when both run concurrently. Neither
+agent did anything wrong — each honoured the limit it was told to honour, and neither could see the other's
+files by scope. The defect is emergent, which is why it is logged here rather than against either task.
+
+**Why it will get worse before it gets better:** T8.10f adds a setup-time gridded probe against the same
+host, and T8.10i re-sources `/marine` onto gridded WW3 — also the same host. That is a plausible **four**
+independent limiters, i.e. up to 8 req/s against a NOAA courtesy limit.
+
+**Why it is not urgent today:** the catalogue build is setup-time and the spectral fetch is cycle-time, so
+in current usage they rarely overlap. Measured: no concrete collision observed during this session's work.
+
+**Risk if ignored:** exceeding a NOAA courtesy limit risks throttling or an IP block, which would present as
+a wave-boundary fetch failure. Post-C-76/C-77 that correctly **raises** and aborts the SWAN cycle — so the
+failure mode is a stopped forecast, loudly, rather than bad data. Loud, but still an outage.
+
+**Recommended fix (not architectural — same behaviour, one enforcement point):** one shared NOMADS limiter
+that every NOMADS consumer acquires, rather than per-module instances. This changes no formula, no contract,
+no responsibility and adds no dependency — it consolidates duplicate enforcement of an existing rule.
+
+**Sequencing:** fold into the round that lands T8.10f, when the third consumer appears and the
+consolidation can be done once against all of them rather than twice.
