@@ -94,6 +94,8 @@ Europe is the opposite case. The **EMODnet Bathymetry DTM (2024)** publishes the
 
 Residual gap: ≈115 m suits L2 (100 m) but not L3 (10 m), so a European L3 still needs a national high-resolution DEM, and those carry national datums — meaning the conversion path is needed at L3 only, not across the whole nest.
 
+**That residual L3 gap may close without any jurisdiction work — filed as future research, not assumed.** Satellite-derived bathymetry calibrated against **ICESat-2 ATL03** is ellipsoid-referenced (ATL03 reports photon elevations relative to the WGS 84 ellipsoid), so ellipsoid → MSL is a **geoid model** (EGM2008, global and free) rather than a tidal separation grid. L3 could then be produced natively in MSL anywhere, making the per-jurisdiction machinery above a US-and-existing-DEM concern rather than the global architecture. Unresolved: accuracy (0.43–1.5 m RMSE) is comparable to the datum error being eliminated, the clarity-vs-morphology compositing tension, permanently turbid coasts, and whether this puts us in the data-supply business or ships as an operator-run pipeline. See [FUTURE-ENHANCEMENTS.md](../planning/FUTURE-ENHANCEMENTS.md) "Satellite-derived bathymetry (SDB) for the surf zone", update 2026-07-26.
+
 **Licensing is the gate, not availability.** VDatum is public domain. VORF is UKHO-licensed; SHOM and AHS terms are unverified. A jurisdiction may therefore require the operator to supply their own licensed grids rather than us redistributing them.
 
 **Implementation risk, recorded rather than hidden:** whether PROJ already carries a given jurisdiction's vertical pipelines, or we must define them, has not been verified hands-on. PROJ separation-grid downloads become a deployment dependency.

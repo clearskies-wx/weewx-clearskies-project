@@ -50,6 +50,74 @@ scheduled.
 **Would be architectural** — a new bathymetry source is trigger 7 (adds a dependency and a data
 source) and would change what feeds the profile. Needs its own ADR.
 
+### Update 2026-07-26 — SDB as the global L3 fallback, and the research it needs
+
+Raised again by the operator while resolving the C-90 datum work: *"we default to using our own
+SDB for that when we cannot easily get our hands on datasets."* This widens the idea from a
+sandbar fix at one spot to **the L3 bathymetry source of last resort worldwide**, and turns up a
+consequence nobody had noticed.
+
+**It would dissolve the L3 vertical-datum problem, not just the data gap.** ADR-098's worldwide
+path needs a per-jurisdiction tidal separation model for every market. SDB calibrated against
+**ICESat-2 ATL03** does not: ATL03 reports photon elevations **relative to the WGS 84 ellipsoid**,
+so SDB output is ellipsoid-referenced, and ellipsoid → MSL is a **geoid model** (EGM2008) — global
+and free, not a tidal separation grid. L3 could therefore be produced natively in MSL anywhere on
+Earth with no jurisdiction-specific anything. That makes the VDatum/VORF/BATHYELLI machinery a
+US-and-existing-DEM concern rather than the global architecture.
+
+**The calibration blocker is solved in the literature.** Classic SDB (Stumpf blue/green log-ratio)
+needs 15–20 in-situ soundings — which you do not have precisely where you lack a DEM. Combined
+active+passive approaches use ICESat-2 for the vertical control instead, "using only satellite
+data," with reported vertical RMSE of **0.43–1.5 m** (ICESat-2 + Sentinel-2); Stumpf's own 2020
+turbid-water work reports **median error 0.5 m over 0–13 m**.
+
+**Depth range fits L3 almost exactly** — SDB is useful roughly 0–15 m; L3 runs from the 15 m
+contour to ~1.78 m.
+
+**Turbidity is addressed by temporal filtering, not by luck** (operator, 2026-07-26: *"google
+earth has time lapse to deal with turbidity"*, *"you can filter for those types of things over a
+time range"*). The ~6 m turbid-water depth limit in the literature is a **per-scene** limit.
+Sentinel-2's 5-day revisit over a multi-year archive gives hundreds of observations per spot;
+filtering on cloud, sun glint and turbidity proxies and keeping the clearest few percent recovers
+clear-water conditions anywhere that is *ever* clear.
+
+**Open research questions — this is why it is filed as research, not work:**
+
+1. **The clarity/currency tension, which is specific to surf.** A long compositing window buys
+   clarity; a short one keeps the morphology current. Bars migrate seasonally, and the bar
+   position *is* the wave — a five-year clear-pixel composite can be a pristine grid of a sandbar
+   that no longer exists. The selection window is probably a parameter with a seasonal default,
+   not a constant. A hydrographic user would not care; we must.
+2. **Permanently turbid coasts.** River mouths and high-sediment shelves are never clear, and no
+   filter fixes that. The correct output there is "no SDB available", not a bad grid.
+3. **Accuracy is comparable to the error we are eliminating.** SDB at 0.5–1.5 m RMSE sits in the
+   same range as the 0.8 m datum error that C-90 showed becomes ~0.6 m of breaking height. SDB
+   belongs at the **bottom** of the L3 priority chain — the answer when no real 10 m DEM exists,
+   never a replacement for one that does.
+4. Whether breaking-zone turbidity specifically defeats the bar crest (carried over from the
+   original entry, still unassessed).
+
+**Data supply vs software supply — the strategic question the operator raised.** Doing this
+centrally would put us **in the data business**: hosting, refreshing and standing behind a global
+derived bathymetry product, with the licensing and liability that implies. That is
+[RELEASE-DATA-REFRESH.md](../RELEASE-DATA-REFRESH.md)'s maintenance burden at planetary scale.
+The alternative is to **ship the pipeline and have the operator generate their own** — which is
+consistent with how the marine service already behaves, since operators already pull NCEI DEMs,
+ETOPO, WW3 and HRRR at setup rather than receiving them from us. Cost of that route: the operator
+needs the compute and the imagery access, and SDB is far heavier than a DEM download. This choice
+should be made **before** any implementation, because it determines whether the deliverable is a
+dataset or a package.
+
+**Imagery access does not require Google Earth Engine.** GEE is free for research and nonprofit
+use but **paid for commercial use** — which matters if operators are commercial. Sentinel-2 is
+free and open via the Copernicus Data Space and Landsat is US public domain, both mirrored on AWS
+Open Data. GEE is a convenience for the compositing step, not a dependency, and keeping it
+optional avoids inheriting its licence terms.
+
+**Related:** [ADR-098](../decisions/ADR-098-swan-datum-consistency.md) (vertical datum
+consistency; SDB would change its worldwide section), C-90 in
+[MARINE-SEP-CONCERNS.md](MARINE-SEP-CONCERNS.md).
+
 ---
 
 ## ~~Which host owns the spot profile cache~~ — ALREADY SCOPED, not an open question
