@@ -1,5 +1,10 @@
 # Phase 8 — Resume Prompt (2026-07-26 handoff)
 
+> ## ⛔ SUPERSEDED — use [PHASE-8-RESUME-PROMPT-2.md](PHASE-8-RESUME-PROMPT-2.md)
+>
+> This file is **history, not instructions**. The current resume prompt is
+> `PHASE-8-RESUME-PROMPT-2.md` (2026-07-26 evening). Read that one.
+
 > ## ⚠ PARTLY SUPERSEDED — a later session ran on 2026-07-26. READ THE LIVE SCRATCH FIRST.
 >
 > **`c:\tmp\marine-sep-P8-resume-scratch.md` is the current state of record and wins wherever it and this
