@@ -3349,3 +3349,51 @@ are trusted; trusted files must not be writable in a torn state.
 in the same file. No behaviour change, no new dependency, no contract change — `os.replace()` is
 atomic within a filesystem and all these paths are under `/etc/weewx-clearskies/`. Kept out of C-77's
 commits so each change's evidence stays clean.
+
+---
+
+## C-08 — CORRECTED: following its own instruction literally would have measured the rejected algorithm (OPEN → measurement ready, awaiting the fresh run)
+
+C-08 and the plan's Phase 4B block both say: *"Re-run `scripts/verify_partition_duplication.py`
+against a fresh model run after deploy; closure should sit at ≈1.0 rather than a 1.63 median."*
+
+**Followed literally that measures the wrong thing, and would have produced a confidently wrong
+answer.** Found by the coordinator reading the script before running it, 2026-07-26.
+
+**Three reasons the existing script cannot validate the fix:**
+
+1. **It calls `decompose_spectrum()` itself** (`scripts/verify_partition_duplication.py:59`) rather
+   than reading the payload's own `components`. `decompose_spectrum()` is the algorithm **T4B.2
+   rejected**; it has had no production caller since `12f9ddc`, because SWAN's own PT* watershed
+   partitions are the source at every live site. Running it against a fresh payload re-measures the
+   rejected algorithm and would still return ≈1.6 — and that number would then have been read as
+   "the fix did not work." **This is the same shape of mistake C-08 exists to prevent:** measuring
+   something other than the thing under test and reading the result as if it settled it. The
+   original concern was about the *payload* being stale; the script being pinned to the old
+   algorithm is a second, independent version of the same trap.
+2. **The published payload is trimmed.** SURF-PUBLISH-RESULTS-ONLY drops `energy`, `freqs_hz`,
+   `dirs_deg` and `handoff_by_transect` at the HTTP serving boundary, so a fetch of
+   `GET /surf/{id}/forecast` has no spectra left to integrate. The untrimmed data exists only in the
+   model host's own `forecast_cache.json`.
+3. **It imports from `/home/ubuntu/repos/weewx-clearskies-api`**, where the SWAN code no longer
+   exists after the marine separation.
+
+**Replacement: `scripts/verify_energy_closure_deployed.py`.** It measures what C-08 actually wants —
+for every timestep, the summed m0 of the components **the model published** (PT*-derived) against
+the m0 of the spectrum they came from, read from librewxr's untrimmed cache.
+
+**No silent skipping.** A timestep with no spectrum, no `components` key, empty components (the PT*
+gap the no-silent-fallback rule produces), or a non-positive m0 is **counted and named as
+unmeasurable**, never quietly dropped from the sample. A run where most timesteps are unmeasurable
+prints `NO MEASURABLE TIMESTEPS — this is a FAIL, not a pass` and exits non-zero. A closure figure
+computed from a handful of surviving timesteps, with the rest silently discarded, would be exactly
+the kind of flattering number this concern was opened to prevent.
+
+**Pass criterion:** median closure within 0.85-1.15 of unity. Baseline printed alongside for
+comparison: the broken `decompose_spectrum()` measured median 1.626, max 2.271, 65/65
+multi-component timesteps over 105% (n=67, 2026-07-25).
+
+`verify_partition_duplication.py` is **kept, not deleted** — it remains the direct measurement of the
+two algorithms against each other, which is what it was written for and what
+`scripts/compare_partitioning.py` still uses `decompose_spectrum()` for. It is simply not the tool
+for this question.
