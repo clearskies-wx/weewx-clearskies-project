@@ -4853,3 +4853,82 @@ land in the wrong region box. No concrete failing coordinate was found and Whiti
 **Process lesson, routed to `rules/clearskies-process.md` at phase close rather than left here:** a commit
 message that cites authority for one decision and cites nothing for an adjacent one is a reliable smell. That
 is how F1 was found.
+
+---
+
+## C-99 — C-94 is fixed and the Great Lakes boundary STILL cannot be fed: the stations now qualify on distance and fail on depth (**T8.10e accept remains unmet; trigger 1, not touched**)
+
+**Found 2026-07-26** by `c94-dev` while verifying the C-94 fix against live data. C-94 itself is resolved —
+the offshore sides are now derived from the shore-normal bearing, Whiting resolves to **N/E** as it should,
+and the nearby GLWU stations pass the unchanged one-grid-cell distance limit (`WHIBRip001` ~0 km from the N
+side, `IndDunesNP` ~0 km from the E side). The geometry defect is gone.
+
+**They then all fail the deep-water depth criterion**, measured from that cycle's live spectra:
+
+| | |
+|---|---|
+| Station depths | **4.9 – 10.2 m** |
+| `T_max` measured in the live spectra | **12.4 – 13.7 s** |
+| Depth required by `0.78 · T_max²` | **120 – 146 m** |
+
+Southern Lake Michigan does not have 120 m of water anywhere near Whiting, so **no configured Great Lakes
+spot can ever satisfy this criterion** as written. T8.10e's accept ("a Great Lakes spot produces a real
+spectral boundary where it previously produced none") is still unmet, and the blocker has moved from geometry
+to physics.
+
+**This was predicted.** C-94 closed with: *"the deep-water criterion `depth >= 0.78 · T_max²` is applied
+identically to both products … whether the same coefficient is right for both is a physics question
+(trigger 1), and it should be answered from the literature rather than by tuning until Whiting passes."*
+That is now the live blocker rather than a footnote.
+
+**Two candidate root causes, and they are different problems.** Neither is being resolved here:
+
+1. **The criterion may be inappropriate for a fetch-limited basin.** `0.78 · T²` is the standard deep-water
+   threshold `d/L₀ > 0.5`, correct for ocean swell. Whether "deep water" in that sense is the right
+   requirement for a boundary station in a lake is a modelling question.
+2. **The `T_max` measurement may be wrong, which would make the criterion innocent.** A 12–14 s period in
+   Lake Michigan is not physically plausible as real wave energy — fetch-limited lake seas run roughly 3–6 s.
+   `_ENERGY_TAIL_FRACTION = 0.01` treats any frequency bin above 1% of peak density as "carrying real
+   energy", and in a spectrum whose real energy sits at 4 s, the 12–14 s bins are plausibly numerical tail
+   rather than sea state. If so the criterion is fine and the input to it is not.
+
+**Root cause 2 is the more likely one and it is the more dangerous one**, because the same tail-fraction
+constant is applied to the ocean product, where it currently produces sensible answers at Huntington and so
+has never been questioned.
+
+**Not touched, deliberately.** Both `_DEEPWATER_DEPTH_COEFFICIENT = 0.78` and `_ENERGY_TAIL_FRACTION = 0.01`
+are constants inside a physics criterion — **trigger 1**, the most explicitly guarded item on the list, and
+the one whose bypass on 2026-07-25 produced the rule in its current form. "T8.10e's acceptance criteria are
+unreachable otherwise" is a **named non-excuse**. The task is blocked; that is the report.
+
+**Recommendation for whoever picks this up:** establish which root cause it is *before* proposing any change,
+by reading the live GLWU spectrum's energy distribution directly and asking where the energy actually sits.
+If it is root cause 2, the fix is to how `T_max` is measured and no physics constant needs to move — which
+would be the better outcome, and it would also want re-checking against the ocean product.
+
+---
+
+## C-100 — the coordinator's `git add -A` swept an agent's in-progress work into an unrelated commit
+
+**Found 2026-07-26**, reported by `c94-dev`. Four agents were working concurrently in the same local
+checkout. The coordinator committed the C-92a catalogue fix with `git add -A`, which staged **every**
+modified file in the tree — including `services/swan_domain.py`, which `c94-dev` had edited minutes earlier
+and had not yet committed. The change landed inside `4ce0191 fix(C-92a): an incomplete on-disk catalogue must
+not shadow the packaged one`, a commit whose message says nothing about it.
+
+**No data was lost** — `c94-dev` diffed the committed content against what it wrote and confirmed it
+byte-identical — but the history is wrong: an authorised architectural-adjacent edit (the
+`mean_offshore_bearing_deg()` extraction) is recorded under an unrelated concern number, so anyone tracing
+why that function exists will land on a catalogue-packaging commit.
+
+**Root cause is the coordinator's, not the agent's.** `git add -A` is unsafe on a shared checkout with
+concurrent agents, and the rules already require per-agent scope blocks precisely so that who-owns-what is
+knowable. The scope blocks were correct; the commit command ignored them.
+
+**Rule-shaped lesson, to be routed to `rules/clearskies-process.md` at phase close:** when more than one
+agent is live in the same repo, **stage explicit paths, never `-A` / `.`** — and that binds the coordinator
+as much as the agents. The existing "agents edit and commit only on the local machine" rule makes concurrent
+work in one checkout normal, so this failure mode is structural rather than a one-off slip.
+
+**Disposition:** history left as-is (rewriting it would be worse than the misattribution). Recorded so the
+provenance is findable, and so the rule change actually gets made.
