@@ -4699,7 +4699,7 @@ Measured on librewxr:
 | 3.7.1 | 9.5.1 | **no — rejected** |
 | **3.7.2 (currently installed)** | 9.5.1 | **no — rejected** |
 
-So T8.11 requires pinning marine to `pyproj<=3.7.0`, a **downgrade of a shared library** other code already
+So T8.11 requires marine to hold at `pyproj<=3.7.0` — implemented as the exact pin `pyproj==3.7.0` (T8.11b) so an unpinned resolve cannot drift up — a **downgrade of a shared library** other code already
 uses. Whether that is acceptable, or whether the grid set should instead be rebuilt/migrated to layout 1.4,
 is the operator's call. Note the Zenodo record is titled *"Early release, Lacks version tag"*, so a
 layout-1.4 republication may appear later.
