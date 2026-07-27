@@ -4769,8 +4769,16 @@ The operator rejected this escalation as over-triggering: *"WHO CARES? WE ARE NO
 GRID IS USED FOR THE HANDOFF TO L3, THAT IS ALL! WHAT DOES IT MATTER WHAT IS HAPPENING AT THE SHORELINE
 BECAUSE WE DO NOT USE THAT!"* The ruling is that this is **not** an architectural question: L2's shoreline
 is never consumed — L2 exists only to carry L1's boundary in to L3 — so nothing reads the cells whose side
-changes. Implemented as option 2 (T8.11b): land cells take the mean of the grid's own water separations, so
-the array carries no datum seam.
+changes. Implemented as option 2. **T8.11b first implemented it as a whole-grid mean of the water-cell separations,
+which is not what option 2 says** — `clearskies-auditor` caught that (C-98 F2) and it was corrected in
+`9ef86ff` to the spatially local nearest-water fill option 2 actually describes: each land cell takes the
+separation of the nearest cell that has one, by 8-connected dilation in grid-index space, NumPy only. Either
+way the array carries no datum seam; the difference is that the local version stays right when the
+separation surface is not flat, and needs no invented spread threshold to notice. Measured against the live
+caches, the two agree to **3.5 mm at L2 and 1.1 mm at the current L3 cluster** — so the correction was about
+the missing safeguard, not a wrong production number. A land cell the dilation cannot reach (fully enclosed
+by unknown-depth cells) **raises**, because leaving it NaN would silently hand SWAN an EXCEPTION point and
+thereby apply option 3 to a subset of cells nobody chose it for.
 
 **Two things stated plainly rather than left implicit:**
 
