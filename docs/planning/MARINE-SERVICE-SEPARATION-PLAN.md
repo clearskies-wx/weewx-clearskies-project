@@ -3960,11 +3960,39 @@ that state means T8.10h could validate **pre-fix output** and pass.
 
 **Do:** Before the first post-T8.10 cycle, archive (do not delete) `forecast_cache.json`, clear the Redis
 last-good entry, and remove L1/L2/L3 hotstart files — the procedure already used for the C-76 reset, which
-archived to a timestamped `swan-precleanup-*` directory. **Keep** bathymetry caches, `swan_grid_sizing.json`
-and `spot_profiles/` — expensive to rebuild and unaffected by a boundary-source change. Confirm the service
-logs a cold start.
+archived to a timestamped `swan-precleanup-*` directory. **Keep** `swan_grid_sizing.json` and
+`spot_profiles/` — expensive to rebuild and unaffected by either the boundary-source change or the datum
+change below.
 
-**Accept:** First post-T8.10 cycle starts cold, with `last_run: null` before it begins. Prior cache
+> **Correction (coordinator, 2026-07-27) — bathymetry caches are no longer on the "keep" list.** The original
+> "keep the bathymetry caches" instruction was correct for the boundary-source change this task was written
+> against, on the reasoning that they are expensive to rebuild and unaffected by it. **T8.11 changed the
+> vertical datum of those exact files**, which that reasoning never covered. Measured live on librewxr, all
+> five caches predate T8.11 and are raw, unconverted NAVD88:
+>
+> ```
+> /etc/weewx-clearskies/swan_bathymetry_L1.json      vertical_datum: NAVD88   source_vertical_datum: None
+> /etc/weewx-clearskies/swan_bathymetry_L2.json      vertical_datum: NAVD88   source_vertical_datum: None
+> /etc/weewx-clearskies/swan_bathymetry_L3_*.json    (3 files)   same
+> ```
+>
+> `source_vertical_datum: None` is the tell — T8.11's conversion always records what it converted from, so
+> these were never run through it. **This fails silently, not loudly:** all five levels agree on NAVD88, so
+> `verify_level_datums_agree()` finds exactly one distinct datum, passes, and the run proceeds on the wrong
+> datum — keeping these caches makes the entire T8.11 datum unification inert while every guard reports
+> healthy. Applying T8.10j's own stated intent (invalidate state a fix changes) to a fix that landed after
+> T8.10j was written: **archive (do not delete) `swan_bathymetry_L1.json`, `swan_bathymetry_L2.json`, and all
+> `swan_bathymetry_L3_*.json` files alongside the rest of the pre-cleanup archive.** `swan_grid_sizing.json`
+> and `spot_profiles/` are unaffected by the datum change and stay on the "keep" list unchanged.
+>
+> **Accepted cost, stated rather than hidden:** all five bathymetry grids rebuild on the next cycle. For a
+> Great Lakes domain this also means a first-time USGS Rohweder DEM download (~1.4 GB for Michigan, C-106).
+> This entry does not mark T8.10j complete — it has not been executed.
+
+Confirm the service logs a cold start.
+
+**Accept:** First post-T8.10 cycle starts cold, with `last_run: null` before it begins, and with bathymetry
+caches (not only forecast/hotstart state) archived rather than reused across the datum change. Prior cache
 archived, not destroyed.
 
 #### T8.10g — Doc sync (mandatory, same phase)
@@ -4091,11 +4119,22 @@ ruling, recorded in full with evidence in `MARINE-SEP-CONCERNS.md` C-103 (trigge
 - T8.11d's per-level agreement guard and T8.11e's "no invented labels" rule both apply **per region**: a
   Great Lakes run's levels agree with each other on `LWD_IGLD85`; an ocean run's levels agree with each
   other on LMSL; the two are never compared against one another.
-- **Bathymetry source routing:** NCEI Great Lakes Bathymetry (already T8.10e's L1/L2 DEM source) is natively
-  on LWD — no conversion needed. NOAA OCM Coastal DEM: Lake Michigan (the L3-grade ~3 m source) is on
-  NAVD88 and needs `NAVD88 → LWD_IGLD85` conversion — **the T8.11a `pyproj` + NOAA-grid pipeline is
-  retargeted to this CRS pair, not discarded.** Whether NOAA's grid set covers this specific transform is
-  unverified and is a check for whoever implements it.
+- **Bathymetry source routing — corrected 2026-07-27 (C-106, adversarial audit; superseding the line
+  originally here).** This entry originally named NCEI Great Lakes Bathymetry as the L1/L2 source, natively
+  on LWD and needing no conversion. That named the wrong product: the code (`_try_great_lakes()` in
+  `providers/nearshore/swan.py`, via `bathymetry_resolver.py`) has never called NCEI Great Lakes Bathymetry
+  at any level. **The actual, sole Great Lakes source at L1, L2, and L3 is the USGS Rohweder 2025 ScienceBase
+  DEM** (DOI `10.5066/P1DA6L6U`, ~3 m, confirmed NAVD88-referenced) — the same source T8.10e's DEM chain
+  already used. C-106 (coordinator ruling, 2026-07-27, under operator instruction not to leave the question
+  open) **decides** this as the Great Lakes bathymetry source going forward, all three levels, and rejects
+  NCEI Great Lakes Bathymetry: NCEI's ~90 m nominal grid cannot serve L3's 10 m target, a split source across
+  levels would seam one domain across two surveys, and NCEI's only advantage (no conversion) is worth nothing
+  now the conversion is implemented and verified. **Consequence: `NAVD88 → LWD_IGLD85` conversion is required
+  at every level, L1 through L3, not L3 alone** — the T8.11a `pyproj` + NOAA-grid pipeline is retargeted to
+  this CRS pair, not discarded. Whether NOAA's grid set covers this specific transform was flagged here as
+  unverified; it has since been **verified** empirically on librewxr (`pyproj` 3.7.0 against NOAA's own
+  `proj.db`) — see ADR-098's amendment for the measured separation table (−176.10 m at Whiting/Calumet
+  Harbor, −173.50 m at Lake Erie, matching NOAA's published Low Water Datum plane elevations).
 - The **runtime path** must route Great Lakes levels to `LWD_IGLD85` and ocean levels to `LMSL` — not only
   a config-time or setup-time check. Same reasoning as the T8.10f runtime-path ruling above.
 
