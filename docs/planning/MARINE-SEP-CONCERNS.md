@@ -4647,6 +4647,13 @@ the mosaic per request the way ETOPO already is, via `find_catalogue_raster()`, 
 datum and single-raster consistency and make it a real source again. **Recommendation: pin it**, since the
 machinery already exists and was written for exactly this.
 
+**CONFIRMED LIVE 2026-07-26 by `clearskies-auditor`**, independently rather than by repeating the claim
+above — `rules/clearskies-process.md` requires a dead-code claim to be verified harder than a "this is fine"
+claim, and the original entry was written from reading, not from running. A live call to NCEI's real
+`getSamples` endpoint returns `location`, `value`, `rasterId` and `resolution` per sample and **never a
+`VerticalDatum` attribute**, which is the exact key `bathymetry.py` looks for. So `_seen_datums` stays empty
+on every unpinned call and T8.11e's raise fires every time. `_try_crm()` is dead in practice, confirmed.
+
 **Disposition:** operator ruling. Blocks nothing today — Huntington's L2/L3 are served by
 `orange_county_13_navd88_2015` and never reach the mosaic.
 
@@ -4756,5 +4763,25 @@ it produces is the physically correct one for a model whose water level is now r
 **Why this is not a coordinator call.** Where the model's land/water boundary sits is trigger 3. It also
 interacts with wave setup and runup, which are computed relative to the still-water line.
 
-**Disposition:** operator ruling, and it **blocks T8.11b** — the conversion cannot be written without
-deciding what happens to the 311 cells.
+**RULED 2026-07-26 — operator, verbally in chat. Recorded late; see the audit note below.**
+
+The operator rejected this escalation as over-triggering: *"WHO CARES? WE ARE NOT USING THAT DATA! THE L2
+GRID IS USED FOR THE HANDOFF TO L3, THAT IS ALL! WHAT DOES IT MATTER WHAT IS HAPPENING AT THE SHORELINE
+BECAUSE WE DO NOT USE THAT!"* The ruling is that this is **not** an architectural question: L2's shoreline
+is never consumed — L2 exists only to carry L1's boundary in to L3 — so nothing reads the cells whose side
+changes. Implemented as option 2 (T8.11b): land cells take the mean of the grid's own water separations, so
+the array carries no datum seam.
+
+**Two things stated plainly rather than left implicit:**
+
+1. **The ruling addressed L2. The coordinator extended the same treatment to L3** under the operator's
+   standing 2026-07-26 instruction to complete Phase 8 without further escalation. L3's waterline is *not*
+   obviously covered by "we do not use that data" — it is the surf zone. The extension is the coordinator's,
+   not the operator's, and is flagged here so it is reviewable rather than buried.
+2. **The audit trail failed even though the authorisation did not.** `clearskies-auditor` raised this as a
+   HIGH finding: the code implemented option 2 while this entry still read "blocks T8.11b", with no recorded
+   ruling anywhere in the repo, and the commit message cited operator approval for the adjacent C-96
+   decisions but nothing for this one. That finding was correct on every fact available to it. A verbal
+   ruling that is never written down is indistinguishable from no ruling, and the reviewer is right to treat
+   it as unauthorised. **The lesson is procedural: record the ruling in the register at the moment it is
+   given, not at closeout.**
