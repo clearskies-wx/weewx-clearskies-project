@@ -47,10 +47,10 @@ You are the coordinator for **Phase 8 of `docs/planning/MARINE-SERVICE-SEPARATIO
 3. `rules/coding.md` §1 — **"A model runs on all its inputs or it does not run — never substitute, never omit."**
 4. `docs/planning/MARINE-SERVICE-SEPARATION-PLAN.md`, the **Phase 8** section — T8.1 through T8.10j plus the Adversarial Audit and QC Gate 8.
 5. `docs/planning/briefs/WW3-SPECTRAL-BOUNDARY-DATA-BRIEF.md` — **mandatory before any T8.10 subtask.** All measured data, SWAN-manual citations, and resolved design questions live here.
-6. `docs/planning/MARINE-SEP-CONCERNS.md` — the **last ~400 lines**: C-81 through C-87, the operator rulings of 2026-07-26, the grid-tiering direction, the setup-probe direction, and the Great Lakes correction. 92+ entries; do not re-read the whole file.
+6. `docs/archive/MARINE-SEP-CONCERNS.md` — the **last ~400 lines**: C-81 through C-87, the operator rulings of 2026-07-26, the grid-tiering direction, the setup-probe direction, and the Great Lakes correction. 92+ entries; do not re-read the whole file.
 7. `reference/clearskies-dev.md` — repo paths, SSH, deploy scripts.
 
-The plan is mandatory. Your job is to get it implemented, not to run on wild goose chases. Log concerns in `docs/planning/MARINE-SEP-CONCERNS.md`. If something looks blocking, read the architecture, briefs and manuals first — most "blockers" are already answered there.
+The plan is mandatory. Your job is to get it implemented, not to run on wild goose chases. Log concerns in `docs/archive/MARINE-SEP-CONCERNS.md`. If something looks blocking, read the architecture, briefs and manuals first — most "blockers" are already answered there.
 
 **You may push and deploy as needed.** This is a test environment with no live traffic.
 

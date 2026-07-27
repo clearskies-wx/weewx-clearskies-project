@@ -1,7 +1,7 @@
 # I18N Composition Patterns — Verified Reference
 
 **Verified:** 2026-07-02 against national meteorological service websites.  
-**Governing plan:** `docs/planning/I18N-COMPLIANCE-PLAN.md` §1D  
+**Governing plan:** `docs/archive/I18N-COMPLIANCE-PLAN.md` §1D  
 **Used by:** API conditions text engine (`weewx_clearskies_api/sse/conditions_text.py`), API locale files (`weewx_clearskies_api/locales/*.json`), CJK composer modules (`weewx_clearskies_api/locales/composers/`)
 
 ---

@@ -395,7 +395,7 @@ Rendered as `<img>` references to hand-authored SVG files, Meteocons-style palet
 | Atmosphere — Dust | Dust overcast | Both | `GlyphDust` | **New** |
 | Fog | Fog / Mist / Rime fog | Both | `GlyphFoggy` | Existing |
 
-All 32 glyphs are implemented at `src/components/weather-icon-glyphs.tsx` (dashboard repo) and are complete — the "Existing" / **New** column above records which glyphs shipped in the original ADR-049 set versus the Phase 1+ icon system overhaul (see `docs/planning/ICON-SYSTEM-OVERHAUL-PLAN.md`); it is a historical provenance marker, not an implementation-status flag. Each component name maps 1:1 to a `.svg` file in `public/icons/` per the file mapping in `weather-icon-glyphs.tsx`.
+All 32 glyphs are implemented at `src/components/weather-icon-glyphs.tsx` (dashboard repo) and are complete — the "Existing" / **New** column above records which glyphs shipped in the original ADR-049 set versus the Phase 1+ icon system overhaul (see `docs/archive/ICON-SYSTEM-OVERHAUL-PLAN.md`); it is a historical provenance marker, not an implementation-status flag. Each component name maps 1:1 to a `.svg` file in `public/icons/` per the file mapping in `weather-icon-glyphs.tsx`.
 
 #### Composition techniques
 

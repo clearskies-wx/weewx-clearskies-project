@@ -52,10 +52,10 @@ Create a `clearskies-wx` GitHub organization. Transfer the 5 active component re
 
 ## Implementation guidance
 
-Executed 2026-06-27 per `docs/planning/GITHUB-ORG-MIGRATION-PLAN.md`. Six phases: pre-flight → create project repo with history → transfer component repos → update references → repoint local + container remotes → cleanup + redeploy.
+Executed 2026-06-27 per `docs/archive/GITHUB-ORG-MIGRATION-PLAN.md`. Six phases: pre-flight → create project repo with history → transfer component repos → update references → repoint local + container remotes → cleanup + redeploy.
 
 ## References
 
-- Migration plan: [GITHUB-ORG-MIGRATION-PLAN.md](../planning/GITHUB-ORG-MIGRATION-PLAN.md)
+- Migration plan: [GITHUB-ORG-MIGRATION-PLAN.md](../archive/GITHUB-ORG-MIGRATION-PLAN.md)
 - Related: ADR-001 (component breakdown), ADR-004 (repo naming), ADR-036 (workspace layout)
 - Org: https://github.com/clearskies-wx

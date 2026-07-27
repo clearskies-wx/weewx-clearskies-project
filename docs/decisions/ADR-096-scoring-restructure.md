@@ -103,4 +103,4 @@ Per SURF-ZONE-MODEL-BRIEF and SURF-1D-IMPLEMENTATION-PLAN:
 - Related: ADR-093 (SWAN replaces NWPS), ADR-095 (SWAN model corrections)
 - Amends: ADR-094 windSource field values: `"hrrr_trushore"` → `"hrrr"`, `"gfs_trushore"` → `"gfs"`
 - Precedent: KEWL Mermaid messiness rating (directional spread at 30% of a sub-score)
-- Plan: `docs/planning/SWAN-CORRECTIONS-PLAN.md` Phases 1, 4, `docs/planning/SURF-1D-IMPLEMENTATION-PLAN.md`
+- Plan: `docs/archive/SWAN-CORRECTIONS-PLAN.md` Phases 1, 4, `docs/archive/SURF-1D-IMPLEMENTATION-PLAN.md`

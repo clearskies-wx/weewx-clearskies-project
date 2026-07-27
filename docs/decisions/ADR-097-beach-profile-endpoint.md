@@ -118,4 +118,4 @@ Per SURF-ZONE-MODEL-BRIEF and SURF-1D-IMPLEMENTATION-PLAN:
 - Related: ADR-095 (cross-shore transect output), ADR-093 (SWAN replaces NWPS)
 - Research: `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md`
 - SWAN user manual: §4.6.1 CURVE, §4.6.2 TABLE (QB, DISSURF quantities)
-- Plan: `docs/planning/SWAN-CORRECTIONS-PLAN.md` Phases 5–6, `docs/planning/SURF-1D-IMPLEMENTATION-PLAN.md`
+- Plan: `docs/archive/SWAN-CORRECTIONS-PLAN.md` Phases 5–6, `docs/archive/SURF-1D-IMPLEMENTATION-PLAN.md`

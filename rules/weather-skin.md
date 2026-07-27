@@ -57,7 +57,7 @@ When evaluating replacement skins, document findings against these criteria:
 - **Maintenance burden:** How often does the upstream release updates? Active community?
 - **Integration:** Does it support Belchertown's current features (gauges, radar, alerts)?
 
-Save evaluation results in `docs/planning/WEATHER-EVALUATION-PLAN.md` with a recommendation summary.
+Save evaluation results in `docs/archive/WEATHER-EVALUATION-PLAN.md` with a recommendation summary.
 
 ## Design-quality bar — weewx ecosystem skins are out
 

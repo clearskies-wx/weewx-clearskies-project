@@ -117,4 +117,4 @@ Dashboard repo:
 - Supersedes: [ADR-003](../archive/decisions/ADR-003-license.md) (License = GPL v3)
 - Related: [ADR-006](../archive/decisions/ADR-006-compliance-model.md) (compliance model — unaffected)
 - PolyForm Noncommercial 1.0.0: https://polyformproject.org/licenses/noncommercial/1.0.0
-- Plan: [DOCS-HELP-LICENSING-PLAN.md](../planning/DOCS-HELP-LICENSING-PLAN.md), Phase 0
+- Plan: [DOCS-HELP-LICENSING-PLAN.md](../archive/DOCS-HELP-LICENSING-PLAN.md), Phase 0

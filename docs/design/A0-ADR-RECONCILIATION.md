@@ -1,7 +1,7 @@
 # A0 — ADR Reconciliation Report (UI-impacting ADRs vs as-built code)
 
 **Status:** Synthesis for user review (2026-05-29). Produced by Track A0 of the UI redesign
-([UI-REDESIGN-PLAN.md](../planning/UI-REDESIGN-PLAN.md)). **No ADR edits have been applied yet** —
+([UI-REDESIGN-PLAN.md](../archive/UI-REDESIGN-PLAN.md)). **No ADR edits have been applied yet** —
 this report presents proposed edits for user approval. On approval, edits land as `Proposed`; the user
 re-approves → `Accepted`, per [rules/clearskies-process.md](../../rules/clearskies-process.md).
 

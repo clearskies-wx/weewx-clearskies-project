@@ -108,7 +108,7 @@ In `/etc/weewx/weewx.conf` (or skin.conf):
 | **Responsive** | https://github.com/weewx/weewx-responsive | Older but lightweight |
 | **Saratoga** | https://github.com/ktownsend-personal/Saratoga-Weather | Complex, feature-rich, requires PHP |
 
-**Evaluation task:** Clone each candidate, test locally, document findings in `docs/planning/WEATHER-EVALUATION-PLAN.md`.
+**Evaluation task:** Clone each candidate, test locally, document findings in `docs/archive/WEATHER-EVALUATION-PLAN.md`.
 
 ## MQTT real-time data chain
 

@@ -146,6 +146,6 @@ If we ever pull `weewx.conf` into the repo for diff purposes, these must be reda
 ## See also
 
 - [REPO-VS-SERVER-DIFF-2026-04-29.md](REPO-VS-SERVER-DIFF-2026-04-29.md) — file-by-file comparison
-- [../planning/WEATHER-EVALUATION-PLAN.md](../planning/WEATHER-EVALUATION-PLAN.md) — phased plan
+- [../archive/WEATHER-EVALUATION-PLAN.md](../archive/WEATHER-EVALUATION-PLAN.md) — phased plan
 - [../../reference/weather-skin.md](../../reference/weather-skin.md) — facts file (corrected from this inventory)
 - [../../reference/CREDENTIALS.md](../../reference/CREDENTIALS.md) — credential pointers (gitignored)

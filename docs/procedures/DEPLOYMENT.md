@@ -83,9 +83,9 @@ Back on DILBERT, update docs:
 # Add entry: "| 2026-04-29 | Feature | weewx-belchertown | Deploy updated skin — [feature description]"
 
 # Mark task complete in planning doc
-# Update docs/planning/WEATHER-EVALUATION-PLAN.md
+# Update docs/archive/WEATHER-EVALUATION-PLAN.md
 
-git add docs/CHANGELOG.md docs/planning/WEATHER-EVALUATION-PLAN.md
+git add docs/CHANGELOG.md docs/archive/WEATHER-EVALUATION-PLAN.md
 git commit -m "Deploy skin update: <description>"
 git push origin main
 ```

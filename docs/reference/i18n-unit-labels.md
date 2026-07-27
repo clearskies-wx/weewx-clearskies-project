@@ -1,7 +1,7 @@
 # I18N Unit Labels — Verified Reference Table
 
 **Verified:** 2026-07-02 against national meteorological service websites.  
-**Governing plan:** `docs/planning/I18N-COMPLIANCE-PLAN.md` §1C  
+**Governing plan:** `docs/archive/I18N-COMPLIANCE-PLAN.md` §1C  
 **Used by:** API locale files (`weewx_clearskies_api/locales/*.json`), dashboard `formatUnit()` custom label fallbacks
 
 ---

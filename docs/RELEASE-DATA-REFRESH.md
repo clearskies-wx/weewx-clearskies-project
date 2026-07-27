@@ -82,7 +82,7 @@ issues dated updates to check against. This one does not: the Zenodo record (151
 *"Vyperdatum grids (NWLD), Early release, Lacks version tag"* — there is no version to compare the installed
 copy against. The refresh check is therefore not "is a newer version available" but **"has NOAA published a
 version-tagged release built against PROJ database layout 1.4 yet"** — because that is what would let the
-`pyproj==3.7.0` pin (`docs/planning/MARINE-SEP-CONCERNS.md` C-96b) be lifted. Until such a
+`pyproj==3.7.0` pin (`docs/archive/MARINE-SEP-CONCERNS.md` C-96b) be lifted. Until such a
 release exists, the grid set and the pin are a matched pair: bumping `pyproj` without a layout-1.4 grid set
 reintroduces a silent 0.0 m ballpark conversion, not a compatibility error.
 

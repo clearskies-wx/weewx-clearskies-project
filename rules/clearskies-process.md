@@ -141,7 +141,7 @@ Use the Nygard format. Template at `docs/decisions/_TEMPLATE.md`. Required: Stat
 **What the reading list looks like (example):**
 ```
 READING LIST (read these files BEFORE writing any code):
-1. docs/planning/MARINE-FIXIT-PLAN.md — read Phase 5, tasks T5.1 and T5.2 (your assigned tasks). These contain the exact card specs, data sources, acceptance criteria, and design references.
+1. docs/archive/MARINE-FIXIT-PLAN.md — read Phase 5, tasks T5.1 and T5.2 (your assigned tasks). These contain the exact card specs, data sources, acceptance criteria, and design references.
 2. docs/manuals/DESIGN-MANUAL.md — read the marine cards section. Your cards must follow these patterns.
 3. docs/manuals/API-MANUAL.md §17-18 — read the surf endpoint contract and wind/water-temp data source rules.
 4. src/components/marine/tabs/SurfingTab.tsx — read the current implementation you're modifying.

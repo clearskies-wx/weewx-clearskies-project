@@ -1015,14 +1015,14 @@ Examples: "Warm and Humid, Overcast, with Light Rain" / "Pleasant, Partly Cloudy
 
 **Component order is fixed in Python, not locale-driven.** `build_weather_text()` always assembles `[temperature-comfort, sky, wind, precipitation]` in that order for every locale — the order in which `parts.append(...)` calls occur in the function body.
 
-**Not implemented (deferred):** the i18n compliance plan's research phase (§1D of `docs/planning/I18N-COMPLIANCE-PLAN.md`) called for three additional pieces that are **not** present in the current code, even though every locale file carries JSON fields that look like wiring for them:
+**Not implemented (deferred):** the i18n compliance plan's research phase (§1D of `docs/archive/I18N-COMPLIANCE-PLAN.md`) called for three additional pieces that are **not** present in the current code, even though every locale file carries JSON fields that look like wiring for them:
 
 - **Per-locale composer dispatch.** `ja.json`, `zh-CN.json`, and `zh-TW.json` each carry `"composition": {"pattern": "custom", "composer": "ja"}` (or `"zh"`) — but no code reads `composition.pattern` or `composition.composer`, and there is no `locales/composers/` module. The generic `_compose()` above runs unconditionally for every locale.
 - **CJK compound-expression composition.** JMA-style forms (時々/一時/のち operators producing e.g. 曇り時々晴れ) and CMA-style space-separated wind-grade forms were researched but not built. Japanese and Chinese `weatherText` at runtime uses the same English-derived word order and punctuation-joining pattern as every other locale, with Japanese/Chinese words and the locale's own separator/connector substituted in — this produces grammatically acceptable but not JMA/CMA-native phrasing.
 - **Locale-driven component order.** Locale files (e.g. `ru.json`, `de.json`) carry a `composition.order` array (`["sky", "temperature", "wind", "precipitation"]` for German and Russian, reflecting those languages' natural word order) — but `build_weather_text()` never reads it; the Python-side order is fixed for all locales.
 - **Case-inflected composition for Russian.** `i18n.t_case()` exists and correctly resolves grammatical-case dicts (nominative/instrumental/genitive), but `_compose()` calls only `t()` — the composition path does not invoke `t_case()`, so Russian `weatherText` uses the nominative form throughout rather than switching to instrumental/genitive forms for "with X" / "without X" constructions.
 
-None of this is a defect in what shipped — the template approach produces correct, readable `weatherText` in all 13 locales. It is a scope reduction from the plan's research relative to native-speaker phrasing for `ja`/`zh-CN`/`zh-TW`/`ru`. Tracked as a deferred item in `docs/planning/I18N-COMPLIANCE-PLAN.md`.
+None of this is a defect in what shipped — the template approach produces correct, readable `weatherText` in all 13 locales. It is a scope reduction from the plan's research relative to native-speaker phrasing for `ja`/`zh-CN`/`zh-TW`/`ru`. Tracked as a deferred item in `docs/archive/I18N-COMPLIANCE-PLAN.md`.
 
 ### Startup
 

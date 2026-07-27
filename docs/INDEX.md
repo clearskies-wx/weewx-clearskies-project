@@ -7,13 +7,13 @@ This repo started as a Belchertown skin evaluation and pivoted to the Clear Skie
 - [ARCHITECTURE.md](ARCHITECTURE.md) — **System architecture: services, containers, endpoints, routing, config** (read before any architecture work)
 - [CLAUDE.md](../CLAUDE.md) — Operating rules & domain routing
 - [CHANGELOG.md](CHANGELOG.md) — Version history & changes
-- [planning/CLEAR-SKIES-PLAN.md](planning/CLEAR-SKIES-PLAN.md) — Active project plan (Phase 2 in progress; Phase 1 closed 2026-05-05; Phase 2 task 1 closed 2026-05-06)
+- [archive/CLEAR-SKIES-PLAN.md](archive/CLEAR-SKIES-PLAN.md) — Active project plan (Phase 2 in progress; Phase 1 closed 2026-05-05; Phase 2 task 1 closed 2026-05-06)
 - [decisions/INDEX.md](decisions/INDEX.md) — All 40 Architecture Decision Records (Accepted)
 
 ## Planning
 
-- **[planning/CLEAR-SKIES-PLAN.md](planning/CLEAR-SKIES-PLAN.md)** — phase tracker for the Clear Skies build (api / realtime / dashboard / stack repos). Plan body is an index — decision content lives in ADRs per [rules/clearskies-process.md](../rules/clearskies-process.md).
-- **[planning/briefs/CONFIGURABLE-CHARTS-PLAN.md](planning/briefs/CONFIGURABLE-CHARTS-PLAN.md)** — operator-configurable charts system (charts.conf, wind rose, custom SQL, weather range, LTTB, export, migration tool).
+- **[archive/CLEAR-SKIES-PLAN.md](archive/CLEAR-SKIES-PLAN.md)** — phase tracker for the Clear Skies build (api / realtime / dashboard / stack repos). Plan body is an index — decision content lives in ADRs per [rules/clearskies-process.md](../rules/clearskies-process.md).
+- **[archive/CONFIGURABLE-CHARTS-PLAN.md](archive/CONFIGURABLE-CHARTS-PLAN.md)** — operator-configurable charts system (charts.conf, wind rose, custom SQL, weather range, LTTB, export, migration tool).
 - ~~planning/briefs/LAYER-CORRECTION-PLAN.md~~ → archived (see below)
 
 ## Decisions

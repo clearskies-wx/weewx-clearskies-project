@@ -91,4 +91,4 @@ Multi-provider cards (one card showing data from two providers): avoid. If unavo
 
 - Related: ADR-064 (card plugin contract), ADR-006 (compliance model), ADR-010 (canonical data model)
 - Research: [PROVIDER-ATTRIBUTION-BRIEF.md](../briefs/PROVIDER-ATTRIBUTION-BRIEF.md)
-- Execution: [PROVIDER-ATTRIBUTION-PLAN.md](../planning/PROVIDER-ATTRIBUTION-PLAN.md)
+- Execution: [PROVIDER-ATTRIBUTION-PLAN.md](../archive/PROVIDER-ATTRIBUTION-PLAN.md)

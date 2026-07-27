@@ -1,7 +1,7 @@
 # C0 — Page Inventory (Track C work list)
 
 **Status:** Research note (not a decision record). Produced 2026-05-28 for the UI redesign roadmap
-([UI-REDESIGN-PLAN.md](../planning/UI-REDESIGN-PLAN.md) item **C0**). Inventory only — **no card design**.
+([UI-REDESIGN-PLAN.md](../archive/UI-REDESIGN-PLAN.md) item **C0**). Inventory only — **no card design**.
 **This document defines the full Track C work list.** Each page below becomes a per-component
 mini-cycle (prior-decision check → data inventory → composition → mockup → ADR → exec plan).
 
@@ -31,7 +31,7 @@ Phase 3 design** — so *layout/treatment is the open part, the card inventory m
 ## Scope — UI-only, on a proven foundation
 
 **The data flow and overall architecture are settled and proven.** Phases 1–4 + the Config-UI/deploy
-phase are complete ([CLEAR-SKIES-PLAN.md](../planning/CLEAR-SKIES-PLAN.md)); the API, the realtime
+phase are complete ([CLEAR-SKIES-PLAN.md](../archive/CLEAR-SKIES-PLAN.md)); the API, the realtime
 API, the provider modules, unit conversion (ADR-042), SSE live updates, the `/api/v1/*` endpoint
 surface, and the `/pages` config model all exist and passed a phase-boundary ADR-compliance sweep
 (26 gaps, all resolved 2026-05-22). **This redesign is a presentation-layer effort only.**
@@ -127,7 +127,7 @@ corrections **edit in place → status flips to Proposed → user re-approves** 
 distinct* decision gets a superseding ADR).
 
 This is owned by **Track A0 — the ADR reconciliation gate** (see
-[UI-REDESIGN-PLAN.md](../planning/UI-REDESIGN-PLAN.md)): a foundational task that **precedes A1 and
+[UI-REDESIGN-PLAN.md](../archive/UI-REDESIGN-PLAN.md)): a foundational task that **precedes A1 and
 all component design**. A0 fixes the known divergences below *and* verifies the wider UI-impacting ADR
 set (013/014/015/016/020/021/022/023/026/040/041/042/044) is accurate vs code. Each per-component
 cycle then re-checks its own component's ADR as step 0 (the prior-decision check), but the systemic
@@ -492,7 +492,7 @@ For each page: **B** = current Belchertown · **CS** = existing Clear Skies buil
 
 Belchertown features with no settled Clear Skies home. Each is routed per your instruction: **UI-only
 items stay in this redesign's work list; anything not UI-specific moves to the master plan**
-([CLEAR-SKIES-PLAN.md](../planning/CLEAR-SKIES-PLAN.md)), and items the plan already tracks are noted
+([CLEAR-SKIES-PLAN.md](../archive/CLEAR-SKIES-PLAN.md)), and items the plan already tracks are noted
 so we don't duplicate.
 
 **A — stays in the UI redesign** (pure presentation; no new data/architecture):
@@ -566,7 +566,7 @@ the condition×theme background scope (NOTES vs ADR-009) is resolved in **A2**; 
 the Records structural model are resolved inside their components (C12 / C8) once A0 makes the ADRs accurate.
 Belchertown-feature decisions that are **not UI-specific** (grid engine, kiosk, marine, staleness
 mechanism, MTD aggregate data, home-page content slots) have been **moved to
-[CLEAR-SKIES-PLAN.md](../planning/CLEAR-SKIES-PLAN.md)** so they are not lost in the UI track.
+[CLEAR-SKIES-PLAN.md](../archive/CLEAR-SKIES-PLAN.md)** so they are not lost in the UI track.
 
 ---
 

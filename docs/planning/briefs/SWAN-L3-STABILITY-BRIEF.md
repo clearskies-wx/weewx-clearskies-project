@@ -419,7 +419,7 @@ the §5.5 degradation ladder with explicit ERROR logging and last-good fallback.
    pypdf via `uv tool run --from pypdf` on weather-dev (PDF page ≈ printed page + 8).
 4. SWAN Technical Manual (`docs/reference/swan-technical-manual.pdf`): §2.6 (setup
    physics, p. 57), Ch. 5 (2D setup implementation + boundary conditions, pp. 119-121).
-5. `docs/planning/SWAN-FIXES-PLAN.md` — Phase 14 REGRESSION PREVENTION RULES 1-5 (binding).
+5. `docs/archive/SWAN-FIXES-PLAN.md` — Phase 14 REGRESSION PREVENTION RULES 1-5 (binding).
 6. Code: `swan_formats.py:852-860` (physics block), `:994`/`:1011` (TABLE specs);
    `swan_runner.py:1722-1751` (OMP env), `:1640-1648` (hotstart init), `:1447-1448` and
    `:1790-1801` (hotstart save); `providers/nearshore/swan.py` (orchestration);

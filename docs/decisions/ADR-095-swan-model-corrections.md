@@ -149,4 +149,4 @@ covering the original four decisions and both amendments.
 - Research: `docs/planning/briefs/WAVE-BREAKING-CONVERSION-BRIEF.md` §4, `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md`
 - SWAN user manual: §4.5.2 (INPGRID WLEVEL/CURRENT), §4.5.4 (OBSTACLE), §4.6.1 (CURVE), §4.6.2 (TABLE/SPECOUT)
 - SWAN technical manual: Battjes-Janssen breaking, triad interactions, obstacle formulas
-- Plan: `docs/planning/SWAN-CORRECTIONS-PLAN.md` Phases 2–3, `docs/planning/SURF-1D-IMPLEMENTATION-PLAN.md`
+- Plan: `docs/archive/SWAN-CORRECTIONS-PLAN.md` Phases 2–3, `docs/archive/SURF-1D-IMPLEMENTATION-PLAN.md`

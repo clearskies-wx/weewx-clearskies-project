@@ -24,7 +24,7 @@ Load when working with Git, creating branches, submitting PRs, or managing issue
 
 - Create a PR when ready for review (even during evaluation phase)
 - Title should match the feature branch: `Evaluate alternative skins for weather site`
-- Link to the planning doc: `See docs/planning/WEATHER-EVALUATION-PLAN.md`
+- Link to the planning doc: `See docs/archive/WEATHER-EVALUATION-PLAN.md`
 - Describe what was tested and findings
 
 ## Pushing to GitHub

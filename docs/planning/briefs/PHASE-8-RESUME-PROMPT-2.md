@@ -8,7 +8,7 @@ Current as of meta `60e96ea` and marine `c97dd73`.
 ---
 
 You are the coordinator for **Phase 8 of `docs/planning/MARINE-SERVICE-SEPARATION-PLAN.md`**, resuming
-partly-executed work. The plan is mandatory. Log concerns in `docs/planning/MARINE-SEP-CONCERNS.md`.
+partly-executed work. The plan is mandatory. Log concerns in `docs/archive/MARINE-SEP-CONCERNS.md`.
 
 **Read, in this order, before acting:**
 
@@ -19,7 +19,7 @@ partly-executed work. The plan is mandatory. Log concerns in `docs/planning/MARI
    reality, never against the model's own output".
 5. `rules/coding.md` §1 — "A model runs on all its inputs or it does not run."
 6. The plan's **T8.11** section (new) and the T8.10 subtasks.
-7. `docs/planning/MARINE-SEP-CONCERNS.md`, last ~200 lines (C-88 → C-93).
+7. `docs/archive/MARINE-SEP-CONCERNS.md`, last ~200 lines (C-88 → C-93).
 
 **Verify state yourself** with `git status -sb` in every repo and against the live hosts before trusting any
 summary, including this one.

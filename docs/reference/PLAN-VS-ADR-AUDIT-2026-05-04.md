@@ -2,7 +2,7 @@
 
 **Trigger:** during the Phase 1 spike, ADR-002 was found to drop Tremor and ECharts in favor of shadcn + Recharts, but the plan body's "Tech stack decisions" table still listed Tremor + ECharts as locked. The spike was built against the stale plan content. User direction: "check the plan body against the ADRs and make sure they are congruent. It sounds like you were making decisions and not properly documenting them in the main plan document."
 
-This file captures every drift found in `docs/planning/CLEAR-SKIES-PLAN.md` against the 39 Accepted ADRs in `docs/decisions/INDEX.md`, and the edits applied to fix them. This is the audit artifact, not a permanent decision record — the plan and the ADRs are the durable surfaces.
+This file captures every drift found in `docs/archive/CLEAR-SKIES-PLAN.md` against the 39 Accepted ADRs in `docs/decisions/INDEX.md`, and the edits applied to fix them. This is the audit artifact, not a permanent decision record — the plan and the ADRs are the durable surfaces.
 
 ## Drift findings
 
@@ -65,7 +65,7 @@ The rule "Plan stays an index, not the content" already exists in `rules/clearsk
 
 ## Edits applied
 
-1. `docs/planning/CLEAR-SKIES-PLAN.md`:
+1. `docs/archive/CLEAR-SKIES-PLAN.md`:
    - Architecture diagram dashboard box: dropped Tremor + ECharts; added Recharts.
    - Components table: full `weewx-clearskies-*` names; row 3 reflects ADR-002 stack.
    - Tech stack decisions table: every row matches ADR-002 verbatim; header note revised; paho-mqtt row added.

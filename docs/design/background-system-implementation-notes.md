@@ -81,4 +81,4 @@ Downscale + compress every shipped background and overlay to **≤ 300 KB each, 
 WebP** (WebP keeps alpha, so the frost overlay needs no separate PNG). The operator's transparent PNG
 is 16 MB at 4032×3024 — this is the single biggest perf risk (the background is typically the
 largest-contentful-paint element). Worst case per view ≈ 600 KB (one background + one overlay). Build
-task in the execution plan ([D3](../planning/briefs/A2-background-system.md)), not done yet.
+task in the execution plan ([D3](../archive/A2-background-system.md)), not done yet.

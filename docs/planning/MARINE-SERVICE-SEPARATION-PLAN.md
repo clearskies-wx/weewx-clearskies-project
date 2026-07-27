@@ -377,7 +377,7 @@ is not yet completely implemented and that comes first.
   `briefs/SURF-PUBLISH-RESULTS-ONLY.md` §6. The `swelltrack` publication fix must go first;
   deploying the API's recompute deletion before it would leave every forecast hour reporting
   `modelStatus: "unavailable"`.
-- **Concerns register:** `docs/planning/MARINE-SEP-CONCERNS.md` carries every item the
+- **Concerns register:** `docs/archive/MARINE-SEP-CONCERNS.md` carries every item the
   coordinator flagged during Phases 5–8, with recorded decisions for the blocking ones.
 
 **Superseded snapshot (kept only to show how far it had drifted):** weewx API at `0d87b28`,
@@ -1211,7 +1211,7 @@ Code state: the *conditional-L3* half IS implemented — `l3_enabled`
 2.5 km fallback.
 
 **Do (research and write-up only — do not modify any source file):**
-1. Read `docs/planning/SURF-1D-IMPLEMENTATION-PLAN.md` (and its archived form if
+1. Read `docs/archive/SURF-1D-IMPLEMENTATION-PLAN.md` (and its archived form if
    it has moved) in full, plus `SURF-ZONE-MODEL-BRIEF.md`,
    `SWAN-L3-STABILITY-BRIEF.md`, `SWAN-NESTING-RESEARCH-BRIEF.md`,
    `1D-MODEL-BENCHMARK-BRIEF.md`, and ADR-093 / ADR-095 / ADR-096 / ADR-097.

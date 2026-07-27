@@ -49,7 +49,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### 2026-04-29 — Project pivot to Clear Skies
 
-- **Pivoted** from "evaluate alternative weewx skins" to "build new modern stack from scratch." Driver: every weewx-ecosystem skin (Belchertown, Seasons, Beautiful Dashboard, Smartphone, Weather Eye) read as visually amateurish; lateral move would not solve the redesign goal. Predecessor plan archived: [archive/WEATHER-EVALUATION-PLAN.md](archive/WEATHER-EVALUATION-PLAN.md). New plan: [planning/CLEAR-SKIES-PLAN.md](planning/CLEAR-SKIES-PLAN.md).
+- **Pivoted** from "evaluate alternative weewx skins" to "build new modern stack from scratch." Driver: every weewx-ecosystem skin (Belchertown, Seasons, Beautiful Dashboard, Smartphone, Weather Eye) read as visually amateurish; lateral move would not solve the redesign goal. Predecessor plan archived: [archive/WEATHER-EVALUATION-PLAN.md](archive/WEATHER-EVALUATION-PLAN.md). New plan: [archive/CLEAR-SKIES-PLAN.md](archive/CLEAR-SKIES-PLAN.md).
 - Five-component breakdown adopted; project name "Clear Skies" verified clear in weewx ecosystem; license set to GPL v3 to mirror weewx.
 
 ### 2026-04-29 — AQI centralization (complete)

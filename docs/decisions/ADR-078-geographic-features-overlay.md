@@ -79,7 +79,7 @@ The current approach uses a CSS blend-mode hack: CartoDB `dark_nolabels` tiles a
 
 ## References
 
-- Plan: `docs/planning/PMTILES-GEOGRAPHIC-FEATURES-PLAN.md`
+- Plan: `docs/archive/PMTILES-GEOGRAPHIC-FEATURES-PLAN.md`
 - Reference: `docs/reference/pmtiles-protomaps-reference.md`
 - Protomaps docs: https://docs.protomaps.com/pmtiles/
 - protomaps-leaflet: https://github.com/protomaps/protomaps-leaflet

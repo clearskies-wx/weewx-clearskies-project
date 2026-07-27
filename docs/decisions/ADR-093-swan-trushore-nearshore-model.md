@@ -241,4 +241,4 @@ spot. The reason to change the offshore edge no longer exists, so it does not ch
 - Supersedes: ADR-084 (NWPS as primary nearshore source with supplementation)
 - Related: ADR-094 (HRRR forecast wind source for surf scoring)
 - Research: `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md`, `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md`, `docs/planning/briefs/1D-MODEL-BENCHMARK-BRIEF.md`
-- Plan: `docs/planning/SWAN-TRUSHORE-PLAN.md`, `docs/planning/SURF-1D-IMPLEMENTATION-PLAN.md`, `docs/planning/SURF-MODEL-FIX-PLAN.md`
+- Plan: `docs/archive/SWAN-TRUSHORE-PLAN.md`, `docs/archive/SURF-1D-IMPLEMENTATION-PLAN.md`, `docs/archive/SURF-MODEL-FIX-PLAN.md`

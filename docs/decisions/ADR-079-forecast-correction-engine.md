@@ -82,5 +82,5 @@ Add a Random Forest-based forecast correction engine. It collects forecast-obser
 
 ## References
 
-- Execution plan: `docs/planning/FORECAST-CORRECTION-PLAN.md`
+- Execution plan: `docs/archive/FORECAST-CORRECTION-PLAN.md`
 - Related: ADR-007 (forecast providers), ADR-017 (caching), ADR-038 (setup endpoints)
