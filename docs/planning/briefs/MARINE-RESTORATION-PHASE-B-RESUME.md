@@ -56,7 +56,7 @@ sees the implementer's own output. Do not report a guard as a live check.
 
 | Repo | Branch | HEAD | State |
 |---|---|---|---|
-| meta (`c:\CODE\weather-belchertown`) | `main` | *Phase A commit — see `git log -1`* | clean at handoff |
+| meta (`c:\CODE\weather-belchertown`) | `main` | **`7dfcd5d`** "governance: collapse duplicated rules, restrict agent profiles (Phase A)" | clean at handoff, **not pushed** |
 | marine (`repos/weewx-clearskies-marine`) | `main` | `4276806` | clean, **ahead of `origin/main` by 12** |
 
 **The twelve unpushed marine commits**, oldest first — these are the fixes Deploy 1 carries and
