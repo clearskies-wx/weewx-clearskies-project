@@ -5245,7 +5245,7 @@ here (outside this entry's scope):**
 
 ---
 
-## C-106 — NCEI Great Lakes Bathymetry (~90 m, native LWD) is not implemented; the codebase runs USGS Rohweder 2025 (~3 m, NAVD88) at every level (record only, no action)
+## C-106 — RULED: USGS Rohweder 2025 (~3 m, NAVD88) is the Great Lakes bathymetry source at all three levels; NCEI Great Lakes Bathymetry (~90 m, native LWD) is rejected (coordinator, 2026-07-27, under operator instruction not to leave the question open)
 
 **Found 2026-07-27**, by an adversarial audit of C-103 and ADR-098's "Great Lakes datum branch" text against
 the actual marine code. Both documents named **NCEI Great Lakes Bathymetry** as the L1/L2 source and stated it
@@ -5270,18 +5270,61 @@ uses. Recorded as a process note, not a code defect: the datum handling downstre
 conversion, verified per the ADR-098 amendment) was built against the DEM the code actually calls, so it is
 correct regardless of which product the register described.
 
-**Open option, not decided here.** NCEI Great Lakes Bathymetry remains **unimplemented** — it is not fetched,
-cached, or referenced by any code path found. It is recorded as a live option, with the tradeoff stated
-neutrally:
+**RULED 2026-07-27 — coordinator, under the operator's instruction that this question could not be left open.**
+The Great Lakes bathymetry source, at all three levels, is the already-implemented **USGS Rohweder 2025**
+ScienceBase DEM. **NCEI Great Lakes Bathymetry is rejected.** Reasoning:
 
-- **NCEI Great Lakes Bathymetry** (~90 m nominal, 3 arc-second): natively referenced to each lake's own low
-  water datum, so a switch to it would need **no** datum conversion — but see C-101: the underlying compilation
-  is 1:250,000 scale with a 5 m contour interval, so the 90 m grid spacing does not carry 90 m of real
-  bathymetric information.
-- **USGS Rohweder 2025 / NOAA OCM Coastal DEM lineage** (~3 m, implemented today): far higher nominal
-  resolution, but NAVD88-referenced, so it requires the `NAVD88 → LWD_IGLD85` conversion this ADR-098 branch
-  performs.
+1. **L3 is decisive.** L3 targets 10 m resolution. NCEI's 3 arc-second (~90 m) nominal grid is compiled from
+   1:250,000-scale source with a 5 m contour interval (C-101) — its real information content is far coarser
+   than 90 m, and it cannot serve L3 at anything close to the target resolution. The USGS DEM, at ~3 m, can.
+2. **A split source would introduce a seam.** NCEI for L1/L2 with USGS for L3 would mean different levels of
+   one domain deriving from different surveys — exactly the class of inconsistency T8.11 exists to eliminate.
+   One source across all three levels is the coherent choice.
+3. **NCEI's only advantage is now worth nothing.** Its appeal was needing no datum conversion. That conversion
+   is implemented, automatic, and empirically verified: `NAVD88 → LWD_IGLD85` (`NOAA:1759`) returns -176.1036 m
+   at Whiting and -173.4996 m at Lake Erie, matching NOAA's published Low Water Datum plane elevations (see
+   ADR-098's amendment for the full table). Avoiding a conversion that demonstrably works is not a benefit.
+4. **It is already implemented and has been audited.** Choosing USGS Rohweder 2025 is the no-change outcome;
+   choosing NCEI would mean adding a new data source (architectural trigger 7) to obtain a strictly worse grid.
 
-Which product the Great Lakes branch should use is an operator call, not recorded as decided by this entry.
+**Residual tradeoff, stated rather than hidden.** The USGS DEM path depends on the VDatum separation grids
+being installed and the `NAVD88 → LWD_IGLD85` conversion succeeding — a Great Lakes domain fails closed if the
+grids are missing (ADR-098's "no silent fallbacks" clause). A native-LWD source would not have that failure
+mode. This is an accepted cost of the decision, not an oversight, and it is the same posture the ocean/tidal
+path already carries under this same ADR.
+
+**Disposition: DECIDED. USGS Rohweder 2025 is the Great Lakes bathymetry source at L1/L2/L3. NCEI Great Lakes
+Bathymetry is not implemented and will not be added for this purpose.**
+
+---
+
+## C-107 — record only: a silently-failed `Write` let a stale commit-message file from another agent land on commit `62100ec`
+
+**Found 2026-07-27**, self-reported by the agent correcting C-103/ADR-098 (this entry). Before committing the
+Great Lakes source correction, a `Write` tool call to a commit-message file (`commit-msg.txt` in the shared
+scratchpad) returned an error ("File has not been read yet") and was treated as failed. It was not fully
+failed: an earlier, unrelated agent's message file already existed at that same path (a leftover from prior
+C-99/C-104/C-105 work), and the `git commit -F` that followed silently read that stale file instead of the
+intended one. The result, `62100ec`, carried a commit message describing C-99/C-104/C-105 outcomes while its
+actual diff was the C-103/ADR-098 Great Lakes correction — file content correct, message wrong.
+
+**Caught, not prevented.** The mismatch was found only because the agent checked `git log -1` after
+committing, out of habit rather than a required step. Nothing in the toolchain flags a commit whose message
+file was stale. It was fixed with `git commit --amend` on the same commit (not yet built on by any other
+agent) to `bad8c6d`.
+
+**Why this recurs under concurrent agents.** Multiple agents share one scratchpad directory in this session.
+A generic filename (`commit-msg.txt`, `commit_msg.txt`) is exactly the kind of name two independently-dispatched
+agents will both reach for, and a `Write` failure that doesn't visibly clear the target leaves the previous
+occupant's content live for whoever commits next.
+
+**Recommended mitigation, not yet applied to tooling:** commit-message scratch files should be named uniquely
+per agent (e.g. include the agent's own name or task id in the filename, as this entry's actual fix commit did
+with `gl-datum-correction-commit-msg.txt`), and a commit made via `git commit -F` should be verified with
+`git log -1 --format='%s%n%n%b'` immediately after, before reporting the commit as done.
+
+**Disposition: record only. Rule-shaped mitigation (unique per-agent scratch filenames; verify commit message
+immediately after `-F` commits) queued for routing to `rules/clearskies-process.md` at phase close, same as
+C-105's queued lessons.**
 
 **Disposition: record only. No action taken or recommended.**
