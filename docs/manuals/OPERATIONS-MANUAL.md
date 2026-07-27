@@ -597,6 +597,7 @@ The config UI serves an admin landing page at `/admin`. This is the default post
 
 | Section | Config source | What it manages |
 |---------|--------------|-----------------|
+| Status | API `GET /setup/marine/health` (live, read-only) + `ApiClient.health()` | API reachability; marine service status/reasons/per-input freshness/invariant activity |
 | Station Identity | `stack.conf [ui]` | Station name, location, altitude |
 | Database | `api.conf [database]` | DB type, connection |
 | Providers | API `/setup/current-config` (authoritative); local `api.conf` fallback | Provider selection + API keys. Radar section includes LibreWxR endpoint mode, self-hosted URL, and geographic bounds when LibreWxR is configured. |
@@ -611,6 +612,8 @@ The config UI serves an admin landing page at `/admin`. This is the default post
 | Haze Calibration | `api.conf [conditions]` + calibration storage | Per-month calibration status (12-month grid), drift warnings, active sensor display, sensor override (dropdown + manual ID), reset button, gamma override |
 
 The Haze Calibration section shows a 12-month status grid with each month's sample count, learned baseline Kcs value, and calibration status (green = fully calibrated, amber = bootstrapping, gray = no data). An overall summary shows "N of 12 months calibrated." When sensor drift or a station type change is detected, a warning banner is shown. The section also provides a "Reset Calibration" button (clears all samples and baselines, triggers re-bootstrap), a toggle to enable or disable haze detection without removing calibration data, and a gamma override input for the hygroscopic correction exponent.
+
+The Status section is read-only — it displays, it does not act. It polls every 30 seconds (HTMX) and shows whether the API is reachable (`ApiClient.health()`, a bare reachable/not-reachable signal — no API version or last-update timestamp is available to this page), and the marine service's own reported health, proxied through the API's `GET /setup/marine/health` (the admin UI never contacts the marine service directly — ARCHITECTURE.md's "add-on reached only through the API" invariant). The marine health block shows `status` (`ok`/`degraded`/`failed`, rendered with colour plus a text label so it is not colour-only), the `reasons` list shown verbatim and in full, per-input freshness (`ww3_boundary`, `wind`, `bathymetry`, `tide` — availability and age), and invariant activity (total fired, last fired time, and the names of anything that fired). An unreachable marine service renders as a status with the API's own error string, not as a stack trace. A marine service that does not yet report `reasons`/`inputs`/`invariants` (a version older than the Marine Model Restoration Plan's B3 task) shows a note that those fields are not reported by this version, rather than a blank section.
 
 Each section shows a summary of current values with an "Edit" link that loads the edit form via HTMX fragment swap.
 
