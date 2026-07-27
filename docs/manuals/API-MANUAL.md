@@ -3317,6 +3317,22 @@ The marine service exposes a health check endpoint that the API polls every 60 s
 
 The health check does not affect non-marine API functionality. Dashboard pages not using marine data are unaffected by marine service failures.
 
+**Admin status pass-through — `GET /setup/marine/health` (Marine Model Restoration Plan B4, part A).** Nothing outside the API may contact the marine service directly (ARCHITECTURE.md "The marine service is an add-on reached only through the API — INVARIANT"), so the admin status page reads marine health through this endpoint rather than calling `{marine_service_url}/health` itself. Session-authenticated (same as the other `/setup/marine/*` endpoints); the marine service's own `/health` stays auth-exempt, so no bearer token is sent upstream. Response: `{reachable: bool, error: str|null, health: object|null}`.
+
+`health` is an **opaque pass-through of the marine service's own `/health` JSON body — verbatim, unmodeled**. The API does not name, validate, or reshape any key inside it. This is deliberate: B3 is adding `reasons`/`inputs`/`invariants` alongside the existing `status`/`version`/`last_run`/`spots`/`run_in_progress` keys, and this endpoint must carry whatever the marine service publishes — including keys added after this endpoint shipped — without code changes on the API side. Do not add a nested Pydantic schema for `health`'s contents later; doing so would silently drop any key the schema doesn't enumerate, which is the same class of defect `GET /health` used to have when it hardcoded `"status": "ok"`. This is *not* the same contract as `POST /setup/providers/test-marine` (§18 setup-endpoint table), which intentionally narrows the marine health response to a pinned six-field shape for the wizard's connectivity test — the two endpoints answer different questions and must not be merged.
+
+Always HTTP 200 (session auth failure aside) — an unreachable or misbehaving marine service is itself a status the admin page renders, not an error page:
+
+| Condition | `reachable` | `error` |
+|---|---|---|
+| `marine_service_url` not configured | `false` | `"Marine service is not configured"` |
+| Connection refused | `false` | `"Connection refused"` |
+| Timeout (5 s) | `false` | `"Connection timed out"` |
+| Other transport exception | `false` | `"Connection failed: <ExceptionClassName>"` |
+| Non-2xx upstream status | `false` | `"Marine service returned HTTP <code>"` |
+| 2xx but body is not a JSON object | `false` | `"Marine service returned a non-JSON response"` |
+| 2xx with a JSON object body | `true` | `null` (`health` carries the body) |
+
 ### §19.8 Post-conversion enrichment — station observations, alerts, locale text
 
 The marine service has no weewx archive and no locale/i18n configuration (ADR-034 co-location; MARINE-SEP-CONCERNS.md C-24/C-29). Four categories of data that lived in the pre-separation API's marine endpoints are therefore restored **on the API side**, after §19.3's unit conversion and before envelope wrapping — `services/marine_enrichment.py`, called from `services/companion_proxy.py`'s `_apply_post_conversion_enrichment()` seam. This is the API's own logic operating on its own data (weewx archive, alert provider, locale files); it is not a second copy of anything the marine service does.
