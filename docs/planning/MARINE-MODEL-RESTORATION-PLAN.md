@@ -387,8 +387,7 @@ itself a status, not a stack trace.
 
 # ⛔ DEPLOY 1 — twelve fixes + observability
 
-**Requires the word "push" from the operator in chat.** `scripts/deploy-marine.sh`, then force a
-cycle.
+
 
 Carries `eb3c4b7` `1664701` `7fb75f9` `83f0205` `bed7ec7` `aa4553d` `bd8c928` `35af390` `ac6bd8a`
 `c28588b` `595ff6a` `4276806` plus B1–B3. The live system is currently running **none** of these.
@@ -637,8 +636,7 @@ separability; the fallback WARNING when `profiles_by_transect` is absent.
 
 # ⛔ DEPLOY 2 — model fixes
 
-**Requires the word "push".** Deploy, **re-push config** (C3's grid sizing is config-time), force a
-cycle.
+
 
 **Rollback:** Deploy 1's commit. Recorded before Deploy 2 begins.
 
