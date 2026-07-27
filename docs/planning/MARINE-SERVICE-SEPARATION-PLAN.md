@@ -4063,6 +4063,56 @@ amended ADR-098. Anything beyond that stops and reports.
 - **STOP condition:** if PROJ carries no usable NAVD 88 ↔ LMSL pipeline, or grids cannot be obtained offline,
   **halt T8.11 and report**. Do not substitute a constant offset — that is the defect being removed.
 
+**STATUS 2026-07-26 — DONE. The transform works offline, per cell, and validates against CO-OPS.**
+
+```
+from: EPSG:6318+EPSG:5703        (NAD83(2011) + NAVD 88 height)
+to  : NOAA:1761                  (NAD83(2011) + LMSL, National_Water_Level_Datum/nwldatum_4.7.0_20240621)
+grid: us_noaa_nos_LMSL-NAD83(2011)_2010.0_(nwldatum_4.7.0_20240621).tif
+ballpark: False        network: disabled
+
+live L2 grid (ncei_regional, NAVD88, 66 x 89 = 5874 cells):
+  separation  min -0.8284  max -0.8207  mean -0.8249  std 0.0015  spread 0.0077 m
+  per-cell varying: YES
+```
+
+Validated against an external source, not against ourselves — at CO-OPS 9410660's own coordinates
+(Los Angeles, 33.72 N 118.272 W): 0.0 m NAVD 88 → **−0.8409 m LMSL**, against CO-OPS' published
+NAVD88 4.03 ft − MSL 6.65 ft = **−0.7986 m**. **4.2 cm apart**, comfortably inside VDatum's own stated
+accuracy.
+
+**Sign, settled with data.** The register's "NAVD − MSL = 0.799 m" is a magnitude. CO-OPS' own table is in
+**feet** and signed **negative**: the NAVD 88 zero surface sits 0.799 m *below* MSL, so a bed at 0.0 m
+NAVD 88 is at −0.80 m LMSL. The transform's sign is correct. Note also that station 9410660 is **Los
+Angeles**, not HB Pier, which is worth fixing wherever the register says otherwise.
+
+**Three findings that constrain the rest of T8.11:**
+
+1. **`vyperdatum` is not needed and should not be installed.** Its whole contribution here is NOAA's
+   `proj.db` plus the grid set; the transform itself is one `pyproj` call, and `pyproj` is already a marine
+   dependency. `vyperdatum` additionally (a) imports `osgeo.gdal` at package import and **GDAL is not on
+   librewxr** — installing it would add geopandas, pyarrow, pyogrio, h5py, laspy and a GDAL build for
+   nothing — and (b) sets `PROJ_DEBUG=2`, `PROJ_NETWORK=ON` and `PROJ_DATA` as global side effects at
+   import, which is unacceptable inside a service process. **This deviates from ADR-098's named library
+   choice and needs an operator ruling** (see C-96); it is a strictly smaller dependency for the same
+   capability, but the ADR names `vyperdatum` explicitly.
+2. **`pyproj` must be ≤ 3.7.0.** NOAA's `proj.db` is database layout **1.3**; PROJ 9.5+ requires 1.4 and
+   *silently falls back to its own bundled db* — `pyproj.datadir.set_data_dir()` emits only a `UserWarning`
+   and the NOAA authority simply is not there, so NAVD 88 → LMSL resolves to a **ballpark `proj=noop`**: a
+   silent 0.0 m offset, the exact defect T8.11 exists to remove. Measured: 3.6.1 (PROJ 9.3.0) works,
+   3.7.0 (PROJ 9.4.1) works, 3.7.1 (PROJ 9.5.1) is rejected. Marine currently has **3.7.2**, so this is a
+   **downgrade of an existing shared dependency** (C-96).
+3. **Land cells have no LMSL value, and that is correct.** 311 of 5874 cells returned non-finite —
+   **all 311 are land (`Z > 0`) and zero water cells failed**. The LMSL surface is defined over water only.
+   T8.11b must decide explicitly what happens to land cells rather than letting `inf` reach SWAN; see C-97,
+   which is a shoreline-position question, not a formatting one.
+
+**Grid footprint, as required by the accept criteria:** Zenodo record 15184045, one file, **14,009,147,384
+bytes** (13.0 GiB) downloaded; **14 GB extracted, 663 files** including `proj.db` (9.5 MB) and 50 LMSL
+regional/national CRSs. ~28 GB transient if the archive is kept alongside the extraction. librewxr has
+508 GB free. Zenodo throttles and **truncated the transfer once at 9.94 GB**, so any setup-time download
+must verify the byte count and resume (`curl -C -`) rather than trusting a clean exit.
+
 #### T8.11b — Per-cell conversion in the bathymetry path
 
 - **Owner:** `clearskies-api-dev` (marine repo)

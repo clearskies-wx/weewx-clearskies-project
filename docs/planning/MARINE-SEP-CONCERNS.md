@@ -4649,3 +4649,96 @@ machinery already exists and was written for exactly this.
 
 **Disposition:** operator ruling. Blocks nothing today — Huntington's L2/L3 are served by
 `orange_county_13_navd88_2015` and never reach the mosaic.
+
+---
+
+## C-96 — T8.11a proved the transform, and in doing so proved ADR-098's library choice unnecessary and its dependency direction backwards (**needs an operator ruling, trigger 7**)
+
+**Found 2026-07-26** while executing T8.11a. Both halves are dependency decisions, so neither is taken
+unilaterally even though T8.11 authorizes trigger 7 "for that task's stated scope".
+
+### C-96a — `vyperdatum` is not needed
+
+ADR-098 selects `vyperdatum` over `coastalmodeling-vdatum` on the grounds that it "resolves grids via the
+`VYPER_GRIDS` environment variable and transforms through PROJ". Reading the installed package confirms
+that is exactly what it does — and that the part we need is not the library at all. `VYPER_GRIDS` must
+point at a directory containing **NOAA's own `proj.db`** (authority `NOAA`) plus the grid TIFFs, and the
+vertical step is then an ordinary PROJ operation between compound CRSs.
+
+Measured: the whole conversion is **one `pyproj` call**, `EPSG:6318+EPSG:5703` → `NOAA:1761`, and `pyproj`
+is already a marine dependency. Installing `vyperdatum` instead would mean:
+
+- **GDAL, which is not on librewxr.** `vyperdatum/__init__.py` does `from osgeo import gdal` at import.
+  There is no Python-wheel GDAL; it needs `libgdal-dev` plus a build, or apt's `python3-gdal` symlinked
+  into the venv. It also pulls geopandas, pyarrow (47.8 MB), pyogrio (31.8 MB), h5py, laspy, lxml,
+  networkx — machinery for transforming BAG/LAS/parquet **raster files**, which we do not do.
+- **Global side effects at import.** It sets `PROJ_DEBUG=2`, `PROJ_NETWORK=ON` and `PROJ_DATA` as
+  process-wide environment variables and calls `pp.network.set_network_enabled(True)`. Inside a long-lived
+  service that shares `pyproj` with other code, that is not acceptable — `PROJ_DEBUG=2` alone would flood
+  the logs.
+
+**Recommendation: use the NOAA grid set with plain `pyproj` and do not install `vyperdatum`.** Same
+capability, same grids, same PROJ, no new Python packages, no GDAL, no global env mutation. It is a
+strictly smaller dependency — but ADR-098 names the library explicitly, so the ADR needs amending rather
+than quietly diverging from.
+
+### C-96b — `pyproj` must be DOWNGRADED to ≤ 3.7.0, and the failure mode if it is not is silent
+
+NOAA's `proj.db` is database layout **1.3**. PROJ **9.5+ requires 1.4** and refuses to open it. The refusal
+is not loud: `pyproj.datadir.set_data_dir()` emits a `UserWarning` ("pyproj unable to set PROJ database
+path"), then **carries on with its own bundled db**. The `NOAA` authority is simply absent, and
+NAVD 88 → LMSL then resolves to a **ballpark `proj=noop`** — a silent 0.0 m offset. That is precisely the
+defect T8.11 exists to remove, arriving through the fix for it.
+
+Measured on librewxr:
+
+| pyproj | PROJ | NOAA authority loads |
+|---|---|---|
+| 3.6.1 | 9.3.0 | yes |
+| 3.7.0 | 9.4.1 | yes |
+| 3.7.1 | 9.5.1 | **no — rejected** |
+| **3.7.2 (currently installed)** | 9.5.1 | **no — rejected** |
+
+So T8.11 requires pinning marine to `pyproj<=3.7.0`, a **downgrade of a shared library** other code already
+uses. Whether that is acceptable, or whether the grid set should instead be rebuilt/migrated to layout 1.4,
+is the operator's call. Note the Zenodo record is titled *"Early release, Lacks version tag"*, so a
+layout-1.4 republication may appear later.
+
+**Whichever is chosen, T8.11b must refuse rather than proceed if the `NOAA` authority is not present or the
+resolved transform describes itself as ballpark.** A version bump must never be able to reintroduce a silent
+zero offset.
+
+---
+
+## C-97 — LMSL is undefined on land, so converting bathymetry moves the shoreline (**needs an operator ruling before T8.11b, trigger 3**)
+
+**Found 2026-07-26** in T8.11a's own output, measured rather than anticipated. Converting the live L2 grid
+NAVD 88 → LMSL returned non-finite values for **311 of 5874 cells — every one of them a land cell
+(`Z > 0`), and not a single water cell**. That is correct behaviour: NOAA's LMSL surface is defined over
+water, and mean sea level has no meaning inland.
+
+**But the shift is not cosmetic at the waterline.** The separation here is −0.82 m, so every cell whose bed
+sits between 0 and 0.82 m above NAVD 88 changes side: land in NAVD 88, below the LMSL zero after
+conversion. SWAN decides wet or dry from BOTTOM plus WLEVEL, so this **moves the modelled shoreline**, and
+on a 1:50 beach 0.82 m of vertical is ~40 m of horizontal — in the surf zone, the part of the domain the
+whole model exists to resolve.
+
+**Three ways to handle the land cells, and they do not agree:**
+
+1. **Leave land cells on NAVD 88.** Cheapest, and wrong in a specific way: the grid then carries two datums
+   with the seam running exactly along the waterline, which is the mixing this task exists to eliminate.
+2. **Extend the separation onto land** (nearest-water value, or extrapolate the surface). Keeps one datum
+   across the grid and puts the shoreline where LMSL says it is. The separation varies by only 7.7 mm
+   across this whole L2 box, so extrapolating a few hundred metres inland is numerically benign here —
+   though that is a Huntington measurement, not a general guarantee.
+3. **Declare land cells to SWAN as `EXCEPTION`**, the mechanism C-90 already established for unknown
+   depths. Honest, but it changes what the model is told about the beach itself.
+
+**Recommendation: option 2.** It is the only one that leaves the whole grid on one datum, and the shoreline
+it produces is the physically correct one for a model whose water level is now referenced to LMSL.
+
+**Why this is not a coordinator call.** Where the model's land/water boundary sits is trigger 3. It also
+interacts with wave setup and runup, which are computed relative to the still-water line.
+
+**Disposition:** operator ruling, and it **blocks T8.11b** — the conversion cannot be written without
+deciding what happens to the 311 cells.
