@@ -4734,8 +4734,24 @@ whole model exists to resolve.
 3. **Declare land cells to SWAN as `EXCEPTION`**, the mechanism C-90 already established for unknown
    depths. Honest, but it changes what the model is told about the beach itself.
 
+**How many cells actually change side — measured on the live Huntington caches, not estimated:**
+
+| grid | cells | land now | flip land → water at −0.8249 m |
+|---|---|---|---|
+| L2 (100 m) | 5,874 | 546 | **11** (0.19% of grid, 2.0% of its land) |
+| L3 cluster `0f38a4a3` (10 m) | 41,340 | 26,688 | **1,179** (2.85% of grid) |
+| L3 `a77270dd` (10 m, stale cluster) | 51,861 | 496 | 177 |
+| L3 `f3b62a2e` (10 m, stale cluster) | 7,918 | 44 | 30 |
+
+Only `0f38a4a3` is a current cluster; the other two are leftovers from earlier configurations (the same
+staleness C-90's cache work and T8.11d's path-derivation already had to account for). The number that
+matters is **1,179 surf-zone cells at 10 m resolution** — a continuous strip along the waterline, which is
+exactly where the forecast is read.
+
 **Recommendation: option 2.** It is the only one that leaves the whole grid on one datum, and the shoreline
-it produces is the physically correct one for a model whose water level is now referenced to LMSL.
+it produces is the physically correct one for a model whose water level is now referenced to LMSL. The
+1,179 cells are not an argument against converting — they are the measurement of how wrong the shoreline is
+*today*, when a NAVD 88 bed is combined with a water level that is not on NAVD 88.
 
 **Why this is not a coordinator call.** Where the model's land/water boundary sits is trigger 3. It also
 interacts with wave setup and runup, which are computed relative to the still-water line.
