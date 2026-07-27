@@ -113,7 +113,7 @@ color tokens from ADR-048) when Track C coding begins.
 
 ## References
 
-- Color sibling: [decisions/ADR-048-theme-color-tokens.md](../decisions/ADR-048-theme-color-tokens.md)
+- Color sibling: [decisions/ADR-048-theme-color-tokens.md](../archive/decisions/ADR-048-theme-color-tokens.md)
 - Visual specimen (mockup HTML): [mockups/C2pre-type-system.html](mockups/C2pre-type-system.html)
 - Visual specimen (PNG, operator-approved): `C:\tmp\C2pre-type-system.png`
 - Font files: `docs/design/mockups/fonts/` — manrope, outfit, lexend; weights 400 / 600 / 700

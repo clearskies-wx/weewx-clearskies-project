@@ -126,7 +126,7 @@ Known cases on this project: weewx's `interval` column collides with MariaDB's `
 
 ### Pydantic `extra="forbid"` requires the right FastAPI wiring to actually enforce
 
-Setting `extra="forbid"` on a Pydantic model is a security control (blocks unknown query params at the trust boundary per [`security-baseline.md`](../docs/contracts/security-baseline.md) §3.5). It only fires when the *whole* query string flows into Pydantic — which happens when the route uses `Depends(model_validator_function)` rather than declaring each query parameter individually with FastAPI's `Query()`.
+Setting `extra="forbid"` on a Pydantic model is a security control (blocks unknown query params at the trust boundary per [`security-baseline.md`](../docs/archive/contracts/security-baseline.md) §3.5). It only fires when the *whole* query string flows into Pydantic — which happens when the route uses `Depends(model_validator_function)` rather than declaring each query parameter individually with FastAPI's `Query()`.
 
 **Anti-pattern (silently broken):**
 

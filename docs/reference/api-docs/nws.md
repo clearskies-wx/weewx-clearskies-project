@@ -295,7 +295,7 @@ Captured for reference; full schemas live in `https://api.weather.gov/openapi.js
 
 ## Forecast Fields Supplied for Text Generation
 
-Per [ADR-082](../../decisions/ADR-082-unified-text-generation-engine.md) (NWS GFE Text Generation System with WorldCast Technology), NWS is the thinnest provider for text-generation inputs — most fields require the raw `/gridpoints/{office}/{gridX},{gridY}` endpoint, which is out of scope (settled decision #7). The table below documents which canonical forecast fields the NWS provider module populates for the text generation engine.
+Per [ADR-082](../../archive/decisions/ADR-082-unified-text-generation-engine.md) (NWS GFE Text Generation System with WorldCast Technology), NWS is the thinnest provider for text-generation inputs — most fields require the raw `/gridpoints/{office}/{gridX},{gridY}` endpoint, which is out of scope (settled decision #7). The table below documents which canonical forecast fields the NWS provider module populates for the text generation engine.
 
 | Field | Supplied? | Wire source | Notes |
 |---|---|---|---|

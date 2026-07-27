@@ -1,7 +1,7 @@
 # Forecast Provider Research
 
 **Date:** 2026-04-30
-**Purpose:** Verify which weather/forecast providers from the Clear Skies candidate set have public APIs technically compatible with our architecture, so we can write Python client modules for each in Phase 2. Per [ADR-006](../decisions/ADR-006-compliance-model.md), end users register and manage their own keys; this research scope is technical compatibility only — no commercial-use weighing, no pricing detail, no provider ranking.
+**Purpose:** Verify which weather/forecast providers from the Clear Skies candidate set have public APIs technically compatible with our architecture, so we can write Python client modules for each in Phase 2. Per [ADR-006](../archive/decisions/ADR-006-compliance-model.md), end users register and manage their own keys; this research scope is technical compatibility only — no commercial-use weighing, no pricing detail, no provider ranking.
 
 **Candidate set:** Aeris, NWS, OpenMeteo, OpenWeatherMap, Weather Underground. (Meteoblue was eliminated 2026-04-29 — free-tier API call limit was so restrictive that practical use required upgrading; other providers covering the same geography offer more generous free tiers.)
 

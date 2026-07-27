@@ -52,7 +52,7 @@ These references are static design shots, not live sites — review is from imag
 **User reaction (reviewed 2026-05-01):**
 
 - **Simplified left menu (icon-only nav rail) — really like.** "Slick and cool."
-- **Card-based architecture plays well with the design** Claude has been describing (the canonical data model from [ADR-010](../decisions/ADR-010-canonical-data-model.md) maps naturally to cards).
+- **Card-based architecture plays well with the design** Claude has been describing (the canonical data model from [ADR-010](../archive/decisions/ADR-010-canonical-data-model.md) maps naturally to cards).
 - **Local customization wanted:** ability to drop in locally-shot background images behind the main current-observations card. (Same theme as ref 1 — user-uploadable imagery is recurring signal.)
 - **Multi-page assumption:** "I would assume there are other pages, but I cannot explore them." (Third reinforcement of multi-page taxonomy preference, after refs 1 and 2.)
 
@@ -112,12 +112,12 @@ Output: `docs/reference/BELCHERTOWN-CONTENT-INVENTORY.md` — comprehensive enum
 
 User direction: **"We need to make sure we preserve the ability to create custom charts."** Belchertown supports operator-defined custom charts via configuration (the `graphs.conf` file in the skin); documentation exists in the Belchertown github repo (https://github.com/poblabs/weewx-belchertown). This is a power-user feature, but a real one — losing it would alienate the weewx audience that values data control.
 
-User open question: **GUI-managed or config-file-only?** "I know that is more advanced, and that might not all be able to be done in a GUI management, we need to figure that out." Likely answer: tier the surface — basic chart definitions (which fields, what time period, line vs bar) feasible in the configuration UI ([ADR-027](../decisions/ADR-027-config-and-setup-wizard.md)); advanced features (multi-axis, custom aggregations, conditional formatting) remain config-file with the GUI offering "edit raw config" as an escape hatch. Final call deferred to ADR-009 synthesis and follow-up Phase-3 ADRs.
+User open question: **GUI-managed or config-file-only?** "I know that is more advanced, and that might not all be able to be done in a GUI management, we need to figure that out." Likely answer: tier the surface — basic chart definitions (which fields, what time period, line vs bar) feasible in the configuration UI ([ADR-027](../archive/decisions/ADR-027-config-and-setup-wizard.md)); advanced features (multi-axis, custom aggregations, conditional formatting) remain config-file with the GUI offering "edit raw config" as an escape hatch. Final call deferred to ADR-009 synthesis and follow-up Phase-3 ADRs.
 
 Implications cascade through:
 - **API:** must expose fields generically enough to support arbitrary client-defined chart queries (broad observation field access, time-window queries, aggregation parameters).
 - **Dashboard:** chart components must accept user-defined chart specs at runtime, not just hardcoded charts.
-- **Config system ([ADR-027](../decisions/ADR-027-config-and-setup-wizard.md)):** must persist chart definitions in a stable schema.
+- **Config system ([ADR-027](../archive/decisions/ADR-027-config-and-setup-wizard.md)):** must persist chart definitions in a stable schema.
 - **Configuration UI:** scope decision per above.
 
 ---

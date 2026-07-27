@@ -1,7 +1,7 @@
 # Earthquake provider research
 
 **Date:** 2026-05-05
-**Purpose:** field-shape research for the four earthquake providers named in [ADR-024](../decisions/ADR-024-page-taxonomy.md) cat 6 + [ADR-038](../decisions/ADR-038-data-provider-module-organization.md). Feeds the `EarthquakeRecord` canonical entity proposal for [ADR-010](../decisions/ADR-010-canonical-data-model.md).
+**Purpose:** field-shape research for the four earthquake providers named in [ADR-024](../archive/decisions/ADR-024-page-taxonomy.md) cat 6 + [ADR-038](../archive/decisions/ADR-038-data-provider-module-organization.md). Feeds the `EarthquakeRecord` canonical entity proposal for [ADR-010](../archive/decisions/ADR-010-canonical-data-model.md).
 
 ## Provider summary
 

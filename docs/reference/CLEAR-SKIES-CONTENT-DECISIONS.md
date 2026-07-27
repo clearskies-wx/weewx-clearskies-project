@@ -25,11 +25,11 @@ Status legend per category: ⬜ pending · 🔄 in discussion · ✅ decided · 
 
 These emerged during the per-category decisions and apply project-wide:
 
-- **All tiles hide-able by operator** — universal config toggle; lands in [ADR-027](../decisions/ADR-027-config-and-setup-wizard.md) and [ADR-024](../decisions/INDEX.md). Every tile gets a stable ID + visibility toggle.
+- **All tiles hide-able by operator** — universal config toggle; lands in [ADR-027](../archive/decisions/ADR-027-config-and-setup-wizard.md) and [ADR-024](../decisions/INDEX.md). Every tile gets a stable ID + visibility toggle.
 - **Click-to-expand "more details" UI pattern** — used in categories 1, 2, 4, 5, 6. Standardized treatment to be designed in Phase 3.
 - **Operator-customizable chart layout** — Belchertown's `graphs.conf` flexibility is the bar. Owned by category 9 (still pending).
 - **Provider-pick at setup** — recurring pattern. Forecast (cat 3), earthquakes (cat 6) — both pick one provider per deploy. Configuration UI must support a "pick one of N providers for X data feed" pattern.
-- **Provider-adaptive UI** — when a provider doesn't return a field, the UI degrades gracefully. Aligned with [ADR-010](../decisions/ADR-010-canonical-data-model.md)'s all-fields-optional design. Forecast cards specifically have to handle different fields per provider.
+- **Provider-adaptive UI** — when a provider doesn't return a field, the UI degrades gracefully. Aligned with [ADR-010](../archive/decisions/ADR-010-canonical-data-model.md)'s all-fields-optional design. Forecast cards specifically have to handle different fields per provider.
 - **User-driven column mapping at setup** — operators map their own weewx archive column names to canonical fields. Subsumes [ADR-035](../decisions/INDEX.md) (Pinned). AQI is the worked example (column names not standardized; operator maps).
 - **New built-in optional pages confirmed:** Almanac/Astronomy (cat 5), Earthquakes (cat 6). Both hide-able. Both feed [ADR-024](../decisions/INDEX.md).
 - **Map stack pulled forward** — Earthquakes page wants an embedded map; this is the first map surface in v0.1. Touches [ADR-015](../decisions/INDEX.md) (currently Pinned). Likely answer: Leaflet or MapLibre with OSM tiles.
@@ -80,7 +80,7 @@ These would move from Pinned → Accepted on the basis of decisions captured her
 
 ### Decisions
 
-- **Live updates: hard requirement.** SSE per [ADR-005](../decisions/ADR-005-realtime-architecture.md), targeting the same ~5s cadence as today's MQTT stream. The user-visible behavior is "values change in place as they update" — same as Belchertown.
+- **Live updates: hard requirement.** SSE per [ADR-005](../archive/decisions/ADR-005-realtime-architecture.md), targeting the same ~5s cadence as today's MQTT stream. The user-visible behavior is "values change in place as they update" — same as Belchertown.
 - **Auto-disconnect: replaced with visibility-based pause.** No wall-clock 30-min timeout. SSE pauses when `document.visibilityState === "hidden"` and resumes when visible. No "Continue Live Updates" button.
 - **Status indicator: 2-state (not 3).** Silent UI when data is fresh; only show an indicator when data is stale or disconnected. No "online" pill in normal operation.
 - **Stale-data alert: ON by default.** Subtle banner shown when no update has arrived in **2× the archive interval**. Threshold is configurable per deploy; a fixed default of 2× is the rule.
@@ -118,8 +118,8 @@ These would move from Pinned → Accepted on the basis of decisions captured her
 
 #### Forecast
 
-- **One forecast provider per deploy.** The operator picks one provider to install/configure; no multi-provider side-by-side comparison in the dashboard. (Codebase still supports the day-1 provider set per [ADR-007](../decisions/ADR-007-forecast-providers.md); this is a *deployment* model decision.)
-- **Provider-adaptive UI.** The forecast UI must gracefully handle whatever fields the configured provider returns — render rich detail when available, render minimal-baseline when not. Aligned with [ADR-010](../decisions/ADR-010-canonical-data-model.md)'s all-fields-optional design. The dashboard never assumes a field is present.
+- **One forecast provider per deploy.** The operator picks one provider to install/configure; no multi-provider side-by-side comparison in the dashboard. (Codebase still supports the day-1 provider set per [ADR-007](../archive/decisions/ADR-007-forecast-providers.md); this is a *deployment* model decision.)
+- **Provider-adaptive UI.** The forecast UI must gracefully handle whatever fields the configured provider returns — render rich detail when available, render minimal-baseline when not. Aligned with [ADR-010](../archive/decisions/ADR-010-canonical-data-model.md)'s all-fields-optional design. The dashboard never assumes a field is present.
 - **Today's forecast on the main page** as a compact card (general shape: narrative + predicted hi/lo + precip% + condition icons through the day). **Exact card content is provider-dependent** — revisit this when each provider's actual response surface is known. Not a one-size-fits-all card.
 - **Multi-day / multi-hour forecast on a dedicated Forecast page.** Hourly view (rolled into a scrollable strip or compact table) + daily view (7-day, extending if the provider gives us more). **Drop the 3-hour view** as a default — but providers that genuinely natively offer 3-hour blocks (and not 1-hour or 24-hour) should still be supported when configured.
 - **Forecast discussion / narrative as a separate tile**, operator-toggled. NWS Area Forecast Discussions, Aeris weather summaries, etc. — when the configured provider offers prose, the operator can opt to include the discussion tile on the Forecast page. Off by default (since most providers don't offer prose), on for those who do (NWS, partial Aeris).
@@ -158,7 +158,7 @@ These would move from Pinned → Accepted on the basis of decisions captured her
 
 - **ADR-035 (column mapping) is load-bearing for AQI.** AQI is now the primary worked example for ADR-035's user-driven schema mapping flow. When ADR-035 is drafted, AQI must be in its examples.
 - **Clear Skies bundles a maintained AQI extension** — project-scope addition. New repo or fork to manage: TBD when Phase 2 lands. Likely either adopting `inguy24/weewx-airvisual` into the Clear Skies repo set or forking it as `weewx-clearskies-airvisual`.
-- **Universal "hide this tile" toggle** — design pattern that lands in [ADR-027](../decisions/ADR-027-config-and-setup-wizard.md) (configuration UI scope) and [ADR-024](../decisions/INDEX.md) (page taxonomy / tile model). Every category from here on adds tiles to a shared inventory; each tile gets a stable ID + visibility toggle.
+- **Universal "hide this tile" toggle** — design pattern that lands in [ADR-027](../archive/decisions/ADR-027-config-and-setup-wizard.md) (configuration UI scope) and [ADR-024](../decisions/INDEX.md) (page taxonomy / tile model). Every category from here on adds tiles to a shared inventory; each tile gets a stable ID + visibility toggle.
 - **Operator-customizable chart layout is reinforced.** The "operator can change which charts are in which group, on which page" capability from Belchertown's `graphs.conf` model is the bar. Category 9 owns the design for this.
 
 ## 5. Almanac / sun & moon · ✅ (decided 2026-05-01)
@@ -259,7 +259,7 @@ Claude's first pass proposed dropping the built-in Marine page and replacing it 
 Re-think the marine page from the ground up. Specifically:
 
 - **Marine page is OPTIONAL** — many operators don't live near a marine environment. Page must be enable-able at setup, off by default. Consistent with the universal hide-able pattern from category 4.
-- **Research what marine data each of our 5 day-1 forecast providers actually supplies** ([ADR-007](../decisions/ADR-007-forecast-providers.md): Aeris, NWS, OpenMeteo, OpenWeatherMap, Weather Underground). Decide what we can build from providers we already integrate with — don't reach for new providers until we know what we have.
+- **Research what marine data each of our 5 day-1 forecast providers actually supplies** ([ADR-007](../archive/decisions/ADR-007-forecast-providers.md): Aeris, NWS, OpenMeteo, OpenWeatherMap, Weather Underground). Decide what we can build from providers we already integrate with — don't reach for new providers until we know what we have.
 - **Surf forecast = surfing environments only.** Probably not in any of our providers. Direction: future-expansion thread on how surf forecasts are developed (wave model + bathymetry + shoreline orientation), and whether Clear Skies could eventually build its own surf module. **Not a v0.1 feature.**
 - **Tides = important in most marine environments**, with the exception of very-low-tide environments like the Great Lakes (where lunar tides are sub-foot and operationally irrelevant; meteorological seiches matter more there).
 - **Boater forecasts** (NWS Coastal Waters Forecast, Offshore Waters Forecast, marine zone forecasts) are missing from the current Belchertown page despite being important. These should be on the table as a first-class feature where a provider supports them.
@@ -555,7 +555,7 @@ Belchertown ships **Highcharts Stock 10** with **5 built-in chart groups** plus 
 
 ### Decisions captured 2026-05-02
 
-- **Chart engine: ECharts** per [ADR-002](../decisions/ADR-002-tech-stack.md). Replaces Highcharts Stock.
+- **Chart engine: ECharts** per [ADR-002](../archive/decisions/ADR-002-tech-stack.md). Replaces Highcharts Stock.
 - **Built-in chart groups for v0.1: `averageclimate`, `homepage`, `monthly`, `ANNUAL`.** AQI folds into `homepage` (per cat 4 decision). `Tropical_Storm_Hilary` drops as built-in — it's station-specific and operators can recreate it via the custom chart system below.
 - **"Built-in" means a pre-configured config file we ship**, fully operator-modifiable. Same flexibility as Belchertown's `graphs.conf`. Operators can edit, add, remove, override built-in groups freely; we just provide a sensible starting set.
 - **Two surfaces for charts:**

@@ -1,7 +1,7 @@
 # Dependency License Audit
 
 **Date:** 2026-04-30
-**Purpose:** Verify that every runtime/build/infra dependency named in [ADR-002](../decisions/ADR-002-tech-stack.md) is license-compatible with our chosen project license, GPL-3.0-or-later (per [ADR-003](../decisions/ADR-003-license.md)).
+**Purpose:** Verify that every runtime/build/infra dependency named in [ADR-002](../archive/decisions/ADR-002-tech-stack.md) is license-compatible with our chosen project license, GPL-3.0-or-later (per [ADR-003](../archive/decisions/ADR-003-license.md)).
 
 This is a research/verification record, not a decision. ADR-002 is the decision; this file is the evidence behind the "all deps compatible" claim. Update or replace if dependencies change or licenses change upstream.
 

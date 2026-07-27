@@ -118,7 +118,7 @@ This implements the FDSN Event Web Service v1 spec (https://www.fdsn.org/webserv
 
 ## Rate limits
 
-No published rate limit. USGS infrastructure is generous; the canonical politeness ask is "don't poll faster than the data updates" (USGS feeds update every few minutes). Cache per [ADR-017](../../decisions/ADR-017-provider-response-caching.md); an 60–120 s TTL is reasonable.
+No published rate limit. USGS infrastructure is generous; the canonical politeness ask is "don't poll faster than the data updates" (USGS feeds update every few minutes). Cache per [ADR-017](../../archive/decisions/ADR-017-provider-response-caching.md); an 60–120 s TTL is reasonable.
 
 ## License
 

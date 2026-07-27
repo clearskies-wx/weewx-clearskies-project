@@ -3,7 +3,7 @@
 **Date:** 2026-07-16
 **Purpose:** Document all technical research findings supporting the decision to run our own SWAN nearshore wave model (TruShore) instead of depending on NOAA's NWPS service for surf forecasting data
 **Status:** Research complete — informs SWAN-TRUSHORE-PLAN.md
-**Companion:** [SWAN-TRUSHORE-PLAN.md](../SWAN-TRUSHORE-PLAN.md) — implementation plan
+**Companion:** [SWAN-TRUSHORE-PLAN.md](../../archive/SWAN-TRUSHORE-PLAN.md) — implementation plan
 
 ---
 

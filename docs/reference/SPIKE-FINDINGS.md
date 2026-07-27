@@ -47,7 +47,7 @@ dist/assets/index-*.css         34.10 kB │ gzip:   6.70 kB
 dist/assets/index-*.js         546.46 kB │ gzip: 164.52 kB
 ```
 
-[ADR-033](../decisions/ADR-033-performance-budget.md) sets the Now-page initial JS bundle budget at **≤ 200 KB gzipped**. We're at **164.52 KB** — under by ~35 KB. The Vite warning about "chunks larger than 500 kB" is a raw-bytes threshold; ADR-033 measures gzipped (the over-the-wire size), so the warning is informational, not a budget violation.
+[ADR-033](../archive/decisions/ADR-033-performance-budget.md) sets the Now-page initial JS bundle budget at **≤ 200 KB gzipped**. We're at **164.52 KB** — under by ~35 KB. The Vite warning about "chunks larger than 500 kB" is a raw-bytes threshold; ADR-033 measures gzipped (the over-the-wire size), so the warning is informational, not a budget violation.
 
 This is dramatically better than the off-spec first pass with ECharts (435 KB gzipped, 2.2× over budget). Recharts is the correct choice for the project's bundle goals, as ADR-002 already concluded.
 
@@ -103,7 +103,7 @@ Recharts renders SVG, not canvas. Good for accessibility (text in DOM), but Rech
 - An `aria-label` on the chart's parent `<section>` summarizing what the chart shows (per `rules/coding.md` §5.5 "Charts (ECharts)" — applies equally to Recharts).
 - A screen-reader-only `<table>` with `class="sr-only"` containing the same data points (hour + temperature). Non-sighted users get the actual values.
 
-This pattern needs to be enforced in any Recharts wrapper component the dashboard repo ships. Bare `<LineChart>` without the table fallback would fail [ADR-026](../decisions/ADR-026-accessibility-commitments.md)'s WCAG 2.1 AA target.
+This pattern needs to be enforced in any Recharts wrapper component the dashboard repo ships. Bare `<LineChart>` without the table fallback would fail [ADR-026](../archive/decisions/ADR-026-accessibility-commitments.md)'s WCAG 2.1 AA target.
 
 ### Finding 9 — Lucide icons work cleanly with React 19
 
@@ -125,7 +125,7 @@ The locked Vite + React 19 + Tailwind 4 + shadcn + Recharts + Lucide stack is **
 - Tremor Raw copy-paste path. Not needed — ADR-002 already drops Tremor; shadcn + Tailwind + Recharts covers everything the locked design needs.
 - Routing — single-page. React Router 7+ vs. TanStack Router not tested.
 - State management — mock data is module-level; the typed API client and SSE wiring not tested.
-- i18n per [ADR-021](../decisions/ADR-021-i18n-strategy.md) — text was English literals.
+- i18n per [ADR-021](../archive/decisions/ADR-021-i18n-strategy.md) — text was English literals.
 - Playwright + axe-core — Phase 1 task 6 (CI scaffolding) covers that.
 - Production build deploy. Built artifacts confirmed in `dist/`; not served from a real reverse-proxy.
 - Real API integration. Mock data only.

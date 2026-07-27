@@ -591,7 +591,7 @@ The AQHI is a **separate, global metric** returned **in addition to** the filter
 
 **Provenance:** Written 2026-05-11 from upstream documentation (https://www.xweather.com/docs/maps/getting-started/map-tiles; AerisWeather rebranded to Xweather mid-2025). **NOT live-verified at brief-draft time.** Test-author should capture a live tile response during fixture work and surface any divergence per `rules/clearskies-process.md` "api-docs file provenance is part of the cross-check."
 
-Aeris exposes radar mosaic + many other weather layers as XYZ slippy-map raster tiles via the Maps API (formerly "AerisWeather Maps," now "Xweather Raster Maps"). Day-1 layer per [ADR-015](../../decisions/ADR-015-radar-map-tiles-strategy.md) is `radar` — global radar mosaic.
+Aeris exposes radar mosaic + many other weather layers as XYZ slippy-map raster tiles via the Maps API (formerly "AerisWeather Maps," now "Xweather Raster Maps"). Day-1 layer per [ADR-015](../../archive/decisions/ADR-015-radar-map-tiles-strategy.md) is `radar` — global radar mosaic.
 
 #### Tile URL template
 
@@ -755,7 +755,7 @@ Match to DailyForecastPoint by comparing `details.day` to the forecast day index
 
 ## Forecast Fields Supplied for Text Generation
 
-Per [ADR-082](../../decisions/ADR-082-unified-text-generation-engine.md) (NWS GFE Text Generation System with WorldCast Technology), the table below documents which canonical forecast fields the Xweather provider module populates for the text generation engine, and the wire field each is sourced from.
+Per [ADR-082](../../archive/decisions/ADR-082-unified-text-generation-engine.md) (NWS GFE Text Generation System with WorldCast Technology), the table below documents which canonical forecast fields the Xweather provider module populates for the text generation engine, and the wire field each is sourced from.
 
 | Field | Supplied? | Wire source | Notes |
 |---|---|---|---|

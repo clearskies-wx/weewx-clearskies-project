@@ -1,7 +1,7 @@
 # Background system — implementation notes (companion to ADR-047)
 
 **Status:** working recipe, validated in the browser prototype and accepted by the operator
-(2026-05-30). The *decisions* live in [ADR-047](../decisions/ADR-047-background-system.md); this doc
+(2026-05-30). The *decisions* live in [ADR-047](../archive/decisions/ADR-047-background-system.md); this doc
 preserves the **concrete working code and exact values** so the React implementation reuses them
 rather than re-deriving. ADR wins on any conflict.
 

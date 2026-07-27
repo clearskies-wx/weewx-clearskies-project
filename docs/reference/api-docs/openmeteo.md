@@ -476,7 +476,7 @@ WMO code values used in `current.weather_code`, `hourly.weather_code`, and `dail
 
 ## Forecast Fields Supplied for Text Generation
 
-Per [ADR-082](../../decisions/ADR-082-unified-text-generation-engine.md) (NWS GFE Text Generation System with WorldCast Technology), the table below documents which canonical forecast fields the Open-Meteo provider module populates for the text generation engine.
+Per [ADR-082](../../archive/decisions/ADR-082-unified-text-generation-engine.md) (NWS GFE Text Generation System with WorldCast Technology), the table below documents which canonical forecast fields the Open-Meteo provider module populates for the text generation engine.
 
 | Field | Supplied? | Wire source | Notes |
 |---|---|---|---|

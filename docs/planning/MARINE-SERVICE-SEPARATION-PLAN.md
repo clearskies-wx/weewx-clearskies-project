@@ -1489,7 +1489,7 @@ L3 is enabled: `1 of 1 cluster(s) enabled`.
    source data, and no better bathymetry is available for this coast. Do NOT change the
    bathymetry source, add a bar parameterisation, or loosen the `is_bar` test to make the feature
    appear to work. Recorded as working to the best of available knowledge. Future path:
-   satellite-derived bathymetry — see [FUTURE-ENHANCEMENTS.md](FUTURE-ENHANCEMENTS.md).
+   satellite-derived bathymetry — see [FUTURE-ENHANCEMENTS.md](../archive/FUTURE-ENHANCEMENTS.md).
 
 **FINDING — the handoff clamped on all 73 timesteps, and station spacing is why.** The full run
 (2026-07-25 07:06Z, 1200 s, `73/73 timestep(s) resolved a per-hour L3 station`) clamped every

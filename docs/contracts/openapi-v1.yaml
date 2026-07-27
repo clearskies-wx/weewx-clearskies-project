@@ -9,31 +9,31 @@ info:
     `weewx-clearskies-dashboard` SPA.
 
     The api reads from a weewx archive database and from per-domain
-    provider plugin modules per [ADR-038](../decisions/ADR-038-data-provider-module-organization.md);
-    it returns canonical types per [ADR-010](../decisions/ADR-010-canonical-data-model.md).
+    provider plugin modules per [ADR-038](../archive/decisions/ADR-038-data-provider-module-organization.md);
+    it returns canonical types per [ADR-010](../archive/decisions/ADR-010-canonical-data-model.md).
 
     **Versioning** — URL path. Major bump only on breaking changes per
-    [ADR-018](../decisions/ADR-018-api-versioning-policy.md). No support-window
-    promise (AS-IS under GPL v3 per [ADR-003](../decisions/ADR-003-license.md)).
+    [ADR-018](../archive/decisions/ADR-018-api-versioning-policy.md). No support-window
+    promise (AS-IS under GPL v3 per [ADR-003](../archive/decisions/ADR-003-license.md)).
 
     **Errors** — every non-2xx response is `application/problem+json`
     (RFC 9457). Provider-domain errors carry `providerId`, `domain`,
-    and `errorCode` (one of the [ADR-038](../decisions/ADR-038-data-provider-module-organization.md)
+    and `errorCode` (one of the [ADR-038](../archive/decisions/ADR-038-data-provider-module-organization.md)
     taxonomy strings).
 
     **Auth** — no end-user authentication per
-    [ADR-008](../decisions/ADR-008-auth-model.md). Optional shared secret
+    [ADR-008](../archive/decisions/ADR-008-auth-model.md). Optional shared secret
     in `X-Clearskies-Proxy-Auth` for cross-host proxy↔inner-service trust;
     browser SPAs do not send this.
 
     **Units** — every unit-bearing response includes a `units` object
     naming the unit per field per
-    [ADR-019](../decisions/ADR-019-units-handling.md) and
-    [ADR-010](../decisions/ADR-010-canonical-data-model.md). Server passes
+    [ADR-019](../archive/decisions/ADR-019-units-handling.md) and
+    [ADR-010](../archive/decisions/ADR-010-canonical-data-model.md). Server passes
     weewx `target_unit` through; no server-side conversion at v0.1.
 
     **Time** — UTC ISO-8601 with `Z` suffix on the wire. Display TZ is
-    station-local per [ADR-020](../decisions/ADR-020-time-zone-handling.md).
+    station-local per [ADR-020](../archive/decisions/ADR-020-time-zone-handling.md).
 
     **Realtime** — the SSE stream from `weewx-clearskies-realtime` is
     documented separately. Both services share the `Observation` schema.
@@ -1400,7 +1400,7 @@ components:
       in: header
       name: X-Clearskies-Proxy-Auth
       description: |
-        Shared secret per [ADR-008](../decisions/ADR-008-auth-model.md).
+        Shared secret per [ADR-008](../archive/decisions/ADR-008-auth-model.md).
         For PROXY-to-INNER-SERVICE trust on cross-host deploys only.
         Browser SPAs MUST NOT send this header. When the inner service
         has `WEEWX_CLEARSKIES_PROXY_SECRET` unset, the header is

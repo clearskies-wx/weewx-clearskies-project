@@ -14,7 +14,7 @@ At the start of a task, identify which domain(s) apply and read the matching fil
 | Task involves… | Load |
 | --- | --- |
 | Belchertown skin development, weewx config, weather data, skin alternatives | [rules/weather-skin.md](rules/weather-skin.md) + [reference/weather-skin.md](reference/weather-skin.md) |
-| Accessing cloud container, Nextcloud, weather.shaneburkhardt.com | [rules/ratbert-lxd.md](rules/ratbert-lxd.md) + [reference/ratbert-lxd.md](reference/ratbert-lxd.md) (from Windows Server project) |
+| Accessing cloud container, Nextcloud, weather.shaneburkhardt.com | [rules/ratbert-lxd.md](../Windows%20Server/rules/ratbert-lxd.md) + [reference/ratbert-lxd.md](../Windows%20Server/reference/ratbert-lxd.md) (from Windows Server project) |
 | Ratbert VM, LXD containers, freepbx, adguard | [rules/ratbert-lxd.md](../Windows%20Server/rules/ratbert-lxd.md) + [reference/ratbert-lxd.md](../Windows%20Server/reference/ratbert-lxd.md) |
 | Home Assistant, automations | [rules/homeassistant.md](../Windows%20Server/rules/homeassistant.md) + [reference/homeassistant.md](../Windows%20Server/reference/homeassistant.md) |
 | GitHub operations (branches, PRs, releases) | [rules/github.md](rules/github.md) |

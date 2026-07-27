@@ -399,7 +399,7 @@ Pollutants: SO2, NO2, PM10, CO, O3, PM2.5. Uses the same linear interpolation fo
 
 **Provenance:** Written 2026-05-11 from upstream documentation (https://openweathermap.org/api/weathermaps). **NOT live-verified at brief-draft time.** Test-author should capture a live tile response during fixture work and surface any divergence per `rules/clearskies-process.md` "api-docs file provenance is part of the cross-check."
 
-OpenWeatherMap exposes weather model layers as XYZ slippy-map raster tiles. Day-1 layer per [ADR-015](../../decisions/ADR-015-radar-map-tiles-strategy.md) is `precipitation_new` — labeled **"Model precipitation"** in the dashboard, NOT "Radar," because OWM serves NWP-model output, not radar reflectivity.
+OpenWeatherMap exposes weather model layers as XYZ slippy-map raster tiles. Day-1 layer per [ADR-015](../../archive/decisions/ADR-015-radar-map-tiles-strategy.md) is `precipitation_new` — labeled **"Model precipitation"** in the dashboard, NOT "Radar," because OWM serves NWP-model output, not radar reflectivity.
 
 #### Tile URL template
 
@@ -484,7 +484,7 @@ Per ADR-017, the tile proxy honors upstream `Cache-Control: max-age=...` if pres
 
 ## Forecast Fields Supplied for Text Generation
 
-Per [ADR-082](../../decisions/ADR-082-unified-text-generation-engine.md) (NWS GFE Text Generation System with WorldCast Technology), the table below documents which canonical forecast fields the OpenWeatherMap provider module populates for the text generation engine.
+Per [ADR-082](../../archive/decisions/ADR-082-unified-text-generation-engine.md) (NWS GFE Text Generation System with WorldCast Technology), the table below documents which canonical forecast fields the OpenWeatherMap provider module populates for the text generation engine.
 
 | Field | Supplied? | Wire source | Notes |
 |---|---|---|---|

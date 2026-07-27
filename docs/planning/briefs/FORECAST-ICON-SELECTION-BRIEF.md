@@ -102,7 +102,7 @@ Uses condition codes rather than numbered icons: `Clear`, `MostlyClear`, `Partly
 
 ### 2.1 Glyph Inventory
 
-All hero icons are inline Material Symbols SVGs with Meteocons-style gradient fills, implemented as React components in [weather-icon-glyphs.tsx](../../repos/weewx-clearskies-dashboard/src/components/weather-icon-glyphs.tsx).
+All hero icons are inline Material Symbols SVGs with Meteocons-style gradient fills, implemented as React components in [weather-icon-glyphs.tsx](../../../repos/weewx-clearskies-dashboard/src/components/weather-icon-glyphs.tsx).
 
 | # | Glyph | Visual Description | Day/Night Variants |
 |---|-------|--------------------|--------------------|
@@ -118,7 +118,7 @@ All hero icons are inline Material Symbols SVGs with Meteocons-style gradient fi
 | 10 | `GlyphHazy` | Clipped sun (top) + amber haze stripes | Day variant |
 | 11 | `GlyphHazyNight` | Clipped moon (top) + amber haze stripes | Night variant |
 
-**Total: 11 distinct glyphs** mapping to **32 WMO codes** via the `WMO_MAP` in [weather-icon.tsx](../../repos/weewx-clearskies-dashboard/src/components/weather-icon.tsx).
+**Total: 11 distinct glyphs** mapping to **32 WMO codes** via the `WMO_MAP` in [weather-icon.tsx](../../../repos/weewx-clearskies-dashboard/src/components/weather-icon.tsx).
 
 ### 2.2 WMO Code Mapping (complete)
 
@@ -172,7 +172,7 @@ Comparing against what major services provide as distinct icons:
 
 **Bug 2: OWM condition IDs are not mapped.** OpenWeatherMap uses its own numeric IDs (200–804 range), not WMO codes. A string like `"500"` would parse as integer 500, which is not in `WMO_MAP` → no icon renders.
 
-**Bug 3: Four API-extension WMO codes (4, 5, 10, 79) have no test coverage** in [weather-icon.test.tsx](../../repos/weewx-clearskies-dashboard/src/components/weather-icon.test.tsx). The test suite exercises 28 of the 32 mapped codes.
+**Bug 3: Four API-extension WMO codes (4, 5, 10, 79) have no test coverage** in [weather-icon.test.tsx](../../../repos/weewx-clearskies-dashboard/src/components/weather-icon.test.tsx). The test suite exercises 28 of the 32 mapped codes.
 
 ### 2.5 Provider Atmosphere Condition Mapping Deficiency
 
@@ -256,7 +256,7 @@ Every major weather service resolves this tension by applying a PoP gate: "don't
 
 ### 3.3 Where PoP Thresholds DO Exist (Text Only)
 
-The GFE text engine in the API ([thresholds.py](../../repos/weewx-clearskies-api/weewx_clearskies_api/sse/gfe/thresholds.py)) already has well-calibrated thresholds, but these only affect the text narrative — not the icon:
+The GFE text engine in the API ([thresholds.py](../../../repos/weewx-clearskies-api/weewx_clearskies_api/sse/gfe/thresholds.py)) already has well-calibrated thresholds, but these only affect the text narrative — not the icon:
 
 | Threshold | Value | Effect |
 |-----------|-------|--------|
