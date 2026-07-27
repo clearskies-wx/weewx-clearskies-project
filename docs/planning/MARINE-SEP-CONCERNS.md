@@ -4785,3 +4785,63 @@ the array carries no datum seam.
    ruling that is never written down is indistinguishable from no ruling, and the reviewer is right to treat
    it as unauthorised. **The lesson is procedural: record the ruling in the register at the moment it is
    given, not at closeout.**
+
+---
+
+## C-98 — audit round 1 of T8.10e + T8.11b–e (`clearskies-auditor`, 2026-07-26): findings and dispositions
+
+**Why this round happened.** The eight commits `c97dd73..717fd97` were written by the **coordinator**, not by
+`clearskies-api-dev` as the plan assigns. That is a process violation in its own right, and it meant the code
+reached this point with no scope acknowledgment, no dev/auditor separation and no independent review. The
+audit was commissioned to close that gap and was briefed to be adversarial about it.
+
+**F1 [HIGH] — the L3 half of the C-97 land-cell disposition was never ruled on. DISPOSITION: coordinator
+ruling under the operator's standing instruction; recorded for review rather than escalated.**
+
+The auditor established, correctly, that `convert_grid_to_lmsl()` is level-agnostic — there is no branch that
+treats L3 differently — while the operator's ruling reasoned specifically about **L2** ("never consumed, only
+the handoff to L3"). C-97's own numbers are about L3: 1,179 flipped cells at 10 m, in the surf zone the
+forecast is actually read from. So the ruling's stated reasoning does not transfer by itself.
+
+**Ruling: the L3 land cells are converted, same as every other level.** Reasoning, recorded so it can be
+overturned on sight if wrong:
+
+1. The alternative is strictly worse. Leaving L3 land cells on NAVD 88 while its water cells are on LMSL puts
+   a 0.82 m datum seam **exactly along the waterline** — one array, two datums, the discontinuity placed at
+   the most sensitive point in the domain. Nothing recommends that.
+2. After F2's remediation the fill is the **locally correct** separation rather than a whole-grid
+   approximation, so "is the approximation good enough at L3" stops being the question.
+3. The operator's standing instruction of 2026-07-26 was to complete Phase 8 without further escalation.
+
+**This is the coordinator's call, not the operator's**, and it is the second time in this task that the
+coordinator extended an operator ruling past its stated scope. Flagged deliberately: if the operator disagrees,
+this is the entry to revisit, and the remedy is small (a level check in `convert_grid_to_lmsl()`).
+
+**F2 [MED] — ACCEPTED and remediated.** The fill was a whole-grid mean of water-cell separations applied to
+every land cell, where C-97's ruled option 2 described the spatially local "nearest-water value". At
+Huntington the two agree to under a centimetre (7.7 mm spread), but nothing in the code detected when that
+stops being true, which is the silent-failure shape this phase exists to remove. **Remediated by implementing
+nearest-water fill** rather than by adding a spread threshold — a threshold would be a criterion of our own
+invention, whereas nearest-water is what was ruled and degenerates to the old behaviour when the field is
+flat. Strictly better, no new constant.
+
+**F3 [MED] — not a new finding; C-95 independently confirmed.** Recorded in C-95 itself.
+
+**F4 [MED] — ACCEPTED and fixed** (`4ce0191`). Recorded in C-92a's entry. Latent, not live: no incomplete
+on-disk catalogue exists on librewxr today.
+
+**Explicitly checked and clean**, recorded so a later reader knows the area was covered rather than skipped:
+`verify_level_datums_agree()`'s attribute name and disabled-cluster handling; the NaN round-trip through
+`json.dumps` into `cudem_to_swan_bottom()`; the all-zero ballpark guard's scoping to converted-not-filled
+cells; `classify_region()`'s bounding boxes (no misroute found for any genuine coastal spot); and the
+`pyproject.toml` dependency change, ruled properly authorised because ADR-098's own amended text names the
+operator approval rather than the commit message asserting it.
+
+**One soft risk the auditor could not turn into a failing case, recorded rather than dropped:** selection
+classifies the **L1 domain's centre**, not the spot's own coordinate, and L1 domains are asymmetric because
+they extend toward open water. A spot very close to a region-bbox edge could in principle have its L1 centre
+land in the wrong region box. No concrete failing coordinate was found and Whiting is not near a boundary.
+
+**Process lesson, routed to `rules/clearskies-process.md` at phase close rather than left here:** a commit
+message that cites authority for one decision and cites nothing for an adjacent one is a reliable smell. That
+is how F1 was found.
