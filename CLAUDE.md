@@ -27,6 +27,9 @@ At the start of a task, identify which domain(s) apply and read the matching fil
 | UI design, visual patterns, tokens, component styling, card anatomy, backgrounds, icons | [docs/manuals/DESIGN-MANUAL.md](docs/manuals/DESIGN-MANUAL.md) — **single authority for all UI design rules**. ADRs explain *why*; the manual says *what to do*. |
 | Clear Skies development: repo paths, dev site URL, SSH access, sync, toolchain, pytest | [reference/clearskies-dev.md](reference/clearskies-dev.md) — **always load when debugging or deploying Clear Skies code** |
 | Writing or modifying code in any language (Python, PHP, JS/TS, shell, Cheetah, SQL) | [rules/coding.md](rules/coding.md) |
+| **Dispatching agents, writing an agent brief, or acting as an agent** | [rules/agents.md](rules/agents.md) — orchestration, scope binding, prompt requirements, git safety, false-claim protocol |
+| **Declaring work done, closing a round, auditing, or running a QC gate** | [rules/verification.md](rules/verification.md) — three-layer model, known-answer mandate, audit rules, round-close gate, validate-against-reality |
+| **Coordinating a session (dispatch, QC, commit, deploy)** | [rules/coordinator.md](rules/coordinator.md) — dispatch gate, acceptance gate, stop-and-surface, operator spot-check protocol |
 
 ## Always-applicable rules
 
@@ -118,19 +121,12 @@ These apply regardless of domain.
 
 **Why (2026-07-08):** An agent ran bare `git pull` as the `claude` user on weewx (instead of `sudo -u ubuntu`), got a permissions error on `.git/FETCH_HEAD`, then ran `sudo chown -R ubuntu:ubuntu` on the entire repo to "fix" it. On weather-dev, the same session ran `sudo chown -R ubuntu:ubuntu /var/www/clearskies` which hit the read-only webcam bind-mount and produced hundreds of errors. Both problems were caused by not using the deploy scripts, and both `chown` commands were wrong — the scripts handle user-switching correctly and never need ownership changes.
 
-### Git safety — agents and coordinator
+### Git safety — agents and coordinator → `rules/agents.md`
 
-These rules apply to ALL repos, ALL domains. No exceptions.
-
-**Agents must NOT run any of these git commands:** `git pull`, `git push`, `git fetch`, `git rebase`, `git merge`, `git remote`, `git checkout` of remote branches, or any command that introduces remote changes or sends local changes to a remote. Agents may only: `git add`, `git commit` (to the local branch), `git status`, `git log`, `git diff`. If an agent encounters a situation where it thinks it needs to pull or push, it MUST stop and report to the coordinator.
-
-**No worktree isolation for implementation agents.** Git worktrees create a parallel checkout that bypasses the local repo. Work done in a worktree gets pushed to GitHub without ever appearing in the primary checkout — the user never sees or approves it. All implementation work happens in the primary local checkout at the known repo path. Worktrees may only be used for read-only exploration.
-
-**Coordinator never pushes without explicit user instruction.** The word "push" must come from the user in chat. Not inferred, not assumed, not triggered by a task being "done." Committing locally is fine after review; pushing is a separate user-authorized step.
-
-**If an agent reports unexpected repo state, STOP.** Diverged remote, unknown commits, merge conflicts, branches that shouldn't exist — any of these mean the coordinator halts all work on that repo and reports to the user immediately. No autonomous resolution. The user decides what to do.
-
-**Why (2026-05-28):** A previous session's agent used worktree isolation, committed 14 commits, and pushed them to GitHub — all without the user's knowledge. The primary checkout never moved. A later session's agent pulled and merged those unknown commits without asking. The user discovered code they never approved in their repo. Agents operating outside the local checkout and pushing without approval is the root cause of half-done, unreviewed work landing in the codebase.
+Moved 2026-07-27 (Marine Model Restoration Plan, task A2) to [rules/agents.md](rules/agents.md)
+§"Git safety — agents and coordinator", alongside the other five agent-rule sections. Not duplicated
+here. **Load `rules/agents.md` before dispatching any agent and before any git operation that touches
+a remote** — it is where the never-push-without-the-word-"push" rule now lives.
 
 ### Doc-code sync
 
@@ -162,26 +158,12 @@ These rules apply to ALL repos, ALL domains. No exceptions.
 - **For root-cause questions, never propose creating/editing records until the *why* is established.**
 - **Plain English to the user.** Every technical term, library name, RFC number, file name, or project-internal acronym gets defined the first time it appears in a conversation. Once per conversation is enough; later uses can lean on the earlier definition. New conversation = counter resets. Detailed rule and worked examples in [rules/clearskies-process.md](rules/clearskies-process.md) "Plain English when explaining decisions to the user."
 
-### Self-audit before delivering
+### Self-audit before delivering, and prompt faithfulness → `rules/verification.md`
 
-For non-trivial outputs (architecture recommendations, multi-step plans, ADR drafts, code beyond a one-line fix), don't ship the first draft. The pattern is **generate → audit → revise → deliver**, and surface the audit in your reply.
-
-- **Generate** the initial recommendation.
-- **Audit it yourself** against concrete categories: security risks, maintenance burden, dependency lock-in, edge cases, what forces rework later, what looks ugly to a future reader. Apply pressure to your own choices.
-- **Revise** based on the audit — strengthen weak points, remove unnecessary complexity, document tradeoffs explicitly, propose mitigations for the risks that remain.
-- **Deliver** the refined output **with the audit findings surfaced**. Show what you considered, what you ruled out, and what's still uncertain.
-
-You have explicit permission to think critically about your own work and refine it. Goal: correct and durable, not fast and sloppy. Surfacing the audit lets the user push back on points you may have under-weighted.
-
-**Evidence over assertion.** When the self-audit involves verifiable claims (tests pass, file exists, endpoint returns expected shape), include the verification command and its output in the reply. "I verified the tests pass" is not evidence. `pytest result: 73 passed, 0 failed at commit abc1234` is evidence. This applies to claims about test results, accessibility scans, build success, deployment state, and any other machine-verifiable assertion. For non-machine-verifiable claims (design judgment, trade-off analysis), the existing audit-and-surface pattern is sufficient.
-
-**Scope:** non-trivial outputs only. For simple sync / match-state / one-line-fix tasks, the "Simple means simple" rule still wins — don't perform an audit just to look thorough.
-
-**Anti-pattern:** announce a perfect-sounding plan, then scramble when the user surfaces an obvious risk. Better to surface the risk yourself first, with the proposed mitigation.
-
-### Prompt faithfulness
-
-Before reporting a task complete, walk the user's original request and confirm every distinct ask has a corresponding deliverable or an explicit deferral communicated to the user. The user should never have to say "but I also asked you to do X." When the task involves multiple items, enumerate them at the start and check them off at the end.
+Both sections moved 2026-07-27 (Marine Model Restoration Plan, task A3) to
+[rules/verification.md](rules/verification.md), alongside the audit rules, the round-close gate, the
+three-layer model (guard / invariant / adversarial), and the known-answer test mandate. Not
+duplicated here. **Load `rules/verification.md` before declaring any non-trivial task done.**
 
 ### Capture lessons in the right place
 

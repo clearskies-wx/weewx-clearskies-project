@@ -81,6 +81,53 @@ rather than temporarily unfetchable — a regional model that does not cover the
 configuration fact for setup-time validation, not a runtime failure to retry forever. If you cannot
 tell those two cases apart in the code, that is a finding to surface, not a judgement call to make.
 
+### Cross-shore distances are measured from the coastline anchor, never from the spot pin
+
+**Read this before writing or modifying any SWAN grid-sizing, transect, beach-profile, or
+depth-contour code.** This is a fact about the data, not a preference.
+
+**Every cross-shore distance in the marine model is measured from the spot's coastline anchor** —
+`coastline_lat`/`coastline_lon`, the depth-zero crossing shoreward of the operator's pin, resolved by
+`find_shoreline_from_grid()`. That includes the per-sample `distance_m` in each spot profile, both
+contour distances (15 m and 30 m), and the three contour-sized grid edges (L3's shoreward
+breaking-depth edge, L3's offshore 15 m edge, L2's offshore 30 m edge).
+
+**The reason is mechanical: that is the origin the generating code walks outward from.**
+`services/grid_sizing_chain.py` passes the anchor into
+`enrichment/bathymetry.py`'s `find_depth_contour_distance()` (`:1391`) and
+`extract_native_profile_from_grid()` (`:1477`). A consumer that projects one of those distances from
+the pin instead overshoots by exactly the pin's own offshore offset. At
+`huntington-city-beach-pier` the pin sits **209.6 m** offshore of the anchor on bearing 238.0°, in
+4.26 m of water — the pin is out on the pier.
+
+**Three origins exist at every spot and they are all different. Do not treat any two as
+interchangeable:**
+
+| Origin | What it is | Correct use |
+|---|---|---|
+| **Coastline anchor** (`coastline_lat/lon`) | Depth-zero crossing shoreward of the pin | **Every** cross-shore distance and contour-sized grid edge |
+| **Spot pin** | Where the operator dropped the marker | Nothing cross-shore. At Huntington it is 209.6 m offshore of the anchor |
+| **Shoreline segment** (`TransectInfo.origin_*`) | The operator-drawn segment | Transect geometry only — it sits 213.5 m offshore of the anchor at the same spot |
+
+The **structure-derived** offshore term is the one genuine exception: it is a distance from the
+cluster centre, so the cluster centre is its correct origin.
+
+**When the anchor is unavailable, do not guess.** `_cross_shore_origin()`
+(`services/swan_domain.py:758`) returns `None`, and each caller keeps its pre-anchor arithmetic
+rather than inventing a placement. Substituting the pin is the defect this rule exists to prevent.
+
+**Why (2026-07-19 → 2026-07-27):** this rule governed the code for months while living nowhere a
+reader would find it — only in a function docstring, in tests, and in conversation. It was violated
+in two places at once. Per-transect POINTS bands were placed from the operator-drawn segment until
+marine `ac6bd8a`; the three contour-sized grid edges were projected from the spot-pin centroid until
+marine `c28588b`, which put L3's shoreward edge 179.6 m offshore of the anchor instead of 30.0 m —
+on roughly twice the depth its own breaking-depth criterion names. A rule that lives only in a
+docstring and a plan file is a rule that gets re-broken; plan files get archived, and that is exactly
+how this one died the first time.
+
+**Recorded as system state in** `docs/ARCHITECTURE.md` (SWAN grid-sizing section, "Every distance in
+that per-spot profile…"). That document says what IS; this rule says what to DO.
+
 ### Treat your own output as untrusted
 
 LLM-generated code (including yours) is unverified until reviewed and tested against the real data shape. Before committing:
@@ -562,7 +609,7 @@ The Clear Skies dashboard uses Recharts v3.x for all chart components. Recharts 
 
 **Why (2026-06-02):** A session spent 3+ hours fixing chart label visibility by guessing at Recharts margin/axis props. Labels were repeatedly broken and re-broken because the developer assumed `margin.bottom` controlled label visibility (it doesn't — XAxis `height` does), assumed `margin.left: -28` was safe (it clips data), and assumed `margin.top` would visually move the chart (it adds invisible SVG whitespace). Reading the actual Recharts source resolved every issue in minutes. The documentation is now saved in the project to prevent this from ever happening again.
 
-### 6.1 Rules
+### 7.1 Rules
 
 1. **No negative margins on charts.** `margin.left: -28` clips leftmost data. `margin.bottom: -N` clips axis labels. Never use negative margins on Recharts charts.
 2. **Do not set `margin.bottom` to "make room for labels."** XAxis has a default `height` of 30px that already provides label space. Extra `margin.bottom` just wastes chart area.
