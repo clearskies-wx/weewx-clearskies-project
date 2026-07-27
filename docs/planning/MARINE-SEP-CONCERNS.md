@@ -5062,18 +5062,36 @@ levels must agree with each other on `LWD_IGLD85`; an ocean run's levels must ag
 
 **Bathymetry source routing, retargeted, not discarded.**
 
-- **NCEI Great Lakes Bathymetry** — already the L1/L2 source named in T8.10e's DEM priority chain
+~~- **NCEI Great Lakes Bathymetry** — already the L1/L2 source named in T8.10e's DEM priority chain
   (`usgs_great_lakes`, `enrichment/bathymetry.py`) — is natively referenced to each lake's own low water
   datum ("Bathymetric data for each lake is referenced to its own low water datum (LWD)", NCEI's own product
   description). At 3 arc-second (~90 m; see C-101 on what that resolution actually carries) this needs
-  **no datum conversion** and is suitable for L1 and L2 as-is.
+  **no datum conversion** and is suitable for L1 and L2 as-is.~~ — **wrong, corrected below.**
+
+**Correction 2026-07-27 (adversarial audit).** The claim above named the wrong product. The code at all three
+levels (`_try_great_lakes()` in `providers/nearshore/swan.py`, via `_ensure_great_lake_dem()` /
+`fetch_great_lake_grid()` in `services/bathymetry_resolver.py`) never fetches NCEI Great Lakes Bathymetry —
+`usgs_great_lakes` is a source label, not a source. It downloads the **USGS Rohweder 2025 ScienceBase release**
+(DOI `10.5066/P1DA6L6U`), cached to `/etc/weewx-clearskies/great_lakes/{lake}.tif`, which derives from NOAA
+OCM's Great Lakes Coastal DEM — roughly 3 m resolution, confirmed **NAVD88**-referenced against NOAA's own
+InPort metadata record. `_try_great_lakes()` hardcodes `grid["vertical_datum"] = "NAVD88"`, and that label is
+correct about the data it actually fetched. The NCEI ~90 m native-LWD product this ruling described **is not
+implemented anywhere in this codebase** — see the new concern opened below for the resulting open option.
+Consequence: the Great Lakes branch performs a real `NAVD88 → LWD_IGLD85` conversion at every level, not a
+no-op at L1/L2 as this ruling originally assumed.
+
 - The L3-grade source, **NOAA OCM Coastal DEM: Lake Michigan** (~3 m), **is** on NAVD88 and **does** need
   conversion — `NAVD88 → LWD_IGLD85` — before it can be combined with the NCEI-sourced L1/L2 grids.
+
+  **Correction 2026-07-27:** this line was written as if only L3 needed conversion. As corrected above, the
+  implemented source (USGS Rohweder 2025 / NOAA OCM Coastal DEM lineage) is what feeds L1 and L2 as well as
+  L3, and it is NAVD88 throughout — so the conversion applies at **every** level, not L3 alone.
 - **The T8.11a conversion machinery (`pyproj` + NOAA PROJ separation grids) is retargeted to this pair, not
   discarded.** The pipeline T8.11a validated is generic to any PROJ-published vertical transform; only the
   source/target CRS pair changes for the Great Lakes branch (`NAVD88 → LWD_IGLD85` instead of
-  `NAVD88 → LMSL`). Whether NOAA's grid set actually covers this specific transform still needs verifying by
-  whoever implements it — flagged here as a check to run, not assumed true.
+  `NAVD88 → LMSL`). ~~Whether NOAA's grid set actually covers this specific transform still needs verifying by
+  whoever implements it — flagged here as a check to run, not assumed true.~~ — **verified, see the ADR-098
+  amendment for the measured separations.**
 
 **Runtime path, same requirement as C-99's ruling.** Whichever SWAN code path selects a level's datum at
 runtime must route Great Lakes levels to `LWD_IGLD85` and ocean levels to `LMSL` — not only the config-time
@@ -5224,3 +5242,46 @@ here (outside this entry's scope):**
    silently absorbing it into its own commit.
 
 **Disposition: record only, commit stands, rule-shaped lessons queued for routing at phase close.**
+
+---
+
+## C-106 — NCEI Great Lakes Bathymetry (~90 m, native LWD) is not implemented; the codebase runs USGS Rohweder 2025 (~3 m, NAVD88) at every level (record only, no action)
+
+**Found 2026-07-27**, by an adversarial audit of C-103 and ADR-098's "Great Lakes datum branch" text against
+the actual marine code. Both documents named **NCEI Great Lakes Bathymetry** as the L1/L2 source and stated it
+needs no datum conversion because it is natively referenced to each lake's own low water datum. Neither claim
+matches what runs.
+
+**What the code actually does.** `_try_great_lakes()` in `providers/nearshore/swan.py`, via
+`_ensure_great_lake_dem()` / `fetch_great_lake_grid()` in `services/bathymetry_resolver.py`, is the sole Great
+Lakes bathymetry path at **L1, L2, and L3** (see the `ordered = [_try_operator, _try_great_lakes, ...]` call
+sites for both the L1 and L2/L3 chains). It downloads the **USGS Rohweder 2025** ScienceBase release (DOI
+`10.5066/P1DA6L6U`), cached to `/etc/weewx-clearskies/great_lakes/{lake}.tif` — the same NOAA OCM Great Lakes
+Coastal DEM lineage originally identified as the L3-only source, not a separate L1/L2 product. It is roughly
+3 m resolution and **NAVD88**-referenced (confirmed against NOAA's own InPort metadata record), which is why
+`_try_great_lakes()` hardcodes `grid["vertical_datum"] = "NAVD88"` — that label is correct about the data
+fetched. The code was never wrong; C-103's ruling and ADR-098's amendment were wrong about which product feeds
+it, and both are corrected in place (see C-103 above and ADR-098's "Great Lakes datum branch" section).
+
+**How the error arose.** NCEI Great Lakes Bathymetry and the USGS Rohweder 2025 / NOAA OCM Coastal DEM lineage
+are both "NOAA-family Great Lakes bathymetry" products, and the research behind the 2026-07-27 ruling conflated
+them — attributing the coarser NCEI product's stated datum behaviour to the finer product the code actually
+uses. Recorded as a process note, not a code defect: the datum handling downstream (`NAVD88 → LWD_IGLD85`
+conversion, verified per the ADR-098 amendment) was built against the DEM the code actually calls, so it is
+correct regardless of which product the register described.
+
+**Open option, not decided here.** NCEI Great Lakes Bathymetry remains **unimplemented** — it is not fetched,
+cached, or referenced by any code path found. It is recorded as a live option, with the tradeoff stated
+neutrally:
+
+- **NCEI Great Lakes Bathymetry** (~90 m nominal, 3 arc-second): natively referenced to each lake's own low
+  water datum, so a switch to it would need **no** datum conversion — but see C-101: the underlying compilation
+  is 1:250,000 scale with a 5 m contour interval, so the 90 m grid spacing does not carry 90 m of real
+  bathymetric information.
+- **USGS Rohweder 2025 / NOAA OCM Coastal DEM lineage** (~3 m, implemented today): far higher nominal
+  resolution, but NAVD88-referenced, so it requires the `NAVD88 → LWD_IGLD85` conversion this ADR-098 branch
+  performs.
+
+Which product the Great Lakes branch should use is an operator call, not recorded as decided by this entry.
+
+**Disposition: record only. No action taken or recommended.**
