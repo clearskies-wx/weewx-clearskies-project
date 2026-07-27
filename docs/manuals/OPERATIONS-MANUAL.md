@@ -188,6 +188,33 @@ Operators who do not configure a marine service never encounter this dependency.
 
 **Precedent:** This establishes the pattern for native dependencies in companion services: pip extras for opt-in features, clear detection with actionable error messages at feature-enable time, detection performed by the service that owns the dependency.
 
+### NOAA VDatum grid data (marine service, US surf/nearshore only)
+
+Converting SWAN bathymetry to a single vertical datum (LMSL) per cell (T8.11b, ADR-098 as amended) requires NOAA's published VDatum PROJ data directory: `proj.db` (carries the `NOAA` authority) plus its separation-grid TIFFs. This is **data, not a Python package** — it is not installed by `pip install "weewx-clearskies-marine[nearshore]"` and does not ship inside any package or container image. It must be obtained and placed on disk separately, once, on whichever host runs the marine service's nearshore (SWAN) provider.
+
+**Only required for US surf/fishing/beach-safety spots using the SWAN nearshore model.** Operators who do not configure a surf spot, or whose spots fall outside NOAA's grid coverage, never need this (see §4 SWAN wizard step / T8.11f — a non-US or out-of-coverage spot configuration is refused at setup with a message naming the gap, not run on mismatched datums).
+
+**Source, size, and known caveats.** Zenodo record 15184045, titled *"Vyperdatum grids (NWLD), Early release, Lacks version tag"* — one file, `proj.zip`, **14,009,147,384 bytes (13.0 GiB)**. Extracted: **14 GB, 663 files**, including `proj.db` (9.5 MB) and roughly 50 LMSL regional/national CRSs. Plan for **~28 GB transient** disk if the archive is kept alongside its extraction, plus the 14 GB steady-state footprint. Because the record is titled "early release" with no version tag, there is nothing to pin a download against; treat a future re-publication with a version tag (e.g. one built against PROJ database layout 1.4) as the trigger to revisit the `pyproj` pin below, not as a routine refresh.
+
+**Download must verify byte count and support resume — a clean `curl` exit is not sufficient evidence of a complete file.** Zenodo throttled and truncated a transfer once at 9.94 GB while `curl` still exited 0. Use `curl -C -` (resume) and compare the final file size against the byte count above before extracting.
+
+```bash
+curl -C - -L -o proj.zip "https://zenodo.org/records/15184045/files/proj.zip"
+[ "$(stat -c%s proj.zip)" = "14009147384" ] || { echo "size mismatch, re-run to resume"; exit 1; }
+```
+
+`unzip` is not a dependency to assume present; extract with Python's standard-library `zipfile` if it is not installed:
+
+```bash
+python3 -c "import zipfile; zipfile.ZipFile('proj.zip').extractall('/var/lib/weewx-clearskies/vdatum-grids')"
+```
+
+**Where it lives.** Default `/var/lib/weewx-clearskies/vdatum-grids`, overridable via the `CLEARSKIES_VDATUM_GRIDS` environment variable on the marine service process (`services/vertical_datum.py`). In a Docker deployment, this directory is not baked into the marine service image (14 GB is prohibitive for an image layer) — mount it as a volume or bind mount at the same path, or point `CLEARSKIES_VDATUM_GRIDS` at wherever it is mounted.
+
+**`pyproj` version is pinned to `==3.7.0` and the upper bound is load-bearing.** NOAA's `proj.db` is database layout 1.3. `pyproj>=3.7.1` (PROJ 9.5+) requires layout 1.4 and refuses to open it — but the refusal is only a `UserWarning`, after which `pyproj` silently falls back to its own bundled database. The `NOAA` authority is then simply absent and a NAVD 88 → LMSL conversion resolves to a **ballpark no-op**: a 0.0 m offset that looks like a completed conversion. Measured: `pyproj` 3.6.1 and 3.7.0 load the NOAA authority; 3.7.1 and later do not. **Do not bump `pyproj` in the marine `[nearshore]` extra past 3.7.0 without first confirming NOAA has republished `proj.db` at layout 1.4** (watch the Zenodo record above). The code checks for the NOAA authority and for a ballpark/all-zero result at runtime and raises rather than proceeding either way — but that is a safety net, not a substitute for respecting the pin.
+
+**Detection.** There is no wizard pre-check for this dependency today (unlike eccodes above) — a missing or wrong-layout grid directory surfaces as a `DatumConversionError` raised from `services/vertical_datum.py` naming the missing path or the version mismatch, at the point a SWAN bathymetry grid is next resolved.
+
 ---
 
 ## §2 Authentication
