@@ -4503,9 +4503,9 @@ orphaned `[marine]` extra — sequence after C-48), C-46 (`MARINE_PROVIDER_MODUL
 implements), C-38 (`assessment.waterTemp` now converts where it did not before), plus all previously
 recorded Phase 8 items.
 
-### 2026-07-27 — Surf model conformance round (marine `7fb75f9` … `ac6bd8a`)
+### 2026-07-27 — Surf model conformance round (marine `7fb75f9` … `c28588b`)
 
-Seven commits in `weewx-clearskies-marine`. None changes a formula, a component's responsibility, a
+Eight commits in `weewx-clearskies-marine`. None changes a formula, a component's responsibility, a
 schedule, or a published field's name/type/nullability. `bd8c928` moves an output *location* and
 carries an operator ruling in chat authorising it (CLAUDE.md trigger 3). Recorded here because the
 outcomes settle open items above.
@@ -4519,6 +4519,7 @@ outcomes settle open items above.
 | `bd8c928` | The deep-water reference is placed on the spot's own measured 15 m contour — the profile's `contour_15m_distance_m`, projected from the coastline anchor. The fixed 2.5 km fallback is removed; no locatable contour ⇒ no DWR output and an ERROR. | Huntington's reference moved from 17.29 m depth to 15.31 m (bilinear; 14.20 m nearest cell — the 100 m L2 grid straddles the contour). |
 | `35af390` | `endpoints/beach_profile.py` converts between the handoff and canonical partition index spaces at each lookup. Both crossings were latent while the two partition lists were the same object and went live when `83f0205` separated them. | On real 2026-07-27T08:00Z Huntington data the mapping is `[0, None]`. Response shapes unchanged. |
 | `ac6bd8a` | The T4B.1 per-transect POINTS bands are projected from the shoreline point on each transect's own line — its origin shifted shoreward by the profile-anchor offset — instead of from the operator-drawn segment origin. Same anchor rule as `bd8c928`, at the sibling call site. | Huntington transect 0's band was sized for 3.03 m → 1.01 m of water and sat in 8.51 m → 7.17 m, with no station in the target range; it now sits in 3.03 m → 1.01 m. Downstream, `select_hourly_handoff()` had been choosing a station by a depth its spectrum was not computed at. |
+| `c28588b` | The three contour-sized cross-shore grid edges (L3 shoreward, L3 offshore, L2 offshore) are projected from the coastline anchor `find_depth_contour_distance()` measured them from, not from the spot-pin centroid. Third instance of the same anchor rule, after `bd8c928` and `ac6bd8a`. | Huntington's L3 shoreward edge moved from anchor +179.6 m to anchor +30.0 m — it had sat on a 3.56 m seabed instead of the 1.78 m its own breaking-depth criterion names. The 15 m and 30 m edges were over-covered by 209.6 m (safe direction). Masked at Huntington by bbox slop around a 567 m diagonal pier; not masked for shorter or more shore-normal structures. |
 
 **Closed against `bed7ec7` and `7fb75f9`:** the finding recorded above that "the handoff clamped on
 all 73 timesteps … roughly 2.25× the breaking depth instead of the intended 1.3× — systematically too
