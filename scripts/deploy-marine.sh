@@ -247,6 +247,14 @@ PrivateTmp=true
 ReadWritePaths=${CONF_DIR}
 ReadWritePaths=/etc/weewx-clearskies
 ReadWritePaths=/var/run/weewx-clearskies
+# The B1 DEBUG trace (services/trace.py) writes
+# /var/log/weewx-clearskies/marine-trace-{YYYYMMDD}.jsonl when
+# CLEARSKIES_MARINE_DEBUG_TRACE is set. /var is read-only under
+# ProtectSystem=strict and the directory did not exist, so the trace silently
+# degraded to its own cannot-open path. LogsDirectory rather than a fourth
+# ReadWritePaths line: systemd creates the directory owned by User= above, so
+# no chown is needed here (CLAUDE.md bans chown/chmod on these hosts).
+LogsDirectory=weewx-clearskies
 
 [Install]
 WantedBy=multi-user.target
