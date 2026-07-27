@@ -1228,7 +1228,21 @@ The API polls the marine service health check every 60 seconds:
 GET {marine_service_url}/health
 ```
 
-No auth required. Response fields: `status`, `version`, `last_run`, `spots`, `run_in_progress`. Three consecutive failures → API removes marine capabilities from `/api/v1/capabilities` and continues serving last-good cached marine data. Non-marine API functionality is unaffected.
+No auth required. Response fields: `status`, `version`, `last_run`, `spots`, `run_in_progress`, `reasons`, `inputs`, `invariants`. Three consecutive failures → API removes marine capabilities from `/api/v1/capabilities` and continues serving last-good cached marine data. Non-marine API functionality is unaffected. (The API's failure-detection loop keys off HTTP-level failures / `last_run`, not off `status` — see B3, MARINE-MODEL-RESTORATION-PLAN.md, 2026-07-27.)
+
+**`status`** (B3, 2026-07-27 — previously hardcoded to `"ok"` on every call regardless of what the model was doing): one of `ok` / `degraded` / `failed`.
+
+- `failed` — the last cycle did not complete (`last_run` is `null`), or a required input (`ww3_boundary`, `wind`, `bathymetry`, `tide` — all four are required; a missing one aborts the SWAN run rather than substituting a default, per rules/coding.md §1) was unavailable, so nothing was published.
+- `degraded` — the last cycle completed and every required input was available, but an input was stale past its own monitoring threshold, or a B2 runtime invariant fired at or after `last_run`.
+- `ok` — last cycle completed, every input fresh, no invariant fired.
+
+**`reasons`** — list of short machine-readable strings explaining a non-`ok` status. Empty when `ok`.
+
+**`inputs`** — per-input freshness, one entry per required input: `{"available": bool, "age_s": int | null}`. An input never recorded (no fetch attempt observed yet this process) reports `{"available": false, "age_s": null}`.
+
+**`invariants`** — `{"fired_total": int, "last_fired_at": str | null, "last_fired_names": [str]}` from `services/invariants.py` (B2), scoped to `since=last_run`.
+
+Immediately after a service restart (module state is cleared, including after a deploy), `/health` reports `failed` until the first cycle completes — this is correct, not a regression; the operator is being told the truth rather than a stale `ok`.
 
 Operators can check marine service health directly:
 

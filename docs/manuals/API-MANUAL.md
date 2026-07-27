@@ -3293,25 +3293,46 @@ The marine service exposes a health check endpoint that the API polls every 60 s
 
 `GET {marine_service_url}/health` — no auth required.
 
-**Response:**
+**Response (B3, MARINE-MODEL-RESTORATION-PLAN.md, 2026-07-27 — `status` was previously hardcoded to `"ok"` on every call regardless of what the model was actually doing; `reasons`/`inputs`/`invariants` are additive):**
 
 ```json
 {
   "status": "ok",
   "version": "0.1.0",
   "last_run": "2026-07-22T14:00:00Z",
-  "spots": 2,
-  "run_in_progress": false
+  "spots": ["huntington-city-beach-pier"],
+  "run_in_progress": false,
+  "reasons": [],
+  "inputs": {
+    "ww3_boundary": {"available": true, "age_s": 3600},
+    "wind": {"available": true, "age_s": 1800},
+    "bathymetry": {"available": true, "age_s": 432000},
+    "tide": {"available": true, "age_s": 900}
+  },
+  "invariants": {"fired_total": 0, "last_fired_at": null, "last_fired_names": []}
 }
 ```
 
 | Field | Description |
 |-------|-------------|
-| `status` | `"ok"` when the service is healthy, `"degraded"` when running but a recent run failed |
+| `status` | One of `"ok"` / `"degraded"` / `"failed"` — **`failed` is new as of B3**; see below. |
 | `version` | Marine service package version |
-| `last_run` | ISO-8601 UTC timestamp of the last successful SWAN run |
-| `spots` | Number of configured surf spots with valid SWAN output |
+| `last_run` | ISO-8601 UTC timestamp of the last completed SWAN cycle, or `null` if none has ever completed |
+| `spots` | Configured surf spot ids (list of strings) |
 | `run_in_progress` | `true` when a SWAN run is currently executing |
+| `reasons` | List of short machine-readable strings explaining a non-`ok` status. Empty when `ok`. |
+| `inputs` | Per required input (`ww3_boundary`, `wind`, `bathymetry`, `tide`): `{"available": bool, "age_s": int \| null}`. An input never recorded reports `{"available": false, "age_s": null}`. |
+| `invariants` | `{"fired_total": int, "last_fired_at": str \| null, "last_fired_names": [str]}` from the B2 runtime invariant registry, scoped to firings at or after `last_run`. |
+
+**`status` resolution (precedence: `failed` > `degraded` > `ok`):**
+
+- `failed` — `last_run` is `null` (no cycle has ever completed — nothing has been published), or a required input is unavailable. All four inputs are required (rules/coding.md §1, C-77): a missing/failed fetch aborts the SWAN run rather than substituting a default, so an unavailable required input means nothing was published this cycle.
+- `degraded` — the cycle completed and every input is available, but an input is stale past its own monitoring threshold, or a B2 invariant fired at or after `last_run`.
+- `ok` — otherwise.
+
+Immediately after a service restart, `/health` reports `failed` until the first cycle completes — this is the honest state, not a regression.
+
+**Note:** `POST /setup/providers/test-marine`'s `TestMarineResponse` (§18 setup-endpoint table, API repo) still documents its own `status` field as `"ok" | "degraded"` only — that is a separate, narrower six-field pinned schema for the wizard's connectivity test (see the distinction called out below), not this endpoint's contract, and is unaffected by B3. It has not been updated to add `failed` as part of this task; flagging here rather than changing the API repo.
 
 **Failure response:** Three consecutive health check failures → API logs ERROR, removes marine capabilities from `/api/v1/capabilities`, and continues serving the last-good cached marine data. When the marine service recovers, the next successful health check re-fetches the manifest and restores capabilities.
 
