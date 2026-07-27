@@ -203,15 +203,28 @@ curl -C - -L -o proj.zip "https://zenodo.org/records/15184045/files/proj.zip"
 [ "$(stat -c%s proj.zip)" = "14009147384" ] || { echo "size mismatch, re-run to resume"; exit 1; }
 ```
 
-`unzip` is not a dependency to assume present; extract with Python's standard-library `zipfile` if it is not installed:
+**The archive extracts one level too deep — this is not optional to check.** `proj.zip` carries a top-level `proj/` directory inside it. A naive extract straight to the target directory lands `proj.db` at `.../vdatum-grids/proj/proj.db`, one level below where `services/vertical_datum.py` looks for it (`.../vdatum-grids/proj.db` — the file must sit **directly inside** the target directory, not in a `proj/` subdirectory beneath it). Every conversion then fails with "contains no proj.db," which reads like a corrupt download rather than a one-directory-too-deep extract. `unzip` is not a dependency to assume present; extract with Python's standard-library `zipfile`, then flatten the `proj/` level:
 
 ```bash
 python3 -c "import zipfile; zipfile.ZipFile('proj.zip').extractall('/var/lib/weewx-clearskies/vdatum-grids')"
+mv /var/lib/weewx-clearskies/vdatum-grids/proj/* /var/lib/weewx-clearskies/vdatum-grids/
+rmdir /var/lib/weewx-clearskies/vdatum-grids/proj
+```
+
+**Verify the extract before trusting it.** Expected result: **663 files**, with `proj.db` directly inside the target directory (not under a `proj/` subdirectory).
+
+```bash
+[ -f /var/lib/weewx-clearskies/vdatum-grids/proj.db ] || { echo "proj.db not at top level -- extract landed one directory too deep"; exit 1; }
+find /var/lib/weewx-clearskies/vdatum-grids -type f | wc -l   # expect 663
 ```
 
 **Where it lives.** Default `/var/lib/weewx-clearskies/vdatum-grids`, overridable via the `CLEARSKIES_VDATUM_GRIDS` environment variable on the marine service process (`services/vertical_datum.py`). In a Docker deployment, this directory is not baked into the marine service image (14 GB is prohibitive for an image layer) — mount it as a volume or bind mount at the same path, or point `CLEARSKIES_VDATUM_GRIDS` at wherever it is mounted.
 
-**`pyproj` version is pinned to `==3.7.0` and the upper bound is load-bearing.** NOAA's `proj.db` is database layout 1.3. `pyproj>=3.7.1` (PROJ 9.5+) requires layout 1.4 and refuses to open it — but the refusal is only a `UserWarning`, after which `pyproj` silently falls back to its own bundled database. The `NOAA` authority is then simply absent and a NAVD 88 → LMSL conversion resolves to a **ballpark no-op**: a 0.0 m offset that looks like a completed conversion. Measured: `pyproj` 3.6.1 and 3.7.0 load the NOAA authority; 3.7.1 and later do not. **Do not bump `pyproj` in the marine `[nearshore]` extra past 3.7.0 without first confirming NOAA has republished `proj.db` at layout 1.4** (watch the Zenodo record above). The code checks for the NOAA authority and for a ballpark/all-zero result at runtime and raises rather than proceeding either way — but that is a safety net, not a substitute for respecting the pin.
+**The ~14 GB `proj.zip` archive can be deleted once the extract is verified** (file count + `proj.db` present as above) — only the extracted directory is read at runtime. Whether to keep it around for a future re-extract (e.g. after a filesystem issue) versus reclaiming the disk is an operator decision, not a required step either way.
+
+**Great Lakes coverage is unverified.** The Great Lakes vertical-datum branch (ADR-098 as amended, C-103) needs a `NAVD88 → LWD_IGLD85` transform for its L3 source, using this same `pyproj` + NOAA-grid-directory mechanism. Whether this Zenodo grid set actually carries the Great Lakes (`IGLD85` family) separation grids alongside the ~50 LMSL regional/national CRSs it is known to carry has not been confirmed — check for the Great Lakes authority/grids after extraction rather than assuming coverage carries over from the ocean case.
+
+**`pyproj` version is pinned to `==3.7.0` and the upper bound is load-bearing.** NOAA's `proj.db` is database layout 1.3. `pyproj>=3.7.1` (PROJ 9.5+) requires layout 1.4 and refuses to open it — but the refusal is only a `UserWarning`, after which `pyproj` silently falls back to its own bundled database. The `NOAA` authority is then simply absent and a NAVD 88 → LMSL conversion resolves to a **ballpark no-op**: a 0.0 m offset that looks like a completed conversion. **A separation of exactly 0.0 m everywhere is the diagnostic signature of this failure, not a coincidence of datums** — no real NAVD 88 ↔ LMSL (or NAVD 88 ↔ `LWD_IGLD85`) separation is ever uniformly zero across a grid, so a converted grid reporting 0.0 m at every cell means the fallback fired, not that the two datums happen to coincide. Measured: `pyproj` 3.6.1 and 3.7.0 load the NOAA authority; 3.7.1 and later do not. **Do not bump `pyproj` in the marine `[nearshore]` extra past 3.7.0 without first confirming NOAA has republished `proj.db` at layout 1.4** (watch the Zenodo record above). The code checks for the NOAA authority and for a ballpark/all-zero result at runtime and raises rather than proceeding either way — but that is a safety net, not a substitute for respecting the pin.
 
 **Detection.** There is no wizard pre-check for this dependency today (unlike eccodes above) — a missing or wrong-layout grid directory surfaces as a `DatumConversionError` raised from `services/vertical_datum.py` naming the missing path or the version mismatch, at the point a SWAN bathymetry grid is next resolved.
 

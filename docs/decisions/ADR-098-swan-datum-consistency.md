@@ -2,7 +2,7 @@
 
 **Status:** Proposed
 **Date:** 2026-07-19
-**Amended:** 2026-07-26 — grid-wise conversion to LMSL adopted for the US (reversing the CMVD deferral), worldwide path enumerated, cross-level datum guard added. Amendments are marked inline.
+**Amended:** 2026-07-26 — grid-wise conversion to LMSL adopted for the US (reversing the CMVD deferral), worldwide path enumerated, cross-level datum guard added. 2026-07-27 — the single-datum contract is split by region: LMSL for ocean/tidal domains (unchanged), per-lake `LWD_IGLD85` for Great Lakes domains (new — the Great Lakes are non-tidal, so no tidal datum including LMSL applies to them). Amendments are marked inline.
 **Supersedes:** None
 **Related:** ADR-093 (SWAN nearshore model), ADR-095 (SWAN model corrections), C-90 (fabricated bathymetry / datum findings, `docs/planning/MARINE-SEP-CONCERNS.md`)
 
@@ -51,6 +51,8 @@ Every data product (bathymetry, tide predictions, water levels) carries its vert
 If datum matching cannot be confirmed (DEM datum is UNKNOWN, CO-OPS doesn't support the datum), the SWAN level fails explicitly with an ERROR log. The system never proceeds with an unverified datum mismatch.
 
 > **Amended 2026-07-26 — cross-level guard.** This clause was never enforced *between* levels, and the code reads one datum for the whole run ("L2 preferred, L1 fallback"), stamping it on every level. Nothing verifies that L1, L2 and L3 agree. They happen to agree today (all five live caches are NAVD 88) but by coincidence, not construction: the same Huntington box offers `socal_1as`/`socal_3as` on **MSL** alongside `orange_county_13_navd88_2015` on **NAVD 88**, and each level looks a DEM up independently. An L2/L3 disagreement would put the full 0.6 m breaking-height error in the surf zone silently. **Every level's datum must be verified to agree before a run; disagreement refuses.** Note that `UNKNOWN_CRM` is a truthy string and so passed this clause's existing check — the label was assigned by us, not published by the source, and is itself removed (the mosaic catalogue publishes `VerticalDatum` per raster).
+>
+> **Amended 2026-07-27 — the guard is per-region, because the common datum is now per-region (C-103, `docs/planning/MARINE-SEP-CONCERNS.md`).** The invariant this clause enforces has not changed shape — every level *within one SWAN domain* must still share exactly one datum — but which datum that is now depends on where the domain sits. Ocean/tidal domains unify on **LMSL** (`NOAA:1761`) as this ADR already specifies, unchanged. Great Lakes domains — non-tidal, so no tidal datum including LMSL applies to them — unify on that lake's own **`LWD_IGLD85`** (`NOAA:1759`, Low Water Datum on the International Great Lakes Datum 1985). The cross-level guard therefore runs **within a region, never across regions**: a Great Lakes run's L1/L2/L3 must agree with each other on `LWD_IGLD85`; an ocean run's levels must agree with each other on LMSL; a Great Lakes level's datum is never compared against an ocean level's, because the two are never inputs to the same SWAN domain. See "Great Lakes datum branch" below for the source routing and conversion pair this adds.
 
 ### Operator uploads
 
@@ -65,11 +67,20 @@ Operator specifies the datum from the CO-OPS-supported list: NAVD88, MLLW, MHW, 
 
 So the deferral rested on a single-point call against a flaky web service, not on the grid-wise offline capability. It is reversed.
 
-**NOW — United States.** Unify every SWAN input on **LMSL**:
+**NOW — United States, ocean/tidal domains.** Unify every SWAN input on **LMSL**:
 
 - L1 (ETOPO 2022 15 arc-sec) is natively MSL — no conversion.
 - L2/L3 regional DEMs convert **per cell** from NAVD 88 (or MHW/MHHW) to LMSL using NOAA's separation grids through PROJ.
 - One CO-OPS WLEVEL fetch in MSL, matching all levels.
+
+**Amended 2026-07-27 — Great Lakes datum branch (operator ruling, C-103, `docs/planning/MARINE-SEP-CONCERNS.md`).** The Great Lakes are non-tidal, so LMSL — a tidal datum — does not apply there: *"the Great Lakes are NOT AT SEA LEVEL"* (operator, verbatim). Confirmed against live data: CO-OPS Great Lakes stations publish only `GL_LWD` and no MSL at all — station 9087044 (Calumet Harbor) returns `GL_LWD: 577.43 ft` (176.0 m) with `LAT`/`HAT` both null. This is why the ADR's single-datum contract (above, and the cross-level guard amendment) is now "one datum per region" rather than "one datum everywhere."
+
+- **NOAA VDatum publishes a separate Great Lakes datum family**, distinct from the tidal family this ADR already validated: `IGLD85` (International Great Lakes Datum 1985), `LWD_IGLD85` (Low Water Datum on IGLD85), `OHWM_IGLD85` (Ordinary High Water Mark on IGLD85). Both families come from the same national NWLD 4.7.0 product line and share the source CRS `EPSG:6318+EPSG:5703`.
+- **Ruling: Great Lakes SWAN domains — bathymetry and WLEVEL alike — unify on `LWD_IGLD85`.** Verified separations from the LMSL/ocean control (−0.8274 m at HB Pier, T8.11a) are roughly 200× larger for the Great Lakes: about **−176.10 m** across the Lake Michigan basin, **−173.50 m** at Lake Erie — matching NOAA's published Low Water Datum plane elevations for those lakes (176.0 m Michigan–Huron, 173.5 m Erie). Anyone reading or writing code against these separations should not assume the ocean case's sub-metre scale.
+- **Bathymetry source routing, retargeted, not discarded.** NCEI Great Lakes Bathymetry (the existing L1/L2 source, `usgs_great_lakes` in the DEM priority chain) is natively referenced to each lake's own low water datum, so it needs **no conversion**. The L3-grade source, NOAA OCM Coastal DEM (~3 m), is on NAVD88 and needs `NAVD88 → LWD_IGLD85` before it can be combined with the NCEI-sourced L1/L2 grids. The T8.11a conversion pipeline (plain `pyproj`, pointed at NOAA's PROJ data directory — see below) is retargeted to this pair; it is generic to any PROJ-published vertical transform, so only the source/target CRS pair changes for the Great Lakes branch. **Whether NOAA's grid set covers this specific transform has not been verified** — flagged as a check to run, not assumed true.
+- **Runtime parity, same requirement as the WW3 boundary-criterion ruling (C-99).** Whichever code path selects a level's datum at runtime must route Great Lakes levels to `LWD_IGLD85` and ocean levels to `LMSL` — not only a config-time or setup-time diagnostic.
+
+**What this does not change.** L1 remains ETOPO 2022 for ocean domains per the existing 2026-07-26 ruling. This is additive: it defines the Great Lakes branch the original "NOW — United States" text did not have. No task status is marked complete by this amendment — implementation of the Great Lakes branch was in flight in the marine repo at the time this amendment was recorded.
 
 ~~Library: **`vyperdatum`** (`noaa-ocs-hydrography`) in preference to `coastalmodeling-vdatum`. Both are open and grid-capable, but `coastalmodeling-vdatum` hardcodes NOAA S3 paths in `_path.py` with no configurable base directory, whereas `vyperdatum` resolves grids via the `VYPER_GRIDS` environment variable and transforms through PROJ. That difference is what makes adding a jurisdiction a tweak rather than a fork.~~
 
