@@ -1021,6 +1021,19 @@ The next full run will cold-start (first 3-6 hours show reduced accuracy, then t
 
 Stationary quick updates (hourly) never save hotstart files. Only full nonstationary runs (every 6 hours) write `level{N}_hotstart.dat`. This prevents a diverged quick-update snapshot from contaminating the nonstationary warm-start chain.
 
+#### Surf-spot data-completeness conditions worth alerting on
+
+These are model-completeness signals, not crashes: the service keeps running and keeps serving, but a spot in one of these states publishes less than a full surf card. All are greppable in the marine service log.
+
+| Level | Condition | Operator-visible effect | What to do |
+|---|---|---|---|
+| **ERROR** | A spot's ~15 m contour cannot be located — the cached profile never reaches 15 m **and** carries no `contour_15m_distance_m` (or that distance falls shoreward of the point being projected from). Message names the spot. | No deep-water reference is emitted for that spot: **the swell card is empty** (`multiSwell: null`) for every timestep, and the 1D pipeline runs with no canonical partition list. The surf height, score, and beach profile are unaffected. | Re-push marine config so the grid-sizing chain regenerates the spot's profile against MEDIUM (L2) bathymetry. If the contour still cannot be found, the spot's bathymetry does not reach 15 m within the L2 domain — this is a spot/bathymetry problem, not a service fault. There is deliberately no fallback position. |
+| **WARNING** | No deep-water-reference spectral entries cached for a spot (whole forecast), or none for one timestep. Message names the spot, and the timestep where applicable. | Same as above for the affected timesteps. | Usually downstream of the ERROR above, or of a cache written before the deep-water reference channel existed. A single successful SWAN cycle repopulates it. |
+| **WARNING** | QB (breaking-fraction) coverage gap on a transect — logged once per transect per run with the reason and the count of stations and hours affected. | The handoff selection steps seaward over stations whose QB is unknown. A persistently dry outermost station is normal and benign; an unexpected per-hour gap is not. | Benign when it names one consistently dry station. Investigate if it names many stations or varies hour to hour. |
+| **WARNING** | A transect's bathymetric profile cannot be truncated at the handoff depth (handoff shallower than every sample, fewer than two samples left, or a non-physical depth). | That transect is skipped for that hour, exactly as one with no bathymetry is. The spot still reports from its remaining transects. | Check the spot's cached profile extent against its configured `max_hs_m`. Repeated occurrences across most transects mean the profile does not overlap the handoff range. |
+
+None of these conditions is retried or substituted. A visible gap is the intended outcome — the alternative is a confident number computed without all of the model's inputs.
+
 #### Bathymetry vertical datum requirement
 
 SWAN requires bathymetry (BOTTOM input) and water level (WLEVEL input) to use the same vertical datum. Mixing datums produces silently wrong depth calculations — SWAN does not detect or report datum mismatches.

@@ -647,7 +647,7 @@ HEAT MAP: All transects, all partitions, structure-affected flagged
 
 This design directly addresses three SURF-FIXIT-LIST items:
 - **SURF-11** (decomposition masks data): Fixed by decomposing at the handoff and carrying all partitions through the 1D model
-- **SURF-23** (swell display uses nearshore values): Fixed by displaying the handoff-point partitions as the swell card (deep water values)
+- **SURF-23** (swell display uses nearshore values): Fixed by displaying the **deep-water reference** partitions as the swell card. *(Correction 2026-07-27: this line read "the handoff-point partitions ... (deep water values)". The handoff is not the deep-water reference — it sits at `1.3 × Hs / γ`, roughly 2–7 m, inside or beside the surf zone, while the deep-water reference is one point per spot on the spot's measured ~15 m contour in L2. Publishing the handoff partitions as the swell card **is** SURF-23, not its fix; the code did exactly that until marine `83f0205`. See `docs/archive/SURF-FIXIT-LIST.md` SURF-23.)*
 - **SURF-22** (K-G at wrong depth): Fixed by applying K-G at each partition's actual break point from the 1D model
 
 ### Break point authority

@@ -3460,8 +3460,14 @@ components:
       description: Surf quality forecast for one spot at one timestep (post wave_transform + surf_scorer).
       properties:
         time: { type: string, format: date-time }
-        waveHeightAtBreak: { type: number, description: "group_wave_height; post-supplement Hsig (after wave_transform supplements)" }
-        swellHeight: { type: number, nullable: true, description: "Raw SWAN Hsig (significant wave height) before wave_transform.py supplements. Absent on WW3 fallback responses." }
+        # KNOWN CONTRACT DIVERGENCE, not introduced by the 2026-07-27 marine fixes and not
+        # resolved by them: endpoints/surf.py emits `waveHeightAtBreak: null` whenever
+        # SwellTrack produced no face height for the timestep (since marine fa1c482), while
+        # this schema declares the field required and non-nullable. Left as declared pending
+        # an operator ruling on which side moves — flipping `nullable` here is a data-contract
+        # change, not a doc sync.
+        waveHeightAtBreak: { type: number, description: "group_wave_height; Hs at the SwellTrack break point (breakingFaceHeight / 1.27). There is no SWAN-transect fallback." }
+        swellHeight: { type: number, nullable: true, description: "group_wave_height; height of the dominant multiSwell partition, sampled at the SWAN deep-water reference point (L2, the spot's measured ~15 m contour). Falls back to the cross-shore transect reference point's HSWELL when that timestep has no deep-water reference. Absent on WW3 fallback responses." }
         breakingFaceHeight: { type: number, nullable: true, description: "Trough-to-crest breaking wave face height via breaker formula (Komar-Gaughan or Caldwell per per-spot config). Primary surfer-scale height; display when surfHeightDisplay='face'. Absent on WW3 fallback." }
         breakingHawaiianHeight: { type: number, nullable: true, description: "Back-of-wave (Hawaiian) scale = breakingFaceHeight × 0.5. Display when surfHeightDisplay='hawaiian'. Null when breakingFaceHeight is null." }
         period: { type: number, description: "group_wave_period; dominant period" }
@@ -3479,6 +3485,14 @@ components:
         multiSwell:
           type: array
           nullable: true
+          description: >-
+            Swell partitions sampled at the SWAN deep-water reference point — one per spot,
+            in the Level 2 (100 m) grid, on the spot's own measured ~15 m contour. Partitions
+            are SWAN's own watershed output (companion TABLE PT* columns), not a decomposition
+            of the SPECOUT energy matrix. Never sampled at the SwellTrack handoff, which sits
+            in or beside the surf zone. Null when the deep-water reference is unavailable for
+            this timestep (no ~15 m contour locatable for the spot, or no PT* row for the
+            point/timestep) — the handoff partitions are never substituted.
           items: { $ref: '#/components/schemas/SpectralWaveComponent' }
       required: [time, waveHeightAtBreak, period, direction, qualityStars, qualityLabel, conditionsText, windQuality, swellDominance]
 

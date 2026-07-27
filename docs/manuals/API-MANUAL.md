@@ -2047,16 +2047,18 @@ Surf quality forecast for one spot at one timestep.
 | `conditionsText` | str | — | No | (locale) Natural-language conditions summary |
 | `windQuality` | str | — | No | (locale) "glassy", "offshore", "cross_offshore", "cross", "cross_onshore", "onshore" |
 | `swellDominance` | float | — | No | Ratio of primary swell energy to total energy (0.0–1.0) |
-| `multiSwell` | list[SpectralWaveComponent] | — | Yes | Individual swell systems from SWAN's own watershed partitioning — TABLE PT* output, not a decomposition of the SPECOUT energy matrix (T3.3/T3.5, algorithm replaced by T4B.2). `null` when SPECOUT is unavailable for this timestep, **or** when PT* partition data is unavailable for the point/timestep (TABLE file missing, or no coordinate match within tolerance) — neither case is recomputed. Not populated from NDBC. Every component's `frequencyRange` is `[0.0, 0.0]` (see `SpectralWaveComponent` above). |
+| `multiSwell` | list[SpectralWaveComponent] | — | Yes | Individual swell systems from SWAN's own watershed partitioning — TABLE PT* output, not a decomposition of the SPECOUT energy matrix (T3.3/T3.5, algorithm replaced by T4B.2). **Sampled at the deep-water reference point: one per spot, in the L2 grid, on the spot's measured ~15 m contour — never at the SwellTrack handoff.** `null` when SPECOUT is unavailable for this timestep, when PT* partition data is unavailable for the point/timestep (TABLE file missing, or no coordinate match within tolerance), **or when the spot has no locatable 15 m contour** so no deep-water reference is emitted at all — none of these is recomputed and the handoff partitions are never substituted (marine `83f0205`, `bd8c928`). Not populated from NDBC. Every component's `frequencyRange` is `[0.0, 0.0]` (see `SpectralWaveComponent` above). |
 | `scoring` | SurfScoringBreakdown | — | Yes | Per-factor scoring breakdown (see below) |
-| `swellHeight` | float | `group_wave_height` | Yes | SWAN HSWELL at the ~10m depth point (swell-only height, display value). `null` when no transect output. |
-| `breakingFaceHeight` | float | `group_wave_height` | Yes | K-G/Caldwell face height (trough-to-crest) at ~10m depth. `null` when unavailable. |
+| `swellHeight` | float | `group_wave_height` | Yes | Height of the dominant `multiSwell` partition — i.e. the deep-water reference, the same point as `multiSwell` (marine `83f0205`). When the deep-water reference is unavailable for that timestep the field falls back to the cross-shore transect reference point's SWAN `HSWELL`, or to that point's `HSIGN` when `HSWELL` is absent — a different quantity at a different place; `multiSwell` still goes `null`. Nullable in the schema, but not emitted null in practice: a timestep whose reference point carries no `waveHeight` is skipped in its entirety, so an entry that exists always carries a `swellHeight`. |
+| `breakingFaceHeight` | float | `group_wave_height` | Yes | Face height (trough-to-crest) at SwellTrack's break point — the H1/10 Rayleigh factor (1.27 × Hs) applied to the break-point Hs, per ADR-095 Amendment 1 "K-G/Caldwell — amended". `null` when unavailable. |
 | `breakingHawaiianHeight` | float | `group_wave_height` | Yes | Hawaiian scale = `breakingFaceHeight × 0.5`. `null` when unavailable. |
 | `windSource` | str | — | Yes | `"hrrr"` for forecast timesteps; `"station"` or `"forecast_provider"` for t=0. |
 | `breakPoints` | list[object] | — | Yes | QB peak locations along the cross-shore transect (T3.4). `null` when no QB peak ≥ 0.25 detected (flat conditions, single-point mode, or QB data absent). Multiple entries for multi-bar beaches (outer bar + inner bar). |
 | `breakPoints[].distanceFromShore` | float | — | — | Distance from shore in meters. |
 | `breakPoints[].depth` | float | — | — | Water depth at the break point in meters. |
 | `breakPoints[].waveHeight` | float | — | — | Wave height (HSIGN) at the break point in meters (not unit-converted — physical position). |
+
+> **Sampling position — corrected 2026-07-27.** `swellHeight` and `breakingFaceHeight` previously read "at the ~10m depth point" / "at ~10m depth". Both are void: ADR-095 Amendment 2 states the ~10 m reference point does not exist in the current architecture, and Amendment 1 moved the face-height calculation to SwellTrack's break point.
 
 #### SurfScoringBreakdown
 
@@ -2380,19 +2382,35 @@ Four enrichment processors for marine data. Each follows the existing enrichment
 **Data pipeline per forecast timestep (ADR-095 corrected, amended for SwellTrack):**
 
 ```
-SWAN L2 deep-water reference point at ~15m depth (POINTS + SPECOUT + TABLE PT*)
+SWAN L2 deep-water reference point, on the spot's measured ~15m contour (POINTS + SPECOUT + TABLE PT*)
   → SWAN's own watershed partitions from TABLE PT* columns (T4B.2) → N swell partitions
+  → carried on the internal "spectral_dwr" channel
   → store as multiSwell (deep-water values, comparable to NDBC buoy; frequencyRange always [0.0, 0.0])
+  → swellHeight = dominant partition height; cross-swell and swell-dominance scoring inputs
+  → canonical partition list for partition matching
 
 SWAN handoff point (L3 CURVE at structure-affected depth, or L2 at 15m for open spots — SPECOUT + TABLE PT*)
   → SWAN's own watershed partitions from TABLE PT* columns (T4B.2) → N partitions for SwellTrack input
+  → carried on the internal "spectral" channel, with the SPECOUT freqs/dirs/energy arrays
   → match to canonical partition list from the deep-water reference point
+  → a handoff partition matching nothing in the canonical list lands in the "other" bucket,
+    partitionIndex = -1
 
 PT* data unavailable for a given (point, timestep) — TABLE missing, or no coordinate match
 within tolerance — → partitions empty, WARNING logged naming spot and timestep, never recomputed
 (no-silent-fallback rule)
 
+Deep-water reference unavailable — for the whole forecast (the spot has no locatable 15m
+contour, so no DWR POINTS/SPECOUT/TABLE is emitted at all) or for one timestep —
+  → multiSwell null, canonical partition list None, WARNING logged
+  → the handoff partitions are NEVER substituted: they are sampled at the handoff depth,
+    inside or beside the surf zone, and publishing them as the swell card is the defect this
+    rule exists to prevent (SURF-23)
+
 Each partition × each transect → independent SwellTrack run (handoff to shore)
+  → the transect bathymetry profile is truncated at that transect's per-hour handoff depth
+    before the model runs, so SwellTrack never re-shoals water SWAN already carried
+  → a profile that cannot be truncated there is skipped with a WARNING, never run untruncated
   → Hs at 3-5m CUDEM resolution (friction enabled: cfjon=0.038 swell, 0.067 windsea)
   → break point: H/d = gamma crossing
   → breaker type: Iribarren number (xi_0)
@@ -2418,17 +2436,23 @@ Across open transects:
 surf_scorer.score_surf(bestPeakFaceHeight, DSPR, partitions, ...) → quality score
 ```
 
-**Legacy pipeline (fallback when SwellTrack unavailable):**
+**Cross-shore transect reference point (what remains of the pre-SwellTrack path):**
 
 ```
-SWAN cross-shore CURVE transect output
-  → find ~10m depth point on transect
-  → HSWELL at ~10m depth → store as swellHeight
-  → HSIGN at ~10m depth → store as waveHeightAtBreak (backward compatible)
-  → breaker_height.hsig_to_face_height(raw HSIGN, Tp, depth, formula, source="deep_water")
-  → store as breakingFaceHeight
-  → degraded: true in response
+SWAN cross-shore transect output for the timestep
+  → select_reference_point() (services/surf_pipeline_timestep.py):
+      the transect point just offshore of the biggest QB peak (>= 0.25),
+      or — when nothing is breaking — the point nearest 10 m depth
+  → HSIGN at that point: required. Absent → the whole timestep is skipped.
+  → HSWELL at that point → swellHeight, UNLESS the deep-water reference has
+    partitions for this timestep, in which case the dominant partition's
+    height overwrites it (marine 83f0205)
+  → DSPR at that point → directionalSpread, and the directional-spread
+    scoring sub-factor
+  → QB peaks along the transect → breakPoints
 ```
+
+> **Corrected 2026-07-27.** This block previously read "find ~10m depth point on transect / HSWELL at ~10m depth → store as swellHeight / HSIGN at ~10m depth → store as waveHeightAtBreak (backward compatible) / breaker_height.hsig_to_face_height(..., source="deep_water") → store as breakingFaceHeight / degraded: true in response". Three parts of that are void. The reference point is not a fixed ~10 m depth — ADR-095 Amendment 2 states the ~10 m reference point does not exist in the current architecture, and `select_reference_point()` picks by QB peak, using 10 m only as the no-breaking tiebreak. `waveHeightAtBreak` and `breakingFaceHeight` have no transect-derived fallback at all: when SwellTrack produces no face height, both are `null` (`endpoints/surf.py`). And `degraded` was replaced by `modelStatus`.
 
 **SWAN integration (ADR-095 corrections):** All components below run in the marine service.
 
@@ -2449,7 +2473,9 @@ SWAN cross-shore CURVE transect output
 
 **SWAN runner:** `services/swan_runner.py` in the marine service — executes two SWAN runs per cycle (outer grid + inner nest). Writes input files (computational grid, wind field, boundary spectra, bathymetry, WLEVEL, CURRENT, OBSTACLE, output CURVE transects), spawns SWAN subprocess, parses TABLE output and SPECOUT files. Output: transect data per surf spot per timestep across 72 forecast hours. Working directory: `/var/run/weewx-clearskies/swan/` (fixed path, not tempfile). **Hotstart:** each run writes a hotstart file after `COMPUTE`; the next run reads it via `INIT HOTSTART` so t=0 immediately has the real wave field from the previous run (no cold-start spin-up). Hotstart files persist at `{outer,inner}_hotstart.dat` in the SWAN workdir.
 
-**Cross-shore CURVE transect output (ADR-095).** Each surf spot gets a CURVE transect perpendicular to the beach, from ~15m depth to ~1m depth, ~50m spacing (10–20 output points). Direction derived from `beach_facing_degrees + 180°`. Replaces the single-point OUTPUT POINTS command. TABLE output at each transect point: `HSIGN HSWELL DIR TM01 DEPTH QB DISSURF DSPR XP YP` (SETUP removed — SWAN SETUP command disabled in parallel OpenMP runs; `setup` field returns `null` in API responses). SPECOUT (2D directional-frequency spectrum) at the ~10m depth point only (one per spot). Break points identified by QB peaks along the transect.
+**Cross-shore CURVE transect output (ADR-095).** Each surf spot gets a CURVE transect perpendicular to the beach, from ~15m depth to ~1m depth, ~50m spacing (10–20 output points). Direction derived from `beach_facing_degrees + 180°`. Replaces the single-point OUTPUT POINTS command. TABLE output at each transect point: `HSIGN HSWELL DIR TM01 DEPTH QB DISSURF DSPR XP YP` (SETUP removed — SWAN SETUP command disabled in parallel OpenMP runs; `setup` field returns `null` in API responses). Break points identified by QB peaks along the transect.
+
+> **SPECOUT placement — corrected 2026-07-27.** The paragraph above previously ended "SPECOUT (2D directional-frequency spectrum) at the ~10m depth point only (one per spot)." That is void — ADR-095 Amendment 2 states the ~10 m reference point does not exist in the current architecture. There are two SPECOUT extractions per spot, each with its own companion `TABLE PT*`: the **deep-water reference** (one per spot, L2, on the spot's measured ~15 m contour) and the **handoff** (one per unique handoff grid cell, L3 where L3 runs, otherwise the same L2 point). ADR-095 Amendment 1 "SPECOUT extraction — amended"; PROVIDER-MANUAL §14.13 "Multi-SPECOUT extraction".
 
 **SWAN physics enabled (ADR-095).** TRIAD (Eldeberky 1996 defaults) for shallow-water triad wave-wave interactions — enabled at all levels. SETUP removed (unsupported in parallel OpenMP runs; nest boundary condition structurally wrong). Setup effect is delivered via WLEVEL input (tide + future analytic estimate). Per-level DIFFRACTION: stabilized (`DIFFRACTION 1 0.2 27`) at Level 3 only.
 
@@ -2460,7 +2486,7 @@ SWAN cross-shore CURVE transect output
 | Field | What it is | Source |
 |---|---|---|
 | `swellHeight` | Dominant deep-water swell partition height | Deep-water reference point at ~15m (L2), SWAN's own watershed partitions from TABLE PT* (T4B.2). Comparable to NDBC buoy reports. |
-| `waveHeightAtBreak` | Post-supplement total wave height (backward compatible) | HSIGN at break point from SwellTrack (or ~10m SWAN fallback) |
+| `waveHeightAtBreak` | Total wave height at the break point (backward-compatible field name) | `breakingFaceHeight ÷ 1.27` — the SwellTrack break-point Hs. **No SWAN fallback:** `null` whenever SwellTrack produced no face height (`endpoints/surf.py`). The former "or ~10m SWAN fallback" is void — ADR-095 Amendment 2 states the ~10 m reference point does not exist in the current architecture. |
 | `breakingFaceHeight` | Trough-to-crest breaking face height at actual break point | 1.27 × Hs at SwellTrack break point (H1/10 Rayleigh factor). Best peak across open transects. |
 | `breakingHawaiianHeight` | Back-of-wave height (×0.5 of face height) | breakingFaceHeight × 0.5 |
 | `bestPeakFaceHeight` | Highest face height among open transects | Max of breakingFaceHeight across non-structure-affected transects |
@@ -2510,9 +2536,15 @@ Two formulas supported, configured per-spot via `breaker_formula` in the marine 
 
 **Relationship to the SWAN→SwellTrack handoff** (decided 2026-07-25, ADR-093 Amendment 2). `1.3 × max_hs_m / gamma` sizes SwellTrack's fine zone for the spot's **largest** swell — that is correct here, because the cached profile must serve every forecast hour including the biggest. Do not reuse this expression as the handoff depth: the handoff moves per forecast hour with that hour's own breaking depth (`Hs(hour) / gamma`), and freezing it at the largest-swell value was an error corrected on 2026-07-25. The fine zone is a static property of the cached profile; the handoff is a per-hour sampling choice. `structure_zone_depth` can only deepen the fine zone — it never moves the handoff.
 
+**SwellTrack starts at the handoff, not at the seaward end of the profile** (marine `7fb75f9`). The per-transect, per-hour handoff depth is resolved before the model runs and the cached profile is truncated there — the seaward-most profile sample at or shallower than the handoff becomes the model's first point. SwellTrack takes its shoaling reference (`Cg0`) from the first point of whatever profile it is handed, so without the truncation the handoff `Hs` — which SWAN had already carried to the handoff depth — was injected at the profile's deepest sample and shoaled a second time over water SWAN had already modelled. Truncation is on the **raw, untided** profile depth, matching the upstream handoff selection, and it snaps shoreward to an existing sample so the model can never start seaward of the handoff. The handoff is keyed by transect index, so every partition of a transect gets an identical grid and the shared-grid RSS combination holds by construction. A profile that cannot be truncated (handoff shallower than every sample, fewer than two samples left, non-physical depth) logs a WARNING and the transect is skipped — it never falls back to the untruncated profile.
+
+The dispersion relation `ω² = g·k·tanh(kd)` is solved by Newton-Raphson on the dimensionless form `y·tanh(y) = x`, started from the Fenton & McKee (1990) explicit approximation, with a relative-step convergence test and an iteration cap (marine `7fb75f9`). The same equation was previously iterated as a fixed-point map a fixed number of times; that map does not converge for `kd ≲ 1` and returned wavelengths as low as 24% of the true value in shallow water.
+
 The fine zone extends to whichever is deeper: the maximum breaking depth with shoaling margin (`1.3 × max_hs_m / gamma`) or the structure interaction depth (`structure_zone_depth` — deepest structure depth + margin, 0.0 when no structures configured). The 1.3× margin accounts for shoaling amplification before breaking (a 4m offshore swell can break at ~7m depth, not 5.5m). `structure_zone_depth` is 0.0 by default — it only extends the fine zone when structures are present. Structure changes re-trigger profile generation.
 
 The CUDEM source profile is interpolated to the variable-resolution grid using **PCHIP** (Piecewise Cubic Hermite Interpolating Polynomial) — preserves sandbar curvature without overshoot artifacts. The interpolated profile is generated once at spot setup and cached at `/etc/weewx-clearskies/spot_profiles/{spot_id}.json`. SwellTrack reads the pre-interpolated profile from the cache on every call. Structure changes re-trigger profile generation.
+
+> **Every distance in a cached spot profile is measured from the profile's coastline anchor, never from the spot pin.** This is a property of how the profile is generated, not a convention a consumer may choose: `services/grid_sizing_chain.py` passes the anchor (`coast_lat`, `coast_lon` — from `find_shoreline_from_grid()`, the depth-zero crossing shoreward of the pin) into both `extract_native_profile_from_grid()`, which produces the per-sample `distance_m` values, and `enrichment/bathymetry.py`'s `find_depth_contour_distance()`, which produces `contour_15m_distance_m` and `contour_30m_distance_m`. The anchor is stored in the same JSON as `coastline_lat`/`coastline_lon`. **A consumer that projects one of these distances from the spot pin overshoots by the pin's own offshore offset from the anchor** — at `huntington-city-beach-pier` the pin is on the pier, 209.6 m offshore of the anchor on bearing 238.0°, in 4.26 m of water. The operator-drawn shoreline segment is not the anchor either: it lies 213.5 m offshore of it at the same spot. See PROVIDER-MANUAL §14.15 "Per-spot profile and grid-sizing caches" and the anchor note under "Multi-SPECOUT extraction" for the producer side and the two consumers that got this wrong (marine `bd8c928`, `ac6bd8a`).
 
 **Precomputed SwellTrack cache (T4B).** `GET /api/v1/surf/{locationId}`'s per-timestep loop no longer runs the 1D pipeline on every request — it reads a precomputed result from the SWAN forecast cache (`payload["swelltrack"][validTime]`), falling back to the on-demand call only on a cache miss or a malformed entry. The precompute happens once per forecast timestep per spot at the end of each successful SWAN cycle. See PROVIDER-MANUAL §14.15 "Precomputed SwellTrack cache" for the full design, the measured cache-size tradeoff, and why `GET /api/v1/surf/{locationId}/profile` (the beach-profile endpoint) deliberately stays on its on-demand call rather than reading this cache.
 
@@ -2545,7 +2577,7 @@ Full research at `docs/planning/briefs/WAVE-BREAKING-CONVERSION-BRIEF.md`.
 | `dataAge` | integer (seconds) | Age of the SWAN output |
 | `breakerFormula` | `"komar_gaughan"` or `"caldwell"` | Which formula was used for this spot |
 | `surfHeightDisplay` | `"face"` or `"hawaiian"` | Operator's configured display preference |
-| `directionalSpread` | float (degrees) | DSPR from SWAN TABLE at ~10m depth (ADR-095). Typically 10–40° for nearshore conditions |
+| `directionalSpread` | float (degrees) | DSPR from SWAN TABLE at the cross-shore transect reference point — `select_reference_point()`, not a fixed depth (the "at ~10m depth" this row used to carry is void; ADR-095 Amendment 2). Typically 10–40° for nearshore conditions |
 | `setup` | float \| null | Wave-induced setup. Currently `null` — SETUP command removed (unsupported in parallel runs). Future: analytic estimate via WLEVEL injection. |
 
 **Wind source for surf quality scoring (ADR-094, updated ADR-096):**
@@ -2607,9 +2639,11 @@ Wind input for the surf scorer uses HRRR forecast wind for forecast timesteps (`
 | Sub-factor | Weight within Organization | Effective weight | Source | Scoring |
 |---|---|---|---|---|
 | Wind effect | 50% | 15% | HRRR/station wind | Offshore = best, onshore = worst. Same classification as before. |
-| Swell dominance | 25% | 7.5% | SWAN TABLE PT* at ~10m | Ratio of primary swell energy to total energy, computed over the same watershed partitions as `multiSwell` (T4B.2). Not NDBC. |
-| Directional spread | 15% | 4.5% | SWAN TABLE DSPR at ~10m | < 15° → 1.0, 15–25° → 0.7, 25–35° → 0.4, > 35° → 0.2 |
-| Cross-swell interference | 10% | 3% | SWAN SPECOUT at ~10m | No cross-swell → 1.0, secondary system > 50% primary energy at > 30° angle diff → 0.4 |
+| Swell dominance | 25% | 7.5% | SWAN `TABLE PT*` at the **deep-water reference** (L2, the spot's measured ~15 m contour) | Ratio of primary swell energy to total energy, computed over the same watershed partitions as `multiSwell` (T4B.2). Not NDBC. |
+| Directional spread | 15% | 4.5% | SWAN `DSPR` at the cross-shore transect reference point | The reference point is the transect point just offshore of the largest break, or — when nothing is breaking — the point nearest 10 m depth (`services/surf_pipeline_timestep.py` `select_reference_point()`). < 15° → 1.0, 15–25° → 0.7, 25–35° → 0.4, > 35° → 0.2 |
+| Cross-swell interference | 10% | 3% | SWAN `TABLE PT*` at the **deep-water reference** (same partition list as `multiSwell`) | No cross-swell → 1.0, secondary system > 50% primary energy at > 30° angle diff → 0.4 |
+
+> **Sampling position — corrected 2026-07-27.** The three rows above previously read "at ~10m". That was stale pre-amendment text: ADR-095 Amendment 2 states the ~10 m reference point does not exist in the current architecture, and ADR-096 Amendment 1 places the cross-swell input "at the deep-water reference point (L2 at ~15m)". Swell dominance and cross-swell both operate on the deep-water partition list (`enrichment/surf_scorer.py` `score_surf(multi_swell=...)`, fed from the `spectral_dwr` extraction — marine `83f0205`). Directional spread has never come from a fixed depth; it is read from the selected cross-shore transect point.
 
 Organization sub-score = weighted sum of sub-factors × 30.
 
@@ -2867,14 +2901,14 @@ The NWS SRF text product's `waterTemp` field (a manually-entered forecaster valu
 | `forecast[].conditionsText` | str | Composed natural-language summary |
 | `forecast[].windQuality` | str | "Offshore"/"Glassy"/"Cross-shore"/"Onshore" |
 | `forecast[].windSource` | str | `"hrrr"` or `"gfs"` for forecast timesteps, `"station"` or `"forecast_provider"` for `t=0` (ADR-096) |
-| `forecast[].swellHeight` | float | HSWELL at ~10m depth in display units (ADR-095) |
-| `forecast[].waveHeightAtBreak` | float | Post-supplement HSIGN at ~10m in display units (backward compatible) |
+| `forecast[].swellHeight` | float | Dominant deep-water-reference partition height in display units (L2, the spot's measured ~15 m contour — marine `83f0205`); falls back to the transect reference point's HSWELL when that timestep has no deep-water reference |
+| `forecast[].waveHeightAtBreak` | float | SwellTrack break-point Hs (`breakingFaceHeight ÷ 1.27`) in display units, or `null` (backward-compatible field name) |
 | `forecast[].breakingFaceHeight` | float | Trough-to-crest breaking face height in display units |
 | `forecast[].breakingHawaiianHeight` | float | Back-of-wave height (×0.5 of face height) in display units |
 | `forecast[].period` | float | Dominant period in seconds |
 | `forecast[].direction` | float | Swell direction in degrees |
-| `forecast[].multiSwell` | list[object] | Spectral breakdown from SWAN SPECOUT per timestep (not NDBC — ADR-095/096) |
-| `forecast[].directionalSpread` | float | DSPR at ~10m depth in degrees (ADR-095) |
+| `forecast[].multiSwell` | list[object] \| null | Swell partitions at the deep-water reference per timestep (not NDBC — ADR-095/096); `null` when no deep-water reference exists for that timestep |
+| `forecast[].directionalSpread` | float | DSPR at the cross-shore transect reference point, in degrees (ADR-095; not a fixed ~10 m depth) |
 | `forecast[].setup` | float \| null | Wave-induced setup. Currently always `null` — SWAN SETUP command removed. Field retained for API contract stability. |
 | `forecast[].breakPoints` | list[object] \| null | QB peak locations — break points along the transect (T3.4) |
 | `forecast[].scoring` | object | 3-factor + 3-penalty scoring breakdown (ADR-096) |
@@ -2908,8 +2942,17 @@ SWAN always produces multi-timestep output. The dashboard's 72-hour forecast cha
 | `locationId` | str | Location slug |
 | `timestep` | str \| null | ISO-8601 forecast time this profile is for (the timestep closest to now); null when no forecast timestep exists at all |
 | `modelStatus` | str | `"ok"` or `"unavailable"` (SURF-PUBLISH-RESULTS-ONLY §3.6) |
-| `perPartitionBreaks` | list[object] \| null | Per-partition break overlay, serialized from the pipeline's `per_partition_breaks`; null when `modelStatus` is `"unavailable"` |
+| `perPartitionBreaks` | list[object] \| null | Per-partition break overlay, serialized from the pipeline's `per_partition_breaks`; null when `modelStatus` is `"unavailable"`. `partitionIndex` is a **canonical** (deep-water-reference) index, plus `-1` for the aggregated "other" bucket — see "Two partition index spaces" below. |
 | `metadata` | object | See below |
+
+**Two partition index spaces (marine `35af390`).** This endpoint's response mixes values derived from both SWAN spectral extractions, and they are indexed differently:
+
+- **Canonical** — the deep-water reference (L2, the spot's measured ~15 m contour) partition list. `perPartitionBreaks[].partitionIndex` and `breakPoints[].partitionInfo.partitionIndex` are values in this space, plus `-1` for the aggregated "other" bucket that handoff partitions matching no canonical partition fall into.
+- **Handoff** — the SwellTrack boundary-condition partition list. The pipeline's internal per-transect results are ordered by it.
+
+The two coincided until marine `83f0205` gave the two extractions separate channels and `bd8c928` moved the deep-water point onto the 15 m contour; the lists now differ in length, ordering and content, and the endpoint converts between the spaces at each lookup rather than treating an index from one as valid in the other. Where the pipeline ran with **no** canonical list (no deep-water reference for the timestep) or reported `degraded`, `partitionIndex` falls back to handoff ordering and the two spaces coincide again — that degrade is logged at WARNING and is never repaired by substituting the handoff partitions for the deep-water ones.
+
+A handoff partition that matches no canonical partition still has its break points published — attributed to the `-1` "other" bucket, or, when no "other" bucket exists (the partition broke only on structure-affected transects, which are excluded from aggregation), published with `partitionInfo: null` and a WARNING naming the transect and handoff index. Break points are never dropped and never attributed to partition 0. Response field names, types and nullability are unchanged by this.
 
 **`transect_index=all`:** `data.profiles` is a `list[object]` — one entry per transect, each shaped as the single-transect fields below — or `null` when `modelStatus` is `"unavailable"`.
 
@@ -2921,7 +2964,7 @@ SWAN always produces multi-timestep output. The dashboard's 72-hour forecast cha
 | `isStructureAffected` | bool \| null | True when this transect crosses a discovered OBSTACLE |
 | `transectBearingDeg` | float \| null | Transect bearing in degrees |
 | `transect` | list[object] \| null | RSS-combined Hs envelope from handoff to shore (per-partition combination, depth-limited saturation applied) |
-| `breakPoints` | list[object] \| null | H/d = gamma crossings with Iribarren number, breaker type, and face height |
+| `breakPoints` | list[object] \| null | H/d = gamma crossings with Iribarren number, breaker type, and face height. Each carries `partitionInfo` (`partitionIndex`/`periodS`/`directionDeg`/`classification`/`heightM`), nullable — see "Two partition index spaces" above. |
 | `waveShapes` | list[object] \| null | Stokes 2nd order / cnoidal / bore surface shape samples from `run_1d_analytical()`, computed on the dominant swell partition |
 | `surfZones` | object \| null | Impact / foam / total / reform-trough zone widths |
 | `jackingFactors` | list[object] \| null | Per-bar `barIndex`/`distance`/`factor` (Hs at bar crest ÷ Hs approach) |

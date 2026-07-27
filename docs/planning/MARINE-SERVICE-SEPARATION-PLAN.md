@@ -15,7 +15,7 @@
 | **Phase 2** — TLS + remote mode | Code landed; QC Gate 2 never formally closed |
 | **Phase 3** — SWAN caching + E2E | **NOT closed.** Root cause is live: see below |
 | **Phase 4** — Marine service repo + scaffold | **COMPLETE. QC Gate 4 CLOSED 2026-07-25** |
-| **Phase 4A** — SwellTrack pipeline + vocabulary | **Tasks complete; QC Gate 4A walked but NOT a clean pass** — see `briefs/P4A-QC-GATE-4A-RESULTS.md`. The "3 of 8 tasks done, T4A.3 halted" text that stood here until 2026-07-25 contradicted this document's own task table below, which records T4A.3 and every other task as DONE. Corrected to match the detail table. |
+| **Phase 4A** — SwellTrack pipeline + vocabulary | **Tasks complete; QC Gate 4A walked but NOT a clean pass** — see `../archive/P4A-QC-GATE-4A-RESULTS.md`. The "3 of 8 tasks done, T4A.3 halted" text that stood here until 2026-07-25 contradicted this document's own task table below, which records T4A.3 and every other task as DONE. Corrected to match the detail table. |
 | **Phase 4B** — Per-transect grid-derived handoff | **PARTIALLY IMPLEMENTED AND DEPLOYED** — not "not started." See the corrected status block below. |
 | **Phase 5** — Move provider modules | **CODE COMPLETE.** Adversarial audit run 2026-07-25: C-28 cleared with evidence, one HIGH finding (C-31, dispatch registry held only the scaffold stub) fixed in Phase 6. |
 | **Phase 6** — API companion proxy | **COMPLETE. QC Gate 6 walked and passed with two named exceptions (C-40, C-48), 2026-07-25.** See the Phase 6 closeout below. |
@@ -284,13 +284,13 @@ Full evidence in `c:	mp\marine-sep-P4-scratch.md`.
 | T4A.12 (remove Supplement 4 topographic multipliers) | **DONE** `7dd9899` + `4d58957` (API-MANUAL), coordinator-verified |
 | T4A.8 (SurfBeat `NameError`) | **DONE** `08ce616` — 6 F821 at parent → 0, coordinator-verified |
 | T4A.7 (delete `wave_transform` supplements) | **DONE** `167ad73` + `aef7669`. Gate answered: SWAN interpolates POINTS/SPECOUT output to the requested coordinate (manual §2.6.4/§4.6.1 + `swanout1.ftn` `SWOEXA`/`SWOEXD`). **Both** surviving supplements removed. |
-| T4A.3.0 (reconstruct intended-vs-actual) | **DONE** `ed4613f` — `briefs/P4A-INTENDED-VS-ACTUAL-RECONSTRUCTION.md`. 17 rows, 11 inventory entries, 8 named gaps. **No longer blocks T4A.3.** |
-| T4A.3 (CUDEM at apply time) | **DONE** `8850e7e` + `db33f01` + `47c3d91`. The earlier "halted, uncommitted, implements a wrong instruction" state is resolved: that work was reviewed and committed as `244ee08`, and the claim that part of it implemented a retracted instruction **was wrong** — see the correction in `briefs/P4A-RESUME-SESSION-PROMPT.md`. `00564b9` adds `max_hs_m`. **Gap: "progress visible to operator" is NOT met** — the chain runs via `BackgroundTasks`; see the named gaps in `briefs/P4A-AUDIT-FINDINGS.md`. |
+| T4A.3.0 (reconstruct intended-vs-actual) | **DONE** `ed4613f` — `../archive/P4A-INTENDED-VS-ACTUAL-RECONSTRUCTION.md`. 17 rows, 11 inventory entries, 8 named gaps. **No longer blocks T4A.3.** |
+| T4A.3 (CUDEM at apply time) | **DONE** `8850e7e` + `db33f01` + `47c3d91`. The earlier "halted, uncommitted, implements a wrong instruction" state is resolved: that work was reviewed and committed as `244ee08`, and the claim that part of it implemented a retracted instruction **was wrong** — see the correction in `../archive/P4A-RESUME-SESSION-PROMPT.md`. `00564b9` adds `max_hs_m`. **Gap: "progress visible to operator" is NOT met** — the chain runs via `BackgroundTasks`; see the named gaps in `../archive/P4A-AUDIT-FINDINGS.md`. |
 | T4A.11 (widen L3 trigger + viability test) | **DONE** `ceb8252` + `d90bc88` + `eca80ee`. Merged with T4A.3 under one agent — both own L3 sizing in `swan_domain.py`. Includes the L2 fallback for L3-disabled spots (see the defect note below) and the shoreward-edge criterion (audit F1). |
 | T4A.9 / T4A.10 (per-hour handoff + QB assertion) | **DONE** `a54f2cb` + `a0c45b5` + `69957f7`. The reopen matters: the handoff was computed and then **discarded at the compute-offload wire**, and only 1 of 5 call sites ever passed it. |
 | T4A.6 (beach profile shape mismatches a–g) | **DONE** `8e2710f` + dashboard `452d921`/`923dd0c`, plus audit fixes `dcbe9e4` (F2) and `3c7e993` (F3). **Watch item:** item (b)'s jacking annotations render only when jacking factors exist, and the regenerated HB profile produces **zero** of them — see T4A.5 below. |
 | T4A.5 (regenerate caches on librewxr) | **DONE 2026-07-25** — see the T4A.5 results block below for evidence and two recorded deviations. |
-| Adversarial audit + QC Gate 4A | **Audit DONE** — 3 BLOCKERs (F1/F2/F3), all remediated; findings recorded in `briefs/P4A-AUDIT-FINDINGS.md`. Gate assessment pending final end-to-end run. |
+| Adversarial audit + QC Gate 4A | **Audit DONE** — 3 BLOCKERs (F1/F2/F3), all remediated; findings recorded in `../archive/P4A-AUDIT-FINDINGS.md`. Gate assessment pending final end-to-end run. |
 | **Phase 4B** (per-transect grid-derived handoff) | **APPROVED 2026-07-25 and largely DONE — this row's "NOT STARTED — awaiting operator sign-off" text was stale and is corrected in the Phase 4B section above, which is authoritative.** T4B.1/3/4 done and deployed; T4B.2 done in `12f9ddc`, not yet deployed; T4B.5 needed no code; T4B.6/7/8 outstanding. The original findings stand as the motivation: the handoff collapsed the 2D field to one point per spot and replicated it across all 32 transects; 50 m station spacing could not reach the handoff depth (all 73 timesteps clamped); and `decompose_spectrum()` did not conserve energy — measured at a 1.626 median and 2.271 worst-case energy closure, now replaced by SWAN's own watershed partitions. |
 
 **Defect found 2026-07-25 and folded into T4A.11 — L3-disabled spots currently produce NO data.**
@@ -303,7 +303,7 @@ that such a spot "runs L1 → L2 → SwellTrack from L2's ~15 m reference, as an
 majority case, landing it without the fallback would take working spots to zero data behind a
 valid HTTP 200. Building the fallback is now mandatory in T4A.11 and must land before the
 viability test can return false. Found by T4A.3.0, coordinator-verified in the code. Full
-citations: `briefs/P4A-INTENDED-VS-ACTUAL-RECONSTRUCTION.md` Area 1 row 1.3.
+citations: `../archive/P4A-INTENDED-VS-ACTUAL-RECONSTRUCTION.md` Area 1 row 1.3.
 
 Same root cause also silently disables the SurfBeat strip for those spots
 (`endpoints/surf.py:829–831`, `if not _sb_pts: continue`), which undercuts the premise that the
@@ -1513,6 +1513,44 @@ and station density are not consistent with each other.
 without visible error. Station density is a sampling choice adjacent to trigger 3, and **T8.7
 (Surfline comparison)** already exists as the plan's task for handoff-accuracy tuning against
 more than one afternoon of data. Routed there.
+
+> **UPDATE 2026-07-27 — the observation stands; the disposition above is refuted. Part of this
+> finding is closed, part is not.**
+>
+> **"SwellTrack absorbs the longer leg without visible error" was wrong.** It was not absorbing
+> it: `run_pipeline()` handed SwellTrack the **full** transect profile and read the handoff depth
+> only afterwards, for two reporting fields. SwellTrack takes its shoaling reference from the
+> first point of the profile it is given, so the handoff `Hs` — which SWAN had already carried to
+> the handoff depth — was injected at the profile's deepest sample and the handoff-to-shore
+> shoaling gain was applied a second time. The tell was in the published output all along: the
+> reported break depth (1.98 m) came out **deeper** than the reported handoff depth (1.46 m), and
+> a wave cannot break seaward of where it was handed off. A second, independent defect in the
+> same model — a dispersion solve that iterated a non-convergent fixed-point map and returned
+> wavelengths as low as 24% of the true value in shallow water — inflated the longest-period
+> component preferentially. The Surfline agreement recorded above was the product of both errors,
+> not evidence against either. Fixed in marine `7fb75f9`: the profile is truncated at the handoff
+> before the model runs, and the dispersion relation is solved by a converging Newton iteration.
+> Published surf height at Huntington for 2026-07-27T08:00Z fell from 6.04 ft to 3.25 ft, and
+> worst-case SwellTrack-vs-SWAN disagreement over the depth range the two models share fell from
+> 47.5% to 12.5%.
+>
+> **The breaking-zone guard that should have caught the clamp was dead** (marine `bed7ec7`). SWAN
+> writes `Hs = -9` at a station that has run dry; the parser drops that row, so the station has no
+> QB entry. Both handoff selectors then replaced the *whole* per-hour QB array with `None`
+> whenever *any* station was missing, taking `refine_handoff_with_qb()` down its "no QB data
+> available" path silently, for every station and every hour. On the live Huntington CURVE all 67
+> `Hs = -9` rows sat at station index 19, so the guard was off for the entire forecast and station
+> 18 — carrying QB up to **0.526**, ten times the 0.05 threshold — was served as the handoff at
+> every hour. With the guard restored, 35 of 67 hours stay at station 18 (QB clean), 30 move
+> seaward to station 17 (3.85 m) and 2 to station 16 (4.93 m). No hour is dropped. Coverage gaps
+> now log at WARNING once per transect per run.
+>
+> **Still open: station density.** Nothing in these commits changes CURVE station placement, so
+> the original observation — targets of 0.02–1.37 m against a shallowest usable station of 2.37 m,
+> grid sizing and station density inconsistent with each other — is unchanged, and the restored QB
+> guard moves the handoff *further* seaward on 32 of 67 hours rather than closer to 1.3×. That
+> remains routed to **T8.7**, and `_MIN_DESIGN_HS_M = 1.0` remains the open trigger-1 question for
+> the operator recorded below.
 
 > **A structural tension in the ADR's rule, surfaced not resolved.** Amendment 2 §2 says to size
 > the grid to "the smallest value [`1.3 × Hs(hour) / gamma`] ever produces for this spot's
@@ -4464,3 +4502,37 @@ orphaned `[marine]` extra — sequence after C-48), C-46 (`MARINE_PROVIDER_MODUL
 **Carried into Phase 8:** C-43 (one untranslated locale key), C-33 (documented health poll no task
 implements), C-38 (`assessment.waterTemp` now converts where it did not before), plus all previously
 recorded Phase 8 items.
+
+### 2026-07-27 — Surf model conformance round (marine `7fb75f9` … `ac6bd8a`)
+
+Seven commits in `weewx-clearskies-marine`. None changes a formula, a component's responsibility, a
+schedule, or a published field's name/type/nullability. `bd8c928` moves an output *location* and
+carries an operator ruling in chat authorising it (CLAUDE.md trigger 3). Recorded here because the
+outcomes settle open items above.
+
+| Commit | What changed | Measured effect |
+|---|---|---|
+| `7fb75f9` | The cached transect profile is truncated at that transect's per-hour handoff depth before SwellTrack runs; the dispersion relation `ω² = g·k·tanh(kd)` is solved by a converging Newton iteration instead of a fixed-point map that does not converge for `kd ≲ 1`. | Huntington 2026-07-27T08:00Z published surf height 6.04 ft → 3.25 ft. Worst-case SwellTrack-vs-SWAN disagreement over the shared depth range 47.5% → 12.5%. |
+| `83f0205` | The deep-water reference and handoff extractions are carried on two internal channels (`spectral_dwr`, `spectral`) instead of one slot the L3 write overwrote. `multiSwell`, `swellHeight`, cross-swell/swell-dominance scoring and the canonical partition list source from `spectral_dwr`. | The published swell card had been byte-identical to the handoff entry at 1.46 m depth with Qb 0.154. A missing deep-water reference now yields `multiSwell: null` + WARNING, never a substitution. |
+| `bed7ec7` | Two readers that tested for `COMPUTE NONSTATIONARY`/`NONSTAT` now match the `COMPUTE NONST` the writer emits; the QB breaking-zone guard tolerates per-station gaps instead of going dark when any one station is dry. | The L2 deep-water-reference `TABLE`/`SPECOUT` gained their `OUTPUT` clause: 1 row → 67. On the live Huntington CURVE the handoff moves seaward on 32 of 67 hours; no hour is dropped. |
+| `aa4553d` | `INIT HOTSTART` is emitted after both `CGRID` and `READ BOT`, per SWAN's own `INITVA` guards (both MSGERR level 2, non-fatal, so the violation presented as a per-cycle hotstart crash that self-healed by cold retry). | An identical `hotstart.dat` now loads and reruns cleanly. |
+| `bd8c928` | The deep-water reference is placed on the spot's own measured 15 m contour — the profile's `contour_15m_distance_m`, projected from the coastline anchor. The fixed 2.5 km fallback is removed; no locatable contour ⇒ no DWR output and an ERROR. | Huntington's reference moved from 17.29 m depth to 15.31 m (bilinear; 14.20 m nearest cell — the 100 m L2 grid straddles the contour). |
+| `35af390` | `endpoints/beach_profile.py` converts between the handoff and canonical partition index spaces at each lookup. Both crossings were latent while the two partition lists were the same object and went live when `83f0205` separated them. | On real 2026-07-27T08:00Z Huntington data the mapping is `[0, None]`. Response shapes unchanged. |
+| `ac6bd8a` | The T4B.1 per-transect POINTS bands are projected from the shoreline point on each transect's own line — its origin shifted shoreward by the profile-anchor offset — instead of from the operator-drawn segment origin. Same anchor rule as `bd8c928`, at the sibling call site. | Huntington transect 0's band was sized for 3.03 m → 1.01 m of water and sat in 8.51 m → 7.17 m, with no station in the target range; it now sits in 3.03 m → 1.01 m. Downstream, `select_hourly_handoff()` had been choosing a station by a depth its spectrum was not computed at. |
+
+**Closed against `bed7ec7` and `7fb75f9`:** the finding recorded above that "the handoff clamped on
+all 73 timesteps … roughly 2.25× the breaking depth instead of the intended 1.3× — systematically too
+deep, on every hour." The clamp itself is closed: the QB guard that should have moved the handoff had
+been disabled for every station whenever any one station was dry. Its disposition note — that
+"SwellTrack absorbs the longer leg without visible error" — is refuted; see the UPDATE block at that
+entry.
+
+**Still open, not closed by these commits:** CURVE station density (nothing here changes station
+placement, and the restored QB guard moves the handoff *further* seaward on 32 of 67 hours) — routed
+to **T8.7**/T8.10h. `_MIN_DESIGN_HS_M = 1.0` remains an open trigger-1 question for the operator.
+
+**Surfaced, needs an operator ruling rather than a doc edit:** `docs/contracts/openapi-v1.yaml`
+declares `SurfForecast.waveHeightAtBreak` required and non-nullable, while `endpoints/surf.py` has
+emitted `null` for it whenever SwellTrack produces no face height since marine `fa1c482` — predating
+this round and not introduced by it. Either the contract or the code moves; changing the contract's
+nullability is itself a data-contract change and was not made here.
