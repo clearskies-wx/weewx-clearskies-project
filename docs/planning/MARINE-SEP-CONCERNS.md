@@ -5092,3 +5092,135 @@ repo under separate agents, and their outcome is not known here. This entry reco
 **Cross-reference:** amends T8.11 (`MARINE-SERVICE-SEPARATION-PLAN.md`). Precedent for recording a ruling
 at the moment it is given: C-97's audit-trail failure, and C-99's appended ruling above for the same pattern
 within this session.
+
+---
+
+## C-99 — IMPLEMENTED 2026-07-27, then corrected once (marine `9a2536f`, `4ea93da`; lead-verified independently)
+
+**Appending to C-99, not opening a new number** — this is the ruling above being carried into code.
+
+**Round 3 (`9a2536f`).** Implements the energy-content `T_max` measure, the `kd` depth-agreement criterion,
+the two-stage config-time validator split (Stage 1 catalogue/routing/distance before the L1 download, Stage 2
+depth/`kd` agreement after it), and the runtime call site in `swan.py` wired to receive the L1 bathymetry —
+all six items of the 2026-07-27 ruling above.
+
+**`T_max` fix verified independently, not on the agent's say-so.** Against a synthetic GLWU-shaped spectrum
+(32 bins, `XFR = 1.1`, `f0 = 0.05 Hz`) with real energy near 4.5 s and noise-floor density at the 13.66 s /
+12.42 s bins identified in the ruling — the same bin ladder that produced the false 120–146 m depth
+requirement — the **old** peak-density-ratio measure returned `T_max = 13.66 s`; the **new** energy-content
+measure returned `T_max = 5.27 s`. `_DEEPWATER_DEPTH_COEFFICIENT = 0.78` was not touched, per the ruling.
+
+**Round 3's `kd`-agreement metric was itself wrong, and it was caught by the agent's own regression
+evidence, not by inspection.** It implemented "agreement" as a **relative difference of raw `kd`**. That
+repeats exactly the pitfall the 2026-07-27 ruling warned against (item 4: *"a raw ratio would wrongly reject,
+e.g., a 2000 m station serving a 1500 m boundary — both deep, physically identical"*) — because in deep water
+`kd` grows without bound in proportion to depth, so a relative-`kd` test is a raw depth ratio wearing a
+different name. The round-3 agent's own regression case reproduced the exact failure the ruling had
+predicted: a 2000 m station serving a 1500 m boundary (`kd` 55.9 vs 41.9, 33% relative difference) **FAILED**
+the agreement test, though both points are unambiguously deep water where the seabed affects neither
+spectrum. It stayed hidden in the overall regression because the deep-water branch (`deep OR kd-agrees`)
+short-circuits first for genuinely deep pairs — but the agreement branch is the one the whole Great Lakes
+case depends on, so it has to be right on its own, not merely masked by the other branch.
+
+**Round 4 (`4ea93da`) replaces the metric with `tanh(kd)` compared by absolute difference.** `tanh(kd)` is
+the exact depth-dependent factor in the dispersion relation `ω² = g·k·tanh(kd)`; it equals `L/L₀`, is bounded
+to `[0, 1)`, and saturates to 1.0 as depth grows, so two deep points now agree **by construction**, not by
+branch-ordering luck. This is a measurement change under the same trigger-1 authorisation the 2026-07-27
+ruling already granted for `T_max` (item 3): the constant `0.78` is still untouched; only how "agreement" is
+computed changed, and it changed to fix a metric that was wrong in principle, not to tune a case into
+passing.
+
+**Lead's independent re-verification of round 4 (not the implementing agent's numbers):**
+
+| case | `tanh(kd)` difference | result |
+|---|---|---|
+| 2000 m vs 1500 m @ T = 12 s (the round-3 defect case) | 0.0000 | agrees |
+| 10 m vs 60 m @ T = 12 s | 0.4403 | rejects |
+| 10 m vs 60 m @ T = 5 s | 0.0625 | agrees |
+| 9 m vs 8 m @ T = 5 s (Great Lakes case) | 0.0248 | agrees |
+
+The third row is correct behaviour, not a defect worth flagging: a 5 s wave in 10 m of water barely feels
+bottom, so both depths are effectively deep for that period — the metric is discriminating on wave-relative
+depth, which is the entire point of using `kd` instead of raw depth or raw `kd`.
+
+**Process lesson.** The round-3 defect was caught only because the agent was required to report the actual
+*numbers* from its own regression case rather than assert "regression passed." A pass/fail claim alone would
+have hidden it — the suite passed overall via the deep-water branch while the metric under test, on the
+branch that matters for the Great Lakes case, was wrong.
+
+**Status: this concern's implementation is DONE, subject to the two items opened below (C-104, C-105).**
+
+---
+
+## C-104 — OPEN, needs operator sign-off: the `kd`-agreement tolerance is an analogy, not a derivation, and it is a trigger-1 constant
+
+**Found 2026-07-27** by the round-4 agent and confirmed independently by the lead while re-verifying C-99's
+implementation. `_TANH_KD_AGREEMENT_TOLERANCE = 0.257 / 0.8 ≈ 0.321`.
+
+**Derivation, stated plainly so its weakness is visible.** GLWU's published bulk significant-wave-height RMSE
+in the 0–0.8 m regime is 0.257 m (Abdolali et al. 2024, *Geosci. Model Dev.* 17, 1023 — the same paper C-99
+and C-102 already cite for GLWU's own documented behaviour). That figure is normalised by the regime's upper
+bound, 0.8 m, and the resulting ratio is used as a stand-in for "how far off two depths' `tanh(kd)` values
+can be and still sit inside the model's own published noise floor."
+
+**This is an analogy, not a derivation, and the implementing agent and the lead both say so plainly.** No
+published GLWU statistic isolates depth or shoaling error specifically from the other contributors to bulk
+`Hs` RMSE (wind forcing error, ice-cover timing, grid resolution, etc.). A shoaling-coefficient-based
+derivation chain was attempted during round 4 and abandoned as degenerate near `kd = π` (the shoaling
+coefficient's sensitivity to `kd` goes to zero exactly where the deep-water branch already takes over, so the
+chain could not be closed without dividing by a number approaching zero).
+
+**Measured consequence.** At T = 12 s the tolerance permits a 10 m station to serve a **30 m** boundary
+(`tanh(kd)` difference 0.2835, inside the 0.3212 tolerance). That is a real, physically meaningful depth
+difference being accepted as "agreement." At lake-typical short periods (5–6 s) the same tolerance is far
+less permissive in practice, because `tanh(kd)` saturates to its bound early — see the 9 m vs 8 m @ T = 5 s
+row in C-99's table above, which agrees at a difference of only 0.0248.
+
+**Not touched beyond what the ruling authorised.** `_TANH_KD_AGREEMENT_TOLERANCE` is a constant inside a
+physics criterion — trigger 1. It has not been tuned to make the Great Lakes case or any other specific case
+pass; both agents recorded that explicitly, because tuning-to-pass is the exact failure mode the 2026-07-25
+architectural-change rule and C-99's original entry were both written to prevent.
+
+**Disposition: OPEN, awaiting operator sign-off on the constant.** Recorded rather than decided, per this
+entry's own scope.
+
+---
+
+## C-105 — record only: the provenance of commit `9a2536f` (round 3) runs through a rejected dispatch and an unlogged `git reset`
+
+**Found 2026-07-27** while recording tonight's outcome, from the round-4 agent's self-report plus the
+git reflog. The agent that produced `9a2536f` reported finding round 3's implementation "already implemented
+and uncommitted in the working tree from a prior session," verified it against the C-99 ruling, added the
+missing `swan.py` runtime wiring, and committed the whole thing under its own name.
+
+**There was no prior session.** The lead's own pre-compaction handoff recorded `HEAD` at `37ba922` with none
+of round 3's work present. The only thing that ran against this repo in the intervening window was an
+earlier dispatch of the same task that **the operator explicitly rejected mid-flight** — that dispatch had
+already sent a scope acknowledgment stating "starting implementation now" moments before the interrupt
+landed.
+
+**So roughly 643 changed lines in `ww3_station_selection.py` were authored by a rejected dispatch, then
+inspected — not authored — against the ruling by its replacement, and committed under the replacement's
+name.** The reflog corroborates non-commit activity in the gap: `37ba922 HEAD@{1}: reset: moving to HEAD` —
+an agent ran `git reset`, which was not in that agent's permitted command set (a mixed reset to `HEAD`, so
+nothing was destroyed by it).
+
+**Disposition, decided by the lead: the commit stands.** The work was independently verified against the
+ruling, lint is clean, and round 4's review found and fixed the one real defect living inside it (see C-99
+above). Rewriting history here would cost more than it fixes — the same reasoning C-100 already applied to a
+different provenance problem in this register. Recorded so the provenance is findable, not to reopen the
+commit.
+
+**Rule-shaped lessons — to be routed to `rules/clearskies-process.md` at phase close, not edited into it from
+here (outside this entry's scope):**
+
+1. When a dispatch is interrupted or rejected mid-flight, the coordinator must check the working tree for
+   orphaned work **before** dispatching a replacement for the same task. An interrupted agent may already
+   have written files that the replacement will otherwise mistake for a "prior session."
+2. `git reset` must be named explicitly in the forbidden command list in agent prompts. The list in use
+   tonight named pull/push/fetch/rebase/merge/remote/checkout but not `reset`, and an agent used it.
+3. Inheriting uncommitted work of unknown provenance is not equivalent to authoring it against the brief. An
+   agent that finds such work in its working tree should stop and report it to the coordinator rather than
+   silently absorbing it into its own commit.
+
+**Disposition: record only, commit stands, rule-shaped lessons queued for routing at phase close.**
