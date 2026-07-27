@@ -3842,6 +3842,33 @@ and the message must say which, because the remedies differ.
 inside a physics-derived criterion (trigger 1). **Propose values with their basis and wait for the
 operator.** Published precedent is ~550 m; station 46222 is 487.9 m at ~20 km.
 
+**RULED 2026-07-27 — operator, in chat, resolving C-99 (this task's own deep-water blocker). Full evidence
+and the ruling text are in `MARINE-SEP-CONCERNS.md` C-99's appended "RULED 2026-07-27" block; summary only
+here so this task's owner does not have to go looking for it.**
+
+- `_DEEPWATER_DEPTH_COEFFICIENT = 0.78` (the `d > 1.56 T^2/2` deep-water limit cited above) is **confirmed
+  correct and does not change.**
+- `_longest_energetic_period_s()` — the `T_max` measurement feeding it — **was the defect**: it thresholds
+  on 1% of peak spectral density rather than energy content, and was picking up GLWU spectral-grid tail bins
+  rather than real wave energy. **Ruled: replace the measurement with an energy-content measure.**
+- The criterion itself is **broadened, not just fixed**, and the broadened form applies **globally, not
+  Great-Lakes-only**: `deep OR kd-agrees`, expressed in dimensionless depth `kd` (never a raw depth ratio).
+  Every currently-passing ocean station passes on the `deep` branch, so ocean regression is zero by
+  construction.
+- `_validate_ww3_boundary_viability()` is **split, not moved**: Stage 1 (catalogue, routing, distance) stays
+  before the L1 bathymetry download; Stage 2 (the depth/`kd` test) runs after, since it needs the L1 grid
+  depth to compute `kd`.
+- The **runtime path** (`providers/nearshore/swan.py`) must carry the same criterion — an optional-kwarg
+  proposal that would have left runtime on deep-water-only while only this config-time check got the
+  upgrade was **rejected**.
+
+Related, record-only concerns surfaced by the same research: `MARINE-SEP-CONCERNS.md` C-101 (NCEI Great
+Lakes bathymetry resolution is nominal, not real) and C-102 (GLWU solves on depths biased shallow — treat
+GLWU depths as the weaker number in any `kd`-agreement comparison).
+
+**This entry records authority only — no subtask status here is marked complete.** Implementation is
+understood to be in flight in the marine repo under a separate agent.
+
 **Cross-repo ownership — the operator-facing half is not in this repo.** Surfacing the chosen station's id,
 distance and depth at setup crosses marine → API → config UI, and per the C-42 invariant nothing but the
 API talks to the marine service. **`clearskies-api-dev` (API repo) and the config-UI owner must be
@@ -4051,6 +4078,30 @@ therefore precedes the marine restart, T8.10j and T8.10h.
 **Architectural change block applies to every agent prompt in this task.** Triggers 7 (dependency) and 4
 (data contract) are authorized **for T8.11's stated scope only**, by the operator decision above and the
 amended ADR-098. Anything beyond that stops and reports.
+
+**CONTRACT AMENDED 2026-07-27 — RULED: "one datum everywhere" becomes "one datum per region."** Operator
+ruling, recorded in full with evidence in `MARINE-SEP-CONCERNS.md` C-103 (trigger 4, arguably trigger 3).
+**Read C-103 before starting any Great Lakes-related T8.11 subtask.** Summary:
+
+- The Great Lakes are non-tidal — LMSL (a tidal datum) does not apply to them at all. Operator's framing,
+  verbatim: *"the Great Lakes are NOT AT SEA LEVEL."*
+- **Great Lakes SWAN domains — bathymetry and WLEVEL alike — unify on `LWD_IGLD85`** (Low Water Datum on
+  the International Great Lakes Datum 1985), NOT LMSL. Ocean/tidal domains stay on LMSL exactly as T8.11a–h
+  below already specify — that scope is unchanged.
+- T8.11d's per-level agreement guard and T8.11e's "no invented labels" rule both apply **per region**: a
+  Great Lakes run's levels agree with each other on `LWD_IGLD85`; an ocean run's levels agree with each
+  other on LMSL; the two are never compared against one another.
+- **Bathymetry source routing:** NCEI Great Lakes Bathymetry (already T8.10e's L1/L2 DEM source) is natively
+  on LWD — no conversion needed. NOAA OCM Coastal DEM: Lake Michigan (the L3-grade ~3 m source) is on
+  NAVD88 and needs `NAVD88 → LWD_IGLD85` conversion — **the T8.11a `pyproj` + NOAA-grid pipeline is
+  retargeted to this CRS pair, not discarded.** Whether NOAA's grid set covers this specific transform is
+  unverified and is a check for whoever implements it.
+- The **runtime path** must route Great Lakes levels to `LWD_IGLD85` and ocean levels to `LMSL` — not only
+  a config-time or setup-time check. Same reasoning as the T8.10f runtime-path ruling above.
+
+**This is additive to T8.11a–h below, which describe the ocean/tidal branch and are otherwise unchanged.**
+No subtask status here is marked complete by this amendment — a Great Lakes-branch task breakdown (owners,
+Do/Accept criteria) has not yet been written into this plan and is not invented by this entry.
 
 #### T8.11a — Prove the transform before building on it
 

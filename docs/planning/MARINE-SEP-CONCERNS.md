@@ -4906,6 +4906,57 @@ by reading the live GLWU spectrum's energy distribution directly and asking wher
 If it is root cause 2, the fix is to how `T_max` is measured and no physics constant needs to move — which
 would be the better outcome, and it would also want re-checking against the ocean product.
 
+**RULED 2026-07-27 — operator, in chat, following the research this entry recommended.** Root cause 2 —
+confirmed. `_DEEPWATER_DEPTH_COEFFICIENT = 0.78` is untouched and correct; `_longest_energetic_period_s()` was
+the defect.
+
+1. **The coefficient is confirmed correct, not merely spared.** `0.78` is the textbook deep-water limit
+   `d > L0/2` with `L0 = 1.56 * T^2` — the same formula T8.10f already cites ("deep water needs
+   d > 1.56 T^2/2"). It does not change.
+2. **The measurement is confirmed defective, and the mechanism is now known.**
+   `_longest_energetic_period_s()` thresholds on 1% of *peak spectral density*
+   (`_ENERGY_TAIL_FRACTION = 0.01`) rather than energy content, and picks up numerical tail bins rather than
+   real wave energy. GLWU's spectral grid starts at 0.05 Hz with geometric growth factor 1.1 across 32 bins,
+   which places bins at periods 20.00, 18.18, 16.53, 15.03, 13.66, 12.42 s. This entry's own live readings —
+   `T_max` of exactly 13.7 s and 12.4 s — are bins 4 and 5 of that ladder, not independently-arrived-at
+   physical periods: `0.78 * 13.66^2` = 145.6 m and `0.78 * 12.42^2` = 120.3 m, reproducing the "120–146 m
+   required" figures above exactly. The depth requirement was arithmetic on a spectral bin edge. The
+   peer-reviewed GLWU description (Geosci. Model Dev. 17, 1023, 2024) independently states "the peak period
+   of young waves during severe conditions remains below 8 s" for the Great Lakes — a measured 12–14 s
+   `T_max` is inconsistent with the model's own documented behaviour.
+3. **Ruling: replace the measurement (`_longest_energetic_period_s()`) with an energy-content measure.
+   `0.78` does not move.** Trigger 1 authorises the measurement change specifically — the constant it feeds
+   remains exactly as guarded as this entry originally left it.
+4. **The criterion itself is broadened, not just fixed.** The absolute deep-water test is *sufficient* but
+   not *necessary* — the operator's ruling is that the general test is dimensionless depth agreement (`kd`,
+   deep water being the degenerate case `kd > pi`), expressed as **`deep OR kd-agrees`**, and applied
+   **globally**, not only to Great Lakes stations: broad shallow ocean shelves (Gulf of Mexico, Georgia
+   Bight, Nantucket Shoals, Chesapeake/Delaware approaches) have the identical latent failure, unseen only
+   because Huntington's steep Pacific shelf reaches deep water close to shore. Every currently-passing ocean
+   station passes on the `deep` branch alone, so ocean regression is zero by construction. Must be expressed
+   in `kd`, never a raw depth ratio (a raw ratio would wrongly reject, e.g., a 2000 m station serving a
+   1500 m boundary — both deep, physically identical, but a bad ratio).
+5. **The config-time validator (T8.10f's `_validate_ww3_boundary_viability()`) is split, not moved.** It
+   runs before the L1 bathymetry download today. Moving the whole check to run after the download would let
+   a `DatumConversionError` or an empty-grid return silently swallow the WW3-boundary finding — the
+   opposite of what a check that exists to be loud at config-push time should do. Ruling: Stage 1 (catalogue,
+   routing, distance) stays before the download, unchanged; Stage 2 (the depth/`kd` agreement test) runs
+   after, since it needs the L1 grid depth at the boundary to compute `kd`.
+6. **The runtime path (`providers/nearshore/swan.py`) gets the same criterion, not just the config-time
+   diagnostic.** An implementation proposal to add the L1 grid as an optional kwarg defaulting to `None` —
+   which would have left the runtime SWAN-boundary path on deep-water-only while only the config-time check
+   got the `kd` upgrade — was **rejected**. Reason: the runtime path feeds SWAN every forecast cycle; the
+   config-time check is a one-time setup diagnostic. Fixing only the diagnostic fixes the warning message,
+   not the thing being warned about.
+
+**Full detail, evidence and the two new related concerns this research surfaced (bathymetry resolution,
+GLWU depth bias) are at C-101 through C-103.** Recording precedent: C-97's own audit-trail failure — a
+verbal ruling not written down promptly, correctly flagged by the auditor as unauthorised code — is why this
+ruling is appended here immediately rather than left for a closeout summary.
+
+**Scope note.** This entry records authority only. Implementation is understood to be in flight in the
+marine repo under a separate agent; its outcome is not known to whoever recorded this ruling.
+
 ---
 
 ## C-100 — the coordinator's `git add -A` swept an agent's in-progress work into an unrelated commit
@@ -4932,3 +4983,112 @@ work in one checkout normal, so this failure mode is structural rather than a on
 
 **Disposition:** history left as-is (rewriting it would be worse than the misattribution). Recorded so the
 provenance is findable, and so the rule change actually gets made.
+
+---
+
+## C-101 — NCEI Great Lakes bathymetry resolution is nominal, not real (record only, no action)
+
+**Found 2026-07-27**, during the research behind C-99's ruling (see C-99's appended "RULED 2026-07-27" block)
+and C-103 (Great Lakes datum unification). The NCEI Great Lakes Bathymetry grid — the L1/L2 source for the
+Great Lakes branch established in C-103 — is delivered at 3 arc-second (~90 m), which nominally matches L2's
+existing 100 m grid spacing.
+
+**The underlying compilation is coarser than the grid spacing suggests.** It is built from source data at
+1:250,000 scale with a 5 m contour interval. A 90 m grid interpolated from 1:250k contours does not carry
+90 m of real bathymetric information — the cell size overstates the resolution of what actually went into
+producing it.
+
+**Acceptable for L2's job in this architecture.** L2 exists only as a handoff to L3 (the same reasoning
+C-97 established: L2's shoreline behaviour is never consumed by anything downstream). What must **not**
+happen is documenting or assuming true 90 m data exists at this source — a later reader sizing an
+L2-dependent decision on "90 m resolution" would be relying on a number the source does not actually
+deliver.
+
+**Disposition: record only. No action taken or recommended.**
+
+---
+
+## C-102 — GLWU solves shallow-water wave physics on depths biased shallow (record only, no action)
+
+**Found 2026-07-27**, during the same research as C-101 and C-99's ruling. Operational GLWU v2.0 (the Great
+Lakes Wave Utility, C-99's data source) uses an explicit solver "without incorporating water level and
+current velocity" (Geosci. Model Dev. 17, 1023, 2024) — forced by wind and static ice cover only. Its
+bathymetry is static LWD (low water datum).
+
+**Because LWD is a low-water reference surface, GLWU computes shallow-water wave physics — shoaling,
+refraction, depth-limited breaking — on depths that are systematically too shallow** by the lake's actual
+water-level anomaly above LWD: roughly 0.4 m in an average year, and as much as ~1.5 m in a high-water year
+such as 2020. In the 8–10 m depths measured near Whiting (C-99), that is a **5–19% depth bias** in NOAA's
+own operational model output.
+
+**Not our defect and not ours to fix** — it is upstream of anything this project controls. Recorded because
+it argues for treating GLWU-derived depths as **the weaker number** whenever a depth-agreement test (the
+`kd` criterion ruled in C-99) compares a GLWU-sourced depth against another source: GLWU's depth carries a
+known, one-directional bias, so a marginal `kd`-agreement result should not be trusted equally in both
+directions.
+
+**Disposition: record only. No action taken or recommended.**
+
+---
+
+## C-103 — RULED: Great Lakes SWAN domains unify on per-lake `LWD_IGLD85`, not LMSL; T8.11's "one datum everywhere" contract becomes "one datum per region" (operator, 2026-07-27, trigger 4, arguably trigger 3)
+
+**Amends T8.11** (`MARINE-SERVICE-SEPARATION-PLAN.md`). T8.11 was scoped around a single global datum,
+LMSL, replacing NAVD 88 across every SWAN level for every spot (see ADR-098 as amended and T8.11's "Why").
+This ruling establishes that the Great Lakes cannot use LMSL at all, so the contract becomes **one datum
+per region**: LMSL for ocean/tidal spots (T8.11a–h, unchanged), `LWD_IGLD85` for Great Lakes spots (new,
+this entry). Recorded here as the finding-and-authority pair, with a pointer added to T8.11 in the plan so
+an implementer or auditor lands on this entry without needing the chat transcript.
+
+**Why LMSL cannot apply to the Great Lakes.** The Great Lakes are non-tidal. Tidal datums, including LMSL
+(local mean sea level — a station-referenced tidal datum), do not apply to a non-tidal water body: there is
+no tidal epoch to average over. Operator's framing, verbatim: *"the Great Lakes are NOT AT SEA LEVEL."*
+
+- NOAA VDatum provides a **separate Great Lakes datum family**, distinct from the tidal family T8.11a
+  already validated: `IGLD85` (International Great Lakes Datum 1985), `LWD_IGLD85` (Low Water Datum on
+  IGLD85), `OHWM_IGLD85` (Ordinary High Water Mark on IGLD85).
+- CO-OPS Great Lakes stations publish **only `GL_LWD`, and no MSL at all** — confirmed live at station
+  9087044 (Calumet Harbor), which returned `GL_LWD: 577.43 ft` (= 176.0 m) with `LAT` and `HAT` both
+  **null**. Converting that figure independently corroborates the Michigan–Huron LWD figure the register
+  already carries elsewhere.
+- T8.11d's cross-level datum-table lookup (built for tidal stations) has **no Great Lakes row** — there is
+  no MSL-referenced entry for a Great Lakes station to agree or disagree against.
+
+**Ruling: Great Lakes SWAN domains — bathymetry and WLEVEL alike — unify on `LWD_IGLD85`. Ocean/tidal
+domains remain on LMSL per T8.11a–h, unchanged.** The per-level datum-agreement guard (T8.11d) and the
+"no invented datum labels" rule (T8.11e) both apply **per-region**, not globally: a Great Lakes run's
+levels must agree with each other on `LWD_IGLD85`; an ocean run's levels must agree with each other on
+`LMSL`; the two are never compared against one another.
+
+**Bathymetry source routing, retargeted, not discarded.**
+
+- **NCEI Great Lakes Bathymetry** — already the L1/L2 source named in T8.10e's DEM priority chain
+  (`usgs_great_lakes`, `enrichment/bathymetry.py`) — is natively referenced to each lake's own low water
+  datum ("Bathymetric data for each lake is referenced to its own low water datum (LWD)", NCEI's own product
+  description). At 3 arc-second (~90 m; see C-101 on what that resolution actually carries) this needs
+  **no datum conversion** and is suitable for L1 and L2 as-is.
+- The L3-grade source, **NOAA OCM Coastal DEM: Lake Michigan** (~3 m), **is** on NAVD88 and **does** need
+  conversion — `NAVD88 → LWD_IGLD85` — before it can be combined with the NCEI-sourced L1/L2 grids.
+- **The T8.11a conversion machinery (`pyproj` + NOAA PROJ separation grids) is retargeted to this pair, not
+  discarded.** The pipeline T8.11a validated is generic to any PROJ-published vertical transform; only the
+  source/target CRS pair changes for the Great Lakes branch (`NAVD88 → LWD_IGLD85` instead of
+  `NAVD88 → LMSL`). Whether NOAA's grid set actually covers this specific transform still needs verifying by
+  whoever implements it — flagged here as a check to run, not assumed true.
+
+**Runtime path, same requirement as C-99's ruling.** Whichever SWAN code path selects a level's datum at
+runtime must route Great Lakes levels to `LWD_IGLD85` and ocean levels to `LMSL` — not only the config-time
+validator or setup-time diagnostic. Same reasoning as C-99 item 6: the runtime path is what feeds SWAN every
+cycle.
+
+**What this does NOT change.** L1 remains ETOPO 2022 for ocean domains per the closed 2026-07-26 ruling
+already recorded in T8.11's "Why" section — that ruling is untouched. This entry is additive: it defines the
+Great Lakes branch that T8.11 as originally scoped did not have.
+
+**Scope note.** Implementation of T8.11's Great Lakes branch is out of scope for whoever recorded this
+entry; `t811f-dev`, `t811g-docs`, and `t811-auditor` are understood to be active on T8.11 work in the marine
+repo under separate agents, and their outcome is not known here. This entry records authority only —
+**no T8.11 subtask status is marked complete by this entry.**
+
+**Cross-reference:** amends T8.11 (`MARINE-SERVICE-SEPARATION-PLAN.md`). Precedent for recording a ruling
+at the moment it is given: C-97's audit-trail failure, and C-99's appended ruling above for the same pattern
+within this session.
