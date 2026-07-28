@@ -297,6 +297,29 @@ Agent `e9-invariants`. Coordinator acceptance gate — all re-run/re-checked ind
   tip+L_tip branch → REDIRECT the guard to the real new check: fire when L3 does NOT contain L4 w/ 2-cell
   clearance, NOT fire when it does; plus assert the structure-grid branch emits the skip (not a check/pass).
 
+## E2b PART 2 — ACCEPTED AT CODE LEVEL (2026-07-27). Commit `c3f22f7` (marine). Adversarial audit + guards PENDING.
+Agent `e2b-l4run`. swan_runner.py only (+571/-66). Runs L4 as a nested inner grid under L3-as-middle. Coordinator gate:
+- Scope = swan_runner.py only; my OWN full suite = 276/2; tree clean.
+- READ the whole L4 branch (swan_runner.py:3454-3863): no-L4 path (3474-3639) BYTE-IDENTICAL to original (same
+  _write_input_files "inner" call + args; scope-restore just moved into finally = safe superset). L4 path: L3 runs
+  "outer" with inner_dims_override=l4_dims + inner_rotation_deg=l4_alpc (L3's own rotation stays 0), INPUT patched
+  BOUNDSPEC→BOUNDNEST1 (proven L2 trick), NO _parse_output on L3-outer (correct — outer emits no POINTS); L4 runs
+  "inner" reading l3_dir/nest_out.dat→l4_dir/nest_in.dat (distinct dirs+filenames), rotation_deg=l4_alpc,
+  is_structure_grid=True, dims_override=l4_dims; parse→all_results. All 4 amendments present+correct: orphaned-spot
+  fallback (3828-3855, loud WARNING, self-flags as Gate-E sizing finding), corner assertion (_l4_dims_and_alpc,
+  Kabsch fit + empirical self-check, RuntimeError→degrade, tol=resolution_m), L4 hotstart invalidation (3727-3757),
+  finally-restore (3856-3860).
+- Agent's evidence: corner recon 2.20 m worst on real HB grid (alpc=229.10, CGRID==NGRID); NESTOUT chain proof;
+  hotstart 3-run cold/warm/cold demo; orphaned-spot 2-spot demo. NOTE: SWAN binary NOT run (monkeypatched, same as
+  existing tests) — REAL nesting behavior is unverified until the Gate-E deploy.
+- 2 design choices CONFIRMED by coordinator: (1) mis-oriented L4 degrades that cluster to no-L4 (loud ERROR) not
+  abort-run; (2) orphaned-spot fallback also covers L3-middle convergence failure. Both good judgment, surfaced not silent.
+- MINOR TRACKED tidy-up: `getattr(domains,"level4_clusters",[])` at :3455 is defensive for a stale SimpleNamespace test
+  double; fix that fixture + use direct access later (test-file change, was outside E2b allowlist). Harmless.
+- PENDING before E5 builds on this: (a) adversarial audit (clearskies-auditor, never saw the impl); (b) guard tests
+  (test-author): byte-identical no-L4 INPUT, NESTOUT chain, corner assertion, orphaned-spot, + the E3-amendment
+  decoupled-nesting guard still owed. E5 does NOT dispatch until the audit clears.
+
 ## E3-AMENDMENT — ACCEPTED (2026-07-27). Commit `53abe07` (marine, LOCAL). Fixes the rotated-nesting defect below.
 Agent `e3-ngrid-fix`. Added `inner_rotation_deg` to build_swan_input; NGRID alpn + geometry now key off it (decoupled
 from the parent's own CGRID `rotation_deg`). Design elegance: NGRID reproduces the child's CGRID by running the
