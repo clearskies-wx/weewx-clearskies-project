@@ -15,6 +15,62 @@ mandatory order: code → config re-push (resizes grid) → confirm last_run adv
 HB wizard discovery+Apply so real pier coords land in marine.conf. Do NOT run deploy-marine.sh before
 E2b+E5+E8+E9+E10 are done (it re-enables the service onto the still-cached 41,895-cell grid = thrash).
 
+**◀◀◀ LATEST STATE — session 3, 2026-07-28, PRE-COMPACTION #3. THIS supersedes everything below. ▶▶▶**
+
+**PHASE E IMPLEMENTATION IS 100% COMPLETE + PUSHED.** Every E-task (E1–E13) + the E8 redesign + the
+projection fix are landed, coordinator-acceptance-gated, adversarially audited where warranted, and on origin.
+
+**SESSION-3 COMMIT LEDGER (all `main`, all PUSHED, each gated by me):**
+- E5 `2bad206` + guard `d68465a` (three-way handoff L4→L3→L2; doc-sync D4). E10 `054df69` + doc `fa02203`
+  (per-transect profiles rebased to transect line, FINE→MEDIUM source fallback; supersedes C4).
+- **E8 REDESIGNED** (was a SWAN-only-era REMNANT: emitted grid points, never ran the 1D chain, never wired to the
+  loop). New design (operator-approved): full runs every 6h on extended HRRR cycles (00/06/12/18Z); hourly **full-nest
+  STATIONARY fill** L1→L4 (reuses last full run's WW3 boundary read from persisted level1/INPUT + runs the SwellTrack
+  1D chain) wired into service.py loop. Commits `618378c`+`bbcec8f`+`c3fa5b6`, audit-fix F2 `1b7699b`, guards `0979b99`
+  (docs `d9abcdd`/`66f9516`). Adversarially audited (0 blockers).
+- **E8 audit F1** (stale hotstart/WW3 on grid resize) → operator Option A: config-push **cold-start** clears swan_work
+  run state `c3ceaa8`, PLUS geometry-changing push **signals an immediate full run** `12907ca` (docs `1c00f41`/`a6f0f4c`).
+- **PROJECTION FIX** (audit F1 "UTM-zone straddle"; operator Option A): ONE locked UTM zone per DEPLOYMENT (L1/L2 are
+  global) from the deployment centroid, threaded to all 31 projection sites, 5 per-grid `utm_zone()` recomputes deleted,
+  `lonlat_to_utm`/`utm_to_lonlat` now require an explicit zone, setup width guard **WARN>1°/refuse>2°**, runtime tripwire.
+  `f6033ed`+`dba0fd4`+`55c3964`+`1584136` (doc `19f862e`). **Adversarial audit CLEAN (0 blockers).** Antimeridian F2
+  (circular-mean centroid + minimal-arc span — operator: product expands beyond US) `71939fd`+`b136f15` (doc `a249c86`).
+- Plan doc-sync (flipped stale ⬜ markers → ✅ with hashes; E2b heading added; projection-fix + deploy-req sections) `241f5b8`.
+
+**REMAINING — 3 items:**
+1. 🔄 **Governing-doc drift fix — agent `phaseE-driftfix` (a47f573cac1540e9c) RUNNING.** E2/E2b/E3/E4/E7/E9 never
+   doc-synced ARCHITECTURE.md/manuals/ADR-093 (E5/E8/E10/projection each did). 6 stale spots: ARCH ~98/116 (L3-as-10m-
+   structure-grid — now L4), ARCH ~102 + API-MANUAL ~2480 (DIFFRACTION "L3 only" — now L4/structure per E7), PROVIDER-MANUAL
+   §14.15 (3-level L1→L3 — now 4-level w/ L4), ADR-093 Amd2 ~231 ("L3 offshore edge stays 15m — closed" — REVERSED by
+   operator D2/D6, needs NEW append-only amendment). Docs-only; verify against CODE not plan prose. Accept when it closes:
+   read diffs, confirm matches code+rulings, spot-check the ADR amendment matches D2/D6. **Does NOT block the deploy.**
+2. ⬜ **DEPLOY — OPERATOR-GATED (surfaced; awaiting go on TIMING + the marine deploy PROCEDURE — I asked, no answer yet).**
+   Marine service on librewxr is STOPPED+DISABLED (E0); deployed commit still `de71775`. The E2b/E5/E8/E9/E10 gate that
+   blocked deploy is now SATISFIED. E0 deploy order: deploy code → **MANDATORY config re-push** (regenerates
+   swan_grid_sizing.json with `locked_utm_zone` + geometry signature — else `run_3level` RAISES RuntimeError on the old
+   cache; fail-clean, confirmed by projection audit F1; one-time migration; the re-push ALSO auto-triggers a full run via
+   the immediate-full-run change) → re-enable/start marine runner → confirm last_run advances → re-run HB wizard
+   discovery+Apply so real pier coords land in marine.conf. Confirm the actual deploy script/steps against reality before running.
+3. ⬜ **Gate E** — 27-row live validation + adversarial, on the deployed system. Owed-at-Gate-E items scattered in plan:
+   E6 row 11 (oblique-swell calibration), E11 item 2 (shadow classification w/ live config), E12 (deployed config has NO
+   `swan_timeout_s` key → runs 900s code default, not documented 3600s; cycle-bound decision pending).
+
+**KEY SESSION-3 DECISIONS (detail lower + in the plan's 2026-07-28 decision log):** E8-is-a-remnant finding → full-nest
+stationary fill rebuild; F1 cold-start + immediate-full-run; projection Option A (one frame/deployment) + antimeridian-aware;
+F2-antimeridian ruled NOT out-of-scope (global expansion); config-push cold-start is the fix for stale-state-on-resize
+(NOT a fill-side guard). Legacy 2-level SWAN path (`run()`/`run_with_tmpdir`/`_run_outer_grid`) confirmed DEAD (no live/test
+caller) — projection fix makes it fail-loud, safe.
+
+**QC METHOD (unchanged — keep doing):** every agent report is a CLAIM — re-run pytest myself (currently **348 passed, 2
+skipped**), `git show <hash> --stat` vs allowlist, read the key diff, reproduce the core property when safety-critical
+(this session I: hand-checked the antimeridian span math, re-ran the F2 honest-skip guard against a pre-change worktree,
+traced the legacy-2level path dead, re-ran the E5 known-answer guard in a worktree). Highest-risk → ADVERSARIAL AUDIT
+(clearskies-auditor, never saw impl) — did this for E8 and the projection fix, both clean. **PUSH BUG:** a second `git push`
+in a compound command runs in the FIRST repo's cwd — always `cd` to the meta repo and push it as its own command.
+
+═══════════════════════════════════════════════════════════════════════════════
+**▼▼▼ EVERYTHING BELOW IS SUPERSEDED SESSION-2 DETAIL (kept for history) ▼▼▼**
+
 **◀◀ LATEST STATE — updated 2026-07-27 session 2, pre-compaction #2. This supersedes the older detail below. ▶▶**
 
 **COMMIT LEDGER — all on `main`, all PUSHED to origin, each coordinator-acceptance-gated:**
