@@ -297,6 +297,38 @@ Agent `e9-invariants`. Coordinator acceptance gate — all re-run/re-checked ind
   tip+L_tip branch → REDIRECT the guard to the real new check: fire when L3 does NOT contain L4 w/ 2-cell
   clearance, NOT fire when it does; plus assert the structure-grid branch emits the skip (not a check/pass).
 
+## ⚠⚠ SURFACED TO OPERATOR — COORDINATE SYSTEM (Cartesian/UTM vs Spherical). Architectural; operator's call. (2026-07-27)
+Operator challenged F1 (UTM-zone straddle) as unacceptable for a general (non-HB) product and asked what SWAN says +
+why not spherical. Coordinator answered from the LOCAL manual (docs/reference/swan-user-manual.pdf), verbatim facts:
+- SWAN supports BOTH: "SWAN operates either in a Cartesian coordinate system or in a spherical coordinate system".
+  We run CARTESIAN + project lat/lon→UTM. Zones exist ONLY because of that projection; SWAN has no zone concept.
+- **Spherical FORBIDS rotated grids:** "in case of spherical coordinates regular grids must always be oriented E-W,
+  N-S, i.e. [alpc]=0, [alpinp]=0, [alpfr]=0." Our L4 structure grid is ROTATED (alpc≈229°, the whole point of E2/E3 —
+  2-3× cell savings, pier-aligned resolution). Spherical ⇒ lose grid rotation (bigger axis-aligned structure grid).
+- Secondary: "set-up is not computed correctly with spherical coordinates" (now mostly moot — setup delivered via WLEVEL).
+- Nesting must use the SAME coordinate system parent+child. Cartesian origin is "chosen totally arbitrarily by the user."
+- **The F1 zone bug is OURS, not SWAN's:** our projection picks a UTM zone PER-GRID from each grid's own centroid, so a
+  parent+child near a 6° zone seam land in different frames. SWAN only requires ONE consistent Cartesian frame for the
+  whole nest.
+**DECISION OWED (operator), two honest paths:**
+  - **A (coordinator RECOMMENDS):** keep Cartesian, fix the projection to ONE frame per site (lock the UTM zone once from
+    site center, or a site-centered transverse-Mercator/local tangent plane — no zone seams). Kills the straddle bug AND
+    the ~2 m flat-earth residual, KEEPS rotated grids. Contained to the projection layer (utm_zone/lonlat_to_utm sites) +
+    a loud guard refusing to run if parent/child resolve to different frames.
+  - **B:** switch to COORDINATES SPHERICAL — matches native lat/lon datums, no projection/zones — but every grid becomes
+    axis-aligned (structure grid loses rotation, grows 2-3×) and it ripples through E3's rotated CGRID/NGRID emission.
+Non-blocking for E5/E8/E10 (handoff/output logic is coordinate-frame-agnostic — they survive either A or B). If B is
+chosen, the rotated-grid layer (E2/E3/E2b/E7 geometry) needs rework; the handoff pipeline built on top does not.
+AWAITING OPERATOR A/B. Pipeline continues on A/B-agnostic work meanwhile.
+
+## E2b+E3 GUARDS — ACCEPTED (2026-07-27). Commit `e14baa2` (marine). Closes audit F2/F3/F4 coverage gaps.
+Agent `e2b-guards`. 2 test files (+770): test_swan_formats_grid_emission.py +65 (F2 decoupled-rotation, proven FAIL at
+53abe07^ via worktree/TypeError), NEW test_swan_runner_l4_nesting.py (8 tests driving REAL run_3level, only SWAN
+subprocess/convergence/parse stubbed; _write_input_files real). Covers: no-L4 inner branch, L4 nested outer→inner +
+NESTOUT distinct-filename collision-safety, orphaned-spot fallback, L3-middle convergence-fail, RuntimeError-degrade,
+scope-restore (normal+exception), F4 idx-align pin. Coordinator gate: `git show e14baa2 --stat`=2 test files only; MY OWN
+`pytest tests/`=285 passed/2 skipped (+9). Honest limit: no real SWAN binary (monkeypatched boundary, same as existing).
+
 ## E2b PART 2 — ADVERSARIAL AUDIT CLEAN (2026-07-27). Agent `e2b-audit` (clearskies-auditor, never saw the impl).
 0 BLOCKER, 0 MAJOR, 4 MINOR. Auditor built its OWN probes (monkeypatched run_3level), did an ACTUAL git-worktree
 byte-diff of no-L4 level1/2/3 INPUT+BOTTOM+WIND (stronger than the author's structural claim — zero diff), reproduced
