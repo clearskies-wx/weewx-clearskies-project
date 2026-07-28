@@ -297,6 +297,29 @@ Agent `e9-invariants`. Coordinator acceptance gate — all re-run/re-checked ind
   tip+L_tip branch → REDIRECT the guard to the real new check: fire when L3 does NOT contain L4 w/ 2-cell
   clearance, NOT fire when it does; plus assert the structure-grid branch emits the skip (not a check/pass).
 
+## E2b PART 2 — ADVERSARIAL AUDIT CLEAN (2026-07-27). Agent `e2b-audit` (clearskies-auditor, never saw the impl).
+0 BLOCKER, 0 MAJOR, 4 MINOR. Auditor built its OWN probes (monkeypatched run_3level), did an ACTUAL git-worktree
+byte-diff of no-L4 level1/2/3 INPUT+BOTTOM+WIND (stronger than the author's structural claim — zero diff), reproduced
+the REAL asymmetric rotation case, and could-not-disprove all 5 invariants. E2b part 2 is CLEARED to build E5 on.
+Findings + disposition:
+- **F1 [MINOR, latent, NOT this diff]** build_swan_input computes UTM `_zone` from the CALLING grid's centroid and
+  reuses it for the child's inner_dims/NGRID projection; the child's own inner call recomputes its own zone. If a
+  parent+child ever STRADDLE a UTM zone boundary (6° wide), CGRID/NGRID diverge by km → silent energy-zero. At HB both
+  are zone 11 (auditor confirmed match). Pre-existing (affects L1→L2/L2→L3 too), not introduced by c3f22f7.
+  **DISPOSITION: TRACKED non-HB limitation — do NOT fix in E2b (out of scope, not triggered).** The E3-amendment's
+  "match by construction" guarantee has a hidden precondition: parent+child share a UTM zone. Before ANY non-HB
+  deployment, add a same-zone assertion/handling in build_swan_input. Candidate cheap guard: assert L3.zone==L4.zone.
+- **F2 [MINOR, coverage]** test 148 (the one 53abe07 updated) still passes the SAME rotation to both params — it does
+  NOT exercise the production asymmetry (parent rotation_deg=0, child inner_rotation_deg≠0). → covered by the queued
+  E3-amendment decoupled guard.
+- **F3 [MINOR, coverage]** NO repo test exercises run_3level's new ~250-line L4 branch. → covered by the queued E2b guard.
+- **F4 [verified NOT a bug]** L4 bathymetry `bathymetry["level4"][idx]` uses the L3-loop idx; `level4_clusters` is built
+  1:1 in the SAME loop in grid_sizing_chain.py:786-827 (grid=None placeholder when no L4), so positionally aligned by
+  construction — but the guarantee lives in a 3rd file with no local assert. → add a PINNING TEST (guard) that a future
+  grid_sizing_chain filter of level4_clusters would break, so misalignment can't land silently.
+**DECISION: E2b (parts 1+2) fully accepted. Dispatch (a) test-author guards covering F2+F3+F4, (b) E5 (design-ack gated
+behind guards landing to avoid shared-tree pytest race). E5 code-write does NOT start until I review its design.**
+
 ## E2b PART 2 — ACCEPTED AT CODE LEVEL (2026-07-27). Commit `c3f22f7` (marine). Adversarial audit + guards PENDING.
 Agent `e2b-l4run`. swan_runner.py only (+571/-66). Runs L4 as a nested inner grid under L3-as-middle. Coordinator gate:
 - Scope = swan_runner.py only; my OWN full suite = 276/2; tree clean.
