@@ -26,7 +26,8 @@ Phase C (C1/C2/C3 ✅ landed; **C4 superseded by E10**) →
 | **Phase C** — C4 | ⛔ Shipped as `060a56b`, **not deployed**, premise removed by Phase E → reworked as **E10** |
 | **Gate C** | ⛔ **Never walked** → rows relocated to **Gate E 18–20** |
 | **Phase E** — E0 | ✅ Done — service **stopped and disabled** on librewxr, deliberately |
-| **Phase E** — E1–E12 | ⬜ **← NEXT, start at E1** |
+| **Phase E** — E1, E6, E11, E12 | ✅ **Done code/test level** (2026-07-27, commits `19b0d4b`…`af02d19`, pushed) — adversarially audited; Gate E live rows still owed. E11 item 2 open for Gate E. See [briefs/PHASE-E-SESSION-LOG-2026-07-27.md](briefs/PHASE-E-SESSION-LOG-2026-07-27.md) |
+| **Phase E** — E2–E5, E7–E10 | ⬜ **← NEXT — E2 blocked on two operator rulings** (design-Tp source; pier-geometry fix — see session log "Surfaced to operator") |
 | **Phase F** (F1–F5), **Phase D** (D1) | ⬜ Not started |
 
 ### Start at E1
