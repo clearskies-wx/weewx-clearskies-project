@@ -25,19 +25,26 @@ Phase C (C1/C2/C3 ✅ landed; **C4 superseded by E10**) →
 | **Phase C** — C1, C2, C3 | ✅ Done (`2ab0a2a`, `de71775`, `9b4fc45`) |
 | **Phase C** — C4 | ⛔ Shipped as `060a56b`, **not deployed**, premise removed by Phase E → reworked as **E10** |
 | **Gate C** | ⛔ **Never walked** → rows relocated to **Gate E 18–20** |
-| **Phase E** (E0–E12) | ⬜ **← NEXT** |
+| **Phase E** — E0 | ✅ Done — service **stopped and disabled** on librewxr, deliberately |
+| **Phase E** — E1–E12 | ⬜ **← NEXT, start at E1** |
 | **Phase F** (F1–F5), **Phase D** (D1) | ⬜ Not started |
 
-### The next two actions, in order
+### Start at E1
 
-1. **E0 — stop the thrash loop.** ⚠️ **Blocked on an operator decision.** The system is currently
-   starting a cycle on the 41 895-cell grid, overrunning, publishing nothing, and repeating.
-   Restarting the service does **not** fix it — geometry is cached in a persisted file. E0 lists four
-   options; **A is recommended**. Nothing else in Phase E is blocked by this, so E1 can start in
-   parallel.
-2. **E1 — structure-grid resolution.** The right first implementation task: self-contained, one
-   file, gated on a known-answer dispersion test, and **every other Phase E geometry task depends on
-   the `dx` it derives**.
+**E0 is done.** The marine service is **deliberately stopped and disabled** on librewxr (operator
+ruling, 2026-07-27) — it was looping on the 41 895-cell grid, burning ~75 min per cycle to publish
+nothing. Finding it `inactive` is expected, not a new failure. **Read E0's restart order before any
+deploy** — a deploy alone re-enables the service but does *not* resize the cached grid, which would
+restart the loop.
+
+**➡ First implementation task: [E1](#e1--structure-grid-resolution-derived-from-the-tip-wavelength).**
+Self-contained, one file, gated on a known-answer dispersion test — and **every other Phase E
+geometry task depends on the `dx` it derives**, so nothing else in Phase E should start before it
+lands.
+
+Nothing is deployed or tested until Phase E's geometry is in place. There is no live system to check
+against in the meantime, so **every Phase E task's evidence is code-level and test-level until the
+service comes back**; Gate E's live rows are collected in one pass after the restart.
 
 ### Before dispatching any Phase E or F agent
 
@@ -928,8 +935,36 @@ the authoritative list; an item not on it and not in a live phase is not being w
 **Nothing on this list may be closed by asserting it was already done in A–C.** Each needs a live
 value from the deployed system, at the gate it has been moved to.
 
-### E0 — Stop the thrash loop  ⬜ **NOT STARTED — ⚠️ NEEDS AN OPERATOR DECISION**
+### E0 — Stop the thrash loop  ✅ **DONE — option C, operator ruling 2026-07-27**
 **Owner:** `coordinator` (operational; no agent) · **Files:** none — deploy and config only
+
+> ### ✅ Executed: the marine service is deliberately STOPPED and DISABLED
+>
+> **Operator ruling:** *"just stop the service until you are ready to deploy and test."*
+>
+> ```
+> systemctl is-active   weewx-clearskies-marine  →  inactive
+> systemctl is-enabled  weewx-clearskies-marine  →  disabled
+> swan processes: 0   ·   listeners on :8780: 0
+> ```
+> `disabled` means it does **not** come back after a reboot. There is no timer unit — cycles are
+> driven by the service's own internal loop, so this stops them completely.
+>
+> **`weewx-clearskies-marine` being `inactive` on librewxr is EXPECTED, not a new failure.** Anyone
+> checking service health during Phase E will find it down. That is this ruling, not a defect.
+>
+> **⚠ The trap on the way back up.** `scripts/deploy-marine.sh` runs `systemctl enable` and
+> `restart`, so **the next deploy brings the service back automatically** — no manual re-enable. But
+> the grid geometry is still cached in `/etc/weewx-clearskies/swan_grid_sizing.json` at **41 895
+> cells**, and a deploy does not resize it. **A deploy alone therefore restarts the thrash loop.**
+>
+> **Order on restart is mandatory:**
+> 1. Phase E geometry code deployed, **then**
+> 2. **config re-pushed** so sizing recomputes (`endpoints/config.py:77` — sizing is config-time, not
+>    per-cycle; a forced cycle will not resize), **then**
+> 3. confirm `/health` shows `last_run` **advancing across two consecutive cycles**.
+>
+> Options A, B and D below were not taken and are retained only to show what was weighed.
 
 **Measured state, 2026-07-27, immediately after the hung cycle was killed:**
 ```
