@@ -2,13 +2,19 @@
 
 **Created:** 2026-07-27
 **Revised:** 2026-07-27 after adversarial review (findings incorporated; see "Review corrections")
-**Status:** Phases A–C landed. **Phases E and F added 2026-07-27** after the grid-strategy review.
+**Revised again:** 2026-07-28 — Phase E (E0–E13, plus the untracked E2b and the F1 projection fix) is
+now **DONE at code/test level, all commits pushed**. Docs-only consolidation pass on this date; no
+code changed. See "Phase E session log, 2026-07-28" in the decision log below.
+**Status:** Phases A–C landed. **Phase E (all tasks E0–E13, plus E2b and the projection fix) landed
+code/test level 2026-07-27/28.** Gate E's live rows (deploy + config re-push required — see Gate E
+preamble) are the only work still owed before Phase F.
 **Repos:** marine = `repos/weewx-clearskies-marine`, meta = repo root
 
 **Sequence:**
 Phase A ✅ → Phase B ✅ → **Deploy 1** ✅ → Gate B (rows 3/5/8/11/13 outstanding) →
 Phase C (C1/C2/C3 ✅ landed; **C4 superseded by E10**) →
-**Phase E (E0–E13; E1/E6/E11/E12 ✅ code-level, E13 next, then E2)** → Gate E → Phase F (F1–F5) → Gate F → Phase D (D1) → Gate D
+**Phase E (E0–E13 ✅ all code/test level, plus E2b ✅ and the F1 projection fix ✅)** → Gate E ⬜ (live
+rows owed — deploy + config re-push, see Gate E preamble) → Phase F (F1–F5) → Gate F → Phase D (D1) → Gate D
 
 ---
 
@@ -29,7 +35,8 @@ Phase C (C1/C2/C3 ✅ landed; **C4 superseded by E10**) →
 | **Phase E** — E1, E6, E11, E12 | ✅ **Done code/test level** (2026-07-27, commits `19b0d4b`…`af02d19`, pushed) — adversarially audited; Gate E live rows still owed. E11 item 2 open for Gate E. See [briefs/PHASE-E-SESSION-LOG-2026-07-27.md](briefs/PHASE-E-SESSION-LOG-2026-07-27.md) |
 | **Phase E** — E13 | ✅ **DONE code/test level** (2026-07-27, new session): marine `8d87ad2`+`1307386`, api `5ca6a93`+`3444fa1`, stack `19d9332`, guards `634c430`. Persisted real OSM geometry through wizard→api→marine; deleted the pin projection. **Coordinator caught + fixed a latent contract bug**: configobj cannot round-trip a nested coord list — JSON-string encoding chosen, decode on both read sides. Gate E rows 25–27 owed live (need deploy + wizard re-run). See session log "2026-07-27 (continued)" |
 | **OPERATOR RULING 2026-07-27** | **Structure grid dx = constant 10 m** ("just use a 10m grid for when L4 is needed, period"). Retires E1's `min(L_tip/8,15)` derivation and **kills the `design_tp_s` config key** — E2's design-Tp blocker is CLOSED. E2 uses a fixed ~15 s representative period only for the grid-EXTENT margin (a sizing constant, not a published value). See session log |
-| **Phase E** — E2–E5, E7–E10 | ⬜ E2 after E13; design-Tp source ruling still open (see session log "Surfaced to operator") |
+| **Phase E** — E2, E2b, E3, E4, E5, E7, E8, E9, E10 | ✅ **DONE code/test level** (2026-07-27/28) — `7ea961b`+`97e08d1` (E2), `9ceab5d`+`53abe07`+`c3f22f7`+`e14baa2` (E2b, untracked task, added mid-session), `49df65c`+`53abe07`+`af7bcda` (E3), `6b48abd` (E4), `2bad206`+`d68465a` (E5), `d517084`+`af7bcda` (E7), `618378c`+`bbcec8f`+`c3fa5b6`+`1b7699b`+`0979b99` (E8, redesigned), `416e1fc`+`255d192`+`0b1cb34` (E9), `054df69` (E10). All pushed. Gate E's live rows are the only work not yet done — they require a deploy plus a marine-config re-push (see Gate E preamble and the new "Deploy requirement" note below Gate E) |
+| **NEW, not an original E-task** — **F1 projection fix** (UTM-zone-straddle, operator Option A) | ✅ **DONE**, adversarially audited clean — `f6033ed`+`dba0fd4`+`55c3964`+`1584136` (lock) + `71939fd`+`b136f15` (antimeridian-aware F2). See "Projection fix" subsection under Phase E |
 | **Phase F** (F1–F5), **Phase D** (D1) | ⬜ Not started |
 
 ### Start at E1
@@ -1032,7 +1039,7 @@ bathymetry resolution, stop and report.**
 (Brent), as `tests/test_surf_1d_dispersion.py` already does, sharing no code path with the
 implementation. Assert `dx` for a table of (Tp, d_tip) pairs including both clamp boundaries.
 
-### E2 — Structure-grid extent: rotated rectangle on the structure  ⬜ **NOT STARTED — UNBLOCKED** (design-Tp closed by 10 m ruling; needs E13 coordinates deployed first)
+### E2 — Structure-grid extent: rotated rectangle on the structure  ✅ **DONE code/test level** — landed as `7ea961b` (feat) + `97e08d1` (guard)
 > **Changes from the 2026-07-27 rulings:** resolution is now **fixed 10 m** (not derived — E1 superseded). The design-Tp blocker is gone. E2 still sizes the grid-EXTENT margins from a wavelength; per the ruling, compute that wavelength from a **single fixed representative period (~15 s) as a module-level sizing constant applied to every spot** — it affects grid extent/cell count only, never a published value. Grid geometry is sized from the **real OSM coordinates** E13 persists, so E13 must be deployed and the HB wizard re-run (coordinates in `marine.conf`) before E2's config-push sizing is exercised live.
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_domain.py` only
 **Must not touch:** L1/L2; the breaking-depth criterion itself (ADR-093 Amendment 2 §2 — reused
@@ -1076,7 +1083,18 @@ base.
 **Guard:** cell count and both spans for a synthetic cluster at a known bearing with a known
 `L_tip`; assert the offshore edge is at tip + L_tip and **not** at any 15 m contour value.
 
-### E3 — Rotated CGRID/NGRID emission  ⬜ **NOT STARTED**
+### E2b — Run L4 as a nested inner grid under L3-as-middle  ✅ **DONE code/test level** — landed as `9ceab5d` (part 1: bathymetry/datum/cache plumbing + rotated-grid params) + `53abe07` (E3-amendment: decouple child NGRID rotation from parent CGRID, required to complete rotated nesting) + `c3f22f7` (part 2: run L4 as the nested inner grid under L3-as-middle) + guard `e14baa2`
+> **Not in the plan as originally written — tracked and dispatched mid-session** (coordinator finding, 2026-07-27, full detail in
+> [briefs/PHASE-E-SESSION-LOG-2026-07-27.md](briefs/PHASE-E-SESSION-LOG-2026-07-27.md) "TRACKED GAP — NEW TASK E2b"). **Owner:**
+> `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_runner.py`, `weewx_clearskies_marine/providers/nearshore/swan.py`
+> (part 1); `weewx_clearskies_marine/services/swan_formats.py` (E3-amendment only, decoupling child/parent rotation)
+>
+> E2 sizes and E4 caches the L4 structure grid, but a read-only survey found **zero L4 references anywhere in the run
+> pipeline** — L4 was sized and cached, never executed. E2b wires L4 in as SWAN's nested inner grid under L3-as-middle
+> (L1→L2→L3→L4), so L4 actually emits CURVE/POINTS output the handoff selection (E5) can read. Adversarially audited
+> clean on both parts (0 blocker/major findings), including the real asymmetric-rotation case.
+
+### E3 — Rotated CGRID/NGRID emission  ✅ **DONE** — landed as `49df65c` (feat) + `53abe07` (E3-amendment, decouples child NGRID rotation/geometry from parent CGRID — required for E2b's rotated nesting) + guard `af7bcda`
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_formats.py` only
 **Must not touch:** `INPGRID BOTTOM` / `INPGRID WIND` rotation (`:1354`, `:1382`) — **these stay
 `0.`**
@@ -1101,7 +1119,7 @@ silently fall back to axis-aligned** — that decision is the operator's.
 **Guard:** assert the emitted `CGRID` and `NGRID` rotation values are equal and non-zero for a
 rotated structure grid, and that both `INPGRID` lines still emit `0.`
 
-### E4 — L3 rescoped: need-driven, sized from L4  ⬜ **NOT STARTED**
+### E4 — L3 rescoped: need-driven, sized from L4  ✅ **DONE** — landed as `6b48abd`
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_domain.py`,
 `weewx_clearskies_marine/services/grid_sizing_chain.py`
 **Must not touch:** C3's `offshore_distance_m` threading — **it is reused, not reverted**
@@ -1129,7 +1147,7 @@ rotated structure grid, and that both `INPGRID` lines still emit `0.`
 **Guard:** a spot with no structures and no classification produces **exactly** today's grid set —
 assert L3 is absent and L1/L2 are unchanged.
 
-### E5 — Handoff selection, and the deep-water reference written down  ⬜ **NOT STARTED**
+### E5 — Handoff selection, and the deep-water reference written down  ✅ **DONE** — landed as `2bad206` (feat, three-way first-match handoff + doc-sync D4) + guard `d68465a`
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/transect_handoff.py`,
 `weewx_clearskies_marine/services/surf_1d_pipeline.py`
 **Must not touch:** the breaking-depth criterion `1.3 · Hs / 0.73`; `L2_REFERENCE_DEPTH_M = 15.0`
@@ -1196,7 +1214,7 @@ alongshore Hs gradient across PT0–PT31 versus an independent reference (neares
 buoy, Surfline per-peak, or operator observation) on an oblique-swell day. **Not a Phase E gate row**
 — it needs the right weather. Record it as owed.
 
-### E7 — Diffraction only in the structure grid; smoothing scaled to resolution  ⬜ **NOT STARTED**
+### E7 — Diffraction only in the structure grid; smoothing scaled to resolution  ✅ **DONE** — landed as `d517084` (feat) + guard `af7bcda`
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_formats.py` only
 **Must not touch:** the `0.2` under-relaxation parameter; wind forcing on any grid (**always on** —
 standing rule)
@@ -1216,7 +1234,7 @@ standing rule)
 **Guard:** assert `smnum == 27` at Δx = 10 m and `smnum == 17` at Δx = 12.5 m; assert no
 `DIFFRACTION` line is emitted for L1, L2 or L3.
 
-### E8 — Rebuild the hourly stationary "fill" update for the D1 architecture  ⬜ **REDESIGNED 2026-07-27, NOT STARTED**
+### E8 — Rebuild the hourly stationary "fill" update for the D1 architecture  ✅ **DONE code/test level** — landed as `618378c` (full-nest stationary runner, reuse WW3, no hotstart save) + `bbcec8f` (stationary fill runs the 1D chain + merges swelltrack) + `c3fa5b6` (wire hourly-fill/6h-full into runner loop) + audit fix `1b7699b` (F2 — fill reports updated-vs-skipped honestly) + guard `0979b99`. Plus the coupled F1 work: `c3ceaa8` (cold-start clear on geometry-changing config push, audit F1 option A) + `12907ca` (geometry-changing config push signals an immediate full run, operator ruling 2026-07-28)
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_runner.py`,
 `weewx_clearskies_marine/providers/nearshore/swan.py`, `weewx_clearskies_marine/service.py`
 **Must not touch:** the T4.2 hotstart-isolation rule (a stationary run never saves/overwrites the
@@ -1281,7 +1299,7 @@ change and there is negligible fetch — its hourly refresh carries almost no ne
 structure grid spans ~2–6 m, where the same metre is a 15–50% change. **That** is where hourly
 matters. Stated so nobody later assumes the L3 hourly run is load-bearing.
 
-### E9 — Rescope the two invariants Phase E breaks  ⬜ **NOT STARTED**
+### E9 — Rescope the two invariants Phase E breaks  ✅ **DONE** — landed as `416e1fc` (rescope invariant 6 per-grid-kind, mark invariant 2 not-applicable) + guard `255d192` + `0b1cb34` (finalize invariant-6 structure-grid skip rationale, Option C)
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/invariants.py` only
 **Must not touch:** invariants 1, 3, 5, 7, 8, 9 — unchanged
 
@@ -1318,7 +1336,7 @@ STOP-and-surface, never a licence to move a boundary (trigger 3).
 **Guard:** invariant 6 must fire against a structure grid whose offshore edge is short of tip + L_tip,
 and must **not** fire against a correctly-sized one — the second half is the part that matters here.
 
-### E10 — Per-transect profiles span the handoff to shore, not a grid bbox *(supersedes and resequences C4)*  ⬜ **NOT STARTED**
+### E10 — Per-transect profiles span the handoff to shore, not a grid bbox *(supersedes and resequences C4)*  ✅ **DONE** — landed as `054df69`
 **Owner:** `clearskies-api-dev` · **Files:** C4's allowlist —
 `services/grid_sizing_chain.py`, `enrichment/bathymetry.py`, `providers/nearshore/swan.py`,
 `endpoints/beach_profile.py` **Must not touch:** `extract_native_profile_from_grid()`'s body;
@@ -1488,7 +1506,56 @@ own axis (real base pin+406 m @ 21°, real tip pin+231 m @ 258°; fabricated: pi
 (zero computational consumers — recorded finding, out of scope); the five scalar fields themselves
 (UI still collects/displays them).
 
+### NEW — Projection fix: one locked UTM zone per deployment  ✅ **DONE**, adversarially audited clean (2026-07-28)
+> **Not an original E-task.** Found during the audit of E8/F1 work: each SWAN grid independently
+> recomputed its own UTM zone from its own centroid, which could put the global L1 grid and a
+> per-cluster L3/L4 grid in **different Cartesian frames near a 6° UTM zone seam**, silently zeroing
+> the nested wave energy at the boundary. **Operator ruling 2026-07-28, Option A:** lock one UTM zone
+> per deployment, computed once from the deployment's surf-spot centroid, rather than let each grid
+> pick its own.
+
+**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/grid_sizing_chain.py`
+and its runtime call sites (deployment-centroid zone lock, width guards, antimeridian handling)
+
+**Design, as landed:**
+1. `f6033ed` — `DomainSizing.locked_utm_zone`, persisted in `swan_grid_sizing.json`
+   (`domain_sizing_to_dict`/`from_dict`). `run_grid_sizing_chain()` computes it once from the
+   deployment's surf-spot centroid (`_locked_utm_zone_for_deployment()`). Setup-time width guard:
+   **WARN if surf spots span > 1° longitude, refuse (raise, no sizing produced) if > 2°** — a
+   misconfiguration catcher, not an accuracy limit.
+2. `dba0fd4` — threads the locked zone through runtime call sites; deletes the per-grid zone
+   recomputes it replaces.
+3. `55c3964` — updates existing test fixtures for the new zone parameters.
+4. `1584136` — adds guards for the UTM-zone lock.
+5. `71939fd` + `b136f15` (audit finding F2) — the deployment centroid and width-span calculation are
+   made **antimeridian-aware** (global, not US-only): naive longitude averaging breaks for a
+   deployment straddling ±180°.
+
+**Consequence for deploy (see the new deploy-requirement note under Gate E, below):** the locked zone
+and the new geometry-change signature are written into `swan_grid_sizing.json` by
+`run_grid_sizing_chain()`, which runs at config push, not per cycle. **A deploy that does not re-push
+marine config leaves the old cache in place**, and `run_3level()` raises `RuntimeError` rather than
+run against it (fail-clean behaviour, confirmed by this fix's own adversarial audit).
+
+**Adversarial:** audited clean — no path found where two grids in the same deployment resolve to
+different UTM zones, and the antimeridian case was specifically exercised.
+
 ## ⛔ QC GATE E — grid strategy  ⬜ **NOT REACHED**
+
+> ### ⚠ Deploy requirement — mandatory config re-push, not just a code deploy
+>
+> **The Phase E deploy MUST re-push marine config** so `run_grid_sizing_chain()` regenerates
+> `swan_grid_sizing.json` with the new `locked_utm_zone` and the geometry-change signature (see the
+> "Projection fix" subsection above). Grid sizing runs **at config push, not per cycle**
+> (`endpoints/config.py:77`) — a code-only deploy leaves the old cache in place.
+>
+> **Without the re-push, `run_3level()` raises `RuntimeError` on the stale cache and forecasting
+> stays dark.** This is fail-clean by design (confirmed by the projection-fix adversarial audit F1) —
+> it does not silently run on a wrong-zone or wrong-geometry cache — but it also does not self-heal.
+> The re-push is a **one-time migration for this deploy**, on top of E0's already-documented restart
+> order (Phase E code → config re-push → confirm `last_run` advancing across two consecutive cycles).
+> Restated here because it now also carries the projection fix's new cache fields, not just the E2–E10
+> grid geometry.
 
 Every row needs a `file:line` read after the change and a live number from the deployed system.
 
@@ -1756,3 +1823,65 @@ and whose question framing is
 | 5 | Nest boundary quality at 100 m → 40 m → 12.5 m | The 8:1 jump is gone, so this is now routine rather than a flagged risk |
 | 6 | `TRANSM` calibration on an oblique-swell day | E6; needs the right weather |
 | 7 | Wall-clock vs cell count | The first structure-grid cycle timestamps it for free. Measured scaling is already **worse than linear** (3.8× cells → >10× time), so small-grid estimates are the trustworthy end |
+
+---
+
+# Decision log
+
+## 2026-07-28 — Consolidated Phase E doc sync (docs-only pass)
+
+Phase E's code and tests all landed and pushed across 2026-07-27/07-28, but the plan's own status
+markers had not been flipped task-by-task as work completed — each task had doc-synced its own piece
+in isolation, leaving the headings for E2/E2b/E3/E4/E5/E7/E8/E9/E10 still reading `⬜ NOT STARTED`
+alongside evidence in the session log that they were done. This entry records what a docs-only pass
+(`clearskies-docs-author`) verified and changed, and stops it happening again silently.
+
+**Verification method:** every commit hash cited in this entry and in the flipped task headings was
+checked with `git -C repos/weewx-clearskies-marine log --oneline` (existence) and, for one commit per
+task, `git show <hash> --stat` (content matches the task's own claim). No hash was trusted on the
+strength of a heading alone.
+
+**What changed in the document, this pass:**
+- Flipped `⬜ NOT STARTED` → `✅ DONE` with a landed-hash citation on: E2 (`7ea961b`+`97e08d1`), E3
+  (`49df65c`+`53abe07`+`af7bcda`), E4 (`6b48abd`), E5 (`2bad206`+`d68465a`), E7 (`d517084`+`af7bcda`),
+  E8 (`618378c`+`bbcec8f`+`c3fa5b6`+`1b7699b`+`0979b99`, plus the coupled F1 commits below), E9
+  (`416e1fc`+`255d192`+`0b1cb34`), E10 (`054df69`).
+- Added an **E2b** task heading — this piece of work has no heading anywhere in the plan as written;
+  it exists only in the session log ("TRACKED GAP — NEW TASK E2b"). Documented as done
+  (`9ceab5d`+`53abe07`+`c3f22f7`+guard `e14baa2`) and flagged as not-originally-planned, per this
+  project's rule that undocumented mid-session work gets a home rather than staying log-only.
+- Added a **"Projection fix"** subsection under Phase E (also not an original E-task): one locked UTM
+  zone per deployment, operator ruling 2026-07-28 Option A (`f6033ed`+`dba0fd4`+`55c3964`+`1584136`,
+  antimeridian-aware `71939fd`+`b136f15`). Adversarially audited clean.
+- Added a **deploy-requirement note** at the top of Gate E: the Phase E deploy must re-push marine
+  config so `run_grid_sizing_chain()` regenerates `swan_grid_sizing.json` with `locked_utm_zone` and
+  the geometry-change signature — otherwise `run_3level()` raises `RuntimeError` on the stale cache
+  (fail-clean, confirmed by the projection fix's own adversarial audit) and forecasting stays dark.
+  One-time migration for this deploy, on top of E0's existing restart order.
+- Updated the top-of-file status line, Sequence line, and START HERE table to reflect all of the
+  above.
+
+**E8 redesign, summarized (full detail: this file's E8 section and the session log).** The original
+E8 ("add L4 to the finest-grid-only quick update") was found to be scoped on a dead premise — the
+quick-update path was a SWAN-only-era remnant that never invoked the 1D handoff→SwellTrack chain and
+was never wired into the runner loop at all. Operator-approved redesign: full non-stationary run every
+6 h on the extended HRRR cycles; **hourly stationary "fill"** runs the **full nest** (L1→L2→L3→L4,
+reusing the last full run's WW3 boundary and hotstart, never saving a new hotstart) **and then runs
+the 1D chain**, so the surf card refreshes hourly, not just SWAN grid points. Landed `618378c`
+(runner) + `bbcec8f` (1D chain + swelltrack merge) + `c3fa5b6` (wired into the loop), with two audit
+findings fixed: F1 — a geometry-changing config push now clears SWAN run state and cold-starts
+(`c3ceaa8`), and signals an **immediate full run** rather than waiting for the next scheduled cycle
+(`12907ca`, operator ruling 2026-07-28); F2 — the fill now reports updated-vs-skipped honestly and the
+loop only advances `last_run` on a real update (`1b7699b`), with guards at `0979b99`.
+
+**Projection fix, summarized.** Found during the E8/F1 audit: each SWAN grid independently recomputed
+its own UTM zone from its own centroid, risking the global L1 grid and a per-cluster L3/L4 grid
+landing in different Cartesian frames near a 6° zone seam — silently zeroing nested wave energy at the
+boundary. Operator ruled Option A: lock one UTM zone per deployment, computed once from the surf-spot
+centroid, with a setup-time width guard (WARN > 1° longitude span, refuse > 2°). Made
+antimeridian-aware in a follow-up fix after the auditor found the naive centroid/span math breaks at
+±180°. Adversarially audited clean.
+
+**Doc-code contradictions found this pass:** see Task 4 findings, reported in this pass's closeout to
+the coordinator — not resolved here, per this agent's scope (docs-only; a contradiction is a finding,
+not something to silently reconcile).
