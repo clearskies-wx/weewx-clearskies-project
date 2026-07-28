@@ -1891,16 +1891,16 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 - `_save_hotstart(run_dir, grid_level)`: copies hotstart file from run dir to persistent parent dir for next cycle; only called for nonstationary runs (see hotstart isolation subsection below)
 - `_parse_output(tmpdir, grid_info)`: reads SWAN TABLE output (HEAD format), discovers column indices from header line. Extracts HSIGN, HSWELL, DIR, TM01, DEPTH, QB, DISSURF, DSPR at each transect point. Matches rows to spots by (Xp, Yp) coordinates. Also parses the two SPECOUT/TABLE extractions — the deep-water reference (L2, the spot's measured ~15 m contour) and the per-transect handoff — into their two separate result channels (ADR-095 Amendment 1; see "Multi-SPECOUT extraction" below). *Previously described as "SPECOUT files at ~10m depth points"; void — ADR-095 Amendment 2 states the ~10 m reference point does not exist in the current architecture.*
 
-**Nested grid architecture:** Three sequential SWAN runs per cycle (L1 → L2 → L3). No operational nearshore system runs fine resolution over the full domain — all use nested grids.
+**Nested grid architecture (ADR-093 Amendment 3, plan task E4/E2b, 2026-07-27 — supersedes the three-level description that follows this note in older readings):** Two SWAN runs always fire per cycle (L1 → L2); a cluster with an eligible structure or an operator-classified refraction feature (point break/headland/bay break) additionally runs L3 and, for a structure, L4 — `L1 → L2 → L3 → L4`. A cluster with neither is unchanged: `L1 → L2` only, byte-identical to production before Phase E. No operational nearshore system runs fine resolution over the full domain — all use nested grids.
 
-| Grid level | Config key | Default resolution | Typical domain | Grid points | Memory |
-|---|---|---|---|---|---|
-| L1 (outer) | `outer_grid_resolution_km` | ~1 km | ~200km × 150km (continental shelf approach, from `hrrr_bbox`) | ~5,000–8,000 | ~100–150 MB |
-| L2 (inner) | `inner_nest_resolution_m` | ~100 m | ~20–30km × 10–15km (tight around surf spots, from `swan_domain_bbox`) | ~3,000–8,000 | ~50–150 MB |
-| L3 (surf) | `surf_nest_resolution_m` | ~10 m | ~2–5km × 1–2km (per surf cluster) | ~2,000–4,000 | ~50–100 MB |
-| **Total** | | | | **~10,000–20,000** | **≤400 MB** |
+| Grid level | Config key | Resolution | Typical domain | Runs when |
+|---|---|---|---|---|
+| L1 (outer) | `outer_grid_resolution_km` | ~1 km | ~200km × 150km (continental shelf approach, from `hrrr_bbox`) | Always |
+| L2 (inner) | `inner_nest_resolution_m` | ~100 m | ~20–30km × 10–15km (tight around surf spots, from `swan_domain_bbox`) | Always |
+| L3 (coarse nest / refraction) | — (`_L3_RESOLUTION_M`, `services/swan_domain.py`) | 40 m | ~1,500m × 1,300m ≈ ~1,400 cells at HB (contains L4 + clearance); *not* the 30 m contour | Structure present (nests L4) OR classified point break/headland/bay break — never otherwise (ADR-093 Amendment 3, D2) |
+| L4 (structure grid) | — (`_STRUCTURE_GRID_DX_FLOOR_M`, `services/swan_domain.py`) | 10 m, fixed (operator ruling 2026-07-27) | Rotated rectangle around the structure's own principal axis, ~5,000 cells at HB | Eligible structure (pier/jetty/groin/breakwater) present |
 
-Level 1 writes `NESTOUT` boundary files; Level 2 reads them via SWAN's `NGRID` command and writes its own `NESTOUT`; Level 3 reads Level 2's `NESTOUT`. Multiple surf spots on the same coastline share Levels 1 and 2; each cluster gets its own Level 3 nest. The runner copies boundary files between level subdirs: `level1/nest_out.dat` → `level2/nest_in.dat`, `level2/nest_out.dat` → `level3_{idx}/nest_in.dat`.
+The `~10,000–20,000` grid-point / `≤400 MB` total that this table previously cited was the pre-Phase-E three-level (L1+L2+L3-always) figure and no longer applies uniformly — an open-beach spot with neither trigger runs only L1+L2 (well under that figure); a structure spot runs all four levels (L1+L2+L3+L4 ≈ 12,600 cells at HB, ADR-093 Amendment 3 D8). L1 writes `NESTOUT` boundary files; L2 reads them via SWAN's `NGRID` command and writes its own `NESTOUT`. When L3 runs, it reads L2's `NESTOUT`; when L3 nests L4 (structure case), L3 itself writes a further `NESTOUT` sized to L4, which L4 reads. Multiple surf spots on the same coastline share Levels 1 and 2; each cluster gets its own L3/L4 nest when triggered. The runner copies boundary files between level subdirs: `level1/nest_out.dat` → `level2/nest_in.dat`, `level2/nest_out.dat` → `level3_{idx}/nest_in.dat`, and (structure case) `level3_{idx}/nest_out.dat` → `level4_{idx}/nest_in.dat`.
 
 Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Forecast span: 72 hours (HRRR hours 0–48, GFS hours 48–72).
 
@@ -1926,11 +1926,13 @@ Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Fo
 
 The shared physics block is differentiated per level. Common commands emitted at all levels: `GEN3 WESTHUYSEN`, `BREAKING CONSTANT 1.0 0.73`, `FRICTION JON 0.067`, `TRIAD`. Level-specific:
 
-| Command | L1 (1 km) | L2 (100 m) | L3 (10 m) |
-|---|---|---|---|
-| SETUP | Removed (unsupported in OpenMP parallel runs; nest BC structurally wrong) | Removed | Removed |
-| DIFFRACTION | Removed (sub-grid at 1 km) | Removed (sub-grid at 100 m) | `DIFFRACTION 1 0.2 27` (smoothed; filter εx≈45m) |
-| NUMERIC alfa | — | — | Stationary only: `NUMERIC STOPC dabs=0.005 drel=0.01 curvat=0.005 npnts=99.5 STAT mxitst=50 alfa=0.01` |
+**Table below is the pre-Phase-E, three-level physics assignment; superseded by ADR-093 Amendment 3 (plan task E7, 2026-07-27) — DIFFRACTION and its NUMERIC under-relaxation now belong to L4 (structure grid), not L3. Current assignment:**
+
+| Command | L1 (1 km) | L2 (100 m) | L3 (40 m, need-driven) | L4 (10 m, structure grid) |
+|---|---|---|---|---|
+| SETUP | Removed (unsupported in OpenMP parallel runs; nest BC structurally wrong) | Removed | Removed | Removed |
+| DIFFRACTION | Removed (sub-grid at 1 km) | Removed (sub-grid at 100 m) | Removed (sub-grid even at 40 m) | `DIFFRACTION 1 0.2 <smnum>` (smoothed; `smnum = round((90/dx)**2/3)` = 27 at dx=10 m, target εx≈45m) |
+| NUMERIC alfa | — | — | — | Stationary only: `NUMERIC STOPC dabs=0.005 drel=0.01 curvat=0.005 npnts=99.5 STAT mxitst=50 alfa=0.01` (travels with DIFFRACTION, E7) |
 
 The SETUP physical effect (~10–15 cm near shore) is delivered via the WLEVEL input grid. Stage 2 (current): tide + analytic radiation-stress-balance setup estimate (`services/wave_setup.py`). The setup profile is computed from the previous run's cached Hs using Green's law shoaling to find breaking, then Longuet-Higgins & Stewart (1964) radiation-stress integration (K ≈ 0.167 for γ=0.73). First run (no previous cache), or genuinely flat offshore conditions (Hs < 0.1m), falls back to tide-only WLEVEL — both are a real computed value, not a caught failure. A genuine computation failure inside the setup pipeline instead aborts the SWAN run as of C-77 (2026-07-26, rules/coding.md §1) rather than silently substituting tide-only WLEVEL for every spot.
 
@@ -2004,14 +2006,16 @@ The cached entry is encoded with a **trimmed** codec (`services/swelltrack_cache
 
 **Two-tier schedule:**
 
+**Table below (grid column, "L3 only") predates ADR-093 Amendment 3 (plan task E8, operator-approved 2026-07-27) — the quick-update path was rebuilt as the "hourly fill" and now runs every grid a cluster has, not L3 alone. Current shape:**
+
 | Tier | Trigger | Grids | Mode | Forecast span | Runtime | Interval |
 |---|---|---|---|---|---|---|
-| Full run | Extended HRRR cycle (00/06/12/18Z) + GFS + WW3 | L1 + L2 + L3 | Nonstationary (72h time-stepping) | 72 hours | ~7–12 min | Every 6 hours |
-| Quick update | Any HRRR cycle (hourly) | L3 only | Stationary (single snapshot, no time-stepping) | 1 timestep ("now") | <1 min | Every hour |
+| Full run | Extended HRRR cycle (00/06/12/18Z) + GFS + WW3 | L1 + L2 (+ L3 + L4 where triggered) | Nonstationary (72h time-stepping) | 72 hours | ~7–12 min | Every 6 hours |
+| Hourly fill | Any intervening (non-extended) HRRR cycle | Full nest — L1 + L2 (+ L3 + L4 where triggered), same as a full run | Stationary (single snapshot, latest HRRR wind) | 1 timestep ("now") | <1 min | Every hour |
 
-**Full runs** produce the 72-hour forecast. All three grid levels must complete within 15 minutes total. Peak memory: ≤400 MB (all three grids run sequentially, not simultaneously).
+**Full runs** produce the 72-hour forecast. All active grid levels must complete within 15 minutes total. Peak memory: ≤400 MB (all grids run sequentially, not simultaneously).
 
-**Quick updates** run a stationary Level 3 SWAN computation per cluster with the latest HRRR wind, reusing Level 2's `nest_out.dat` from the last full run. Per SWAN user manual §4.7: "For small domains (< 100 km), a stationary computation is recommended." Each Level 3 grid is ~2-5 km. The stationary result is merged into the existing forecast cache (replaces the entry closest to the snapshot time). Skipped for 30 minutes after a full run completes (no overlap). Quick updates refresh nearshore wind effects (sea breeze, wind chop, wind quality scoring) hourly; the deep-water swell propagation stays correct from the last full run.
+**The hourly fill runs the full nest stationary** (`SWANRunner.run_stationary_full_nest()`, `services/swan_runner.py`) — L1 through whichever of L2/L3/L4 this cluster has, not L3 alone. L1 reuses the last full run's WW3 boundary files already on disk rather than re-fetching (deep-water swell changes slowly). The fill also runs the 1D SwellTrack chain and merges the result into the existing forecast cache (replaces the entry closest to the snapshot time), so it refreshes the actual surf card at every spot — including open-beach (L2-only) spots — not just SWAN grid points, which is what the pre-E8 L3-only quick update did not do. Per SWAN user manual §4.7: "For small domains (< 100 km), a stationary computation is recommended." Warm-starts from, but never saves, the full run's hotstart chain (T4.2 isolation).
 
 **Working directory:** SWAN runs in `/var/run/weewx-clearskies/swan/` (fixed path, not tempfile). Subdirectories `level1/`, `level2/`, and `level3_{idx}/` (one per cluster) are cleaned at the start of each run. Hotstart files (`level1_hotstart.dat`, `level2_hotstart.dat`, `level3_{idx}_hotstart.dat`) persist between runs. Nesting file flow: Level 1 writes `nest_out.dat`, runner copies to Level 2 as `nest_in.dat`; Level 2 writes `nest_out.dat`, runner copies to Level 3 as `nest_in.dat`. The fixed path is visible from SSH (unlike `tempfile.mkdtemp` which was hidden by systemd's `PrivateTmp=yes`) and survives service restarts.
 

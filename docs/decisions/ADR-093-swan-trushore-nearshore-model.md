@@ -236,6 +236,55 @@ spot. The reason to change the offshore edge no longer exists, so it does not ch
 
 **Unchanged by this amendment.** Amendment 1's alongshore smart-sizing rule stands.
 
+### Amendment 3 (2026-07-27): L3 rescoped as need-driven; L4 introduced as the structure grid; L3's 15 m offshore edge retired for the structure-grid case
+
+**This amendment documents an already-made operator ruling — it is not a new decision.** The ruling was
+given in chat during the Marine Model Restoration Plan Phase E review session, 2026-07-27, and is
+recorded in full at `docs/planning/briefs/SWAN-GRID-STRATEGY-RESEARCH-FINDINGS.md` §0A (rulings D1–D8)
+and implemented per `docs/planning/MARINE-MODEL-RESTORATION-PLAN.md` Phase E, tasks E1–E9. This
+amendment's job is only to reconcile ADR-093 itself with that ruling — Amendment 2 predates it and, on
+the point below, is superseded.
+
+**What changed.** Amendment 2 §2/§4 sized L3 as a single per-cluster fine grid (10 m) reaching from a
+fixed **15 m offshore (seaward) edge** down to the per-hour breaking-depth contour, and closed the
+question of moving that offshore edge ("L3's offshore (seaward) edge stays at the 15 m contour —
+question closed"). Findings §0A ruling **D2** replaced that single-purpose L3 with a need-driven grid
+that exists for exactly two reasons and never otherwise: (a) as the coarse nesting step under a new,
+separate fine grid — the **structure grid, tier L4** (`services/swan_domain.py`
+`compute_structure_grid_domain()` / `StructureGridDomain`) — a true rotated rectangle fixed at 10 m
+resolution, sized to the structure's own principal axis; or (b) as the working refraction grid at an
+operator-classified point break, headland, or bay break, unchanged from Amendment 2's cross-shore
+sizing. Ruling **D6 item 1** — *"Retire the 15 m-contour offshore edge; adopt the structure grid" —
+Approved* — is the specific line item that reverses Amendment 2's "question closed" statement.
+
+**Scope of the reversal — role (a) only.** For a role-(a) cluster (structure present), L3's cross-shore
+extent is no longer the 15 m contour on either edge: it is sized directly around the already-sized L4
+structure grid, extent = L4's footprint plus clearance of at least 2 L2 cells on every side, plus the
+cluster's alongshore pin span (`size_l3_coarse_nest()`). The 15 m contour has no role in sizing a
+role-(a) L3 at all. For a role-(b) cluster (classification, no structure) L3's cross-shore extent is
+**unchanged** — Amendment 2 §2's breaking-depth-criterion shoreward edge and the 15 m contour offshore
+edge both still apply exactly as written there. A cluster with neither a structure nor a classification
+runs no L3 at all, byte-identical to production before this ruling (D2's own strongest acceptance
+criterion).
+
+**Consequences also decided by the same ruling, recorded here for completeness (implemented E1–E9):**
+- L3's resolution changes from the fixed 10 m Amendment 2 assumed to a fixed **40 m**
+  (`_L3_RESOLUTION_M`, `services/swan_domain.py`) — D6 item 5, "L3 at 30–40 m for refraction spots,
+  diffraction off there."
+- `DIFFRACTION` moves from L3 (Amendment 2's era) to **L4 only** — plan task E7 — because at L3's now
+  coarser 40 m (and L1/L2's 1 km/100 m) diffraction is sub-resolution; smoothing (`smnum`) scales with
+  the grid's own `dx`.
+- The variance-test / conditional-band mechanism that Amendment 2 (and the earlier §2.2/§2.3 research)
+  proposed to gate L3 is **struck entirely** — D2's consequences, D6 item 6.
+- L4's resolution is a **fixed 10 m constant**, not derived from wavelength (operator ruling, verbatim:
+  *"Just use a 10m grid for when L4 is needed, period"*) — superseding the `min(L_tip/8, 15m)` floor-10
+  derivation that plan task E1 had implemented immediately prior to this ruling.
+
+**Unchanged by this amendment.** Amendment 1's alongshore smart-sizing rule (structure shadow-zone
+extent) stands and now sizes L4's alongshore extent as well as L3's, per `services/swan_domain.py`.
+Amendment 2's handoff-depth criterion (`1.3 × Hs(hour) / gamma`) is unchanged and now applies uniformly
+to whichever of L3/L4 a transect hands off from (Marine Model Restoration Plan E5, ruling D3).
+
 ## References
 
 - Supersedes: ADR-084 (NWPS as primary nearshore source with supplementation)
