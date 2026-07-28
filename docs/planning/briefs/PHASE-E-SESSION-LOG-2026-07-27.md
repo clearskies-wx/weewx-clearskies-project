@@ -15,49 +15,63 @@ mandatory order: code → config re-push (resizes grid) → confirm last_run adv
 HB wizard discovery+Apply so real pier coords land in marine.conf. Do NOT run deploy-marine.sh before
 E2b+E5+E8+E9+E10 are done (it re-enables the service onto the still-cached 41,895-cell grid = thrash).
 
-**COMMIT LEDGER (all on `main`, each independently acceptance-gated by coordinator):**
-- Phase E DONE + PUSHED (all repos): E13 — marine `8d87ad2`+`1307386`+guard `634c430`; api `5ca6a93`;
-  meta(API-MANUAL) `3444fa1`; stack `19d9332`. (Real OSM structure coords persisted wizard→api→marine;
-  pin-projection fabrication deleted; JSON-encoded coords contract fixed — configobj can't round-trip
-  a nested list.)
-- Phase E DONE, marine, PUSHED (session 2, just pushed): E2 `7ea961b` + guard `97e08d1`; E3 `49df65c`;
-  E7 `d517084`; E4 `6b48abd`.
-- E6 (pier TRANSM 0.82) `dba85ea`, E1/E11/E12 — done in session 1 (see task table further down).
+**◀◀ LATEST STATE — updated 2026-07-27 session 2, pre-compaction #2. This supersedes the older detail below. ▶▶**
+
+**COMMIT LEDGER — all on `main`, all PUSHED to origin, each coordinator-acceptance-gated:**
+- Session-1 (pushed earlier): E13 (marine `8d87ad2`/`1307386`/guard `634c430`; api `5ca6a93`; meta `3444fa1`;
+  stack `19d9332`), E2 `7ea961b`+guard `97e08d1`, E3 `49df65c`, E7 `d517084`, E4 `6b48abd`, E6 `dba85ea`,
+  E1/E11/E12 (see task table lower in file).
+- Session-2 NEW (all pushed): E3+E7 guards `af7bcda`; E9 impl `416e1fc` + guard `255d192`; l_tip Option-C
+  finalize `0b1cb34`; E2b part1 `9ceab5d`; **E3-AMENDMENT `53abe07`** (decoupled child NGRID rotation — fixed
+  E3's incomplete rotated nesting); **E2b part2 `c3f22f7`** (L4 runs nested under L3-middle); E2b/E3 guards `e14baa2`.
 
 **PHASE E TASK STATUS:**
-- ✅ E13, E1(⛔superseded by 10m ruling — dead code dormant), E2, E3, E4, E6, E7, E11, E12 — DONE.
-- 🔄 E3+E7 guards: test-author agent `adf822c0fe2974f44`, scope CONFIRMED, writing
-  `tests/test_swan_formats_grid_emission.py` (7 guards). Accept when it closes out (diff+rerun+worktree-clean).
-- ⬜ **E2b (NEXT, HIGH RISK)** — run L4 through swan.py/swan_runner.py. Full design+risk map is in the
-  "E2b DESIGN + RISK MAP" section below. Core: L3 must become a "middle" grid writing a NESTOUT for L4
-  (replicate the PROVEN L2 pattern at swan_runner.py:2673-2761; DIFFERENT filenames or SWAN zeroes
-  energy — known prod bug). Byte-identical L1/L2/L3 when no L4. Then L4 emits CURVE/POINTS for E5.
-  Allowlist: `providers/nearshore/swan.py` (+ `services/swan_runner.py`). Owner clearskies-api-dev.
-  Operator nod on "replicate L2 pattern" approach requested but NOT blocking (D2 already approves the
-  nesting). Sites: bathymetry dict +"level4" (swan.py:709/751,:2887); datum guard +L4 (swan.py:662);
-  bathymetry_cache_path level-4 branch keyed off the persisted StructureGridDomain (swan.py:240);
-  run_3level L3 loop (swan_runner.py:3253-3405); pass rotation_deg+is_structure_grid at swan_runner.py:4021.
-- ⬜ E9 (invariants 2+6 rescope) — INDEPENDENT of E2b (reads sizing cache, not L4 run). Can dispatch in
-  parallel. Files: services/invariants.py. Invariant 6 → per-grid-kind reach; invariant 2 → mark N/A
-  where handoff is a clean boundary (D3). Must-not-touch invariants 1,3,5,7,8,9.
-- ⬜ E5 (handoff rule D3, first-match-wins per transect; deep-water ref stays L2; DOC-SYNC in same
-  commit) — depends on E2b (L4 must emit output). Files: transect_handoff.py, surf_1d_pipeline.py.
-- ⬜ E8 (hourly quick update runs every handoff grid; swan_runner.py) — depends on E2b (L3-middle).
-- ⬜ E10 (per-transect profiles span own handoff→shore; reworks C4 `060a56b`) — depends on E5.
-  Files: grid_sizing_chain.py, enrichment/bathymetry.py, providers/nearshore/swan.py, endpoints/beach_profile.py.
-- Then: single Phase-E deploy → Gate E (27 rows, live) + adversarial → Phase F (F1-F5, wind source term
-  in 1D model; F3 needs Young&Verhagen 1996 paper — HARD GATE) + Gate F → Phase D (D1) + Gate D.
+- ✅ DONE+PUSHED: E1(dead/superseded), E2, E3, **E3-amendment**, E4, E6, E7, E9(+guard), E11, E12, E13,
+  **E2b parts 1+2 (ADVERSARIAL AUDIT CLEAN — 0 blocker/major)**, all guards (E3/E7, E9, E2b/E3-decoupled).
+- 🔄 **E5 — IN FLIGHT**: agent `e5-handoff` (clearskies-api-dev) IMPLEMENTING now (I sent GO). Three-way
+  handoff L4→L3→L2. TURNED OUT SMALL: the L4 band already reaches the select call (E2b skips _parse_output on
+  L3-outer, so L4 is the sole band), it was just MISLABELED "L3" → a 4-edit labeling fix + refine_handoff_with_qb
+  →("L3","L4") + rule-2 pure logic + doc-sync(D4). ALLOWLIST CORRECTED (plan was wrong): transect_handoff.py +
+  swan_runner.py (call sites :808/:1943, _parse_output, the two _select_l3_handoff_* helpers) + surf_pipeline_timestep.py
+  (no change needed) + docs(ARCHITECTURE.md, API-MANUAL.md) + surf_1d_pipeline.py(doc-only). RULE-2 (L3-refraction for
+  L4-uncovered transects) is NOT WIRED (L3 runs outer-only when it nests L4 → uncovered transects fall to L2 via E2b
+  fallback) — TRACKED KNOWN GAP, needs grid-role dispatch (E4/E7 territory), untested-by-design. Accept E5 when it
+  closes out (my own suite run + byte-identical-non-L4 + doc-sync in same commit).
+- ⬜ E5 guard (test-author) — after E5 lands. ⬜ E8 (hourly quick-update runs every handoff grid; swan_runner.py
+  run_stationary_level3) — sequence AFTER E5 (shared file). ⬜ E10 (per-transect profiles span own handoff→shore;
+  reworks C4 `060a56b`; files grid_sizing_chain.py, enrichment/bathymetry.py, swan.py, endpoints/beach_profile.py) — after E5.
+- ⬜ **Phase-E consolidated doc-sync** (ARCHITECTURE.md SWAN section line ~98 + manuals + ADR-093 cross-refs still
+  describe the PHASE-14 grid: "L3=10m surf zone, runs to 15m, handoff 1.3·Hs/0.73") — reconcile ONCE after E10, BEFORE Gate E.
+- ⬜ Single Phase-E deploy (E0 order: code → config re-push resizes grid → confirm last_run advances 2 cycles →
+  re-run HB wizard) → Gate E (27 rows live + adversarial) → Phase F → Phase D.
 
-**KEY RULINGS THIS SESSION (detail in sections below):** (1) OPERATOR: structure grid dx = fixed 10m;
-kills design_tp_s + E1 derivation. (2) E2 across-span = wavelength-bounded halo (4·L_tip illuminated
-side / 2·L_tip not), NOT geometric ray-cast. (3) coords JSON-encoded across api↔marine (configobj
-can't round-trip nested list). (4) E3 item4 xlenc branch on rotation (no new dims key); item5
-relocated to E4. (5) E7 NUMERIC follows DIFFRACTION to L4. (6) E4 role-B L3 also 40m; E4 flags but
-doesn't fix bathymetry cache-rekey (→E2b). (7) E2b = replicate L2 middle-grid pattern.
+**⚠ NEW OPERATOR-DECIDED TASK — COORDINATE FRAME (Option A, decided 2026-07-27):** Operator chose **A: keep Cartesian,
+fix the projection to ONE frame per site** (NOT spherical — SWAN forbids rotated grids in spherical, would kill the L4
+structure grid). Root cause (audit F1): our code picks a UTM zone PER-GRID from each grid's centroid (swan_formats.py:1364,
+swan_runner.py:1037/4276/4488, + default inside lonlat_to_utm:101) → parent/child near a 6° zone seam desync → silent
+energy-zero. FIX: choose the zone/frame ONCE per run from a canonical site point and thread it to ALL projection calls
+(replace the per-grid utm_zone() recomputes; ~33 lonlat_to_utm/utm_to_lonlat call sites across swan_formats.py[10]/
+swan_runner.py[22]/swan.py[1]); add a loud guard that refuses to run if any grid resolves to a different frame. Primitives:
+swan_formats.py:90 utm_zone, :95 lonlat_to_utm(zone optional), :135 utm_to_lonlat. ARCHITECTURAL — operator approved A.
+NON-HB-blocking, not triggered at HB. **SEQUENCE AFTER E5/E8/E10** (collides on swan_runner.py/swan_formats.py). Design-ack
+required (cross-cutting). This ALSO kills the ~2m flat-earth-vs-UTM residual finding. Dedicated task, own allowlist.
 
-**QC METHOD (keep doing):** every agent report is a claim — re-run its check myself, `git show
-<commit> --stat` vs allowlist, spot-read one design element, confirm no must-not-touch file changed.
-Agents dispatched with mandatory git-restriction + arch-change blocks; scope-ack before code.
+**KEY RULINGS/FINDINGS THIS SESSION (detail in sections lower in file):** (1) l_tip_m persistence = Option C (validated at
+setup by _l3_viability_check, per-cycle re-check omitted — no new field). (2) E9 allowlist was wrong (assertions live at
+swan.py/surf_1d_pipeline.py call sites, not invariants.py) — corrected. (3) E3 was INCOMPLETE for rotated nesting (own-CGRID
+& child-NGRID coupled to one rotation_deg + NGRID geom from axis-aligned bbox) → E3-amendment `53abe07` added inner_rotation_deg,
+NGRID reproduces child CGRID by construction (contract: inner_dims==child dims). (4) E2b design choices confirmed: mis-oriented
+L4 degrades that cluster to no-L4; orphaned-spot fallback also covers L3-middle convergence failure. (5) Coordinate frame = Option A.
+TRACKED tidy-ups: getattr(domains,"level4_clusters",[]) swan_runner.py:3455 (fix stale test fixture later); F4 idx-align (pinned by guard).
+
+**QC METHOD (keep doing):** every agent report is a CLAIM — re-run its check myself, `git show <commit> --stat` vs allowlist,
+read the key diff section, reproduce the core property myself when safety-critical (e.g. I ran /c/tmp/e3_verify.py for the
+E3-amendment; reproduced the decoupled-nesting emission). Highest-risk changes get an ADVERSARIAL AUDIT (clearskies-auditor,
+never saw the impl) + guard tests before building on them (did this for E2b part2). Agents: mandatory git-restriction +
+arch-change blocks; DESIGN-ack before code on anything non-trivial; hold code-writes to avoid 2 agents on the shared checkout.
+
+**ACTIVE AGENTS AT COMPACTION:** `e5-handoff` (a...ac471ee46f83ad505 / name "e5-handoff") — IMPLEMENTING E5, will report
+closeout. Reattach via SendMessage to name "e5-handoff". No other agent running.
 
 ═══════════════════════════════════════════════════════════════════════════════
 
