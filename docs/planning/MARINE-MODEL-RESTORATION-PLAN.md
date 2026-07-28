@@ -8,7 +8,7 @@
 **Sequence:**
 Phase A ✅ → Phase B ✅ → **Deploy 1** ✅ → Gate B (rows 3/5/8/11/13 outstanding) →
 Phase C (C1/C2/C3 ✅ landed; **C4 superseded by E10**) →
-**Phase E (E0–E12)** → Gate E → Phase F (F1–F5) → Gate F → Phase D (D1) → Gate D
+**Phase E (E0–E13; E1/E6/E11/E12 ✅ code-level, E13 next, then E2)** → Gate E → Phase F (F1–F5) → Gate F → Phase D (D1) → Gate D
 
 ---
 
@@ -996,7 +996,7 @@ concern, and **Gate E rows 21–22 need it**. Leave it enabled.
 **Whatever is chosen, the acceptance criterion is the same:** `/health` shows `last_run` **advancing
 across two consecutive cycles**. Not "the service restarted." Not "a cycle started."
 
-### E1 — Structure-grid resolution derived from the tip wavelength  ⬜ **NOT STARTED**
+### E1 — Structure-grid resolution derived from the tip wavelength  ✅ **DONE code/test level** (2026-07-27: `19b0d4b` + audit fix `b044f91`; known-answer guard `f03d688`+`9331841`, 18 tests; adversarial pass clean. Gate E rows 1–2 still owed live. Design Tp arrives as a function argument — its source is an **open operator ruling**, needed before E2 wires the call site)
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_domain.py` only
 **Must not touch:** L1 and L2 sizing; `_compute_level3_grid()`'s non-delegating branch (1353-1460);
 anything in `swan_formats.py` (that is E3/E6/E7)
@@ -1162,7 +1162,7 @@ mis-implemented — report, do not adjust the envelope to make the check pass.
 **cannot be exercised at HB**. They will be written and untested until a spot exists whose structure
 grid covers only part of the beach. Nobody may claim these paths are verified.
 
-### E6 — Pier transmission 0.95 → 0.82  ⬜ **NOT STARTED**
+### E6 — Pier transmission 0.95 → 0.82  ✅ **DONE code level** (2026-07-27: `dba85ea`, Elgar 2001 cited; adversarial pass clean — no second 0.95 path. Gate E row 11 live check and oblique-swell calibration still owed)
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_formats.py` only
 (`_OBSTACLE_PARAMS`) **Must not touch:** the jetty / groin / breakwater / seawall rows — all unchanged
 
@@ -1315,7 +1315,7 @@ before E10 so E10's contribution is distinguishable from C1's.
 **Guard:** a spot with **no L3 and no structure grid** produces 32 profiles each spanning its own
 handoff point to shore. This case is unreachable under C4's design and is the whole point of E10.
 
-### E11 — Shadow classification: the two call sites C2 did not reach  ⬜ **NOT STARTED**
+### E11 — Shadow classification: the two call sites C2 did not reach  ✅ **DONE code/test level** (2026-07-27: `3e40238`, guard `af02d19`; adversarial pass demonstrated invariant 3 was structurally unfireable before and fires correctly now. **Item 2 remains OPEN — resolve at Gate E row 19 with live config**; probe numbers are non-authoritative pending E13's real geometry. Item 3 confirmed: invariant 3 was trivially passing on empty lists)
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_runner.py` only
 **Must not touch:** `marine_config.py` (C2's fix — already landed as `de71775` and deployed); the
 shadow-classification function's own logic until item 2 below has been answered
@@ -1354,7 +1354,7 @@ defect it was meant to catch.
 **Guard:** both call sites receive a non-empty structures list for a spot that has one — asserted at
 the call site, not by mocking the classifier.
 
-### E12 — A cycle that overruns must not report `ok`  ⬜ **NOT STARTED**
+### E12 — A cycle that overruns must not report `ok`  ✅ **DONE code/test level** (2026-07-27: `eba9622`, guards `85ce1a2`+`f2f4c31`, 16/16; adversarial pass clean incl. failed-never-downgraded. **Finding 2 answered and owed to operator:** timeout is per-SWAN-invocation (`_spawn_swan` :4065), nothing bounds the cycle; deployed config has NO `swan_timeout_s` key so production runs the 900 s code default, not the documented 3600 s — and E0's hung process outlived both, so the timeout appears ineffective. Cycle-bound + value decisions pending)
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/endpoints/health.py`,
 `weewx_clearskies_marine/state.py`, `weewx_clearskies_marine/services/swan_runner.py`
 **Must not touch:** B3's input-freshness registry; the invariant-scoping fix (`49839ac`); the four
