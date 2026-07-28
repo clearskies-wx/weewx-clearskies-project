@@ -27,7 +27,8 @@ Phase C (C1/C2/C3 ✅ landed; **C4 superseded by E10**) →
 | **Gate C** | ⛔ **Never walked** → rows relocated to **Gate E 18–20** |
 | **Phase E** — E0 | ✅ Done — service **stopped and disabled** on librewxr, deliberately |
 | **Phase E** — E1, E6, E11, E12 | ✅ **Done code/test level** (2026-07-27, commits `19b0d4b`…`af02d19`, pushed) — adversarially audited; Gate E live rows still owed. E11 item 2 open for Gate E. See [briefs/PHASE-E-SESSION-LOG-2026-07-27.md](briefs/PHASE-E-SESSION-LOG-2026-07-27.md) |
-| **Phase E** — E13 | ⬜ **← NEXT, runs before E2** — persist discovery geometry, delete the pin projection (operator-ordered 2026-07-27; supersedes C2's projection helper) |
+| **Phase E** — E13 | ✅ **DONE code/test level** (2026-07-27, new session): marine `8d87ad2`+`1307386`, api `5ca6a93`+`3444fa1`, stack `19d9332`, guards `634c430`. Persisted real OSM geometry through wizard→api→marine; deleted the pin projection. **Coordinator caught + fixed a latent contract bug**: configobj cannot round-trip a nested coord list — JSON-string encoding chosen, decode on both read sides. Gate E rows 25–27 owed live (need deploy + wizard re-run). See session log "2026-07-27 (continued)" |
+| **OPERATOR RULING 2026-07-27** | **Structure grid dx = constant 10 m** ("just use a 10m grid for when L4 is needed, period"). Retires E1's `min(L_tip/8,15)` derivation and **kills the `design_tp_s` config key** — E2's design-Tp blocker is CLOSED. E2 uses a fixed ~15 s representative period only for the grid-EXTENT margin (a sizing constant, not a published value). See session log |
 | **Phase E** — E2–E5, E7–E10 | ⬜ E2 after E13; design-Tp source ruling still open (see session log "Surfaced to operator") |
 | **Phase F** (F1–F5), **Phase D** (D1) | ⬜ Not started |
 
@@ -996,7 +997,8 @@ concern, and **Gate E rows 21–22 need it**. Leave it enabled.
 **Whatever is chosen, the acceptance criterion is the same:** `/health` shows `last_run` **advancing
 across two consecutive cycles**. Not "the service restarted." Not "a cycle started."
 
-### E1 — Structure-grid resolution derived from the tip wavelength  ✅ **DONE code/test level** (2026-07-27: `19b0d4b` + audit fix `b044f91`; known-answer guard `f03d688`+`9331841`, 18 tests; adversarial pass clean. Gate E rows 1–2 still owed live. Design Tp arrives as a function argument — its source is an **open operator ruling**, needed before E2 wires the call site)
+### E1 — Structure-grid resolution derived from the tip wavelength  ⛔ **SUPERSEDED by the 2026-07-27 "constant 10 m" operator ruling**
+> The wavelength derivation (`min(L_tip/8,15)`, floor 10) is retired: **structure grid dx = 10.0 m, fixed**. E1's landed code (`19b0d4b` `compute_structure_grid_resolution` / `tip_depth_from_fine_profile`, guard `f03d688`+`9331841`) is now dead — it has no caller. E2 uses the constant directly; E1's helper may be deleted in E2's commit. **`design_tp_s` is off the table.** Original E1 spec retained below for history only.
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_domain.py` only
 **Must not touch:** L1 and L2 sizing; `_compute_level3_grid()`'s non-delegating branch (1353-1460);
 anything in `swan_formats.py` (that is E3/E6/E7)
@@ -1030,7 +1032,8 @@ bathymetry resolution, stop and report.**
 (Brent), as `tests/test_surf_1d_dispersion.py` already does, sharing no code path with the
 implementation. Assert `dx` for a table of (Tp, d_tip) pairs including both clamp boundaries.
 
-### E2 — Structure-grid extent: rotated rectangle on the structure  ⬜ **NOT STARTED**
+### E2 — Structure-grid extent: rotated rectangle on the structure  ⬜ **NOT STARTED — UNBLOCKED** (design-Tp closed by 10 m ruling; needs E13 coordinates deployed first)
+> **Changes from the 2026-07-27 rulings:** resolution is now **fixed 10 m** (not derived — E1 superseded). The design-Tp blocker is gone. E2 still sizes the grid-EXTENT margins from a wavelength; per the ruling, compute that wavelength from a **single fixed representative period (~15 s) as a module-level sizing constant applied to every spot** — it affects grid extent/cell count only, never a published value. Grid geometry is sized from the **real OSM coordinates** E13 persists, so E13 must be deployed and the HB wizard re-run (coordinates in `marine.conf`) before E2's config-push sizing is exercised live.
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_domain.py` only
 **Must not touch:** L1/L2; the breaking-depth criterion itself (ADR-093 Amendment 2 §2 — reused
 unchanged); `_cluster_spots()`'s distance logic
@@ -1390,7 +1393,8 @@ finding before changing any timeout value — a timeout is a config key (trigger
 than the threshold and `run_in_progress` is True; returns `ok` when it is within it. Reuses
 `tests/test_marine_health_state.py`'s existing fixtures.
 
-### E13 — Structure geometry: persist the discovery outline, delete the pin projection  ⬜ **NOT STARTED — RUNS BEFORE E2**
+### E13 — Structure geometry: persist the discovery outline, delete the pin projection  ✅ **DONE code/test level (2026-07-27)**
+> **Landed:** marine `8d87ad2` (deleted `_populate_structure_coordinates` + `build_obstacle_structures` case (b)) + `1307386` (JSON-decode coordinates on read) + guards `634c430`; api `5ca6a93` (optional `coordinates` field, `json.dumps` write / `json.loads` read) + `3444fa1` (API-MANUAL §19.5); stack `19d9332` (wizard/admin carry-through, single [lat,lon]→[lon,lat] conversion). All independently acceptance-gated by the coordinator. **Contract bug caught in QC:** configobj returns a nested coord list as strings, so the marine reader's `float(c[0])` hit `'['`; resolved by JSON-string encoding end-to-end with `json.loads` on both read sides (marine reader + api serialize). The mandatory guard round-trips through a real configobj file. **Owed live at Gate E (rows 25–27):** deploy stack+api, re-run HB wizard discovery + Apply so `marine.conf` carries the real outline.
 **Owner:** `clearskies-api-dev` (three scoped dispatches, one per repo) + `clearskies-test-author`
 **Authority:** ADR-095 Decision 3 (Accepted): *"Structure coordinates from the wizard's Overpass API
 discovery."* Operator ruling 2026-07-27 in chat: the spot pin is a point-of-interest marker with no

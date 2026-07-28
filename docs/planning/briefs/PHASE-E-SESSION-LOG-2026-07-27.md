@@ -95,3 +95,55 @@ OSM way 45074900 (Huntington Beach Pier), principal-axis analysis of 35-node pol
 
 ## Verification evidence (fill as gates walk)
 - (none yet — no live system until Phase E deploys; E1 evidence is code+test level)
+
+---
+
+# 2026-07-27 (continued) — new session, operator rulings + E13 execution
+
+## OPERATOR RULING — structure grid resolution is a CONSTANT 10 m. Supersedes E1 derivation + D6 item 2.
+Given in chat after the coordinator explained design-Tp only sets grid cell size (~10 vs ~12.5 m):
+*"Just use a 10m grid for when L4 is needed, period."*
+- **Structure grid (L4) dx = 10.0 m, fixed.** The `min(L_tip/8, 15)`-floor-10 derivation (E1, D6 item 2)
+  is **retired**. E1's landed code (`19b0d4b` `compute_structure_grid_resolution`,
+  `tip_depth_from_fine_profile`) is now **dead** — it has no caller; E2 uses the constant directly.
+  Leave E1 code dormant or delete it in E2's commit (coordinator's call at E2 dispatch).
+- **`design_tp_s` config key is OFF THE TABLE.** No new config key, no wizard field, no per-spot value.
+  The E2 blocker "where does design Tp come from" is CLOSED by this ruling.
+- **Residual, surfaced to operator (proceeding unless overruled):** E2 still needs a wavelength to size
+  the grid-EXTENT margin (grid edge sits ~2 wavelengths past the pier near-field). Coordinator ruling:
+  compute that margin from a **single fixed representative period (~15 s) as a documented sizing constant,
+  applied uniformly to every spot** — affects only grid extent/cell count, never a published wave number.
+  Alternative offered: a flat fixed margin distance. Settle at E2 dispatch.
+- D7 (dx-vs-source-resolution safety) is trivially satisfied: fixed 10 m == HB source bathymetry 10 m.
+- Gate E rows 1–2 ("dx derived = 12.5 m") are now **wrong by design** — restate as "dx = 10 m constant per
+  operator ruling" when Gate E is walked.
+
+## FINDING + coordinator decision — structure `coordinates` never round-tripped; JSON encoding chosen.
+While QC-ing E13's api portion the coordinator empirically tested configobj (write nested list → read):
+- configobj returns coordinates as a **list of strings** (native nested list) or a **single string**
+  (JSON), NEVER a list of float-pairs. The marine reader `[[float(c[0]),float(c[1])] for c in
+  section.get("coordinates",[])]` hits `float('[')` and dies either way.
+- **`coordinates` has NEVER executed in production** (no config ever had it — session-log history above),
+  so this reader has never actually parsed real data. E13 as written would persist coordinates the SWAN
+  model silently cannot read → "passes every gate, broken at runtime."
+- **Decision (coordinator, within E13's authorized contract — same field, shape, [lon,lat] order):**
+  JSON-string encode on write, `json.loads` on read.
+  - **stack** hidden inputs carry JSON `[[lon,lat],…]`; wizard→api payload is a real parsed list.
+  - **api** `_build_marine_conf_section` writes `json.dumps(coords)`; `_serialize_marine_locations_section`
+    decodes str→`json.loads` (tolerant list fallback kept).
+  - **marine** reader gains `import json` + str→`json.loads` decode (4 lines, same file, within allowlist).
+    Follow-up commit after the deletion `8d87ad2`.
+- **Not architectural:** on-disk encoding is not a trigger-4 attribute (field name/shape/nullability/units
+  all unchanged); `json` is stdlib (no new dep); `coordinates` already exists (no new key). Defect fix.
+- **Guard mandate for test-author:** the E13 guard MUST round-trip through a REAL configobj file
+  (write json.dumps → configobj write → configobj read → StructureConfig → assert pairs). A hand-built
+  Python list would PASS while production FAILS — that is exactly the bug that hid here.
+
+## E13 execution log (this session)
+| Portion | State | Commit |
+|---|---|---|
+| marine deletion (item 3) | ACCEPTED — coordinator re-ran greps (111320 gone, helper gone, 2 files) | `8d87ad2` |
+| marine reader decode (finding above) | dispatched follow-up | (pending) |
+| api field + JSON encode (item 2) | encoding confirmed, implementing | (pending) |
+| stack wizard/admin carry-through (item 1) | scope confirmed, implementing | (pending) |
+| test-author guards (item 4) | dispatch after marine reader lands; MUST use real configobj round-trip | (pending) |
