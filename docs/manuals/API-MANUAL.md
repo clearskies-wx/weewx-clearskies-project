@@ -2475,7 +2475,7 @@ SWAN cross-shore transect output for the timestep
 
 **Cross-shore CURVE transect output (ADR-095).** Each surf spot gets a CURVE transect perpendicular to the beach, from ~15m depth to ~1m depth, ~50m spacing (10–20 output points). Direction derived from `beach_facing_degrees + 180°`. Replaces the single-point OUTPUT POINTS command. TABLE output at each transect point: `HSIGN HSWELL DIR TM01 DEPTH QB DISSURF DSPR XP YP` (SETUP removed — SWAN SETUP command disabled in parallel OpenMP runs; `setup` field returns `null` in API responses). Break points identified by QB peaks along the transect.
 
-> **SPECOUT placement — corrected 2026-07-27.** The paragraph above previously ended "SPECOUT (2D directional-frequency spectrum) at the ~10m depth point only (one per spot)." That is void — ADR-095 Amendment 2 states the ~10 m reference point does not exist in the current architecture. There are two SPECOUT extractions per spot, each with its own companion `TABLE PT*`: the **deep-water reference** (one per spot, L2, on the spot's measured ~15 m contour) and the **handoff** (one per unique handoff grid cell, L3 where L3 runs, otherwise the same L2 point). ADR-095 Amendment 1 "SPECOUT extraction — amended"; PROVIDER-MANUAL §14.13 "Multi-SPECOUT extraction".
+> **SPECOUT placement — corrected 2026-07-27.** The paragraph above previously ended "SPECOUT (2D directional-frequency spectrum) at the ~10m depth point only (one per spot)." That is void — ADR-095 Amendment 2 states the ~10 m reference point does not exist in the current architecture. There are two SPECOUT extractions per spot, each with its own companion `TABLE PT*`: the **deep-water reference** (one per spot, L2, on the spot's measured ~15 m contour) and the **handoff** (one per unique handoff grid cell, now first-match-wins L4 → L3 → L2 per transect per hour — E5 ruling D3, otherwise the same L2 point). ADR-095 Amendment 1 "SPECOUT extraction — amended"; PROVIDER-MANUAL §14.13 "Multi-SPECOUT extraction". **The deep-water reference is always L2-sourced and is NOT the 1D model's (SwellTrack's) starting point** (E5 ruling D4) — it stays on L2 at the spot's own 15 m contour in every case, regardless of which grid level supplies that spot's handoff, so a later reader must not "fix" an observed handoff/reference depth mismatch by moving the reference to whichever finest grid happens to cover 15 m.
 
 **SWAN physics enabled (ADR-095).** TRIAD (Eldeberky 1996 defaults) for shallow-water triad wave-wave interactions — enabled at all levels. SETUP removed (unsupported in parallel OpenMP runs; nest boundary condition structurally wrong). Setup effect is delivered via WLEVEL input (tide + future analytic estimate). Per-level DIFFRACTION: stabilized (`DIFFRACTION 1 0.2 27`) at Level 3 only.
 
@@ -2969,7 +2969,7 @@ A handoff partition that matches no canonical partition still has its break poin
 | `surfZones` | object \| null | Impact / foam / total / reform-trough zone widths |
 | `jackingFactors` | list[object] \| null | Per-bar `barIndex`/`distance`/`factor` (Hs at bar crest ÷ Hs approach) |
 | `handoffDepthM` | float \| null | This transect's per-hour handoff depth (T4A.9 per-hour selection, not the setup-time placeholder) |
-| `handoffSourceLevel` | str \| null | `"L2"` or `"L3"` — which grid level the handoff spectrum came from |
+| `handoffSourceLevel` | str \| null | `"L4"`, `"L3"`, or `"L2"` — which grid level the handoff spectrum came from (E5 ruling D3, 2026-07-27: first match wins — L4 if the transect's cross-shore line enters the structure grid's footprint, else L3 if a classified refraction feature covers it, else L2 at the fixed 15 m reference depth) |
 
 **`metadata` object (present in both modes, fields null when `modelStatus` is `"unavailable"`):**
 
@@ -2980,7 +2980,7 @@ A handoff partition that matches no canonical partition still has its break poin
 | `transectCount` | int \| null | Total transects computed for this spot |
 | `openTransectCount` | int \| null | Transects not excluded as structure-affected |
 | `handoffDepthM` | float \| null | Representative handoff depth (the "best" transect's) |
-| `handoffSourceLevel` | str \| null | Representative handoff source level |
+| `handoffSourceLevel` | str \| null | Representative handoff source level — `"L4"`, `"L3"`, or `"L2"` (E5 ruling D3) |
 
 **`units` object:** `distance` and `depth` use the operator's configured distance display unit (foot or meter — same resolution path as `group_wave_height`'s unit group); `hs` uses the wave-height display unit. Unit conversion is applied to all wave-height and distance/depth fields; nothing in this response is a fixed physical unit.
 
