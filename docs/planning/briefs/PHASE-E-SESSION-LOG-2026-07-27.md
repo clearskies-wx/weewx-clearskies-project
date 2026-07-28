@@ -297,6 +297,41 @@ Agent `e9-invariants`. Coordinator acceptance gate — all re-run/re-checked ind
   tip+L_tip branch → REDIRECT the guard to the real new check: fire when L3 does NOT contain L4 w/ 2-cell
   clearance, NOT fire when it does; plus assert the structure-grid branch emits the skip (not a check/pass).
 
+## 🛑 FINDING (E2b review) — E3 is INCOMPLETE for rotated NESTING. New blocker: E3-amendment task. (2026-07-27)
+Surfaced while reviewing E2b's design + the agent's Amendment-2 (corner-reconstruction) work. Coordinator
+independently verified by reading swan_formats.py:1388 (own CGRID) and :1595-1634 (child NGRID):
+- **Problem A (rotation coupling):** in one `grid_level="outer"` build_swan_input call, the grid's OWN CGRID
+  (`_alpc_alpn`, :1344/1388) and the child's NGRID (`_alpn`, :1627) BOTH use the single `rotation_deg`. For
+  L3-as-middle nesting a ROTATED L4, L3's own CGRID must be alpc=0 while L4's NGRID must be alpn=L4-rotation —
+  one param can't do both. Wrong → CGRID(L4) ≠ NGRID(L4-from-L3) → SWAN silently zeroes L4 energy (the exact bug
+  E3 point 2 warns of).
+- **Problem B (NGRID geometry):** the NGRID origin/extents (:1601-1623) come from an AXIS-ALIGNED inner bbox
+  (`inner_dims` via `_compute_swan_grid_dims`), not L4's rotated rectangle. Even with correct alpn the child's
+  position/extent would be wrong.
+- **Root cause:** E3 delivered rotated SELF-CGRID (works for L4 describing itself) but never a rotated-child
+  NGRID from an UNROTATED parent. The E3 guard (test_swan_formats_grid_emission.py:126) only tested the COUPLED
+  case (a grid's own inner-CGRID vs a synthetic parent's outer-NGRID, BOTH rotation 221) — passed, gave false
+  confidence. The real L3(0)→L4(221) case was never emitted or tested.
+- **NOT a new architectural decision** — E3's own plan (MARINE-...-PLAN.md:1079-1102) mandates working rotated
+  CGRID/NGRID nesting; this is a defect fix to make E3 meet its stated contract (emitter's job unchanged).
+  In-scope, no operator approval needed. But it's OUTSIDE E2b's allowlist (swan_formats.py = E3's file).
+- **ACTION:** E2b PAUSED on the L3-middle/L4 branch (committed its independent part-1 plumbing first). Dispatch an
+  E3-amendment task on swan_formats.py: decouple the parent's own-CGRID rotation from the child's NGRID
+  rotation+geometry (add e.g. `inner_rotation_deg` + source NGRID origin/extents from the child's ROTATED
+  descriptor, not an axis-aligned bbox); byte-identical for all-unrotated; then EXTEND the E3 guard to the
+  unrotated-parent→rotated-child case (NGRID alpn=child-rot AND same INPUT's CGRID alpc=0; NGRID origin/extents
+  match the child's rotated rectangle). Then resume E2b.
+
+## 📌 TRACKED FINDING (not fixed now) — swan_domain corners (flat-earth/true-north) vs swan_formats (UTM/grid-north).
+E2b's Amendment-2 reconstruction found a ~2.2 m irreducible residual (least-squares 4-corner best-fit) between
+`compute_structure_grid_domain`'s corner construction (equirectangular local E/N, true north, swan_domain.py
+~2020-2036) and build_swan_input's real-UTM projection (grid north; meridian convergence ~0.5° at HB's ~1° offset
+from the zone central meridian). Sub-grid-cell (dx=10 m), physically negligible vs 2-4·L_tip margins; nest stays
+internally consistent (CGRID=NGRID from one value). Also confirmed: `alpc = (90 - rotation_deg) mod 360` (compass→
+SWAN-Cartesian) is required and is the CALLER's (E2b's) job — build_swan_input's docstring already says so.
+E2b ships the corner-reconstruction guard with tolerance = resolution_m (10 m). A swan_domain UTM-consistent
+corner rebuild is a SEPARATE future task if ever warranted — not now (no functional impact at HB).
+
 ## ✅ OPERATOR DECISION — l_tip_m persistence: OPTION C (no persistence). Resolved 2026-07-27, commit `0b1cb34`.
 Operator reframed (correctly) that grids are sized+validated ONCE at setup and frozen — nothing re-sizes at runtime.
 Coordinator verified: the structure grid's offshore reach IS validated at config-push by `_l3_viability_check()`
