@@ -297,6 +297,21 @@ Agent `e9-invariants`. Coordinator acceptance gate — all re-run/re-checked ind
   tip+L_tip branch → REDIRECT the guard to the real new check: fire when L3 does NOT contain L4 w/ 2-cell
   clearance, NOT fire when it does; plus assert the structure-grid branch emits the skip (not a check/pass).
 
+## ✅ OPERATOR DECISION — l_tip_m persistence: OPTION C (no persistence). Resolved 2026-07-27, commit `0b1cb34`.
+Operator reframed (correctly) that grids are sized+validated ONCE at setup and frozen — nothing re-sizes at runtime.
+Coordinator verified: the structure grid's offshore reach IS validated at config-push by `_l3_viability_check()`
+(swan_domain.py:355), which runs with the freshly-computed L_tip in hand and disables a grid that can't reach its
+structure. So the per-cycle invariant-6 structure-grid reach check is REDUNDANT with the setup gate, and persisting
+l_tip_m buys only a re-check of a frozen value (catches cache corruption only — not invariant 6's purpose).
+**RULING: keep the per-cycle structure-grid branch a permanent loud skip. NO l_tip_m persistence, NO new field, NO
+HARD-BLOCK change.** Coverage is complete without it: "L4 reaches structure" = setup viability test; "L3 still
+contains L4" = per-cycle invariant-6 nesting check (E9); "L4 reaches tip+L_tip per cycle" = redundant, skipped.
+Coordinator's earlier framing (that this was a coverage gap) was wrong — over-weighted the per-cycle invariant vs
+the setup gate. Finalized swan.py + invariants.py skip text to state this rationale (`0b1cb34`, comment/log only).
+LESSON (→ candidate rules/verification.md): a "frozen-at-setup" quantity should be validated at the setup gate
+where all inputs are in hand, NOT re-checked per-cycle against a lossy persisted cache — the per-cycle check is
+either redundant or forced-tautological. Ask "does this re-check catch anything the setup gate can't?" before persisting.
+
 ## E9 GUARD — ACCEPTED (2026-07-27 session 2). Commit `255d192` (marine, pushed).
 Agent `e9-guard`. tests/test_swan_invariant6_grid_kind.py, 8 tests (+390). Acceptance gate (re-run independently):
 - `git show 255d192 --stat` = only the new test file; tree clean; single worktree.
