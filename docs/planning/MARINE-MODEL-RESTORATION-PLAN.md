@@ -7,8 +7,44 @@
 
 **Sequence:**
 Phase A ✅ → Phase B ✅ → **Deploy 1** ✅ → Gate B (rows 3/5/8/11/13 outstanding) →
-Phase C (C1/C2/C3 ✅ landed; **C4 superseded by E10**) → **E0 restore service** →
-Phase E (E0–E12) → Gate E → Phase F (F1–F5) → Gate F → Phase D (D1) → Gate D
+Phase C (C1/C2/C3 ✅ landed; **C4 superseded by E10**) →
+**Phase E (E0–E12)** → Gate E → Phase F (F1–F5) → Gate F → Phase D (D1) → Gate D
+
+---
+
+# ▶ START HERE
+
+**Every task and gate in this document carries a status marker.** `✅ DONE` · `⬜ NOT STARTED` ·
+`⛔ SUPERSEDED` / `NEVER WALKED` · `⚠️ PARTIAL`. If a heading has no marker it is not a task.
+
+| | State |
+|---|---|
+| **Phase A** (A1–A8) + Gate A | ✅ Done, gate passed |
+| **Phase B** (B1–B4) + Deploy 1 | ✅ Done |
+| **Gate B** | ⚠️ **Partial** — rows 3, 5, 8, 11, 13 never passed → relocated to **Gate E 21–24**, **Gate F 11** |
+| **Phase C** — C1, C2, C3 | ✅ Done (`2ab0a2a`, `de71775`, `9b4fc45`) |
+| **Phase C** — C4 | ⛔ Shipped as `060a56b`, **not deployed**, premise removed by Phase E → reworked as **E10** |
+| **Gate C** | ⛔ **Never walked** → rows relocated to **Gate E 18–20** |
+| **Phase E** (E0–E12) | ⬜ **← NEXT** |
+| **Phase F** (F1–F5), **Phase D** (D1) | ⬜ Not started |
+
+### The next two actions, in order
+
+1. **E0 — stop the thrash loop.** ⚠️ **Blocked on an operator decision.** The system is currently
+   starting a cycle on the 41 895-cell grid, overrunning, publishing nothing, and repeating.
+   Restarting the service does **not** fix it — geometry is cached in a persisted file. E0 lists four
+   options; **A is recommended**. Nothing else in Phase E is blocked by this, so E1 can start in
+   parallel.
+2. **E1 — structure-grid resolution.** The right first implementation task: self-contained, one
+   file, gated on a known-answer dispersion test, and **every other Phase E geometry task depends on
+   the `dx` it derives**.
+
+### Before dispatching any Phase E or F agent
+
+Read, in this order: findings **§0A** (grid rulings) and **§0B** (wind); the Phase E preamble's
+reading-order note; then the task. **Findings §1–§8 are the research record and contain superseded
+text — §0A/§0B win on every conflict.** §5.1.3 in particular is marked superseded and must not be
+implemented.
 
 **Phase D has been physically moved to sit below Gate F**, so document order *is* execution order.
 It previously sat immediately after Phase C — which is done — so anyone reading top-down would have
@@ -159,13 +195,13 @@ its agent with the failing row named.
 
 # PHASE A — Governance (coordinator alone; no agents dispatched)
 
-### A1 — One canonical architectural block
+### A1 — One canonical architectural block  ✅ **DONE**
 **Owner:** coordinator · **Files:** `CLAUDE.md`, `~/.claude/CLAUDE.md`
 **Design:** The block exists twice, near-verbatim. Project `CLAUDE.md` keeps the canonical full
 text. Global keeps only the one-sentence rule, the seven triggers as a bare list, and a pointer.
 **Must not touch:** the trigger wording. Deduplicate, do not re-draft.
 
-### A2 — Collapse agent rules into `rules/agents.md`
+### A2 — Collapse agent rules into `rules/agents.md`  ✅ **DONE**
 **Owner:** coordinator · **Files:** new `rules/agents.md`; `rules/clearskies-process.md`, `CLAUDE.md`
 **Design:** Six locations hold agent rules — `CLAUDE.md` §"Git safety — agents and coordinator",
 and `clearskies-process.md` §"Agent orchestration" (121), §"Architectural change block" (207),
@@ -173,7 +209,7 @@ and `clearskies-process.md` §"Agent orchestration" (121), §"Architectural chan
 protocol" (263). Move all six into one file, once; leave a one-line pointer at each origin.
 **Must not touch:** the substance of any rule. Relocation and deduplication only.
 
-### A3 — Collapse verification rules into `rules/verification.md`
+### A3 — Collapse verification rules into `rules/verification.md`  ✅ **DONE**
 **Owner:** coordinator · **Files:** new `rules/verification.md`; `clearskies-process.md`, `CLAUDE.md`
 **Design:** Move `clearskies-process.md` §"Audit rules" (276), §"Round-close verification gate"
 (296) and its steps (300-337), §"Validate against reality, never against the model's own output"
@@ -183,7 +219,7 @@ system works / **invariant** = runtime assertion on real data / **adversarial** 
 sees the implementing agent's work); and the **known-answer test mandate** for numerical kernels,
 with `tests/test_surf_1d_dispersion.py` cited as the pattern.
 
-### A4 — Rewrite the six agent profiles
+### A4 — Rewrite the six agent profiles  ✅ **DONE**
 **Owner:** coordinator
 **Files:** `.claude/agents/clearskies-{api-dev,auditor,dashboard-dev,docs-author,realtime-dev,test-author}.md`
 **Design:** Common four-part spine; only the domain section differs.
@@ -196,7 +232,7 @@ with `tests/test_surf_1d_dispersion.py` cited as the pattern.
    trigger hit and stopped on. A claim without a command and its output is not evidence.
 **Must not touch:** existing domain knowledge. Replace only the boilerplate.
 
-### A5 — Agents may not spawn agents
+### A5 — Agents may not spawn agents  ✅ **DONE**
 **Owner:** coordinator · **Files:** the six profiles
 **Design:** **The profiles currently have no `tools:` frontmatter at all** — they inherit
 everything, including `Agent`. So this task *adds* a restrictive `tools:` line to each, omitting
@@ -204,7 +240,7 @@ everything, including `Agent`. So this task *adds* a restrictive `tools:` line t
 "remove `Agent`/`Task` from every profile's tool list," targeting something that does not exist,
 and its gate row would have passed before any change was made.)
 
-### A6 — Create `rules/coordinator.md`
+### A6 — Create `rules/coordinator.md`  ✅ **DONE**
 **Owner:** coordinator · **Files:** new `rules/coordinator.md`; `CLAUDE.md` routing entry
 **Design:**
 - **Dispatch gate.** No agent is dispatched without a file allowlist, the design to file-and-line,
@@ -220,13 +256,13 @@ and its gate row would have passed before any change was made.)
   self-enforce. State plainly which gate rows the operator should spot-check by hand, and that a
   coordinator claim of "gate passed" without pasted raw output is to be rejected.
 
-### A7 — Deduplicate the remainder
+### A7 — Deduplicate the remainder  ✅ **DONE**
 **Owner:** coordinator · **Files:** `rules/coding.md`
 **Design:** Two sections are both numbered 6 (§6 Internationalization at 474; §6.1 Rules at 565,
 under §7 Charts). Fix the numbering. **Do not look for a `CLAUDE.md` counterpart to §1 "A model
 runs on all its inputs" — review confirmed none exists in either CLAUDE.md.**
 
-### A8 — Write down the anchor rule *(new; review finding)*
+### A8 — Write down the anchor rule *(new; review finding)*  ✅ **DONE**
 **Owner:** coordinator · **Files:** `docs/ARCHITECTURE.md` or the relevant manual; `rules/coding.md`
 **Design:** Mechanism 4 is not closed. The rule — profile distances are measured from the coastline
 anchor, never the operator's pin, because that is how `find_depth_contour_distance()` generates
@@ -237,7 +273,7 @@ grid or profile code.
 
 ---
 
-## ⛔ QC GATE A — governance
+## ⛔ QC GATE A — governance  ✅ **PASSED**
 
 | # | Element | Evidence required |
 |---|---|---|
@@ -279,7 +315,7 @@ session that wrote Phase A runs agents under the profiles this plan replaces.
 
 # PHASE B — Observability
 
-### B1 — DEBUG trace
+### B1 — DEBUG trace  ✅ **DONE**
 **Owner:** `clearskies-api-dev`
 **Files:** new `weewx_clearskies_marine/services/trace.py`; the call-site files in the table below
 **Must not touch:** any physics, any published field, any existing log line
@@ -313,7 +349,7 @@ re-push, and Gate B does not require it from a forced cycle.
 station using only the trace file.
 **Guard:** disabled produces zero output.
 
-### B2 — Runtime invariants
+### B2 — Runtime invariants  ✅ **DONE**
 **Owner:** `clearskies-api-dev`
 **Files:** new `weewx_clearskies_marine/services/invariants.py`; call sites at the stages above
 **Must not touch:** thresholds inside physics formulae
@@ -344,7 +380,7 @@ Provenance is the catchable signal and B1 already records it.
 **Invariant 6 note:** grid sizing is config-time. The invariant reads the cached sizing metadata
 each cycle rather than recomputing.
 
-### B3 — Marine health reports a real state *(new; the review's highest-value finding)*
+### B3 — Marine health reports a real state *(new; the review's highest-value finding)*  ✅ **DONE**
 **Owner:** `clearskies-api-dev`
 **Files:** `weewx_clearskies_marine/endpoints/health.py`, `weewx_clearskies_marine/state.py`,
 `weewx_clearskies_marine/services/invariants.py`
@@ -382,7 +418,7 @@ it QC repeats the failure at higher volume.**
 **Live check:** force an invariant to fire — `status` becomes `degraded` and `reasons` names it.
 Stop a required input — `status` becomes `failed`. Neither requires reading the journal.
 
-### B4 — Admin status page *(new; operator direction, 2026-07-27)*
+### B4 — Admin status page *(new; operator direction, 2026-07-27)*  ✅ **DONE**
 **Owner:** `clearskies-api-dev` (FastAPI + Jinja, not React — this is the config UI, not the dashboard)
 **Repo:** `repos/weewx-clearskies-stack`
 **Files:** `weewx_clearskies_config/admin/routes.py`,
@@ -423,7 +459,7 @@ before diagnosing.
 
 ---
 
-## ⛔ QC GATE B — observability, and the twelve commits
+## ⛔ QC GATE B — observability, and the twelve commits  ⚠️ **PARTIAL** — rows 3, 5, 8, 11, 13 never passed; relocated to Gate E 21–24 and Gate F 11
 
 Walked against **deployed production**.
 
@@ -480,7 +516,7 @@ the trace cannot account for.
 
 # PHASE C — Model fixes
 
-### C1 — Per-transect handoff reaches the pipeline
+### C1 — Per-transect handoff reaches the pipeline  ✅ **DONE**
 **Owner:** `clearskies-api-dev`
 **Files:** `weewx_clearskies_marine/services/surf_pipeline_timestep.py` only
 **Must not touch:** `swan_runner.py`; the return type; the five call sites; `surf_1d_pipeline.py`
@@ -507,7 +543,7 @@ skips that case; Gate C1 row 1 must be evaluated on an L3 cycle.
 **Live check:** distinct `handoffDepthM` count > 1; `bestPeakFaceHeight` > `spotAverageFaceHeight`;
 `peelDirection` not `a_frame` on every timestep.
 
-### C2 — Populate structure coordinates at config parse
+### C2 — Populate structure coordinates at config parse  ✅ **DONE**
 **Owner:** `clearskies-api-dev`
 **Files:** `weewx_clearskies_marine/config/marine_config.py` only
 **Must not touch:** `build_obstacle_structures()`; `compute_transect_shadows()`; `TRANSM 0.95`
@@ -549,7 +585,7 @@ coordinates"` gone from the journal.
 production's shape — yields two coordinate points and shadows transects. The deleted test only ever
 built the explicit-coordinates shape, which is why it passed while production failed.
 
-### C3 — L3 offshore edge returns to the measured 15 m contour
+### C3 — L3 offshore edge returns to the measured 15 m contour  ✅ **DONE**
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_domain.py` only
 **Must not touch:** L3 resolution; L3's shoreward edge and `shoreward_distance_m`; the lateral terms;
 L1 and L2; `_compute_level3_grid()`'s non-delegating branch (1353-1460)
@@ -645,7 +681,7 @@ separable.
 
 ---
 
-## ⛔ QC GATE C — one gate per task
+## ⛔ QC GATE C — one gate per task  ⛔ **NEVER WALKED** — rows relocated to Gate E 18–20
 
 Every row needs a `file:line` and a live number from the deployed system.
 
@@ -892,22 +928,38 @@ the authoritative list; an item not on it and not in a live phase is not being w
 **Nothing on this list may be closed by asserting it was already done in A–C.** Each needs a live
 value from the deployed system, at the gate it has been moved to.
 
-### E0 — Restore service before anything else
+### E0 — Stop the thrash loop  ⬜ **NOT STARTED — ⚠️ NEEDS AN OPERATOR DECISION**
 **Owner:** `coordinator` (operational; no agent) · **Files:** none — deploy and config only
 
-The 41 895-cell grid is deployed and **no forecast has published since it landed**. Debug tracing
-from B1 is still enabled on librewxr, writing daily files.
+**Measured state, 2026-07-27, immediately after the hung cycle was killed:**
+```
+status: ok | run_in_progress: True | last_run: 2026-07-27T19:57:32Z   (1 swan process)
+```
+**The system is in a loop.** Restarting the service killed the hung cycle, and the scheduler
+immediately started another on the **identical 41 895-cell grid**. Grid geometry is cached in
+`/etc/weewx-clearskies/swan_grid_sizing.json` — **a persisted file a restart does not touch** — so
+every new cycle rebuilds the same oversized domain, overruns, and publishes nothing. `last_run` has
+not advanced since 19:57:32Z.
 
-1. Roll the marine service back to `49839ac` and re-push config so grid sizing recomputes at the
-   pre-C3 geometry. **Grid sizing runs at config push (`endpoints/config.py:77`), not per cycle** —
-   a forced cycle alone will not resize. This is the same sequencing trap C3's live check names.
-2. Disable the B1 trace key in `/etc/weewx-clearskies/marine/network.env`; restart.
-3. Confirm a cycle completes and `/health` reports `last_run` advancing.
+**Restarting the service is NOT a fix and must not be recorded as one.** It buys exactly one cycle.
 
-**This is a service restoration, not a decision on Phase E.** The rollback target is the grid that
-was publishing, not an endorsement of the 870 m defect C3 fixed — Phase E replaces both.
+**Four options. This is the operator's call, not the coordinator's**, because two of them change the
+operator's own spot config or revert shipped work.
 
-### E1 — Structure-grid resolution derived from the tip wavelength
+| | Action | Consequence |
+|---|---|---|
+| **A** *(recommended)* | **Temporarily remove the pier structure from the spot config** | Config value only, no code change. L3 is triggered by structure presence (`swan_domain.py:206-213`), so with no structure the spot runs `L1 → L2 → 1D at 15 m` — **exactly the open-beach path Phase E gives it anyway** — at ~6 100 cells. Forecasts publish. Reversed by re-adding the structure at Phase E. Loses pier modelling meanwhile, **which currently produces `shadowed_count: 0` regardless** — that is E11 |
+| B | Revert C3 (`9b4fc45`) | Restores the pre-C3 grid, but that is the **collapsed 870 m defect**. Tangles with E4 and E10, which reuse C3's `offshore_distance_m` threading, and with C4 (`060a56b`), which builds on it |
+| C | Stop the marine timer | No cycles, no thrash, no publishing. Cleanest pause; the site goes fully stale |
+| D | Leave it | Every cycle burns ~75 min of CPU to publish nothing, indefinitely |
+
+**Not blocking on the trace.** B1's debug tracing is still on and totals **242 KB** — not a disk
+concern, and **Gate E rows 21–22 need it**. Leave it enabled.
+
+**Whatever is chosen, the acceptance criterion is the same:** `/health` shows `last_run` **advancing
+across two consecutive cycles**. Not "the service restarted." Not "a cycle started."
+
+### E1 — Structure-grid resolution derived from the tip wavelength  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_domain.py` only
 **Must not touch:** L1 and L2 sizing; `_compute_level3_grid()`'s non-delegating branch (1353-1460);
 anything in `swan_formats.py` (that is E3/E6/E7)
@@ -941,7 +993,7 @@ bathymetry resolution, stop and report.**
 (Brent), as `tests/test_surf_1d_dispersion.py` already does, sharing no code path with the
 implementation. Assert `dx` for a table of (Tp, d_tip) pairs including both clamp boundaries.
 
-### E2 — Structure-grid extent: rotated rectangle on the structure
+### E2 — Structure-grid extent: rotated rectangle on the structure  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_domain.py` only
 **Must not touch:** L1/L2; the breaking-depth criterion itself (ADR-093 Amendment 2 §2 — reused
 unchanged); `_cluster_spots()`'s distance logic
@@ -984,7 +1036,7 @@ base.
 **Guard:** cell count and both spans for a synthetic cluster at a known bearing with a known
 `L_tip`; assert the offshore edge is at tip + L_tip and **not** at any 15 m contour value.
 
-### E3 — Rotated CGRID/NGRID emission
+### E3 — Rotated CGRID/NGRID emission  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_formats.py` only
 **Must not touch:** `INPGRID BOTTOM` / `INPGRID WIND` rotation (`:1354`, `:1382`) — **these stay
 `0.`**
@@ -1009,7 +1061,7 @@ silently fall back to axis-aligned** — that decision is the operator's.
 **Guard:** assert the emitted `CGRID` and `NGRID` rotation values are equal and non-zero for a
 rotated structure grid, and that both `INPGRID` lines still emit `0.`
 
-### E4 — L3 rescoped: need-driven, sized from L4
+### E4 — L3 rescoped: need-driven, sized from L4  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_domain.py`,
 `weewx_clearskies_marine/services/grid_sizing_chain.py`
 **Must not touch:** C3's `offshore_distance_m` threading — **it is reused, not reverted**
@@ -1037,7 +1089,7 @@ rotated structure grid, and that both `INPGRID` lines still emit `0.`
 **Guard:** a spot with no structures and no classification produces **exactly** today's grid set —
 assert L3 is absent and L1/L2 are unchanged.
 
-### E5 — Handoff selection, and the deep-water reference written down
+### E5 — Handoff selection, and the deep-water reference written down  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/transect_handoff.py`,
 `weewx_clearskies_marine/services/surf_1d_pipeline.py`
 **Must not touch:** the breaking-depth criterion `1.3 · Hs / 0.73`; `L2_REFERENCE_DEPTH_M = 15.0`
@@ -1073,7 +1125,7 @@ mis-implemented — report, do not adjust the envelope to make the check pass.
 **cannot be exercised at HB**. They will be written and untested until a spot exists whose structure
 grid covers only part of the beach. Nobody may claim these paths are verified.
 
-### E6 — Pier transmission 0.95 → 0.82
+### E6 — Pier transmission 0.95 → 0.82  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_formats.py` only
 (`_OBSTACLE_PARAMS`) **Must not touch:** the jetty / groin / breakwater / seawall rows — all unchanged
 
@@ -1104,7 +1156,7 @@ alongshore Hs gradient across PT0–PT31 versus an independent reference (neares
 buoy, Surfline per-peak, or operator observation) on an oblique-swell day. **Not a Phase E gate row**
 — it needs the right weather. Record it as owed.
 
-### E7 — Diffraction only in the structure grid; smoothing scaled to resolution
+### E7 — Diffraction only in the structure grid; smoothing scaled to resolution  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_formats.py` only
 **Must not touch:** the `0.2` under-relaxation parameter; wind forcing on any grid (**always on** —
 standing rule)
@@ -1124,7 +1176,7 @@ standing rule)
 **Guard:** assert `smnum == 27` at Δx = 10 m and `smnum == 17` at Δx = 12.5 m; assert no
 `DIFFRACTION` line is emitted for L1, L2 or L3.
 
-### E8 — Hourly quick update covers every grid that supplies a handoff
+### E8 — Hourly quick update covers every grid that supplies a handoff  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_runner.py`
 **Must not touch:** the stationary/non-stationary mode selection — quick updates stay **stationary**
 (operator-confirmed, already correct); the 6-hourly full-cycle cadence
@@ -1144,7 +1196,7 @@ change and there is negligible fetch — its hourly refresh carries almost no ne
 structure grid spans ~2–6 m, where the same metre is a 15–50% change. **That** is where hourly
 matters. Stated so nobody later assumes the L3 hourly run is load-bearing.
 
-### E9 — Rescope the two invariants Phase E breaks
+### E9 — Rescope the two invariants Phase E breaks  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/invariants.py` only
 **Must not touch:** invariants 1, 3, 5, 7, 8, 9 — unchanged
 
@@ -1181,7 +1233,7 @@ STOP-and-surface, never a licence to move a boundary (trigger 3).
 **Guard:** invariant 6 must fire against a structure grid whose offshore edge is short of tip + L_tip,
 and must **not** fire against a correctly-sized one — the second half is the part that matters here.
 
-### E10 — Per-transect profiles span the handoff to shore, not a grid bbox *(supersedes and resequences C4)*
+### E10 — Per-transect profiles span the handoff to shore, not a grid bbox *(supersedes and resequences C4)*  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:** C4's allowlist —
 `services/grid_sizing_chain.py`, `enrichment/bathymetry.py`, `providers/nearshore/swan.py`,
 `endpoints/beach_profile.py` **Must not touch:** `extract_native_profile_from_grid()`'s body;
@@ -1226,7 +1278,7 @@ before E10 so E10's contribution is distinguishable from C1's.
 **Guard:** a spot with **no L3 and no structure grid** produces 32 profiles each spanning its own
 handoff point to shore. This case is unreachable under C4's design and is the whole point of E10.
 
-### E11 — Shadow classification: the two call sites C2 did not reach
+### E11 — Shadow classification: the two call sites C2 did not reach  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_runner.py` only
 **Must not touch:** `marine_config.py` (C2's fix — already landed as `de71775` and deployed); the
 shadow-classification function's own logic until item 2 below has been answered
@@ -1265,7 +1317,7 @@ defect it was meant to catch.
 **Guard:** both call sites receive a non-empty structures list for a spot that has one — asserted at
 the call site, not by mocking the classifier.
 
-### E12 — A cycle that overruns must not report `ok`
+### E12 — A cycle that overruns must not report `ok`  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/endpoints/health.py`,
 `weewx_clearskies_marine/state.py`, `weewx_clearskies_marine/services/swan_runner.py`
 **Must not touch:** B3's input-freshness registry; the invariant-scoping fix (`49839ac`); the four
@@ -1301,7 +1353,7 @@ finding before changing any timeout value — a timeout is a config key (trigger
 than the threshold and `run_in_progress` is True; returns `ok` when it is within it. Reuses
 `tests/test_marine_health_state.py`'s existing fixtures.
 
-## ⛔ QC GATE E — grid strategy
+## ⛔ QC GATE E — grid strategy  ⬜ **NOT REACHED**
 
 Every row needs a `file:line` read after the change and a live number from the deployed system.
 
@@ -1352,7 +1404,7 @@ and the coordinator's yardstick was wrong — the value is in the surf scorer's 
 **Read findings §0B in full before any Phase F task.** §0B.5 (the double-count trace) and §0B.6 (why
 option C beat A and B) are the design; this phase implements them.
 
-### F1 — Carry `is_wind_sea` through the partition conversion
+### F1 — Carry `is_wind_sea` through the partition conversion  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_spectral.py` only
 **Must not touch:** `parse_table_pt_partitions()`'s parsing (it already sets the flag correctly at
 `:1136`); the descending-Hs sort at `:1207`; `decompose_spectrum()`
@@ -1373,7 +1425,7 @@ approved.** This is the whole reason Phase F cannot double-count.
 **Guard:** a converted partition set where the wind sea is **not** the tallest — assert the flag
 follows the right partition through the sort.
 
-### F2 — Sample per-spot wind from the field that forces SWAN
+### F2 — Sample per-spot wind from the field that forces SWAN  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/providers/nearshore/swan.py`,
 `weewx_clearskies_marine/services/surf_pipeline_timestep.py`
 **Must not touch:** `_stitch_wind()`'s blending; the HRRR/GFS fetch
@@ -1395,7 +1447,7 @@ same forecast hour.
    (`services/compute_client.py` / `compute_service.py`) — that is a data-contract change
    (trigger 4) and is **not approved**.
 
-### F3 — Depth-limited growth kernel — gated on a known-answer test
+### F3 — Depth-limited growth kernel — gated on a known-answer test  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:** one new module under
 `weewx_clearskies_marine/services/` **Must not touch:** `run_1d_analytical()` — F3 is a standalone
 kernel with no caller yet
@@ -1432,7 +1484,7 @@ contribution is ~0.2 m, and `_combine_partition_hs()` already enforces depth-lim
 the RSS total (`surf_1d_pipeline.py:407`), so a crude estimate is capped correctly by existing
 machinery. **Document the approximation at the call site.**
 
-### F4 — Grow the wind-sea partition along the 1D run
+### F4 — Grow the wind-sea partition along the 1D run  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:**
 `weewx_clearskies_marine/services/surf_1d_pipeline.py` only
 **Must not touch:** `run_1d_analytical()` (`surf_1d_analytical.py`) — **the physics module does not
@@ -1458,7 +1510,7 @@ remaining fetch. No double-count by construction.
 **Guard:** a two-partition set (one swell, one wind sea) — assert the swell partition's output is
 **byte-identical** to the pre-change result and only the wind-sea partition changed.
 
-### F5 — Fallback: synthesize a wind-sea partition when SWAN handed none over
+### F5 — Fallback: synthesize a wind-sea partition when SWAN handed none over  ⬜ **NOT STARTED**
 **Owner:** `clearskies-api-dev` · **Files:**
 `weewx_clearskies_marine/services/surf_1d_pipeline.py` only
 
@@ -1474,7 +1526,7 @@ nothing to double.
 3. **Log at INFO every time it fires, with the reason** — this path also covers the bulk-parameter
    degradation route, and silent synthesis would hide a partition-parsing failure.
 
-## ⛔ QC GATE F — wind source term
+## ⛔ QC GATE F — wind source term  ⬜ **NOT REACHED**
 
 | # | Element | Live value proving it ran |
 |---|---|---|
@@ -1499,7 +1551,7 @@ field; any change to a swell partition; and a second wind source.
 
 # PHASE D — Verify the whole chain
 
-### D1 — Cold-start first hour
+### D1 — Cold-start first hour  ⬜ **NOT STARTED**
 Previously C5; **moved because its gate opened only post-deploy, making Phase C circular.**
 The first output row of every run is the empty initial field (`Hsig 0.014 m`, partitions zero,
 `Tm01 1.6 s`) and is published as a forecast hour. That is expected for a cold-started spectral
@@ -1515,7 +1567,7 @@ it gets designed then, not now.
 > exists. A coordinator who reads an empty first hour on the first post-E cycle and reopens
 > `aa4553d` has made a sequencing error of exactly the kind C3's live-check note warns about.
 
-## ⛔ QC GATE D — the whole chain
+## ⛔ QC GATE D — the whole chain  ⬜ **NOT REACHED**
 
 | # | Element | Evidence |
 |---|---|---|
