@@ -8,10 +8,15 @@
 **Sequence:**
 Phase A ✅ → Phase B ✅ → **Deploy 1** ✅ → Gate B (rows 3/5/8/11/13 outstanding) →
 Phase C (C1/C2/C3 ✅ landed; **C4 superseded by E10**) → **E0 restore service** →
-Phase E (E1–E10) → Gate E → Phase F (F1–F5) → Gate F → Phase D (D1, D2) → Gate D
+Phase E (E0–E12) → Gate E → Phase F (F1–F5) → Gate F → Phase D (D1) → Gate D
 
-**Phase D does not move.** Hotstarts are grid-shaped and Phase E invalidates every one of them;
-Phase F changes the published partitions Gate D checks. Reasoning is in Phase D's own header note.
+**Phase D has been physically moved to sit below Gate F**, so document order *is* execution order.
+It previously sat immediately after Phase C — which is done — so anyone reading top-down would have
+started it now. Hotstarts are grid-shaped and Phase E invalidates every one; Phase F changes the
+published partitions Gate D checks.
+
+**The "Reality reads" section sits before Phase E**, because its first read happens at Gate E. Left
+inside Phase D it would have been read too late to execute.
 
 > ### ⛔ Read this before touching Phase C or the L3 grid
 >
@@ -678,90 +683,68 @@ not to shrink the grid, which is the defect.**
 
 ---
 
-# PHASE D — Verify the whole chain
+# ⛔ PHASE D IS NOT HERE. IT RUNS LAST, AFTER GATE F.
 
-> ### Why Phase D stays last, and does not move *(ruled 2026-07-27)*
->
-> **Hotstart files are grid-shaped.** Phase E changes every grid's geometry — L3 rescoped, the
-> structure grid new, rotation enabled. Every existing hotstart is invalidated the moment E deploys.
-> D1 is *about* whether a working hotstart populates the first forecast hour, so running it before E
-> produces a result that E then throws away.
->
-> Phase F is a physics change whose output must appear in the published partitions Gate D row 4
-> checks. Running D before F would validate a chain that is about to change.
->
-> **Sequence stands: E0 → E → Gate E → F → Gate F → D → Gate D.**
+**Phase D used to sit at exactly this point — immediately after Phase C. Phase C is done, so anyone
+reading this document top-down would have started Phase D now.** This plan exists because agents did
+what was in front of them; leaving execution order and document order disagreeing would have been the
+same mistake in a new costume.
 
-### D1 — Cold-start first hour
-Previously C5; **moved because its gate opened only post-deploy, making Phase C circular.**
-The first output row of every run is the empty initial field (`Hsig 0.014 m`, partitions zero,
-`Tm01 1.6 s`) and is published as a forecast hour. That is expected for a cold-started spectral
-model and is not itself a defect. `aa4553d` fixes the hotstart. **Check first whether a working
-hotstart populates the first hour. Only if it is still empty does suppression get designed** — and
-it gets designed then, not now.
+**Phase D has been physically moved below Phase F.** Document order is now execution order.
 
-> **⚠ Phase E invalidates every hotstart. Read this before concluding `aa4553d` failed.**
-> Hotstart files are written for a specific grid geometry. After Phase E deploys, **the first cycle
-> is necessarily a cold start** and its first forecast hour will be the empty initial field — once.
-> That is Phase E's expected cost, **not evidence the hotstart fix is broken**.
-> **Evaluate D1 on the second cycle after Phase E**, when a hotstart written by the new geometry
-> exists. A coordinator who reads an empty first hour on the first post-E cycle and reopens
-> `aa4553d` has made a sequencing error of exactly the kind C3's live-check note warns about.
+Why it runs last:
+- **Hotstarts are grid-shaped.** Phase E changes every grid's geometry, invalidating every hotstart.
+  D1 is *about* whether a working hotstart populates the first forecast hour — run before E, its
+  result is thrown away and re-run anyway.
+- Phase F changes the published partitions Gate D row 4 checks. Running D before F validates a chain
+  that is about to change.
 
-### D2 — Reality baselines, so three physics changes stay attributable *(new; found checking D against E/F)*
-**Owner:** `coordinator`
+**What Phase D is for:** it is the **only place in this plan where output is checked against the real
+world**. Every other gate — guards, invariants, live checks — compares the system against its own
+design, which cannot catch a design that is wrong. Gate D's reference comparisons are the sole
+external check. That is worth having, and it is worth having *once, at the end, on the finished
+system*.
 
-**The problem.** Gate D rows 3 and 4 — published output against Surfline and Surf-forecast — are the
-**only validate-against-reality step in this entire plan** (`rules/verification.md`). As sequenced,
-three independent physics changes land before it fires even once: the grid geometry (E1–E4),
-**`TRANSM 0.95 → 0.82`** (E6), and the **wind source term** (Phase F). If the comparison comes out
-wrong, nothing distinguishes which change caused it.
+**➡ Next work is E0, not D1.**
 
-**Design — the same read, taken three times. It costs one Surfline page view each.**
+---
+
+# Reality reads — the only external check in this plan
+
+**Placed here, before Phase E, because the first read happens at Gate E — long before Phase D.**
+Left inside Phase D it would have been read too late to execute.
+
+Guards, invariants and live checks all compare the system to its own design. Three independent
+physics changes are about to land — grid geometry (E1–E4), **`TRANSM 0.95 → 0.82`** (E6), and the
+**wind source term** (Phase F). Checked only once at the end, a wrong result cannot be attributed to
+any of them.
+
+**Protocol — the same read, at each gate. Costs one reference page view each.**
 
 | When | What it establishes |
 |---|---|
-| At **E0**, after rollback, before any Phase E work | Baseline error of the currently-publishing system |
-| At **Gate E** | Effect of grid geometry **and** `TRANSM 0.82` together |
-| At **Gate F** | Effect of the wind source term alone |
+| **Gate E** | Grid geometry **and** `TRANSM 0.82` together |
+| **Gate F** | The wind source term alone |
+| **Gate D** | The finished system |
 
-Each read records: published surf height, per-partition height/period/direction, the reference
-values, and the deltas. **Same spot, same forecast hour, stated conditions.**
+Each read records: published surf height, per-partition height/period/direction, the reference values
+(Surfline and Surf-forecast), and the deltas. **Same spot, same forecast hour, conditions stated.**
 
-**Limit, stated so it is not overclaimed:** grid and `TRANSM` land together at Gate E and are not
-separable from each other by this method. Separating them would need an extra deploy; E6's own
-calibration (an oblique-swell day against an independent reference) is the instrument for `TRANSM`
-specifically, and it is already recorded as owed.
+**⚠ There is no pre-refactor baseline, and one cannot be manufactured.** The deployed configuration
+cannot complete a cycle, so it publishes nothing to read. The configuration before it had the
+collapsed 870 m grid — a *known-defective* baseline whose numbers would mean nothing. **Every
+configuration in this window is defective in a known way.** Recovering a baseline would mean
+deploying a grid we already know is wrong, purely to measure it. Not worth it — the operator's
+ruling is that the model is being refactored, not propped up.
 
-## ⛔ QC GATE D — the whole chain
+**Consequence, stated so it is not discovered later:** Gate E's read is the **first** data point, so
+"is this better than before?" is unanswerable by this method. What the protocol still delivers is
+Gate F attributable against Gate E, and absolute agreement with reference at Gate D. Grid and
+`TRANSM` also remain inseparable from each other — E6's own calibration on an oblique-swell day is
+the instrument for `TRANSM` specifically, and is already recorded as owed.
 
-| # | Element | Evidence |
-|---|---|---|
-| 1 | Every **applicable** invariant passes | raw log, no ERROR. **Requires E9.** The count is no longer nine: invariant 6 is rescoped per grid kind and invariant 2 is marked not-applicable where the handoff is a boundary rather than an overlap. **State the applicable set and why each excluded one is excluded** — a shrinking invariant count is exactly how coverage quietly disappears |
-| 2 | One number traced end to end | full chain from the trace, pasted |
-| 3 | Surf height vs reference | published vs Surfline and Surf-forecast, deltas stated — **alongside the E0 and Gate E baselines from D2** |
-| 4 | Swell partitions vs reference | height, period, direction per partition vs both |
-| 5 | The westerly is published | the 6–8 s W component appears in `multiSwell` |
-| 6 | Alongshore variation is real | spread of face height across the 32 transects. **Expected magnitude changed by E6**: at `TRANSM 0.82` the lee deficit is ~20% of height, not the ~5% that `0.95` produced. A spread still near 5% means E6 did not take effect |
-| 7 | Cycle completes in cadence | wall time vs schedule interval, warm or cold stated. **Expected ~7 min at ~12 600 cells** (Phase E), against >75 min DNF at 47 992 |
-| 8 | Health reports `ok` — and has earned it | `status: ok` with every input fresh and zero invariants fired. After Phase C this is the first time in the plan an `ok` is a pass rather than a fail |
-| 9 | The admin status page agrees | rendered output showing `ok` for both API and marine |
-| 10 | First forecast hour is not the initial field | Hs and Tp of hour 1 — **on the second post-E cycle**, per D1's warning |
-| 11 | **Locally generated wind sea reaches the published output** *(new; Phase F)* | on an onshore-wind hour, a short-period partition appears in `multiSwell` that is **not** present in the L2 handoff spectrum — the end-to-end proof F1–F5 did anything |
-| 12 | **A no-structure spot is byte-identical to pre-Phase-E** *(new)* | its published bundle before and after. E4's strongest criterion, verified end to end rather than at the sizing layer |
+---
 
-**Adversarial:** `clearskies-auditor`, with no access to any implementing agent's tests, commit
-messages, or reports, attempts to disprove C1–C4, D1, and Phases E and F on the deployed system.
-
-Then `clearskies-docs-author` syncs governing documents to what actually landed — after Gate D, so
-the documents describe the verified system rather than the intended one. **Scope now includes Phases
-E and F**: `docs/ARCHITECTURE.md`'s SWAN section (grid tiers, what nests in what, which physics runs
-where), `API-MANUAL.md` (the handoff rule, the deep-water reference's L2 provenance, the wind-sea
-partition), and `rules/clearskies-process.md` (the 2026-07-27 rulings alongside the 07-19 and 07-23
-incident rules).
-
-**E5's documentation obligation is *not* deferred to here.** It lands inside E5, in the same commit
-as the code, per the doc-code sync rule. This closing pass reconciles everything else.
 
 ---
 
@@ -903,7 +886,7 @@ the authoritative list; an item not on it and not in a live phase is not being w
 | Gate C row for C3 | *"L3 grid ≥ 2 674 m"* — **now wrong by design.** Phase E retires that edge | **struck**; replaced by Gate E rows 3 and 15 |
 | **Shadow classification** | Two call sites still pass no structures; C2 fixed only one path | **E11** |
 | **Gate B rows 3, 5, 8** | Never passed | **Gate E rows 21–23** below |
-| **Gate B row 11** | Deep-water reference returned **1 row, not 67** | **Gate E row 24** — and it is a prerequisite for D2's baselines, which read that reference |
+| **Gate B row 11** | Deep-water reference returned **1 row, not 67** | **Gate E row 24** — and it is a prerequisite for the **Reality reads**, which read that reference |
 | **Gate B row 13** | **No tide field in the published payload** | **Gate F row 11** — Phase F touches the same publish path, and tide is already computed correctly (findings §0B.1); this is a plumbing gap, not a physics one |
 
 **Nothing on this list may be closed by asserting it was already done in A–C.** Each needs a live
@@ -1349,7 +1332,7 @@ Every row needs a `file:line` read after the change and a live number from the d
 | 21 | A published number is fully traceable | follow one `breakingFaceHeight` to its SWAN station using only the trace. Paste the chain |
 | 22 | No published field changed by the trace | forecast bundle with trace on and off — byte-identical |
 | 23 | No invariant fires off stale cache | for each firing, show it came from the live computation, not a cached artefact. **Sharper after Phase E**: geometry is cached at config push, so a stale-cache firing is the likeliest false positive |
-| 24 | Deep-water reference returns **67 rows, not 1** | the row count. **Blocking for D2** — the reality baselines read this reference, and a 1-row reference cannot support them |
+| 24 | Deep-water reference returns **67 rows, not 1** | the row count. **Blocking for the Reality reads** — they read this reference, and a 1-row reference cannot support them |
 
 **Adversarial:** `clearskies-auditor`, given D1–D8 and the expected numbers above but **not** any
 implementing agent's tests, commits or reports, attempts to disprove E1–E8 on the deployed system.
@@ -1511,6 +1494,56 @@ nothing to double.
 implementing agent's tests, commits or reports. Specifically briefed to hunt: a coefficient with no
 citation; wind sea grown from alongshore or offshore wind; the flag read by index rather than by
 field; any change to a swell partition; and a second wind source.
+
+---
+
+# PHASE D — Verify the whole chain
+
+### D1 — Cold-start first hour
+Previously C5; **moved because its gate opened only post-deploy, making Phase C circular.**
+The first output row of every run is the empty initial field (`Hsig 0.014 m`, partitions zero,
+`Tm01 1.6 s`) and is published as a forecast hour. That is expected for a cold-started spectral
+model and is not itself a defect. `aa4553d` fixes the hotstart. **Check first whether a working
+hotstart populates the first hour. Only if it is still empty does suppression get designed** — and
+it gets designed then, not now.
+
+> **⚠ Phase E invalidates every hotstart. Read this before concluding `aa4553d` failed.**
+> Hotstart files are written for a specific grid geometry. After Phase E deploys, **the first cycle
+> is necessarily a cold start** and its first forecast hour will be the empty initial field — once.
+> That is Phase E's expected cost, **not evidence the hotstart fix is broken**.
+> **Evaluate D1 on the second cycle after Phase E**, when a hotstart written by the new geometry
+> exists. A coordinator who reads an empty first hour on the first post-E cycle and reopens
+> `aa4553d` has made a sequencing error of exactly the kind C3's live-check note warns about.
+
+## ⛔ QC GATE D — the whole chain
+
+| # | Element | Evidence |
+|---|---|---|
+| 1 | Every **applicable** invariant passes | raw log, no ERROR. **Requires E9.** The count is no longer nine: invariant 6 is rescoped per grid kind and invariant 2 is marked not-applicable where the handoff is a boundary rather than an overlap. **State the applicable set and why each excluded one is excluded** — a shrinking invariant count is exactly how coverage quietly disappears |
+| 2 | One number traced end to end | full chain from the trace, pasted |
+| 3 | Surf height vs reference | published vs Surfline and Surf-forecast, deltas stated — **per the "Reality reads" protocol, presented alongside the Gate E and Gate F reads**. Note there is no pre-refactor baseline and none can be manufactured; see that section |
+| 4 | Swell partitions vs reference | height, period, direction per partition vs both |
+| 5 | The westerly is published | the 6–8 s W component appears in `multiSwell` |
+| 6 | Alongshore variation is real | spread of face height across the 32 transects. **Expected magnitude changed by E6**: at `TRANSM 0.82` the lee deficit is ~20% of height, not the ~5% that `0.95` produced. A spread still near 5% means E6 did not take effect |
+| 7 | Cycle completes in cadence | wall time vs schedule interval, warm or cold stated. **Expected ~7 min at ~12 600 cells** (Phase E), against >75 min DNF at 47 992 |
+| 8 | Health reports `ok` — and has earned it | `status: ok` with every input fresh and zero invariants fired. After Phase C this is the first time in the plan an `ok` is a pass rather than a fail |
+| 9 | The admin status page agrees | rendered output showing `ok` for both API and marine |
+| 10 | First forecast hour is not the initial field | Hs and Tp of hour 1 — **on the second post-E cycle**, per D1's warning |
+| 11 | **Locally generated wind sea reaches the published output** *(new; Phase F)* | on an onshore-wind hour, a short-period partition appears in `multiSwell` that is **not** present in the L2 handoff spectrum — the end-to-end proof F1–F5 did anything |
+| 12 | **A no-structure spot is byte-identical to pre-Phase-E** *(new)* | its published bundle before and after. E4's strongest criterion, verified end to end rather than at the sizing layer |
+
+**Adversarial:** `clearskies-auditor`, with no access to any implementing agent's tests, commit
+messages, or reports, attempts to disprove C1–C4, D1, and Phases E and F on the deployed system.
+
+Then `clearskies-docs-author` syncs governing documents to what actually landed — after Gate D, so
+the documents describe the verified system rather than the intended one. **Scope now includes Phases
+E and F**: `docs/ARCHITECTURE.md`'s SWAN section (grid tiers, what nests in what, which physics runs
+where), `API-MANUAL.md` (the handoff rule, the deep-water reference's L2 provenance, the wind-sea
+partition), and `rules/clearskies-process.md` (the 2026-07-27 rulings alongside the 07-19 and 07-23
+incident rules).
+
+**E5's documentation obligation is *not* deferred to here.** It lands inside E5, in the same commit
+as the code, per the doc-code sync rule. This closing pass reconciles everything else.
 
 ---
 
