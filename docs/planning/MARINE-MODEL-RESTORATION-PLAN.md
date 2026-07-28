@@ -2,12 +2,30 @@
 
 **Created:** 2026-07-27
 **Revised:** 2026-07-27 after adversarial review (findings incorporated; see "Review corrections")
-**Status:** APPROVED — not started
+**Status:** Phases A–C landed. **Phases E and F added 2026-07-27** after the grid-strategy review.
 **Repos:** marine = `repos/weewx-clearskies-marine`, meta = repo root
 
 **Sequence:**
-Phase A (coordinator alone) → **VSCode restart** → Phase B → **Deploy 1** → Gate B →
-Phase C → **Deploy 2** → Gate C → Phase D → Gate D
+Phase A ✅ → Phase B ✅ → **Deploy 1** ✅ → Gate B (rows 3/5/8/11/13 outstanding) →
+Phase C ✅ (C1/C2/C3 landed; **C4 pending**) → **E0 restore service** →
+Phase E → Gate E → Phase F → Gate F → Phase D → Gate D
+
+> ### ⛔ Read this before touching Phase C or the L3 grid
+>
+> **C3 landed and is not being reverted as a defect** — it correctly restored L3's offshore edge to
+> the measured 15 m contour per this plan as written. But the resulting **41 895-cell** grid ran
+> **past 75 minutes without completing**, against a ~7-minute baseline, and no forecast published.
+>
+> The 2026-07-27 review concluded the 15 m offshore edge was a carryover from when L3 was the
+> fine-detail model, and that **10 m resolution was an assumption, not a derivation**. **Phase E
+> replaces the L3 strip with a small rotated grid on the structure** and rescopes L3 to a nesting
+> step. C3's `offshore_distance_m` threading is **kept and reused** by E4.
+>
+> **E0 comes first**: roll back to the publishing grid and restore service before any Phase E work.
+>
+> Governing rulings: [briefs/SWAN-GRID-STRATEGY-RESEARCH-FINDINGS.md](briefs/SWAN-GRID-STRATEGY-RESEARCH-FINDINGS.md)
+> §0A (grid strategy) and §0B (wind). **Findings §1–§8 are the research record and contain
+> superseded text — §0A/§0B win on every conflict.**
 
 Two deploys, not one. Both need the operator's word. The reason is in "Why observability deploys
 first" below — without it the plan cannot be executed as written.
@@ -763,3 +781,496 @@ L2 boundary without agreeing exactly, with nothing deciding which owns a transec
 
 Not live today: one spot, one cluster. The rule would fire for the first time when a second
 L3-triggering spot is added, on live data, with nobody watching.
+
+**Disposition after the 2026-07-27 grid-strategy review:**
+
+- **O1 is promoted to a task.** Its rotation mechanics are correct and are now used by **E3** — but
+  applied to the **structure grid (L4)**, not to L3. The coordinator's earlier ruling that rotation
+  is pointless because swell does not arrive along the tilt was **wrong for a nested grid**: a nested
+  grid receives parent boundary spectra around its *entire* perimeter, so orientation never gates
+  energy entry. Rotation here is an area optimization around a fixed physical object, not an attempt
+  to align with a variable swell. See findings §3.1.
+- **O2 is narrowed and stays open.** Under §0A D2, L3 is a nesting step sized from L4 plus clearance,
+  not a long strip along the beach. The `L · sin(Δ/2)` penalty scales with strip length, so a short
+  L3 is far more merge-tolerant than the restored strip was. The correctness half of O2 — two grids
+  computing the same water with nothing deciding which owns a transect in the overlap — is
+  **unchanged and still unresolved**. Not live today (one spot, one cluster).
+
+---
+
+# PHASE E — Grid strategy: the structure grid replaces the L3 strip
+
+**Authority:** operator rulings D1–D8 in
+[briefs/SWAN-GRID-STRATEGY-RESEARCH-FINDINGS.md](briefs/SWAN-GRID-STRATEGY-RESEARCH-FINDINGS.md)
+§0A, given in chat on 2026-07-27. Every task below trips at least one architectural trigger; **the
+approval is D6's table and nothing else.** An agent that finds itself wanting a change not on that
+table stops and reports.
+
+**What this phase supersedes.** **C3 restored L3's offshore edge to the measured 15 m contour
+(41 895 cells).** That was correct against the plan as written and is *not* being reverted as a
+defect — but the resulting cycle **ran past 75 minutes without completing** against a ~7-minute
+baseline, and the review concluded the 15 m offshore edge was a carryover from when L3 was the
+fine-detail model. Phase E retires that edge for structure spots and replaces the strip with a small
+rotated grid on the structure. **C3's threading work (`offshore_distance_m` through five hops) is
+kept** — E4 reuses it.
+
+### Reading order, mandatory before any Phase E task
+1. Findings §0A (the rulings) — **not** §1–§8, which are the research record and contain superseded text.
+2. Findings §5.1.4 "Misreadings to guard against."
+3. This phase's task.
+Anything in findings §1–§8 that appears to contradict §0A: **§0A wins.** §5.1.3 in particular is
+marked superseded and must not be implemented.
+
+### E0 — Restore service before anything else
+**Owner:** `coordinator` (operational; no agent) · **Files:** none — deploy and config only
+
+The 41 895-cell grid is deployed and **no forecast has published since it landed**. Debug tracing
+from B1 is still enabled on librewxr, writing daily files.
+
+1. Roll the marine service back to `49839ac` and re-push config so grid sizing recomputes at the
+   pre-C3 geometry. **Grid sizing runs at config push (`endpoints/config.py:77`), not per cycle** —
+   a forced cycle alone will not resize. This is the same sequencing trap C3's live check names.
+2. Disable the B1 trace key in `/etc/weewx-clearskies/marine/network.env`; restart.
+3. Confirm a cycle completes and `/health` reports `last_run` advancing.
+
+**This is a service restoration, not a decision on Phase E.** The rollback target is the grid that
+was publishing, not an endorsement of the 870 m defect C3 fixed — Phase E replaces both.
+
+### E1 — Structure-grid resolution derived from the tip wavelength
+**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_domain.py` only
+**Must not touch:** L1 and L2 sizing; `_compute_level3_grid()`'s non-delegating branch (1353-1460);
+anything in `swan_formats.py` (that is E3/E6/E7)
+
+Today L3's resolution is the constant 10 m. Findings §1.1: SWAN's manual requires mesh size
+**1/5 to 1/10 of the dominant wavelength near the tip of the diffracting obstacle** — evaluated at
+the **tip**, not everywhere. 10 m was an assumption, never a derivation.
+
+**Design:**
+1. Add a module-level helper computing the structure grid's resolution:
+   `dx = min(L_tip / 8.0, 15.0)`, **floored at 10.0 m**, where `L_tip` is the local wavelength from
+   the dispersion relation ω² = gk·tanh(kd) at the spot's **design Tp** and the tip depth `d_tip`.
+2. `d_tip` is read from the **cached FINE profile** at the cluster's most-seaward structure point.
+   **Do not interpolate between contour distances** — findings §7 item 2 flags the coordinator's
+   6.3 m tip-depth figure as exactly that kind of assumption. If the cached profile cannot supply a
+   depth at that point: log WARNING, use the 10.0 m floor, and record the reason.
+3. The floor exists for short-period wind-swell coasts where `L_tip/8` would go below the useful
+   range. The 15 m ceiling exists because that is the manual's L/5 limit at our periods.
+4. Emit `dx` into the sizing cache alongside the grid geometry so E7 can derive `smnum` from it and
+   the auditor can read it without recomputing.
+
+**Expected at HB:** Tp 15.27 s, `d_tip` from the profile → `L_tip ≈ 118 m` → `dx = 12.5 m` (≈ L/9.4).
+**Do not hardcode 12.5** — findings §5.1.4 misreading 2. It is a result, not a constant.
+
+**Safe against the source data (D7):** HB bathymetry is 10 m, so a 12.5 m grid is *coarser than its
+data* and does not interpolate. An agent computing `dx` below the source resolution has produced a
+grid that computes interpolation rather than physics — the 2026-07-19 defect. **If `dx` < the source
+bathymetry resolution, stop and report.**
+
+**Guard:** known-answer test on the wavelength — solve ω² = gk·tanh(kd) with an independent solver
+(Brent), as `tests/test_surf_1d_dispersion.py` already does, sharing no code path with the
+implementation. Assert `dx` for a table of (Tp, d_tip) pairs including both clamp boundaries.
+
+### E2 — Structure-grid extent: rotated rectangle on the structure
+**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_domain.py` only
+**Must not touch:** L1/L2; the breaking-depth criterion itself (ADR-093 Amendment 2 §2 — reused
+unchanged); `_cluster_spots()`'s distance logic
+
+**The single biggest change in this phase: the 15 m-contour offshore edge is retired.** It made
+sense when L3 was the general fine-detail model. The structure grid's job is the structure.
+
+**Design — every quantity is available at config-push time:**
+1. **Orientation:** rotated to the structure cluster's **principal axis** (its long axis). At HB the
+   pier bears 221°.
+2. **Along-structure axis:** from the **breaking-depth contour** (existing criterion, unchanged) to
+   the structure's seaward **tip + 1 · L_tip**. The offshore margin exists so the grid boundary sits
+   clear of the obstacle's near field. **NOT the 15 m contour.**
+3. **Across-structure axis:** the union, over the spot's **swell-climate direction window**, of the
+   geometric shadow cast on the shoreward edge, **+ 2 · L_tip beyond the shadow boundary on each
+   side**. Include both sides when the climate window crosses the structure axis (at HB: S swells
+   shadow the NW side, W/NW windswell the SE side).
+   *Basis (findings §3.2):* for directional random seas the diffraction coefficient is ≈ 0.7 on the
+   geometric shadow boundary and recovers to within a few percent of 1 within ~2 wavelengths outside
+   it; the strongly-modified zone sits within ~2–4 wavelengths of the tip. Directional spreading is
+   why the zone is small — real seas fill shadows.
+4. **Anchor-relative, mandatory.** Project from `coastline_origin`, never the operator's pin — A8's
+   rule. Where `coastline_origin` is None, **stop and report**; do not fall back to the pin.
+5. **Sized once, at config push. Frozen thereafter.** No runtime resize, no per-run reshaping by
+   swell direction — the standing 2026-07-23 rule (a runtime resize left the grid outside the
+   NESTOUT and silently zeroed the swell). Findings §3.3. The per-run saving would be ~1–2 min/day
+   against a repealed safety rule and invalidated hotstarts, which are grid-shaped.
+6. Run the existing viability test (grid must reach its feature). A structure grid that cannot is
+   **disabled at setup**, exactly as today's L3 is — never resized at runtime.
+
+**Expected at HB:** along-pier ≈ 1 000 m, across-pier ≈ 800 m → at 12.5 m, **80 × 64 = 5 120 cells**
+(against 41 895 today). Axis-aligned at 10 m the same box is ~16 100 — rotation and tip-scaled
+resolution together are the 3–8× win.
+
+**Report, do not fix:** findings §7 item 1 — the pier-base position was read as "124 m offshore of
+the spot pin", giving pier ≈ anchor+334 m to anchor+901 m. **Verify against the Overpass way geometry
+before sizing.** If it disagrees, report the discrepancy and stop; do not size from an unverified
+base.
+
+**Guard:** cell count and both spans for a synthetic cluster at a known bearing with a known
+`L_tip`; assert the offshore edge is at tip + L_tip and **not** at any 15 m contour value.
+
+### E3 — Rotated CGRID/NGRID emission
+**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_formats.py` only
+**Must not touch:** `INPGRID BOTTOM` / `INPGRID WIND` rotation (`:1354`, `:1382`) — **these stay
+`0.`**
+
+O1's mechanics, now approved (D6 item 3) and applied to the structure grid.
+
+**Design:**
+1. `CGRID REG … [alpc]` (`swan_formats.py:1337`) and `NGRID 'inner' … [alpn]` (`:1538`) take the
+   structure grid's rotation angle instead of the hardcoded `0.` / `0.0`.
+2. **They must agree exactly.** The nest's geometry is declared by the child in `CGRID` and by the
+   parent in `NGRID`; a mismatch produces a nest reading boundary conditions along the wrong line,
+   **silently**. Emit both from one value, never two computations.
+3. **`INPGRID` does not rotate.** SWAN interpolates input fields at any relative orientation, so
+   bathymetry, DEM sampling and wind are untouched. Output points are absolute UTM and unaffected.
+4. `mxc`/`myc` derivation from a lat/lon bbox (`:258-259`) must compute along the **rotated** axes.
+5. L2 must still contain the rotated rectangle — assert it, and fail loudly if not.
+
+**Severable.** If rotation is deferred, E2's design still works axis-aligned at ~16 100 cells
+(~15 min cycles instead of ~7). The architecture survives; only the factor-of-2 is lost. **Do not
+silently fall back to axis-aligned** — that decision is the operator's.
+
+**Guard:** assert the emitted `CGRID` and `NGRID` rotation values are equal and non-zero for a
+rotated structure grid, and that both `INPGRID` lines still emit `0.`
+
+### E4 — L3 rescoped: need-driven, sized from L4
+**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_domain.py`,
+`weewx_clearskies_marine/services/grid_sizing_chain.py`
+**Must not touch:** C3's `offshore_distance_m` threading — **it is reused, not reverted**
+
+**Ruling D2.** L3 is built for exactly two reasons and never otherwise:
+
+**Design:**
+1. **As the nesting step under a structure grid.** 100 m → 12.5 m is 8:1; L3 at 30–40 m makes it
+   2.5:1 then 3.2:1. Extent = the structure grid's footprint **plus clearance of at least 2 parent
+   cells on every side**, plus the spot's alongshore span. **Not the 30 m contour** — that rationale
+   died with the conditional band.
+2. **As the working refraction grid** at an operator-classified point break, headland, or bay.
+   Extent per the existing feature-sizing logic; cross-shore span 15 m contour → breaking-depth
+   contour. **Diffraction OFF here** (E7).
+3. **Neither condition → no L3 at all.** `L1 → L2 → 1D at 15 m`, the current production path,
+   byte-identical. **This redesign must not change a single value for a spot with no structure and
+   no classified feature** — that is E4's strongest acceptance criterion.
+4. If both conditions hold, build **one** L3 covering both roles. **Never two grids stacked
+   edge-to-edge** — edge-on-edge nesting is degenerate (findings §5.1.4 misreading 5).
+5. **The L2-collar fallback from findings §2.3 is struck.** It existed to hedge the 8:1 jump, which
+   L3 now removes.
+
+**Expected at HB:** ~1 500 × 1 300 m at 40 m ≈ **1 400 cells**.
+
+**Guard:** a spot with no structures and no classification produces **exactly** today's grid set —
+assert L3 is absent and L1/L2 are unchanged.
+
+### E5 — Handoff selection, and the deep-water reference written down
+**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/transect_handoff.py`,
+`weewx_clearskies_marine/services/surf_1d_pipeline.py`
+**Must not touch:** the breaking-depth criterion `1.3 · Hs / 0.73`; `L2_REFERENCE_DEPTH_M = 15.0`
+(`transect_handoff.py:79`) — **the constant is unchanged; only which transects use it changes**
+
+**Ruling D3 — the rule findings §5.1.3 got wrong.** Hand off as deep as possible; go shallower only
+where 2D physics still matters, and only as far as the grid modelling it reaches.
+
+**Design — first match wins, per transect, per forecast hour:**
+```
+1. The transect's cross-shore line enters the structure grid's footprint
+       → read per-transect POINTS from L4 at the per-hour 1.3·Hs/0.73 depth.
+2. The transect lies in a classified refraction feature covered by L3
+       → read per-transect POINTS from L3 at the per-hour 1.3·Hs/0.73 depth.
+3. Otherwise
+       → hand off from L2 at fixed 15.0 m. Unchanged production path.
+```
+1. **"Touches" = the transect's cross-shore line enters the structure grid's footprint.**
+   Operator-accepted definition. Not "the handoff point is inside", not "the spot has a structure".
+2. Neighbouring transects MAY resolve to different rules. That is the non-uniform handoff the
+   operator explicitly accepted — **not a defect, and not to be smoothed**.
+3. **The deep-water reference stays on L2 at the spot's own 15 m contour, in every case.** The
+   structure grid never reaches it and can never supply it.
+4. **Doc-code sync, mandatory in this task, not deferred:** write into `docs/ARCHITECTURE.md` and
+   `docs/manuals/API-MANUAL.md` that the deep-water reference is **L2-sourced and is not the 1D
+   model's starting point**, so a future reader does not "fix" a by-design difference. D4.
+
+**Live check:** at HB the structure grid covers all 32 transects, so **every transect must resolve
+to rule 1**. If any resolves to rule 3, either the envelope is undersized or "touches" is
+mis-implemented — report, do not adjust the envelope to make the check pass.
+
+**Known gap, record it — do not attempt to close it:** rule 2's path and the mixed rule-1/rule-3 case
+**cannot be exercised at HB**. They will be written and untested until a spot exists whose structure
+grid covers only part of the beach. Nobody may claim these paths are verified.
+
+### E6 — Pier transmission 0.95 → 0.82
+**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_formats.py` only
+(`_OBSTACLE_PARAMS`) **Must not touch:** the jetty / groin / breakwater / seawall rows — all unchanged
+
+**Architectural trigger 1. Approved: D6 item 4.**
+
+SWAN's `TRANSM` is a **wave-height** ratio, not energy (manual). `0.95` passes 95% of height = 90% of
+energy and traces to nothing. The measured PT0–PT7 deficit (0.83 vs 0.87 ≈ 0.95) was the model
+echoing its own input constant back — **not evidence about the pier**.
+
+**Evidence for 0.82:** Elgar, Guza, O'Reilly, Raubenheimer & Herbers (2001), *Wave energy and
+direction observed near a pier*, JWPCOE 127(1):2–6 — the Duck, NC research pier, 561 m,
+pile-supported, directly comparable to HB's 567 m. Matching observations required **30–50% energy
+blocking** by the pilings ⇒ **Kt_height ≈ 0.71–0.84**. Blocking is strongest for
+obliquely-crossing components; at HB swell from 201.9° crosses the 221° pier at ~19° — the
+high-attenuation geometry.
+
+**Design:** set the pier class to `TRANSM 0.82`. One value. **Do not implement `TRANS2D`** —
+direction-dependent transmission is the physically better shape and is explicitly deferred: one
+constant first, calibrate, then decide.
+
+**Do not launder bathymetry through Kt.** Much of Duck's far-field pattern was **refraction over the
+scour trench** under the pier, not the pilings. If HB's 10 m DEM contains the trench, that is a
+separate resolvable mechanism. **Inflating Kt to cover a missing bathymetric feature would bake a
+site-specific data error into a physics constant.** Findings §4.3.
+
+**Calibrate against reality, not the model** (`rules/verification.md`): the observable is the
+alongshore Hs gradient across PT0–PT31 versus an independent reference (nearest CDIP/NDBC nearshore
+buoy, Surfline per-peak, or operator observation) on an oblique-swell day. **Not a Phase E gate row**
+— it needs the right weather. Record it as owed.
+
+### E7 — Diffraction only in the structure grid; smoothing scaled to resolution
+**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_formats.py` only
+**Must not touch:** the `0.2` under-relaxation parameter; wind forcing on any grid (**always on** —
+standing rule)
+
+**Design:**
+1. **`DIFFRACTION` is emitted for the structure grid and no other grid.** At 30–100 m it is
+   sub-resolution — emitting it there is both useless and destabilising, and it "disappears" as cells
+   coarsen past L/10. L3, L2 and L1 get none. Findings §5.1.4 misreading 3.
+2. `smnum` derives from the grid's own `dx` via the existing project relation
+   **εx = ½ · √(3n) · Δx**, target **εx ≈ 45 m**.
+3. **Arithmetic check, and it validates the relation:** at Δx = 10 m the relation gives
+   √(3n) = 45/5 = 9 → n = **27**, which is exactly today's emitted `DIFFRACTION 1 0.2 27`. At
+   Δx = 12.5 m it gives √(3n) = 45/6.25 = 7.2 → n = **17**. An agent whose formula does not reproduce
+   27 at 10 m has the relation wrong — **stop and report**.
+4. **Never emit bare unsmoothed `DIFFRACTION`** — hard project rule since 2026-07-19.
+
+**Guard:** assert `smnum == 27` at Δx = 10 m and `smnum == 17` at Δx = 12.5 m; assert no
+`DIFFRACTION` line is emitted for L1, L2 or L3.
+
+### E8 — Hourly quick update covers every grid that supplies a handoff
+**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_runner.py`
+**Must not touch:** the stationary/non-stationary mode selection — quick updates stay **stationary**
+(operator-confirmed, already correct); the 6-hourly full-cycle cadence
+
+**Ruling D5.** Today quick updates run "the finest grid only", which was safe when the finest grid
+spanned the whole spot. Under D2/D3 it may cover only part of one, silently leaving transects with no
+hourly refresh.
+
+**Design:** the hourly quick update runs **every grid that supplies a handoff under E5's rule** for
+this spot — L4 and/or L3 as applicable. A spot whose transects all hand off from L2 gets its existing
+behaviour.
+
+**Cost at HB:** L3 + L4 ≈ **6 520 cells**.
+
+**Record, do not act on:** L3 sits in 15–30 m of water where a metre of tide is a few percent depth
+change and there is negligible fetch — its hourly refresh carries almost no new information. The
+structure grid spans ~2–6 m, where the same metre is a 15–50% change. **That** is where hourly
+matters. Stated so nobody later assumes the L3 hourly run is load-bearing.
+
+## ⛔ QC GATE E — grid strategy
+
+Every row needs a `file:line` read after the change and a live number from the deployed system.
+
+| # | Element | Live value proving it ran |
+|---|---|---|
+| 1 | Structure-grid resolution is derived, not constant | `dx` from the sizing cache = 12.5 m at HB, with the `L_tip` and `d_tip` it came from |
+| 2 | `dx` is not finer than the source bathymetry | `dx` vs the DEM resolution actually used (10 m at HB) |
+| 3 | Offshore edge is tip + L_tip, **not** the 15 m contour | offshore reach from anchor; must **not** be ~2 574 m |
+| 4 | Structure grid is rotated, and `CGRID`/`NGRID` agree | both angles from the emitted INPUT file, equal and non-zero |
+| 5 | `INPGRID` still emits `0.` | both lines from the same file |
+| 6 | Cell counts | L1 / L2 / L3 / L4 and total; total ≈ 12 600 at HB |
+| 7 | Cycle completes in cadence | wall time vs schedule interval, warm or cold stated |
+| 8 | A no-structure spot is unchanged | its grid set before and after, identical |
+| 9 | All 32 HB transects resolve to handoff rule 1 | per-transect rule, from the trace |
+| 10 | Deep-water reference still sourced from L2 | the SPECOUT grid, from the emitted INPUT file |
+| 11 | `TRANSM 0.82` emitted for the pier | the `OBSTACLE` line |
+| 12 | `DIFFRACTION` on L4 only, `smnum` = 17 | every `DIFFRACTION` line in every emitted INPUT file |
+| 13 | Hourly update runs L3 + L4 | grid names in one quick-update run's log |
+| 14 | Docs synced | the ARCHITECTURE.md / API-MANUAL.md diff for E5 item 4 |
+
+**Adversarial:** `clearskies-auditor`, given D1–D8 and the expected numbers above but **not** any
+implementing agent's tests, commits or reports, attempts to disprove E1–E8 on the deployed system.
+Specifically briefed to hunt: a hardcoded 12.5; a 15 m offshore edge surviving anywhere; `CGRID`/
+`NGRID` rotation disagreement; `DIFFRACTION` emitted on a coarse grid; and any changed value at a
+no-structure spot.
+
+---
+
+# PHASE F — Wind source term in the 1D model
+
+**Authority:** operator ruling, 2026-07-27, recorded in findings §0B.4. **This trips architectural
+trigger 1.** The coordinator recommended against it on height impact (2–3%); the operator overruled,
+and the coordinator's yardstick was wrong — the value is in the surf scorer's **swell dominance** and
+**cross-swell** sub-factors, which currently cannot see a locally generated short-period component.
+
+**Read findings §0B in full before any Phase F task.** §0B.5 (the double-count trace) and §0B.6 (why
+option C beat A and B) are the design; this phase implements them.
+
+### F1 — Carry `is_wind_sea` through the partition conversion
+**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_spectral.py` only
+**Must not touch:** `parse_table_pt_partitions()`'s parsing (it already sets the flag correctly at
+`:1136`); the descending-Hs sort at `:1207`; `decompose_spectrum()`
+
+`watershed_partitions_to_component_format()` (`:1194-1208`) **discards `is_wind_sea`**, and its own
+docstring says so: *"Consuming that distinction is a separate, not-yet-approved change."* **It is now
+approved.** This is the whole reason Phase F cannot double-count.
+
+**Design:**
+1. Carry `is_wind_sea` into the converted dict, defaulting **False** when absent.
+2. **The descending-Hs sort stays.** Consumers rely on it. The flag must therefore be read **from the
+   field, never from the index** — after sorting, partition 1 is no longer at index 0.
+3. Update the docstring: the distinction is now consumed, by whom, and under what approval.
+4. **`classification` is not a substitute and must not be used as one.** It is a period-based proxy
+   (`_classify_period`, `:26-29`): a decayed 9 s swell is labelled `wind_swell` and is not a wind
+   sea; a wind sea under strong forcing can exceed 10 s.
+
+**Guard:** a converted partition set where the wind sea is **not** the tallest — assert the flag
+follows the right partition through the sort.
+
+### F2 — Sample per-spot wind from the field that forces SWAN
+**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/providers/nearshore/swan.py`,
+`weewx_clearskies_marine/services/surf_pipeline_timestep.py`
+**Must not touch:** `_stitch_wind()`'s blending; the HRRR/GFS fetch
+
+**Ruling §0B.9 — one wind, not two.** Wind exists as a spatial field (`blended_wind`,
+`swan.py:1299`). The 1D model's wind must be sampled from **that same field**, at the spot, for the
+same forecast hour.
+
+**Design:**
+1. Sample `blended_wind` at the spot's anchor for each forecast hour; carry speed and direction to
+   the 1D pipeline alongside `tide_level`.
+2. **Never introduce a second wind source** — a station observation or a different forecast product
+   would drive SWAN and its own 1D continuation with different winds across the handoff, producing
+   plausible, wrong, hard-to-diagnose output.
+3. **Follow the tide precedent exactly: refuse rather than substitute.** When wind is unavailable,
+   the growth term is **skipped and logged**, never applied with a zero or a guess. See the three
+   existing tide guards (`surf_pipeline_timestep.py:110`, `surf.py:954`, `beach_profile.py:1001`).
+4. Do **not** thread this across the compute-service HTTP boundary
+   (`services/compute_client.py` / `compute_service.py`) — that is a data-contract change
+   (trigger 4) and is **not approved**.
+
+### F3 — Depth-limited growth kernel — gated on a known-answer test
+**Owner:** `clearskies-api-dev` · **Files:** one new module under
+`weewx_clearskies_marine/services/` **Must not touch:** `run_1d_analytical()` — F3 is a standalone
+kernel with no caller yet
+
+**Design:**
+1. Implement **finite-depth fetch-limited growth**: Young, I.R. & Verhagen, L.A. (1996), *The growth
+   of fetch limited waves in water of finite depth. Part 1: Total energy and peak frequency*,
+   Coastal Engineering **29**, 47–78. Input: wind speed, fetch, depth. Output: wind-sea Hs and Tp.
+2. **Deep-water JONSWAP is the wrong relation and must not be used.** The run goes 15 m → 0 m;
+   growth in shallow water is capped by depth well before fetch.
+
+**⛔ HARD GATE — coefficients.** **Two web searches did not surface Young & Verhagen's explicit
+coefficients, so none are written in this plan or in the findings document, deliberately.** The
+implementing agent must:
+- obtain the **primary source** (or Breugem & Holthuijsen 2007, the later revision) and transcribe
+  every coefficient from it;
+- **cite the equation number and page** for each, in a comment at the constant;
+- **stop and report if the source cannot be obtained.** Do not infer, do not reconstruct from a
+  secondary summary, do not use a plausible value.
+
+*Why this gate exists:* `TRANSM 0.95` entered this system as a plausible-looking constant that traced
+to nothing, and E6 is the cost of removing it. A second one is not acceptable.
+
+**Guard — known-answer test, mandatory (`rules/verification.md`).** Young & Verhagen publish growth
+curves: measured height and period against known fetch, wind speed and depth. Assert the
+implementation reproduces published points **including at least one in the depth-limited regime**,
+where growth has ceased. This must be a genuine independent reference, **not a rearrangement of the
+implementation**.
+
+**Design decision, already made — do not re-open.** Apply the relation at each march step using
+**local depth** and **cumulative fetch from the handoff point**. The theoretically cleaner
+alternative (differentiate the growth curve to get dE/dx and integrate) is **deferred**: the total
+contribution is ~0.2 m, and `_combine_partition_hs()` already enforces depth-limited saturation on
+the RSS total (`surf_1d_pipeline.py:407`), so a crude estimate is capped correctly by existing
+machinery. **Document the approximation at the call site.**
+
+### F4 — Grow the wind-sea partition along the 1D run
+**Owner:** `clearskies-api-dev` · **Files:**
+`weewx_clearskies_marine/services/surf_1d_pipeline.py` only
+**Must not touch:** `run_1d_analytical()` (`surf_1d_analytical.py`) — **the physics module does not
+change**; `_combine_partition_hs()`'s RSS and saturation logic; any swell partition's path
+
+**Option C from §0B.6.** SWAN grows the wind sea to the handoff; the 1D model continues it over the
+remaining fetch. No double-count by construction.
+
+**Design:**
+1. In the per-partition loop, the partition carrying `is_wind_sea == True` — **and only that one** —
+   gets F3's growth applied as it marches. Swell partitions are untouched.
+2. **Fetch geometry (§0B.7), and this is what stops the double-count returning by the side door:**
+   - Use the **onshore component** of wind only, with fetch measured from the handoff point shoreward.
+   - **Alongshore wind: do not regenerate.** Its fetch lies inside SWAN's 2D domain, so it is already
+     in the handoff spectrum.
+   - **Offshore wind: contributes nothing.** Those waves travel seaward, away from the break. Its
+     real effect on the wave face is already the surf scorer's job at 15% of the score.
+3. At most **one** partition may be flagged. If more than one arrives flagged, log ERROR and grow
+   none — that is a parsing defect upstream, not a condition to paper over.
+4. Growth is applied **before** breaking, so the grown wind sea breaks through the existing
+   Battjes-Janssen path like any other partition.
+
+**Guard:** a two-partition set (one swell, one wind sea) — assert the swell partition's output is
+**byte-identical** to the pre-change result and only the wind-sea partition changed.
+
+### F5 — Fallback: synthesize a wind-sea partition when SWAN handed none over
+**Owner:** `clearskies-api-dev` · **Files:**
+`weewx_clearskies_marine/services/surf_1d_pipeline.py` only
+
+**Option B from §0B.6, surviving only as a fallback** — it cannot double-count because there is
+nothing to double.
+
+**Design:**
+1. Fires **only** when *both*: no arriving partition is flagged `is_wind_sea`, **and** there is a
+   non-zero onshore wind component.
+2. Synthesize one partition from F3 at zero initial energy, direction = the onshore wind direction,
+   and append it to the partition list. It then flows through F4 and `_combine_partition_hs()`
+   normally.
+3. **Log at INFO every time it fires, with the reason** — this path also covers the bulk-parameter
+   degradation route, and silent synthesis would hide a partition-parsing failure.
+
+## ⛔ QC GATE F — wind source term
+
+| # | Element | Live value proving it ran |
+|---|---|---|
+| 1 | `is_wind_sea` survives the conversion and the sort | a live partition set with the flag on a non-tallest partition |
+| 2 | Coefficients are cited to equation and page | the source comments at each constant |
+| 3 | Known-answer test passes in the depth-limited regime | the published point, expected vs computed |
+| 4 | Wind comes from `blended_wind`, not a second source | the sampling call site |
+| 5 | Missing wind skips growth, never zero-substitutes | log line from a forced missing-wind run |
+| 6 | Only the wind-sea partition changed | swell partition output, before vs after, identical |
+| 7 | Alongshore/offshore wind generate nothing | three forced runs: onshore, alongshore, offshore |
+| 8 | Depth saturation still caps the RSS total | combined Hs vs γd at the shallowest profile point |
+| 9 | F5 logs when it fires | INFO line with the reason, from a forced no-wind-sea run |
+| 10 | Magnitude is in the expected range | wind-sea Hs at the break for ~15 kt onshore; ~0.2 m expected — **an order-of-magnitude miss means the relation is wrong, not the expectation** |
+
+**Adversarial:** `clearskies-auditor`, given §0B and the expectations above but **not** any
+implementing agent's tests, commits or reports. Specifically briefed to hunt: a coefficient with no
+citation; wind sea grown from alongshore or offshore wind; the flag read by index rather than by
+field; any change to a swell partition; and a second wind source.
+
+---
+
+# Phase E/F provenance
+
+Both phases originate in the 2026-07-27 grid-strategy review, whose research record is
+[briefs/SWAN-GRID-STRATEGY-RESEARCH-FINDINGS.md](briefs/SWAN-GRID-STRATEGY-RESEARCH-FINDINGS.md)
+and whose question framing is
+[briefs/SWAN-GRID-STRATEGY-RESEARCH-BRIEF.md](briefs/SWAN-GRID-STRATEGY-RESEARCH-BRIEF.md).
+
+**Owed measurements — not gate rows, but not to be lost** (findings §7, as narrowed by §0A):
+
+| # | Measurement | Why it is still owed |
+|---|---|---|
+| 1 | Pier-base position vs Overpass way geometry | E2 sizes from it; currently an assumption |
+| 2 | Tip depth from the cached FINE profile | E1 uses it; the 6.3 m figure was interpolated |
+| 3 | Does HB's 10 m DEM contain the pier scour trench? | Decides whether trench refraction — **dominant at Duck** — is in or out of our model. Highest-value single check in the review. |
+| 4 | L2 vs L3 handoff spectra at the same points | Demoted from a gate to a measurement of record: D2 chose L2-direct for open beaches. Read both in one run and compare; **no separate A/B configuration needed** |
+| 5 | Nest boundary quality at 100 m → 40 m → 12.5 m | The 8:1 jump is gone, so this is now routine rather than a flagged risk |
+| 6 | `TRANSM` calibration on an oblique-swell day | E6; needs the right weather |
+| 7 | Wall-clock vs cell count | The first structure-grid cycle timestamps it for free. Measured scaling is already **worse than linear** (3.8× cells → >10× time), so small-grid estimates are the trustworthy end |
