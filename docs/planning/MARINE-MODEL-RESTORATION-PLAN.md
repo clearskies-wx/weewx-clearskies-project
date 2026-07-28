@@ -596,13 +596,13 @@ structures test at `:286-296` asserts only the shoreward edge. Add a case passin
 
 ### C4 — Per-transect bathymetry profiles — ⛔ SUPERSEDED BY E10, DO NOT IMPLEMENT AS WRITTEN
 
-> **C4 never started, and Phase E removed its premise.** It extracts the profile over **the L3 grid's
-> bbox** and depends on C3 having pushed that grid out to the 15 m contour. Under Phase E an
-> open-beach spot has **no L3 at all**, and a structure spot's L3 is a small grid hugging the
-> structure — neither spans to 15 m. **[E10](#e10--per-transect-profiles-span-the-handoff-to-shore-not-a-grid-bbox-supersedes-and-resequences-c4)
-> re-bases extraction on the transect itself and drops the L3 dependency.** The allowlist, the
-> `profiles_by_transect` artefact, the consumers, and the C1-first measurement all carry over
-> unchanged. Retained below for that detail and to show what was replaced.
+> **C4 shipped as `060a56b` and is committed but NOT deployed** (librewxr runs `de71775`). Phase E
+> then removed its premise: it extracts the profile over **the L3 grid's bbox** and depends on C3
+> having pushed that grid out to the 15 m contour. Under Phase E an open-beach spot has **no L3 at
+> all**, and a structure spot's L3 is a small grid hugging the structure — neither spans to 15 m.
+> **E10 re-bases extraction on the transect itself and drops the L3 dependency.** It is a **rework of
+> `060a56b`**, not a fresh build: the allowlist, the `profiles_by_transect` artefact, the consumers,
+> and the C1-first measurement all carry over. Retained below for that detail.
 
 **Owner:** `clearskies-api-dev`
 **Files:** `services/grid_sizing_chain.py`, `enrichment/bathymetry.py`,
@@ -886,6 +886,28 @@ kept** — E4 reuses it.
 3. This phase's task.
 Anything in findings §1–§8 that appears to contradict §0A: **§0A wins.** §5.1.3 in particular is
 marked superseded and must not be implemented.
+
+## Carried forward from Phases A–C — relocated here, because a closed phase never gets revisited
+
+**Operator ruling, 2026-07-27:** *"If anything changes in A–C, those changes need to be moved to
+D–F, or else they will never get fixed."*
+
+Phases A–C are closed. Anything still owed from them has **no owner and no gate** where it currently
+sits. Every item below is therefore **relocated into Phase E or F and owned there**. This table is
+the authoritative list; an item not on it and not in a live phase is not being worked on by anybody.
+
+| Owed from | What | Relocated to |
+|---|---|---|
+| **C4** | Implemented as `060a56b`, **committed, never deployed**; its L3-bbox extraction basis is broken by Phase E | **E10** — rework, not rebuild |
+| **Gate C** | **Never walked.** C1/C2/C3 were accepted individually; the gate itself never ran | **Gate E rows 18–20** below |
+| Gate C row for C3 | *"L3 grid ≥ 2 674 m"* — **now wrong by design.** Phase E retires that edge | **struck**; replaced by Gate E rows 3 and 15 |
+| **Shadow classification** | Two call sites still pass no structures; C2 fixed only one path | **E11** |
+| **Gate B rows 3, 5, 8** | Never passed | **Gate E rows 21–23** below |
+| **Gate B row 11** | Deep-water reference returned **1 row, not 67** | **Gate E row 24** — and it is a prerequisite for D2's baselines, which read that reference |
+| **Gate B row 13** | **No tide field in the published payload** | **Gate F row 11** — Phase F touches the same publish path, and tide is already computed correctly (findings §0B.1); this is a plumbing gap, not a physics one |
+
+**Nothing on this list may be closed by asserting it was already done in A–C.** Each needs a live
+value from the deployed system, at the gate it has been moved to.
 
 ### E0 — Restore service before anything else
 **Owner:** `coordinator` (operational; no agent) · **Files:** none — deploy and config only
@@ -1182,11 +1204,15 @@ and must **not** fire against a correctly-sized one — the second half is the p
 `endpoints/beach_profile.py` **Must not touch:** `extract_native_profile_from_grid()`'s body;
 `_band_ray_origin()` (`swan_runner.py:124-163`)
 
-**Found checking Phase D against Phase E. C4 as written cannot be delivered after Phase E.**
+**C4 IS IMPLEMENTED. This is a rework of shipped code, not a fresh build.**
+`060a56b feat(C4): add per-transect bathymetry profiles from each transect's own anchor` is
+**committed on `main` and NOT deployed** — librewxr runs `de71775`. Read that commit before writing
+anything. An agent that treats E10 as greenfield will duplicate `profiles_by_transect` instead of
+re-basing it.
 
-C4 extracts the profile **over the L3 grid's bbox** (`grid_sizing_chain.py:539, 556`) and its
-sequencing note reads *"Depends on C3… per-transect profiles are worth little until the grid reaches
-15 m."* Phase E removes that premise entirely:
+**Found checking Phase D against Phase E.** C4 extracts the profile **over the L3 grid's bbox**
+(`grid_sizing_chain.py:539, 556`) and its sequencing note reads *"Depends on C3… per-transect
+profiles are worth little until the grid reaches 15 m."* Phase E removes that premise entirely:
 
 - **Open-beach spot** → under D2 there is **no L3 at all**. No bbox exists to extract over.
 - **Structure spot** → L3 is a small nesting grid hugging the structure. Its bbox does **not** span
@@ -1217,6 +1243,45 @@ before E10 so E10's contribution is distinguishable from C1's.
 **Guard:** a spot with **no L3 and no structure grid** produces 32 profiles each spanning its own
 handoff point to shore. This case is unreachable under C4's design and is the whole point of E10.
 
+### E11 — Shadow classification: the two call sites C2 did not reach
+**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_runner.py` only
+**Must not touch:** `marine_config.py` (C2's fix — already landed as `de71775` and deployed); the
+shadow-classification function's own logic until item 2 below has been answered
+
+**Recorded during Phase C as a separate defect and left unfixed. It has no owner until now.**
+Under Phase E this stops being cosmetic: `TRANSM 0.82` (E6) makes the lee deficit ~20% of height
+rather than ~5%, and the structure grid (E2) is sized specifically to resolve the shadow's edge. A
+structure grid computing a shadow that the classifier then fails to attribute to any transect is
+~5 000 cells of wasted compute per cycle.
+
+**Two live trace records, same cycle, proving two distinct problems:**
+```
+{"stage":"shadow","spot_id":null,                      "structures_received":{"count":0,"ids":[]},             "shadowed_count":0}
+{"stage":"shadow","spot_id":"huntington-city-beach-pier","structures_received":{"count":1,"ids":["pier(567m)"]},"shadowed_count":0}
+```
+
+**Design — two separate items. Do not conflate them.**
+
+1. **`swan_runner.py:2880` and `:3836` pass no `structures` argument at all** — hence
+   `count: 0` and `spot_id: null`. C2 fixed the `providers/nearshore/swan.py` path only. Thread the
+   spot's structures to both call sites, from the same source C2 populated. **Verify the line numbers
+   against the current tree before editing** — C1/C2/C3 have all landed since they were recorded.
+
+2. **The second record shows `count: 1` but still `shadowed_count: 0`.** Structures *were* received
+   and nothing was shadowed anyway. **Determine whether that is correct or a second defect — do not
+   assume either.** It may be legitimate: swell at 201.9° crossing a pier bearing 221° is a ~19°
+   grazing geometry, and with the *current* axis-aligned grid the geometric shadow may genuinely miss
+   every transect. It may equally be a real defect. **Report the finding with the geometry that
+   produced it; do not "fix" it until it is established which.** Changing shadow-attribution criteria
+   on an assumption is a trigger-1 change.
+
+**Invariant 3** (*"`spot_config.structures` non-empty ⟹ shadowed count > 0"*) should be firing on
+this today. Confirm it is. An invariant that ought to fire and does not is a worse finding than the
+defect it was meant to catch.
+
+**Guard:** both call sites receive a non-empty structures list for a spot that has one — asserted at
+the call site, not by mocking the classifier.
+
 ## ⛔ QC GATE E — grid strategy
 
 Every row needs a `file:line` read after the change and a live number from the deployed system.
@@ -1240,6 +1305,15 @@ Every row needs a `file:line` read after the change and a live number from the d
 | 15 | Invariant 6 fires on a short grid and **not** on a correct one | both runs; the second is the row that matters |
 | 16 | Invariant 2's not-applicable status is recorded in its own text | the invariant's text, and the applicable set stated |
 | 17 | 32 per-transect profiles, each spanning its own handoff to shore | first and last depth of three transects using **different** handoff rules — or a statement that HB exercises only rule 1 |
+| | **↓ Relocated from Gate C, which was never walked ↓** | |
+| 18 | C1 — distinct handoff depths across transects | the 32 values; count of distinct ones > 1 |
+| 19 | C2 + E11 — structures reach every shadow call site | both trace records showing `count: 1`, and the E11 item-2 finding stated either way |
+| 20 | Cell count and cadence together | per-grid and total cells beside wall time; **replaces Gate C's struck `L3 ≥ 2 674 m` row**, which Phase E makes wrong by design |
+| | **↓ Relocated from Gate B, never passed ↓** | |
+| 21 | A published number is fully traceable | follow one `breakingFaceHeight` to its SWAN station using only the trace. Paste the chain |
+| 22 | No published field changed by the trace | forecast bundle with trace on and off — byte-identical |
+| 23 | No invariant fires off stale cache | for each firing, show it came from the live computation, not a cached artefact. **Sharper after Phase E**: geometry is cached at config push, so a stale-cache firing is the likeliest false positive |
+| 24 | Deep-water reference returns **67 rows, not 1** | the row count. **Blocking for D2** — the reality baselines read this reference, and a 1-row reference cannot support them |
 
 **Adversarial:** `clearskies-auditor`, given D1–D8 and the expected numbers above but **not** any
 implementing agent's tests, commits or reports, attempts to disprove E1–E8 on the deployed system.
@@ -1395,6 +1469,7 @@ nothing to double.
 | 8 | Depth saturation still caps the RSS total | combined Hs vs γd at the shallowest profile point |
 | 9 | F5 logs when it fires | INFO line with the reason, from a forced no-wind-sea run |
 | 10 | Magnitude is in the expected range | wind-sea Hs at the break for ~15 kt onshore; ~0.2 m expected — **an order-of-magnitude miss means the relation is wrong, not the expectation** |
+| 11 | **Tide appears in the published payload** *(relocated from Gate B row 13)* | the tide field in one published bundle. Tide is already computed correctly (findings §0B.1) — **this is a publish-path plumbing gap, not a physics one**, and it lands here because Phase F touches the same publish path |
 
 **Adversarial:** `clearskies-auditor`, given §0B and the expectations above but **not** any
 implementing agent's tests, commits or reports. Specifically briefed to hunt: a coefficient with no
