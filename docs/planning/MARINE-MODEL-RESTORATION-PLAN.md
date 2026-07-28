@@ -27,7 +27,8 @@ Phase C (C1/C2/C3 ✅ landed; **C4 superseded by E10**) →
 | **Gate C** | ⛔ **Never walked** → rows relocated to **Gate E 18–20** |
 | **Phase E** — E0 | ✅ Done — service **stopped and disabled** on librewxr, deliberately |
 | **Phase E** — E1, E6, E11, E12 | ✅ **Done code/test level** (2026-07-27, commits `19b0d4b`…`af02d19`, pushed) — adversarially audited; Gate E live rows still owed. E11 item 2 open for Gate E. See [briefs/PHASE-E-SESSION-LOG-2026-07-27.md](briefs/PHASE-E-SESSION-LOG-2026-07-27.md) |
-| **Phase E** — E2–E5, E7–E10 | ⬜ **← NEXT — E2 blocked on two operator rulings** (design-Tp source; pier-geometry fix — see session log "Surfaced to operator") |
+| **Phase E** — E13 | ⬜ **← NEXT, runs before E2** — persist discovery geometry, delete the pin projection (operator-ordered 2026-07-27; supersedes C2's projection helper) |
+| **Phase E** — E2–E5, E7–E10 | ⬜ E2 after E13; design-Tp source ruling still open (see session log "Surfaced to operator") |
 | **Phase F** (F1–F5), **Phase D** (D1) | ⬜ Not started |
 
 ### Start at E1
@@ -1389,6 +1390,55 @@ finding before changing any timeout value — a timeout is a config key (trigger
 than the threshold and `run_in_progress` is True; returns `ok` when it is within it. Reuses
 `tests/test_marine_health_state.py`'s existing fixtures.
 
+### E13 — Structure geometry: persist the discovery outline, delete the pin projection  ⬜ **NOT STARTED — RUNS BEFORE E2**
+**Owner:** `clearskies-api-dev` (three scoped dispatches, one per repo) + `clearskies-test-author`
+**Authority:** ADR-095 Decision 3 (Accepted): *"Structure coordinates from the wizard's Overpass API
+discovery."* Operator ruling 2026-07-27 in chat: the spot pin is a point-of-interest marker with no
+geometric meaning for structures; the code that fabricates structure position from it is the defect.
+A8's anchor rule already bans pin-derived geometry. **This task supersedes and reverses C2's
+projection helper (`de71775`) — stated explicitly, not silently.**
+
+**History (git-established 2026-07-27, full citations in
+[briefs/PHASE-E-SESSION-LOG-2026-07-27.md](briefs/PHASE-E-SESSION-LOG-2026-07-27.md)):** the wizard's
+discovery endpoint downloads the full OSM way geometry (`out body geom`, api `setup.py:3460-3495`)
+and always has; the T5.2/T5.3 wizard UI displayed it and **discarded it at form submit**, so no
+config has ever contained structure coordinates (verified: live api.conf + both backups + the
+SWAN-L3-STABILITY-PLAN's own line 259). `ac73ab2` (07-19) fabricated a line from
+bearing/length/distance measured off the pin instead of surfacing the missing save step; C2
+entrenched the same fabrication at config parse. The fabricated pier is displaced ~500 m along its
+own axis (real base pin+406 m @ 21°, real tip pin+231 m @ 258°; fabricated: pin+124.5→691 m @ 221°).
+
+**Design — one conversion point, no fallback:**
+1. **stack** — wizard discovery-card JS (`wizard/routes.py:3436-3449`) adds a hidden
+   `..._coordinates` input carrying the way geometry from `data-geometry`, converted once
+   lat/lon → lon/lat (the marine `StructureConfig.coordinates` contract). Map-draw tool
+   (`step_marine.html:1294-1337`) persists the drawn polyline the same way instead of discarding
+   it. Form parse (`routes.py:2952-2972`) includes it. Admin round-trips it (hidden field);
+   stale comment `admin/marine.html:589-595` updated.
+2. **api** — `MarineStructureApplyConfig` (`setup.py:523-546`, extra="forbid") gains optional
+   `coordinates`; `_build_marine_conf_section()` (`:1296-1306`) writes it to api.conf
+   (JSON-string encoded for configobj); `_serialize_marine_locations_section()` (`:1499-1521`)
+   decodes it — reviving the already-written, currently-dead carry-over branch. API-MANUAL
+   structures schema updated in the same commit (doc-code sync).
+3. **marine** — DELETE `_populate_structure_coordinates()` + call site
+   (`marine_config.py:371-405`, `:994-996`) and `build_obstacle_structures()` case (b)
+   (`swan.py:877-895`). Restore the original contract: explicit coordinates used directly; no
+   coordinates → excluded with WARNING, **never fabricated**. `StructureConfig.coordinates`
+   docstring updated; scalars become display metadata only.
+4. **Guards** (`clearskies-test-author`): rewrite `tests/test_structure_config_coordinates.py`
+   (currently pins the fabrication) — no-coordinates structure stays empty and is excluded with
+   WARNING; explicit coordinates pass through untouched; end-to-end shadow test drives real
+   OSM-shaped coordinates. `tests/test_swan_runner_structures_threading.py` fixture supplies
+   explicit coordinates instead of calling the deleted helper.
+5. **Operational, after deploy:** re-run wizard marine-step discovery for HB and Apply, so the
+   pushed config carries the pier's real outline. Expected (OSM way 45074900, measured
+   2026-07-27): base (33.6568071, -118.0023173), tip (33.6529618, -118.0063370),
+   axis 566.8 m @ 221.0°.
+
+**Must not touch:** `compute_transect_shadows()` logic; `_OBSTACLE_PARAMS`; `bearing_to_spot_degrees`
+(zero computational consumers — recorded finding, out of scope); the five scalar fields themselves
+(UI still collects/displays them).
+
 ## ⛔ QC GATE E — grid strategy  ⬜ **NOT REACHED**
 
 Every row needs a `file:line` read after the change and a live number from the deployed system.
@@ -1421,6 +1471,10 @@ Every row needs a `file:line` read after the change and a live number from the d
 | 22 | No published field changed by the trace | forecast bundle with trace on and off — byte-identical |
 | 23 | No invariant fires off stale cache | for each firing, show it came from the live computation, not a cached artefact. **Sharper after Phase E**: geometry is cached at config push, so a stale-cache firing is the likeliest false positive |
 | 24 | Deep-water reference returns **67 rows, not 1** | the row count. **Blocking for the Reality reads** — they read this reference, and a 1-row reference cannot support them |
+| | **↓ E13 — structure geometry ↓** | |
+| 25 | Pushed config carries the pier's real outline | `coordinates` in `/etc/weewx-clearskies/marine/marine.conf` with endpoints within ~10 m of OSM base (33.6568071, -118.0023173) and tip (33.6529618, -118.0063370) |
+| 26 | No pin-projection code remains | `grep -rn "111320" ` across marine + api repos returns nothing in structure paths; both deleted sites shown gone by diff |
+| 27 | OBSTACLE line derives from the real outline | the emitted `OBSTACLE` UTM points back-convert to the OSM endpoints, not to pin+124.5 m |
 
 **Adversarial:** `clearskies-auditor`, given D1–D8 and the expected numbers above but **not** any
 implementing agent's tests, commits or reports, attempts to disprove E1–E8 on the deployed system.
