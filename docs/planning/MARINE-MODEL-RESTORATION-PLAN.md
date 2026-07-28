@@ -1282,6 +1282,42 @@ defect it was meant to catch.
 **Guard:** both call sites receive a non-empty structures list for a spot that has one — asserted at
 the call site, not by mocking the classifier.
 
+### E12 — A cycle that overruns must not report `ok`
+**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/endpoints/health.py`,
+`weewx_clearskies_marine/state.py`, `weewx_clearskies_marine/services/swan_runner.py`
+**Must not touch:** B3's input-freshness registry; the invariant-scoping fix (`49839ac`); the four
+original `/health` response keys
+
+**Two findings, measured live 2026-07-27 while checking E0's starting state.** Both are the same
+class of defect B3 exists to remove, one layer further out.
+
+**Finding 1 — `/health` reports `ok` through a 90-minute overrun.**
+```
+status: ok | run_in_progress: True | last_run: 2026-07-27T19:57:32Z
+```
+Read at ~21:30Z. The cycle began ~20:41Z; nothing had completed since 19:57Z. Health has **no concept
+of a cycle taking too long** — `run_in_progress: True` is reported as healthy indefinitely. A
+forecast site that has published nothing for an hour and a half reports `ok` to the admin page B4
+built — the one surface the operator was meant to be able to trust.
+
+**Design:** `_compute_status()` gains a **cycle-duration** check against
+`_last_cycle_started_at` (already recorded by `49839ac`). Beyond a threshold, status becomes
+**`degraded`** with a reason naming the elapsed time. **Not `failed`** — output from the previous
+cycle is still being served and is merely stale, which is exactly the degraded/failed distinction
+the plan already draws. Threshold is a **named constant**, set from the measured cadence, not
+inlined.
+
+**Finding 2 — the SWAN timeout did not visibly fire.** One `swan` process was still resident ~50
+minutes past the documented 3600 s timeout, with the cycle still marked in progress. **Establish
+whether the timeout is per-grid-invocation rather than per-cycle, or whether it failed to fire at
+all — do not assume either.** If it is per-invocation, a three-grid cycle can legitimately run to
+3×3600 s and **the real defect is that nothing bounds the cycle**; say so and bound it. Report the
+finding before changing any timeout value — a timeout is a config key (trigger 7).
+
+**Guard:** `/health` returns `degraded` naming elapsed time when `_last_cycle_started_at` is older
+than the threshold and `run_in_progress` is True; returns `ok` when it is within it. Reuses
+`tests/test_marine_health_state.py`'s existing fixtures.
+
 ## ⛔ QC GATE E — grid strategy
 
 Every row needs a `file:line` read after the change and a live number from the deployed system.
