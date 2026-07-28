@@ -1216,10 +1216,55 @@ standing rule)
 **Guard:** assert `smnum == 27` at Δx = 10 m and `smnum == 17` at Δx = 12.5 m; assert no
 `DIFFRACTION` line is emitted for L1, L2 or L3.
 
-### E8 — Hourly quick update covers every grid that supplies a handoff  ⬜ **NOT STARTED**
-**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_runner.py`
-**Must not touch:** the stationary/non-stationary mode selection — quick updates stay **stationary**
-(operator-confirmed, already correct); the 6-hourly full-cycle cadence
+### E8 — Rebuild the hourly stationary "fill" update for the D1 architecture  ⬜ **REDESIGNED 2026-07-27, NOT STARTED**
+**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/swan_runner.py`,
+`weewx_clearskies_marine/providers/nearshore/swan.py`, `weewx_clearskies_marine/service.py`
+**Must not touch:** the T4.2 hotstart-isolation rule (a stationary run never saves/overwrites the
+nonstationary chain's hotstart); the full non-stationary run's own path (`_run_all_spots_locked` /
+`run_3level`); the C-76 "never fabricate a WW3 boundary" rule.
+
+> **SUPERSEDES the original E8 below (operator ruling 2026-07-27).** The original E8 ("add L4 to the
+> finest-grid-only quick update") was scoped on a premise that does not hold. Investigation while
+> preparing to dispatch it found:
+>
+> 1. **The quick-update path is a SWAN-only-era remnant.** `run_stationary_level3` /
+>    `_run_quick_update_locked` are a straight port of the old `run_stationary_inner` path. They emit
+>    **SWAN grid points only** — they never invoke the D1 handoff→SwellTrack 1D chain
+>    (`_precompute_swelltrack_for_spot`) that produces the actual surf forecast under the current
+>    architecture. Even wired, they would refresh SWAN numbers and leave the surf card stale.
+> 2. **It was never wired in.** The marine runner loop (`service.py`) fires **only full runs**, on
+>    every HRRR cycle change; `run_quick_update` is called from nothing (its own docstring says so).
+> 3. **A nested grid from a cached parent boundary is a stale-boundary shortcut.** L3-only-from-cached-
+>    L2-NESTOUT refreshes a child grid's interior wind but freezes its offshore boundary at the last
+>    full run, and refreshes **no** open-beach (L2-only) spot at all.
+>
+> **Corrected design (operator-approved, cadence + shape ruled 2026-07-27):**
+>
+> - **Cadence.** Full **non-stationary** run every **6 h**, on the extended HRRR cycles (00/06/12/18Z,
+>   which run the extended 48–72 h forecast). **Hourly stationary "fill"** on the intervening HRRR
+>   cycles. The loop currently fires a full run on *every* cycle — this throttles full to 6-hourly and
+>   adds the fill between (cadence change, trigger 6, operator-approved).
+> - **The fill runs the full nest stationary**, not L3-only: L1→L2→L3→L4, single snapshot, latest HRRR
+>   wind. L1 **reuses the last full run's WW3 boundary files** already on disk in the persistent
+>   `swan_work/level1/` (same pattern the current code uses to reuse `level2/nest_out.dat`; deep-water
+>   swell changes slowly, so reusing the last-fetched WW3 is correct — operator ruling). Because L1
+>   runs, the WW3 boundary object is naturally in scope and the C-76 fabrication rule is never touched.
+>   Warm-start from the last full run's hotstart, **do not save** one (T4.2).
+> - **Then run the 1D chain** — `_precompute_swelltrack_for_spot`, exactly as `_run_all_spots_locked`
+>   does — so the surf card (the 1D product) refreshes, not just SWAN grid points. Merge into cache the
+>   same way, including the `swelltrack` payload key.
+> - **Wire into the runner loop** at the new cadence.
+>
+> **Feasibility verified 2026-07-27:** `swan_work` (`/var/run/weewx-clearskies/swan`) is persistent
+> (no tmpdir cleanup on the 3-level path); the full run writes WW3 boundary files to `level1/` there;
+> `_precompute_swelltrack_for_spot` is a reusable function the full path already calls after
+> `run_3level`. The three pieces are coupled through the workdir/orchestration contract → dispatched as
+> **one** task, guards + a follow-on adversarial audit (production-loop change = highest verification
+> tier).
+
+---
+
+**Original E8 (SUPERSEDED — retained for the record):**
 
 **Ruling D5.** Today quick updates run "the finest grid only", which was safe when the finest grid
 spanned the whole spot. Under D2/D3 it may cover only part of one, silently leaving transects with no
