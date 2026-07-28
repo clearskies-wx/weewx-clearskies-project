@@ -297,6 +297,28 @@ Agent `e9-invariants`. Coordinator acceptance gate — all re-run/re-checked ind
   tip+L_tip branch → REDIRECT the guard to the real new check: fire when L3 does NOT contain L4 w/ 2-cell
   clearance, NOT fire when it does; plus assert the structure-grid branch emits the skip (not a check/pass).
 
+## E3-AMENDMENT — ACCEPTED (2026-07-27). Commit `53abe07` (marine, LOCAL). Fixes the rotated-nesting defect below.
+Agent `e3-ngrid-fix`. Added `inner_rotation_deg` to build_swan_input; NGRID alpn + geometry now key off it (decoupled
+from the parent's own CGRID `rotation_deg`). Design elegance: NGRID reproduces the child's CGRID by running the
+IDENTICAL formula on the IDENTICAL dims (contract: outer-call `inner_dims` == child inner-call `dims`, and
+`inner_rotation_deg` == child's `rotation_deg`) — a match by construction, not a second geometry derivation.
+Coordinator acceptance gate:
+- `git show 53abe07 --stat` = swan_formats.py (+the 1-line authorized mechanical fix to test 148); tree clean.
+- Full suite MY OWN run: 276 passed / 2 skipped.
+- Diff confirms NGRID block (branch select + `_alpn`) now uses `inner_rotation_deg`; CGRID block still `rotation_deg`.
+- **I INDEPENDENTLY REPRODUCED the previously-broken case** (scratch /c/tmp/e3_verify.py): outer call rotation_deg=0.0
+  + inner_rotation_deg=221.0 → parent CGRID alpc="0.", NGRID alpn="221.00", and NGRID x/y/xlenc/ylenc/mxc/myc ==
+  the child's own inner-CGRID fields EXACTLY. This is the case that silently zeroed energy before; now correct.
+- **inner_dims CONTRACT for E2b (verbatim):** when the child is rotated (`inner_rotation_deg != 0`), the outer call's
+  `inner_dims` MUST be field-for-field identical to the `dims` dict passed to that child's OWN `grid_level="inner"`
+  call, and `inner_rotation_deg` == that child's `rotation_deg`. lon_sw/lat_sw = the grid's ORIGIN CORNER (local (0,0)
+  on its rotated axes), NOT a bbox SW corner. E2b: build ONE dims dict for L4, pass it as both L4's inner `dims` and
+  L3's outer `inner_dims`, with the same rotation value.
+- OWED: NEW positive guard (test-author) — the updated test 148 still only tests the COUPLED case (both 221); the
+  decoupled parent-0/child-221 case is currently guarded only by my scratch reproduction. Dispatch AFTER E2b part 2
+  (shared-tree/pytest-collection concurrency). Guard asserts: parent CGRID alpc=0 + same INPUT NGRID alpn=child-rot +
+  NGRID fields == child inner-CGRID fields.
+
 ## 🛑 FINDING (E2b review) — E3 is INCOMPLETE for rotated NESTING. New blocker: E3-amendment task. (2026-07-27)
 Surfaced while reviewing E2b's design + the agent's Amendment-2 (corner-reconstruction) work. Coordinator
 independently verified by reading swan_formats.py:1388 (own CGRID) and :1595-1634 (child NGRID):
