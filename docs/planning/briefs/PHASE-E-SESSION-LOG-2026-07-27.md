@@ -281,6 +281,93 @@ Confirmed: ZERO L4 references in the run pipeline — L4 is sized+cached but nev
   from the L2 template. The L2→L3→L4 nesting itself is APPROVED design (§0A D2), so E2b is authorized
   integration, not a new architectural decision — but it is the highest-risk implementation in Phase E.
 
+## E9 IMPL — ACCEPTED (2026-07-27 session 2). Commit `416e1fc` (marine, LOCAL, not pushed).
+Agent `e9-invariants`. Coordinator acceptance gate — all re-run/re-checked independently:
+- `git show 416e1fc --stat` = ONLY the 3 allowlisted files (swan.py inv-6 block +161, invariants.py +79, surf_1d_pipeline.py inv-2 block); tree clean; single worktree.
+- Full marine suite MY OWN run: 268 passed / 2 skipped (matches agent).
+- Renamed INVARIANT_6 string value ("...reaches_15m_contour" → "...reaches_feature_it_was_sized_for"):
+  grepped ALL repos + docs — ZERO references outside this session log. Safe rename (tests use the attribute).
+- `git diff 416e1fc^ 416e1fc` adds/removes NO lines mentioning INVARIANT_1/3/4/5/7/8/9; surf_1d change is one
+  contiguous hunk @@ -1204,30 +1204,33 @@ (invariant 2 only). Other invariants byte-unchanged — verified, not trusted.
+- Spot-read swan.py 2308-2429: per-grid-kind branches exactly as ruled — structure-grid→loud skip (info, not
+  check); L3+structure→REAL independent check `rotated_rect_clearance_to_bbox_m(L4.corners vs L3 bbox) ≥ 2·L3 dx`
+  (non-tautological: two independently-sized shapes); L3-only→15 m-contour assertion retained byte-faithful;
+  neither→explicit non-vacuous skip. New helper `rotated_rect_clearance_to_bbox_m` is pure geometry.
+- OWED: E9 GUARD (test-author). Plan's guard text ("fire against short structure grid") targets the NOW-STUBBED
+  tip+L_tip branch → REDIRECT the guard to the real new check: fire when L3 does NOT contain L4 w/ 2-cell
+  clearance, NOT fire when it does; plus assert the structure-grid branch emits the skip (not a check/pass).
+
+## 📌 TRACKED (NOT a silent deferral) — Phase-E consolidated doc-sync before Gate E.
+The governing docs do NOT enumerate invariants by number, so E9 has no per-invariant doc obligation. BUT
+ARCHITECTURE.md (line ~98) + ADR-093 + API/OPERATIONS/PROVIDER manuals still describe the PHASE-14 SWAN grid:
+"L3 = 10 m surf zone, does not run to shore, handoff at 1.3×Hs/0.73, alongshore smart-sized around structures."
+Phase E's D2/D3 redesign supersedes ALL of that (L4 rotated structure grid; L3 = coarse 40 m nest OR refraction
+grid; handoff rule D3; per-transect profiles). This is real doc-code drift but it can only be reconciled ONCE the
+final design lands (after E2b/E5/E8/E10) — writing it now would document a half-built state. **ACTION: a single
+doc-sync task updating ARCHITECTURE.md SWAN section + the manuals + ADR cross-refs, run AFTER E10, BEFORE the
+Phase-E deploy/Gate E, same increment.** Do not skip — it is a Gate-E precondition.
+
+## ⚠ SURFACED TO OPERATOR — l_tip_m persistence dropped by the 10 m ruling (silent deferral). E9 partially blocked.
+Found by agent `e9-invariants` during E9 prep, independently confirmed by coordinator (2026-07-27 session 2).
+- **The gap:** invariant 6's structure-grid branch is specced as "structure-grid offshore edge ≥ tip + 1·L_tip."
+  But `l_tip_m` is NOT persisted in the sizing cache — `domain_sizing_to_dict()` (swan_domain.py:2216) emits
+  only corners/rotation_deg/resolution_m/along_span_m/across_span_m/level. The corners/along_span_m ALREADY
+  bake in tip + L_tip, so any check reading them for both sides is TAUTOLOGICAL; the only independent L_tip
+  needs a dispersion recompute against the FINE profile, which E9 forbids. No non-tautological in-scope path exists.
+- **Root cause = silent deferral:** plan E1 ruling #3 fixed the key `structure_grid_resolution` (carrying
+  `l_tip_m`) and required it persisted "for E7 + auditor." The 10 m operator ruling then killed
+  `compute_structure_grid_resolution` (dx now constant) — but NEVER stated l_tip_m was no longer needed.
+  E9/E7/auditor still need it; it fell out of the cache unnoticed. Exactly the "silent deferral never dealt
+  with by the coordinator" pattern flagged at session start.
+- **Coordinator handling (no lead call on the arch part):** E9 proceeds on all other branches + invariant 2
+  now; the structure-grid branch ships as a LOUD, tracked skip (INFO, not a pass) naming this reason, so
+  coverage loss is visible and a one-line follow-up can flip it to the real check once L_tip is persisted.
+- **OPERATOR DECISION OWED** (adding a field to the sizing cache = trigger 4/7, arch HARD BLOCK — needs your nod):
+  - Option A (RECOMMENDED): restore the plan's own intent — persist `l_tip_m` + structure tip position into
+    the StructureGridDomain serialization at sizing time (small E2-amendment task: swan_domain.py sizing +
+    domain_sizing_to_dict/from_dict). Then invariant 6's structure-grid check becomes a genuine, non-tautological
+    cache-consistency + collapse guard (persisted-L_tip vs corners-derived edge, two independent values that can disagree).
+  - Option B: accept a WEAKER check — structure-grid edge ≥ structure tip (tip from the persisted config OSM
+    coords, independent of grid sizing); catches a full collapse but not the 1·L_tip margin. In-scope for E9, under the plan spec.
+  - Option C: leave the structure-grid branch as the permanent loud-skip (coverage gap accepted; invariant 6
+    never validates the case E6/E2 care about most). NOT recommended.
+
+## E3+E7 GUARDS — ACCEPTED (2026-07-27 session 2). Commit `af7bcda` (marine, LOCAL, not pushed).
+Agent `e37-tests`. tests/test_swan_formats_grid_emission.py, 8 tests (8 functions for 7 numbered guards;
+guard 4 split). Coordinator acceptance gate (all independently re-run, not trusted):
+- `git show af7bcda --stat` = ONLY the test file, +362; `git worktree list` = primary only; tree clean.
+- `pytest tests/test_swan_formats_grid_emission.py -q` on main → 8 passed (my own run).
+- Fail-vs-pre-change corroborated by API presence: `rotation_deg` count 0 in 49df65c^ → 12 in 49df65c;
+  `is_structure_grid` count 0 in d517084^ → 4 in d517084. Guards must TypeError against the parents.
+- Agent honestly flagged test 4 pins the mxc*dx formula (algebraically == corner projection at this grid
+  size, so value-indistinguishable — pins against a future dx-rederivation regression, not a branch divergence)
+  and that guard 6 caught a REAL pre-E7 regression (L3-style call emitted DIFFRACTION before E7 gated it).
+  Both acceptable. Full suite (agent) 268 passed / 2 skipped; pure-addition test file cannot break prod, accepted.
+
+## FINDING + coordinator decision — E9 allowlist ("invariants.py only") is WRONG; corrected to 3 files.
+Verified before dispatch (2026-07-27 session 2). The plan's E9 header says **Files: invariants.py only**, but
+the actual invariant ASSERTIONS do not live there — invariants.py holds only the geometry helper
+(`ray_box_exit_distance_m`) and the name constants. The real `invariants.check()` call sites are:
+- **Invariant 6** assertion → `providers/nearshore/swan.py:2308-2354` (reads `domains.level3_clusters`,
+  `runtime_profile.contour_15m_distance_m`, measures bbox exit along bearing, compares to 15 m contour).
+- **Invariant 2** skip → `services/surf_1d_pipeline.py:1205-1231` (already logs a SKIP, NOT a pass, per the
+  7fb75f9 lead ruling — but frames the zero-overlap as a *data-flow* artifact, not the D3 architectural boundary).
+
+**Coordinator ruling:** the "invariants.py only" line is a plan defect (wrong about code location), NOT an
+architectural question — the invariant's job (observe grid collapse, log, never alter output) is unchanged;
+only the assertion predicate (per-grid-kind) and invariant-2's recorded rationale change, both explicitly
+authorized by E9 + D2/D3. **Corrected allowlist: `invariants.py` + the invariant-6 block in `swan.py`
+(2308-2354 only) + the invariant-2 block in `surf_1d_pipeline.py` (1205-1231 only).** Must-not-touch:
+every OTHER line of swan.py and surf_1d_pipeline.py, and the call sites of invariants 1,3,4,5,7,8,9.
+- **Grid-kind is inferable from existing fields (no new field needed):** `DomainSizing.level4_clusters`
+  (StructureGridCluster, each `.grid: StructureGridDomain`) + `level3_clusters`. Per spot:
+  in level4 → structure grid; has L3 AND in level4 → L3 nesting step; has L3 NOT in level4 → L3 refraction
+  (retain 15 m assertion); neither → skip (not vacuous pass). `StructureGridDomain.along_span_m` is defined
+  as reaching tip + 1·L_tip, so the structure-grid check must be MEANINGFUL (fail against a shrunk grid),
+  not tautological — measure the actual seaward corners vs tip+L_tip, matching E9's mandated guard.
+- E9 is INDEPENDENT of E2b: it reads the sizing cache written at config-push by E2/E4 (already committed),
+  not the L4 SWAN run. Dispatched in parallel with the E3/E7 guards.
+
 ## E13 execution log (this session)
 | Portion | State | Commit |
 |---|---|---|
