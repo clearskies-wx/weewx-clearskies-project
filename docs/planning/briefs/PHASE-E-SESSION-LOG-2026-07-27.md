@@ -297,6 +297,30 @@ Agent `e9-invariants`. Coordinator acceptance gate — all re-run/re-checked ind
   tip+L_tip branch → REDIRECT the guard to the real new check: fire when L3 does NOT contain L4 w/ 2-cell
   clearance, NOT fire when it does; plus assert the structure-grid branch emits the skip (not a check/pass).
 
+## E9 GUARD — ACCEPTED (2026-07-27 session 2). Commit `255d192` (marine, pushed).
+Agent `e9-guard`. tests/test_swan_invariant6_grid_kind.py, 8 tests (+390). Acceptance gate (re-run independently):
+- `git show 255d192 --stat` = only the new test file; tree clean; single worktree.
+- MY OWN `pytest tests/test_swan_invariant6_grid_kind.py -q` → 8 passed. Full suite (agent) 276 passed / 2 skipped.
+- Change-guards: tests 1-2 (known-answer on rotated_rect_clearance_to_bbox_m, 222.64 m hand-computed) + tests 3-4
+  (threshold boundary 79.9 m FIRES / 80.1 m does NOT, around 2·dx=80). These 5 depend on the E9-new helper →
+  AttributeError at 416e1fc^ (helper absent — verified during E9 accept). The 3 that pass pre-change pin UNCHANGED
+  behavior (refraction branch + structure-no-L3 no-op) — regression pins, not change-guards. Correct.
+- Test 5 spies invariants.check via monkeypatch → proves structure-grid stub NEVER calls check() (not a silent pass;
+  get_invariant_state only records firings so the spy is the right observable). Honest coverage caveat carried in
+  the module + per-test docstrings (helper+predicate level, NOT swan.py dispatch — see the RESIDUAL note below).
+
+## 📌 TRACKED (NOT a silent deferral) — E9 guard covers helper + branch predicates, NOT swan.py dispatch wiring.
+The invariant-6 block is inline in `_run_all_spots_locked` (~1000 lines; wind/bathymetry/SWAN-exec run before
+it), so it is not unit-drivable without a disproportionate mock stack, and extracting a testable helper would
+collide with E2b (concurrently editing swan.py). E9 guard (`e9-guard`, tests/test_swan_invariant6_grid_kind.py)
+therefore: (1) known-answer-tests the new helper `rotated_rect_clearance_to_bbox_m` directly — the real new
+geometry; (2) drives the branch predicates + the 2·dx-clearance boundary + check()-firing with swan.py's own
+args, but NOT swan.py's 4-way branch dispatch. **RESIDUAL: a regression introduced only in swan.py's branch
+selection would not be caught.** CLOSE THIS when swan.py is next legitimately open (after E2b lands) by
+extracting the invariant-6 evaluation into a small pure helper + a test that drives it — methodology, not
+architecture (invariant's job unchanged). Not urgent (dispatch logic is simple boolean cluster-membership,
+coordinator-read-verified), but tracked so it doesn't rot.
+
 ## 📌 TRACKED (NOT a silent deferral) — Phase-E consolidated doc-sync before Gate E.
 The governing docs do NOT enumerate invariants by number, so E9 has no per-invariant doc obligation. BUT
 ARCHITECTURE.md (line ~98) + ADR-093 + API/OPERATIONS/PROVIDER manuals still describe the PHASE-14 SWAN grid:
