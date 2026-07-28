@@ -7,8 +7,11 @@
 
 **Sequence:**
 Phase A ✅ → Phase B ✅ → **Deploy 1** ✅ → Gate B (rows 3/5/8/11/13 outstanding) →
-Phase C ✅ (C1/C2/C3 landed; **C4 pending**) → **E0 restore service** →
-Phase E → Gate E → Phase F → Gate F → Phase D → Gate D
+Phase C (C1/C2/C3 ✅ landed; **C4 superseded by E10**) → **E0 restore service** →
+Phase E (E1–E10) → Gate E → Phase F (F1–F5) → Gate F → Phase D (D1, D2) → Gate D
+
+**Phase D does not move.** Hotstarts are grid-shaped and Phase E invalidates every one of them;
+Phase F changes the published partitions Gate D checks. Reasoning is in Phase D's own header note.
 
 > ### ⛔ Read this before touching Phase C or the L3 grid
 >
@@ -591,7 +594,16 @@ exactly this reason. The 870 m grid is the defect, not a cheaper option.
 structures test at `:286-296` asserts only the shoreward edge. Add a case passing structures *and*
 `offshore_distance_m`, asserting the offshore edge lands on the contour.
 
-### C4 — Per-transect bathymetry profiles
+### C4 — Per-transect bathymetry profiles — ⛔ SUPERSEDED BY E10, DO NOT IMPLEMENT AS WRITTEN
+
+> **C4 never started, and Phase E removed its premise.** It extracts the profile over **the L3 grid's
+> bbox** and depends on C3 having pushed that grid out to the 15 m contour. Under Phase E an
+> open-beach spot has **no L3 at all**, and a structure spot's L3 is a small grid hugging the
+> structure — neither spans to 15 m. **[E10](#e10--per-transect-profiles-span-the-handoff-to-shore-not-a-grid-bbox-supersedes-and-resequences-c4)
+> re-bases extraction on the transect itself and drops the L3 dependency.** The allowlist, the
+> `profiles_by_transect` artefact, the consumers, and the C1-first measurement all carry over
+> unchanged. Retained below for that detail and to show what was replaced.
+
 **Owner:** `clearskies-api-dev`
 **Files:** `services/grid_sizing_chain.py`, `enrichment/bathymetry.py`,
 `providers/nearshore/swan.py`, `endpoints/beach_profile.py`
@@ -668,6 +680,18 @@ not to shrink the grid, which is the defect.**
 
 # PHASE D — Verify the whole chain
 
+> ### Why Phase D stays last, and does not move *(ruled 2026-07-27)*
+>
+> **Hotstart files are grid-shaped.** Phase E changes every grid's geometry — L3 rescoped, the
+> structure grid new, rotation enabled. Every existing hotstart is invalidated the moment E deploys.
+> D1 is *about* whether a working hotstart populates the first forecast hour, so running it before E
+> produces a result that E then throws away.
+>
+> Phase F is a physics change whose output must appear in the published partitions Gate D row 4
+> checks. Running D before F would validate a chain that is about to change.
+>
+> **Sequence stands: E0 → E → Gate E → F → Gate F → D → Gate D.**
+
 ### D1 — Cold-start first hour
 Previously C5; **moved because its gate opened only post-deploy, making Phase C circular.**
 The first output row of every run is the empty initial field (`Hsig 0.014 m`, partitions zero,
@@ -676,26 +700,68 @@ model and is not itself a defect. `aa4553d` fixes the hotstart. **Check first wh
 hotstart populates the first hour. Only if it is still empty does suppression get designed** — and
 it gets designed then, not now.
 
+> **⚠ Phase E invalidates every hotstart. Read this before concluding `aa4553d` failed.**
+> Hotstart files are written for a specific grid geometry. After Phase E deploys, **the first cycle
+> is necessarily a cold start** and its first forecast hour will be the empty initial field — once.
+> That is Phase E's expected cost, **not evidence the hotstart fix is broken**.
+> **Evaluate D1 on the second cycle after Phase E**, when a hotstart written by the new geometry
+> exists. A coordinator who reads an empty first hour on the first post-E cycle and reopens
+> `aa4553d` has made a sequencing error of exactly the kind C3's live-check note warns about.
+
+### D2 — Reality baselines, so three physics changes stay attributable *(new; found checking D against E/F)*
+**Owner:** `coordinator`
+
+**The problem.** Gate D rows 3 and 4 — published output against Surfline and Surf-forecast — are the
+**only validate-against-reality step in this entire plan** (`rules/verification.md`). As sequenced,
+three independent physics changes land before it fires even once: the grid geometry (E1–E4),
+**`TRANSM 0.95 → 0.82`** (E6), and the **wind source term** (Phase F). If the comparison comes out
+wrong, nothing distinguishes which change caused it.
+
+**Design — the same read, taken three times. It costs one Surfline page view each.**
+
+| When | What it establishes |
+|---|---|
+| At **E0**, after rollback, before any Phase E work | Baseline error of the currently-publishing system |
+| At **Gate E** | Effect of grid geometry **and** `TRANSM 0.82` together |
+| At **Gate F** | Effect of the wind source term alone |
+
+Each read records: published surf height, per-partition height/period/direction, the reference
+values, and the deltas. **Same spot, same forecast hour, stated conditions.**
+
+**Limit, stated so it is not overclaimed:** grid and `TRANSM` land together at Gate E and are not
+separable from each other by this method. Separating them would need an extra deploy; E6's own
+calibration (an oblique-swell day against an independent reference) is the instrument for `TRANSM`
+specifically, and it is already recorded as owed.
+
 ## ⛔ QC GATE D — the whole chain
 
 | # | Element | Evidence |
 |---|---|---|
-| 1 | Every invariant passes | raw log, all nine, no ERROR |
+| 1 | Every **applicable** invariant passes | raw log, no ERROR. **Requires E9.** The count is no longer nine: invariant 6 is rescoped per grid kind and invariant 2 is marked not-applicable where the handoff is a boundary rather than an overlap. **State the applicable set and why each excluded one is excluded** — a shrinking invariant count is exactly how coverage quietly disappears |
 | 2 | One number traced end to end | full chain from the trace, pasted |
-| 3 | Surf height vs reference | published vs Surfline and Surf-forecast, deltas stated |
+| 3 | Surf height vs reference | published vs Surfline and Surf-forecast, deltas stated — **alongside the E0 and Gate E baselines from D2** |
 | 4 | Swell partitions vs reference | height, period, direction per partition vs both |
 | 5 | The westerly is published | the 6–8 s W component appears in `multiSwell` |
-| 6 | Alongshore variation is real | spread of face height across the 32 transects |
-| 7 | Cycle completes in cadence | wall time vs schedule interval, warm or cold stated |
+| 6 | Alongshore variation is real | spread of face height across the 32 transects. **Expected magnitude changed by E6**: at `TRANSM 0.82` the lee deficit is ~20% of height, not the ~5% that `0.95` produced. A spread still near 5% means E6 did not take effect |
+| 7 | Cycle completes in cadence | wall time vs schedule interval, warm or cold stated. **Expected ~7 min at ~12 600 cells** (Phase E), against >75 min DNF at 47 992 |
 | 8 | Health reports `ok` — and has earned it | `status: ok` with every input fresh and zero invariants fired. After Phase C this is the first time in the plan an `ok` is a pass rather than a fail |
 | 9 | The admin status page agrees | rendered output showing `ok` for both API and marine |
-| 10 | First forecast hour is not the initial field | Hs and Tp of hour 1 |
+| 10 | First forecast hour is not the initial field | Hs and Tp of hour 1 — **on the second post-E cycle**, per D1's warning |
+| 11 | **Locally generated wind sea reaches the published output** *(new; Phase F)* | on an onshore-wind hour, a short-period partition appears in `multiSwell` that is **not** present in the L2 handoff spectrum — the end-to-end proof F1–F5 did anything |
+| 12 | **A no-structure spot is byte-identical to pre-Phase-E** *(new)* | its published bundle before and after. E4's strongest criterion, verified end to end rather than at the sizing layer |
 
 **Adversarial:** `clearskies-auditor`, with no access to any implementing agent's tests, commit
-messages, or reports, attempts to disprove C1–C4 and D1 on the deployed system.
+messages, or reports, attempts to disprove C1–C4, D1, and Phases E and F on the deployed system.
 
 Then `clearskies-docs-author` syncs governing documents to what actually landed — after Gate D, so
-the documents describe the verified system rather than the intended one.
+the documents describe the verified system rather than the intended one. **Scope now includes Phases
+E and F**: `docs/ARCHITECTURE.md`'s SWAN section (grid tiers, what nests in what, which physics runs
+where), `API-MANUAL.md` (the handoff rule, the deep-water reference's L2 provenance, the wind-sea
+partition), and `rules/clearskies-process.md` (the 2026-07-27 rulings alongside the 07-19 and 07-23
+incident rules).
+
+**E5's documentation obligation is *not* deferred to here.** It lands inside E5, in the same commit
+as the code, per the doc-code sync rule. This closing pass reconciles everything else.
 
 ---
 
@@ -1073,6 +1139,84 @@ change and there is negligible fetch — its hourly refresh carries almost no ne
 structure grid spans ~2–6 m, where the same metre is a 15–50% change. **That** is where hourly
 matters. Stated so nobody later assumes the L3 hourly run is load-bearing.
 
+### E9 — Rescope the two invariants Phase E breaks
+**Owner:** `clearskies-api-dev` · **Files:** `weewx_clearskies_marine/services/invariants.py` only
+**Must not touch:** invariants 1, 3, 5, 7, 8, 9 — unchanged
+
+**Found while checking Phase D against this redesign. Without E9, Gate D row 1 ("every invariant
+passes, no ERROR") fails by design and can never pass again.**
+
+**Invariant 6 — "L3 offshore edge ≥ the spot's measured 15 m contour".** Phase E **deliberately
+retires that edge** (E2): the structure grid's offshore edge is tip + 1·L_tip, nowhere near the 15 m
+contour. Left as-is, invariant 6 fires on every cycle forever, and the one signal that was supposed
+to catch a grid collapse becomes noise that gets ignored — which is mechanism 3 from this plan's own
+Context section, rebuilt.
+
+**Design:** invariant 6 is rescoped to assert **each grid reaches the feature it was sized for**:
+- structure grid → its offshore edge ≥ the structure tip + 1·L_tip;
+- L3 as nesting step → contains the structure grid with ≥ 2 parent cells of clearance on every side;
+- L3 as refraction grid → offshore edge ≥ the spot's measured 15 m contour (**today's assertion,
+  retained for exactly this case**);
+- no L3 and no structure grid → invariant does not apply; skip, do not pass vacuously.
+
+Still evaluated at config push against cached sizing metadata, checked per cycle — unchanged
+mechanism, changed assertion.
+
+**Invariant 2 — "SwellTrack Hs vs SWAN Hs over the overlapping depth range, 25%".** It already had
+**no measurable overlap** after `7fb75f9`. Under D3 the overlap is definitively **zero** on the
+open-beach path: SWAN stops at 15 m, the 1D model starts at 15 m. There is no depth range where both
+have a value.
+
+**Design:** do **not** invent an overlap to keep it alive. Mark invariant 2 **not applicable** where
+the handoff is a clean boundary rather than an overlap, and record it — **explicitly, in the
+invariant's own text** — as a check the current architecture cannot support. **Report; do not
+redesign the handoff to create an overlap.** A plan whose acceptance criterion is unreachable is a
+STOP-and-surface, never a licence to move a boundary (trigger 3).
+
+**Guard:** invariant 6 must fire against a structure grid whose offshore edge is short of tip + L_tip,
+and must **not** fire against a correctly-sized one — the second half is the part that matters here.
+
+### E10 — Per-transect profiles span the handoff to shore, not a grid bbox *(supersedes and resequences C4)*
+**Owner:** `clearskies-api-dev` · **Files:** C4's allowlist —
+`services/grid_sizing_chain.py`, `enrichment/bathymetry.py`, `providers/nearshore/swan.py`,
+`endpoints/beach_profile.py` **Must not touch:** `extract_native_profile_from_grid()`'s body;
+`_band_ray_origin()` (`swan_runner.py:124-163`)
+
+**Found checking Phase D against Phase E. C4 as written cannot be delivered after Phase E.**
+
+C4 extracts the profile **over the L3 grid's bbox** (`grid_sizing_chain.py:539, 556`) and its
+sequencing note reads *"Depends on C3… per-transect profiles are worth little until the grid reaches
+15 m."* Phase E removes that premise entirely:
+
+- **Open-beach spot** → under D2 there is **no L3 at all**. No bbox exists to extract over.
+- **Structure spot** → L3 is a small nesting grid hugging the structure. Its bbox does **not** span
+  to the 15 m contour.
+- Meanwhile D3 makes the 1D run **longer**, not shorter: open transects now run the full
+  ~2 450 m from 15 m to shore on their own profile. **Per-transect profiles matter more under this
+  design than they did under C4's, not less.**
+
+**Design — the extraction basis changes from a grid bbox to the transect itself:**
+1. Each transect's profile spans **from that transect's own handoff point to shore**, where the
+   handoff point comes from E5's rule — L4 or L3 at the per-hour breaking depth, or L2 at 15.0 m.
+2. Sample along the transect's own line from `_band_ray_origin()`'s per-transect shoreline anchor,
+   at the **source bathymetry's native resolution** (10 m at HB), interpolated to the 3–5 m profile
+   spacing the 1D model expects. **Do not sample finer than the source** — D7.
+3. The named artefact is unchanged from C4: the profile cache gains a **`profiles_by_transect`** key
+   mapping transect index to profile array, alongside the existing per-spot `profile`, which stays
+   for every current consumer. Additive; nothing existing changes shape.
+4. Consumers unchanged from C4: `swan.py:1599-1602` and `beach_profile.py:264-265` assign from
+   `profiles_by_transect[t.index]` when present, falling back to the shared profile **with a
+   WARNING** when absent.
+5. **No dependency on C3 or on any L3 geometry.** That coupling was the defect.
+
+**Sequencing:** C4's own note says C1 alone already yields 32 *differently truncated* profiles — same
+seabed, different start points — because truncation copies rather than mutates
+(`surf_1d_pipeline.py:269-272`). **That measurement is still owed and still separable**: take it
+before E10 so E10's contribution is distinguishable from C1's.
+
+**Guard:** a spot with **no L3 and no structure grid** produces 32 profiles each spanning its own
+handoff point to shore. This case is unreachable under C4's design and is the whole point of E10.
+
 ## ⛔ QC GATE E — grid strategy
 
 Every row needs a `file:line` read after the change and a live number from the deployed system.
@@ -1093,6 +1237,9 @@ Every row needs a `file:line` read after the change and a live number from the d
 | 12 | `DIFFRACTION` on L4 only, `smnum` = 17 | every `DIFFRACTION` line in every emitted INPUT file |
 | 13 | Hourly update runs L3 + L4 | grid names in one quick-update run's log |
 | 14 | Docs synced | the ARCHITECTURE.md / API-MANUAL.md diff for E5 item 4 |
+| 15 | Invariant 6 fires on a short grid and **not** on a correct one | both runs; the second is the row that matters |
+| 16 | Invariant 2's not-applicable status is recorded in its own text | the invariant's text, and the applicable set stated |
+| 17 | 32 per-transect profiles, each spanning its own handoff to shore | first and last depth of three transects using **different** handoff rules — or a statement that HB exercises only rule 1 |
 
 **Adversarial:** `clearskies-auditor`, given D1–D8 and the expected numbers above but **not** any
 implementing agent's tests, commits or reports, attempts to disprove E1–E8 on the deployed system.
