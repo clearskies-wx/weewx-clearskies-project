@@ -151,6 +151,22 @@ Two consequences that catch people out:
 - Because both services run from the API repo's venv, **the API repo checkout on librewxr is
   the one that matters for any SWAN, SwellTrack, SurfBeat, or surf-endpoint change.**
 
+### SWAN documentation is committed to this repo — NEVER download it
+
+The SWAN user manual is at **`docs/reference/swan-user-manual.pdf`** (v41.45). A curated command
+extract (CURVE / TABLE / SPECOUT / OBSTACLE / HOTSTART / INPGRID / DIFFRACTION / NUMERIC, with
+measured corrections against real output) is at **`docs/reference/swan-commands-extract.md`**.
+
+- To read manual text, extract it **locally**: `pdftotext -layout docs/reference/swan-user-manual.pdf <out.txt>` then grep. `pdftotext` is available in this environment.
+- **Do NOT `WebFetch` / download the SWAN manual, `swanmodel.sourceforge.io`, or any SWAN official
+  documentation.** We already have it. Web research is only for *third-party* material the repo does
+  not contain (other modelers' best practices, papers, USACE CEM) — never for the manual itself.
+- Any agent brief that touches SWAN **must** point the agent at these two local files and forbid
+  downloading SWAN docs (see `rules/agents.md` → "Agent prompt requirements").
+
+**Why (2026-07-29):** agents (and coordinator briefs) repeatedly re-downloaded the SWAN docs the
+repo already contains, wasting time and tokens. The operator called it out explicitly.
+
 ### librewxr resource budget — `omp_num_threads = 6` is an operator decision
 
 `/etc/weewx-clearskies/api.conf` → `[swan] omp_num_threads = 6`. **Six. Not 16, not 0.**

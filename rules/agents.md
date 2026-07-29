@@ -148,7 +148,7 @@ This block is mandatory in every implementation agent prompt. Not optional, not 
 
 1. **Round identity** — round number, date, lead, teammates, auditor.
 2. **Scope (in / out)** — per "Scope binding before agent dispatch" above.
-3. **Reading list** — ordered list of files to read before coding. Extract relevant sections; do not say "read the full rules file" for a 150-line file when 10 lines are relevant.
+3. **Reading list** — ordered list of files to read before coding. Extract relevant sections; do not say "read the full rules file" for a 150-line file when 10 lines are relevant. **For any SWAN task, cite the local docs (`docs/reference/swan-user-manual.pdf`, `docs/reference/swan-commands-extract.md`) and explicitly forbid downloading SWAN documentation — the manual is committed; re-fetching it from the web wastes time and tokens (2026-07-29).**
 4. **Pre-round verification** — what the lead verified before writing the brief (repo HEAD, weather-dev sync state, pytest baseline, cross-check results). This is the lead's evidence that the starting state is clean.
 5. **Per-deliverable spec** — for each endpoint/module/component, the behavior decision tree or equivalent. Not "implement the endpoint" — the specific happy path, error paths, edge cases, and response shapes.
 6. **Lead calls** — decisions the lead has already made that the agent must follow (not re-derive). Cite the reasoning.
