@@ -2057,6 +2057,7 @@ Surf quality forecast for one spot at one timestep.
 | `breakPoints[].distanceFromShore` | float | — | — | Distance from shore in meters. |
 | `breakPoints[].depth` | float | — | — | Water depth at the break point in meters. |
 | `breakPoints[].waveHeight` | float | — | — | Wave height (HSIGN) at the break point in meters (not unit-converted — physical position). |
+| `tideLevel` | float | `group_water_level` | Yes | Tide height at this forecast hour (metres vs the station datum), resolved from the same cached CO-OPS tide series the pipeline uses (findings §0B.1). `null` when the tide series is unavailable for a tidal region — refuse-not-substitute, never a substituted `0.0` — or for a non-tidal location with no level. Publish-path field added at Gate F row 11 (relocated from Gate B). |
 
 > **Sampling position — corrected 2026-07-27.** `swellHeight` and `breakingFaceHeight` previously read "at the ~10m depth point" / "at ~10m depth". Both are void: ADR-095 Amendment 2 states the ~10 m reference point does not exist in the current architecture, and Amendment 1 moved the face-height calculation to SwellTrack's break point.
 
