@@ -101,16 +101,40 @@ nearest source cell" but fallback is PER-AXIS — fix docstring.
   deep-tip structure is ever configured. Fastest path to the first full run.
 - **Option B — land F1 first, then deploy.** Cleaner (no known-wrong margin / false comment shipped).
 
-**F1 remediation spec (if re-dispatching — the `bathy-resample` agent's in-flight work may be lost):**
+**F1 remediation — approach SETTLED at scope-ack (agent `bathy-resample` HELD pre-code for
+compaction; re-engage by name or re-dispatch fresh with this):**
+
 Re-derive the study margin so it provably ≥ the actual `l4_coverage_domain` margin-from-polygon for ALL
-tip depths (5–150 m) and structure sizes. **Preferred:** compute a conservative worst-case L4 coverage
-box upfront using `compute_structure_grid_domain`'s own along/across-span logic with **l_tip =
-l_tip_max** (deep-water asymptote; real l_tip ≤ l_tip_max always) + the structure polygon dimensions,
-and size the study area to enclose that — no hand-tuned multiplier. Acceptance: a sweep table (tip
-5–150 m × structure sizes incl. a long jetty) with **0 shortfall + headroom**, HB row shown; fix the
-false comment; F2 warning-suppression; F3 docstring. Allowlist: `grid_sizing_chain.py` +
-`bathymetry_resample.py` ONLY. Do NOT touch the resampler core averaging or the coverage assertion
-(audited clean). Then independently reproduce the sweep before accepting.
+tip depths and structure sizes. **Method (provable, not empirical):** the study area must enclose a
+**worst-case L4 coverage box** computed with **l_tip = l_tip_max = g·T²/(2π)** at
+`T=_STRUCTURE_MARGIN_PERIOD_S`. This is a strict upper bound (dispersion `L=L0·tanh(2πd/L)`, tanh<1 →
+real l_tip < l_tip_max for any depth); L4's along/across spans are monotonically non-decreasing in
+l_tip at the SAME rotation, so the worst-case rectangle encloses the real one, and feeding it to the
+(audited, unchanged) `l4_coverage_domain()` gives a box enclosing the real coverage box — structural,
+holds for every tip depth + structure size. The non-l_tip inputs the worst-case box needs are ALL
+available upfront in the per-cluster loop before the download (`shoreward_contour_by_spot`,
+`_cross_shore_origin(...)`, `directional_exposure`, structures) — only d_tip→l_tip isn't.
+
+**COORDINATOR REDIRECT (important — do NOT let the agent do what its ack proposed):** the agent proposed
+**duplicating ~200 lines** of `compute_structure_grid_domain`'s rotation/coord/span arithmetic into
+`grid_sizing_chain.py`. **Reject that** — a 200-line geometry duplication is a large drift hazard + audit
+burden. **Instead: call the REAL `compute_structure_grid_domain()` unchanged, feeding it a synthetic
+profile with a deep tip (e.g. d_tip=1000 m) so its own dispersion yields l_tip≈l_tip_max** — reuses the
+real code, zero duplication. Valid ONLY if that function uses the profile solely for d_tip→l_tip (agent
+to verify it does nothing else geometric with it). If that assumption fails, fall back to a corrected
+multiplier (must include `l4_coverage_domain`'s own `max(along,across)` term + footprint) and flag it.
+
+**F2:** wrap the `np.nanmean` in `bathymetry_resample.py` with `warnings.catch_warnings()` +
+`simplefilter("ignore", RuntimeWarning)` (the `np.errstate` is ineffective for the "empty slice"
+warning). **F3:** correct the `area_mean_resample_grid` docstring — fallback is PER-AXIS, not
+whole-cell-nearest (docstring only).
+
+**Acceptance (coordinator reproduces before accepting):** sweep table (tip 5–150 m × structure sizes
+incl. a long jetty) — worst-case study margin vs real `l4_coverage_domain` at each tip depth, **0
+shortfall + headroom**, HB row shown; false "comfortably non-marginal" comment replaced with the
+derivation. Allowlist: `grid_sizing_chain.py` (F1 + read-only imports from swan_domain.py, NO edit to
+it) + `bathymetry_resample.py` (F2/F3 only). Do NOT touch the resampler averaging core, `assert_grid_
+encloses`, or `l4_coverage_domain` (all audited clean). Then re-run the 3 test files green + the sweep.
 
 ---
 
