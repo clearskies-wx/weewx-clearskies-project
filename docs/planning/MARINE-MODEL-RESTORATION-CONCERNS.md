@@ -328,6 +328,71 @@ with/without comparison on a real run — do not fix on principle if the delta i
 
 ---
 
+## C-E10 — `CLEARSKIES_MARINE_API_URL` not set on librewxr → every `/surf` call 502s on current-obs enrichment (OPEN, pre-existing, non-blocking)
+
+**Severity:** Low-Medium. Does NOT break the surf forecast (the exception is caught and
+`/surf` still returns the forecast), but it spams a full traceback on **every** `/surf`
+request, adds latency, and means the t=0 station-observation wind enrichment
+(`windSource: "station"`) can never populate on this host. **Pre-existing, NOT a Phase F
+defect** — surfaced 2026-07-29 while walking Gate F because the coordinator was polling
+`/surf` (nobody had been calling it before, so the error had 0 occurrences in the pre-deploy
+window).
+
+**Finding.** `endpoints/surf.py:568` `get_surf()` calls
+`services/api_client.py`'s `fetch_current_observation_si()` → `_api_base_url()` (api_client.py:52),
+which raises `HTTPException 502: CLEARSKIES_MARINE_API_URL is not configured; cannot reach the
+Clear Skies API`. The marine service on librewxr has no `CLEARSKIES_MARINE_API_URL` in its
+process environment. Every `/surf` request logs the 502 traceback (caught, non-fatal). Related
+recurring line: `services/api_client.py` `CLEARSKIES_MARINE_API_URL is not set — cannot reach
+the Clear Skies API`, evaluated on a ~30s cadence when `/surf` is hit.
+
+**Why it matters (not cosmetic-only).** (a) On a station-served spot the t=0 wind should come
+from the local weewx station via the API's `GET /current?units=si`; without the URL it always
+falls back to `forecast_provider`/HRRR (documented fallback, but the station value is silently
+never used). (b) Traceback-per-request pollutes the log and slows `/surf` — combined with
+[[C-E11]] it made `/surf` time out (`HTTP 000`) on short-timeout probes right after a restart.
+
+**Follow-up (do NOT chase now — log per operator steer):** set `CLEARSKIES_MARINE_API_URL` in
+the marine service's systemd environment to the API base URL (or confirm this host is
+intentionally standalone with no API, in which case the current-obs enrichment should be
+guarded to skip cleanly rather than raise+catch a 502 every call). Decide which; if standalone
+is intended, the fix is a config presence check that short-circuits `fetch_current_observation_si()`
+without raising. Not a marine-model-restoration task; environmental/config.
+
+---
+
+## C-E11 — OFS/WCOFS ocean-current NetCDF fetch fails on future-dated files → traceback spam + `/surf` latency (OPEN, pre-existing/environmental, non-blocking)
+
+**Severity:** Low. Ocean-current (OFS CURRENT) input is one of SWAN's inputs, but its failure
+here is an **environmental artifact of the 2026-dated test clock**, not a code defect, and does
+not break the surf forecast on the on-demand path. **Pre-existing, NOT a Phase F defect** —
+surfaced 2026-07-29 during the Gate F deploy walk.
+
+**Finding.** The service repeatedly logs
+`OSError: [Errno -90] NetCDF: file not found:
+'https://opendap.co-ops.nos.noaa.gov/thredds/dodsC/NOAA/WCOFS/MODELS/2026/07/29/wcofs.t03z.20260729.regulargrid.f003.nc'`
+and a paired `KeyError` on the `netCDF4.Dataset` cache key, each with a Traceback. The requested
+WCOFS/OFS forecast files are **future-dated** (the environment clock is 2026 and NOAA's OFS
+THREDDS has no 2026 files), so the OPeNDAP fetch 404s. Consistent with the resume brief's note:
+"Environment clock is 2026 and GRIB inputs are future-dated → live external reality compare is
+limited." Adds latency to any request/cycle that attempts the current fetch and contributed
+(with [[C-E10]]) to `/surf` `HTTP 000` timeouts right after a cold-start restart.
+
+**Why it matters.** Per ADR-095/C-77 "a model runs on all its inputs or it does not run," a
+missing OFS CURRENT input should abort a full SWAN run (raise, retry-same-cycle) rather than
+proceed. In the 2026 test environment this is expected and unavoidable (the data does not
+exist); it is logged so it is not mistaken for a Phase-F/Phase-E regression, and so that when
+the environment runs against real (present-dated) NOAA data the OFS path can be re-verified to
+actually succeed rather than silently 404.
+
+**Follow-up (do NOT chase now):** no code action while the clock is future-dated. When testing
+against real-dated inputs, confirm the OFS/WCOFS fetch succeeds (or that its documented
+refuse-don't-substitute abort fires correctly). If the traceback volume is itself a problem,
+consider demoting the expected-404 case to a single WARNING rather than a full Traceback.
+Environmental; not a marine-model-restoration task.
+
+---
+
 ## C-E09 — SWAN L3/L4 → D1 handoff plumbing is broken; spectrum has no 3 swell components (HIGH — the big one, fix after the rest of the plan) (OPEN)
 
 **Severity:** HIGH. Operator ruling 2026-07-29: **log now, address after the rest of the plan is
