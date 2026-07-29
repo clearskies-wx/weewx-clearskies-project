@@ -447,3 +447,77 @@ is trusted. Entangled with [[C-E05]]; both feed D1's input — fix together. Rel
 done), [[C-E08]] (L4 wind), [[C-E06]]/[[C-E02]] (shadow/structure data).
 
 ---
+
+## C-E12 — WW3 boundary spectrum is a broad hump, not the 3 sharp trains reality shows (OPEN, PINNED 2026-07-29)
+
+**Severity:** Medium — open question about the *quality* of the WW3 boundary we ingest. **Operator
+ruling 2026-07-29: PIN this and finish B/C first** (curve-clip + watershed join, below). Return to it
+after the L4→D1 chain is working.
+
+**Context — WW3 fetch is NOT broken (ruled out first).** The operator suspected the WW3 `.spec` fetch
+was code-broken because it "404s all day." Traced 2026-07-29: the `.spec` **URL pattern is correct**
+(`gfswave.<STATION>.spec` returned HTTP 200 for `gfs.20260728/12Z`). The 404s are the *current* 6-hourly
+cycle not being published yet when a run fires (e.g. 00Z at 01:00 UTC); the cross-cycle fallback in
+`ww3_station_selection.select_boundary_stations_with_cycle_fallback()` correctly drops to the previous
+cycle (18Z) and succeeds. Today's counts: **693 `.spec` 200s vs 393 404s** — succeeding via fallback.
+The boundary IS real WW3 station spectra (buoys 46222/46223/46253/46256), one cycle old. The clock is
+**synced to real NOAA data** (HRRR/GFS wind pull fine for the same dates) — NOT future-dated as earlier
+docs claimed. *Minor sub-defect:* the code tries the doomed current cycle first every run → 404 log-spam
++ latency; fixable by accounting for the known posting lag (tracked as fix "A", non-blocking).
+
+**The actual concern (period/train resolution).** Measured the real 2-D spectrum directly (energy vs
+period, not the partition table) at the L2 deep-water reference, valid 2026-07-31T18:00Z:
+
+| Period band | m0 energy |
+|---|---|
+| 13.2 s (peak) | 0.303 |
+| 14.6 s | 0.241 |
+| 11.9 s | 0.215 |
+| 16.2 s | 0.087 |
+| 18.0 s | 0.019 |
+
+The spectrum is a **broad single hump peaking at 13.2 s** with real energy present up to 18 s but no
+distinct secondary peaks. Meanwhile **both** Surfline (LOTUS: 18 s SSW + 16 s SSE + 10 s S) **and**
+Surf-forecast (Swell 1 ~17 s SSW + Swell 2 + Swell 3, screenshots 2026-07-29) resolve **three sharp
+trains** with the primary at **16–18 s**. So the WW3 boundary we ingest is lower-resolution / over-
+smoothed relative to the two commercial models: the 16–18 s energy is present but smeared into one broad
+swell rather than partitioned into distinct trains, and the *peak* sits ~3–5 s low (13 vs 17). Period is
+conserved through shoaling, so the ~13 s nearshore peak faithfully reflects the ~13 s boundary — "our
+periods are our periods," but the operator is not satisfied the boundary itself is right.
+
+**Why it matters.** This — not the watershed partitioner — is the real reason we cannot publish
+Surfline's 3 trains at 16–18 s: **we are never handed 3 sharp trains at the boundary.** Fixing B
+(curve-clip) and C (watershed join) recovers the real ~2 trains at ~13 s that ARE in our spectrum; it
+does not and cannot manufacture trains WW3 didn't give us.
+
+**Follow-up (after B/C — do NOT chase now):** determine whether we are (a) fetching the wrong/too-coarse
+WW3 product, (b) losing partition structure in `ww3_spectrum_to_swan_boundary()` / the boundary
+synthesis, or (c) genuinely limited by the global WW3 model's spectral resolution vs regional LOTUS.
+Compare a raw `gfswave.<station>.spec` 2-D spectrum's own partition structure against Surfline/NDBC for
+the same time before concluding. Related: [[C-E05]] (train count), [[C-81]]/[[C-83]] (boundary
+synthesis history).
+
+---
+
+## DIAGNOSIS UPDATE 2026-07-29 — C-E05 and C-E09 root causes were WRONG; corrected
+
+Live diagnosis 2026-07-29 (coordinator, from real SWAN output files + trace + SWAN manual) **overturned
+the stated root causes of [[C-E05]] and [[C-E09]]**. The corrected entries land with the code fix
+(doc-code sync); recorded here so no one acts on the stale text:
+
+- **C-E05 said "the L4 per-transect `TABLE_PT_*` are all SWAN-exception −9/−99."** FALSE — the PT* tables
+  are rich (the L4 CURVE table carries 4 non-zero partitions; L2 DWR carries 2). The trains are lost in a
+  **coordinate JOIN** downstream, not missing from SWAN.
+- **C-E09 problem-1 prescribed "read each transect's own L4 `TABLE PT*` instead of the shared CURVE"**
+  (an alongshore-granularity change). Unnecessary and wrong target. The real C-E09 root cause is **defect
+  B**: the diagnostic CURVE that feeds the L4 handoff spectrum is clipped to a **7 m degenerate sliver at
+  ~2 m depth** because the curve-clip bbox in `swan_formats.py` (~line 1802) is built axis-aligned and
+  **ignores the L4 grid's 221° rotation**, placing the clip rectangle ~1 km off the real grid. The L4
+  handoff spectrum is therefore sampled in breaking-zone water — why the L4→D1 path is worse than L2→D1.
+- **The "period 8.1 s" symptom** = defect **C**: the watershed PT*↔CURVE-station coordinate join orphans
+  stations (nearest-neighbour collision on the sub-metre-spaced degenerate curve) → empty `components` →
+  the T4B.2 no-fallback rule forces a single **bulk** partition, publishing `TM01` (mean, 8.1 s) instead
+  of the partition peak (~13 s) and collapsing multiple trains to 1.
+
+Fixes in progress: **B** (`swan_formats.py` rotation-aware curve-clip bbox) then **C** (`swan_runner.py`
+watershed join hardening, only if the join still drops partitions after B). WW3 quality is [[C-E12]].
