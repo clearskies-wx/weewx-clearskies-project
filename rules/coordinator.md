@@ -55,6 +55,13 @@ restating it.
 A report saying "done, tests pass" that you have not independently reproduced is an unverified
 claim, and forwarding it to the operator as a result is the specific failure this file exists to stop.
 
+**Marine deploy discipline (D4, added 2026-07-29 T0.2).** Marine deploys go through
+`scripts/deploy-marine.sh` ONLY — never a bare `git pull` on librewxr. A run's evidence counts only
+if the service `ExecMainStartTimestamp` postdates the deploy of the commit under test; record the
+commit short-hash and process start-time in every acceptance block. `deploy-marine.sh` now prints
+both (`[verify] running commit … process started …`), and prints a `STALE PROCESS` banner on the
+`--no-restart` path — a no-restart deploy can never be mistaken for a live one.
+
 **Why (2026-05-11):** 3b-12 api-dev claimed "1762 passed, 0 failed"; the lead's independent run
 returned 103 failed. The lead initially trusted the count and almost closed the round on a
 false-clean narrative. Dashboard a11y compliance claims were never independently verified either.

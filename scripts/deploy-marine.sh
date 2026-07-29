@@ -268,6 +268,14 @@ echo "[svc] unit installed and enabled"
 # --- Step 6: restart + verify ---
 if [ "$no_restart" = "1" ]; then
     echo "--- [6/6] restart: SKIPPED (--no-restart) ---"
+    # D4 (T0.2): a --no-restart deploy leaves the OLD process running the OLD
+    # code. Make that impossible to mistake for a live deploy by printing the
+    # unchanged process start-time with a STALE banner. The three manual
+    # `git pull`s on 2026-07-29 that voided a whole session's evidence looked
+    # exactly like a successful deploy in the logs; this line is why they can't
+    # anymore.
+    STALE_START=$(run_root "systemctl show ${SERVICE} -p ExecMainStartTimestamp --value")
+    echo "[verify] STALE PROCESS — service not restarted; running process predates this deploy (ExecMainStartTimestamp ${STALE_START})"
     echo "=== Deploy complete (no restart) ==="
     exit 0
 fi
@@ -283,6 +291,15 @@ if ! run_root "systemctl is-active --quiet ${SERVICE}"; then
     exit 1
 fi
 echo "[svc] ${SERVICE} active"
+
+# D4 (T0.2): make "what commit is actually running, since when" impossible to
+# miss. The D4 failure mode was not a missing restart — it was code pulled to
+# disk while the running process kept executing the pre-fix commit. Printing
+# the deployed commit alongside the process start-time lets any later
+# acceptance block cite both, and lets a stale process be spotted at a glance.
+DEPLOYED_COMMIT=$(run_ubuntu "cd ${REPO_PATH} && git rev-parse --short HEAD")
+PROC_START=$(run_root "systemctl show ${SERVICE} -p ExecMainStartTimestamp --value")
+echo "[verify] running commit ${DEPLOYED_COMMIT}; process started ${PROC_START}"
 
 # /health and /manifest are the two unauthenticated endpoints (ARCHITECTURE.md
 # port registry, port 8780). Everything else requires the Bearer token.
