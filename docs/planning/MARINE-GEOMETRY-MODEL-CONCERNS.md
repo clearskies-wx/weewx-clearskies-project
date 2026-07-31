@@ -27,6 +27,19 @@ to the operator. This file is for non-blocking gaps where a reasonable, document
 - **Assumption made:** where a plan-cited test path doesn't exist, agents create the KAT under `tests/` or `tests/services/` and verify there. Existing coverage for touched modules is run by name-grep.
 - **To revisit:** confirm test-file placement convention with operator; optionally correct the plan's `tests/enrichment/`/`tests/config/` verify paths.
 
+## TC-11 — [OPEN 2026-07-31, trivial] ww3_station_selection docstrings call mean_offshore_bearing "the same bearing L1 uses" — now stale
+- **What:** After G2.1, L1 prefers the open-water bearing (mean_offshore is the fallback). `ww3_station_selection.py` module docstring (~:55-60) and `_resolve_offshore_bearing_deg` docstring (~:422-427) still say mean_offshore is "the same bearing L1 sizing uses."
+- **Where:** `services/ww3_station_selection.py` docstrings only (no functional change — the file needed none; the existing `offshore_bearing_deg` kwarg is the injection point).
+- **Why non-blocking:** code comments, not governing docs; the functional behavior is correct; mean_offshore is still the shared fallback.
+- **To revisit:** touch up the two docstrings to "L1 prefers the open-water bearing; mean_offshore is the fallback" when the file is next edited for a functional reason. Left untouched now for minimal-delta (don't add a file to the diff that needs no functional change).
+
+## TC-10 — [OPEN 2026-07-31, MEDIUM — operational] Public Overpass (overpass-api.de) is flaky; geography fetch depends on it (raise, no fallback)
+- **What:** From librewxr on 2026-07-31, overpass-api.de returned HTTP 504 on 2 of 3 attempts (server-side gateway timeout under load), then 200 in 1.4s on the 3rd. The kumi mirror did not respond (35s). geography.fetch_osm_coastline RAISES on failure (no silent fallback, per ADR-100), so a transient Overpass 504 storm fails the whole config-time grid-sizing chain.
+- **Where:** `services/geography.py` fetch_osm_coastline / _get_http_client; every config push that hits a cache-miss bbox.
+- **Mitigation applied (d8a4397):** bumped the geography HTTP client read_timeout to 35s (was 15s < the 25s query timeout — a real bug) and max_retries to 5, so the config-time cached-30-days fetch rides out transient 504s. Once fetched, cached 30 days (no re-fetch).
+- **Why non-blocking (for the plan):** the code correctly raises (loud, not silent); the retry resilience makes success very likely; the gate just needs ONE success (then cached); scope is testing/gate-validation, not production cutover.
+- **To revisit (production hardening, separate task):** consider an Overpass mirror-fallback list (kumi/private.coffee/etc. — still real OSM data, within ADR-100), or a self-hosted Overpass, before a public production cutover. Operator decision.
+
 ## TC-8 — [OPEN 2026-07-31, low] Heading-consistency self-check threshold = 30 deg (diagnostic only)
 - **What:** `check_heading_consistency` (G1.5, geography.py) flags OSM-vs-isobath heading divergence above 30 deg with a WARN.
 - **Why non-blocking:** it is a diagnostic WARN sensitivity (AD-6 self-check); no physics branches on it. Chosen so an "aligned" pair (small diff) passes and a 40-deg-divergent pair flags (per G1.5 accept).
