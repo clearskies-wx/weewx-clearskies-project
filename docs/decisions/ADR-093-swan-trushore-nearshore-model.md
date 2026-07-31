@@ -285,6 +285,115 @@ extent) stands and now sizes L4's alongshore extent as well as L3's, per `servic
 Amendment 2's handoff-depth criterion (`1.3 × Hs(hour) / gamma`) is unchanged and now applies uniformly
 to whichever of L3/L4 a transect hands off from (Marine Model Restoration Plan E5, ruling D3).
 
+### Amendment 4 (2026-07-29): the 1-D model's LANDWARD boundary — the maximum-total-water-level criterion
+
+**Why this amendment exists.** Every prior amendment specifies the 1-D model's **seaward** end — the
+handoff surface at `1.3 × Hs(hour) / gamma`, fed by L4 (or L2 fallback) per Amendment 3. None specifies
+its **landward** end. Amendment 2 just says SwellTrack "and the SurfBeat strip model from there to the
+beach," leaving *how far landward the profile runs* and *how tide interacts with it* undefined. That gap
+is a real defect (tracked as TA-C18): above roughly +0.5 m of tide the served surf collapses to zero
+(`best_peak = 0.00 m`, `peel = nan`, marine invariant 8 fires) across all open transects at Huntington
+City Beach Pier. It is not physics — a real wave always breaks as it runs up the beach — it is a
+too-short model domain.
+
+**Root cause (verified against the deployed cache and grids, 2026-07-29).**
+1. Each per-transect bathymetric profile starts at that transect's **SWAN sampling-band anchor**
+   (`_band_ray_origin`, shared with the per-transect POINTS bands), which legitimately sits ~1 m *seaward*
+   of the true waterline because SWAN deliberately stops before the swash. The cached per-transect
+   profiles for HB begin at depth **1.01–2.83 m** at `distance_from_shore = 0`; the shared per-spot
+   profile, anchored at the true shoreline, begins at **0.00 m**. So the 1-D model imports SWAN's offshore
+   boundary as its own shoreward start.
+2. The profile sampler then **deletes the subaerial beach twice**: `_grid_depth_below_msl()` returns
+   `max(0.0, -elev)`, clamping every land cell to depth 0; the downstream `depth_m > 0` filter
+   (`providers/nearshore/swan.py`, `endpoints/beach_profile.py`) drops those zeros. The beach face the DEM
+   *does* contain is discarded before the 1-D model sees it.
+3. The 1-D model adds tide to every depth (`depths = seabed + tide_level`). With the profile floored ~1 m
+   deep and the beach face deleted, a rising tide lifts the shallowest modeled point above breaking depth
+   (`Hs/gamma`). Above ~+0.5 m the wave never reaches breaking depth inside the domain → no break points →
+   zero surf. Sharp cliff because all open transects share a similar shoreward floor.
+
+**Data is not the constraint.** The cached grids around the pier carry full topobathy: land elevations up
+to **+15.1 m** (L4/L3 nest), +17.6 m (L2). We have been deleting the beach, not lacking it.
+
+**Decision — the landward boundary is the Highest Astronomical Tide (HAT), computed ONCE at setup.**
+This follows the established principle for cross-shore wave-transformation models — place the domain's
+landward boundary above the highest still-water shoreline so the moving shoreline stays inside the domain
+at every tide (CSHORE extends into the wet/dry zone above still water). We cap at HAT rather than the full
+flood-planning Total Water Level (which adds storm surge and wave runup) **because this is a surf model,
+not a flood model**: it forecasts surfable conditions, not the storm-driven extremes above HAT. It is the
+symmetric complement of Amendment 2's seaward rule ("size to reach as far shoreward as it is *ever*
+useful"): size the profile to reach as far **landward** as it is ever useful for a surfable tide — i.e. to
+HAT.
+
+**Why setup-once, not per cycle (operator ruling 2026-07-29).** The profile cache is built at
+config-receipt (`services/grid_sizing_chain.py`, `source: config_receipt_pchip`), and "all SWAN grid
+geometry is fixed at setup time" is a binding rule (`rules/clearskies-process.md`). The landward extent is
+therefore sized once to the spot's **worst case** — its configured maximum swell and its tide station's
+high-water datum — not recomputed per forecast hour. Per-cycle self-scaling would buy nothing here: the
+per-hour tide already moves through the existing wet/dry clamp inside a fixed-geometry profile, so a
+profile sized to the worst case is wet exactly as far up the beach as each hour's actual water level
+requires, with no accuracy lost.
+
+Concretely:
+
+1. **Decouple each transect from the SWAN band anchor.** Each 1-D transect finds its *own* shoreline
+   (walk shoreward through the covering grid until elevation crosses 0, as `find_shoreline_from_grid`
+   already does for the shared anchor) and runs an independent line from its handoff depth to that
+   shoreline and beyond — never starting at the SWAN POINTS-band anchor. This is the independence the 1-D
+   model is supposed to have from SWAN except at the handoff.
+
+2. **Landward extent = the Highest Astronomical Tide (HAT), computed at setup:**
+   ```
+   E_landward = HAT
+   ```
+   in the DEM's own vertical datum (LMSL at HB; datum consistency guaranteed by ADR-098 match-at-source, so
+   tide and seabed share a datum). **No storm-surge term, no wave (setup/runup) term.** This is a *surf*
+   forecast model, not a flood model: storm surge and wave runup are the domain of the storm that produces
+   them, and nobody is surfing that. Under normal astronomical conditions the still-water line never rises
+   above HAT, so a profile that reaches the HAT elevation always has wet ground for the wave to break on at
+   every hour's tide — which is all the 1-D model needs.
+
+   `HAT` is taken from **the same tide model already feeding `tide_level`** — the CO-OPS harmonic
+   predictions for the spot's configured station (`coops_station_ids[0]`, `providers/tides/coops.py`, the
+   source `resolve_ondemand_tide_level()` resolves; `providers/nearshore/swan.py:2397`). HAT is by
+   definition the maximum of that harmonic prediction; at setup it is obtained as the max over a ≥1-year
+   prediction window (equivalently the station's published HAT, same constituents), requested in the DEM
+   datum (match-at-source). Same source, same station, same datum as the runtime tide — no new or distant
+   source is introduced. On a prediction-fetch failure, log a WARNING and degrade per this chain's posture.
+
+   Each transect's profile is extended up its own beach face to `E_landward = HAT`.
+
+3. **Sample signed depth; stop filtering land.** For the 1-D profile, return the *signed* value
+   (`-elev`, negative on land) instead of clamping land to 0, and drop the `depth_m > 0` filter, so the
+   beach face keeps its true elevation. The existing `depth = max(seabed + tide, 0.01)` line in
+   `run_1d_analytical` then does the per-hour wet/dry automatically: a beach-face cell is dry (~0.01 m) at
+   low tide and wet at high tide. No new machinery, no per-hour geometry change — grid geometry stays
+   fixed at setup (profile sized once to the worst-case landward reach), only the wet/dry state moves.
+
+4. **Guard, never a silent cap.** If a spot's topobathy cannot reach `E_landward` at setup (data runs out
+   up the beach), log a WARNING naming the spot, the shortfall, and the affected transects — an
+   operator-visible flare, not a silent zero. With +15 m of land available at HB this is a backstop, not
+   the normal path.
+
+**Scope — landward end only.** The seaward handoff (`1.3 · Hs/gamma`, from L4/L2 per Amendment 3) and all
+SWAN grid geometry are unchanged. No physics formula changes: shoaling, refraction, Battjes-Janssen
+breaking, and the roller model are untouched; this amendment only defines *how far landward the profile
+extends* and *that land is sampled with its real elevation* so those existing formulas have ground to run
+on at high tide.
+
+**Files this governs (implementation to follow, separately reviewed):** `services/grid_sizing_chain.py`
+(per-transect anchor + landward extent), `enrichment/bathymetry.py` (signed-depth sampling for the 1-D
+profile + landward walk to `E_landward`), the `depth_m > 0` filters in `providers/nearshore/swan.py` and
+`endpoints/beach_profile.py`. `services/surf_1d_analytical.py` is unchanged (its wet/dry clamp already
+handles the new points).
+
+**Best-practice basis:**
+- CSHORE (Kobayashi, U. Delaware CACR) — the directly analogous 1-D cross-shore wave/current model;
+  its domain extends into the wet/dry zone above the still-water shoreline, which is the principle
+  adopted here. We take the still-water ceiling as HAT (astronomical), deliberately excluding the
+  storm-surge and wave-runup terms that flood-planning TWL adds (FEMA / Stockdon 2006), because a surf
+  model has no reason to model ground that is only submerged during the storm.
+
 ## References
 
 - Supersedes: ADR-084 (NWPS as primary nearshore source with supplementation)

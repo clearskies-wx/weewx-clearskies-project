@@ -2054,7 +2054,7 @@ Surf quality forecast for one spot at one timestep.
 | `breakingHawaiianHeight` | float | `group_wave_height` | Yes | Hawaiian scale = `breakingFaceHeight × 0.5`. `null` when unavailable. |
 | `windSource` | str | — | Yes | `"hrrr"` for forecast timesteps; `"station"` or `"forecast_provider"` for t=0. |
 | `breakPoints` | list[object] | — | Yes | QB peak locations along the cross-shore transect (T3.4). `null` when no QB peak ≥ 0.25 detected (flat conditions, single-point mode, or QB data absent). Multiple entries for multi-bar beaches (outer bar + inner bar). |
-| `breakPoints[].distanceFromShore` | float | — | — | Distance from shore in meters. |
+| `breakPoints[].distanceFromShore` | float | — | — | Distance from shore in meters, measured from the reference waterline (the DEM datum's 0 m / LMSL shoreline). Positive = seaward. **Can be negative** (ADR-093 Amendment 4): at high tide a break can occur on the beach face *landward* of the reference waterline, reported as a negative distance. Consumers must accept negatives; a display should treat a negative value as "at/onshore of the shoreline," not clamp or `abs()` it. |
 | `breakPoints[].depth` | float | — | — | Water depth at the break point in meters. |
 | `breakPoints[].waveHeight` | float | — | — | Wave height (HSIGN) at the break point in meters (not unit-converted — physical position). |
 | `tideLevel` | float | `group_water_level` | Yes | Tide height at this forecast hour (metres vs the station datum), resolved from the same cached CO-OPS tide series the pipeline uses (findings §0B.1). `null` when the tide series is unavailable for a tidal region — refuse-not-substitute, never a substituted `0.0` — or for a non-tidal location with no level. Publish-path field added at Gate F row 11 (relocated from Gate B). |
@@ -2507,10 +2507,13 @@ All four fields are present in every response regardless of the operator's `surf
 
 **Breaker formulas (`enrichment/breaker_height.py`):**
 
-Two formulas supported, configured per-spot via `breaker_formula` in the marine location config:
+**Active face conversion (SwellTrack path — the normal path).** Face height is the flat Rayleigh H1/10 statistical factor applied at SwellTrack's break point: `breakingFaceHeight = 1.27 × Hs_break` (`hsig_to_face_height(..., source="break_point")`). **No K-G period term and no shoaling coefficient are applied here** — SwellTrack already carried the period-dependent shoaling/refraction/breaking from the handoff to the break, so re-applying K-G would double-count (ADR-095 Amendment 1; WAVE-BREAKING-CONVERSION-BRIEF Addendum 2026-07-30). The period signal lives in SwellTrack's dispersion + `Ks=√(Cg0/Cg)` shoaling, not in a lumped K-G term. The 1.27× is **handoff-agnostic** — identical for L4 (shallow structure-grid) and L2 (deep 15 m open-beach) handoffs, because both shoal to the same break point in SwellTrack; the L4-vs-L2 difference is handoff *cleanliness* (the QB guard), not the face factor. Output clamped to [Hs, 3 × Hs].
 
-- **Komar-Gaughan (1973)** (default): `Hb = 0.39 × g^(1/5) × (Tp × Hsig²)^(2/5)`. General-purpose, works for all periods and coastline types. Depth-aware correction when SWAN output is in shallow water (< 15m). Output clamped to [Hsig, 3 × Hsig].
-- **Caldwell (2007)** (opt-in `caldwell`): Empirically tuned for steep volcanic island coasts (Hawaii, Indonesia, Tahiti). Predicts H1/10 (set waves). **Auto-crossover:** when Tp < 10s, automatically falls to Komar-Gaughan (Caldwell is unreliable for short-period wind swell).
+**Legacy direct-offshore path (`source="deep_water"`)** — used only when a deep-water Hs is converted directly, without SwellTrack. Here the full period-dependent formula selected per-spot via `breaker_formula` applies:
+- **Komar-Gaughan (1973)** (default): `Hb = 0.39 × g^(1/5) × (Tp × Hsig²)^(2/5)`. General-purpose, all periods and coastline types.
+- **Caldwell (2007)** (opt-in `caldwell`): Empirically tuned for steep volcanic island coasts (Hawaii, Indonesia, Tahiti); predicts H1/10 (set waves). **Auto-crossover:** for Tp < 10s, falls to Komar-Gaughan (Caldwell is unreliable for short-period wind swell).
+
+The former ad-hoc depth-aware correction (SWAN-output-in-shallow-water lerp, `SHALLOW_DEPTH_THRESHOLD_M`) was **removed** in T4.3 and does not exist in the current code — it is superseded by SwellTrack, which tracks the full shoaling path explicitly.
 
 `hawaiian_height(face_height_m)` returns `face_height_m × 0.5`. Always proportional — no independent calculation.
 

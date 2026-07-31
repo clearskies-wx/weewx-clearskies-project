@@ -19,7 +19,7 @@ STOP and report the drift — do not hunt for "what was probably meant."
 
 ---
 
-## Execution status — LIVE (keep this updated; last: 2026-07-29 coordinator session)
+## Execution status — LIVE (keep this updated; last: 2026-07-30 coordinator session)
 
 **Legend:** ✅ done+verified · 🔄 in progress · ⛔ blocked · ⬜ not started
 
@@ -30,19 +30,34 @@ STOP and report the drift — do not hunt for "what was probably meant."
 - T0.2 deploy-restart proof (D4) + coordinator rule — ✅ (meta repo). Verified LIVE: deploy printed running-commit + process-start.
 - T0.3 hotstart split + stale-hotfile guard (D2/D2b) — ✅ `94c43f4`. **STANDS under the hybrid** — L1/L2 stay nonstationary in the full run, so the hotstart-timestamp fix is still needed (earlier "moot if stationary" note was wrong: the hybrid keeps L1/L2 nonstationary).
 - T0.4/T0.4b gate known-answer tests + re-audit guards — ✅ `63c6191`, `f39f9cf`, `c15944d`.
-- T0.5 spectral trace WW3→L4 (A–E) — ✅ `f657bda`. Sub-task F (live readout) — 🔄 partial: WW3-raw + L1-boundary captured; downstream stages need a completed run.
+- T0.5 spectral trace WW3→L4 (A–E) — ✅ `f657bda`. Sub-task F (live readout) — ✅ **CLOSED as moot-by-T3.0 (operator-approved 2026-07-30 PM).** Its purpose was to bisect *where* a three-swell input collapses to one; T3.0 established the input is a **single S-family swell** (real buoy 46222 agrees with our WW3 input; no 3-swell collapse exists to trace). The trace infrastructure was exercised this session (QB/handoff/swelltrack readout, TA-C20) and reverted. No spectral-collapse readout needed.
 - QC Gate 0 — ✅ two blind adversarial passes; all *reachable* defeats closed+guarded; negative-scan residual (positive-completion check) deferred to T1.2 (TA-C06).
 
-### Phase 1 — Unblock computation; prove a REAL run (M1) — ⛔ BLOCKED
-- T1.1 OBSTACLE ≤180-char wrap (D1) — ✅ `a915deb`. **D1 is FIXED** — no >180-char line in generated INPUT.
+### Phase 1 — Unblock computation; prove a REAL run (M1) — 🔄 SWAN 4-level COMPUTED (2026-07-30); structure→surf handoff gap open (TA-C17)
+- T1.1 OBSTACLE ≤180-char wrap (D1) — ✅ `a915deb`. **D1 FIXED and now RUN-VERIFIED (2026-07-30):** the first real 35-node pier OBSTACLE emitted into L3/L4 INPUT wrapped across 5 `&`-continuation lines, longest 174 ≤ 180 chars; SWAN accepted it (L4 converged 99.6%). Prior runs never exercised it (pier inert).
 - Phase 0+T1.1 deploy — ✅ `deploy-marine.sh`, `c15944d` live 2026-07-29 17:14 UTC.
-- **T1.0 (NEW) — all-stationary quasi-stationary full run — 🔄 DECIDED + SCOPED, READY TO DISPATCH (not yet coded). THIS is the real M1 blocker, not D1.** Cold run failed *honestly* at L1: the nonstationary S&L scheme trips CFL>10 (governed by the 0.03 Hz spectral bin at group speed — deterministic every run). **DECIDED (operator 2026-07-29) = ALL-STATIONARY** (quasi-stationary: `MODE NONSTATIONARY` + per-hour `COMPUTE STAT` sequence at every level, SORDUP, no CFL; manual-recommended for <100 km) **+ directional resolution 36→72 + `NUMERIC alfa` under-relaxation on + mandatory COLDSTART.** Operator confirmed hourly cadence + alfa on. HYBRID (L1/L2 nonstationary) retained as documented fallback. Full task contract in `#### T1.0`; design/rationale in the ledger; Fable-review corrections incorporated. NEXT ACTION: dispatch `clearskies-api-dev` for the emitter+caller, then `clearskies-test-author` guard, then coordinator deploy(COLDSTART)+measure.
-- T1.2 cold full run (M1 evidence) — ⬜ blocked by T1.0 (run so far = honest FAIL at L1).
-- T1.3 re-verify C-E07 + curve-clip — ⬜ blocked by T1.2.
-- QC Gate 1 / **M1** — ⬜ not reached.
+- **T1.0 — all-stationary quasi-stationary full run — ✅ DEPLOYED + RUN + VERIFIED (2026-07-30).** Marine `main` at `a68215d` (pushed, deployed). All-stationary (`MODE NONSTATIONARY` + per-hour `COMPUTE STAT`, SORDUP, no CFL) + 36→72 dir + `NUMERIC alfa` + COLDSTART. The CFL blocker is gone — all levels converge (see T1.2). Two orthogonal bugs surfaced+fixed during the run: **TA-C13** (pier had no `coordinates` in config → no L3/L4; fixed by injecting the real OSM 35-node ring, grid-sizing now sizes L3 40 m + L4 10 m) and **TA-C16** (`a68215d`: HRRR+GFS wind stitch went non-monotonic on a stale GFS cycle → SWAN `[time] before current time`; fixed to reconcile by absolute valid_time). Durability: **TA-C15** (`9d1c10a`, api repo, deployed) API can now read JSON-string coordinates + weewx api.conf patched.
+- **T1.2 cold full 4-level run (M1 evidence) — ✅ RAN HONESTLY (2026-07-30, cycle 00Z).** L1→L2→L3→L4 all computed: L1 99.8% / L2 99.9% / L3 (40 m) 99.8% / L4 (10 m structure grid, 5292-cell) 99.6% (valid_fraction 95.4%), nan=0, no fatals, gate honest at every level. forecast_cache mtime > restart → THIS cycle's computation, not cache. Peak tmpfs ~1.36 GB. Runtime ~41 min. **Caveat 1 (window):** coverage hours 0–66 not 0–72 — GFS 00z unpublished, fell back to 18z (honest short coverage, TA-C16, not truncation).
+- **T1.2b per-transect handoff now REACHES D1 — ✅ FIXED + VERIFIED (2026-07-30, commit d803d9c).** TA-C17 root cause: the per-transect L4 handoff was gated behind a single-diagnostic-CURVE pick that failed (the CURVE is drawn longer than the small L4 grid, its fixed offshore sample point sits OUTSIDE the grid → 0/67 resolved → whole spot fell back to scalar L2 handoff, 32/32 open). Decoupled so the per-transect block runs regardless. Re-run confirmed: **32/32 transects resolve their own L4 handoff, 0% clamp, 6–14 structure-affected transects now appear per hour** (was flat 32-open). Partial-coverage transects (e.g. #31, shoreward cells outside L4) correctly use their own L4 column as far as it reaches (better than L2's ~15 m).
+- **T1.2c — TA-C18: surf ZEROES at high tide — ✅ FIXED + VERIFIED (2026-07-30, commits bae26a4 + 73ce11f, deployed).** Symptom: whenever tide ≳ +0.5 m the whole spot dropped to best_peak=0.00 m / peel=nan (sharp cliff). Root cause (verified vs cache + grids, NOT the earlier handoff-depth guess): each 1-D transect profile stopped ~1 m deep instead of at the beach — anchored at the SWAN sampling-band origin, and the subaerial beach deleted by the `depth_m>0` filter (DEM holds land to +15 m). Fix (ADR-093 Amendment 4): landward boundary = **Highest Astronomical Tide (HAT)** computed once at setup as the max of the SAME CO-OPS harmonic predictions feeding `tide_level` (no surge/wave term — surf model, not flood model); decouple each transect to its own shoreline; signed-depth sampling; drop the `depth_m>0` filter; extend each profile up its beach face to HAT; wet/dry via the existing clamp; setup-time WARN guard. **Adversarially audited** (F1 distanceFromShore re-basing + F2 walk-cap found and fixed; distanceFromShore can now be negative — API-MANUAL updated, dashboard deferred TA-C19). A HAT station-source bug (read from surf-spot config, which has no station, instead of the location) shipped past mocked tests and was **caught on the real run** (`e_landward_m=null`) and fixed. **Real-run verified:** HAT=+1.36 m computes, profiles extend up the beach; served surf has **0 zero-hours, 0 invariant-8 firings, varies sanely across the full tide cycle** (high tide ~1.2 m, low/mid ~1.6 m).
+- **T1.2d NEW BLOCKER — TA-C20: surf magnitude ~2× UNDER-forecast (we ~4.5 ft vs Surfline 8–10 ft).** Exposed by the FIRST real reality check (operator Surfline screenshot, 2026-07-30). This is the M1-purpose blocker now. Root cause is a STACK, all architectural (see MARINE-WORKING-MODEL-CONCERNS.md TA-C20 for full data): (1) the 1-D handoff lands at ~1.46 m depth — **shoreward of SWAN's ~3 m break point** — so the surf model gets the already-broken wave; SWAN's OWN peak Hs is 1.44 m @3 m (~6 ft face) vs the ~4.5 ft served; (2) the headline is max-single-partition, not the combined wave SWAN breaks; (3) a residual ~30–60% gap even in SWAN (long-period shoaling/refraction, or face-scale convention vs Surfline). The earlier "period (16 s vs 12 s) is the 2× lever" hypothesis was **WRONG** — period ≈ 0 % effect at HB's shallow depth-saturated handoff. **Related correctness fix done (committed `f337648`, pushed, DEPLOYED 2026-07-30 — earlier "uncommitted" note stale):** per-transect swell-spectrum handoff — each transect uses its OWN in-grid `PT*` partitions, the single out-of-grid diagnostic CURVE spectrum path removed entirely (it returned empty every hour → bulk-fallback → `multiSwell`/`breakingFaceHeight` served as `None`); 490 tests pass; but this does NOT move the headline (may lower it per cause #2). **UPDATE 2026-07-30 PM (TRACE-CONFIRMED):** on f337648 the handoff lands CLEAN at ~2.5 m (Qb≈0.04, ~98 % of the Hsig peak) — **cause #1 does NOT occur**; cause #3 resolved by T3.0; served magnitude MATCHES the matched-time cam. No architectural change needed. Only latent, non-2× items remain (T2.2 PART B half-applied fix; T2.3 multi-swell metric). See CONCERNS TA-C20 "TRACE-CONFIRMED".
+- T1.3 re-verify C-E07 + curve-clip — 🔄 UNBLOCKED 2026-07-30 PM (TA-C20 trace-confirmed: the served path IS magnitude-correct for current conditions; reconfirm at more sea states). Not yet started.
+- QC Gate 1 / **M1** — 🔄 SWAN-computation criterion MET (4 levels, honest gate, this-cycle); L3/L4 REACH the served surf per-transect (TA-C17); high-tide zeroing FIXED (TA-C18). **Status 2026-07-30 PM:** (a) **magnitude — TRACE-CONFIRMED MATCHING reality** (served best_peak 4.7–5.0 ft ≈ the 4–5 ft cam; the "~2×" was a stale wrong-hour comparison; TA-C20 downgraded MEDIUM) — validated at ~1 m swell only, reconfirm at larger seas; (b) window 66 h vs 72 h (TA-C16 GFS staleness) still open; (c) no formal blind audit of the full served forecast yet. M1's *purpose* (a served forecast that matches reality) is now largely met for current conditions. **Lesson (2026-07-30, sharpened PM): the automated gates passed for days while we *believed* the forecast was half of reality — and then the "2×" itself turned out to be a STALE wrong-hour Surfline comparison; only a MATCHED-TIME trace + cam settled it (magnitude actually matches). Validate against reality at MATCHED time — both the automated gate AND the ad-hoc reality check can mislead (rules/verification.md).**
+- **Performance (discussed 2026-07-30, decisions; DEPRIORITIZED behind TA-C20 — a faster wrong forecast is not the priority):** full run ~41 min (all-stationary, L4 dominates). Iteration counts healthy (none >20) so lowering convergence % is NOT a lever. Directional stays CIRCLE 72 (5°) — manual §2.6.3, NOT a path. **The one clean lever = cadence: hourly 0–24 then ~6-hourly to 72** (~52% fewer solves, ~41→~24-27 min, no accuracy cost). **Gate CLEARED (2026-07-30):** the whole chain (SWAN parser → forecast_cache → API → dashboard) is timestamp-driven, no consumer assumes uniform hourly spacing; SWAN hotstart not spacing-sensitive; producer-only change (`swan_formats.py` compute-list + TABLE output schedule); dashboard time-axis is cosmetic-only. Ready to implement once magnitude is right.
 
-### Phases 2–3 — ⬜ not started (blocked by M1)
-- T3.0 partially informed: trace shows the WW3 boundary DOES carry directional structure (≥2 distinct swell directions + windsea at station 46223) → swell loss is **downstream in our pipeline, not the WW3 data** (confirms the plan's leading hypothesis). Which grid collapses it = TBD (needs a completed run's full trace).
+### Phases 2–3 — 🔄 IN PROGRESS on the UNBLOCKED, non-architectural parts (coordinator session 2026-07-30 PM)
+- **Phase 2 magnitude work — TRACE-CONFIRMED 2026-07-30 PM: cause #1 RESOLVED on f337648; served magnitude MATCHES the matched-time cam.**
+  Baseline CORRECTED (the "~2× / 8–10 ft" was a STALE last-night comparison; current cam **4–5 ft**). The live QB trace (fresh run,
+  restart 21:15:40Z → cache 21:56:25Z) is **DONE**: across **2144** HB handoff picks the QB guard NEVER fires (100 % "selected") because
+  the handoff already lands **CLEAN** (2.5 m, Qb≈0.04, ~98 % of the Hsig peak) — NOT in the breaking zone. Served best_peak **4.7–5.0 ft** ≈
+  the 4–5 ft cam. ⟹ **T2.2 cause #1 = resolved** (no handoff change needed); its **PART B half-applied advancement fix is LATENT / LOW
+  priority** (the guard never moves a station here). **T2.3 cause #2** (combined metric, §11.3) is **LATENT for multi-swell days only** —
+  today is one dominant swell, so it is NOT the current-conditions lever; build it guarded + validate on a real multi-swell day. T2.0/T2.1
+  (defect B/C) CLOSED by T3.0; cause #3 RESOLVED by T3.0. **Phase 3 T3.1 now UNBLOCKED** — validate magnitude at LARGER / multi-swell seas
+  (today validated ~1 m swell only). Remaining code work (T2.2 PART B, T2.3) is non-urgent, needs operator go + full dispatch/known-answer/blind-audit.
+- **T3.0 (ground-truth the boundary vs a REAL NDBC buoy + RAW WW3 `.spec`) — ✅ DONE + coordinator-reproduced 2026-07-30 PM.** Station 46222, valid 2026-07-30T19:00:00Z. **Verdict (a) RULED OUT — conversion is byte-faithful (raw Hs 0.894 = converted 0.894, 0.00%, reproduced).** So the boundary writer / old T2.1 defect-C join fix is **NOT needed** — confirmed. **Bigger finding: the real NDBC buoy AGREES with our WW3 input (Hs 0.93 vs 0.89; same S-family swell direction ~161–179°; same W windsea), and Surfline is the OUTLIER** (~1.28 m swell / 2 directions). The operator's Surfline screenshot is date-only → a timing confound; the "~2× under-forecast" premise (TA-C20) needs a SAME-HOUR reality check before any magnitude surgery. Train-count 2-vs-3 = frequency sub-structure WW3 smooths within one direction family; doesn't move swell Hs/direction. Named blind spot: 1-D-marginal partitioning can't split same-freq/different-direction trains (non-load-bearing here per buoy direction data). Full detail in CONCERNS TA-C20 T3.0-UPDATE + `docs/planning/briefs/T3.0-BOUNDARY-GROUNDTRUTH-2026-07-30.md`.
+- Prior partial note (still valid): an earlier trace showed the WW3 boundary carries ≥2 distinct swell directions + windsea at station 46223 → any swell loss is downstream in our pipeline, not obviously the WW3 data (T3.0 tests this against a REAL buoy + raw `.spec`, not our own trace).
+- **T4.4 Part A (structure-shadow 0/32 diagnosis) — ✅ DONE + coordinator-reproduced 2026-07-30 PM.** Verdict **(ii): 0/32 is geometrically CORRECT** — the deployed HB pier (bbox lat 33.65296–33.65687) sits entirely up-coast of the operator-drawn 32-transect segment (lat 33.65044–33.65280); the pier's alongshore shadow span never overlaps the transect fan (27–139 m gap at all `beach_facing±30°` angles). No geometry defect. **M2 consequence (favorable): QC Gate 3's shadow-bias requirement is SATISFIED** — nothing is wrongly shadowed, so the headline face aggregate is not shadow-biased; no code change needed for M2 on this axis. Residual = invariant 3 over-fires (a harmless per-cycle false alarm); rescoping it is architectural (criterion, trigger 1) → operator decision, tracked as CONCERNS **TA-C21**. Findings: `docs/planning/briefs/T4.4-SHADOW-DIAGNOSIS-2026-07-30.md`. Part B (wire a real tip-depth lookup so the log stops showing 0.0 m) deferred — non-arch, low value, not done this round.
 
 ### Key findings this session (corrected per Fable review 2026-07-29)
 - **The "217 s complete" runs were fake** — established by PRINT forensics (SWAN refused every timestep; L4 TABLE 100% exception values), so the old vacuous gate published garbage/warm-start, not a computed field. **Fable correction:** those *pre-deploy* runs failed on the **D1 over-long-OBSTACLE severe error**, NOT CFL; the **CFL block is the NEW post-D1 blocker**, shown only after T1.1 fixed the obstacle — do not conflate them. (Earlier "L2 alone ~10 min" was an invented figure contradicting "no baseline exists" — struck.) **No real run-time baseline exists yet.**
@@ -871,6 +886,20 @@ weather snapshot across all 72 h with no SWAN error.** Representation (a `comput
   the split is the hybrid fallback). Do NOT change `_OBSTACLE_PARAMS` or any coefficient. Do NOT switch
   to BSBT. If the manual/code contradicts this contract at a cited line, STOP and surface.
 
+- **IMPLEMENTATION LANDED (2026-07-29; local `main`, NOT pushed): commits `19d7994` (swan_formats.py),
+  `71d70f9` (swan_runner.py), `1d82be5` (provider caller).** Representation = a new bool
+  `stationary_sequence` alongside `stationary`; the full-run caller (`_run_all_spots_locked`) now passes
+  `stationary=True, stationary_sequence=True`. I/O gates decoupled via `not stationary or stationary_sequence`.
+  **Additional emission site NOT in the original code map, fixed in-scope (coordinator ruling 2026-07-29,
+  in-scope for T1.0 — not architectural):** the L2 deep-water-reference (DWR) SPECOUT/TABLE patch block in
+  `swan_runner.py` (~`:3210-3260`, four `OUTPUT`-clause sites + the T4B.4 per-transect variant) gated its
+  per-hour `OUTPUT` on a text-scan for `COMPUTE NONST`, which the new mode never emits — it would have
+  silently frozen the open-beach DWR spectrum to one snapshot (same Fable finding-1 trap, missed site).
+  Fixed with a combined `_dwr_output_enabled = (_dwr_is_nonstat or stationary_sequence) and _dwr_tbeg is
+  not None` and a `COMPUTE STAT` timestamp fallback scan. Coordinator-verified by independent generation
+  matrix (new mode = 72 `COMPUTE STAT`, `MODE NONSTATIONARY`, `CIRCLE 72`, NONSTAT inputs, `NUMERIC alfa`;
+  both existing modes unchanged bar the approved `CIRCLE 72`). Concerns: TA-C09.
+
 **Accept:** (1) unit test asserts the new mode emits `MODE NONSTATIONARY` + `NONSTAT` inputs + per-hour
 `OUTPUT` + a multi-line `COMPUTE STAT` sequence (one per forecast hour) + `HOTFILE` + `NUMERIC alfa`, and
 that inputs are NOT frozen; a generated INPUT has 72-ish `COMPUTE STAT` lines and `CIRCLE … 72 …`.
@@ -910,9 +939,58 @@ surfaced (not asserted from the old runs).
 
 ---
 
-### Phase 2 — Correct the spectrum & handoff (root cause corrected 2026-07-29)
+### Phase 2 — Correct the spectrum & handoff (root cause corrected 2026-07-29; **RECONCILED 2026-07-30 — see status update**)
 
-> **Read `MARINE-MODEL-RESTORATION-CONCERNS.md` "DIAGNOSIS UPDATE 2026-07-29" first.** It OVERTURNS the
+> **★ STATUS UPDATE 2026-07-30 (supersedes the "don't go per-transect" guidance below where they conflict).**
+> Live evidence this session CONTRADICTS the 2026-07-29 diagnosis update's premise. That update claimed "the
+> L4 CURVE table carries 4 non-zero partitions" and therefore ruled the per-transect "read each transect's own
+> stations" approach the *wrong target* — fix the watershed **join** (defect C) instead. But on the deployed
+> L4 **structure-grid** config, the shared diagnostic CURVE returns **empty / out-of-grid EVERY hour**
+> (`single-line handoff pick empty, 0 usable timesteps`, components empty, bulk-fallback 67/67, served
+> `multiSwell`/`breakingFaceHeight` = `None`). So the premise is stale in the current geometry, and its
+> conclusion no longer binds. **Operator direction 2026-07-30: eliminate the single shared CURVE entirely; go
+> per-transect.** Implemented (uncommitted → being deployed): each transect reads its OWN in-grid `PT*`
+> partitions; the shared-CURVE spectrum path is removed. This is now the chosen approach; T2.1's "do NOT
+> reinstate own-stations" is **superseded** for the spectrum handoff.
+>
+> **Latent/bypassed — defect B (curve-clip rotation).** The likely reason the shared CURVE is empty is that the
+> curve-clip bbox is still misaligned to the rotated L4 grid (defect B, thought fixed in `daddf19`). Per-transect
+> **bypasses** the CURVE, so the handoff no longer depends on it — but defect B may still be latent for any other
+> CURVE consumer. Do NOT assume `daddf19` is effective without a trace (T2.0 still valid as a check).
+>
+> **What Phase 2 now IS (the real magnitude work, = TA-C20 in CONCERNS) — UPDATED 2026-07-30 PM, operator-approved,
+> briefs-grounded, specced below as T2.2 + T2.3:**
+> **Baseline correction:** the "~2× under / 8–10 ft" premise was a STALE comparison — that Surfline screenshot was
+> LAST NIGHT's bigger swell. The **current cam (operator, 2026-07-30) reads 4–5 ft "chest to head."** So the true
+> magnitude gap is much smaller than "2×"; the fixes below are about **measuring in the correct location and
+> defining the headline correctly**, NOT inflating to 8–10 ft. Validate against the **contemporaneous cam**, and
+> **do not over-shoot it.**
+>
+> **★ TRACE-CONFIRMED 2026-07-30 PM (diagnosis DONE — supersedes "diagnose before fixing" below):** the live QB
+> trace (fresh run 21:15:40Z→21:56:25Z) shows **cause #1 does NOT occur on f337648** — the handoff lands CLEAN at
+> ~2.5 m (Qb≈0.04, ~98 % of the Hsig peak), the guard never fires (2144/2144 "selected"), and served best_peak
+> (4.7–5.0 ft) MATCHES the cam. So **T2.2 needs NO handoff change** (only the latent, LOW-priority half-applied
+> fix), and **T2.3 is latent for multi-swell days** (today is one dominant swell). Cause #3 already resolved by
+> T3.0. The "(1)/(2)" framing below is retained to spec the LATENT fixes; it is no longer a live magnitude emergency.
+> (1) **T2.2 — handoff sampled inside the breaking zone.** `1.3·Hs/γ` places the handoff at ~1.46 m — below HB's
+> measured QB=0 floor (~3.7 m, SURF-ZONE-MODEL §2.3.4), i.e. after SWAN breaks the wave (~3 m). Fix = restore the
+> clean-zone (QB≈0) handoff the design already specifies (the wired-but-not-firing `refine_handoff_with_qb` guard);
+> amends ADR-093 Am2. **Diagnose (live QB trace) before fixing.** Operator-approved in chat.
+> (2) **T2.3 — headline = max-single-partition, not the combined sea state.** Fix = the conditional swell-combination
+> rule from MARINE-SURF-FISHING §11.3 (WaveSEP/AUSWAVE; 75 %/50 % thresholds, ±3 s/±45° compatibility, energy
+> superposition), confirmed by NOAA/NWS/BoM (combined SWH = √ΣHs²) + Surfline (combines primary+secondary, gives a
+> range). Operator-approved in chat 2026-07-30.
+> (3) **residual/train-count — RESOLVED by T3.0** (NOT a Phase 2 code fix): boundary conversion is byte-faithful; the
+> real buoy AGREES with our WW3 input; the 2-vs-3 train difference is WW3 frequency-resolution within one swell
+> direction family, not our loss. The old "period 16 s vs 12 s doubles it" idea was **WRONG** (≈0 % at HB's shallow
+> handoff). Any face-scale-convention question folds into T2.3's K-G handling.
+>
+> **Done this session, do NOT redo:** high-tide zeroing (HAT landward boundary, deployed `73ce11f`); per-transect
+> spectrum handoff (deploying now). **M1 (a real run) is met; magnitude is M2** — the plan already says M1 does
+> not claim reality-match.
+
+> **Read `MARINE-MODEL-RESTORATION-CONCERNS.md` "DIAGNOSIS UPDATE 2026-07-29" first — but see the STATUS UPDATE
+> above; parts of it are now superseded.** It OVERTURNS the
 > earlier C-E05/C-E09 theories: the L4 `TABLE_PT*` are NOT exception values (the L4 CURVE table carries 4
 > non-zero partitions; L2 DWR carries 2), and "read each transect's OWN L4 stations" is the **wrong
 > target**. The real causes are **defect B** and **defect C**. **Do NOT assume a boundary cap on trains:**
@@ -956,14 +1034,233 @@ and collapsing the trains to 1. Same mechanism as the "flat/static across all 67
 the 8.1 s bulk TM01; swell not flat across 67 h; a **known-answer test** on `parse_table_pt_partitions` (a
 synthetic 3-partition table → 3 components). The L2→D1 path is not broken.
 
+> **T2.0/T2.1 status (2026-07-30):** largely **CLOSED/superseded by T3.0.** T3.0 proved
+> `ww3_spectrum_to_swan_boundary()` is a byte-faithful passthrough (raw Hs 0.894 = converted 0.894,
+> 0.00%) — so **no boundary-writer / defect-C join fix is warranted** (verdict (a) ruled out). The
+> remaining Phase 2 magnitude work is **T2.2 (cause #1) + T2.3 (cause #2)** below, both **operator-approved
+> in chat 2026-07-30** and both grounded in the research briefs (not first-principles). See CONCERNS **TA-C20**.
+
+---
+
+#### T2.2 — Cause #1 (TA-C20): the SWAN→SwellTrack handoff is sampled INSIDE the breaking zone
+- Owner: `clearskies-api-dev` (diagnose→fix) + Coordinator (QC + reality validation) + `clearskies-auditor` (blind adversarial)
+- Files (allowlist, to be finalized after the diagnosis pins the site): `services/transect_handoff.py`
+  (`select_hourly_handoff`:613, `breaking_margin_depth_m`:588, `refine_handoff_with_qb`:821); `services/swan_runner.py`
+  (the two `refine_handoff_with_qb` call sites ~:951 and ~:2189, and where `station_qb`/`station_depths_m` are
+  assembled per transect); possibly `services/surf_1d_pipeline.py` (`_truncate_bathy_at_handoff`, the handoff-depth
+  truncation ~:138-151). NEW test under `tests/services/`.
+- Architectural: **operator-APPROVED in chat 2026-07-30** ("measure the wave in the proper location, not after the
+  break"). This restores the **clean-zone (QB≈0) handoff the design already specifies** and **amends ADR-093
+  Amendment 2**. Do **NOT** change γ (0.73), the K-G/Caldwell face conversion, or Amendment 4's HAT landward boundary.
+
+> **⚠ SUPERSEDED for current code by the TRACE-READ RESULT below (2026-07-30 PM).** The broken-wave framing in
+> this paragraph was the early-diagnosis / pre-f337648 picture (handoff at ~1.46 m, inside the surf zone). The fresh
+> traced run shows the deployed f337648 handoff actually lands at **~2.5 m, Qb≈0.04 (clean, ~98 % of the Hsig peak)**
+> — NOT on a broken wave — so cause #1 does not occur. Kept for history; the TRACE-READ RESULT is authoritative.
+
+**The defect (data-backed — TA-C20 + the real HB SWAN field + the briefs' own HB measurement):**
+The per-hour handoff depth is `target = 1.3 · Hs(hour) / γ` (`breaking_margin_depth_m`, γ=0.73 → `target ≈ 1.78·Hs`),
+and `select_hourly_handoff` samples the L4/L3 station nearest that depth; the 1-D profile is then **truncated** at the
+handoff (`surf_1d_pipeline._truncate_bathy_at_handoff`), so **no break can be reported deeper than it**. For HB's
+~1 m Hs that lands the handoff at **~1.46 m depth** — but SWAN's own field shoals the wave UP and breaks it at
+**~3 m** (TA-C20 real run: 1.06 m@10 m → 1.44 m@3 m PEAK → 1.21 m@2 m broken). So SwellTrack is handed the
+**already-broken, smaller** wave (~1.1 m), not SWAN's ~1.44 m pre-break peak → served face ~4.5 ft vs SWAN's own ~6 ft.
+
+**Handoff architecture (operator-clarified 2026-07-30 — the cause is SPECIFIC to L4):** the deployed handoff
+selection (`select_hourly_handoff`, ADR-093 Am2 + E5 ruling) is **L4 → L3 → L2**, and per the code's own KNOWN-GAP
+note the L3 branch is **not wired** in the run path — so in practice it is **L4 (structure grid) OR L2 (fixed
+`l2_reference_depth_m` = 15 m)**. **Open beach / any transect that does NOT intersect the L4 grid hands off at L2 =
+15 m** (deep, clean, well seaward of the break — cause #1 does NOT apply there). **Cause #1 is specifically the L4
+(structure-grid) SHALLOW handoff** (~2–3 m near the pier), where the structure band overlaps the breaking zone.
+
+**Governing briefs (READ these — the fix is derived from them, NOT invented):**
+- **`SURF-ZONE-MODEL-BRIEF.md` §2.3.3** (handoff risk table): **`< 5 m` depth → "QB very likely > 0 for moderate+
+  waves, NOT recommended as handoff depth"**; clean physics zone 10–15 m (open) / 5–8 m (structure). Its **worked HB
+  example** measured **QB = 0 only from 15 m down to ~3.7 m** — below that SWAN is actively breaking. **NOTE:** §2.3.4's
+  fixed "10 m open-beach default / 5 m floor" is **SUPERSEDED by ADR-093 Amendment 2** (open-beach handoff is now L2
+  15 m, not 10 m); cite §2.3.3's clean-zone PRINCIPLE, not §2.3.4's superseded depth numbers. **§2.3.1** published
+  criteria (context, all deeper than `1.3·Hs/γ`): XBeach `max(10 m, 2·Hs)`; Deltares `≥ 3·Hs, cg/c < 0.9`; CoSMoS
+  −15 m; Fiedler 11 m. **§2.3.4 Step 4** = the runtime QB-refinement (`refine_handoff_with_qb`): scan **seaward**
+  until QB≈0; never serve a breaking cell — this applies on the **L4** path.
+- **`ADR-093` Amendment 2 §2** — the deployed `1.3·Hs/γ` per-hour handoff (the doc under amendment). Its premise
+  ("SwellTrack is the weaker model; hand off shallow so SWAN carries more") is **contradicted by SURF-ZONE-MODEL §1
+  and §6.1**, which make SwellTrack (fine 1–2 m grid + roller) the **surf-zone authority** SWAN's coarse grid
+  over-dissipates — so SWAN must hand off in the clean zone and let SwellTrack do the breaking.
+
+**The guard that SHOULD prevent this already exists and is wired — it is not firing at HB.**
+`transect_handoff.refine_handoff_with_qb()` (`:821`, T4A.10 / brief §2.3.4 Step 4) is called in the run path at
+`swan_runner.py:951` and `:2189`. Contract (its own docstring): **"never serve a sample from a breaking cell"** —
+if SWAN's QB at the selected station exceeds `qb_threshold` (0.05, cited to SURF-ZONE-MODEL §2.3.3) it moves the
+sample **seaward** (toward deeper water) up to `max_deepening_stations=5`, else raises `HandoffBreakingError` and the
+hour MUST fail. It carries a 2026-07-27 contract-conformance note: callers previously nulled the WHOLE QB array
+whenever ANY station was dry, switching the guard **off permanently** (a station at QB=0.154, 3× threshold, was
+being served) — that was "fixed" per the note; **verify it on the live run**.
+
+**Do — PART A (DIAGNOSE FIRST, no fix): live QB + handoff-depth trace on HB's transects (fresh run only). — ✅ DONE 2026-07-30 PM.** Result (see TRACE-READ RESULT below): the guard never fires, the handoff lands clean at ~2.5 m (Qb≈0.04), cause #1 does not occur; served magnitude matches the cam. PART B (half-applied) remains as a latent low-priority fix.
+Instrument, per transect per hour: the `target` depth, the station index/depth `select_hourly_handoff` picked, SWAN's
+QB at that station and at each seaward station, and what `refine_handoff_with_qb` did (moved / clean / raised /
+returned-unchanged-because-QB-unavailable). Determine **why the handoff is not moving to the QB≈0 clean zone** at HB —
+candidates: (a) QB data not reaching the guard (the 2026-07-27 null-array regression, per-station `None` handling);
+(b) the L4 structure grid is too shallow to offer a clean station within the 5-station cap; (c) `1.3·Hs/γ` drags the
+initial pick below HB's ~3.7 m clean floor and the cap can't recover; (d) the guard is firing but the **truncation**
+(`_truncate_bathy_at_handoff`) still cuts the profile at a broken depth. Report which, with the numbers. **Run on a
+process whose start-time postdates the deploy (D4); the served cache is not valid until the in-progress run finishes.**
+
+**Do — PART B (FIX, after diagnosis + coordinator confirms scope):** make the handoff honor the clean-zone (QB≈0 /
+unbroken) rule the design already specifies (SURF-ZONE-MODEL §2.3.3/§2.3.4 + the `refine_handoff_with_qb` contract).
+The exact edit depends on Part A's root cause — do NOT pre-commit a fix here; bring the diagnosis to the coordinator,
+who confirms the specific change before code. Amend **ADR-093 (new Amendment 5)** in the SAME commit (doc-code sync).
+
+> **CONFIRMED CODE FINDING (2026-07-30 PM, coordinator code-read — FIX as part of PART B): the seaward
+> advancement is HALF-APPLIED.** When `refine_handoff_with_qb` moves the sample seaward to a clean pre-break
+> station (transect_handoff.py:986-999), it updates `station_index`/`station_depth_m` (so the SPECTRUM is read
+> from the deeper clean station) **but leaves `handoff_depth_m` UNCHANGED at the original target `1.3·Hs/γ`.**
+> The 1-D profile truncation `_truncate_bathy_at_handoff` (surf_1d_pipeline.py:1031/1198) truncates on
+> `handoff_depth_m` (the un-advanced target) — so a seaward move advances the spectrum the model reads but NOT
+> the seaward boundary of the model's domain: SwellTrack starts its march shoreward of where its own boundary
+> spectrum was measured. Small in magnitude (~0.5 m near the peak) but a genuine inconsistency. **Fix: on a
+> seaward move, carry the advanced depth through to `handoff_depth_m` (or truncate on `station_depth_m`), so the
+> profile boundary follows the advanced sample.**
+>
+> **TRACE-READ RESULT (2026-07-30 PM — fresh run restart 21:15:40Z → cache 21:56:25Z; DONE, trace reverted):**
+> across all **2144** HB `handoff_selection` records: `qb_refined`=0, `clamped`=0, breaking-exhausted=0, reason
+> **100 % "selected"** — **the guard NEVER fires because the initial pick is already clean.** L4 `TABLE_PT` ground
+> truth (transect 0, 18:00): Hsig peaks 1.425 m @3.08 m (Qb 0.008); Qb crosses 0.05 between 2.66 m (0.029) and
+> 2.27 m (0.071); the handoff lands at **2.5 m → Qb ≈ 0.04 (clean, ~98 % of the Hsig peak)** — NOT in the broken
+> zone (the "1.46 m inside surf zone" was the PRE-f337648 shared-CURVE state). Served best_peak **4.7–5.0 ft** ≈
+> the 4–5 ft cam. ⟹ **The half-applied advancement is LATENT/moot for HB** (chosen≈target, mean diff 0.00 m; it
+> bites only when the guard moves a station — other spots/bigger swells). **Keep the PART B fix as LOW priority
+> (real correctness bug), NOT the magnitude lever it was framed as.** Cause #1 = resolved on f337648. Deployed
+> stage name is `handoff_selection` (the `_merge` twin at :2203/:2228 is the retired spot-level path, 0 records).
+
+**Accept:** on a fresh matched-time run — (1) every served HB transect's handoff sits at a depth where SWAN's
+QB ≤ 0.05 (in the clean zone, ≥ HB's ~3.7 m floor), evidenced in the trace; (2) the 1-D profile is no longer
+truncated at a broken depth, so the break is reported inside SwellTrack's domain; (3) the served best-peak face rises
+toward SWAN's own pre-break value; (4) a **known-answer test**: a synthetic transect whose QB>0.05 at the
+`1.3·Hs/γ`-nearest station and QB≈0 two stations seaward → the handoff resolves to the seaward clean station (fails
+against pre-fix code); (5) **reality**: the served surf face matches the contemporaneous cam within the T3.1 pinned
+tolerance (do NOT over-shoot — if it now exceeds observed, that is a finding, not a pass).
+
+**Doc-sync:** `ADR-093` Amendment 5 (handoff = clean-zone/QB≈0, superseding Am2's `1.3·Hs/γ` placement);
+`PROVIDER-MANUAL.md` handoff section; `MARINE-WORKING-MODEL-CONCERNS.md` TA-C20.
+
+---
+
+#### T2.3 — Cause #2 (TA-C20): the surf-height headline uses MAX-SINGLE-PARTITION, not the combined sea state
+- Owner: `clearskies-api-dev` (impl) + `clearskies-test-author` (known-answer tests) + Coordinator (QC) + `clearskies-auditor` (blind)
+- Files (allowlist): `services/surf_1d_pipeline.py` (the headline `best_peak_face_height = max(open_face_heights)` at
+  `:1236` and its twin at `:2131`; the per-transect `best_face_height_m` = max-over-partitions at `:134-136`; the
+  combined `Hs_total = √(ΣPi²)` site); `enrichment/breaker_height.py` (K-G/Caldwell `hsig_to_face_height` — the face
+  conversion, NOT to be double-counted); `models/responses.py` (served surf fields, if a range/combined field is added).
+  NEW test under `tests/services/`.
+- Architectural: **operator-APPROVED in chat 2026-07-30** — adopt the **conditional swell-combination rule** from
+  `MARINE-SURF-FISHING-RESEARCH-BRIEF §11.3` (WaveSEP/AUSWAVE), NOT a naive "always RSS." This is a metric-definition
+  change (trigger 4). Keep per-partition outputs (swell card) and the K-G conversion.
+- **STATUS (2026-07-30 PM trace): NOT today's lever — LATENT for multi-swell days.** The fresh traced run showed HB
+  running **one dominant swell** (swellDominance 1.0 / 0.6) → §11.3's own rule returns "dominant only" → the
+  combined metric would not change today's headline, and served best_peak (4.7–5.0 ft) already matches the cam
+  (4–5 ft). This fix is real for correctness on genuinely multi-swell days but is **not the current-conditions
+  magnitude fix**; implement it **guarded so it can never over-shoot** a single-dominant-swell day, and validate on
+  a real multi-swell sea state (not today's).
+- **DONE + QC GATE 2 AUDITED (2026-07-30 PM).** Implemented `6f525b2` (`_combine_partition_faces_11_3` in
+  `surf_1d_pipeline.py`, both best_face sites); §11.3 with NO directional filter (SWAN handles it, operator-approved);
+  known-answer tests `7d52e68` (7 branches, coordinator re-ran 38 green); blind auditor: CLAIM 1 (T2.2 PART B) and the
+  §11.3 arithmetic (energy basis, 75/50 thresholds, ±3 s/±45° gate + wrap-around, RSS, γ·d cap, NO double-count, S4
+  invariant) **could not be disproved**. Auditor CLAIM-2 finding: the dominant-only branch returns the
+  dominant-by-ENERGY partition's face, which ≠ old `max(face)` in general. **Coordinator-verified NON-issue on current
+  data:** the near-term served window is **256/256 open transect-hours single-partition** → §11.3 == old max →
+  **served best_peak unchanged today** (cam match preserved). The divergence is not physically reachable under the
+  continuous γ·d saturation (bigger energy → deeper break → bigger face). **DEFERRED CHECK:** on the first genuine
+  multi-swell day (≥2 significant partitions on a transect, no >75% dominant), reality-validate best_peak vs the
+  contemporaneous cam before trusting the combined headline. NOT pushed/deployed yet (awaiting operator "push").
+- **✅ DEPLOY HOLD LIFTED (2026-07-30 evening) — CONCERNS TA-C23 RESOLVED (correct physics).** The Surfline comparison
+  was investigated by faithful replay of the DEPLOYED (f337648) pipeline against the real T0 handoff inputs. Finding:
+  swells are NOT lost — SWAN hands off 3 partitions and SwellTrack runs all; the dominant (1.30 m/14.7 s) breaks and
+  sets the correct 4.7 ft headline; the **secondary handed off is a small 0.506 m / 7 s wave that legitimately does not
+  reach `H/d≥γ` at breakable depth** on the gentle sandy profile (correct physics, not a gap). Secondaries DO break
+  when big enough — **215 secondary breaks across the served 67 h × 32-transect cache.** T2.3 (combined-swell) is
+  therefore NOT globally inert (it fires when compatible secondaries break) but does not change THIS spot's headline:
+  a 15 s + 7 s pair is period-incompatible under §11.3 (Δ≈7–8 s ≫ 3 s), so the dominant stands alone. Showing a
+  distinct 7 s secondary is a separate multi-swell **display** feature, not what T2.3 does. **T2.3 is valid to deploy
+  on its own merits.** See CONCERNS TA-C23 for the full replay + the station-selection lesson (handoff clamps to an
+  INTERIOR band station, not the shallowest/boundary cell).
+
+**The defect:** the headline `best_peak_face_height` is the **largest SINGLE swell partition's** face (each partition
+is transformed and broken independently, and the code reports `max` over partitions/transects). When multiple
+significant swells are present, SWAN breaks the **combined** sea state — larger than any single partition — so the
+single-partition headline **under-reports**, and splitting can make it DROP (TA-C20 cause #2).
+
+**Definition + precedent — surf/breaking height is the COMBINATION of the significant swells, never the single
+biggest (confirmed by our briefs AND external operational practice):**
+- **`MARINE-SURF-FISHING-RESEARCH-BRIEF.md` §11.3 — "Multi-Swell Integration Methodology" (the APPROVED rule),
+  sourced to Chawla et al. 2013 (WW3 partitioning), Hanson & Phillips 2001 (WaveSEP), BoM AUSWAVE operational
+  practice:**
+  - **Directional filter first:** drop swell from the spot's blocked/exposed directions before combining.
+  - **If primary swell energy > 75 % of total → use the primary (dominant) swell only.**
+  - **If secondary swell energy > 50 % of primary → energy-superpose:** `H_combined = √(H₁² + H₂²)`,
+    energy-weighted period `T_combined = (T₁·E₁ + T₂·E₂)/(E₁ + E₂)`, with `E = ρ g H²/8`.
+  - **Otherwise → use the dominant swell only.**
+  - **Compatibility gate for superposition:** similar periods **±3 s**, compatible directions **±45°**.
+- **`1D-MODEL-BENCHMARK-BRIEF.md` §7.9** treats **"per-partition RSS `Hs_total > any single partition` — any
+  violation → model bug"** as a **validation invariant** (S4 mixed-swell test case, §7.8).
+- **`SURF-ZONE-MODEL-BRIEF.md` §7** (per-partition pipeline): each partition breaks at its own bar; at each transect
+  point `Hs_total = √(P1²+P2²+P3²)`; K-G/Caldwell applied at each partition's break; headline = best-peak/spot-avg
+  face across **OPEN** transects (§2.2.3/§2.2.5).
+- **`WAVE-BREAKING-CONVERSION-BRIEF.md`** — the Hs→face conversion (Komar-Gaughan 1973 default / Caldwell 2007;
+  face ≈ 1.15–1.27× Hs for ground swell) and its **double-count guard** (§4: apply reduced amplification when SWAN
+  output is already nearshore — do NOT re-shoal what SWAN/SwellTrack already shoaled).
+- **External operational standard (WebSearch 2026-07-30):** NOAA/NWS + BoM define combined significant wave height
+  as **√(Σ Hs_i²)** (Pythagorean sum of swell + windsea); **Surfline/LOTUS** computes surf height from the
+  **primary AND secondary** swells and reports a **range** based on how they interact. The operator's own cam
+  screenshot corroborates: swells 2.5 + 2.8 + 1.7 ft combine (RSS) to ≈ **4.1 ft**, surf read **4–5 ft**; the single
+  biggest swell (2.8 ft) is ~half.
+
+**Do — the fix (apply the §11.3 rule, honoring the guardrails):**
+1. Per transect, combine the transformed partitions per the §11.3 decision rule above — **but SKIP §11.3's
+   "directional filter" step (operator-approved 2026-07-30 PM after in-project SWAN-manual research; implemented in
+   `6f525b2`).** The per-transect partitions are SWAN's PT* Hanson & Phillips (2001) watershed partitions read at the
+   handoff, already POST-refraction/shoaling/shadowing (SWAN manual: 2D→1D handoff via SPECout, lines 539–543; PARTIT
+   via Hanson & Phillips, lines 5275–5306), so re-dropping blocked directions would DOUBLE-COUNT what SWAN's 2D physics
+   already did. Apply only the 75 %/50 % energy thresholds → energy superposition with the ±3 s/±45° compatibility gate.
+2. Apply the combination to the **breaking** sea state, respecting the **depth-limited γ·d cap on the COMBINED wave**
+   at the break (SURF-ZONE-MODEL §7) — combine energy, then cap, then K-G/Caldwell face conversion **without
+   double-counting shoaling** (WAVE-BREAKING-CONVERSION-BRIEF §4).
+3. Headline `best_peak_face_height` = max over **OPEN** transects of the **combined** breaking face; `spot_average` =
+   mean over open transects. Keep per-partition break info (period/direction/peel) and the swell card unchanged.
+4. **Optionally** report a **range** (Surfline-style) reflecting constructive/destructive interaction — flag as a
+   secondary decision if the operator wants a single number vs a range.
+
+**Do NOT:** change γ; double-count the K-G conversion; drop `multiSwell`/`spectralComponents`; naively RSS
+incompatible swells (the ±3 s/±45° gate and the 75 %/50 % thresholds exist precisely to prevent that).
+
+**Accept:** (1) **known-answer test** on the combination rule — three synthetic partition sets exercising each branch:
+primary >75 % → dominant only; secondary >50 % + compatible → superposed `√(H₁²+H₂²)` with the energy-weighted period;
+incompatible (Δperiod >3 s or Δdir >45°) → dominant only (fails against the pre-fix `max`-only code). (2) The S4
+mixed-swell invariant holds: combined > any single partition when superposition applies. (3) Served headline reflects
+the combined sea state (not max-single) and per-partition/swell-card outputs are retained. (4) **Reality:** matches the
+contemporaneous cam within the T3.1 pinned tolerance — with cause #1, verify the pair does not OVER-shoot observed.
+
+**Doc-sync:** `API-MANUAL.md` (surf response — `breakingFaceHeight`/best-peak definition = combined sea state per
+§11.3; add a range field if adopted); `PROVIDER-MANUAL.md` surf-height section; a decision record for the metric
+(new ADR or an ADR-093 amendment); `MARINE-WORKING-MODEL-CONCERNS.md` TA-C20.
+
+---
+
 #### QC Gate 2
-- **Mechanical:** `spectralComponents` carries the trains our boundary actually contains (~2, not forced
-  to 3); published period is the partition peak (not 8.1 s bulk TM01); output varies across hours.
-- **Adversarial:** auditor tries to show the trains are phantom/duplicate or the period mis-surfaced, and
-  confirms the "own-stations" change was NOT re-introduced; known-answer tests pass.
-- **Boundary NOT assumed as the cap:** any residual gap to Surfline's 3 trains is decided by T3.0 (real
-  buoy + raw `.spec` vs reality), not auto-blamed on WW3 — if the raw data has the trains, the loss is ours
-  and stays a Phase 2 fix.
+- **T2.2 (cause #1 handoff) — Mechanical:** every served HB transect's handoff sits where SWAN QB ≤ 0.05
+  (clean zone, ≥ HB's ~3.7 m floor), evidenced in the live trace on a process postdating deploy; the profile
+  is no longer truncated at a broken depth; the ADR-093 Amendment 5 doc landed in the same commit.
+- **T2.3 (cause #2 combined metric) — Mechanical:** the headline reflects the **combined** sea state per the
+  §11.3 rule (not max-single-partition); per-partition/swell-card outputs retained; known-answer test covers
+  all three §11.3 branches (75 %/50 %/compatibility); the S4 invariant (combined > any single) holds.
+- **Adversarial (blind, both):** auditor tries to show — for T2.2, the handoff still samples a breaking cell
+  or the "clean" reading is a QB-unavailable false pass; for T2.3, the combination double-counts K-G shoaling,
+  RSS-es incompatible swells, or drops a partition. Passes only if it cannot and names what it ruled out.
+- **Reality (both, together):** the served surf face matches the **contemporaneous cam** within the T3.1
+  pinned tolerance and does **not OVER-shoot** observed once #1 and #2 are combined — over-shoot is a finding.
+- **Boundary train-count (T3.0-decided, NOT auto-blamed on WW3):** T3.0 already ruled the boundary conversion
+  faithful and the 2-vs-3-train gap a WW3 frequency-resolution property within one direction family (not our
+  bug) — so it is NOT a Phase 2 code fix; `spectralComponents` carries the trains the raw data actually holds.
 
 ---
 
@@ -1030,9 +1327,11 @@ attributed to C-E12; L4→D1 ≥ L2→D1; no flat output.
 #### QC Gate 3 — **MILESTONE M2**
 - **Mechanical:** the T3.1 comparison table (ours vs contemporaneous Surfline) meets the pinned face
   tolerance; the period/train gap is quantified and attributed to C-E12; L4→D1 ≥ L2→D1.
-- **Shadow-bias handling:** the headline face aggregate either **excludes** structure-shadowed transects
-  or records that T4.4's D5 diagnosis shows the shadow classification does not materially bias it (run
-  T4.4 before closing M2 — non-architectural, may run in parallel with Track A).
+- **Shadow-bias handling — ✅ SATISFIED (T4.4, 2026-07-30):** T4.4's diagnosis shows HB classifies 0/32
+  transects as shadowed and that this is **geometrically correct** (pier alongshore-disjoint from the drawn
+  segment). Since nothing is shadowed, no transect is wrongly excluded/included, so the headline face
+  aggregate is **not** shadow-biased. Requirement met without a code change. (Residual invariant-3
+  over-fire is cosmetic; TA-C21, operator decision.)
 - **Adversarial:** auditor validates against reality independently; checks total-right/distribution-wrong,
   flat output, degenerate-sample closure (n=1 partition ≠ pass); known-answer tests green.
 

@@ -718,6 +718,8 @@ The original research produced detailed decision rules for combining multiple sw
 
 **Directional filtering**: Before combining, check each swell component against the spot's 8-direction directional exposure. Swell from blocked directions is eliminated before scoring. This is the purpose of the directional exposure config added to T0C.2 in the plan.
 
+> **Note (2026-07-30, operator-approved — SWAN→SwellTrack pipeline):** in the deployed SWAN-based pipeline this directional-filter step is **NOT re-applied at the partition-combination stage** (T2.3, commit `6f525b2`). The per-transect partitions are SWAN's PT* Hanson & Phillips (2001) watershed partitions read at the *nearshore handoff*, already post-refraction/shoaling/shadowing — SWAN's 2D physics (on the real bathymetry) has already removed or reduced energy from blocked/shadowed directions (SWAN user manual: 2D→1D handoff via `SPECout`, lines 539–543; `PARTIT` via Hanson & Phillips, lines 5275–5306). Re-dropping blocked directions at the combination step would **double-count**. The 8-direction exposure config still governs scoring/structure logic elsewhere; only the *combination-step* directional drop is superseded for this pipeline.
+
 Research basis: WaveWatch III spectral partitioning (Chawla et al. 2013), WaveSEP algorithm (Hanson & Phillips 2001), Australian BoM AUSWAVE operational practice.
 
 ### 11.4 Expanded Wave Quality Assessment Framework

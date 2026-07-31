@@ -7,6 +7,22 @@
 
 ---
 
+## Addendum 2026-07-30 — Face conversion after SwellTrack (SUPERSEDES §4 depth-lerp and §5 code sketch)
+
+**Read this first.** §1–§3 (the three gaps, the Rayleigh statistics table, and the formula catalogue) remain valid reference. **§4's "reduced/full Komar-Gaughan on the SWAN output point" recommendation and §5's `hsig_to_face_height` code sketch (the `output_depth_m < 15` shoaling lerp) are SUPERSEDED** by the SwellTrack architecture (ADR-093 Amendment 2, ADR-095 Amendment 1, tasks T4.3/T4A.7). This addendum records the current, validated design so it is not re-researched. (Operator-directed, 2026-07-30, after re-verifying the convention against the code and the surf-zone literature once the L4 grid was added.)
+
+**What the code does now** (`enrichment/breaker_height.py` + `services/surf_1d_pipeline.py`): the 1D cross-shore model (SwellTrack, `services/surf_1d_analytical.py`) shoals each partition from the SWAN→SwellTrack handoff to its break point, then the face conversion applies **only the flat Rayleigh H1/10 statistical factor — 1.27 × Hs — at the break** (`hsig_to_face_height(..., source="break_point")`). No K-G period term and no shoaling coefficient are applied at the face step. Hawaiian scale = face × 0.5. Per ADR-095 Amendment 1.
+
+**Why the K-G period term is NOT applied at the face step (correct, not a regression).** The period-dependent shoaling that K-G's `(Tp·Hsig²)^0.4` lumped into one closed form now lives **explicitly in SwellTrack**: `_dispersion(T,d)` solving ω²=g·k·tanh(kd), the exact shoaling coefficient `Ks=√(Cg0/Cg)`, Snell refraction, and Battjes-Janssen breaking at γ. Applying K-G on top of SwellTrack's already-shoaled break-point Hs would **double-count shoaling** — precisely the failure §3 (Formula 4) and §4 warn against. The long-period signal (the "ankle slop vs overhead" discriminator, Gap 2) is preserved inside SwellTrack's dispersion/shoaling, not lost. (SwellTrack's dispersion solver was hardened specifically to avoid *inflating* long-period shoaling — see the `_dispersion` docstring.)
+
+**Why 1.27 (H1/10), not §4's ×1.15.** 1.27 = H1/10 ÷ H1/3 for a Rayleigh (narrow-band) sea state = the "set-wave" face, which is what Surfline reports as face height. The surf-zone wave-height distribution is **~Rayleigh at the outer edge / onset of breaking**, narrows below 1.27 only in the *mid* surf zone (depth-limited truncation), and returns to Rayleigh near shore (surf-zone distribution literature, 2026-07-30). SwellTrack applies the factor **at the computed break point (onset)** — where Rayleigh holds — so 1.27 is better-grounded there than §4's cruder "×1.15 at a fixed ~2–3 m depth," which could land mid-surf-zone. Empirically corroborated 2026-07-30: served best-peak 4.7–5.0 ft matched a 4–5 ft cam; ×1.15 would under-serve.
+
+**L4 vs L2 handoff — the face convention is handoff-agnostic; do NOT branch it.** Both the L4 (shallow ~2–3 m structure-grid) and L2 (deep 15 m open-beach) handoffs feed the *same* SwellTrack, which shoals to the *same* physical break point and applies the *same* 1.27× there. Handoff depth changes only the SWAN-vs-SwellTrack split of the total shoaling, not the break-point Hs or its statistics. The only real L4-vs-L2 asymmetry is the **clean-handoff guarantee** — a shallow L4 handoff must not land in the QB>0 breaking zone, or SwellTrack receives an already-broken Hs — which is the `refine_handoff_with_qb` guard's job (see `MARINE-WORKING-MODEL-PLAN.md` T2.2), NOT a face-convention issue. Face factor validated; the L4 risk is handoff cleanliness, tracked separately.
+
+**Governing records:** ADR-095 Amendment 1 (decision: 1.27× H1/10 at break, `source="break_point"`; depth-lerp eliminated) · ADR-093 Amendments 2 & 4 (handoff surface) · `docs/manuals/API-MANUAL.md` "Breaker formulas" + surf-response height fields.
+
+---
+
 ## §1 — The Problem: Three Gaps Between Hsig and What Surfers See
 
 SWAN outputs significant wave height (Hsig, also written Hm0) — the average height of the highest one-third of waves in the sea state. This is a purely oceanographic metric. Three gaps exist between Hsig and the wave height surfers observe at the beach:
