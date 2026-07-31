@@ -394,9 +394,138 @@ handles the new points).
   storm-surge and wave-runup terms that flood-planning TWL adds (FEMA / Stockdon 2006), because a surf
   model has no reason to model ground that is only submerged during the storm.
 
+### Amendment 5 (2026-07-31): Geography-aware study-area geometry — isobath-normal facing, open-water L1 aim, OMBB L4 axis, curvature-derived break-type, obstacle representation
+
+**Status: Accepted.** Approval of `docs/planning/MARINE-GEOMETRY-MODEL-PLAN.md` IS the acceptance of this
+amendment's architecture (operator ruling 2026-07-30, recorded in that plan). This amendment records the
+SWAN-model-**derivation** changes of the Marine Geometry-Model Plan — architecture decisions **AD-1, AD-3,
+AD-4, AD-5, AD-8**. The net-new geography-**determination** subsystem those decisions consume (OSM coastline,
+the wrap-aware fetch/openness fan, water-body classification, and the two-stage study-area basis — AD-2, AD-6,
+AD-7) is a distinct decision recorded in **ADR-100**, which this amendment cross-references throughout.
+
+**Scope discipline — what this amendment does NOT change.** It changes *what bearing / exposure / open-water
+direction / grid axis is passed into the existing, validated sizing and handoff code* — **not** the sizing
+formulas (`1.3 × Hs / γ`, γ = 0.73, `_MIN_DESIGN_HS_M`, the 30 m/15 m contour criteria, tier resolutions, the
+shadow-union + 2λ formula), **not** the 2D→1D handoff surface or its first-match L4→L3→L2 control flow, **not**
+the convergence gate, the hotstart mechanism, the all-stationary COMPUTE sequence, the `CIRCLE 72` directional
+resolution, the HAT landward boundary (Amendment 4), the deep-water reference (always L2 at the spot's own 15 m
+contour), or L1/L2/L3 axis-alignment (only L4 rotates). It also changes **no SWAN command syntax** — only the
+computed **values** that flow into the existing, working `CGRID`/`NGRID`/`INPGRID`/`READINP`/`BOUNDSPEC`/
+`OBSTACLE`/`NESTOUT`/`BOUNDNEST1` emission (MARINE-GEOMETRY-MODEL-PLAN "OFF LIMITS"; operator directive
+2026-07-30). See that plan's OFF-LIMITS fence for the exhaustive list.
+
+**Why this amendment exists.** The single-cross-shore-facing model — one beach-normal per spot, derived as the
+perpendicular of the operator-drawn shoreline segment (`_segment_bearing`→`_perpendicular_bearing`,
+`config/marine_config.py`) — is inadequate for the US coasts this system must serve: curved shores, point
+breaks, bays, island-sheltered coasts, and the Great Lakes. Amendments 1–4 built the working nearshore model
+against a straight-open-beach mental model; this amendment replaces the *derivation* of where and which way that
+model looks — beach facing, transect bearing, L1 aim, the WaveWatch III boundary sides, exposure, the L4 axis,
+and the L3 trigger — with a **geography-aware, automated** determination grounded in bathymetry isobaths and the
+actual open-water geometry.
+
+**AD-1 — Shore-facing is the isobath-normal, derived per-transect (replaces segment-perpendicular).**
+`beach_facing_degrees` and each transect bearing are derived from the **local shallow-isobath heading** (the
+2 m / 5 m depth-contour trend from the setup-time bathymetry), smoothed over ≈ the surf-zone width / the ~300 m
+study segment, taken **perpendicular** (seaward sense) as the shore-normal — **per-transect** where the shore
+curves, collapsing to a single value on a straight beach. Isobath heading is **datum-robust** (a datum shift
+slides a contour, barely rotates it), which sidesteps the DEM 0 m-datum sensitivity of the drawn segment.
+Degenerate/flat bathymetry falls back to the segment-perpendicular value with a WARNING. **This REOPENS
+Amendment 2 §3's deferral of contour-orientation derivation** ("specified nowhere and built nowhere") — it is
+now specified (this amendment / MARINE-GEOMETRY-MODEL-PLAN G1) and built. **Sizing stays coverage-driven** (a
+settled operator framing, 2026-07-30): with per-transect bearings the offshore contour is measured per-transect
+and L2 encloses the **union** of all transects' reaches (the covering envelope it already computes), not a
+single representative bearing; the bearing's only sizing role is the direction the contour distance is measured
+along. Implemented MARINE-GEOMETRY-MODEL-PLAN G1 (`enrichment/bathymetry.py` new heading helper;
+`config/marine_config.py`; `services/swan_formats.py`; `services/grid_sizing_chain.py`; `services/swan_domain.py`
+L2/L3 sizing).
+
+**AD-3 — L1 offshore aim and WW3 boundary sides come from open water, not the beach bearing.** `_compute_level1`
+aims its offshore extension along the **open-water bearing** (ADR-100 fetch fan) instead of
+`mean_offshore_bearing_deg`; `ww3_station_selection`'s offshore-**side** selection uses the same open-water
+bearing (the single shared source). L1 and L2 **remain axis-aligned** — only the aim/extent value moves, never
+rotation. **Islands, headlands, and peninsulas in a swell corridor** (an ADR-100 *wrap-candidate* direction):
+L1 is enlarged to **enclose the intervening land AND the open water beyond it** so SWAN computes the
+refraction/diffraction wrap-around at the spot — *"islands are MODELLED, not flagged,"* extended to headlands
+and peninsulas. **The fetch fan sizes the domain and picks the boundary side; SWAN computes the wave** — the fan
+never decides how much energy arrives. **Great Lakes:** L1 is sized from lake-geometry/fetch (no shelf edge;
+`find_shelf_distance` returns the nearest *ocean* shelf and would oversize a lake L1), routed to the GLWU WW3
+product that already exists. The WW3 station **qualification** criterion (`deep water OR tanh(kd)`) and the
+`BOUNDSPEC SIDE VARIABLE FILE` emission are unchanged — only the aim/side *input* changes. The selection
+pipeline stays **cardinal-only (N/E/S/W)**; the side set is not extended to diagonals. Implemented
+MARINE-GEOMETRY-MODEL-PLAN G2 (`services/swan_domain.py`, `services/ww3_station_selection.py`,
+`services/shelf_boundary.py` lake branch). *Resolves Phase-5 D6c (enlarged-L1 Bolsa → 0 qualifying stations) as
+a validation gate — root-cause first, then validate on the real 2-spot config, not a pre-marked fix.*
+
+**AD-4 — One oriented-bounding-box (OMBB) primitive; L4 axis from it; multi-obstacle proximity clustering.** A
+new `services/structure_geometry.py` provides an OMBB helper (shapely `minimum_rotated_rectangle`), built once
+and consumed by **both** the obstacle router (structure polygon alone — centerline + width) and the L4 axis in
+`compute_structure_grid_domain`, which replaces the `_most_distant_pair` two-point axis with the OMBB long-axis
+of the *obstacle-plus-shadow* (single) or *merged-cluster* footprint. Re-deriving the axis **re-anchors
+tip/base** (tip = farther-from-anchor) so the tip-depth lookup and the 1-wavelength along-axis margin still
+work. Obstacle boxes **merge when < 500 m apart** (`cluster_distance_m = 500.0`) into ONE L4 grid = the OMBB of
+the merged footprint, minimum box 200 m × 200 m (20 × 20 cells at 10 m). **Separate-box multiple-L4-grids is
+DEFERRED** (a follow-up plan): far-apart obstacles give the single L4 to the primary structure (the one covering
+the served transects / nearest the pin), the rest logged to the concerns file — still a strict improvement over
+today's degenerate cross-structure axis. Only the computed `alpc`/`alpn` values and extents change; the
+CGRID/NGRID emission is unchanged. Implemented MARINE-GEOMETRY-MODEL-PLAN G0.1 + G4 (`services/swan_domain.py`).
+
+**AD-5 — Break-type derived from curvature drives the L3 trigger; operator classification demoted to optional
+override.** Point-break / headland / bay classification is **derived** from the measured shoreline/isobath
+curvature (the same isobath analysis AD-1 builds) and becomes the **L3-enable trigger** (which currently reads
+`topographic_feature`). The operator `topographic_feature` field is **no longer a required input**; it is
+retained as an **optional override** for a sub-grid feature bathymetry cannot see — e.g. a submerged reef
+(operator ruling 2026-07-31). This **amends Amendment 2 §3**, which chose operator classification precisely
+because contour-shape derivation was "specified nowhere and built nowhere"; this amendment builds it. L3's
+CGRID/NGRID emission and its viability test are unchanged — only *whether* L3 emits. Implemented
+MARINE-GEOMETRY-MODEL-PLAN G5 (`services/swan_domain.py` L3 trigger; `config/marine_config.py`; stack wizard).
+
+**AD-8 — Obstacle representation: bathymetry-injection fork + static cited coefficients** (folds the working-model
+Track B architectural sign-off into this plan; no separate mid-run sign-off). **Line-vs-footprint fork:** a
+structure **≥ 3 L4 cells (~30 m) wide AND solid** (`breakwater|jetty|groin|seawall|mole`) → **burn its footprint
+into the L4 BOTTOM** as emergent cells, no OBSTACLE line; everything else (all piers; any solid structure
+< 3 cells) → an **OBSTACLE line** on the simplified OMBB centerline. **`shapely` only — no `rasterio`** (deps
+unchanged). **Static, cited per-type coefficients** (`Kt` is a wave-HEIGHT ratio): pier `TRANSM 0.74` (Elgar
+2001, ~45 % energy blocking); seawall `REFL 0.9 RSPEC` (smooth vertical / sheet-pile, JMSE 2021);
+breakwater/jetty/groin keep their existing static `DAM …` forms unchanged. **Dynamic per-segment crest `Rc` and
+Seelig–Ahrens reflection are DEFERRED** (need data no config carries) — a Phase-5 design task. **Presence check:**
+a structure already emergent in the DEM (emergent-cell fraction ≥ 0.65 AND an elevation-anomaly ridge) → skip
+injection, logged (no double-count). This touches OBSTACLE `TRANSM`/`REFL` and `BOTTOM.txt` **values** only —
+the OBSTACLE and INPGRID/READINP BOTTOM **syntax is unchanged**. Implemented MARINE-GEOMETRY-MODEL-PLAN
+G4.3–G4.5 (`services/swan_formats.py`, `services/swan_runner.py`).
+
+**Phase F (Young & Verhagen 1-D wind-sea term) is DROPPED from scope** (operator, 2026-07-30). SWAN grows wind
+sea over the real domain fetch (GEN3 physics from the wind field), and the Great Lakes get their wind sea via the
+GLWU boundary + SWAN growth — the same architecture as the ocean, not a 1-D term. `services/wind_sea_growth.py`
+stays in the repo, **unwired**. A real wind-sea gap at a reality check is a SWAN wind-forcing/physics
+investigation, not a 1-D addition.
+
+**Implementation status (2026-07-31, at this amendment's writing).** The architecture above is the **approved
+target**; the code migrates across MARINE-GEOMETRY-MODEL-PLAN phases G0–G6. Sections of ARCHITECTURE.md, the
+PROVIDER-MANUAL, and the OPERATIONS-MANUAL that describe this target while the code is still migrating carry a
+"(target — Phase GX)" annotation, per that plan's Phase D convention, so a target description is never mistaken
+for a false claim of current state.
+
+**Acceptance criteria (Amendment 5).**
+- [ ] `beach_facing_degrees` and per-transect bearings reflect the isobath-normal on real bathymetry, collapsing
+  to the segment-perpendicular on a straight beach and falling back (with WARNING) on degenerate bathymetry.
+- [ ] L1 offshore aim and WW3 boundary sides track the open-water bearing; a wrap-candidate direction enlarges L1
+  to enclose the intervening land + open water beyond; a Great Lakes spot sizes L1 by lake fetch, not ocean shelf.
+- [ ] L4 `alpc` derives from the OMBB long-axis with tip/base re-anchored; obstacles < 500 m apart merge to one
+  L4; a separate far obstacle is logged to concerns, not given a second grid.
+- [ ] The L3 trigger reads the derived break-type; a config `topographic_feature` still overrides; a config
+  without it validates.
+- [ ] Pier emits `TRANSM 0.74`; seawall `REFL 0.9 RSPEC`; a wide solid structure burns into L4 BOTTOM with no
+  OBSTACLE line; an already-emergent structure injects 0 cells (logged).
+- [ ] No SWAN command syntax changed anywhere; a real 4-level run parses, runs, and converges on the re-aimed /
+  re-sized / re-axed grids (Gate GR).
+- [ ] The served headline re-validates against the contemporaneous cam/Surfline at the Phase-3 pinned tolerance
+  after the geometry lands (Gate GR — non-negotiable, because the per-transect bearing flows into the shadow
+  classification and the headline aggregate).
+
 ## References
 
 - Supersedes: ADR-084 (NWPS as primary nearshore source with supplementation)
-- Related: ADR-094 (HRRR forecast wind source for surf scoring)
+- Related: ADR-094 (HRRR forecast wind source for surf scoring); ADR-100 (geography-aware study-area geometry — the OSM coastline + fetch-fan subsystem Amendment 5's AD-1/AD-3/AD-4/AD-5 consume)
+- Plan (Amendment 5): `docs/planning/MARINE-GEOMETRY-MODEL-PLAN.md` (architecture decisions AD-1..AD-8; approval of the plan IS the acceptance of Amendment 5 and ADR-100)
 - Research: `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md`, `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md`, `docs/planning/briefs/1D-MODEL-BENCHMARK-BRIEF.md`
 - Plan: `docs/archive/SWAN-TRUSHORE-PLAN.md`, `docs/archive/SURF-1D-IMPLEMENTATION-PLAN.md`, `docs/archive/SURF-MODEL-FIX-PLAN.md`

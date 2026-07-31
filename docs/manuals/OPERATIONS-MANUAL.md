@@ -860,18 +860,27 @@ Marine locations are configured in the `[marine]` section of `api.conf`. This se
 | `segment_end_lat` | float | [-90, 90] | Shoreline segment end latitude. |
 | `segment_end_lon` | float | [-180, 180] | Shoreline segment end longitude. |
 | `transect_spacing_m` | float | > 0 (default: 10.0) | Spacing between cross-shore transects along the segment. |
-| `beach_facing_degrees` | float | [0, 360) | **Computed** — perpendicular to the segment line. Not operator-entered. |
+| `beach_facing_degrees` | float | [0, 360) | **Computed** — the **isobath-normal** (2 m/5 m depth-contour heading, seaward perpendicular) at the segment, resolved at grid-sizing time; the segment-perpendicular is a fallback until the bathymetry grid resolves it (target — Marine Geometry-Model Plan G1; ADR-093 Amendment 5 AD-1). Not operator-entered. |
 | `transect_count` | int | — | **Computed** — `segment_length_m / transect_spacing_m + 1`. Read-only. |
 | `primary_transect_index` | int | — | **Computed** — midpoint transect index. Used as the default display transect. |
 | `bottom_type` | str | `sand`, `rock`, `coral_reef`, `mixed` | Seabed composition |
 | `beach_slope` | float | — | Computed from CUDEM bathymetric profile at setup |
-| `topographic_feature` | str | `point_break`, `bay_break`, `headland`, `straight_beach` | Coastal morphology classification |
-| `directional_exposure` | dict | 8 compass directions → bool | Which swell directions reach this spot |
+| `topographic_feature` | str (optional) | `point_break`, `bay_break`, `headland`, `straight_beach` | Coastal morphology classification. **No longer required** — the L3-enable break-type is **derived** from the measured shoreline/isobath curvature by default; this field is an **optional override** for a sub-grid feature bathymetry cannot see (e.g. a submerged reef). (target — Marine Geometry-Model Plan G5; ADR-093 Amendment 5 AD-5.) |
+| `directional_exposure` | dict (optional) | 8 compass directions → bool | Which swell directions reach this spot. **No longer required** — exposure is **derived** from the wrap-aware fetch/openness fan (`services/geography.py`) by default; this field is an **optional override**. (target — Marine Geometry-Model Plan G3; ADR-100 AD-2.) |
 | `bathymetric_profile` | list | — | Stored after CUDEM download: `[(distance_m, depth_m), ...]` |
 | `structures` | list | — | Optional coastal structures (see below) |
 | `l3_enabled` | str | `auto` (default), `on`, `off` | SWAN Level 3 grid control. `auto` enables L3 when structures exist near the spot (structure shadow requires fine-resolution modeling). `on` forces L3 regardless. `off` skips L3 — transects hand off from L2 at ~15m depth. |
 | `breaker_formula` | str | `komar_gaughan` (default), `caldwell` | Breaker height formula used to convert post-supplement Hsig to face height (T2.6). `komar_gaughan` — Komar & Gaughan (1973), general-purpose, all periods and coastlines. `caldwell` — Caldwell & Aucan (2007) H1/10 empirical predictor calibrated to steep volcanic island coasts (Oahu north shore); auto-crossover to Komar-Gaughan below Tp=10s. |
 | `surf_height_display` | str | `face` (default), `hawaiian` | Display convention for the breaking wave height in the surf card. `face` — trough-to-crest face height (Western scale). `hawaiian` — back-of-wave scale (= face height × 0.5). |
+
+**Study-area geometry is automated (target — Marine Geometry-Model Plan; ADR-093 Amendment 5 + ADR-100).** The
+operator draws the surf area (a shoreline segment, or — new — a **polygon** via the wizard draw tool) and the
+rest is derived: the per-transect facing from the local isobath heading, the L1 aim and WW3 boundary sides from
+the wrap-aware open-water fetch fan, the directional exposure from that same fan, and the L3 break-type from the
+measured curvature. `topographic_feature` and `directional_exposure` are demoted from required inputs to
+**optional overrides** (above). The wizard help-content strings for these changes land per-phase with the wizard
+edits (Marine Geometry-Model Plan G3.3 / G5.3 / G6.3); the sizing formulas, the SWAN→SwellTrack handoff, and all
+SWAN command syntax are unchanged (off-limits).
 
 **Structure configuration (within `[[surf]]`):**
 

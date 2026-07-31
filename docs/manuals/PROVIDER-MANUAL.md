@@ -2214,6 +2214,77 @@ When neither path yields a point the function logs at **ERROR** naming the spot 
 - Windsea (Tp < 10s): cfjon = 0.067
 - Friction is always enabled in production — frictionless propagation was a development default only.
 
+#### §14.15 Amendment: geography-aware study-area geometry (target — Marine Geometry-Model Plan G0–G6; ADR-093 Amendment 5 + ADR-100)
+
+**This amendment changes the VALUES fed into the SWAN emitters, never their syntax, and never the sizing
+formulas.** The sizing formulas and constants of §14.15 (`1.3 × Hs / γ`, γ = 0.73, `_MIN_DESIGN_HS_M`, the
+30 m/15 m contour criteria, tier resolutions, nesting ratios, the shadow-union + 2λ formula) are **unchanged
+and off-limits**. What changes is *which bearing / exposure / open-water direction / grid axis / L3-enable
+trigger* is passed into that machinery. Items marked "(target — Phase GX)" are not yet code-migrated.
+
+**Facing derivation — isobath-normal, per-transect (AD-1, Phase G1).** `beach_facing_degrees` and each transect
+bearing come from the **local shallow-isobath heading** — a new helper in `enrichment/bathymetry.py` samples the
+2 m/5 m depth contours near each transect origin, fits the smoothed local heading (~300 m scale / the study
+segment), and returns the **seaward perpendicular** (compass degrees). Producers: `config/marine_config.py`
+(the `beach_facing_degrees` derivation, computed at grid-sizing time when the bathymetry grid exists, not in
+`__init__`), `services/swan_formats.py` (the `transect_bearings` list — per-transect instead of one scalar).
+Consumers are **unchanged** — `find_shoreline_from_grid`, `find_depth_contour_distance`, `compute_transect_shadows`
+already take a bearing. Datum-robust (heading, not the 0 m line); degenerate/flat bathymetry falls back to the
+segment-perpendicular with a WARNING. **Sizing aggregation is coverage-driven:** L2/L3 enclose the **union** of
+every transect's own offshore-contour reach (the covering envelope already computed), not a single averaged
+bearing — the bearing's only sizing role is the contour-measurement direction.
+
+**L1 aim + WW3 boundary sides — the open-water fetch fan (AD-3, ADR-100, Phase G2).** `_compute_level1`
+(`services/swan_domain.py`) aims the L1 offshore extension along the **open-water bearing** from the fetch fan
+(`services/geography.py`, ADR-100), not `mean_offshore_bearing_deg`; `ww3_station_selection`'s offshore-side
+selection reads the same open-water bearing. **VALUE change only** — L1/L2 stay axis-aligned; the CGRID/INPGRID
+emission, the `mean_offshore_bearing_deg` definition, the WW3 station **qualification** criterion
+(`deep water OR tanh(kd)`), and the cardinal-only (N/E/S/W) side set are all unchanged. **Wrap-candidate
+directions** (island/headland/peninsula with ≥5 km open water beyond) enlarge L1 to enclose the intervening land
++ the open water beyond so SWAN computes the wrap-around. **Great Lakes** L1 is sized from the fan's fetch value
+(lake fetch), not `find_shelf_distance` (which returns the nearest ocean shelf and oversizes a lake L1); the GLWU
+product routing already exists.
+
+**Exposure source — fan-derived (AD-2, Phase G3).** `compute_structure_grid_domain(directional_exposure=…)` and
+`enrichment/surf_scorer.py` read the **fan-derived** exposure (directly-open & wrap-candidate = EXPOSED,
+truly-blocked = sheltered) in the **same dict-of-8-compass-sectors→bool shape** the config field used. The typed
+`directional_exposure` config field becomes an optional override. **VALUE change only** —
+`compute_structure_grid_domain` and the L4 sizing math are unchanged.
+
+**L4 axis + clustering (AD-4, Phase G0.1 + G4).** A new `services/structure_geometry.py` provides an **OMBB
+helper** (shapely `minimum_rotated_rectangle`) built once and consumed by both the obstacle router (structure
+polygon alone) and the L4 axis. `compute_structure_grid_domain` derives `rotation_deg` from the OMBB long-axis
+of the obstacle-plus-shadow (single) or merged-cluster footprint instead of `_most_distant_pair`, **re-anchoring
+tip/base** (tip = farther-from-anchor) so the tip-depth lookup and the 1-wavelength along-axis margin still work.
+Obstacle boxes **merge when < 500 m apart** (`cluster_distance_m = 500.0`) into ONE L4 = the OMBB of the merged
+footprint, min box 200 m × 200 m. **Only the `alpc`/`alpn` values and extents change; CGRID/NGRID syntax is
+unchanged.** Separate-box multiple-L4-grids is DEFERRED — the single L4 goes to the primary structure, others are
+logged to the concerns file.
+
+**Obstacle representation (AD-8, Phase G4.3–G4.5).** `normalize_structure` (via the OMBB) routes each structure
+to `line` or `footprint`: a solid structure (`breakwater|jetty|groin|seawall|mole`) **≥ 3 L4 cells (~30 m) wide**
+→ **burn its footprint into the L4 BOTTOM** as emergent cells (values in `BOTTOM.txt`; INPGRID/READINP BOTTOM
+syntax unchanged, stationary-only, `idla=3`), no OBSTACLE line; everything else (all piers; solid < 3 cells) → an
+**OBSTACLE line** on the simplified OMBB centerline (≤180-char `&` wrap; OBSTACLE LINE format unchanged, only the
+vertex list simplified). **Static cited per-type coefficients** (`_OBSTACLE_PARAMS`, `services/swan_formats.py`):
+pier `TRANSM 0.74` (Elgar 2001, ~45 % energy blocking); seawall `REFL 0.9 RSPEC` (smooth vertical / sheet-pile,
+JMSE 2021); breakwater/jetty/groin keep their existing `DAM GODA …` / `DAM DANGremond …` forms unchanged.
+Dynamic per-segment crest `Rc` and Seelig–Ahrens reflection are DEFERRED. **Presence check:** a structure already
+emergent in the DEM (emergent-cell fraction ≥ 0.65 AND an elevation-anomaly ridge) → skip injection, logged (no
+double-count). Dep: **shapely only — no `rasterio`.**
+
+**L3 trigger — derived break-type (AD-5, Phase G5).** The L3-enable decision (`services/swan_domain.py`,
+`_TOPOGRAPHIC_L3_TRIGGERS`) reads the **derived** point-break/headland/bay classification (from the measured
+shoreline/isobath curvature, a `services/geography.py` helper reusing the isobath analysis) instead of the config
+`topographic_feature`. `topographic_feature` is retained as an **optional override** (e.g. a submerged reef).
+**Only *whether* L3 emits changes** — L3's CGRID/NGRID emission and the viability test are unchanged.
+
+**`classify_region` reuse (AD-7, Phase G0.2).** The coarse **5-region coastal** `classify_region` +
+`REGION_*` constants are moved to a shared `services/region.py` (pure move, identical logic); both
+`enrichment/bathymetry.py` and the geometry water-body regime import it. The **11-region biogeographic**
+same-named function in `enrichment/fishing_species.py` is renamed `classify_biogeographic_region` (callers
+updated). **The two are NOT merged — different taxonomies; merging is a bug.**
+
 ### §14.16 GFS wind provider (Phase 7 — supplements HRRR for 72-hour forecast)
 
 **Module identity:** `providers/wind/gfs.py`, `PROVIDER_ID = "gfs"`, `DOMAIN = "wind"`.
