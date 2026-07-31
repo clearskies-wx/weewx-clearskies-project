@@ -2233,6 +2233,17 @@ already take a bearing. Datum-robust (heading, not the 0 m line); degenerate/fla
 segment-perpendicular with a WARNING. **Sizing aggregation is coverage-driven:** L2/L3 enclose the **union** of
 every transect's own offshore-contour reach (the covering envelope already computed), not a single averaged
 bearing — the bearing's only sizing role is the contour-measurement direction.
+**Runtime reach (G1.6, landed).** Because the SWAN runtime process re-parses the persisted operator config fresh
+(recomputing the segment-perpendicular) and reads only caches, the resolved bearings are **persisted into the
+per-spot profile cache** (`spot_profiles/{spot_id}.json` gains `beach_facing_degrees` = the midpoint isobath-normal
+and `transect_bearings` = the per-transect list, index-aligned with `profiles_by_transect`). At runtime the marine
+service writes the cached `beach_facing_degrees` back onto the `SurfSpotConfig` via a setter at profile-cache load
+(so every existing `beach_facing_degrees` read, incl. the invariant-6 check, then uses the isobath-normal — which
+also makes invariant-6 self-consistent, since its 15 m-contour reference was already measured along the
+isobath-normal), and threads the cached `transect_bearings` into `compute_spot_transects` (a new override param;
+priority override > grid > scalar) for both the served SWAN CURVE emission and the SwellTrack precompute. This is a
+**value-only** change into the existing emission — no SWAN command syntax changes. A cache lacking the fields falls
+back cleanly to the segment-perpendicular. The served effect is validated live at Gate GR.
 
 **L1 aim + WW3 boundary sides — the open-water fetch fan (AD-3, ADR-100, Phase G2).** `_compute_level1`
 (`services/swan_domain.py`) aims the L1 offshore extension along the **open-water bearing** from the fetch fan
