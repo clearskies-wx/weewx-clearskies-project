@@ -88,3 +88,32 @@ to the operator. This file is for non-blocking gaps where a reasonable, document
 - **Why non-blocking:** the actionable instruction — "use the existing shared client, do NOT add `requests`" — is correct and unaffected.
 - **Assumption made:** G0.3 uses `ProviderHTTPClient` (the `_get_http_client()` singleton pattern in bathymetry.py:233 / ndbc.py:254).
 - **To revisit:** nothing required; cosmetic plan wording.
+
+## TC-14 — [OPEN 2026-07-31, low latent] G2.5 island enclosure re-projects rays from _compute_level1's arithmetic-mean centroid, not the geography step's circular-mean centroid
+- **What:** The fan casts rays from grid_sizing_chain's centroid (circular-mean lon, `_circular_mean_lon_deg`); `RayResult.bearing_deg` is relative to that. But `_compute_level1` re-projects each wrap-candidate ray endpoint from its OWN `center_lat/lon` (plain arithmetic mean). The two centroids differ slightly.
+- **Where:** swan_domain.py `_compute_level1` (~:1048) vs grid_sizing_chain.py geography step (~:980); G2 blind-audit finding F1.
+- **Why non-blocking (not reachable):** the F1-proj UTM-zone-straddle guard (`_locked_utm_zone_for_deployment`) refuses configs spanning >2° lon, where circular-mean ≈ arithmetic-mean are numerically indistinguishable. No accepted config can reach a material difference today.
+- **To revisit:** if the >2° guard threshold ever changes, thread the geography step's centroid into `_compute_level1` (a param) so the enclosure re-projects from the same centroid the rays were cast from. Small hardening; not urgent.
+
+## TC-15 — [OPEN 2026-07-31, MEDIUM — being addressed in G3] G1.6 runtime write-back reaches the runner loop but NOT the endpoints/surf.py scoring/pipeline path
+- **What:** G1.6 wrote the resolved isobath-normal beach_facing/transect_bearings back onto the runner-loop `SurfSpotConfig` (providers/nearshore/swan.py), which is what produces the cached SWAN forecast (verified live: runner-loop `beach_facing=201.9°`). BUT the SERVE-time path (`endpoints/surf.py`) does an INDEPENDENT fresh `load_marine_config()` parse (the `wire_surf_config()` singleton has zero production callers), so `score_surf` (surf_scorer directional filter) and the endpoint's `_compute_spot_transects`/`_compute_pipeline_for_timestep` (679/993) use the SEGMENT-PERPENDICULAR beach_facing + the CONFIG directional_exposure — not the geometry-derived values.
+- **Where:** discovered in G3.2 scope-ack (agent trace). endpoints/surf.py's fresh-parse spot_config ≠ the runner-loop/swan.py spot_config that G1.6 wrote back.
+- **Why it matters (Gate GR):** the served headline's directional filter (score) and any serve-time transect recompute would use the OLD facing/exposure — inconsistent with the isobath-normal cached forecast — IF those endpoint paths run at serve time in remote mode (being confirmed).
+- **Resolution (in-progress, G3):** add a write-back at `endpoints/surf.py`'s spot_config resolution reading the persisted profile-cache fields (directional_exposure for G3.2, AND beach_facing/transect_bearings for this G1.6 gap) — but ONLY the fields the endpoint actually consumes at serve time in remote mode (agent confirming; skip any that are gated off / cache-read, to avoid orphan write-backs).
+- **To revisit:** confirm at Gate GR that the served score + headline reflect the isobath-normal + fan exposure (not segment-perp + config exposure).
+
+## TC-16 — [RESOLVED 2026-07-31, was MEDIUM] Non-override directional_exposure defaulted to worst-case before first fan/cache write (G3 audit F1)
+- **What:** A fan-derived (non-override) spot, before grid_sizing_chain persists its profile cache (first cycle / persistent PCHIP failure), had a freshly re-parsed all-False directional_exposure → surf_scorer scored it fully blocked (0.1x every direction), silently (DEBUG). G3.3 made this the common case.
+- **Where:** marine_config.py directional_exposure default; endpoints/surf.py _apply_persisted_geometry no-cache path.
+- **Resolution (fix committed):** non-override pre-fan default is now all-EXPOSED (neutral) — an unknown-exposure spot is not penalized (parity with beach_facing's segment-perp degrade). Verified: non-override → _directional_filter 1.0 all dirs (was 0.1); override all-False → still 0.1 (honored). KAT updated (_ALL_TRUE for the 3 non-override cases; override-all-False stays _ALL_FALSE).
+- **Blast radius (per auditor):** narrow — an existing spot keeps serving its old cache during recompute; only first-cycle-ever + persistent-failure. Did not block HB gate (HB has a cache).
+
+## TC-17 — [OPEN 2026-07-31, low] Gate-G3 test left HB config fan-derived (directional_exposure removed)
+- **What:** To exercise the fan-derived exposure path live at Gate G3, the coordinator POSTed the HB marine.conf with `directional_exposure` stripped (making it fan-derived). This overwrote the persisted /etc/weewx-clearskies/marine/marine.conf, so HB's operator-set directional_exposure override is gone; HB now uses the fan.
+- **Why non-blocking:** G3.3's intent IS that the fan is the default (directional_exposure optional). The fan (measured openness) is arguably more correct than a typed guess. HB's L4 is exposure-insensitive (identical L4 fan vs config), so grid geometry is unaffected; only the serve-time directional-filter score differs (fan sectors vs the old E/SE/S/SW).
+- **To revisit:** at Gate GR, confirm the served HB score with fan exposure is sensible. If the operator intended the E/SE/S/SW override, re-add it to the config (it's now an optional override, honored if present).
+
+## TC-18 — [OPEN 2026-07-31, low] HB L4 across-axis is exposure-insensitive (dominated by structure shadow)
+- **What:** Fan exposure (open_ocean, S/SW/W) vs the old config exposure (E/SE/S/SW) produced an IDENTICAL L4 (rotation 221°, 4264 cells, across 1030 m) for HB. So the directional_exposure change was a no-op for L4 geometry.
+- **Why non-blocking:** the L4 across-axis is the swell-climate shadow-UNION envelope + 2λ, dominated by the pier's 572 m alongshore structure extent; the exposure sectors are secondary for a structure-grid spot. Correct behavior. Meant the live D6b POSITIVE case (L4 resize → cold-start) couldn't be triggered via exposure alone at HB — but it's conclusively guard-proofed on the deployed signature functions (KAT importlib proof) + KAT clears-run-state tests; the live NO-OP case (no false cold-start) was confirmed.
+- **To revisit:** the live D6b positive case will naturally exercise at G4 (OMBB axis changes L4 rotation → real L4 geometry change → D6b cold-start).
