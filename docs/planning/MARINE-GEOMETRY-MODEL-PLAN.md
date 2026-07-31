@@ -133,6 +133,15 @@ non-blocking gap never justifies stalling.
 
 > **Scope note:** AD-1's design paragraph and PHASE G1's task specs below still describe the superseded isobath ray-fit — kept for the record. **Do NOT implement the ray-fit; implement AD-1R (which carries the operator-required pinned equations) via PHASE G1R.**
 
+### PHASE G1R execution (2026-07-31) — facing fix DONE; Gate G1R FAILED (architectural, surfaced)
+
+- **G1R.0** serve-nothing-on-failure guard — ✅ done + accepted (marine `8cce0a5`; librewxr 9/9; frozen convergence gate untouched). A convergence-failed run now publishes nothing.
+- **G1R.1** `shoreline_normal_bearing` + strip fetch + KATs — ✅ done + accepted (marine `7f07075`; librewxr 13/13; all pinned AD-1R equations/constants coordinator-verified verbatim; genuine known-answer tests).
+- **G1R.2** rewire chain/`compute_spot_transects` to AD-1R; restore `beach_facing_degrees`/`beach_facing_source` config keys; delete `isobath_normal_bearing` — ✅ done + accepted (marine `73df829`; librewxr 63/63; 0 isobath hits).
+- **G1R.4** (partial) doc-sync — ✅ ADR-093 Amdt 5 AD-1R subsection + PROVIDER-MANUAL §14.15 rewrite (meta `0fb110c`). Operator-Manual wizard narrative deferred to land with G1R.3.
+- **G1R.3** definition-time wizard flow (`/geometry/facing` + API pass-through + apply models + wizard pre-fill) — ⬜ NOT started (held; not required for the gate nest — the chain recomputes the facing at config-push).
+- **QC Gate G1R** — ⛔ **FAILED. Facing known-answer PASS (HB resolved to 217.0°; 202° did not reproduce), but the clean full 4-level re-run's L4 `valid_fraction` = 7.1% (needs ≥80%) — worse than TC-21's 27.3%.** The facing fix is confirmed working and is DISPROVEN as the root cause; the root cause is the L4-grid-coverage-vs-transect-handoff-envelope (architectural triggers 2/3). **Surfaced to the operator (TC-23).** The TC-21 bisect (pre-G4/pre-G3 isolation) is the operator-pre-authorized next diagnostic step but was NOT auto-run — surfaced because the result is worse than decision-6's premise and the fix is architectural. Marine service stopped on librewxr to halt the failing retry loop.
+
 ---
 
 ## Architecture decisions (APPROVED BY APPROVING THIS PLAN)
