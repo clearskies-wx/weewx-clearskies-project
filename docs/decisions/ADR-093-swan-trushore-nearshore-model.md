@@ -424,6 +424,13 @@ and the L3 trigger — with a **geography-aware, automated** determination groun
 actual open-water geometry.
 
 **AD-1 — Shore-facing is the isobath-normal, derived per-transect (replaces segment-perpendicular).**
+> **⛔ METHOD SUPERSEDED 2026-07-31 by AD-1R (below). The isobath 2 m/5 m ray-fit produced a wrong facing —
+> 202° at Huntington vs the true ~220°: it measured the offshore contours (bent by sandbars, channels, and the
+> pier's own scour), and the production call site handed it the 1 km L1 grid so the 300 m search sampled bilinear
+> noise inside a single cell. AD-1's *intent* stands (a derived, per-transect, geography-aware facing; coverage-
+> driven L2/L3 sizing); its *method* below is dead. `isobath_normal_bearing` and its KATs were deleted with the
+> replacement (MARINE-GEOMETRY-MODEL-PLAN G1R.2, marine `73df829`). Read AD-1R for the current method.**
+
 `beach_facing_degrees` and each transect bearing are derived from the **local shallow-isobath heading** (the
 2 m / 5 m depth-contour trend from the setup-time bathymetry), smoothed over ≈ the surf-zone width / the ~300 m
 study segment, taken **perpendicular** (seaward sense) as the shore-normal — **per-transect** where the shore
@@ -438,6 +445,34 @@ single representative bearing; the bearing's only sizing role is the direction t
 along. Implemented MARINE-GEOMETRY-MODEL-PLAN G1 (`enrichment/bathymetry.py` new heading helper;
 `config/marine_config.py`; `services/swan_formats.py`; `services/grid_sizing_chain.py`; `services/swan_domain.py`
 L2/L3 sizing).
+
+**AD-1R — Beach facing = the smoothed-0 m-shoreline normal (DSAS/CliffMetrics), at spot-definition time,
+operator-overridable (SUPERSEDES AD-1's ray-fit method; operator-approved in chat 2026-07-31).** The facing is the
+**seaward perpendicular of the smoothed 0 m shoreline's local tangent**, not the 2 m/5 m isobath ray-fit. The 0 m
+shoreline is traced from the finest bathymetry as an ordered polyline (seeded along the drawn segment), its
+coordinates moving-average-smoothed over an alongshore window swept **500 → 2500 m in 500 m steps until the heading
+stabilizes** (successive-window change ≤ 5°; "Option B"), and the normal is taken from the smoothed tangent — the
+USGS **DSAS** smoothed-baseline and **CliffMetrics v1.0** (Payo et al. 2018) method. It is computed **at
+spot-DEFINITION time** and depends on **nothing but the drawn segment** — no SWAN grid, domain, or L1–L4 sizing
+exists yet (they are sized AFTER, from this facing), so a spot with **no structures never has an L4 (possibly no
+L3)** and the facing is still defined. The wizard calls a new marine geometry endpoint (via the API — INVARIANT)
+with just the segment; the strip-bathymetry fetch builds its own coverage box from the segment alone. The computed
+value pre-fills the wizard field; the operator may adjust; the confirmed value is **stored in config**
+(`beach_facing_degrees` returns as a stored key — reversing T2.1's removal) with a source tag
+`beach_facing_source ∈ {operator, computed, fallback_segment_perp}` (only `operator` is an override; it wins at
+every consumer, and per-transect bearings are then uniform = the override). The config-push chain
+(`run_grid_sizing_chain`) READS the stored facing and only re-derives it when the source is `fallback_segment_perp`
+or absent (a deterministic retry now that the strip fetch may succeed); it derives the **per-transect** bearings
+from the same strip and persists them to the profile cache (G1.6 shape unchanged) — never during model runs.
+Degenerate/short-run shoreline falls back to the segment-perpendicular + WARNING. Datum-robust (a datum shift
+slides the 0 m line but barely rotates its heading over ≥ 500 m). **The pinned equations and constants
+(`W_MIN=500`, `W_MAX=2500`, `W_STEP=500`, `STABILITY_TOL_DEG=5.0`, `TRACE_DEPTH_M=0.0`, `MAX_CROSS_SEARCH_M=1000.0`)
+live in MARINE-GEOMETRY-MODEL-PLAN §AD-1R** and are implemented verbatim there. Implemented G1R.1 (`shoreline_normal_bearing`
++ strip fetch, marine `7f07075`) and G1R.2 (chain/`compute_spot_transects` rewire, `beach_facing_degrees`/
+`beach_facing_source` config keys restored, `isobath_normal_bearing` deleted, marine `73df829`); the definition-time
+wizard endpoint + API pass-through + apply-model acceptance is G1R.3. **Validated on the real Huntington config
+2026-07-31: the chain resolved the facing to 217.0° from the shoreline strip (within the 220° ± 5° known-answer;
+the broken 202° did not reproduce).**
 
 **AD-3 — L1 offshore aim and WW3 boundary sides come from open water, not the beach bearing.** `_compute_level1`
 aims its offshore extension along the **open-water bearing** (ADR-100 fetch fan) instead of

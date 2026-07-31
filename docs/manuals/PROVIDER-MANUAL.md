@@ -2222,25 +2222,36 @@ formulas.** The sizing formulas and constants of §14.15 (`1.3 × Hs / γ`, γ =
 and off-limits**. What changes is *which bearing / exposure / open-water direction / grid axis / L3-enable
 trigger* is passed into that machinery. Items marked "(target — Phase GX)" are not yet code-migrated.
 
-**Facing derivation — isobath-normal, per-transect (AD-1, Phase G1).** `beach_facing_degrees` and each transect
-bearing come from the **local shallow-isobath heading** — a new helper in `enrichment/bathymetry.py` samples the
-2 m/5 m depth contours near each transect origin, fits the smoothed local heading (~300 m scale / the study
-segment), and returns the **seaward perpendicular** (compass degrees). Producers: `config/marine_config.py`
-(the `beach_facing_degrees` derivation, computed at grid-sizing time when the bathymetry grid exists, not in
-`__init__`), `services/swan_formats.py` (the `transect_bearings` list — per-transect instead of one scalar).
-Consumers are **unchanged** — `find_shoreline_from_grid`, `find_depth_contour_distance`, `compute_transect_shadows`
-already take a bearing. Datum-robust (heading, not the 0 m line); degenerate/flat bathymetry falls back to the
-segment-perpendicular with a WARNING. **Sizing aggregation is coverage-driven:** L2/L3 enclose the **union** of
-every transect's own offshore-contour reach (the covering envelope already computed), not a single averaged
-bearing — the bearing's only sizing role is the contour-measurement direction.
+**Facing derivation — the smoothed-0 m-shoreline normal, per-transect (AD-1R, Phase G1R; SUPERSEDES the AD-1
+isobath ray-fit).** `beach_facing_degrees` and each transect bearing are the **seaward perpendicular of the
+smoothed 0 m shoreline's local tangent** (USGS DSAS smoothed-baseline / CliffMetrics v1.0), NOT the 2 m/5 m isobath
+ray-fit (which gave 202° vs the true ~220° at Huntington and is deleted). `shoreline_normal_bearing(grid, segment
+endpoints, *, anchor_lat=None, anchor_lon=None)` in `enrichment/bathymetry.py` traces the 0 m shoreline as an
+ordered polyline seeded along the drawn segment, moving-average-smooths its coordinates over an alongshore window
+swept 500 → 2500 m until the heading settles (≤ 5° change between windows), and returns the seaward normal of the
+smoothed tangent; degenerate/short-run shoreline falls back to the segment-perpendicular + WARNING. The strip
+bathymetry it runs over is fetched from the **drawn segment alone** (`fetch_shoreline_strip_bathymetry`, a
+segment-bbox coverage box through the existing profile-bathymetry downloader) — **no SWAN grid/domain input**, so
+the facing is defined at spot-definition time before any nest is sized (a no-structure spot never has an L4). The
+pinned equations/constants live in MARINE-GEOMETRY-MODEL-PLAN §AD-1R and are implemented verbatim. Producers:
+`config/marine_config.py` (the restored `beach_facing_degrees` + `beach_facing_source` config keys),
+`services/grid_sizing_chain.py` (reads the stored facing; re-derives only when the source is `fallback_segment_perp`
+or absent; derives the per-transect bearings from the strip), `services/swan_formats.py` (`compute_spot_transects`
+per-transect via the same helper / the `transect_bearings` override). Consumers are **unchanged** —
+`find_shoreline_from_grid`, `find_depth_contour_distance`, `compute_transect_shadows` already take a bearing.
+Operator override: `beach_facing_source = "operator"` wins at every consumer and makes per-transect bearings
+uniform. **Sizing aggregation is coverage-driven:** L2/L3 enclose the **union** of every transect's own
+offshore-contour reach (the covering envelope already computed), not a single averaged bearing — the bearing's only
+sizing role is the contour-measurement direction. Validated on the real Huntington config 2026-07-31: the chain
+resolved the facing to 217.0° from the strip (within 220° ± 5°; 202° did not reproduce).
 **Runtime reach (G1.6, landed).** Because the SWAN runtime process re-parses the persisted operator config fresh
 (recomputing the segment-perpendicular) and reads only caches, the resolved bearings are **persisted into the
-per-spot profile cache** (`spot_profiles/{spot_id}.json` gains `beach_facing_degrees` = the midpoint isobath-normal
+per-spot profile cache** (`spot_profiles/{spot_id}.json` gains `beach_facing_degrees` = the midpoint shoreline-normal
 and `transect_bearings` = the per-transect list, index-aligned with `profiles_by_transect`). At runtime the marine
 service writes the cached `beach_facing_degrees` back onto the `SurfSpotConfig` via a setter at profile-cache load
-(so every existing `beach_facing_degrees` read, incl. the invariant-6 check, then uses the isobath-normal — which
+(so every existing `beach_facing_degrees` read, incl. the invariant-6 check, then uses the shoreline-normal — which
 also makes invariant-6 self-consistent, since its 15 m-contour reference was already measured along the
-isobath-normal), and threads the cached `transect_bearings` into `compute_spot_transects` (a new override param;
+shoreline-normal), and threads the cached `transect_bearings` into `compute_spot_transects` (a new override param;
 priority override > grid > scalar) for both the served SWAN CURVE emission and the SwellTrack precompute. This is a
 **value-only** change into the existing emission — no SWAN command syntax changes. A cache lacking the fields falls
 back cleanly to the segment-perpendicular. The served effect is validated live at Gate GR.
