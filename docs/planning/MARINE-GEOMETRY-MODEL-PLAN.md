@@ -104,8 +104,34 @@ non-blocking gap never justifies stalling.
 **Legend:** ✅ done+verified · 🔄 in progress · ⛔ blocked · ⬜ not started
 
 - **Plan authored** — ✅ (architecture decisions, off-limits, phases G0–G7 + gates, SWAN appendix, carry-forward audit).
-- **Operator review/approval** — ⬜ pending (= architecture approval).
-- All implementation phases — ⬜ not started; gated on approval.
+- **Operator review/approval** — ✅ granted; autonomous execution 2026-07-31.
+
+### Phase completion (2026-07-31)
+
+- **Phase D** (governing-doc updates) — ✅ committed (meta `34d2db0`).
+- **G0** (foundations: `region.py`, OMBB `structure_geometry.py`, `geography.py` + KATs) — ✅ committed (`200c657`, `311f74a`, `efbff4d`, `3360ddb`, `c10ba7d`).
+- **G1** (isobath-normal facing + per-transect bearings + runtime wiring + self-check + KATs) — ⛔ **implemented, but the beach-facing METHOD is WRONG — see Critical finding 1.** Commits `53ba649`, `1787b6a`, `5524e1f`, `c1cc889`, `08fb5d1`. Everything downstream that consumes `beach_facing_degrees`/per-transect bearings inherits the bad angle. **Replacement approved 2026-07-31: AD-1R / PHASE G1R** (⬜ not started).
+- **G2** (L1 aim + WW3 sides from open water) — ✅ implemented + deployed (`38f93ac`, `8f76af8`; deployed librewxr `4828d99`). Gate G2 (real SWAN L1 converged; D6c ≥2 stations) passed.
+- **G3** (exposure from fan → L4 sizing + surf-scorer + optional override + D6b L4 cold-start) — ✅ implemented + deployed (`edf831f`, `829d634`, `f788611`, `ab97929`). Gate G3 (sizing chain + D6b no-op) passed — **but did NOT re-validate a converged 4-level run** (see Critical finding 2).
+- **G4** (L4 axis from OMBB + obstacle route/coeffs + invariant-3 rescope + proximity clustering) — 🔄 code implemented + deployed (`37acb0c`, `418f1f5`, `5dbce94`, `6a8c18e`, `2597011`; clustering `02ef999` local-only). The obstacle emission (`OBSTACLE TRANSM 0.74` 2-vertex OMBB centerline) and the invariant-3 rescope validated live. **⛔ Gate G4 FAILED — see Critical finding 2.**
+- **G5 / G6 / G7 / Gate GR** — ⬜ not started.
+
+### Critical findings — BLOCKING (surfaced to operator 2026-07-31; logged as TC-21 in `MARINE-GEOMETRY-MODEL-CONCERNS.md`)
+
+1. **Beach-facing method (AD-1 / G1) is fundamentally wrong — must be replaced.** `isobath_normal_bearing` ray-casts to the **2 m and 5 m depth contours** and line-fits them. That measures *offshore*, where sandbars, channels, and the pier's own scour bend the contours away from the actual beach line. For Huntington it returns **202°**; the true beach-facing (perpendicular to the straight beach = the pier direction) is **~220°**.
+   - **Correct method (operator-approved 2026-07-31): AD-1R — the DSAS/CliffMetrics smoothed-shoreline normal.** Trace the **0 m shoreline** from the finest bathymetry as an ordered polyline, smooth its coordinates over an alongshore window swept **500 → 2500 m until the heading stabilizes**, take the **seaward perpendicular** of the smoothed line's local tangent. Computed **at spot SETUP time, persisted on the spot** — NOT during model runs — and **operator-overridable** (wizard pre-fills the computed value). The operator-drawn segment is for the **study area only, never the facing** (the facing was originally an operator-given bearing, removed at T2.1, that G1 was meant to automate — with this method, not the ray-fit). **Full pinned design + equations in §AD-1R; implementation tasks in §PHASE G1R.**
+   - **Additional defect found 2026-07-31 (code archaeology):** the production call site (`grid_sizing_chain.py:1142`) hands the ray-fit the **1 km L1 grid** — its 300 m search radius is smaller than a single grid cell, so the "contour fit" was bilinear-interpolation noise independent of the method's own conceptual flaw.
+   - **Validated:** a smoothed-0 m-shoreline heading on the native profile bathymetry near HB → **~214°, tightening toward ~220° as the smoothing window widens** (the AD-1R Option-B sweep converging), vs the broken 202°.
+2. **Gate G4 FAILED — the L4 grid lands on land.** The 10 m surf-zone grid is **35% dry land**; **25 of 32 transect handoff points fall on dry cells**; L4 convergence = **27.3%** valid (gate requires ≥80%). SWAN itself converged (99.82% of wet points); our quality gate correctly rejected the result. Cause: the wrong beach-facing (transects aimed ~18° off, walking onto the sand) compounded by the G3 (exposure-driven width) and G4 (OMBB axis) grid changes. **Process gap:** neither Gate G2 (L1-only) nor Gate G3 (sizing + D6b) re-ran a converged 4-level nest, so this went undetected until the G4 gate. The last verified 4-level convergence was the pre-G4 baseline (`4828d99`, L4 at 80.3%).
+3. **Serve-on-failure bug (operator priority).** When a run fails the convergence gate, the service **still caches and serves** a forecast off the coarser grid (silent "degrade to L3"). **A failed run must serve nothing.** Not yet fixed. Site: `providers/nearshore/swan.py` caches each spot (`spots_cached += 1`, ~line 3122) with no convergence check.
+
+### Next actions (agreed with operator, in order)
+
+1. **Serve-nothing-on-failure guard** — a run that fails convergence publishes nothing. → **G1R.0**.
+2. **Replace G1 beach-facing with AD-1R** — the DSAS/CliffMetrics smoothed-shoreline normal (pinned equations), computed at spot setup, persisted per spot, operator-overridable. → **G1R.1–G1R.4**.
+3. **Re-validate the L4 grid lands in the water** — operator-directed order (2026-07-31): facing fix first, then ONE full 4-level re-run at **QC Gate G1R** (which re-tests Gate G4's criteria); the TC-21 bisect only if still failing.
+
+> **Scope note:** AD-1's design paragraph and PHASE G1's task specs below still describe the superseded isobath ray-fit — kept for the record. **Do NOT implement the ray-fit; implement AD-1R (which carries the operator-required pinned equations) via PHASE G1R.**
 
 ---
 
@@ -117,6 +143,13 @@ the 2026-07-30 chat are recorded here (Fable flagged they had no paper trail oth
 water), the L2 coverage-driven framing (AD-1 note), and the supersede-not-amend structure.
 
 ### AD-1 — Shore-facing is the isobath-normal, derived per-transect (replaces segment-perpendicular)
+
+> **⛔ METHOD SUPERSEDED 2026-07-31 by AD-1R (below).** The isobath ray-fit produced a wrong facing (Critical
+> finding 1: 202° vs true ~220° at HB). AD-1's *intent* stands — a derived, per-transect, geography-aware facing;
+> coverage-driven L2/L3 sizing — but its *method* (the 2 m/5 m contour ray-fit in the Design paragraph below) is
+> dead. **Do not implement the Design paragraph below; implement AD-1R.** The sizing-aggregation paragraph
+> (coverage-driven) remains in force unchanged.
+
 **Trigger 1** (changes how the bearing is derived — a method/criterion). Implements the documented-but-unbuilt
 SURF-ZONE §2.6 design; **reopens ADR-093 Amendment 2 §3** (contour-orientation derivation, previously deferred).
 
@@ -135,6 +168,125 @@ L1 and must enclose the L3/L4 grids and every transect across all spots. With pe
 contour is measured **per-transect** and L2 **encloses the union** (the covering envelope it already computes),
 not a single representative bearing. The bearing's only role in sizing is the direction the contour distance is
 measured along.
+
+### AD-1R — Beach facing = smoothed-0 m-shoreline normal (DSAS/CliffMetrics), at setup, operator-overridable — REPLACES AD-1's ray-fit
+**Approved by the operator in chat 2026-07-31** (ledger). **Trigger 1** (replaces the facing-derivation method
+inside AD-1) **+ Trigger 7** (re-introduces `beach_facing_degrees` as a stored config key with a source tag; one
+new cached shoreline-strip bathymetry file per spot; one new marine geometry endpoint + API pass-through for the
+definition-time computation; wizard help-content doc-sync).
+
+**⛔ Scope constraints (operator corrections, 2026-07-31, chat):** (1) the computation runs at
+**spot-DEFINITION time** and depends on **NOTHING but the drawn segment** — no SWAN grid, domain, or sizing
+exists yet (L1–L4 are sized AFTER, *from* this facing), and none may be assumed anywhere in the implementation;
+(2) it is defined for **every** spot, including open beaches with **no structures — no L4 (and possibly no L3)
+grid ever exists there**; zero dependency on obstacle discovery or grid levels.
+
+**Why AD-1's method failed:** the ray-fit measured the **2 m/5 m offshore contours** — bent by sandbars, channels,
+and the pier's own scour — within a **300 m** radius, and the production call site (`grid_sizing_chain.py:1142`)
+handed it the **1 km L1 grid**, so the 300 m search sampled bilinear noise inside a single cell. HB: 202° vs ~220°.
+
+**Method basis (researched 2026-07-31):** USGS **DSAS** (Digital Shoreline Analysis System) smoothed-baseline
+transect casting — transects cast perpendicular to a baseline smoothed over a "smoothing distance" (recommended
+500 m, max 2500 m; analyst widens until transects sit perpendicular — AD-1R automates that loop as the Option-B
+sweep) — and **CliffMetrics v1.0** (Payo et al. 2018, GMD 11:4317): trace the shoreline from the DEM, smooth the
+polyline coordinates with a moving-average window scaled to physical length, cast each normal perpendicular to the
+smoothed line's local before/after tangent.
+
+**Design — ALL equations pinned (operator directive 2026-07-31: implementing agents implement EXACTLY this math;
+do NOT re-derive, substitute, or "improve" it).**
+
+Work per spot in a local east/north meter frame about the segment midpoint `M = (lat0, lon0)`:
+
+```
+x_e(lat, lon) = (lon − lon0) · cos(lat0 · π/180) · M_LAT          # meters east
+y_n(lat, lon) = (lat − lat0) · M_LAT                              # meters north
+bearing(Δx_e, Δy_n) = (atan2(Δx_e, Δy_n) · 180/π + 360) mod 360   # compass deg, 0 = N, clockwise
+```
+
+`M_LAT` = the existing `_M_PER_DEG_LAT` constant. **Pinned constants:** `W_MIN = 500.0 m`, `W_MAX = 2500.0 m`,
+`W_STEP = 500.0 m`, `STABILITY_TOL_DEG = 5.0`, `TRACE_DEPTH_M = 0.0`, `MAX_CROSS_SEARCH_M = 1000.0`.
+
+- **Step 0 — shoreline-strip bathymetry (⛔ NO SWAN-GRID DEPENDENCY — operator correction 2026-07-31).** This
+  runs when the surf spot is **being DEFINED in the wizard** — NO SWAN domain, no L1/L2/L3/L4 sizing, no grid
+  caches exist yet (they are sized AFTER, *from* this facing). **Every input derives from the drawn segment
+  alone:** bbox = segment midpoint ±(W_MAX + 250 m) along the segment bearing × ±1000 m along the provisional
+  perpendicular (~5.5 km × 2 km). Fetch through the **existing bathymetry downloader mechanics**
+  (`download_bathymetry_for_level(..., margin_resolution_m=…)` / the `swan_bathymetry_PROFILE_*` bbox-keyed
+  cache pattern, `providers/nearshore/swan.py:285-304`) with a cache key derived from the **segment bbox** — an
+  implementation that requires a `GridDomain`/sized SWAN domain as input is WRONG; construct the coverage box
+  directly from the segment. Request the **FINE tier (~10 m — the heading gains nothing from 3 m)**; degrade to
+  MEDIUM (100 m) + WARN (operator decision 4, 2026-07-31); neither covers → raise (no silent fallback — the
+  wizard then pre-fills the segment-perpendicular tagged `fallback`, below).
+- **Step 1 — trace the 0 m shoreline (ordered polyline).** Seed stations `s_i = M + i·Δ·û`, `i = −N..N`, `û` =
+  unit vector along the drawn segment's bearing, `Δ` = the strip grid's native resolution (m), `N = ceil(W_MAX/Δ)`.
+  At each station find the `TRACE_DEPTH_M` crossing along the provisional facing (the segment-perpendicular,
+  searched both senses, ≤ `MAX_CROSS_SEARCH_M`) by the existing signed-depth zero-crossing (linear interpolation
+  between consecutive samples of opposite sign: signed depths `s1, s2`, positive = underwater → crossing at
+  fraction `t = s1 / (s1 − s2)` from sample 1). Stations with no crossing are dropped. The surviving points `p_i`,
+  ordered by `i`, ARE the polyline — the alongshore seeding provides the ordering (no wall-follower needed).
+  **Degenerate flags (CliffMetrics-style):** a consecutive-point gap > `5·Δ` → WARN, split at the gap, keep the
+  contiguous run containing the anchor; fewer than `max(7, round(W_MIN/Δ))` points in that run → the whole call
+  falls back to the segment-perpendicular + WARNING (the existing fallback contract).
+- **Step 2 — smooth (per window W).** Point spacing `Δs = median(|p_{i+1} − p_i|)`. Half-width in points
+  `k(W) = max(1, round(W / (2·Δs)))`. Moving average of the coordinates:
+  `p̂_i(W) = (1/(2k+1)) · Σ_{j=i−k..i+k} p_j`, defined only where full ±k support exists; an anchor lacking full
+  support uses the largest symmetric window available (log the actual meters used).
+- **Step 3 — tangent + seaward normal at an anchor.** Anchor index `a = argmin_i |p_i − q|` where `q` = the
+  segment midpoint's shoreline crossing (spot facing) or the transect's own coastline anchor (per-transect).
+  Tangent by CliffMetrics' before/after rule on the SMOOTHED line: `v = p̂_{a+1}(W) − p̂_{a−1}(W)`; line heading
+  `θ_line = bearing(v) mod 180`; normal candidates `θ_line + 90` and `θ_line + 270` (mod 360). **Seaward sense:**
+  the existing signed-depth probe from G1.1's implementation, UNCHANGED — probe both candidates, keep the deeper
+  (more positive signed depth); unresolvable → the fallback contract.
+- **Step 4 — stability sweep (operator "Option B", 2026-07-31).** For `W_j ∈ {500, 1000, 1500, 2000, 2500}` m
+  (capped at the largest window the surviving run supports; cap < `W_MIN` → fallback + WARN), compute `θ_j` via
+  steps 2–3. Circular difference `δ(a,b) = min(|a−b| mod 360, 360 − |a−b| mod 360)`. **Answer = the first `θ_j`
+  (j ≥ 2) with `δ(θ_j, θ_{j−1}) ≤ STABILITY_TOL_DEG`.** No pair stabilizes → the largest-window `θ` + WARNING
+  listing every `(W_j, θ_j)`. Log per anchor: the window cap, each `(W_j, θ_j)`, the settled window. (Smooth once
+  per `W` for the whole polyline; every anchor then reads its own tangent — the sweep is O(points × 5).)
+- **Step 5 — per-transect bearings.** Steps 2–4 with `q` = each transect's own coastline anchor. Collapses to one
+  value on a straight beach (KAT); fans with real curvature exactly as AD-1 intended.
+- **Step 6 — invocation sites, storage, consumers (operator-corrected 2026-07-31: definition-time, chicken-and-egg
+  resolved).** TWO invocation sites, one algorithm:
+  1. **Spot-DEFINITION time (the authoritative facing).** When the operator draws the segment, the wizard calls a
+     **new marine-service geometry endpoint via the API** (marine is reached only through the API — INVARIANT;
+     suggested routes `POST /geometry/facing` on marine, passed through the wizard's existing `/setup/*` channel —
+     exact names aligned to API-MANUAL conventions at G1R.4). Request carries ONLY the segment endpoints; the
+     service fetches the strip (step 0), runs steps 1–4, and returns the computed facing + the per-window sweep
+     log. The wizard **pre-fills** the facing field with it; the operator may adjust; the confirmed value is
+     **STORED IN CONFIG** (`beach_facing_degrees` returns as a stored key — T2.1 removed it; this restores it)
+     with a source tag `beach_facing_source ∈ {operator, computed, fallback_segment_perp}` (`operator` = the
+     operator adjusted the pre-fill; `computed` = untouched AD-1R result; `fallback_segment_perp` = the strip
+     fetch/trace failed at wizard time and the segment-perpendicular was pre-filled + flagged in the UI).
+  2. **Config-push time (`run_grid_sizing_chain()`) — per-transect bearings + fallback retry.** The chain reads
+     the stored facing (it does NOT recompute a `computed`/`operator` facing) and runs the SAME helper over the
+     cached strip for the **per-transect bearings** (step 5) — replacing BOTH production call sites of
+     `isobath_normal_bearing` (`grid_sizing_chain.py:1142` — which today hands the ray-fit the 1 km L1 grid —
+     and `swan_formats.py:803`) — **before the 30 m contour search**, so the facing feeds the contour-measurement
+     directions and the existing G1.6 profile-cache persistence + G1.6/TC-15 write-backs (unchanged in shape).
+     A `fallback_segment_perp`-tagged facing IS recomputed here (deterministic retry now that the fetch may
+     succeed); on success the resolved value is persisted and logged — the config tag stays `fallback` until the
+     operator re-visits the wizard (config is operator-owned; the chain never rewrites it).
+  Never computed during model runs. Consumers of the bearing value untouched; sizing formulas untouched
+  (OFF-LIMITS). **`isobath_normal_bearing` and its KATs are DELETED in the same commit** — added by this plan's
+  own G1, superseded before ever being right; do not leave dead code.
+
+**Operator override semantics (approved 2026-07-31).** `beach_facing_source = "operator"` wins at every consumer;
+the derived value is still computed and logged for comparison (parity with `directional_exposure`, G3.3). With an
+operator override, **per-transect bearings are UNIFORM = the override** (an operator asserting a facing asserts
+one facing; curved-shore spots should not override). Help-content doc-sync per process rules. **Apply-contract
+sync (the 2026-07-11/07-15 lesson):** the wizard sends `beach_facing_degrees` + `beach_facing_source` in the
+apply payload → the API's `ApplyRequest`/marine apply models MUST accept both (models are `extra="forbid"`), and
+the config writer persists them — verified end-to-end at the gate.
+
+**Datum robustness:** carried over from AD-1 — a vertical-datum shift slides the 0 m line but barely rotates its
+heading over ≥ 500 m; grids are per-cell LMSL-converted anyway (T8.11b).
+
+**AD-5 note:** the traced smoothed shoreline polyline (steps 1–2 output) is the natural curvature input for G5's
+break-type classification — G5.1 should read this polyline instead of the "G1.1 isobath analysis" it cites.
+
+**References:** USGS DSAS v5 User Guide (smoothing distance 500 m rec., 2500 m max); Payo et al. 2018,
+*CliffMetrics v1.0*, Geosci. Model Dev. 11, 4317 (wall-follower trace, coordinate moving-average, before/after
+tangent normals, window-scales-with-resolution finding); DSAS v5.1 data releases (500 m in practice).
 
 ### AD-2 — Fetch/openness fan + water-body classification-first + derived exposure (new subsystem)
 **Trigger 2** (classification drives regime — a responsibility) **+ Trigger 7** (new OSM-coastline data source +
@@ -434,6 +586,31 @@ guard — proceed as-written, independent of geometry)**, T4.6 (draw-tool polygo
 - **2026-07-31 — Coordinator has standing permission to push/deploy as necessary for testing** (operator, chat).
   The gate-validation SWAN runs on librewxr deploy autonomously; the plan runs from approval through every gate with
   no per-gate push touchpoint. Scoped to testing/gate-validation, not a public production cutover.
+- **2026-07-31 — AD-1's facing METHOD replaced by AD-1R** (operator, chat): the DSAS/CliffMetrics
+  smoothed-0 m-shoreline normal, equations pinned verbatim in §AD-1R — the operator explicitly required the
+  equations in the plan; implementing agents must not derive their own math. The isobath 2 m/5 m ray-fit is dead;
+  `isobath_normal_bearing` is deleted with the replacement.
+- **2026-07-31 — `beach_facing_degrees` optional override key approved** (operator, chat): the system computes
+  and pre-fills the facing in the wizard; an operator adjustment round-trips as the override and wins (trigger 7).
+- **2026-07-31 — Smoothing "Option B" stability sweep approved** (operator, chat): windows 500 → 2500 m in 500 m
+  steps; settle at successive-heading change ≤ 5° (`STABILITY_TOL_DEG = 5.0`, pinned); never-stable → largest
+  window + WARN. (DSAS itself does not self-tune — this automates the analyst loop its user guide prescribes.)
+- **2026-07-31 — Trace at 0 m** (operator, chat), not CliffMetrics' +1 m infrastructure offset; the heading is
+  threshold-insensitive; revisit only if the HB known-answer test shows structure contamination.
+- **2026-07-31 — MEDIUM (100 m) strip fallback accepted** (operator, chat) when the FINE tier cannot cover the
+  window (decision 4).
+- **2026-07-31 — Gate-G4 recovery order** (operator, chat): land the facing fix, run ONE full 4-level nest at
+  QC Gate G1R (re-tests Gate G4's criteria), and bisect per TC-21 only if L4 coverage still fails.
+- **2026-07-31 — Shoreline-strip fetch CONFIRMED, with two operator corrections** (operator, chat): a new
+  ~5.5 km × 2 km bbox per spot through the existing bathymetry-downloader mechanics (one new cached file per
+  spot, trigger 7) — needed because NO existing grid spans the 500–2500 m alongshore window. Corrections:
+  (1) **chicken-and-egg** — the facing is computed when the surf spot is being DEFINED; nothing may depend on
+  SWAN grids/domains existing (they are sized AFTER, from this facing) — the strip bbox and cache key derive from
+  the drawn segment alone; (2) **no-L4 reminder** — a spot with no obstacles never has an L4 (and possibly no L3):
+  the facing + per-transect bearings are defined for every spot with zero dependency on structures or grid
+  levels. The definition-time flow's new marine geometry endpoint + API pass-through is approved as part of this
+  (trigger 7). `beach_facing_degrees` is stored in config with `beach_facing_source ∈ {operator, computed,
+  fallback_segment_perp}`; only `operator` is an override.
 
 ---
 
@@ -657,6 +834,92 @@ NET-NEW modules, so few current-code quotes; the spec IS the design (AD-2, AD-4,
   self-check); agreement → trust; sharp divergence → WARN + flag (bad OSM coastline or anomalous bathymetry).
   Known-answer test the divergence flag.
 - **Accept:** aligned synthetic inputs → no flag; a 40°-divergent pair → flag + WARN.
+
+---
+
+### PHASE G1R — Beach-facing replacement (AD-1R) + serve-nothing guard (operator-approved 2026-07-31)
+
+**Gate to start:** operator approval 2026-07-31 (granted in chat; all decisions in the ledger, including the
+strip fetch and the definition-time / no-L4 corrections). **Order: G1R.0 first (independent, operator priority
+1), then G1R.1 → G1R.4, then QC Gate G1R.** Every agent prompt carries the git-restrictions +
+architectural-change blocks.
+
+#### G1R.0 — Serve-nothing-on-failure guard (operator priority 1) · Critical finding 3
+- Owner: `clearskies-api-dev` (impl) + `clearskies-test-author` (guard KAT).
+- File: `providers/nearshore/swan.py` — the per-spot cache write (`spots_cached += 1`, ~line 3122) has **no
+  convergence check**; a run failing the convergence gate still caches + serves a coarser-grid forecast (silent
+  degrade-to-L3).
+- **Change:** a run that fails the convergence gate **publishes nothing** — no forecast-cache write, no served
+  update for that cycle; the previous good cache (if any) keeps serving until it expires; loud ERROR naming the
+  failed level + valid_fraction. **No SWAN emission change.** Off-limits: the convergence gate itself
+  (`_check_convergence`) is frozen — this task changes what happens AFTER it fails, not the gate.
+- **Accept (KAT):** failed-gate run → forecast cache byte-untouched + ERROR logged; passed-gate run → caches
+  exactly as today.
+
+#### G1R.1 — Shoreline-strip fetch + `shoreline_normal_bearing` helper (AD-1R steps 0–4) · AD-1R
+- Owner: `clearskies-api-dev` (impl) + `clearskies-test-author` (KAT).
+- Files: **NEW** helper `shoreline_normal_bearing(...)` in `enrichment/bathymetry.py` (beside
+  `find_shoreline_from_grid`, whose zero-crossing walk it reuses); strip fetch via the existing
+  profile-bathymetry mechanism (`providers/nearshore/swan.py:285-304`).
+- **Implement AD-1R steps 0–4 EXACTLY as pinned — the equations are in the AD; do not re-derive them.** Reuse
+  the existing seaward-sense probe from G1.1's implementation. **Delete `isobath_normal_bearing` + its KATs in
+  the same commit** (AD-1R step 6). The helper + strip fetch take ONLY the segment endpoints (+ a grid handle) —
+  **no `GridDomain`/SWAN-sizing parameter in any signature** (AD-1R scope constraint 1); works identically for a
+  spot with no structures (scope constraint 2).
+- Verify: `pytest tests/enrichment/test_bathymetry.py -q -k shoreline_normal` (path per TC-1 convention).
+- **Accept (KAT, synthetic grids):** N–S straight shoreline, water east → 90.0° ± 0.5° at every window, stable
+  at W=1000; the same rotated 20° → 110.0° ± 0.5°; sinusoidal shoreline (amplitude 50 m, wavelength 400 m) →
+  settled facing within ±3° of the underlying trend's normal; shoreline run shorter than `W_MIN` →
+  segment-perpendicular fallback + WARN; a > 5·Δ gap → split-and-keep-contiguous-run behavior.
+
+#### G1R.2 — Rewire both call sites: chain READS the stored facing + derives per-transect bearings · AD-1R step 6.2
+- Owner: `clearskies-api-dev`.
+- Files: `services/grid_sizing_chain.py:1142` (currently hands the ray-fit the **1 km L1 grid**; now **reads the
+  stored config facing** — no recompute unless `beach_facing_source == "fallback_segment_perp"`, which retries the
+  full derivation — and derives the **per-transect bearings** from the cached strip via the G1R.1 helper,
+  **before the 30 m contour search** so the facing feeds the contour-measurement directions);
+  `services/swan_formats.py:803` (per-transect call site). The G1.6 profile-cache persistence and the G1.6/TC-15
+  runtime + endpoint write-backs are **UNCHANGED in shape** (same fields, new values).
+- **Off-limits:** sizing formulas; every consumer of the bearing; SWAN emission (VALUE change only). No
+  dependency on L3/L4 existing — an open-beach spot (no structures, no L3/L4) resolves identically.
+- Verify: `pytest tests/services/test_grid_sizing_chain.py tests/services/test_swan_formats.py -q`.
+- **Accept (known answer):** on the real HB config, `beach_facing_degrees` ≈ **220° ± 5°** (the pier/L4-rotation
+  heading; the broken 202° MUST NOT reproduce); per-transect bearings ≈ uniform on HB's straight shore; an
+  open-beach fixture (no structures) resolves per-transect bearings identically; the persisted profile carries
+  the new values; no consumer signature changes.
+
+#### G1R.3 — Definition-time flow: marine geometry endpoint + API pass-through + wizard pre-fill + stored key · AD-1R step 6.1
+- Owner: `clearskies-api-dev` (marine endpoint + API pass-through + apply models) + `clearskies-dashboard-dev`
+  (stack wizard).
+- Files: marine service — **NEW** `POST /geometry/facing` (Bearer, same auth as `/config`; request = segment
+  endpoints ONLY; response = computed facing + the per-window sweep log + source tag; route naming aligned to
+  API-MANUAL conventions at G1R.4); API — pass-through on the wizard's existing `/setup/*` channel (ADR-038),
+  AND `ApplyRequest`/marine apply models accept `beach_facing_degrees` + `beach_facing_source` (models are
+  `extra="forbid"` — the 2026-07-11/07-15 apply-contract lesson; miss this and every apply 422s); marine
+  `config/marine_config.py` (parse the stored key + source tag; property/setter at :611-636); stack wizard marine
+  step (call the endpoint when the segment is drawn → pre-fill; operator adjustment → `source=operator`;
+  fetch/trace failure → pre-fill the segment-perpendicular + `source=fallback_segment_perp` + a visible UI flag);
+  **help-content doc-sync**.
+- **Off-limits:** no SWAN emission; the endpoint must work on a bare segment with **no prior config, no grids, no
+  sizing** (AD-1R scope constraint 1).
+- **Accept:** wizard draw → field pre-fills with the computed facing (HB: ≈ 220°); an adjustment round-trips as
+  `source=operator` and wins at every consumer (per-transect uniform; derived value still logged); an untouched
+  pre-fill round-trips as `source=computed`; strip failure → segment-perp pre-fill, flagged, tagged
+  `fallback_segment_perp`; the full wizard apply flow persists both keys end-to-end with **no 422**; help keys
+  updated.
+
+#### G1R.4 — Doc-sync (Opus/Coordinator-owned, NOT delegated)
+- ADR-093 Amendment 5: correct the facing method to AD-1R (DSAS/CliffMetrics; equations by reference to this
+  plan). ARCHITECTURE.md geometry bullet (updated 2026-07-31 with this plan revision — verify at the gate).
+  PROVIDER-MANUAL §14.15 facing derivation. Operator-Manual/wizard narrative (the override field).
+
+#### QC Gate G1R — the operator-directed re-run (decision 6, 2026-07-31)
+- Adversarial audit + the KATs above; then **deploy and run ONE full 4-level nest on the real HB config**
+  (facing fix first, then re-run — the operator-directed order). **This gate re-tests Gate G4's criteria:** L4
+  `valid_fraction ≥ 80%`, transect handoff points wet (TC-21's 25/32-dry must clear), full-nest convergence.
+  - **Pass →** Gate G4 unblocks; G5+ proceeds (Gate GR still re-validates against the cam later).
+  - **Still failing →** only THEN the TC-21 bisect (redeploy pre-G4 `f788611` / pre-G3 `4828d99`, same-cycle
+    isolation runs) — not before.
 
 ---
 
@@ -1011,3 +1274,10 @@ footprints (T4.2) changes the **values in `BOTTOM.txt`**, not this syntax.
 - **2026-07-30** — Plan created from STUDY-AREA-GEOMETRY-BRIEF (Fable-reviewed x2, 24 findings incorporated) +
   operator directions. Supersedes MARINE-WORKING-MODEL-PLAN. Architecture decisions AD-1..AD-8 stated for
   approval-via-plan. Off-limits fence and full carry-forward audit recorded.
+- **2026-07-31** — G1's facing method found wrong (Critical finding 1; plus the 1 km-grid call-site defect found
+  in review). Researched USGS DSAS (smoothed-baseline transect casting, 500–2500 m smoothing distance) and
+  CliffMetrics v1.0 (DEM shoreline trace → coordinate moving-average → before/after tangent normals). **AD-1R**
+  written with operator-required pinned equations; **PHASE G1R** added (serve-nothing guard G1R.0, method
+  replacement G1R.1–.2, override key G1R.3, doc-sync G1R.4, Gate G1R = the one-full-run Gate-G4 retest). Operator
+  approved all decisions in chat except the shoreline-strip fetch (pending — see ledger). ARCHITECTURE.md
+  geometry bullet updated to AD-1R the same day.
