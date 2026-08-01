@@ -147,9 +147,14 @@ domain. The core defect is BD-1/BD-2 alone.
 
 ## 6. Parameters — RULED by the operator, 2026-08-01 chat
 
-1. **Deviation band (BD-7): ±0.75 σ of the main-break-zone mean.** Transects whose bigger-break
-   face height falls within 0.75 standard deviations of the zone mean contribute to the headline
-   average.
+1. **Deviation band (BD-7): the UPPER TAIL — transects whose bigger-break face height is ABOVE
+   the zone mean + 0.75 σ contribute to the headline average.** (Corrected ruling, same day —
+   NOT a symmetric ±band.) Rationale (operator): SWAN conveys hourly-averaged swell statistics,
+   not individual waves — every per-transect face height is already a smoothed average, so the
+   upper tail of transects is what corresponds to the set waves surfers actually judge by;
+   averaging around the mean would double-smooth and understate. Single-transect anomalies are
+   guarded by ruling 2's ≥5-transect zone window, not by trimming the top. Fallback: if fewer
+   than 2 in-zone transects clear mean+0.75σ, use the top 2 (never a single transect).
 2. **Main-break-zone window: minimum ~5 consecutive transects (~50 m at 10 m spacing)** — a zone
    is a real stretch of beach, never one anomalous line.
 3. **BD-8 RESCINDED — no exclusion at all.** Operator reasoning: with the zone-based headline, a
@@ -164,7 +169,9 @@ domain. The core defect is BD-1/BD-2 alone.
    profile the H/d ≥ γ condition can flicker over a few metres, splitting one physical break
    into several detected entries; a merge threshold would coalesce them.) Ruling: rely on the
    existing engine's guards; tune ONLY if the HB double-break reality gate (§4.1) shows zone
-   fragmenting. No speculative parameter now.
+   fragmenting. No speculative parameter now. (Operator note reinforcing deferral: the model
+   conveys hourly-AVERAGED swells, not individual waves — Hs profiles are spatially smooth, so
+   γ-condition flicker is unlikely in practice.)
 5. **Band widening cost (BD-1): measure first** — coordinator measures the actual TABLE_PT cost
    from the 2026-08-01 run artifacts and presents the number; full-length bands adopted if the
    cost is unremarkable.
