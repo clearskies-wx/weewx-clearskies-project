@@ -1915,8 +1915,9 @@ superseded markers), and PROVIDER-MANUAL.md §14.15.
    computation. The new sizer is pin-independent by construction (beach-frame, anchored on the coastline,
    never the pin).
 4. **Transect spacing stays 10 m**, pending performance data from the first full test run against the new
-   grid (a full SWAN run was in progress at the time of this doc-sync pass — see R3's PENDING test-run
-   note).
+   grid. *(Update, same day: that run completed — 143 transects, full nest in ~17 min wall clock, all
+   levels converged, published. No performance problem observed at 10 m spacing this cycle; see the R3
+   RESULT block.)*
 
 ---
 
@@ -2161,7 +2162,32 @@ within 20% of the boundary file's swell Hs. **Must not touch:** anything beyond 
 >
 > **Remaining R2 sub-items NOT done this session (still tracked above, do not lose):** durable cache-coverage GUARD/invariant (wet-boundary check, item ★ MISSING GUARD — code for the coverage gate landed but the loud wet-boundary invariant did not); south `[len]` clamp; single-VARIABLE-point revisit; OBSTACLE double-counting split (pending operator nod); surfbeat maxerr; regression-diff commit hunt; whitecapping/breaking isolation re-run. These are correctness/hardening items, not publish blockers.
 
-### R3 — L3-strip viability + frame integrity under AD-1R facing  ⏳ **REWRITE LANDED + DEPLOYED 2026-08-01 (marine `4e79d21`); full SWAN test run PENDING**
+### R3 — L3-strip viability + frame integrity under AD-1R facing  ✅ **DONE — REWRITE DEPLOYED + FULL SWAN TEST RUN VERIFIED 2026-08-01 (marine `4e79d21`)**
+
+> **R3 RESULT 2026-08-01 (~19:06–19:23 UTC full test run, code `4e79d21`, coordinator-measured from the
+> run log + published cache — supersedes the PENDING note below):**
+> - **Convergence:** L1 accuracy 100%, L2 99.7%, L3 99.7%, **L4 accuracy 99.6% / valid_fraction 100.0%**
+>   (pre-rewrite baseline: 5.2%). 0 NaN, 0 overflow, all levels `convergence OK`.
+> - **Per-transect L4 handoff (T4B.3): 143/143 transects each resolved 35/35 timesteps on their own
+>   10 m band** — log shows 143 × "35/35 timestep(s) resolved a per-hour position on its own 10 m band".
+> - **PUBLISHED:** `forecast_cache.json` 106 MB @ 19:23 UTC; real 3-component spectral DWR at the spot
+>   (0.51 m @ 13.3 s @ 197.5° groundswell + two wind-swell components); `spectral` payload =
+>   per-transect carrier form (`handoff_by_transect`) for all 35 hours.
+> - **Nest swell L1→L2 (T>10 s):** max 0.52 m @ 13.2 s @ 198°, median 0.42 m, 227/306 locations >0.3 m
+>   (healthy; prior verified cycle 0.64/0.54 under different conditions).
+> - **Regen guard event (surfaced):** initial smart-sized L3 viability fired ("structure unreachable by
+>   ~254 m — L3 disabled"), then superseded by the designed role-A coarse-nest rebuild around L4
+>   (enabled, ≥200 m clearance) — final state enabled; sequence is the designed E4/D2 flow.
+> - **Follow-up kill (operator-ordered same day, marine `1c98507`, local at time of writing):** the
+>   legacy pin-anchored spot-level CURVE pick `_select_l3_handoff_spectra()` — which resolved 0/35 and
+>   spammed ~70 clamp WARNINGs per run while the per-transect path did all real work, and whose
+>   "0/35 resolved a per-hour L4 station" INFO line misdirected diagnosis for 5 days — was deleted
+>   after a consumption trace proved today's published output byte-identical without it (CURVE
+>   geometry/TABLE/SPECOUT all stay — load-bearing for `forecast` + the per-transect selector).
+>   Defect-2 end-to-end coverage re-pointed through `_select_l3_handoff_position_and_spectrum()`.
+>   The R3 "Accept" criteria below are superseded by these measured results: the 238°-era comparators
+>   are moot under the shadow-envelope design; acceptance = the measured convergence/handoff/publish
+>   numbers above.
 
 > **R3 UPDATE 2026-08-01 (rewrite landed, this doc-sync pass):** the L4-grid↔transect co-registration fix named
 > in the "R3 UPDATE" note below (superseded) is BUILT: `compute_structure_grid_domain()` was rewritten
