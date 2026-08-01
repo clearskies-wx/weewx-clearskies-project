@@ -2376,7 +2376,9 @@ Four enrichment processors for marine data. Each follows the existing enrichment
 
 > **Marine Geometry-Model Plan — served-contract scope (target; ADR-093 Amendment 5 + ADR-100).** The geometry
 > model changes how the study area's geometry is *derived* inside the marine service (isobath-normal facing,
-> open-water L1 aim/WW3 sides, fan-derived exposure, OMBB L4 axis, curvature L3 trigger). **The only served-API
+> open-water L1 aim/WW3 sides, fan-derived exposure, transect-shadow-envelope L4 sizing [reversed from the
+> originally planned OMBB axis 2026-08-01, marine `4e79d21` — see ARCHITECTURE.md + PROVIDER-MANUAL.md §14.15],
+> curvature L3 trigger). **The only served-API
 > effects are the two noted in this manual:** the `modelStatus` fraction-degraded grading + new `"partial"` value
 > (G7.5, above) and the reconciliation of the CURVE transect direction with the isobath-normal `beach_facing_degrees`
 > (below). **No surf/marine response field is added, removed, renamed, or reshaped by the geometry model** — the

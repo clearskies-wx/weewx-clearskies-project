@@ -365,6 +365,16 @@ diagnosed (the two-spot lateral-union enlargement and catalogue density near the
 the aim). Root-cause it, then validate with the real 2-spot Bolsa station-selection run (Gate G2).
 
 ### AD-4 — One oriented-bounding-box primitive; L4 axis from it; multi-obstacle proximity clustering
+
+> **⛔ SUPERSEDED/REVERSED 2026-08-01 (operator-approved, ADR-093 Amendment 6).** This design (below) was
+> implemented (G0.1/G4, `37acb0c`/`418f1f5`/`5dbce94`/`02ef999`) but never reached a converged deployment — Gate
+> G4 failed and the AD-1R facing fix (PHASE G1R) did not resolve it either (see Critical finding 2 / QC Gate G1R
+> above: an OMBB axis rotates independently of the cross-shore transects the grid must supply a handoff to, so
+> co-registration was coincidental). Replaced by a beach-frame transect-shadow-envelope design (marine `4e79d21`,
+> R3 residual "L4-transect co-registration") that also drops the primary-structure/proximity-group narrowing
+> (G4.2 below) entirely — see ADR-093 Amendment 6 and `docs/manuals/PROVIDER-MANUAL.md` §14.15 for the current
+> design. Text below is the historical record of what was approved and attempted — **do not implement.**
+
 **Trigger 2** (L4 axis method + sizing). **Sequence D6b (L4-only cold-start guard) BEFORE any L4 resize.**
 
 **Design.** A new `services/structure_geometry.py` provides an **OMBB helper** (shapely `minimum_rotated_rectangle`
@@ -1056,6 +1066,14 @@ AD-8 (this plan)** — no separate mid-run sign-off; implement per AD-8.
   old two-point axis (within tolerance) with tip/base unchanged; a bent jetty → OMBB long-axis, not the tip-to-tip line.
 
 #### G4.2 — Multi-obstacle proximity clustering — MERGE only; separate-box multi-L4 is DEFERRED
+
+> **⛔ SUPERSEDED/REVERSED 2026-08-01 (operator-approved, ADR-093 Amendment 6).** The "PRIMARY structure gets the
+> single L4, others logged to concerns" rule below no longer exists. Every operator-identified eligible structure
+> in a cluster now participates in the one sized L4 grid (`_cluster_structures_by_proximity()`/
+> `_select_primary_group()` deleted, marine `4e79d21`) — "a beach may have no dominant structure" (operator
+> ruling 2026-08-01: two equal breakwaters, or a jetty with adjoining breakwaters, must not have one arbitrarily
+> designated primary). Text below is the historical record — **do not implement.**
+
 - Owner: `clearskies-api-dev`. File: `services/swan_domain.py` (clustering + L4 sizing). **VALUE change only — NO
   new SWAN emission.** *(The runner/emitter are single-L4-child by construction: scalar child params + one `NGRID`
   `swan_formats.py:1814-1819`; class-constant nest filenames `swan_runner.py:2646-2647`; first-matching-L4-only

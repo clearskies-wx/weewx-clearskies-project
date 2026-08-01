@@ -918,3 +918,30 @@ production.
   (`smart_size_l3_grid`), `services/swan_formats.py` (`_OBSTACLE_PARAMS`, CGRID/NGRID emission,
   `DIFFRACTION 1 0.2 27`); ARCHITECTURE.md SWAN section; rules/clearskies-process.md 2026-07-19 /
   2026-07-23 incident rules.
+
+---
+
+## ADDENDUM (2026-08-01, Phase R doc-sync pass) — §3.1/§3.2's "rotated to the pier axis" design superseded
+
+**§3.1's rotation and §3.2's extent rule (above) describe the ORIGINAL illustrative design (AD-4, "L4 axis from
+the OMBB"), which never reached a converged deployment** — Gate G4 failed (the sized grid landed on land) and
+was replaced 2026-08-01 by a beach-frame transect-shadow-envelope design (marine `4e79d21`, ADR-093 Amendment 6).
+Kept above for the record — **do not implement §3.1/§3.2 as written.** Current design:
+
+- **Rotation** — the resolved **beach facing** (the AD-1R shoreline-strip-derived bearing), never the structure's
+  own axis. §3.1's "rotation here is purely an area optimization around a fixed physical object" framing no
+  longer applies; rotation now serves alignment with the transects, not a cell-count optimization around the
+  structure.
+- **Extent** — the beach-frame bounding rectangle of every eligible structure's footprint UNION the handoff
+  points of every surf-area transect any one of them shadows (per-structure shadow test against the ADR-100
+  fetch-fan's open rays), not §3.2's swell-direction-climate-window shadow + fixed wavelength margins. The
+  shoreward edge is the minimum-`u` shadowed-transect handoff point (the ADR-093 `l3_shoreward_edge_depth_m()`
+  ≈1.78 m contour on each transect's own profile), not the structure's breaking-depth-contour-to-tip axis.
+- **No primary-structure selection** (same-day amendment): every eligible structure in a cluster participates in
+  the one L4 grid.
+
+The shadow-decay research this brief's §3.2 cites (Goda diffraction diagrams, the ~2–4 wavelength strongly-
+modified zone) remains valid physics background — see the parallel addendum in
+`SWAN-OBSTACLE-BEST-PRACTICES-2026-07-29.md` for the fuller citation list (SWAN manual 1–2λ, CEM ~20λ, Duck FRF
+pier 200–400 m). It informed the ORIGINAL across-structure-axis margin, not the current per-transect handoff-
+based extent. See PROVIDER-MANUAL.md §14.15 and ADR-093 Amendment 6 for the adopted design.

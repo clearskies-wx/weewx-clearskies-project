@@ -172,3 +172,30 @@ structure [2].
 - "Two parallel lines" for width — untested approximation.
 - Oblique-attack transmission — stock DAM assumes direction independence.
 - Tapered-structure best practice — synthesis, no dedicated study located.
+
+---
+
+## ADDENDUM (2026-08-01, Phase R doc-sync pass) — L4 sizing design adopted; shadow-decay research
+
+**Adopted: the L4 grid sizing rewrite (marine `4e79d21`, ADR-093 Amendment 6).** `compute_structure_grid_domain()`
+now sizes L4 from a beach-frame transect-shadow envelope (rotation = resolved beach facing; extent = every
+eligible structure's footprint UNION the handoff points of every transect it shadows) instead of an
+obstacle-OMBB axis. This brief's own obstacle-representation content above (TRANSM/REFL coefficients, line-vs-
+footprint fork, the tips/pitfalls list, the sources) is **unaffected** — this addendum concerns L4's *extent and
+orientation*, not how a structure is represented once it is inside the grid. See PROVIDER-MANUAL.md §14.15 and
+ADR-093 Amendment 6 for the full sizing design.
+
+**Sourced findings on structure-shadow decay distance (from the prior research session, relevant to how far
+downwave a shadow — and therefore a shadow-derived grid envelope — should extend):**
+- SWAN's own diffraction is only meaningful within about 1–2 wavelengths of an obstacle tip (SWAN technical
+  documentation, obstacles chapter).
+- Classical coastal-engineering practice terminates diffraction-shadow diagrams at roughly 20 wavelengths (CEM /
+  ICCE diffraction diagrams).
+- At the Duck, NC FRF pier, the measured shadow is strong to about 200 m downwave and largely healed by about
+  400 m (Elgar et al. 2001 — already source [1] above).
+- Depth-limited breaking and bottom friction both act to dissipate a structure's shadow through the shallows,
+  independent of the diffraction mechanism itself.
+
+These findings inform how far downwave a shadow-derived grid extent is physically justified; they are cited here
+as research inputs, not as a new pinned constant — the actual L4 shoreward/seaward edges are computed per
+ADR-093 Amendment 6's formula, not from a fixed wavelength multiple.

@@ -30,7 +30,9 @@ Three specific defects motivated this decision (STUDY-AREA-GEOMETRY-BRIEF, Fable
    bug, because they answer different questions.
 
 ADR-093 Amendment 5 records the changes to how the SWAN model *consumes* geography (isobath-normal facing,
-open-water L1 aim, OMBB L4 axis, curvature break-type, obstacle representation — AD-1/AD-3/AD-4/AD-5/AD-8).
+open-water L1 aim, L4 axis/extent [originally the OMBB structure axis per AD-4; reversed to a beach-frame
+transect-shadow envelope by ADR-093 Amendment 6, 2026-08-01], curvature break-type, obstacle representation —
+AD-1/AD-3/AD-4/AD-5/AD-8).
 **This ADR records the net-new geography-*determination* subsystem those changes read from** — AD-2 (fetch fan
 + classification-first + derived exposure), AD-6 (OSM two-stage study-area basis), AD-7 (classifier reuse). It
 is a distinct decision because it introduces a **new external data source** (OSM/Overpass `natural=coastline`)
@@ -100,6 +102,15 @@ sheltered (this object replaces the typed 8-sector `directional_exposure`, in th
 the L4 sizer and surf-scorer already consume) — and **(b) the open-water bearing** (the openness-weighted
 seaward direction, feeding ADR-093 Amendment 5 AD-3), and **(c) a fetch value** (the open-water fetch along the
 dominant open direction, used to size L1 in the Great Lakes where there is no shelf edge).
+
+**Consumers note added 2026-08-01 (ADR-093 Amendment 6).** The fan's individual **rays** (`RayResult`, not just
+the aggregate exposure/bearing/fetch outputs above) gained a fourth consumer: `compute_structure_grid_domain()`
+now takes the fan's rays directly (`open_rays`, every ray whose classification is not `truly_blocked` —
+`wrap_candidate` counts as open) to classify which surf-area transects a structure shadows, which decides the
+**L4 structure grid's own extent** (shoreward/seaward/lateral edges — see ADR-093 Amendment 6 for the sizing
+rule). This is additive: the fan's ray-casting, classification, and its three existing outputs (exposure,
+open-water bearing, fetch value) are unchanged; L4 sizing is a new reader of the same `rays` list, not a new
+computation inside `services/geography.py`.
 
 **CRITICAL — the fan does NOT decide how much energy arrives; SWAN does.** For every directly-open and
 wrap-candidate direction, L1 is sized to **enclose the open water AND any intervening land**

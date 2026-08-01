@@ -1900,7 +1900,7 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 | L1 (outer) | `outer_grid_resolution_km` | ~1 km | ~200km × 150km (continental shelf approach, from `hrrr_bbox`) | Always |
 | L2 (inner) | `inner_nest_resolution_m` | ~100 m | ~20–30km × 10–15km (tight around surf spots, from `swan_domain_bbox`) | Always |
 | L3 (coarse nest / refraction) | — (`_L3_RESOLUTION_M`, `services/swan_domain.py`) | 40 m | ~1,500m × 1,300m ≈ ~1,400 cells at HB (contains L4 + clearance); *not* the 30 m contour | Structure present (nests L4) OR classified point break/headland/bay break — never otherwise (ADR-093 Amendment 3, D2) |
-| L4 (structure grid) | — (`_STRUCTURE_GRID_DX_FLOOR_M`, `services/swan_domain.py`) | 10 m, fixed (operator ruling 2026-07-27) | Rotated rectangle around the structure's own principal axis, ~5,000 cells at HB | Eligible structure (pier/jetty/groin/breakwater) present |
+| L4 (structure grid) | — (`_STRUCTURE_GRID_DX_FLOOR_M`, `services/swan_domain.py`) | 10 m, fixed (operator ruling 2026-07-27) | Rotated rectangle in the **beach frame** (rotation = resolved beach facing, not a structure axis) — the union of every eligible structure's footprint + the handoff points of every transect it shadows (marine `4e79d21`, 2026-08-01); measured HB regen 2026-08-01: 46×137 = 6,302 cells, u_span 450 m, v_span 1358 m, rot 216.4° | Eligible structure (pier/jetty/groin/breakwater) present AND it shadows ≥1 surf-area transect |
 
 The `~10,000–20,000` grid-point / `≤400 MB` total that this table previously cited was the pre-Phase-E three-level (L1+L2+L3-always) figure and no longer applies uniformly — an open-beach spot with neither trigger runs only L1+L2 (well under that figure); a structure spot runs all four levels (L1+L2+L3+L4 ≈ 12,600 cells at HB, ADR-093 Amendment 3 D8). L1 writes `NESTOUT` boundary files; L2 reads them via SWAN's `NGRID` command and writes its own `NESTOUT`. When L3 runs, it reads L2's `NESTOUT`; when L3 nests L4 (structure case), L3 itself writes a further `NESTOUT` sized to L4, which L4 reads. Multiple surf spots on the same coastline share Levels 1 and 2; each cluster gets its own L3/L4 nest when triggered. The runner copies boundary files between level subdirs: `level1/nest_out.dat` → `level2/nest_in.dat`, `level2/nest_out.dat` → `level3_{idx}/nest_in.dat`, and (structure case) `level3_{idx}/nest_out.dat` → `level4_{idx}/nest_in.dat`.
 
@@ -1912,7 +1912,7 @@ Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Fo
 
 | Setting | Value | Why |
 |---|---|---|
-| `SET ... MAXERR 3` | Only stop on severe errors (level 3) | Default MAXERR=1 stops on boundary mismatch warnings (level 2), which are normal for nonstationary TPAR boundaries |
+| `SET ... MAXERR 2` | Fail on SEVERE errors (level 3) only; warnings (level 1, including the boundary-height-mismatch warning) and SWAN's own auto-repairable errors (level 2) still let the run continue | Was `MAXERR 3` ("run no matter what"), which hid genuinely broken runs (marine `51543b1`, 2026-08-01, operator: "set the model to fail if it is not running correctly, not hide a bad run"). The old `MAXERR 3` row's own rationale was itself wrong — PRINT shows the boundary mismatch as a level-1 `** WARNING`, not level 2, so `MAXERR 2` does not halt on it. SWAN's own default is `MAXERR 1`. |
 | `QUANTITY HSIGN TM01 DIR excv=-9.` | Explicit no-data sentinel | Without this, SWAN uses an implementation default indistinguishable from real near-zero values |
 | `TABLE ... TIME XP YP HSIGN TM01 DIR` | SWAN output quantity names | `HSIGN` (not `HS`) is the correct quantity name; `TIME` must be explicitly requested (not automatic) |
 | `INIT HOTSTART 'hotstart.dat'` | Load wave field from previous run | Eliminates cold-start spin-up; t=0 has realistic waves immediately. **Must be emitted after both `CGRID` and `READ BOT`** — see below |
@@ -1926,7 +1926,7 @@ Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Fo
 
 **Per-level physics (SWAN-L3-STABILITY-PLAN Phase 2):**
 
-The shared physics block is differentiated per level. Common commands emitted at all levels: `GEN3 WESTHUYSEN`, `BREAKING CONSTANT 1.0 0.73`, `FRICTION JON 0.067`, `TRIAD`. Level-specific:
+The shared physics block is differentiated per level. Common commands emitted at all levels: `GEN3 WESTHUYSEN`, `BREAKING CONSTANT 1.0 0.73`, `FRICTION JON 0.038`, `TRIAD`. **`FRICTION JON` was `0.067`; corrected to `0.038` (marine `51543b1`, 2026-08-01)** — the SWAN User Manual §FRICTION recommends 0.038 m²/s³ for typical sandy bottoms, applied to both wind sea and swell, and explicitly discourages 0.067 "even for wind sea conditions." The old 0.067 value (~76% more bottom drag) was over-dissipating long-period swell over the propagation fetch — found during the 2026-08-01 swell-loss regression investigation. Level-specific:
 
 **Table below is the pre-Phase-E, three-level physics assignment; superseded by ADR-093 Amendment 3 (plan task E7, 2026-07-27) — DIFFRACTION and its NUMERIC under-relaxation now belong to L4 (structure grid), not L3. Current assignment:**
 
@@ -2258,32 +2258,75 @@ priority override > grid > scalar) for both the served SWAN CURVE emission and t
 **value-only** change into the existing emission — no SWAN command syntax changes. A cache lacking the fields falls
 back cleanly to the segment-perpendicular. The served effect is validated live at Gate GR.
 
-**L1 aim + WW3 boundary sides — the open-water fetch fan (AD-3, ADR-100, Phase G2).** `_compute_level1`
-(`services/swan_domain.py`) aims the L1 offshore extension along the **open-water bearing** from the fetch fan
-(`services/geography.py`, ADR-100), not `mean_offshore_bearing_deg`; `ww3_station_selection`'s offshore-side
-selection reads the same open-water bearing. **VALUE change only** — L1/L2 stay axis-aligned; the CGRID/INPGRID
-emission, the `mean_offshore_bearing_deg` definition, the WW3 station **qualification** criterion
-(`deep water OR tanh(kd)`), and the cardinal-only (N/E/S/W) side set are all unchanged. **Wrap-candidate
-directions** (island/headland/peninsula with ≥5 km open water beyond) enlarge L1 to enclose the intervening land
-+ the open water beyond so SWAN computes the wrap-around. **Great Lakes** L1 is sized from the fan's fetch value
-(lake fetch), not `find_shelf_distance` (which returns the nearest ocean shelf and oversizes a lake L1); the GLWU
-product routing already exists.
+**L1 aim + WW3 boundary sides — the open-water fetch fan (AD-3, ADR-100, Phase G2). IMPLEMENTED + DEPLOYED**
+(marine `51543b1`, 2026-08-01 — confirmed against current code, not just the commit message: `_compute_level1()`
+takes `open_water_bearing_deg`/`regime`/`fetch_value_km`/`rays`/`horizon_km`, `services/grid_sizing_chain.py`
+passes all five from `geography_result` at apply time, and `providers/nearshore/swan.py` passes
+`offshore_bearing_deg=domains.open_water_bearing_deg` into `select_boundary_stations_with_cycle_fallback()` at
+runtime). `_compute_level1` (`services/swan_domain.py`) aims the L1 offshore extension along the **open-water
+bearing** from the fetch fan (`services/geography.py`, ADR-100), not `mean_offshore_bearing_deg`;
+`ww3_station_selection`'s offshore-side selection reads the same open-water bearing — see §14.3b above for the
+runtime-wiring defect this fixed (the runtime call previously omitted the argument and silently fell back to
+beach facing). **VALUE change only** — L1/L2 stay axis-aligned; the CGRID/INPGRID emission, the
+`mean_offshore_bearing_deg` definition, the WW3 station **qualification** criterion (`deep water OR tanh(kd)`),
+and the cardinal-only (N/E/S/W) side set are all unchanged. **Wrap-candidate directions** (island/headland/
+peninsula with ≥5 km open water beyond) enlarge L1 to enclose the intervening land + the open water beyond so
+SWAN computes the wrap-around. **Great Lakes** L1 is sized from the fan's fetch value (lake fetch), not
+`find_shelf_distance` (which returns the nearest ocean shelf and oversizes a lake L1); the GLWU product routing
+already exists.
 
-**Exposure source — fan-derived (AD-2, Phase G3).** `compute_structure_grid_domain(directional_exposure=…)` and
-`enrichment/surf_scorer.py` read the **fan-derived** exposure (directly-open & wrap-candidate = EXPOSED,
-truly-blocked = sheltered) in the **same dict-of-8-compass-sectors→bool shape** the config field used. The typed
-`directional_exposure` config field becomes an optional override. **VALUE change only** —
+**Exposure source — fan-derived (AD-2, Phase G3).** `enrichment/surf_scorer.py` reads the **fan-derived**
+exposure (directly-open & wrap-candidate = EXPOSED, truly-blocked = sheltered) in the **same
+dict-of-8-compass-sectors→bool shape** the config field used. The typed `directional_exposure` config field
+becomes an optional override. **`compute_structure_grid_domain()` no longer takes a `directional_exposure`
+parameter at all** — the 2026-08-01 L4 sizing rewrite (marine `4e79d21`, ADR-093 Amendment 6) dropped the
+exposure-derived lateral-halo margin along with the OMBB axis method; L4's lateral extent is now the footprint/
+shadowed-handoff-point envelope described in §14.15 below, with no separate exposure input. **VALUE change
+only** for the surf-scorer consumer —
 `compute_structure_grid_domain` and the L4 sizing math are unchanged.
 
-**L4 axis + clustering (AD-4, Phase G0.1 + G4).** A new `services/structure_geometry.py` provides an **OMBB
-helper** (shapely `minimum_rotated_rectangle`) built once and consumed by both the obstacle router (structure
-polygon alone) and the L4 axis. `compute_structure_grid_domain` derives `rotation_deg` from the OMBB long-axis
-of the obstacle-plus-shadow (single) or merged-cluster footprint instead of `_most_distant_pair`, **re-anchoring
-tip/base** (tip = farther-from-anchor) so the tip-depth lookup and the 1-wavelength along-axis margin still work.
-Obstacle boxes **merge when < 500 m apart** (`cluster_distance_m = 500.0`) into ONE L4 = the OMBB of the merged
-footprint, min box 200 m × 200 m. **Only the `alpc`/`alpn` values and extents change; CGRID/NGRID syntax is
-unchanged.** Separate-box multiple-L4-grids is DEFERRED — the single L4 goes to the primary structure, others are
-logged to the concerns file.
+**L4 axis + clustering (AD-4, Phase G0.1 + G4) — ⛔ REVERSED 2026-08-01, see below for current design.** The
+OMBB-axis design this subsection originally described (`services/structure_geometry.py`, shapely
+`minimum_rotated_rectangle`, `rotation_deg` from the obstacle-plus-shadow OMBB long-axis, primary-structure
+selection for far-apart obstacles) never reached a converged deployment — Gate G4 failed (L4 grid landed on
+land; see MARINE-GEOMETRY-MODEL-PLAN.md Critical finding 2) — and was replaced before AD-4 shipped. Kept for the
+historical record only; **do not implement.**
+
+**L4 sizing — CURRENT design (`compute_structure_grid_domain()`, marine `4e79d21`, 2026-08-01, R3 residual
+"L4-transect co-registration"; ADR-093 Amendment 6, operator-approved).** `rotation_deg` = the resolved **beach
+facing** (`avg_bearing` — the same shoreline-strip-derived bearing AD-1R computes), never a structure axis. The
+grid is the beach-frame bounding rectangle of **every eligible structure's own footprint UNION the handoff
+points of every surf-area transect any one of them shadows**:
+- **Shadow test** is per-structure (never a union footprint — a gap between two structures must not itself be
+  shadowed, since that gap is exactly where swell passes through) against the geography fetch fan's open rays
+  (`open_rays` — any classification but `truly_blocked`; `wrap_candidate` counts as open, conservative
+  coverage).
+- **Shoreward edge** (`u_min`) = the minimum-`u` shadowed transect handoff point only — never a structure
+  footprint point (a pier root on the beach must not drag the grid landward; footprint points landward of
+  `u_min` are expected-clipped, and the SWAN obstacle line is clipped at the grid edge). Each transect's own
+  handoff point is its own first seaward crossing of the ADR-093 `l3_shoreward_edge_depth_m()` contour
+  (`1.3 × _MIN_DESIGN_HS_M / γ` = `1.3 × 1.0 / 0.73` ≈ **1.78 m**, `services/swan_domain.py`) on its own profile.
+- **Seaward edge** (`u_max`) = the seaward-most footprint point across every eligible structure, + one margin
+  wavelength (unchanged tip-depth/dispersion arithmetic — only the lookup point moved from the OMBB tip to
+  this).
+- **Lateral extent** (`v_min`/`v_max`) = min/max across every eligible structure's footprint UNION the shadowed
+  handoff points, ± one `resolution_m` (10 m, `_STRUCTURE_GRID_DX_FLOOR_M`) cell of slack.
+- **Zero shadowed transects** → L4 is skipped (not sized) for that cluster.
+
+**No primary-structure selection** (operator ruling 2026-08-01, same day as the rewrite): a beach may have no
+dominant structure (two equal breakwaters; a jetty with adjoining breakwaters). Every operator-identified
+eligible structure participates in the ONE sized grid — `_cluster_structures_by_proximity()`/
+`_select_primary_group()` are deleted; the "far-apart obstacles get the primary structure's L4, others logged to
+concerns" behaviour described above no longer exists. **Only the `alpc`/`alpn` values and extents change;
+CGRID/NGRID syntax is unchanged.** Sized once at config push, frozen — no runtime resizing.
+
+**Measured production numbers (HB regen, 2026-08-01 ~19:00 UTC, deployed commit `4e79d21`):** beach facing
+resolved 216.4° from the shoreline strip; L4 = 46×137 = 6,302 cells, u_span 450 m, v_span 1358 m, rot 216.4°,
+dx 10 m, 143/143 transects shadowed, 37 open rays, `n_footprint_clipped`=16, `L_tip` 128.3 m; L3 coarse nest
+45×40 @ 40 m around L4 (≥200 m clearance). For contrast, the superseded OMBB-axis grid measured 458×1247 m,
+rot 47.3°, 46×125 = 5,750 cells, median depth −0.17 m, 54% dry, 333/352 handoff points outside the grid,
+valid_fraction 5.2%. **A full SWAN test run against this rewrite was in progress as of this doc-sync pass —
+test-run/reality-gate results are not yet available; see MARINE-MODEL-RESTORATION-PLAN.md §R3.**
 
 **Obstacle representation (AD-8, Phase G4.3–G4.5).** `normalize_structure` (via the OMBB) routes each structure
 to `line` or `footprint`: a solid structure (`breakwater|jetty|groin|seawall|mole`) **≥ 3 L4 cells (~30 m) wide**

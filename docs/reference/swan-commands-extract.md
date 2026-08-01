@@ -236,6 +236,13 @@ NGRID 'sname' [xpn] [ypn] [alpn] [xlenn] [ylenn] [mxn] [myn]
 
 The NGRID rectangle must match the CGRID boundaries of the child nested run.
 
+**L4 (structure grid) `alpc`/`alpn` note (added 2026-08-01, marine `4e79d21`).** For the structure grid, `alpc`
+(CGRID) / `alpn` (NGRID) is the **resolved beach facing** (the AD-1R shoreline-strip-derived bearing every
+transect and L2/L3 sizing already use) — **not** a structure/obstacle axis. An earlier design rotated L4 to the
+obstacle's own oriented-bounding-box axis; that design never reached a converged deployment and was reversed
+(ADR-093 Amendment 6). Only the `alpc`/`alpn` VALUE and the grid extent change with this — the `CGRID`/`NGRID`
+command syntax above is unaffected.
+
 ## NESTOUT — write boundary spectra for a child grid
 
 Syntax:

@@ -252,7 +252,9 @@ question closed"). Findings §0A ruling **D2** replaced that single-purpose L3 w
 that exists for exactly two reasons and never otherwise: (a) as the coarse nesting step under a new,
 separate fine grid — the **structure grid, tier L4** (`services/swan_domain.py`
 `compute_structure_grid_domain()` / `StructureGridDomain`) — a true rotated rectangle fixed at 10 m
-resolution, sized to the structure's own principal axis; or (b) as the working refraction grid at an
+resolution, sized to the structure's own principal axis [**⛔ this axis method is superseded by
+Amendment 6 (2026-08-01) — current rotation is the beach facing, not a structure axis; kept here as the
+original Amendment 3 wording**]; or (b) as the working refraction grid at an
 operator-classified point break, headland, or bay break, unchanged from Amendment 2's cross-shore
 sizing. Ruling **D6 item 1** — *"Retire the 15 m-contour offshore edge; adopt the structure grid" —
 Approved* — is the specific line item that reverses Amendment 2's "question closed" statement.
@@ -556,6 +558,64 @@ for a false claim of current state.
 - [ ] The served headline re-validates against the contemporaneous cam/Surfline at the Phase-3 pinned tolerance
   after the geometry lands (Gate GR — non-negotiable, because the per-transect bearing flows into the shadow
   classification and the headline aggregate).
+
+### Amendment 6 (2026-08-01): L4 sizing reversed from the OMBB structure axis to a beach-frame transect-shadow envelope; no primary-structure selection
+
+**Status: Accepted.** Operator-approved in chat, 2026-08-01 ("Phase R, R3 residual").
+
+**What this amendment reverses.** Amendment 5's **AD-4** (above) — L4 `alpc`/`alpn` derived from the
+oriented-bounding-box (OMBB) long-axis of the obstacle-plus-shadow footprint, with multi-obstacle proximity
+clustering and a primary-structure selection for far-apart obstacles — **never reached a converged deployment**.
+Gate G4 failed (the sized grid landed on land/straddled the waterline) and, after the AD-1R facing replacement
+(Amendment 5 above) still did not resolve it, root-caused to the AD-4 axis method itself: an OMBB axis rotates
+independently of the cross-shore transects the grid must supply a handoff to, so the grid and the transects
+co-register only by coincidence (`MARINE-MODEL-RESTORATION-PLAN.md` §R3, "L3-strip viability + frame integrity
+under AD-1R facing" — measured 333/352 handoff points landing outside the rotated grid, `valid_fraction` 5.2%).
+AD-4's acceptance-criteria bullet above ("L4 `alpc` derives from the OMBB long-axis... obstacles < 500 m apart
+merge to one L4...") is **superseded by this amendment and was never met in production** — left in place above
+as the historical record of what was approved and attempted, per this project's ADR-correction convention (edit
+the amendment that is wrong; add a new amendment for a fundamentally distinct decision, which this is).
+
+**Decision — new design (`compute_structure_grid_domain()`, marine `4e79d21`).** `rotation_deg` = the resolved
+**beach facing** (`avg_bearing`, the same AD-1R shoreline-strip-derived bearing every transect and L2/L3 sizing
+already use) — never a structure axis. The grid is the beach-frame bounding rectangle of **every eligible
+structure's own footprint UNION the handoff points of every surf-area transect any one of them shadows**:
+- **Shadow test**, per structure (never a union footprint — a gap between two structures must not itself be
+  shadowed): against the ADR-100 geography fetch fan's open rays (any classification but `truly_blocked`;
+  `wrap_candidate` counts as open, conservative coverage) — see the companion consumers note added to ADR-100.
+- **Shoreward edge** = the minimum-`u` shadowed-transect handoff point (each transect's own first seaward
+  crossing of this ADR's `l3_shoreward_edge_depth_m()` ≈1.78 m contour, on its own profile) — never a structure
+  footprint point, so a pier root sitting on the beach cannot drag the grid landward.
+- **Seaward edge** = the seaward-most footprint point across every eligible structure + one margin wavelength
+  (unchanged tip-depth/dispersion arithmetic — only the lookup point moved).
+- **Lateral extent** = footprint UNION shadowed handoff points, ± one grid cell (10 m) of slack.
+- Zero shadowed transects → L4 is skipped for that cluster (not sized).
+
+**No primary-structure selection (same-day amendment, operator ruling 2026-08-01).** A beach may have no
+dominant structure — two equal breakwaters, or a jetty with adjoining breakwaters. Every operator-identified
+eligible structure participates in the ONE sized grid; `_cluster_structures_by_proximity()`/
+`_select_primary_group()` are deleted. AD-4's "far-apart obstacles give the primary structure the L4, others
+logged to concerns" behaviour no longer exists.
+
+**Operator rulings recorded with this amendment:**
+- Shadow selection decides grid **inclusion only, never physics** — over-inclusion is benign ("when in doubt,
+  include — SWAN inside the box is the authority on the physics").
+- The spot PIN is a site designator only and has **zero bearing on any actual measurement** (the operator may
+  relocate it along the beach without affecting sizing); the new sizer is pin-independent by construction.
+- Transect spacing stays 10 m pending performance data from the first full test run.
+- Grid **orientation is decoupled from the structure**: rotation is the beach frame; the structure's true
+  orientation is preserved inside the model as the OBSTACLE geometry (AD-8, unaffected by this amendment).
+
+**Scope discipline — unchanged by this amendment.** Same fence as Amendment 5: no SWAN command syntax changes
+(only `alpc`/`alpn`/extent values), no change to the 2D→1D handoff surface's first-match L4→L3→L2 control flow,
+no change to `l3_shoreward_edge_depth_m()`'s own formula (`1.3 × Hs / γ`, `_MIN_DESIGN_HS_M`), no change to the
+convergence gate, HAT landward boundary, or deep-water reference.
+
+**Verification status as of this doc-sync pass (2026-08-01):** commit `4e79d21` is deployed (measured HB regen:
+facing 216.4°, L4 46×137 = 6,302 cells, 143/143 transects shadowed, 37 open rays — see PROVIDER-MANUAL.md §14.15
+and `MARINE-MODEL-RESTORATION-PLAN.md` §R3 for the full numbers). **A full SWAN test run against this design was
+in progress at the time this amendment was written — a converged 4-level run and the reality-gate comparison are
+not yet confirmed; do not read this amendment as claiming a passed test run.**
 
 ## References
 

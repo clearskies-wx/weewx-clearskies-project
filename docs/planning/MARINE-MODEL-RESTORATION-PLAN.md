@@ -1895,6 +1895,29 @@ antimeridian-aware in a follow-up fix after the auditor found the naive centroid
 the coordinator — not resolved here, per this agent's scope (docs-only; a contradiction is a finding,
 not something to silently reconcile).
 
+## 2026-08-01 — R3 L4 rewrite: four operator rulings (Phase R doc-sync pass)
+
+Recorded during the doc-sync pass that followed the L4 structure-grid siting rewrite (marine `4e79d21`,
+R3 residual "L4-transect co-registration," ADR-093 Amendment 6). All four rulings were given in chat
+2026-08-01 and are cross-referenced from ADR-093 Amendment 6, `MARINE-GEOMETRY-MODEL-PLAN.md` (AD-4/G4.2
+superseded markers), and PROVIDER-MANUAL.md §14.15.
+
+1. **No primary structure.** L4 is sized against every operator-identified eligible structure in a
+   cluster, not a single "primary" one — a beach may have no dominant structure (two equal breakwaters;
+   a jetty with adjoining breakwaters). `_cluster_structures_by_proximity()`/`_select_primary_group()`
+   deleted; AD-4's proximity-clustering/primary-structure design (G4.2) is superseded, not merely
+   unimplemented.
+2. **Shadow selection decides grid inclusion only, never physics.** Over-inclusion in the shadow test is
+   benign — "when in doubt, include — SWAN inside the box is the authority on the physics." The shadow
+   test exists to size the grid, not to pre-judge which transects the physics will actually affect.
+3. **The spot PIN has zero bearing on any measurement.** It is a site designator only; the operator may
+   relocate it along the beach without affecting L4 sizing, transect bearings, or any other geometry
+   computation. The new sizer is pin-independent by construction (beach-frame, anchored on the coastline,
+   never the pin).
+4. **Transect spacing stays 10 m**, pending performance data from the first full test run against the new
+   grid (a full SWAN run was in progress at the time of this doc-sync pass — see R3's PENDING test-run
+   note).
+
 ---
 
 # PHASE R — 2026-07-31 regression recovery + anti-regression hardening
@@ -2138,9 +2161,23 @@ within 20% of the boundary file's swell Hs. **Must not touch:** anything beyond 
 >
 > **Remaining R2 sub-items NOT done this session (still tracked above, do not lose):** durable cache-coverage GUARD/invariant (wet-boundary check, item ★ MISSING GUARD — code for the coverage gate landed but the loud wet-boundary invariant did not); south `[len]` clamp; single-VARIABLE-point revisit; OBSTACLE double-counting split (pending operator nod); surfbeat maxerr; regression-diff commit hunt; whitecapping/breaking isolation re-run. These are correctness/hardening items, not publish blockers.
 
-### R3 — L3-strip viability + frame integrity under AD-1R facing  ⏳ **PUBLISH UNBLOCKED via R7 2026-08-01; residual = L4-grid↔transect co-registration (trigger-3, operator decision)**
+### R3 — L3-strip viability + frame integrity under AD-1R facing  ⏳ **REWRITE LANDED + DEPLOYED 2026-08-01 (marine `4e79d21`); full SWAN test run PENDING**
 
-> **R3 UPDATE 2026-08-01:** the publish-blocking symptom (L4 gate abort) is FIXED by R7 (see R7 result — model publishes + reality-gate PASS). The remaining R3 substance is the FRAME root cause: the pier-OMBB L4 grid (alpc 47.32°) does not co-register with the cross-shore transects — 0/32 transects get ≥3 band points inside it (they clip its deep corner). L4 therefore supplies no handoff and HB models as open-beach L2. Fixing this is a grid-orientation/placement change (`swan_domain.compute_structure_grid_domain` OMBB axis vs transect bearings) — trigger-3, operator decision, not required for correct publishing. R3 diagnosis block below retained.
+> **R3 UPDATE 2026-08-01 (rewrite landed, this doc-sync pass):** the L4-grid↔transect co-registration fix named
+> in the "R3 UPDATE" note below (superseded) is BUILT: `compute_structure_grid_domain()` was rewritten
+> (`services/swan_domain.py`, marine `4e79d21`) to size L4 from the beach-frame transect-shadow envelope instead
+> of the OMBB structure axis — operator-approved in chat 2026-08-01, recorded as ADR-093 Amendment 6. Same-day
+> amendment also dropped primary-structure/proximity-group narrowing (every eligible structure participates).
+> See PROVIDER-MANUAL.md §14.15 and ADR-093 Amendment 6 for the full design. **Deployed; measured HB regen
+> 2026-08-01 ~19:00 UTC:** facing resolved 216.4° from the shoreline strip; L4 = 46×137 = 6,302 cells, u_span
+> 450 m, v_span 1358 m, rot 216.4°, dx 10 m, **143/143 transects shadowed**, 37 open rays, n_footprint_clipped=16,
+> L_tip 128.3 m; L3 coarse nest 45×40 @ 40 m around L4 (≥200 m clearance) — contrast the pre-rewrite OMBB grid
+> below (458×1247 m, rot 47.3°, 46×125 cells, 333/352 handoff points outside, valid_fraction 5.2%). **A full SWAN
+> test run against the new grid was IN PROGRESS at the time of this doc-sync pass — no run/convergence/reality-gate
+> result is claimed here; test run PENDING.** Operator rulings from the same session are recorded in the Decision
+> log below.
+>
+> **R3 UPDATE 2026-08-01 (superseded by the rewrite above, kept for the record):** the publish-blocking symptom (L4 gate abort) is FIXED by R7 (see R7 result — model publishes + reality-gate PASS). The remaining R3 substance is the FRAME root cause: the pier-OMBB L4 grid (alpc 47.32°) does not co-register with the cross-shore transects — 0/32 transects get ≥3 band points inside it (they clip its deep corner). L4 therefore supplies no handoff and HB models as open-beach L2. Fixing this is a grid-orientation/placement change (`swan_domain.compute_structure_grid_domain` OMBB axis vs transect bearings) — trigger-3, operator decision, not required for correct publishing. R3 diagnosis block below retained.
 
 > **R3 DIAGNOSIS — 2026-08-01 (coordinator, hard measurement on the preserved failing L4 workdir `/tmp/r3-evidence` on librewxr; code `51543b1`, 217° facing).** This is why the model does not publish (R2 DEPLOY+VERIFY block).
 > - **`valid_fraction` (L4, nonstationary) = fraction of forecast TIMESTEPS where ≥50% of the per-transect handoff POINTS have a valid Hs** (`swan_runner.py:5776-5784`). Measured L4 = **5.2%**.
