@@ -1919,6 +1919,62 @@ superseded markers), and PROVIDER-MANUAL.md §14.15.
    levels converged, published. No performance problem observed at 10 m spacing this cycle; see the R3
    RESULT block.)*
 
+## 2026-08-01 — SURF-ZONE-BREAK-DETECTION-SPEC Round 1 (BD-1/BD-2/BD-4, bands)
+
+Recorded during the doc-sync pass that followed Round 1 of `docs/planning/briefs/SURF-ZONE-BREAK-DETECTION-
+SPEC-2026-08-01.md` (APPROVED 2026-08-01, operator signed off in chat same day). Cross-referenced from
+ADR-093 Amendment 7, PROVIDER-MANUAL.md §14.15, and API-MANUAL.md §18.
+
+**Commits:** `03b33e1` (feat, initial Round-1 implementation: BD-1 `find_outermost_break_index()`, BD-2
+`max_seaward_break_index` narrowing in `select_hourly_handoff()`, full-length T4B.1 bands +
+`_TRANSECT_BAND_MAX_POINTS` 60→150 + mandatory TABLE_PT parse-and-delete, BD-4
+`PartitionBreakResult.primary_break_index` + `_select_primary_break_point()`) → `ea62e85` (fix, adversarial
+audit remediation) → `b60ef92` (fix, companion fix to `ea62e85`'s Finding F2).
+
+**Adversarial audit — FAIL → remediation → re-audit PASS.** `03b33e1` was audited by the coordinator before
+this round closed and FAILED on two findings:
+- **F1 (BLOCKER):** `select_hourly_handoff()` published `handoff_depth_m` as the untouched target-depth
+  FORMULA value even when BD-2's break constraint had moved the actual pick to a deeper (more seaward)
+  station. Reproduced with the auditor's own dry-neighbour fixture: the published depth sat shallower than
+  every station on the profile, so `_truncate_bathy_at_handoff()` found no ground and silently dropped the
+  transect.
+- **F2 (MAJOR):** `endpoints/beach_profile.py` paired `break_points[0]`'s (outermost) geometry with
+  `pbr.face_height_m`, which post-BD-4 is the PRIMARY (biggest-face) break's face height — a mismatch on any
+  double-break day with a bigger inner break.
+
+**Remediation (`ea62e85`):** F1 fixed in both the L4 and L3 branches of `select_hourly_handoff()` — when the
+constraint actually displaces the pick, `handoff_depth_m` now follows the selected station's own depth (T2.2
+PART B principle, same rule `refine_handoff_with_qb()` already applies for its own seaward moves). F2 fixed at
+both `beach_profile.py` sites (the SurfBeat blend boundary and the published break-point entry) to read
+`break_points[primary_break_index]`. **Re-audit PASS: 6 adversarial edge cases + a non-vacuity simulation**
+(the auditor's own dry-neighbour fixture, run end-to-end selection → truncation, is now a permanent known-
+answer test — `tests/test_break_aware_handoff_domain.py::test_a1_bd2_handoff_depth_survives_bathy_truncation`).
+
+**Companion fix (`b60ef92`).** F2's remediation flagged, but did not fix as outside that finding's authorized
+scope, a companion defect in the same file's non-primary-break loop: a positional `break_points[1:]` either
+duplicated the just-emitted primary entry (when `primary_break_index == 1`) or omitted the true outermost
+break entirely (whenever the inner break was primary). Fixed same-day: `enumerate(pbr.break_points)` skipping
+`primary_break_index`, emitting every OTHER break point exactly once, each with its own geometry and its own
+freshly-computed face height. **Process note: this fix shipped without its own dedicated test in `ea62e85`**
+(that commit's test coverage was for F1) — it was covered one commit later, in `b60ef92` itself
+(`tests/test_beach_profile_partition_index_spaces.py::test_non_primary_break_points_are_all_emitted_when_primary_is_inner`).
+Flagged here per the doc-sync brief's explicit instruction to record this as a process note, not because the
+gap was left open — it was closed in the very next commit, same day.
+
+**Deferred items (tracked, not part of this round's scope):**
+- `_transect_band_depths()` and `_TRANSECT_BAND_PAD_FRACTION` (the retired Hs-bracket band-sizing
+  helper/constant, superseded by the full-crossing mechanism) are NOT deleted — `tests/test_swan_l4_intersection.py`
+  still tests `_transect_band_depths()` directly, and that test file is outside this round's allowlist.
+  Deletion is a follow-up round's task.
+- **tmpfs-peak limitation:** the mandatory TABLE_PT parse-and-delete fix (measured 42 MB/cycle old width →
+  ~170 MB/cycle at full-length without it) shortens the TAIL of the tmpfs footprint (how long files linger
+  after being consumed), not the PEAK (every `TABLE_PT_*` file already exists simultaneously the moment SWAN
+  finishes writing them, before `_check_convergence()` even runs, let alone before the T4B.3 delete-after-parse
+  loop). Recorded as a known limitation of this round's fix, not a defect — see PROVIDER-MANUAL.md §14.15.
+
+**Live verification pending.** A full SWAN test run against this Round-1 implementation was in progress at the
+time of this doc-sync pass. No run/convergence/reality-gate result is claimed anywhere in this entry.
+
 ---
 
 # PHASE R — 2026-07-31 regression recovery + anti-regression hardening

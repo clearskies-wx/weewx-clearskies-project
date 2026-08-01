@@ -2352,6 +2352,84 @@ shoreline/isobath curvature, a `services/geography.py` helper reusing the isobat
 same-named function in `enrichment/fishing_species.py` is renamed `classify_biogeographic_region` (callers
 updated). **The two are NOT merged — different taxonomies; merging is a bug.**
 
+**T4B.1 per-transect POINTS bands — full grid crossing, not an Hs bracket (BD-1, `SURF-ZONE-BREAK-DETECTION-
+SPEC-2026-08-01`, marine `03b33e1`, 2026-08-01).** The per-transect station band (`swan_runner.py`, the loop that
+writes each transect's `POINTS_{n}_{index}.txt`/`TABLE_PT_{n}_{index}.txt`) used to bracket only the expected
+handoff depth (`_TRANSECT_BAND_PAD_FRACTION = 0.5`, padding an L2-Hs-derived target on both ends). It now spans
+each transect's FULL crossing of the inner grid it samples, so BD-1's break-suspect scan (below) has the whole
+line to search, not just the neighbourhood of one depth guess. Mechanism: `compute_spot_transect()`'s call site
+passes a deliberately out-of-range deep target (`_TRANSECT_BAND_FULL_CROSSING_DEEP_M = 999.0`) so the function's
+own `_dist_at_depth()` substitutes the profile's deepest sampled point (already logged there), and the seaward
+end is then determined SOLELY by that function's **existing** `grid_bbox` clip (already logged there too) — the
+actual inner grid's own edge along the transect's bearing, not a new depth guess or new geometry. No new
+ray/bbox-intersection code. `_TRANSECT_BAND_MAX_POINTS` raised **60 → 150** — a clamp headroom, not an
+allocation target: measured production station counts on the deployed L4 (u_span 450.2 m, 2026-08-01) are
+~45–55 stations/transect at `_TRANSECT_BAND_SPACING_M` (10 m); 150 is well above that, sized for the old
+narrow-bracket assumption's replacement.
+
+**Mandatory memory fix — TABLE_PT parse-and-delete.** Full-length bands multiply each transect's `TABLE_PT_*`
+file size roughly in proportion to the wider station count. Measured at HB (143 transects/spot): **42 MB/cycle**
+at the old pad-bracket width → **~170 MB/cycle** at full-length, on a memory-tight tmpfs box, if each file were
+left for the run's final tmpdir cleanup like before. The offsetting fix (mandatory, not an optimization): each
+`TABLE_PT_*` file is deleted from tmpfs immediately after its content is captured into `_t_table_text` during
+the per-transect handoff-selection loop (`swan_runner.py`, T4B.3), rather than persisting until cleanup.
+
+**Known limitation — this shortens the tail, not the peak.** `_check_convergence()`'s Check 3 (valid-point
+fraction, R7.2-scoped to `TABLE_PT_*` for `level4_*` runs) reads every declared `TABLE_PT_*` file's full text
+BEFORE the T4B.3 handoff-selection loop runs and deletes them — `_check_convergence()` is called once per grid
+level immediately after that level's SWAN run completes, which is earlier in the cycle than the per-transect
+handoff selection. SWAN itself writes every `TABLE_PT_*` file to tmpfs during its own COMPUTE step, before any
+consumer reads or deletes anything — so the PEAK simultaneous tmpfs footprint (every file present at once) is
+already reached before `_check_convergence()` runs, let alone before T4B.3's delete-after-parse. The T4B.3 fix
+reduces how long the files linger AFTER being consumed (the tail); it does not reduce how many exist
+simultaneously right after SWAN writes them (the peak). Recorded as a known limitation, not a defect in the
+fix — the fix's own authorized scope was the offsetting cost of full-length bands, not `_check_convergence()`'s
+read pattern.
+
+**Handoff selection — break-suspect scan + seaward-of-break constraint (BD-1/BD-2, marine `03b33e1`/`ea62e85`,
+ADR-093 Amendment 7).** Before `select_hourly_handoff()` picks this hour's handoff station, every transect's
+full band (now full-crossing, above) is scanned seaward→shore by `find_outermost_break_index()`
+(`services/transect_handoff.py`) for the first station where either the depth-limited criterion
+`Hs ≥ γ·depth` or QB ≥ the existing QB threshold indicates active breaking — both criteria reused from this
+module's own existing constants (`_GAMMA_BREAKING`, `_DEFAULT_QB_THRESHOLD`), no new formula. `None` entries
+(dry cell / no row this hour) are skipped, never treated as breaking or clean. The result
+(`max_seaward_break_index`) restricts `select_hourly_handoff()`'s nearest-to-target-depth search (both the L4
+and L3 branches) to stations strictly seaward of that index — the SAME target-depth formula and QB refinement
+as before, only the candidate pool narrows. No suspected break anywhere on the band → unconstrained search,
+byte-identical to before this change. **When the constraint actually moves the pick, the published
+`handoff_depth_m` follows the selected station's own depth** rather than the untouched formula target
+(adversarial audit Finding F1, `ea62e85`) — see ADR-093 Amendment 7 for why (a published depth shallower than
+every station on the shifted profile silently drops the transect downstream at `_truncate_bathy_at_handoff()`).
+See ADR-093 Amendment 7 for the full architectural framing (this is a trigger-1 criterion change, authorized by
+`SURF-ZONE-BREAK-DETECTION-SPEC-2026-08-01` + operator sign-off — the target-depth formula itself, Amendment 2
+§2, is unchanged).
+
+**Primary-break reporting (BD-4, marine `03b33e1`/`ea62e85`/`b60ef92`, ADR-093 Amendment 7).**
+`PartitionBreakResult.break_points` stays a list ordered outermost-first, unchanged — but the break reported as
+"the" break for a partition/transect is no longer unconditionally `break_points[0]`. `primary_break_index`
+(default 0) names the break with the LARGEST face height, usually but not always the outermost. Every consumer
+that reports "the break" reads `break_points[primary_break_index]`: `PartitionBreakResult.face_height_m`/
+`hs_at_break_m` themselves, the peel-angle break-point choice, `per_partition_breaks` summaries, and the §11.3
+combined-face depth cap (`_combine_partition_faces_11_3()`, which now caps against the PRIMARY break's depth,
+not unconditionally the outermost's). `endpoints/beach_profile.py` emits, per partition, one entry pairing the
+PRIMARY break's own geometry with its own face height, plus every OTHER break point in that partition (each
+with its OWN geometry and its OWN freshly-computed face height, never the primary's) — see API-MANUAL.md §18
+for the wire-level detail. **`INVARIANT_1` and diagnostic `trace.emit()` sites intentionally keep reading
+`break_points[0]` (outermost)** — unchanged, by design: they observe the outermost/seaward-most break, a
+different question from "which break is biggest," and BD-2's seaward-of-break constraint only strengthens what
+they observe.
+
+**Adversarial audit note.** `03b33e1`'s initial implementation was audited before this round closed; two
+findings (F1 above, and F2 — `beach_profile.py` pairing the outermost break's geometry with the primary's face
+height on a double-break day) were fixed (`ea62e85`) and re-audited PASS. F2's own remediation flagged, without
+fixing, a companion defect in the same file's non-primary-break loop; `b60ef92` fixed it same-day with its own
+dedicated test. Full narrative: `MARINE-MODEL-RESTORATION-PLAN.md` decision log, Round-1 entry.
+`_transect_band_depths()`/`_TRANSECT_BAND_PAD_FRACTION` (the retired band-sizing helper) are kept, not deleted —
+`tests/test_swan_l4_intersection.py` still tests the helper directly and is outside this round's scope.
+
+**Live verification pending.** A full SWAN test run against this design was in progress at the time of this
+doc-sync pass. No run/convergence/reality-gate result is claimed here.
+
 ### §14.16 GFS wind provider (Phase 7 — supplements HRRR for 72-hour forecast)
 
 **Module identity:** `providers/wind/gfs.py`, `PROVIDER_ID = "gfs"`, `DOMAIN = "wind"`.

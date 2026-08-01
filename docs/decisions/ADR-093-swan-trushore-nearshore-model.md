@@ -617,6 +617,91 @@ and `MARINE-MODEL-RESTORATION-PLAN.md` §R3 for the full numbers). **A full SWAN
 in progress at the time this amendment was written — a converged 4-level run and the reality-gate comparison are
 not yet confirmed; do not read this amendment as claiming a passed test run.**
 
+### Amendment 7 (2026-08-01): Per-hour handoff gains a break-suspect-seaward constraint (BD-1/BD-2); primary-break reporting criterion (BD-4)
+
+**Status: Accepted.** Operator-signed 2026-08-01 in
+`docs/planning/briefs/SURF-ZONE-BREAK-DETECTION-SPEC-2026-08-01.md` (APPROVED, every open parameter ruled in
+chat same day). That spec is the design authority and the authorization trail for this amendment — the spec's
+own §5 names the handoff-criterion change as architectural (trigger 1: a criterion inside a formula's
+selection), so this amendment documents what the spec already authorized, not a new decision made here.
+
+**What this amendment does NOT change.** Amendment 2 §2's breaking-margin target-depth FORMULA —
+`handoff depth (this hour) = 1.3 × Hs(hour) / γ` (`breaking_margin_depth_m()`, `services/transect_handoff.py`) —
+is **unchanged**. Also unchanged: the grid-frozen-at-setup rule, the L4→L3→L2 first-match-wins selection order
+(Amendment 3), the true-grid-boundary no-boundary-cell rule (ADR-095 Amendment 2), and the L2 deep-water
+reference (always L2 at 15 m, never the handoff). This amendment adds a CONSTRAINT on which station the
+existing formula's nearest-to-target-depth search may select from — it does not touch the formula itself.
+
+**BD-1 — full-band break-suspect scan.** Before selection, every transect's full station band (SWAN's own Hs,
+depth, and QB at each station, seaward→shore) is scanned for the outermost suspected break zone:
+`find_outermost_break_index()` (`services/transect_handoff.py`) returns the index of the first station (walking
+shoreward) where EITHER the existing depth-limited criterion `Hs ≥ γ·depth` (the same `_GAMMA_BREAKING` this
+ADR's own formula already uses) OR QB ≥ the existing `_DEFAULT_QB_THRESHOLD` (the same threshold
+`refine_handoff_with_qb()` already uses) holds. Both criteria are reused unchanged — no new formula, no new
+constant. A `None`/skipped station entry (dry cell, no row this hour) is skipped for the Hs/depth test, never
+treated as breaking and never treated as clean. No suspected break anywhere on the band → `None` → the
+constraint below does not bind, byte-identical to before this amendment.
+
+**BD-2 — the selected station must be seaward of the outermost suspected break.** `select_hourly_handoff()`
+gains `max_seaward_break_index` (both the L4 and L3 branches): when supplied, the nearest-to-target-depth
+search is restricted to stations strictly seaward of that index, before applying the SAME formula and the SAME
+QB refinement as before. The station immediately seaward of a break zone remains a valid interior candidate —
+this is a separate concept from the TRUE grid-boundary exclusion (ADR-095 Amendment 2) and the two are never
+conflated. `None` (the default, and every pre-2026-08-01 caller) reproduces the prior unconstrained search
+byte-for-byte. This retires "first-crossing-of-target-depth" as a description of the OLD behavior (the search
+was already nearest-to-target-depth, not literally first-crossing, by the time of Amendment 2 — the spec's own
+defect statement §1.1 named the practical effect on a barred profile: the nearest-to-target search could still
+land in the trough between two bars); the retirement is of the missing seaward-of-break guarantee, not of the
+target-depth formula.
+
+**Published `handoff_depth_m` follows the actual selection when the constraint binds (adversarial audit Finding
+F1, `ea62e85`).** When `max_seaward_break_index` actually displaces the pick from what the unconstrained
+nearest-target-depth argmin would have chosen, `HandoffSelection.handoff_depth_m` is now the SELECTED station's
+own depth, not the untouched target-depth formula value — mirroring `refine_handoff_with_qb()`'s own T2.2
+PART B rule ("the truncation depth must follow the advanced sample"). Without this, `_truncate_bathy_at_handoff()`
+(`services/surf_1d_pipeline.py`) truncates the 1D profile at a depth shallower than every station on the
+now-seaward-shifted profile and silently drops the transect — reproduced and fixed against the auditor's own
+dry-neighbour fixture (`tests/test_break_aware_handoff_domain.py::test_a1_bd2_handoff_depth_survives_bathy_truncation`).
+When the constraint does not bind, or is `None`, `handoff_depth_m` is exactly the formula's `target_depth_m` —
+unchanged.
+
+**T4B.1 band widening (mechanical prerequisite for BD-1's scan, not itself part of the selection criterion) —
+see PROVIDER-MANUAL.md §14.15 for the full mechanism and the measured memory cost.**
+
+**BD-4 — primary-break reporting criterion.** `PartitionBreakResult` gains `primary_break_index` (default 0):
+the index into `break_points` (unchanged list, still ordered outermost-first) of the break with the LARGEST
+face height — usually but not always the outermost. Every reporting consumer that reads "the reported break"
+(`face_height_m`/`hs_at_break_m` on `PartitionBreakResult`, the peel-angle break-point choice,
+`per_partition_breaks` summaries, the §11.3 combined-face depth cap, and both `endpoints/beach_profile.py` sites
+— see PROVIDER-MANUAL.md and API-MANUAL.md for the endpoint-level semantics) now reads
+`break_points[primary_break_index]`. **`INVARIANT_1` and the diagnostic `trace.emit()` sites intentionally keep
+reading `break_points[0]` (outermost)** — they exist to observe the outermost/seaward-most break specifically,
+not "the reported break," and BD-2's seaward-of-break constraint only strengthens what they observe, never
+weakens it.
+
+**Adversarial audit remediation (`ea62e85`, `b60ef92`) — process note.** The initial BD-1/BD-2/BD-4
+implementation (`03b33e1`) shipped with a coordinator-run adversarial audit that found two issues before this
+round closed: **F1** (BLOCKER, above — `handoff_depth_m` desync from the actual selected station, reproduced
+with a dry-neighbour fixture that silently dropped a transect) and **F2** (MAJOR — `endpoints/beach_profile.py`
+paired `break_points[0]`'s geometry with the PRIMARY break's face height, a mismatch on any double-break day
+with a bigger inner break). Both were fixed and re-audited PASS (6 adversarial edge cases + a non-vacuity
+simulation — see `MARINE-MODEL-RESTORATION-PLAN.md` decision log for the full round entry). F2's remediation
+flagged, but did not fix as out of its authorized scope, a companion defect in the same file's non-primary
+break-points loop (a positional `break_points[1:]` either duplicating the primary entry or omitting the true
+outermost break whenever `primary_break_index != 0`); `b60ef92` fixed it as a same-day follow-up, with its own
+dedicated test. **No wire/API field renamed by any of this** — `beach_profile.py`'s per-break-point payload has
+no `role`/`isPrimary` key to begin with; see API-MANUAL.md §18 for what a consumer can and cannot infer from the
+payload shape.
+
+**Deferred, tracked, not part of this amendment's scope:** `_transect_band_depths()` and
+`_TRANSECT_BAND_PAD_FRACTION` (the retired Hs-bracket band-sizing helper/constant) are NOT deleted —
+`tests/test_swan_l4_intersection.py` still tests `_transect_band_depths()` directly and that test file is
+outside this round's allowlist. Deletion is a follow-up round's task, not a defect in this one.
+
+**Verification status as of this doc-sync pass (2026-08-01): live verification pending.** A full SWAN test run
+against this design was in progress at the time this amendment was written. No run, convergence, or
+reality-gate result is claimed here.
+
 ## References
 
 - Supersedes: ADR-084 (NWPS as primary nearshore source with supplementation)
