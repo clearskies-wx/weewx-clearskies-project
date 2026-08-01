@@ -153,8 +153,11 @@ domain. The core defect is BD-1/BD-2 alone.
    not individual waves — every per-transect face height is already a smoothed average, so the
    upper tail of transects is what corresponds to the set waves surfers actually judge by;
    averaging around the mean would double-smooth and understate. Single-transect anomalies are
-   guarded by ruling 2's ≥5-transect zone window, not by trimming the top. Fallback: if fewer
-   than 2 in-zone transects clear mean+0.75σ, use the top 2 (never a single transect).
+   guarded by ruling 2's ≥5-transect zone window, not by trimming the top. **Fallback (operator
+   ruling, same day): if fewer than 5 transects clear mean+0.75σ, lower the deviation threshold
+   for that run until at least 5 qualify.** Deterministic implementation: effective threshold =
+   `min(mean + 0.75σ, 5th-highest bigger-break face in the zone)` — identical to 0.75σ whenever
+   it already yields ≥5, otherwise admits exactly the top 5.
 2. **Main-break-zone window: minimum ~5 consecutive transects (~50 m at 10 m spacing)** — a zone
    is a real stretch of beach, never one anomalous line.
 3. **BD-8 RESCINDED — no exclusion at all.** Operator reasoning: with the zone-based headline, a
