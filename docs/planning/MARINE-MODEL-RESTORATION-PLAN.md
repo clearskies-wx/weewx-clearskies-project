@@ -1999,7 +1999,7 @@ either result redirects R2. **Rollback ref:** current HEAD hash recorded before 
 > band `energy` omits `dtheta`, under-reporting swell ~3.16×) + KAT. Once landed + deployed, one run
 > traces the swell through every handoff and pins the death point (the real R2 mechanism hunt).
 
-### R2 — Pin and fix the swell-starvation mechanism  ⏳ **IN PROGRESS 2026-08-01 (SWAN-manual + input audit; fixes staged, regression hunt opened)**
+### R2 — Pin and fix the swell-starvation mechanism  ✅ **SWELL FIX DONE + VERIFIED, PUSHED + DEPLOYED 2026-08-01 (publish still blocked downstream by L4/R3 — see DEPLOY+VERIFY block)**
 **Owner:** coordinator diagnosis; fix by `clearskies-api-dev` after operator sign-off (the fix
 will touch trigger-3 territory: L1 extent/aim/boundary).
 **Leads, in order:** (a) the open-water fan's derived aim for HB — the DWR's sole surviving
@@ -2124,8 +2124,30 @@ within 20% of the boundary file's swell Hs. **Must not touch:** anything beyond 
 >
 > **Standing approvals (operator, 2026-08-01, in chat):** friction fix and maxerr fix authorized.
 > Obstacle split + surfbeat straggler + isolation re-run + push/deploy: awaiting explicit go.
+>
+> ### ✅ DEPLOY + VERIFY — 2026-08-01 (coordinator, operator "push" go). Swell fix proven end-to-end; publish blocked by L4.
+> **Pushed:** marine `5581b0a..51543b1` (open-water boundary sides + cache-coverage gate + friction 0.067→0.038 + maxerr 3→2; incl. `67911d2` NESTOUT trace fix) + meta `f27a25f..4e534f1`. **Deployed** via `scripts/deploy-marine.sh`: running commit `51543b1`, ExecMainStartTimestamp 2026-08-01 08:23:25 UTC. **Cleared ALL stale caches** (bathymetry L*/PROFILE, swan_grid_sizing.json, forecast_cache.json, hotstarts, level* workdirs, .stale-jul27 .bak) then **regenerated fresh** via the production apply chain (`run_grid_sizing_chain()`): L1 AND L2 both logged "covers the full domain" (L1 1064 cells, L2 5694 cells), `open_water_bearing_deg=215.0` persisted to `swan_grid_sizing.json`, beach_facing=217.0°. **One full nest run** via `run_all_spots()` (OMP_NUM_THREADS=6), service stopped for isolation.
+>
+> **MEASURED (artifacts in `/run/weewx-clearskies/swan/level1/`, code `51543b1`):**
+> - **L1 `BOTTOM.txt` south rows 0–3 = 38/38 wet each; whole grid 1064/1064 wet** (was 0/38 dry with the stale cache). Cmd: parse `level1/BOTTOM.txt`, ncol=38.
+> - **Boundary selection = 215.0° open-water, sides S/W** (was 238° beach facing) — journal `select_boundary_stations: ocean -- bearing 215.0 deg -> sides S/W -- S:[46223], W:[46256,46222,46253]`. South side is a REAL boundary (`BOUND_S_46223.txt`, 9 MB, written).
+> - **L1→L2 nest swell (T>10 s) = 0.64 m @ 10.7 s @ 192° (max), median 0.54 m, 219/298 nest locations > 0.3 m** (was 0.12 m with the stale cache; target 0.5–0.6). Cmd: `/tmp/nestout_probe.py level1/nest_out.dat`. Matches the pre-fix session's independent 0.62 m. **Swell RESTORED — confirms the dead-boundary root cause.**
+> - **PUBLISH: NO — `forecast_cache.json` ABSENT.** L1/L2/L3 all converged clean (L2 acc 99.6%, L3 acc 100%); **L4 alone failed: valid_fraction=5.2%** → the convergence gate is all-or-nothing and raised `RuntimeError: SWAN: convergence gate failed at level4_0; nothing published this cycle` (`swan.py:3210`). The runner had already computed a valid L2 DWR fallback for the spot (67 timesteps ~15 m, journal "falling back to the L2 DWR reference") but the outer gate discards it.
+>
+> **BOTTOM LINE:** the swell-starvation root cause (dead south boundary from the stale pre-facing-flip cache) is FIXED and VERIFIED. The model still does not publish — blocked by the **L4 convergence collapse under the AD-1R 217° facing**, which R1 already pinned (238° → L4 94.7%; 217° → L4 5–7%, measured 5.2% here). **That is R3, not R2.** No R2 code remains. Reality gate (published DWR vs NDBC 46222) is MOOT until publish is unblocked — no published value exists to compare. Service left running (`51543b1`); `/health`=`failed` on fresh-start reasons (has not run its own cycle yet). Full session record: coordinator scratchpad `phase-r-session.md`.
+>
+> **Remaining R2 sub-items NOT done this session (still tracked above, do not lose):** durable cache-coverage GUARD/invariant (wet-boundary check, item ★ MISSING GUARD — code for the coverage gate landed but the loud wet-boundary invariant did not); south `[len]` clamp; single-VARIABLE-point revisit; OBSTACLE double-counting split (pending operator nod); surfbeat maxerr; regression-diff commit hunt; whitecapping/breaking isolation re-run. These are correctness/hardening items, not publish blockers.
 
-### R3 — L3-strip viability + frame integrity under AD-1R facing  ⬜
+### R3 — L3-strip viability + frame integrity under AD-1R facing  ⏳ **MECHANISM PINNED 2026-08-01 (coordinator, measured) — FIX AWAITS OPERATOR SIGN-OFF (trigger-3/architectural)**
+
+> **R3 DIAGNOSIS — 2026-08-01 (coordinator, hard measurement on the preserved failing L4 workdir `/tmp/r3-evidence` on librewxr; code `51543b1`, 217° facing).** This is why the model does not publish (R2 DEPLOY+VERIFY block).
+> - **`valid_fraction` (L4, nonstationary) = fraction of forecast TIMESTEPS where ≥50% of the per-transect handoff POINTS have a valid Hs** (`swan_runner.py:5776-5784`). Measured L4 = **5.2%**.
+> - **L4 CGRID:** `REG` origin (407323.57, 3723898.01) UTM, **alpc=47.32°**, xlen=458.05 m, ylen=1247.52 m, 46×125 cells. BOTTOM INPGRID 372×367 @ 10 m.
+> - **★ Root mechanism (measured): 333 of 352 handoff POINTS fall OUTSIDE the rotated L4 computational grid; only 19 inside (5.4% ≈ valid_fraction 5.2%).** The outside points sit at grid-local cross-shore x = **−117.1 .. −0.6 m** (grid spans x: 0..458), local-y 129.5..421.7 (fully within 0..1248). **The misalignment is purely CROSS-SHORE**: the grid's shoreward edge is placed up to ~117 m offshore of the transect handoff points it exists to sample. Along-axis placement is correct.
+> - **The grid straddles the waterline:** L4 BOTTOM median depth **−0.17 m**, **54% of cells shallower than the 1.78 m breaking depth** (0 EXCEPTION cells, but ~half the grid is subaerial/surf-zone → dry in the computation). Compounding WARNINGs this run: per-transect profiles "never reach 0.51/1.00/2.24 m — depths span 2.822–15.955 m" (points snap to the shallowest available sample at ~2.8 m), and L4 sizing "tip depth unavailable from the cached FINE profile at −339 m from the anchor — using the 150 m margin-wavelength fallback." So both the grid extent AND the point depths fell back under this facing.
+> - **Reconciles R1:** 238° facing → L4 94.7%; 217° → 5.2%. The AD-1R facing rotates the OMBB-derived grid (alpc) so the separately-derived handoff points fall off its shoreward edge. The open question R3 named — "is the anchor/bbox derivation in a consistent frame, or does the rotation expose an origin offset" — resolves to: **grid-origin derivation (`swan_domain.compute_structure_grid_domain`) and per-transect POINTS derivation are not co-registered on the cross-shore axis under the new facing** (cf. HB's documented anchor-vs-pin ≈209.6 m and segment ≈213.5 m offsets).
+> - **FIX CLASS = OPERATOR DECISION (both candidates are gated):** **(A)** the AD-1R 217° facing itself — R1 showed 238° recovers L4; changing the facing criterion is **architectural (trigger 1)**. **(B)** re-register the L4 grid's cross-shore extent (and/or the transect point depths) to the breaking-depth contour under the current facing so the grid actually reaches its points — this **moves a grid extent/edge (trigger 3)** and is the exact class of the 2026-07-25 grid-resize incident, so it needs sign-off even though it reads as a co-registration bug fix. **Coordinator did NOT implement either.** Recommendation for the operator is in the session report + scratchpad.
+
 **Owner:** `clearskies-api-dev` after R2. **Design:** with the facing chain at 217°, re-verify
 the L3-strip viability test passes (structure reachable); if it still fails, the anchor/bbox
 derivation inherits the same frame bug — diagnose against the 238°-era bbox
