@@ -1,7 +1,18 @@
 # Session state — L4 rewrite coordination (2026-08-01)
 
-## ═══ RESUME HERE (written pre-compaction, ~22:20 UTC 2026-08-01) ═══
-**Immediate state:** Round 1 live verification run IN FLIGHT on librewxr
+## ═══ RESUME HERE (final update ~22:50 UTC 2026-08-01 — ROUND 1 CLOSED) ═══
+**FINAL: the live run COMPLETED and PASSED before compaction.** Measured (testrun_round1.log,
+code b60ef92): RUN_ALL_SPOTS_DONE clean; L4 accuracy 99.6% / valid_fraction 100.0% / 0 NaN;
+**143 transects × 67/67 timesteps resolved on their own bands** (this cycle had 67 forecast
+hours); 3,266 total band points (~23/transect avg — full-length crossing chords vary per
+transect, no 150-cap hits, memory ~half the 170 MB estimate); 143× "no suspected break zone …
+handoff selection unconstrained (byte-identical)" INFO lines — correct for today's small swell,
+the case-(c) path verified LIVE; published forecast_cache.json 206 MB @ 22:42. Service
+RESTARTED, active. Meta docs 07bee6b + resume-brief 4a6b1d6 pushed. **ROUND 1 IS CLOSED — all
+gates: adversarial audit PASS, lead gate 141/141, docs committed+pushed, live check PASS.**
+On resume: go straight to briefing Round 2 (below). Steps 1-4 of the old checklist are DONE.
+
+**Superseded pre-compaction state (kept for context):** Round 1 live run was in flight on librewxr
 (/tmp/testrun_round1.log, launched ~22:02 UTC, deployed commit b60ef92). At last check: all 4
 levels converged (L4 accuracy 99.6%, valid_fraction=100.0%, nan=0), run was in the per-transect
 parse/handoff/1D/publish phase — the exact phase Round 1 rewrote. Marine SERVICE IS STOPPED
