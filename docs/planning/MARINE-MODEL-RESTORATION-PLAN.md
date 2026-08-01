@@ -1945,12 +1945,59 @@ prior sessions' "L4 grid is 35% dry land" (grid is 100% wet).
 fix, one change per deploy, reality-gated) → R4 → R5/R6 → R7 (sign-off designs) — with R8/R9/R10
 as a parallel docs/tests lane.**
 
-### R1 — Bisect-confirm the cliff at `4828d99`  ⬜ (operator "go" required — compute + deploy)
+### R1 — Bisect-confirm the cliff at `4828d99`  ✅ **RAN 2026-08-01 (operator go) — PREMISE REFUTED**
 **Owner:** coordinator. **Design:** on librewxr, check out `f337648` (last-known-publishing
 commit) detached, restart service, force one full run. Record: does it publish; DWR partitions
 vs NDBC 46222 + Surfline (the reality comparison); valid_fraction; station band depths. Then
 redeploy current HEAD. **Accept:** cliff confirmed (f337648 publishes real swell) or refuted —
 either result redirects R2. **Rollback ref:** current HEAD hash recorded before checkout.
+
+> **R1 RESULT — 2026-08-01 (measured on librewxr; f337648 detached run, evidence preserved at
+> `/tmp/r1-f337648-run/`). Coordinator findings; the two contradictions below are surfaced to the
+> operator, NOT self-ruled.** HEAD `73df829` restored, service stopped afterward.
+>
+> 1. **Bisect REFUTED — swell starvation is present at f337648, older than the cliff.**
+>    `python3 /tmp/spec_probe.py` on the L2 workdir: L1 south boundary INPUT (`BOUND_S_46223`)
+>    carries **Hs_swell(T>10s)=0.82 m @ 11.9 s @ 185°**; the 15 m reference OUTPUT (`SPEC_DWR_1`)
+>    has **Hs_swell=0.04 m**, 0.72 m of 4.2 s @ 268° wind chop. Same starvation signature as broken
+>    HEAD's 18:46 run. f337648 predates `4828d99`, so **root-regression #1's attribution (mechanism
+>    in the 4828d99 window) is contradicted** — the starvation is chronic.
+> 2. **The L4 collapse is facing/frame-driven and separable.** f337648 recomputes facing to
+>    **238.0°** (working-era) and L4 converges **valid_fraction=94.7%** (journal
+>    `SWAN convergence OK level=level4_0`) vs **7.1%** at HEAD's 217°. Restoring facing recovers L4
+>    grid validity; it does NOT fix the starvation.
+> 3. **f337648 also fails to publish today** — a separate latent crash: `wind_sea_growth.py:158`
+>    `ValueError: fetch_m … must be > 0 (got fetch_m=-1.91)` in the 1D per-transect pipeline
+>    (offshore-wind/negative-fetch, unguarded) → every timestep `modelStatus unavailable` → 0 published.
+> 4. **`len_deg` is NOT exonerated.** L1 `BOUNDSPEC SIDE S … 0.4086 …` emits DEGREES
+>    (`swan_formats.py:2531` writes `station.len_deg`) into a Cartesian METERS grid; local manual
+>    `swan-user-manual.txt:2510` says `[len]` is meters for non-spherical. Confirmed real defect
+>    (category error, angle vs distance). **Candidate for the starvation, NOT proven cause** — the
+>    south side has a single spectrum, which SWAN applies across the whole side regardless of `[len]`,
+>    so the south-swell loss is not explained by this alone. Mechanism-pin is R2.
+>
+> **R2 redirect (awaiting operator ruling):** hunt the starvation in the
+> L1-boundary → L1-interior → L2-nest → 15 m reference chain, NOT the 4828d99 window. Next step
+> proposed: read-only per-stage swell measurement on the preserved workdir to localize where the
+> swell dies, before any fix (fix is trigger-3, needs sign-off).
+>
+> **R5 deploy result (2026-08-01, measured on librewxr, commit `5581b0a` deployed):** the `[len]`
+> fix is CONFIRMED live (L1 BOUNDSPEC S=37975 m, W=646/9517/13952 m — real meters, west 3-station
+> mangling fixed) but did NOT restore the swell. From the B1 trace time-series (valid-time-aligned,
+> `spec_l1_boundary` vs `spec_l2_dwr`): south swell ~0.5–0.74 m @ 185° enters the L1 boundary
+> correctly (matches Surfline ~0.85 m) and arrives at the 15 m reference as ~0.03–0.04 m — **~94–95%
+> lost, every hour**, dominated there by 222° wind chop. WW3→L1-boundary handoff is HEALTHY; the
+> loss is L1-interior/L1→L2-nest/L2. As predicted (single-spectrum south side), `[len]` was not the
+> cause. R5 stands as a correct defect fix; it is not the swell fix.
+>
+> **Trace-logging defect (2026-08-01, dispatched to `clearskies-api-dev`):** the grid-handoff trace
+> stages EXIST (`_trace_nest_handoff` → `spec_l1_nestout`/`spec_l2_nestout`/`spec_l3_handoff`) but
+> emit ZERO records — `_trace_nest_handoff` parses the NESTOUT file with the SPECOUT parser
+> (`parse_specout_file_multi`), which throws (`timestep block before AFREQ/NDIR`); the bare
+> `except: return` swallows it silently. So the L1→L2/L2→L3/L3→L4 handoffs have never been logged.
+> Fix in flight: NESTOUT-aware parse + silent-swallow→WARNING + per-band Hs accuracy (`summarize_spectrum`
+> band `energy` omits `dtheta`, under-reporting swell ~3.16×) + KAT. Once landed + deployed, one run
+> traces the swell through every handoff and pins the death point (the real R2 mechanism hunt).
 
 ### R2 — Pin and fix the swell-starvation mechanism  ⬜
 **Owner:** coordinator diagnosis; fix by `clearskies-api-dev` after operator sign-off (the fix
@@ -1981,7 +2028,7 @@ admin status page. A viability-test failure at config push must likewise surface
 only the journal. **Guard:** a forced degraded cycle yields `degraded`/`failed` health, never
 silent `ok` + no-publish. **Must not touch:** the serve-nothing-on-failure rule (G1R.0 stands).
 
-### R5 — BOUNDSPEC `[len]` units fix (defect, latent)  ⬜
+### R5 — BOUNDSPEC `[len]` units fix (defect, latent)  ⏳ **IN PROGRESS 2026-08-01 (operator-directed; promoted ahead of R2/R3 because R1 measured it live-wrong)** — `clearskies-api-dev` implementing degrees→meters at the emitter + a known-answer guard; coordinator runs the reality-gate model check (does swell reach the 15 m reference) at acceptance. NOTE: fixes a confirmed defect + the west-side 3-station mangling for sure; whether it fully restores the south swell is settled by the acceptance model run (R1 caveat: single-spectrum south side may need more).
 **Owner:** `clearskies-api-dev`. **Design:** in Cartesian mode emit meters along the side
 (convert `len_deg` at the emitter or compute `len_m` in `select_boundary_stations()`); verify
 VARIABLE FILE semantics against the LOCAL manual (`docs/reference/swan-user-manual.txt`) §2.6.3
@@ -2006,7 +2053,17 @@ each a separate sign-off item, none pre-approved by this plan:
    coverage; otherwise it continues to L2 (fixed 15 m reference) — the FINDINGS-D3 ladder at
    transect granularity, per the operator's stated architecture (triggers 2/4).
 
-### R8 — Test audit: delete/replace tests that pin superseded behavior  ⬜
+### R8 — Test audit: delete/replace tests that pin superseded behavior  ✅ **DONE 2026-08-01 (pushed; operator waived pytest re-verify)**
+> **Status 2026-08-01 (coordinator):** Inventory + one scoped deletion, **pushed to origin/main**
+> (operator gave "push" 2026-08-01): `5874578` (TEST-INVENTORY.md, all 58 tests classified) →
+> `99f2378` (per-function correction) → `cb0fe57` (removed the dead E1
+> `compute_structure_grid_resolution` KAT, renamed the file to `test_tip_depth_from_fine_profile.py`,
+> kept the 9 live guards) → `14b769f` (stale cross-ref fix). Audit result: the suite is essentially
+> clean — **zero** tests pin superseded behaviour in their own assertions; the single file-level
+> DELETE-candidate was a misclassification (it also guarded the LIVE `tip_depth_from_fine_profile`,
+> called `swan_domain.py:2253`), caught at coordinator review, so only the dead-function part was
+> removed. Operator **waived** the pytest re-verification (2026-08-01: "no you do not need to test the
+> test … we have nothing to test"). Gate R row 6: inventory delivered + stale test removed = met.
 **Owner:** `clearskies-test-author` under coordinator review. **Why:** a stale test that pins
 superseded behavior invites the next agent to "fix" code back to it — a reversion engine.
 **Design:** inventory EVERY marine-repo test touching facing/geometry/handoff/boundary/gate;
