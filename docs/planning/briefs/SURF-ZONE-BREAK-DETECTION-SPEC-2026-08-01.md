@@ -179,6 +179,35 @@ domain. The core defect is BD-1/BD-2 alone.
    from the 2026-08-01 run artifacts and presents the number; full-length bands adopted if the
    cost is unremarkable.
 
+## 7a. Doc-sync task — REQUIRED, per round (operator-ordered 2026-08-01)
+
+Each implementation round closes ONLY with its doc-sync pass (CLAUDE.md doc-code sync rule —
+same commit/PR discipline, meta repo):
+
+**Round 1 (BD-1/BD-2/BD-4, bands):**
+- `docs/decisions/ADR-093-swan-trushore-nearshore-model.md` — new amendment: per-hour handoff
+  criterion is now "nearest target depth AMONG stations seaward of the outermost suspected
+  break zone" (supersedes plain first-crossing/nearest-target; Amendment 2 §2's target-depth
+  formula itself unchanged).
+- `docs/manuals/PROVIDER-MANUAL.md` — T4B.1 band description (full-crossing stations,
+  parse-and-delete), handoff selection §, BD-4 primary-break semantics.
+- `docs/ARCHITECTURE.md` — handoff/1D boundary description wherever it names the selection rule.
+- `docs/manuals/API-MANUAL.md` — per-transect payload semantics if the primary-break index or
+  band fields change shape.
+- `docs/planning/MARINE-MODEL-RESTORATION-PLAN.md` decision log — round entry.
+**Round 2 (BD-7/BD-9):**
+- `docs/manuals/API-MANUAL.md` — headline-metric contract (main-break-zone average, upper-tail
+  threshold + ≥5 fallback), representative-transect cross-section field semantics,
+  `open_transect_count`/exclusion-retirement semantics.
+- `docs/manuals/DASHBOARD-MANUAL.md` — cross-section = representative transect (not averaged),
+  heatmap break-zone presentation.
+- `docs/ARCHITECTURE.md` + `docs/manuals/PROVIDER-MANUAL.md` — headline metric + BD-8
+  retirement.
+- SURF-ZONE-MODEL-BRIEF — dated addendum pointing to this spec.
+- Plan decision log — round entry.
+Session logs/concerns files/archive stay untouched (records, not governing docs). The
+coordinator gates each round's close on this pass, same as Phase R.
+
 ## 7. BD-9 — Representative-transect cross-section (operator ruling, 2026-08-01)
 
 The cross-sectional depth/wave graphic shows ONE transect. Do NOT build an averaged "best
