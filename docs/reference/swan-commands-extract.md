@@ -500,7 +500,7 @@ STOP
 |---------|-----------|------------|------------------|---------------|
 | GEN3 WESTHUYSEN | emit | emit | emit | emit |
 | BREAKING CONSTANT 1.0 0.73 | emit | emit | emit | emit |
-| FRICTION JON 0.067 | emit | emit | emit | emit |
+| FRICTION JON 0.038 | emit | emit | emit | emit |
 | TRIAD | emit | emit | emit | emit |
 | SETUP | **REMOVED** | **REMOVED** | **REMOVED** | **REMOVED** |
 | DIFFRACTION | **REMOVED** | **REMOVED** | `DIFFRACTION 1 0.2 27` | `DIFFRACTION 1 0.2 27` |

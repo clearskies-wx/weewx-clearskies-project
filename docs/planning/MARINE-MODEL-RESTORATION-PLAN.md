@@ -1999,7 +1999,7 @@ either result redirects R2. **Rollback ref:** current HEAD hash recorded before 
 > band `energy` omits `dtheta`, under-reporting swell ~3.16×) + KAT. Once landed + deployed, one run
 > traces the swell through every handoff and pins the death point (the real R2 mechanism hunt).
 
-### R2 — Pin and fix the swell-starvation mechanism  ⬜
+### R2 — Pin and fix the swell-starvation mechanism  ⏳ **IN PROGRESS 2026-08-01 (SWAN-manual + input audit; fixes staged, regression hunt opened)**
 **Owner:** coordinator diagnosis; fix by `clearskies-api-dev` after operator sign-off (the fix
 will touch trigger-3 territory: L1 extent/aim/boundary).
 **Leads, in order:** (a) the open-water fan's derived aim for HB — the DWR's sole surviving
@@ -2009,6 +2009,121 @@ sides carry BOUNDSPEC, station set, `[len]` values; (c) `select_boundary_station
 derivation under the new `mean_offshore_bearing` source. **Accept:** a named file:line cause +
 minimal fix, then a full run whose DWR shows the boundary's swell partition (13–14 s, ~185°)
 within 20% of the boundary file's swell Hs. **Must not touch:** anything beyond the named cause.
+
+> **R2 PROGRESS — 2026-08-01 (coordinator + operator, SWAN-manual read + live-artifact input audit).**
+> Read the load-bearing sections of the local SWAN User Manual (`docs/reference/swan-user-manual.txt`)
+> against the ACTUAL generated L1/L2 INPUT (pulled from librewxr) and the LIVE run artifacts. Findings
+> are measured, not inferred.
+>
+> ### ✅ ROOT CAUSE PINNED & VERIFIED — 2026-08-01 (Fable review + coordinator independent verification)
+> **The swell is not dissipated in transit — it never ENTERS the domain. Stale bathymetry caches leave
+> the entire south boundary dry, so `BOUNDSPEC SIDE S` is imposed on `-9999` exception points and SWAN
+> silently discards it.** Chain (all measured on librewxr):
+> - L1 `BOTTOM.txt` (IDLA=3, file row 0 = SOUTH): **rows 0–3 = 0 wet cells**; east **cols 24–37 = 0 wet**.
+>   (= exactly the 488 nodata cells: 4 south rows + 14 east cols − overlap.) L2 `BOTTOM.txt` south rows
+>   0–3 also **0 wet** — same defect.
+> - `/etc/weewx-clearskies/swan_bathymetry_L1.json` (**mtime Jul 27 03:24**): footprint **lat 33.5067–33.7122,
+>   lon −118.2472 to −117.9298**, ni=30 nj=24 — the PRE-facing-flip domain. Current CGRID extends ~4 km
+>   further south and ~14 km further east than the cache covers; resample fills the gap with NaN→−9999→dry.
+>   L2 cache same mtime, same defect (footprint short on its south edge).
+> - The fixed-name L1/L2 caches are NOT bbox-keyed (unlike L3/L4) and the cache-load early-return in
+>   `providers/nearshore/swan.py` (~548) **never re-runs the `_covers()` gate**, violating that function's
+>   own docstring contract ("guaranteed to span the whole domain"). The facing flip / L1 re-aim
+>   (`38f93ac`/`73df829`/`f6033ed`) moved the box after Jul-27; F1's "clear SWAN run state on geometry
+>   push" (`c3ceaa8`) evidently does NOT clear these caches — **verify c3ceaa8 scope.**
+> - **Reconciles:** magnitude (Fable's order-of-magnitude check: friction over 22 km ≈ 2–10% Hs, not 97%
+>   energy loss — physics could NOT do this), the absent south-boundary warnings (a fully-dry side is
+>   silent at any maxerr), "worked a week ago" (pre-flip box matched the cache lineage), and R1's f337648
+>   bisect (TWO live starvation bugs — the len-degrees BOUNDSPEC bug [R5, now fixed] AND this stale cache;
+>   the bisect found the symptom, not the introduction point).
+>
+> **Corrected reasoning errors (mine, this session):** "swell enters correctly" was a NON SEQUITUR (no
+> warning ⇏ enters; a dry side produces no warning); "bathymetry realistic → not the bug" looked at
+> depth VALUES but missed the DRY MASK; the shallow skew (65% <150 m, median 41.6 m for a box reaching
+> 30 km offshore) was itself the red flag that the deep/offshore half was amputated.
+>
+> **Superseded localization (kept for the record, now WRONG):** earlier this session I concluded the loss
+> was "L1-interior dissipation over the fetch" and that the swell "enters the south boundary correctly."
+> Both refuted by the BOTTOM.txt dry-mask evidence above. The L1 PRINT IS healthy (converges 99.6%) — but
+> convergence measures the solver on the WET subset and says nothing about the domain being amputated.
+>
+> **REFUTED this session (stop chasing):** (a) **bathymetry** — live L1 `BOTTOM.txt`: median 41.6 m, max
+> 510 m, deep-offshore-shoaling-to-shore, sign NOT flipped → realistic, not the bug (but 65% of wet cells
+> <150 m, so the swell path IS friction-active — friction coefficient is high-leverage). (b) **handoffs /
+> convergence** — healthy per PRINT. (c) **whitecapping** — weak suspect: `GEN3 WESTHUYSEN` is the
+> swell-friendly saturation scheme (fixed Komen's swell over-dissipation, confirmed by manual + literature).
+> (d) **directional resolution** — operator: prior working models used the same/finer, so not it.
+> (e) **MODE NONSTATIONARY+COMPUTE STAT**, **flow=0.03**, **df/f≈0.11**, **alfa=0.01**, **SORDUP default** —
+> all manual-correct.
+>
+> **NEW REGRESSION FRAME (operator, 2026-08-01):** runs from ~a week ago (≈2026-07-24) did NOT show this
+> loss → treat as a REGRESSION, not chronic. (Tension with R1's f337648 starvation — reconcile via the diff.)
+>
+> **Fable review dispatched 2026-08-01** (independent skeptical critique of the whole diagnosis +
+> regression checklist + magnitude sanity-check). Integrate its findings here when it returns.
+>
+> **IDENTIFIED FIXES — tracked (do NOT leave as prose):**
+> - [x] **★ THE SWELL FIX — regenerated the stale L1/L2 bathymetry caches** — DONE + VERIFIED 2026-08-01
+>   (operator go). Backed up the two Jul-27 caches aside (`.stale-jul27-*.bak`), re-ran the production apply
+>   chain (`load_config()`+`run_grid_sizing_chain()` via marine venv). Chain re-downloaded L1/L2 for the
+>   CURRENT box: new L1 cache spans **lat 33.4560–33.7148** (was 33.5067; grid south edge ~33.47 now
+>   covered), logged **"covers the full domain"** for L1 AND L2; ocean cells 576→856. **MEASURED on the
+>   live cycle's fresh L1 BOTTOM.txt (deployed code 5581b0a, friction still 0.067 — clean isolation):
+>   south edge 0/38→38/38 wet, whole grid 576→1064/1064 wet.** The swell's entry edge is real ocean again.
+>   **END-TO-END REALITY GATE (measured, live cycle L1 `nest_out.dat`, 298 nest locations): L1→L2 handoff
+>   swell(T>10s) = 0.62 m @ 10.7 s @ 192° (max), median 0.54 m, 219/298 locations > 0.3 m — vs 0.12 m
+>   before. Swell RESTORED.** Confirms Fable's magnitude argument (swell was never dissipated in transit;
+>   the 85% loss was the dead boundary). ⏳ Pending: confirm the full cycle PUBLISHES (the original
+>   regression symptom) + durable code fix so this cannot silently recur.
+> - [x] **★ DURABLE fix — re-run coverage gate on cache load** — CODE DONE (working tree, syntax-verified;
+>   NOT committed/deployed). `providers/nearshore/swan.py`: added module-level `_grid_covers_domain_gap()`
+>   (mirrors the download path's own `_covers()` criterion) and gated the cache-HIT early return — a
+>   fresh-by-TTL but domain-SHORT cache is now treated like a missing/corrupt one: re-download at apply
+>   (`allow_download=True`), hard-ERROR+abort at runtime (`allow_download=False`) rather than silently
+>   returning a domain-short grid. Restores the docstring's "guaranteed to span the whole domain" contract.
+>   Still TODO: (a) **verify `c3ceaa8` cache-clearing scope** (geometry-push must invalidate these
+>   fixed-name caches); (b) optional bbox-key L1/L2 like L3/L4 (trigger-7 persisted-file naming — operator call).
+> - [ ] **★ MISSING GUARD (would have caught this in seconds)** — invariant: every side named in a
+>   BOUNDSPEC, and the BOUNDNEST1 ring, MUST have ≥1 wet boundary cell, else FAIL the run loudly. Extend
+>   the trace to record computed Hs at the first WET row inside each forced boundary (so "swell enters" is
+>   never again asserted from the input file alone). This — not maxerr — is the real guard.
+> - [x] **FRICTION JON 0.067 → 0.038** — manual §FRICTION + Zijlema (2012): 0.038 for BOTH swell and wind
+>   sea; 0.067 "discouraged even for wind sea." `swan_formats.py:~1783` (all 4 levels). Doc synced
+>   (`swan-commands-extract.md:503`). **Code done, working tree — NOT committed/deployed. Valid correctness
+>   fix but NOT the swell fix (recovers only a few cm). Do NOT run in the same validation as the cache fix
+>   — confounds attribution (Fable).**
+> - [x] **SET maxerr 3 → 2** — was running through SEVERE errors ("run no matter what"); now fails on
+>   level-3, still allows warnings/repairable. Old code comment misread the boundary mismatch as level-2
+>   (PRINT shows it is a `** WARNING`, level 1). `swan_formats.py:~1597`. **Code done, working tree —
+>   NOT committed/deployed. NOTE: would NOT have caught this bug — SWAN emits nothing for a fully-dry
+>   BOUNDSPEC side; do not credit maxerr as the guard (the wet-boundary invariant above is the guard).**
+> - [ ] **South `[len]`=37975.34 > side length 37475.17** — buoy 46223 foot point projects ~500 m past the
+>   SE corner; `ww3_boundary_files_and_command()` (`swan_formats.py:~2606`) never clamps. Dormant while the
+>   side is dry; live the moment the cache is fixed. Clamp `[len]` into [0, side_len] or reject.
+> - [ ] **Single VARIABLE point on a side** — `CONSTANT FILE` is the SWAN idiom for one station; VARIABLE's
+>   extrapolation outside the given `[len]` range is undocumented. Revisit south/other single-station sides.
+> - [ ] **OBSTACLE double-counting** — the identical `OBSTACLE TRANSM 0.74 LINE …` pier appears in BOTH
+>   L1 and L2 INPUT (code threads one domain-wide `structures` list into every level's `build_swan_input`,
+>   no L4-only gate) → a wave in the pier's lee is attenuated 26% at each grid level. **Fix (pending
+>   operator nod on the split):** structure-grid-eligible (pier/jetty/groin/breakwater, which get an L4
+>   grid) → obstacle on **L4 only**; **seawall** (no L4, per `swan_domain.py:1876-1881`) → obstacle on the
+>   coarse grid that covers it. NOT a blanket "L4-only" (that would drop seawalls).
+> - [ ] **surfbeat_runner.py:359 `SET … 200 3`** — separate surfbeat model carries its own maxerr=3;
+>   align to 2 for consistency (pending operator ok — different subsystem).
+> - [ ] **REGRESSION diff (highest priority given "worked a week ago"):** diff the SWAN-input generation
+>   between ~2026-07-24 (last known good) and HEAD — projection/UTM switch (Cartesian), grid sizing/
+>   orientation/facing, boundary `[len]` units, physics command, spectral resolution, obstacle routing.
+>   Find the commit that introduced the loss.
+> - [ ] **Isolation re-run (decisive experiment):** with friction=0.038 as the new baseline, re-run L1 and
+>   measure swell at the nest; then toggle whitecapping OFF (`OFF WCAP`) and breaking OFF one at a time to
+>   name the exact L1-interior sink. Manual §2.7 endorses this method.
+>
+> **DEFERRED (architectural — sign-off required, not now):** `GEN3 WESTHUYSEN → ST6` (+ `SSWELL ZIEGER` +
+> `NEGATINP`) A/B for swell-in-mixed-seas. Only after friction + the regression diff are settled; ST6's
+> nearshore benefit is "moderated by friction/breaking" per the literature, so it is not the likely bug.
+>
+> **Standing approvals (operator, 2026-08-01, in chat):** friction fix and maxerr fix authorized.
+> Obstacle split + surfbeat straggler + isolation re-run + push/deploy: awaiting explicit go.
 
 ### R3 — L3-strip viability + frame integrity under AD-1R facing  ⬜
 **Owner:** `clearskies-api-dev` after R2. **Design:** with the facing chain at 217°, re-verify
