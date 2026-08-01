@@ -2213,7 +2213,10 @@ gate semantics or L3-strip-era handoff). **Deliverable:** `docs/planning/briefs/
 "what tests exist." **Accept:** zero tests remain that assert superseded design; inventory
 committed.
 
-### R9 — Brief→plan reconciliation audit  ⬜
+### R9 — Brief→plan reconciliation audit  ⏳ **DIVERGENCES LOGGED 2026-08-01 (TC-24); doc CORRECTIONS deferred to R7/R10 pending the R3 ruling**
+
+> **R9 status 2026-08-01 (coordinator + read-only sweep agent):** all 9 brief↔plan divergences logged to `MARINE-GEOMETRY-MODEL-CONCERNS.md` **TC-24**. Key findings: (1) the briefs + geometry-plan OFF-LIMITS still assert the L4/per-transect-handoff machinery "already works / is off-limits," contradicted by the measured R3 reality (333/352 points outside L4) and the TC-23 operator ruling — but correcting them depends on the R3 A-vs-B decision, so DEFERRED; (2) facing method-of-record is stale in SURF-ZONE §2.6 + STUDY-AREA §1/§5 (still isobath-gradient; AD-1R replaced it) — safe R10 fix; (3) `ARCHITECTURE.md:117` "+15 km" L1 margin vs code/brief "+10 km" — safe R10 fix; (4) handoff-ladder + 1.78 m floor own no plan task — R7/R9 follow-up after R3. The "correct the plans" half of R9 is intentionally held until R3 is ruled (the geometry plan is suspended pending Gate R; editing it now pre-judges the facing decision).
+
 **Owner:** coordinator (docs). **Design:** walk `STUDY-AREA-GEOMETRY-BRIEF.md` §3.1 (FIXED
 table), §0/§3.3.6 (L4-need-not-cover-fan + clamp), `SURF-ZONE-MODEL-BRIEF.md` §2.3.4 (with its
 supersession boxes), and the geometry plan's AD-1R/AD-3/AD-4 against BOTH plans; log every
