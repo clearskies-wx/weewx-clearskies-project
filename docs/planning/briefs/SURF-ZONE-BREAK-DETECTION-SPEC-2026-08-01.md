@@ -1,8 +1,8 @@
-# SURF-ZONE BREAK DETECTION & REPORTING — DESIGN SPEC (DRAFT — awaiting operator sign-off)
+# SURF-ZONE BREAK DETECTION & REPORTING — DESIGN SPEC (APPROVED 2026-08-01)
 
-**Date:** 2026-08-01 · **Status:** DRAFT — operator rulings captured from chat, same day; NOT yet
-approved for implementation. No code changes are authorized by this document until the operator
-signs off in chat and the open parameters (§6) are ruled.
+**Date:** 2026-08-01 · **Status:** **APPROVED** — operator signed off in chat same day and ruled
+every open parameter (see §6, now RULINGS). Round 1 (BD-1/BD-2/BD-4) is GO. Round 2 =
+BD-7 + BD-9; BD-8 is RESCINDED as an exclusion (flag retired to metadata-only, see §6.3).
 
 **Context:** written the same day the L4 shadow-envelope rewrite (marine `4e79d21`) passed its
 full-run reality gate (L4 valid_fraction 100%, 143/143×35/35 per-transect handoff, published).
@@ -145,13 +145,36 @@ domain. The core defect is BD-1/BD-2 alone.
 - The spot-level pin-anchored CURVE pick is deleted (marine `1c98507`) — do not resurrect it;
   all selection is per-transect.
 
-## 6. Open parameters — operator must rule before implementation
+## 6. Parameters — RULED by the operator, 2026-08-01 chat
 
-1. **Deviation band width** for BD-7 (e.g., ±1σ, ±20% of zone mean?).
-2. **Main-break-zone identification window** (alongshore smoothing length / minimum zone width
-   in transects?).
-3. **Degradation criterion** for BD-8 (face height alone, or face height + peel?).
-4. **Break-zone merge threshold** — when do two adjacent breaking regions count as ONE zone
-   (bar-trough-bar spacing floor)?
-5. **Band widening cost** (BD-1): accept larger TABLE_PT files / station counts, or cap and
-   interpolate? (Cost will be measured and presented before ruling if preferred.)
+1. **Deviation band (BD-7): ±0.75 σ of the main-break-zone mean.** Transects whose bigger-break
+   face height falls within 0.75 standard deviations of the zone mean contribute to the headline
+   average.
+2. **Main-break-zone window: minimum ~5 consecutive transects (~50 m at 10 m spacing)** — a zone
+   is a real stretch of beach, never one anomalous line.
+3. **BD-8 RESCINDED — no exclusion at all.** Operator reasoning: with the zone-based headline, a
+   structure-degraded transect simply fails to qualify for the main break zone; a structure-
+   improved one legitimately qualifies. Verified fact behind the ruling: `is_structure_affected`
+   is a geometric-SHADOW classification (beach_facing ±30° test, `swan_formats.py` TransectInfo
+   docstring) — NOT an "uncomputable transect" marker; every flagged transect is fully computed.
+   Disposition: the flag and `shadowing_structures` labels are RETAINED as map/UI metadata
+   (heatmap semantics) and lose all aggregation roles. `open_transect_count` semantics update
+   accordingly at implementation time.
+4. **Break-zone merge threshold: DEFERRED with default.** (Meaning, for the record: on a noisy
+   profile the H/d ≥ γ condition can flicker over a few metres, splitting one physical break
+   into several detected entries; a merge threshold would coalesce them.) Ruling: rely on the
+   existing engine's guards; tune ONLY if the HB double-break reality gate (§4.1) shows zone
+   fragmenting. No speculative parameter now.
+5. **Band widening cost (BD-1): measure first** — coordinator measures the actual TABLE_PT cost
+   from the 2026-08-01 run artifacts and presents the number; full-length bands adopted if the
+   cost is unremarkable.
+
+## 7. BD-9 — Representative-transect cross-section (operator ruling, 2026-08-01)
+
+The cross-sectional depth/wave graphic shows ONE transect. Do NOT build an averaged "best
+curve." Instead, pick the transect that best represents the identified main-break-zone window
+and render its actual cross-section. Selection: the in-zone transect whose bigger-break face
+height is closest to the zone's band-filtered mean (deterministic tiebreak: nearest the zone's
+alongshore center). Spatial variation across the beach is the heatmap's job (BD-6), not the
+cross-section's. This replaces any averaging ambition in BD-5's presentation layer; BD-5's
+anatomy requirements (both breaks, foam/reform zones on the rendered transect) stand.
