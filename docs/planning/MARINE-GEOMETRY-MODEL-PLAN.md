@@ -115,6 +115,10 @@ non-blocking gap never justifies stalling.
 - **G3** (exposure from fan → L4 sizing + surf-scorer + optional override + D6b L4 cold-start) — ✅ implemented + deployed (`edf831f`, `829d634`, `f788611`, `ab97929`). Gate G3 (sizing chain + D6b no-op) passed — **but did NOT re-validate a converged 4-level run** (see Critical finding 2).
 - **G4** (L4 axis from OMBB + obstacle route/coeffs + invariant-3 rescope + proximity clustering) — 🔄 code implemented + deployed (`37acb0c`, `418f1f5`, `5dbce94`, `6a8c18e`, `2597011`; clustering `02ef999` local-only). The obstacle emission (`OBSTACLE TRANSM 0.74` 2-vertex OMBB centerline) and the invariant-3 rescope validated live. **⛔ Gate G4 FAILED — see Critical finding 2.**
 - **G5 / G6 / G7 / Gate GR** — ⬜ not started.
+- **⛔ PLAN SUSPENDED 2026-07-31 (operator direction):** the 11:13 deploy of `4828d99` (G2 + the
+  G1 facing wiring) broke publishing entirely — see the corrected TC-21/TC-23 and
+  `MARINE-MODEL-RESTORATION-PLAN.md` **PHASE R**, which now owns recovery, the test audit, the
+  brief→plan reconciliation, and the QC hardening. **No further G-phase work until Gate R passes.**
 
 ### Critical findings — BLOCKING (surfaced to operator 2026-07-31; logged as TC-21 in `MARINE-GEOMETRY-MODEL-CONCERNS.md`)
 

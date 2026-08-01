@@ -20,6 +20,15 @@ rows owed — deploy + config re-push, see Gate E preamble) → Phase F (F1–F5
 
 # ▶ START HERE
 
+> ## ⛔ 2026-07-31: ALL WORK REDIRECTED TO PHASE R (end of this document)
+>
+> On 2026-07-31 the marine model **stopped publishing entirely** after the 11:13 deploy of
+> `4828d99` (geometry plan G2 + the G1 facing going live). The full evidence-backed diagnosis,
+> the recovery tasks, the test purge, the brief/manual reconciliation, and the QC hardening are
+> in **[PHASE R](#phase-r--2026-07-31-regression-recovery--anti-regression-hardening)** at the
+> end of this file. **Phase R runs before Phase F and Phase D and before ANY further work on
+> `MARINE-GEOMETRY-MODEL-PLAN.md`.** The geometry plan is suspended until Gate R passes.
+
 **Every task and gate in this document carries a status marker.** `✅ DONE` · `⬜ NOT STARTED` ·
 `⛔ SUPERSEDED` / `NEVER WALKED` · `⚠️ PARTIAL`. If a heading has no marker it is not a task.
 
@@ -1885,3 +1894,185 @@ antimeridian-aware in a follow-up fix after the auditor found the naive centroid
 **Doc-code contradictions found this pass:** see Task 4 findings, reported in this pass's closeout to
 the coordinator — not resolved here, per this agent's scope (docs-only; a contradiction is a finding,
 not something to silently reconcile).
+
+---
+
+# PHASE R — 2026-07-31 regression recovery + anti-regression hardening
+
+**Created 2026-07-31 (Fable diagnosis session, operator-directed). Runs before Phase F, Phase D,
+and any further `MARINE-GEOMETRY-MODEL-PLAN.md` work.** Every claim below was measured from
+primary artifacts this date (preserved workdirs, B1 trace, journal, deploy reflog) — none of it
+is inherited from prior session reports, several of which were factually wrong (see TC-21/TC-23
+corrections in `MARINE-GEOMETRY-MODEL-CONCERNS.md`).
+
+## R-DIAGNOSIS — what actually happened on 2026-07-31 (evidence-stamped, read first)
+
+| Time (UTC) | Event | Evidence |
+|---|---|---|
+| ≤ 07:25 | Model WORKING: valid_fraction 95.0–95.4%, published 4–5 ft SW faces @ 8–9 s matching Surfline | trace `published` 07:00; journal |
+| **11:13** | **Deploy `4828d99`** — geometry-plan G2 (L1 aim + WW3 sides from open-water fan, GL sizing, island enclosure) **plus the G1 ray-fit facing going live** (238.0° → 201.9° at the 11:16 push) | reflog; journal `beach_facing=` |
+| 11:16 | **L3-strip viability test FAILED** — "structure unreachable by ~180 m … L3 disabled; handoff falls back to L2 at ~15 m." The guard fired correctly; nothing surfaced it to the operator. L4 along 483→399 m, reach 30→21 m, L3 bbox moved ~1 km | journal swan_domain |
+| 11:51 | Run PASSES gate (80.3%) but "zero usable L3 handoff timesteps"; per-hour ERRORs "no clean QB station"; nearshore Hs already 0.65–0.69 m vs a real high-surf morning; **publishes NOTHING, silently — 07:00 remains the last publish ever**; /health stayed `ok` | journal 11:52; trace (0 `published` records after 07h) |
+| 12:49–13:49 | Gate failures 27.3% / 35.5% / 27.3% — same geometry, data-sensitive metric | journal |
+| 18:10 | AD-1R facing (217.0°, correct) re-push; frame moves again | journal |
+| 18:46 | Failed gate run (7.1%): L4 grid **100% wet** (4752/4752 nodes), all 96 handoff stations **wet but OUTSIDE the grid** (4–56 m shoreward of its frozen edge, at 0.72–1.49 m depth); **south swell (verified in boundary file: 13.6 s @ 185°, Hs_swell 0.85 m, matching Surfline) entirely ABSENT at the 15 m reference** (0.30 m of 5.6 s W wind chop only) | measured from `/tmp/g1r-gate-level4_0-failed` + level1/level2 workdirs |
+
+**Root regressions (fix targets):**
+1. **Swell starvation** — boundary files carry the real swell; the model's interior does not.
+   Mechanism sits in the `4828d99` window (G2's `_compute_level1` aim / `select_boundary_stations`
+   side derivation / L1 box relocation) — pinned to one deploy, NOT yet to one line (task R2).
+2. **Frame break** — the facing flip moved the anchor/contour frame; L3-strip viability failed
+   (loud but unsurfaced); L4's frozen shoreward edge moved seaward of the station band.
+3. **Silent no-publish** — a gate-PASSING run published nothing with `/health` = `ok` (task R4).
+4. **Wrong gate contract** — the L4 `low_valid_fraction` check asserts "transect fan inside L4",
+   contradicting the operator architecture ruling (2026-07-31, recorded in TC-23): L4 models
+   refraction/diffraction around the obstacle; it is NEVER the sole handoff; a transect that
+   does not intersect L4 continues to L2. No L4-intersection routing exists anywhere in code.
+5. **Missing design floor** — `_MIN_DESIGN_HS_M = 1.0` (→ the 1.78 m contour, STUDY-AREA brief
+   §3.1 "smallest handoff ever") is applied to grid sizing ONLY; station placement has no floor.
+6. **Latent defects** — BOUNDSPEC `[len]` emitted in degrees (`len_deg`, swan_formats.py:2531)
+   into a Cartesian-meters grid (non-fatal so far, wrong since the Jul-28 projection switch);
+   NOMADS station-spectra fetches intermittently 403/404 with hot retry loops.
+
+**Exonerated by evidence:** G4.1/G4.2 (L4 axis rotation 221.0° unchanged across every failing
+run sized by pre-G4 code); G3 exposure (byte-identical L4 at the pre/post-G3 pushes); the
+`len_deg` defect as the trigger (model published real swell through it Jul 29–31 07h);
+prior sessions' "L4 grid is 35% dry land" (grid is 100% wet).
+
+## R-tasks
+
+**Sequencing: R11 (rules) FIRST, before any agent is dispatched; then R1 → R2/R3 (diagnosis +
+fix, one change per deploy, reality-gated) → R4 → R5/R6 → R7 (sign-off designs) — with R8/R9/R10
+as a parallel docs/tests lane.**
+
+### R1 — Bisect-confirm the cliff at `4828d99`  ⬜ (operator "go" required — compute + deploy)
+**Owner:** coordinator. **Design:** on librewxr, check out `f337648` (last-known-publishing
+commit) detached, restart service, force one full run. Record: does it publish; DWR partitions
+vs NDBC 46222 + Surfline (the reality comparison); valid_fraction; station band depths. Then
+redeploy current HEAD. **Accept:** cliff confirmed (f337648 publishes real swell) or refuted —
+either result redirects R2. **Rollback ref:** current HEAD hash recorded before checkout.
+
+### R2 — Pin and fix the swell-starvation mechanism  ⬜
+**Owner:** coordinator diagnosis; fix by `clearskies-api-dev` after operator sign-off (the fix
+will touch trigger-3 territory: L1 extent/aim/boundary).
+**Leads, in order:** (a) the open-water fan's derived aim for HB — the DWR's sole surviving
+partition is 262° W, suspicious against HB's true S–SW window; (b) diff the 18:46 L1 INPUT
+(preserved) against an f337648-generated L1 INPUT on the same data: CGRID box position, which
+sides carry BOUNDSPEC, station set, `[len]` values; (c) `select_boundary_stations()` side
+derivation under the new `mean_offshore_bearing` source. **Accept:** a named file:line cause +
+minimal fix, then a full run whose DWR shows the boundary's swell partition (13–14 s, ~185°)
+within 20% of the boundary file's swell Hs. **Must not touch:** anything beyond the named cause.
+
+### R3 — L3-strip viability + frame integrity under AD-1R facing  ⬜
+**Owner:** `clearskies-api-dev` after R2. **Design:** with the facing chain at 217°, re-verify
+the L3-strip viability test passes (structure reachable); if it still fails, the anchor/bbox
+derivation inherits the same frame bug — diagnose against the 238°-era bbox
+`[33.64135,-118.02855 – 33.65696,-118.00203]` (worked) vs the failing
+`[33.633251,-118.033738 – 33.655251,-118.002549]`. **Accept:** viability PASS logged at config
+push, L3 re-enabled, and the L4 sizing log's shoreward reach/along-span within 15% of the
+238°-era values (30 m / 483 m) OR a justified explanation of the delta.
+
+### R4 — No-publish paths must be loud and truthful  ⬜
+**Owner:** `clearskies-api-dev`. **Design:** trace the 11:51 abort (gate PASSED, zero published
+entries, no ERROR naming the abort): follow "zero usable L3 handoff timesteps" through the
+publish/cache step; every path that ends a cycle with nothing published must (1) log ONE ERROR
+naming the reason, (2) set B3 `/health` `status != ok` with a `reasons` entry, (3) appear on the
+admin status page. A viability-test failure at config push must likewise surface via B3, not
+only the journal. **Guard:** a forced degraded cycle yields `degraded`/`failed` health, never
+silent `ok` + no-publish. **Must not touch:** the serve-nothing-on-failure rule (G1R.0 stands).
+
+### R5 — BOUNDSPEC `[len]` units fix (defect, latent)  ⬜
+**Owner:** `clearskies-api-dev`. **Design:** in Cartesian mode emit meters along the side
+(convert `len_deg` at the emitter or compute `len_m` in `select_boundary_stations()`); verify
+VARIABLE FILE semantics against the LOCAL manual (`docs/reference/swan-user-manual.txt`) §2.6.3
+— never web-fetch SWAN docs. **Guard:** KAT asserting emitted `[len]` equals the UTM distance
+of each station's projection along the side (known-answer from hand-computed geometry).
+
+### R6 — WW3 fetch hygiene  ⬜
+**Owner:** `clearskies-api-dev`. **Design:** exponential backoff + per-cycle retry cap on the
+NOMADS station-spectra fetches (403/404 observed with hot retry loops, journal Jul 30–31); a
+cycle that runs on cached boundary data logs it and reflects it in B3 `inputs.ww3_boundary`
+(age + `available`). **Accept:** a blocked NOMADS never produces a hot loop; staleness visible
+in `/health` without reading the journal.
+
+### R7 — Handoff containment trio (ARCHITECTURAL — designs for operator sign-off, then build)  ⬜
+Per the operator architecture ruling recorded in TC-23 (2026-07-31). Three coordinated designs,
+each a separate sign-off item, none pre-approved by this plan:
+1. **Hs floor in station placement:** apply `_MIN_DESIGN_HS_M` to `_transect_band_depths()` so
+   no station is ever placed shoreward of the 1.78 m design contour (trigger 1 — criterion).
+2. **Rescope the L4 `low_valid_fraction` gate** to judge L4 only on cells/outputs L4 is
+   responsible for — "fan outside L4" is a routing condition, not an L4 failure (trigger 1).
+3. **Per-transect L4-intersection routing:** each transect reads L4 where it intersects wet L4
+   coverage; otherwise it continues to L2 (fixed 15 m reference) — the FINDINGS-D3 ladder at
+   transect granularity, per the operator's stated architecture (triggers 2/4).
+
+### R8 — Test audit: delete/replace tests that pin superseded behavior  ⬜
+**Owner:** `clearskies-test-author` under coordinator review. **Why:** a stale test that pins
+superseded behavior invites the next agent to "fix" code back to it — a reversion engine.
+**Design:** inventory EVERY marine-repo test touching facing/geometry/handoff/boundary/gate;
+classify each as (a) known-answer (independent reference — keep), (b) behavior-pinning current
+design (keep, cite the ADR/brief it pins), (c) **pinning superseded behavior — DELETE in the
+same commit that documents why** (candidates: segment-perpendicular/238° relics, isobath
+ray-fit leftovers, 2-point-pier OMBB-equivalence fixtures, anything asserting fan-inside-L4
+gate semantics or L3-strip-era handoff). **Deliverable:** `docs/planning/briefs/TEST-INVENTORY.md`
+— one line per test file: what it asserts, class, verdict — the operator-readable answer to
+"what tests exist." **Accept:** zero tests remain that assert superseded design; inventory
+committed.
+
+### R9 — Brief→plan reconciliation audit  ⬜
+**Owner:** coordinator (docs). **Design:** walk `STUDY-AREA-GEOMETRY-BRIEF.md` §3.1 (FIXED
+table), §0/§3.3.6 (L4-need-not-cover-fan + clamp), `SURF-ZONE-MODEL-BRIEF.md` §2.3.4 (with its
+supersession boxes), and the geometry plan's AD-1R/AD-3/AD-4 against BOTH plans; log every
+divergence found to `MARINE-GEOMETRY-MODEL-CONCERNS.md`; correct the plans. Known divergences
+to seed it: the handoff ladder (first-match L4→L3→L2 @ 15 m) and the 1.78 m shoreward-reach
+rationale appear in NO plan task; the geometry plan's G-phases never referenced the FIXED table.
+
+### R10 — Manual doc-sync (what the Sonnet agents actually read)  ⬜
+**Owner:** `clearskies-docs-author` after R7 designs are ruled. **Design:** update
+`docs/ARCHITECTURE.md` (marine section, :99–127) and `PROVIDER-MANUAL.md` §14.15 (+ OPERATIONS
+where touched) to state: AD-1R facing (setup-time, operator-overridable); the L4-coverage ruling
+(L4 = obstacle refinement, never sole handoff; open beach has no L3/L4); the handoff ladder
+incl. per-transect routing once R7.3 lands; the 1.78 m floor semantics; the serve-nothing +
+loud-refusal behavior (R4). **Accept:** an agent reading only the manuals reproduces the
+operator's architecture — no manual statement contradicts a ruling.
+
+### R11 — QC hardening: rule edits (land BEFORE dispatching any Phase-R agent)  ⬜
+**Owner:** coordinator; operator approves final wording. Draft content:
+1. **`rules/verification.md` — Reality gate on every marine deploy:** within one forecast cycle
+   of ANY marine deploy/config push, paste published (or DWR) Hs/Tp/dir beside NDBC 46222 (or
+   Surfline) values; disagreement beyond stated tolerance = deploy FAILED, roll back. *A deploy
+   with no reality comparison is not complete.* (The operator's manual Surfline checks caught
+   every regression the gates missed — make that check mandatory and mechanical.)
+2. **`rules/verification.md` — Publish-liveness check:** after any marine deploy, confirm a
+   publish (or an explicit, health-visible refusal) within one cycle. Silent `ok` + no-publish
+   = FAILED deploy.
+3. **`rules/verification.md` — Stale tests:** a task that changes behavior updates/deletes the
+   tests pinning the old behavior IN THE SAME COMMIT. An agent finding a failing test that pins
+   superseded behavior STOPS and surfaces — **never** alters code to satisfy it.
+4. **`rules/agents.md` — mandatory prompt line for implementation agents:** "If an existing
+   test contradicts your tasked change, STOP and report it. Do not modify code to make a stale
+   test pass; do not delete a test without listing it in your report."
+5. **`rules/coordinator.md` — One functional change per deploy** during restoration/recovery
+   phases; **baseline capture before replacing any working input** (record facing, DWR Hs,
+   valid_fraction, station-band depths pre-change and diff post-change in the gate).
+6. **`rules/coordinator.md` — A fired guard is a gate event:** any viability/invariant/guard
+   failure at config push or runtime during a gated task is pasted into the gate record and
+   surfaced to the operator — "the guard fired and we continued" (11:16, L3 disabled) is the
+   exact shape this plan exists to end.
+
+## ⛔ QC GATE R
+
+| # | Element | Evidence |
+|---|---|---|
+| 1 | Model publishes on current HEAD | `published` trace records this cycle; site serves forecast |
+| 2 | Reality gate passes | pasted model-vs-NDBC/Surfline comparison within tolerance |
+| 3 | Swell present at 15 m reference | DWR partition table shows the boundary's swell partition (period + direction), not wind chop alone |
+| 4 | valid_fraction ≥ 80% on a full nest | journal line pasted |
+| 5 | No silent no-publish path | forced degraded cycle → health != ok + admin page shows reason |
+| 6 | Test inventory delivered, stale tests gone | `TEST-INVENTORY.md` committed; deletion commit hashes |
+| 7 | Rules landed | R11 edits committed with operator-approved wording |
+| 8 | Manuals match rulings | R10 spot-checked by adversarial auditor against TC-23 ruling |
+
+**Adversarial:** auditor gets the R-DIAGNOSIS table and this gate — briefed to disprove rows 1–4
+with live artifacts, and specifically to attempt one "plausible but stale" test resurrection to
+prove row 6's process holds.
