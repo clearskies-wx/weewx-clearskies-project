@@ -113,8 +113,29 @@ excluded from maps.
 
 ## 5. Current-state facts an implementer must know
 
-- Per-transect fine profiles (`hs_total_profile`, distances, depths) already span the FULL
-  transect — the detection data exists; only the logic layer is missing.
+**REVISION (same day, operator prompted "I can swear we already wrote some of this"): the
+multi-break engine and zone classifier ALREADY EXIST — verified in code.** This shrinks the
+package: BD-3 and most of BD-5 are already implemented and are merely STARVED by the handoff
+domain. The core defect is BD-1/BD-2 alone.
+
+- `surf_1d_analytical.py::_find_break_points()` (~line 484): walks the whole given profile,
+  edge-detects EVERY entry into breaking (H/d ≥ γ transitions), returns ALL break points,
+  outermost first (guards: depth > 0.3 m, Hs > 0.15 m). Multi-break by design.
+- `surf_1d_analytical.py::_classify_zones()` (~line 514): builds the full anatomy — impact zone
+  (outer break → 50% energy decay), foam/bore zone, and an explicit **reform zone when
+  `len(break_points) > 1`** (the double-break case, already coded).
+- **Why none of this shows in the product:** the profile fed to the engine starts at the
+  handoff (1.05 m depth in the 2026-08-01 run) — shoreward of any outer bar — so only the shore
+  break is ever visible to it. Fix the handoff domain (BD-1/BD-2) and the existing engine
+  produces both breaks + reform zone through the existing data contracts.
+- `PartitionBreakResult.break_points` is already `list[BreakPoint]` ("primary = index 0,
+  outermost") end-to-end through the cache codec (`swelltrack_cache.py`) and API — no payload
+  shape change needed for multi-break.
+- BD-4 is a one-comparison change: primary/reported break is currently the OUTERMOST
+  (`break_points[0]` everywhere: face height, invariants, peel); the ruling changes the
+  criterion to the BIGGER (usually the same wave; not always).
+- Per-transect fine profiles (`hs_total_profile`, distances, depths) span the transect at fine
+  resolution — the detection data exists.
 - The cross-section product = `endpoints/beach_profile.py` `"transect": hs_envelope`.
 - The heatmap contract = `per_transect` in `surf_1d_pipeline.PipelineResult` (structure-affected
   included by design).
