@@ -102,6 +102,41 @@ scalar WW3 parameters — and no self-consistency test could ever have found it.
 physics validated. The script measures what it measures. Ask what it *cannot* see, and go look at that
 with something external.
 
+## Marine deploy verification — reality gate and publish-liveness (added 2026-07-31, Phase R)
+
+**Why:** on 2026-07-31 a single deploy stopped the marine model publishing for a full day and
+decoupled its sea state from the ocean — while every gate passed, `/health` said `ok`, and a fired
+viability guard scrolled by unread. The only working QC was the operator manually comparing against
+Surfline. These rules make that check mandatory and mechanical.
+
+1. **The reality gate.** No marine deploy or config push is complete until, within one forecast
+   cycle, the coordinator pastes the model's deep-water values (Hs / Tp / direction at the 15 m
+   reference or the published forecast) beside an external reference (NDBC 46222 observations at
+   the matching hour, or Surfline) — with the comparison quantity and tolerance stated *before*
+   looking at the numbers. Out of tolerance = the deploy FAILED; roll back first, diagnose second.
+   A deploy with no pasted reality comparison is an unverified deploy, whatever its gates said.
+2. **Publish-liveness.** Within one cycle of any marine deploy, the service either publishes or
+   refuses loudly (health ≠ `ok`, reason named, visible on the admin page). Silent `ok` +
+   no-publish = FAILED deploy. "The gate passed" does not answer "did it publish."
+3. **Every phase gate carries one end-to-end row** — a full nest run → valid_fraction → publish →
+   reality comparison — however component-scoped the phase. Gate G2 (L1-only) and Gate G3
+   (sizing-only) both passed while the system was breaking; a component gate with no system row
+   is how four regressions stack before the first end-to-end measurement.
+
+## Evidence hygiene (added 2026-07-31, Phase R)
+
+- **Numbers carry their command.** Any quantitative claim entering a gate record, a concerns entry,
+  or an operator report cites the command and artifact that produced it. A number without
+  provenance is a claim, not evidence — TC-21's "grid is 35% dry land" steered a full day of
+  operator decisions and was false; the artifact that would have disproven it existed the whole time.
+- **"Behavior unchanged" is verified on production-shaped data, never only the fixture.** A
+  commit claiming "matches the old value to 0.0000°" against a 2-point fixture was wrong in
+  production. Equivalence claims get checked against the real config/geometry, or they are not made.
+- **Stale tests.** A task that changes behavior updates or deletes the tests pinning the old
+  behavior IN THE SAME COMMIT. A failing test that pins superseded behavior is a finding — STOP
+  and surface it; never alter code to satisfy it. A test pinning dead design is a standing
+  instruction to the next agent to revert the system, which is how "finished" capabilities vanish.
+
 ## Audit rules
 
 **Two audit modes, both required for non-trivial work.** Runtime tests against real backends + source-only review against ADRs/rules. Neither alone is sufficient. Order: dev produces → tests run on weather-dev → auditor reviews diff → lead synthesizes.

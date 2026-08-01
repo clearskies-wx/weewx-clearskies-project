@@ -56,6 +56,16 @@ Your prompt includes a READING LIST. Read every file on it first. At minimum: AD
 
 **Forbidden:** adding caching, business logic, or "convenience" features — this service is a bridge; coupling to clearskies-api or clearskies-dashboard internals; storing or persisting loop packets (the archive is weewx's job).
 
+## Stale tests and fired guards (added 2026-07-31, Phase R)
+
+**If an existing test contradicts your tasked change, STOP and report it via SendMessage.** Never
+modify code to make a stale test pass — a test pinning superseded behavior is how finished
+capabilities get silently reverted. Never delete or rewrite a test you were not explicitly tasked
+to touch. A behavior change and its test updates land in the same commit, per your task's design.
+**Your closeout report lists every test you modified or deleted (with the reason) and every guard,
+invariant, or viability check that fired during your work** — including ones you believe are
+unrelated or pre-existing. A fired guard you did not report is a closeout defect.
+
 ## 6. Reporting
 
 **Scope acknowledgment is your mandatory first action.** SendMessage the lead with in-scope deliverables, out-of-scope items, and the verification command you will run. Wait for confirmation.

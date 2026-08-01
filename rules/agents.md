@@ -104,6 +104,21 @@ This block is mandatory in every implementation agent prompt. Not optional, not 
 
 **Lead-direct for small fixes.** When auditor findings or test bugs are mechanical and small (<=50 lines, <=3 files, no judgment calls), the lead fixes directly. Spawning costs 30-60 min; lead-direct is minutes.
 
+## Stale-test block — mandatory agent prompt section (added 2026-07-31, Phase R)
+
+**Every implementation agent prompt must contain this block verbatim.** Same standing as the
+git-restrictions and architectural blocks. Why: a test that pins superseded behavior is a standing
+instruction to "fix" code back to the old design — the likeliest mechanism behind capabilities
+silently reverting across the 2026-07 plans.
+
+> **Stale tests — STOP, do not obey them.** If an existing test contradicts your tasked change,
+> STOP and report it via SendMessage — do not modify code to make it pass, and do not delete it
+> on your own authority. A behavior change and its test updates land in the same commit, per your
+> task's design; a test you were not told to touch that fails against your change is a finding.
+> Your closeout report must list every test you modified or deleted, with the reason, and every
+> guard, invariant, or viability check that fired during your work — including ones you believe
+> are unrelated or pre-existing.
+
 ## Architectural change block — mandatory agent prompt section
 
 **Every implementation agent prompt must contain this block verbatim.** Not optional, not "when relevant." Same standing as the git-restrictions block. See the HARD BLOCK in `CLAUDE.md` and in the user's global rules for the full rule and its history.

@@ -2036,7 +2036,14 @@ incl. per-transect routing once R7.3 lands; the 1.78 m floor semantics; the serv
 loud-refusal behavior (R4). **Accept:** an agent reading only the manuals reproduces the
 operator's architecture — no manual statement contradicts a ruling.
 
-### R11 — QC hardening: rule edits (land BEFORE dispatching any Phase-R agent)  ⬜
+### R11 — QC hardening: rule edits (land BEFORE dispatching any Phase-R agent)  ✅ **DONE 2026-07-31**
+
+> Landed with operator approval (chat, 2026-07-31): `rules/verification.md` gained "Marine deploy
+> verification — reality gate and publish-liveness" + "Evidence hygiene"; `rules/coordinator.md`
+> gained §7 "Deploy discipline"; `rules/agents.md` gained the "Stale-test block — mandatory agent
+> prompt section"; all six `.claude/agents/clearskies-*.md` profiles gained "Stale tests and fired
+> guards". The continuous reality invariant + `last_publish_age_s` health field + reality-check
+> script fold into R4/R6 dispatch. The draft wording below is retained as the design record.
 **Owner:** coordinator; operator approves final wording. Draft content:
 1. **`rules/verification.md` — Reality gate on every marine deploy:** within one forecast cycle
    of ANY marine deploy/config push, paste published (or DWR) Hs/Tp/dir beside NDBC 46222 (or

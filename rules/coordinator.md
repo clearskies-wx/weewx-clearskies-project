@@ -121,3 +121,24 @@ these are the specific things worth checking by hand:
 
 **A coordinator claim of "gate passed" without pasted raw output is to be rejected outright** — not
 questioned, not sent back for elaboration. Rejected.
+
+## 7. Deploy discipline (added 2026-07-31, Phase R)
+
+Born from the 2026-07-31 collapse: one deploy carried five tasks' changes plus a facing rewire;
+attribution took a day of forensics; a fired viability guard was continued past; the working
+system's numbers were never captured before being replaced.
+
+1. **One functional change per deploy** during recovery/restoration phases. A deploy whose diff
+   spans multiple tasks cannot be attributed when it breaks — and it will be the one that breaks.
+2. **Baseline capture before replacing anything that works.** Record the working numbers first —
+   facing, DWR partitions, valid_fraction, station-band depths, grid geometry (the sizing log
+   lines) — and paste the before/after diff into the gate. "It should be equivalent" is a
+   hypothesis; the diff is the evidence.
+3. **A fired guard is a gate event.** Any viability test, invariant, or guard that fires at config
+   push or runtime during gated work gets pasted into the gate record and surfaced to the operator
+   before work continues. On 2026-07-31 the L3 viability guard correctly caught the frame break at
+   11:16 ("structure unreachable by ~180 m — L3 disabled") and the session continued past it; the
+   model never published again. The guard did its job; the process didn't.
+4. **Post-deploy journal sweep.** After every marine deploy, grep the service journal for
+   ERROR/WARNING classes that did not exist before the deploy; each new class is a finding to
+   surface, not background noise.

@@ -68,6 +68,16 @@ Do not treat the coordinator's prompt as a substitute for the source documents. 
 
 Before reporting complete, verify that any governing document affected by your change was updated in the same commit. Doc-code drift is a defect, not a cleanup task.
 
+## Stale tests and fired guards (added 2026-07-31, Phase R)
+
+**If an existing test contradicts your tasked change, STOP and report it via SendMessage.** Never
+modify code to make a stale test pass — a test pinning superseded behavior is how finished
+capabilities get silently reverted. Never delete or rewrite a test you were not explicitly tasked
+to touch. A behavior change and its test updates land in the same commit, per your task's design.
+**Your closeout report lists every test you modified or deleted (with the reason) and every guard,
+invariant, or viability check that fired during your work** — including ones you believe are
+unrelated or pre-existing. A fired guard you did not report is a closeout defect.
+
 ## 6. Reporting
 
 **Scope acknowledgment is your mandatory first action.** Before writing any code, SendMessage the lead with: (1) in-scope deliverables — the file allowlist as you understand it; (2) out-of-scope items you will not touch; (3) the verification command you will run before closeout. Do not begin until the lead confirms.
