@@ -2138,7 +2138,9 @@ within 20% of the boundary file's swell Hs. **Must not touch:** anything beyond 
 >
 > **Remaining R2 sub-items NOT done this session (still tracked above, do not lose):** durable cache-coverage GUARD/invariant (wet-boundary check, item ★ MISSING GUARD — code for the coverage gate landed but the loud wet-boundary invariant did not); south `[len]` clamp; single-VARIABLE-point revisit; OBSTACLE double-counting split (pending operator nod); surfbeat maxerr; regression-diff commit hunt; whitecapping/breaking isolation re-run. These are correctness/hardening items, not publish blockers.
 
-### R3 — L3-strip viability + frame integrity under AD-1R facing  ⏳ **MECHANISM PINNED 2026-08-01 (coordinator, measured) — FIX AWAITS OPERATOR SIGN-OFF (trigger-3/architectural)**
+### R3 — L3-strip viability + frame integrity under AD-1R facing  ⏳ **PUBLISH UNBLOCKED via R7 2026-08-01; residual = L4-grid↔transect co-registration (trigger-3, operator decision)**
+
+> **R3 UPDATE 2026-08-01:** the publish-blocking symptom (L4 gate abort) is FIXED by R7 (see R7 result — model publishes + reality-gate PASS). The remaining R3 substance is the FRAME root cause: the pier-OMBB L4 grid (alpc 47.32°) does not co-register with the cross-shore transects — 0/32 transects get ≥3 band points inside it (they clip its deep corner). L4 therefore supplies no handoff and HB models as open-beach L2. Fixing this is a grid-orientation/placement change (`swan_domain.compute_structure_grid_domain` OMBB axis vs transect bearings) — trigger-3, operator decision, not required for correct publishing. R3 diagnosis block below retained.
 
 > **R3 DIAGNOSIS — 2026-08-01 (coordinator, hard measurement on the preserved failing L4 workdir `/tmp/r3-evidence` on librewxr; code `51543b1`, 217° facing).** This is why the model does not publish (R2 DEPLOY+VERIFY block).
 > - **`valid_fraction` (L4, nonstationary) = fraction of forecast TIMESTEPS where ≥50% of the per-transect handoff POINTS have a valid Hs** (`swan_runner.py:5776-5784`). Measured L4 = **5.2%**.
@@ -2179,7 +2181,17 @@ cycle that runs on cached boundary data logs it and reflects it in B3 `inputs.ww
 (age + `available`). **Accept:** a blocked NOMADS never produces a hot loop; staleness visible
 in `/health` without reading the journal.
 
-### R7 — Handoff containment trio (ARCHITECTURAL — designs for operator sign-off, then build)  ⬜
+### R7 — Handoff containment trio (ARCHITECTURAL — designs for operator sign-off, then build)  ✅ **BUILT + DEPLOYED + PUBLISH RESTORED + REALITY-GATE VERIFIED 2026-08-01 (operator chat go)**
+
+> **R7 RESULT — 2026-08-01 (coordinator; operator approved build in chat "fix the handoffs").** Commit `2087fc1` (marine, pushed + deployed to librewxr, running 11:42:52 UTC). clearskies-api-dev implemented per coordinator design (scratchpad R3-R7-design.md); coordinator QC'd (diff = swan_runner.py + tests/test_swan_l4_intersection.py only; independent pytest 93 passed; spot-checked prune + gate filter).
+> - **R7.1** — `_transect_band_depths` shallow floor 0.1 m → `l3_shoreward_edge_depth_m()` (≈1.78 m). No station placed in the surf zone.
+> - **R7.3** — per-transect L4-intersection test (`_point_in_rotated_rect` + `_l4_cgrid_geometry_utm` + `_l4_point_is_wet`): each transect's band pruned to inside-rotated-CGRID + wet points; ≥3 survivors → L4, else → L2 (via the pre-existing, unmodified `resolve_handoff_by_transect` fallback).
+> - **R7.2** — `_check_convergence` Check 3 scoped to `TABLE_PT_*` for `level4_*` (excludes the diagnostic CURVE table, which was being counted); 0 TABLE_PT → no-op PASS, not FAIL.
+> - **★ THE PUBLISH FIX (measured, live nest, commit 2087fc1, HRRR 06Z):** `SWAN convergence OK level=level4_0: accuracy=99.5%, valid_fraction=0.0%` (no-op pass) → **`forecast cache persisted to disk (1 spots, 3.2 MB)` — MODEL PUBLISHES** (was `RuntimeError: nothing published this cycle`). Served surf endpoint returns HTTP 200 with real swell.
+> - **★ REALITY GATE — PASS (vs NDBC 46222 San Pedro, obs 2026-08-01 11:56 UTC):** buoy total WVHT **0.8 m**, swell **0.3 m @ 13.3 s @ S**. Model 12:00Z DWR: total **0.79 m**; multiSwell = 0.55 m @ 10.4 s @ 192° + **0.47 m @ 13.5 s @ 198° (groundswell)** + 0.31 m @ 4.1 s @ 265°. Total Hs match within 1%; the long-period groundswell matches the buoy in period (13.5 vs 13.3 s) and direction (198° vs S) — inside the pre-declared ±30%/±2 s/±30° tolerances. Swell restoration validated against an independent buoy.
+> - **RESIDUAL (NOT a routing/gate defect — the R3 geometry root cause):** L4 provides a handoff for **0 of 32 transects** — 15 transects graze the L4 CGRID with only 1–2 points each (max 2; ≥3 needed for an interior station), because the pier-OMBB-rotated L4 grid (alpc 47.32°) and the cross-shore transect bearings are geometrically mismatched: transects clip the grid's deep (~11 m) corner rather than running through it. So HB currently models as open-beach L2 — the pier's refraction/sheltering is not captured. This is R3 frame/geometry (L4 grid ORIENTATION/PLACEMENT vs transect bearings — trigger-3), separate from R7's routing+gate, and NOT required for correct publishing (HB matches the buoy today). Fixing it = align the L4 OMBB axis / grid placement with the transects, or densify the band — a geometry change for operator decision. Tracked as R3-residual.
+> - health=`failed` after the restart is R4 restart-lag (serves real cached data but the service hasn't run its OWN cycle; self-resolves next cycle) — separate task R4.
+
 Per the operator architecture ruling recorded in TC-23 (2026-07-31). Three coordinated designs,
 each a separate sign-off item, none pre-approved by this plan:
 1. **Hs floor in station placement:** apply `_MIN_DESIGN_HS_M` to `_transect_band_depths()` so
