@@ -825,7 +825,17 @@ settle the clock question**, no code action either way yet); C-E12 partially res
 check, parked); D7 parked-to-cutover (confirmed no length/quality gate at the store site —
 policy question intact for Phase 5).
 
-### V3-F4-IMPL — /surf breakPoints re-sourced to the 1D pipeline  ⬜ *(OPERATOR-APPROVED 2026-08-02)*
+### V3-F4-IMPL — /surf breakPoints re-sourced to the 1D pipeline  ✅ **CLOSED 2026-08-02 — deployed + live-verified**
+**Round record:** marine `f925d77` (surf.py sourcing block + `_break_points_for_representative_transect()`
+helper, strict index match, all-partitions seaward-first, wire shape {distance, depth, hs}
+unchanged; 10 KATs incl. end-to-end cache-hit path + mutation check) + meta `2a284ec`
+(API-MANUAL rewrite + pre-existing waveHeight→hs doc error fixed). AUDIT PASS-WITH-FINDINGS:
+0 functional defects; /profile point-set agreement proven by shared-fixture SET equality
+(the operator's intent, by construction); 2 LOW doc notes (null-semantics third-disjunct
+precision — fold into next doc pass; commit-msg §-slip). Lead gate: independent 28/28.
+DEPLOYED 20:17:00Z, reality gate: **55/55 live entries serve pipeline break points** (was
+null 36/36 forever; rep idx 35, e.g. {9.84 m, 0.78 m depth, 0.57 m Hs} + inner break
+{1.25 m, 0.44 m, 0.32 m} — outer+inner bars now visible on the wire).
 **Owner:** `clearskies-api-dev` (Sonnet). **QC:** auditor before lead gate.
 Per the operator ruling in §V3-F2/F4/F7: `forecast[].breakPoints` populates from the
 SwellTrack 1D pipeline's REPRESENTATIVE transect break points (the same transect /profile
