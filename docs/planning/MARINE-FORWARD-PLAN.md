@@ -320,6 +320,19 @@ is the H3-class doc-truth fix that misled this very plan).
 **Accept:** both products render current live data end-to-end after H4; double-break fixture
 shows two break markers in both views; manual corrected.
 
+### D8 — Peel-direction chevron re-wire *(NEW 2026-08-02, found by D4.1's contract audit)*  ⬜
+**Owner:** `clearskies-dashboard-dev` (Sonnet). **QC:** auditor at Gate D.
+**Defect:** `SurfingTab.tsx:2240/2243` renders the left/right peel chevron via
+`peelClassification.includes('right'/'left')` — but the served values are PLAIN
+(`closeout|fast|good|mellow`, confirmed live + API-MANUAL:2526), so the condition is always
+false and the chevron never renders (silent dead code). The live payload carries a separate
+`peelDirection` field (e.g. `a_frame`) that was absent from types.ts/openapi entirely.
+**Sequencing:** D4 Stage 2 lands the CONTRACT half (adds `peelDirection` to types.ts+openapi,
+corrects the stale `peelClassification` doc comment). This task is the RENDER half only:
+re-wire the chevron to consume `peelDirection`, with a per-value rendering decision table
+(incl. `a_frame`) written by the lead at dispatch. **MUST NOT TOUCH:** anything beyond the
+chevron block + its test. Blocked on D4 Stage 2 landing.
+
 ### ⛔ QC GATE D — assigned: `clearskies-auditor`
 | # | Element | Evidence |
 |---|---|---|
