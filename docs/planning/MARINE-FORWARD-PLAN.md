@@ -944,13 +944,23 @@ scalar correction it never had (shared helper). Audit PASS (4 mutations caught i
 module-global-coupling probe; fallback path proven byte-identical vs pre-change worktree).
 LIVE: beach_profile request now logs `beach_facing=216.4°/29/114` (was 240.0°/25/118 on
 every request). 12 KATs + 119-test regression subset green.
-**C7a ⛔ BLOCKED ON OPERATOR (network infrastructure):** setting `CLEARSKIES_MARINE_API_URL`
-is pointless today — librewxr CANNOT reach weewx:8765 at all (IPv6 ULA and IPv4
-192.168.2.121 both time out; inter-VLAN 192.168.7.x→192.168.2.x:8765 firewall-blocked —
-which is WHY the var was never set). Operator decision: add a MikroTik allow rule
-(librewxr→weewx:8765) and then set the var (base URL, no auth needed for the two calls), or
-accept that fishing-solunar/station-wind remain 502/fallback on this topology. CONFIG.md
-already corrected either way.
+**C7a — UNBLOCKED 2026-08-02, ready to dispatch (queued behind V3-F4-IMPL, same repo):**
+(1) **Firewall FIXED by operator** (librewxr 192.168.7.22 added to `weather-api-src`
+addr-list 12:23; rule 58 `weather-api-src`→`weather-api-dst`:8765 covers it). Lead
+verified: TCP connect 2 ms; API answers HTTPS with problem+json; correct base path is
+`/api/v1` (`/api/v1/current` → 200).
+(2) **Remaining blocker found: TLS.** API cert is self-signed `CN=clearskies-api`, NO
+SANs → httpx default verification fails for any hostname. Deployed precedent for exactly
+this: api.conf `marine_verify_tls = false` (API→marine direction, §19.2 secure-default
+pattern).
+(3) **✅ OPERATOR APPROVED 2026-08-02 (chat: "a"): mirror the pattern.** Scoped round:
+new env key `CLEARSKIES_MARINE_API_VERIFY_TLS` (default `"true"` = secure; `"false"`
+honored) wired into BOTH API-talking call sites (`services/api_client.py:get_json` and
+`config/__init__.py:fetch_config_from_api`), KAT-pinned both values + default; then lead
+deploy-time: set `CLEARSKIES_MARINE_API_URL=https://192.168.2.121:8765/api/v1` +
+`CLEARSKIES_MARINE_API_VERIFY_TLS=false` in `/etc/weewx-clearskies/marine/network.env`,
+restart (cycle-window discipline), verify solunar/station-wind 502s cease. CONFIG.md +
+OPERATIONS-MANUAL document the new key same round.
 
 ### ⛔ QC GATE C — assigned: `clearskies-auditor`
 C1's report spot-audited (pick 3 CLOSED rows, independently re-verify); C2/C3 rounds get the
