@@ -378,14 +378,34 @@ height, `:2350+` per-partition break rows) — three features that silently neve
 same failure class as D8's chevron. Origin claims in types.ts: T7.2b/T7.3 era. The marine
 service DOES serve a documented `perPartitionBreaks` (types.ts:1880's own comment calls it
 "related but separate").
-**D10.1 (read-only):** API-repo + marine-repo git history — did the pre-separation surf
-implementation ever emit these three? If yes, cite the commit where each stopped (separation
-casualty = lost capability); if no, they were never-implemented dashboard speculation.
-**D10.2 (OPERATOR DECISION):** per field — restore server-side (marine round) OR remove the
-dashboard render code + types + openapi entries (dashboard round). The D4 openapi catch-up
-entries for these 3 stay AS-IS (honest mirrors, descriptions already note their origin)
-until this decision.
+**D10.1 ✅ DONE 2026-08-02 (Explore agent, full-graph `git grep` across every ref of both
+server repos):** NONE of the three was EVER server-side — but they are NOT dead speculation.
+`docs/archive/SURF-1D-IMPLEMENTATION-PLAN.md:1443` records all of them (T7 closeout) as an
+explicit "Deferred / awaiting API" list of 8 SurfForecast fields, of which the API
+subsequently implemented SIX (API `eef56fd` T4.4 → marine `fa1c482` T5.9, live today).
+These are the unfinished stragglers of a documented catch-up — same symptom class as D8's
+chevron, OPPOSITE disposition evidence. Per-field: `partitionBreakInfo` = dashboard `c021bc3`
+(T5.4, mis-targeted at T5.2 which put the data on beach-profile as `perPartitionBreaks` —
+types.ts:1880's "related but separate" documents an accident, and openapi:3664's "populated
+by surf.py" is false); `shadowFaceHeight` = `292216e` T7.3 (aggregate over
+`is_structure_affected` transects — data at surf.py:1197 call site today);
+`waveShapeClassification` = `292216e` T7.2b (peel+Iribarren live on PipelineResult, but
+Stokes/cnoidal `WaveShape.regime` is NOT — real plumbing + the 4-way cut points were never
+implemented anywhere).
+**D10.2 (OPERATOR DECISION — three rulings needed, investigator recommends RESTORE for all):**
+1. `partitionBreakInfo`: restore by emitting the EXISTING `perPartitionBreaks` shape on
+   SurfForecast and re-pointing the dashboard type at it (kills the duplicate schema —
+   investigator-preferred), or build the dashboard's bespoke shape? (Data-contract choice.)
+2. `shadowFaceHeight`: is a non-headline shadow AGGREGATE a legitimate consumer of
+   `is_structure_affected` under BD-8's metadata-only demotion? (Investigator: yes — BD-8
+   removed headline aggregation roles; this is a secondary readout.)
+3. `waveShapeClassification`: authorize as a REAL scoped round (regime threading + coding the
+   4-way classification cut points from SURF-1D-IMPLEMENTATION-PLAN.md:1227-1234 — those
+   thresholds are new formula criteria, trigger 1, and need explicit approval), or defer/pin?
 **MUST NOT TOUCH until ruled:** the three render blocks, the type/openapi entries.
+**Doc fixes queued for the D10 round (from investigation):** openapi:3664 false claim,
+openapi:3295 wrong date, this section's original T7.2b/T7.3-only origin attribution
+(partitionBreakInfo is T5.4).
 
 ### D11 — Test-order pollution: tide-level tests leak state into health tests *(NEW 2026-08-02, found during H4, confirmed pre-existing via git-stash baseline)*  ⬜
 **Owner:** `clearskies-test-author` (Sonnet). **QC:** auditor at Gate D.
