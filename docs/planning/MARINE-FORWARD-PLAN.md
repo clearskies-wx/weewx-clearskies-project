@@ -60,7 +60,25 @@ closes before its next task round dispatches.
 
 ## PHASE H — Operational hardening
 
-### H1 — No-publish paths must be loud and truthful *(was Restoration R4; Gate R row 5)*  ⬜
+### H1 — No-publish paths must be loud and truthful *(was Restoration R4; Gate R row 5)*  🔶 CODE-COMPLETE + AUDITED (2026-08-02) — live check pending deploy
+**Round record (2026-08-02):** marine `c768b18` + remediation `2491ada`; meta doc-sync
+`d98c091` + `4e2acc2` (API-MANUAL §19.7). Adversarial audit round 1 FAIL (BLOCKER: GFS-wind
+inline-refetch path uninstrumented, production-reachable; MAJOR: HRRR companion) → remediated →
+re-audit PASS (4/4 mutations caught, full-function re-sweep: **13 instrumented no-publish
+exits, no 14th**). Amendments to the spec as written, all lead-ruled + operator-visible:
+(1) Files list gained `services/grid_sizing_chain.py` (narrow: detect + record only) because
+the plan's own H1.3 "viability failure at config push" category lives there, and
+`state.py` (the actual health store — `service.py` holds no state); (2) H1.4 satisfied by
+H1.3 with ZERO stack-repo changes — the admin template already generically renders `/health`
+`reasons[]` (trace: marine `/health` → API `setup.py:3082` pass-through → stack
+`status.html`/`routes.py:3679`); (3) final slug list (13 sites, 11 slugs):
+`no_grid_sizing_cache`, `hrrr_wind_failed`, `gfs_wind_failed`, `ww3_boundary_failed`,
+`tide_fetch_failed`, `currents_fetch_failed`(×2), `bathymetry_failed`, `wave_setup_failed`,
+`swan_fatal`(×2), `convergence_gate_failed`, `no_usable_handoff_timesteps`, plus per-cluster
+`l3_viability_failed` in its own per-config-push registry (NOT cleared by cycle success —
+clearing it on success would re-hide the R-DIAGNOSIS 11:16 shape); (4) spot_cfg-None per-spot
+skip = WARNING only (config defect, not a runtime no-publish). Remaining for Accept: deploy +
+forced-degraded live check + normal-cycle recovery (Gate H row 2).
 **Owner:** `clearskies-api-dev` (Sonnet). **QC:** `clearskies-auditor` at Gate H.
 **Origin/context:** archived restoration plan §R4; the 2026-07-31 11:51 abort (gate PASSED, zero
 published entries, no ERROR naming why) is the motivating incident — its diagnosis is in the
@@ -472,6 +490,19 @@ standard adversarial pass (falsifiable KATs, allowlist diff, baseline diff).
 | **Marine service separation** | Unified service live on librewxr:8780 (ADR-099, `deploy-marine.sh`); plan archived 2026-08-02 as overtaken |
 
 ## Decision log
+
+- **2026-08-02 (execution, round H1+D2) — D2 closed; H1 code-complete + audited.** D2: marine
+  `e8646d2`, fixture-only (one kwarg), serve-nothing suite 2F/7P → 9/9, lead-verified
+  independently; Gate-D row-1 evidence banked. H1: Sonnet implementer (scope-ack with full
+  no-publish enumeration first) → adversarial audit FAIL (found the uninstrumented
+  production-reachable GFS-wind refetch abort — the exact silent-abort class H1 targets) →
+  remediation `2491ada` → re-audit PASS with a 13-exit full-function re-sweep. Lead rulings
+  during the round are recorded in §H1's round record: grid_sizing_chain.py allowlist
+  extension (plan-internal contradiction resolved in favor of H1.3's own spec + KAT (b)),
+  H1.4 satisfied-by-H1.3 (admin template renders reasons[] generically), health precedence =
+  floor-at-degraded/never-downgrade-failed, two separately-cleared registries. The 02:30Z
+  routine cycle (pre-deploy baseline) was clean: main_zone on all timesteps, headline ≤
+  best_peak, zero bulk-fallbacks, zero ERRORs.
 
 - **2026-08-02 — Plan created.** Operator approved the three-plan triage in chat: working-model
   archived (fully superseded); restoration status-corrected (Phase F/R5 markers were stale) and
