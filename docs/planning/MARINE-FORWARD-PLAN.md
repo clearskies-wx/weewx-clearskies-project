@@ -60,7 +60,21 @@ closes before its next task round dispatches.
 
 ## PHASE H — Operational hardening
 
-### H1 — No-publish paths must be loud and truthful *(was Restoration R4; Gate R row 5)*  🔶 CODE-COMPLETE + AUDITED (2026-08-02) — live check pending deploy
+### H1 — No-publish paths must be loud and truthful *(was Restoration R4; Gate R row 5)*  ✅ DONE 2026-08-02 — deployed + forced-degraded drill PASSED (second attempt, after the drill itself found and fixed a defect)
+**Live acceptance record (2026-08-02):** Drill #1 (grid-sizing-cache rename + restart,
+06:01Z): abort fired correctly (prefixed ERROR, last-good preserved) BUT the no-publish
+reason was INVISIBLE in `/health` `reasons[]` — the H1.3 append sat after the failed
+early-return, hiding the reason in exactly the fetch-failure shapes that matter. Fixed
+lead-direct (marine `3d42088`: reasons collected before the early-return, `h1_reason_count`
+guard preserves precedence; KAT extended with failed-with-reason visibility + the drill's
+fetch-failure shape; falsifiability proven vs pre-fix code). Deployed alone (proc 06:51:43Z).
+Drill #2 (06:52Z): `/health` = `failed` with `"no-publish: no_grid_sizing_cache …"` FIRST in
+reasons; exactly 1 prefixed ERROR in journal; cache restored; recovery via retry-same-cycle.
+ERROR-multiplicity ruling: one PREFIXED machine-readable ERROR per path (holds); pre-existing
+callee-detail/runner-level ERROR classes kept (H1 not chartered to silence them). H1.4 admin
+row: code-trace + live `/health` string verified; authenticated admin-page render = one-glance
+operator check (page is login-gated; template renders `reasons[]` generically per the F2
+trace). Gate H rows 1-3 evidence banked (audit + drill).
 **Round record (2026-08-02):** marine `c768b18` + remediation `2491ada`; meta doc-sync
 `d98c091` + `4e2acc2` (API-MANUAL §19.7). Adversarial audit round 1 FAIL (BLOCKER: GFS-wind
 inline-refetch path uninstrumented, production-reachable; MAJOR: HRRR companion) → remediated →
@@ -115,7 +129,14 @@ against the inverse regression).
 **Accept:** all three KATs; live check = one forced degraded cycle on librewxr shows
 health != ok + admin row + single ERROR, then a normal cycle returns to `ok`.
 
-### H2 — Upstream fetch hygiene: WW3/NOMADS (+ same-class audit) *(was Restoration R6)*  🔶 CODE-COMPLETE + AUDITED (2026-08-02) — live check (≥2 cycles) pending deploy
+### H2 — Upstream fetch hygiene: WW3/NOMADS (+ same-class audit) *(was Restoration R6)*  ✅ DONE 2026-08-02 — deployed + BOTH live cycles verified (incl. a natural NOMADS storm)
+**Live acceptance record (2026-08-02):** Cycle #1 (04:05Z, deployed `498b6a8`, natural 00z
+not-yet-published storm): exactly 12 attempts across 4 stations (3/station cap HELD), ONE
+aggregated WARNING verbatim ("WW3 20260802 00z ocean spectra unavailable after 12 attempt(s)
+across 4 station(s); proceeding on 20260801 18z"), cycle completed on the 18z fallback
+04:48Z. Cycle #2 (06:06→06:50Z, healthy path): zero 4xx, zero WARNING, zero extra calls.
+`/health` `inputs.ww3_boundary.age_s` visible live (2649 s post-cycle). No hot loop in
+either cycle. Gate H rows 4-5 evidence = audit (mutations+storm probe) + these two cycles.
 **Round record (2026-08-02):** marine `498b6a8` (2 files: `services/ww3_station_selection.py`
 + new `tests/services/test_ww3_fetch_backoff.py`, 14 KATs). Adversarial audit PASS first pass
 (3/3 mutations caught incl. retry-count pinning by 3 independent assertions; auditor wrote its
