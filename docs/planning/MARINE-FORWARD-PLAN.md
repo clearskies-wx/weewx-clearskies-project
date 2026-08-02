@@ -333,6 +333,18 @@ re-wire the chevron to consume `peelDirection`, with a per-value rendering decis
 (incl. `a_frame`) written by the lead at dispatch. **MUST NOT TOUCH:** anything beyond the
 chevron block + its test. Blocked on D4 Stage 2 landing.
 
+### D9 — SurfingTab definition-list a11y structure fix *(NEW 2026-08-02, found by D4's first-ever axe scan of this markup)*  ⬜
+**Owner:** `clearskies-dashboard-dev` (Sonnet). **QC:** auditor at Gate D (axe re-scan row).
+**Defect (pre-existing, WCAG 1.3.1 serious ×2):** SurfingTab.tsx "T6.1: 3 stats" block
+(`<dl class="grid grid-cols-3 ...">`, ~:2229) nests each `<dt>`/`<dd>` two `<div>` levels deep
+— axe: `definition-list` + `dlitem` violations. Never caught before because no tab-level test
+file existed until D4 created SurfingTab.test.tsx. The sibling flex-row pattern elsewhere in
+the file (4 other sites) is NOT in a `<dl>` and is not affected. **Fix:** restructure this ONE
+block so dt/dd associate correctly (direct children, or `<div role="presentation">`-free
+grouping per axe's allowed content model) with zero visual regression (grid classes preserved).
+**MUST NOT TOUCH:** anything beyond this block + its test. **Accept:** axe scan of SurfingTab
+render = 0 violations; visual snapshot/build unchanged; targeted vitest green.
+
 ### ⛔ QC GATE D — assigned: `clearskies-auditor`
 | # | Element | Evidence |
 |---|---|---|
