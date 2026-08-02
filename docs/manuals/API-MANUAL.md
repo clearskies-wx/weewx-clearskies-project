@@ -3367,8 +3367,12 @@ The marine service exposes a health check endpoint that the API polls every 60 s
 **`status` resolution (precedence: `failed` > `degraded` > `ok`):**
 
 - `failed` — `last_run` is `null` (no cycle has ever completed — nothing has been published), or a required input is unavailable. All four inputs are required (rules/coding.md §1, C-77): a missing/failed fetch aborts the SWAN run rather than substituting a default, so an unavailable required input means nothing was published this cycle.
-- `degraded` — the cycle completed and every input is available, but an input is stale past its own monitoring threshold, or a B2 invariant fired at or after `last_run`.
+- `degraded` — the cycle completed and every input is available, but an input is stale past its own monitoring threshold, or a B2 invariant fired at or after `last_run`, **or a recorded H1 no-publish/L3-viability reason is live (below)**.
 - `ok` — otherwise.
+
+**H1 no-publish reasons (MARINE-FORWARD-PLAN.md task H1, was Restoration R4, 2026-08-02).** `last_run`/`inputs` describe the LAST *successful* cycle — a cycle that fails after that point (convergence gate, a SWAN subprocess crash, a run that exits cleanly with zero usable spots, a config-push L3 viability failure) can leave both looking healthy while the service is silently not publishing (the 2026-07-31 11:51 incident this task is named for: gate PASSED, zero published entries, `/health` stayed `ok`). Two additional reason sources close that gap, both additive to `reasons` and never able to downgrade an already-`failed` status, only to floor an `ok` at `degraded`:
+- A **SWAN-cycle no-publish reason** — `"no-publish: <slug> <detail>"`, one of `no_grid_sizing_cache`, `ww3_boundary_failed`, `tide_fetch_failed`, `currents_fetch_failed`, `bathymetry_failed`, `wave_setup_failed`, `swan_fatal`, `convergence_gate_failed`, `no_usable_handoff_timesteps` — recorded when the current SWAN cycle produces nothing to publish, cleared by the next cycle that actually publishes.
+- A **per-cluster L3 viability failure** — `"l3_viability_failed: <cluster_key> <detail>"` — recorded at config-push time when a cluster's L3 grid was triggered (a structure or operator classification justified it) but failed ADR-093 Amendment 2 §4's viability test (the grid cannot reach the feature it was sized for). Rebuilt fresh at every config push, independent of how many SWAN cycles run in between — L3 viability does not change just because a cycle using the L2 fallback succeeded.
 
 Immediately after a service restart, `/health` reports `failed` until the first cycle completes — this is the honest state, not a regression.
 
