@@ -309,6 +309,23 @@ must not delay the next cycle's start — non-blocking placement is a Stage-2 de
 requirement, not an option). Required KATs stand: byte-identical-cache-key,
 warmed-then-first-request-does-not-refetch, publish-never-blocked-by-warming-failure.
 Stage 2 dispatches to `l4-rewrite` after its C2 round closes.
+
+**Stage 2 ✅ IMPLEMENTED 2026-08-02, marine `53b25d3` (local, deploy pending audit):**
+`bbox_for_location()` shared helper in hrrr.py; surf.py:652-657 refactored onto it
+(byte-identical); `_warm_hrrr_cache_for_locations()` + fire-and-forget daemon thread after
+the full-cycle "complete" log (full-cycle branch only); 8/8 new KATs
+(tests/test_h5_hrrr_publish_warming.py) covering all 3 required classes; 157-test
+regression sweep green; adversarial audit in flight.
+**⛔ NEW OPERATOR ITEM — partial coverage (mandatory verification finding, code-cited):**
+surf.py's HRRR cache key rolls on WALL-CLOCK HOUR boundaries
+(`_compute_hrrr_cycle(datetime.now(UTC))`, hrrr.py:641-666/771/803) — independent of
+publish events. Full-cycle-only warming therefore fixes the post-publish 503 but NOT the
+hour-boundary rollovers between publishes (publish gaps observed 2 min–2h43m): those first
+requests still pay the full ~22-33 s cold fetch. Options for operator: (a) accept as-is
+(reduces, does not eliminate, the 503s); (b) extend warming to every runner wake
+(~5-min loop tick or the stationary-fill branch — a new trigger/cadence, architectural,
+needs approval); (c) something else (e.g. pin the request-path key to the published cycle —
+data-selection change, also architectural). Agent correctly held rather than deciding.
 **MUST NOT TOUCH (carries to Stage 2):** cache file shape, publish decisions, H4's
 chunked encoder.
 
@@ -426,7 +443,18 @@ is the H3-class doc-truth fix that misled this very plan).
 **Accept:** both products render current live data end-to-end after H4; double-break fixture
 shows two break markers in both views; manual corrected.
 
-### D8 — Peel-direction chevron re-wire *(NEW 2026-08-02, found by D4.1's contract audit)*  ⬜
+### D8 — Peel-direction chevron re-wire *(NEW 2026-08-02, found by D4.1's contract audit)*  ✅ **CLOSED 2026-08-02 (combined round with D9)**
+**Round record:** dashboard `d667c7c` (5 files, +214/-34) + meta `9bec177` (API-MANUAL
+peelClassification suffix truth + new peelDirection row). Chevron re-wired to the lead
+decision table (closeout gates OFF first regardless of direction; right→›, left→‹,
+a_frame→‹›, null/unrecognized→none) with sr-only i18n phrases; folded-in one-line
+`_a_frame` fix in the 72h-row abbreviation; types.ts/openapi corrected to as-built
+(13-value classification enum, closed peelDirection enum + nullable). ADVERSARIAL AUDIT
+PASS 0 findings (auditor independently: closeout+right/left constructions, 13-value
+arithmetic vs pipeline source, union-fallout grep [1 consumer], runtime-tolerance mutation,
+dl DOM inspection, Tailwind Preflight margin proof, 3/3 mutations incl. own glyph-swap, 6
+axe scenarios 0 violations). Lead gate: tsc clean, 16/16, build clean, stat matches.
+DEPLOYED weather-dev (bundle index-C5xzLiyY.js, HTTP 200, config service active).
 **Owner:** `clearskies-dashboard-dev` (Sonnet). **QC:** auditor at Gate D.
 **Defect (PREMISE CORRECTED 2026-08-02, lead source-read + live query):** the original
 finding said served `peelClassification` values are plain — that was a sampling artifact
@@ -447,7 +475,11 @@ re-wire the chevron to consume `peelDirection`, with a per-value rendering decis
 (incl. `a_frame`) written by the lead at dispatch. **MUST NOT TOUCH:** anything beyond the
 chevron block + its test. Blocked on D4 Stage 2 landing.
 
-### D9 — SurfingTab definition-list a11y structure fix *(NEW 2026-08-02, found by D4's first-ever axe scan of this markup)*  ⬜
+### D9 — SurfingTab definition-list a11y structure fix *(NEW 2026-08-02, found by D4's first-ever axe scan of this markup)*  ✅ **CLOSED 2026-08-02 — same round/commit as D8 (`d667c7c`)**
+3-stats block restructured to 3 mini-`<dl>`s (outer dl→div grid preserved, icon a sibling,
+each dl = exactly dt+dd). Axe: the 2 known definition-list/dlitem serious violations → 0;
+0 total across 6 scenarios (auditor-verified incl. own missing-data scenario). Visual
+byte-identity proven via Tailwind v4 Preflight universal margin reset. See D8 record.
 **Owner:** `clearskies-dashboard-dev` (Sonnet). **QC:** auditor at Gate D (axe re-scan row).
 **Defect (pre-existing, WCAG 1.3.1 serious ×2):** SurfingTab.tsx "T6.1: 3 stats" block
 (`<dl class="grid grid-cols-3 ...">`, ~:2229) nests each `<dt>`/`<dd>` two `<div>` levels deep
@@ -582,11 +614,41 @@ ARCHITECTURAL — investigation reports, operator decides), and whether publishi
 mid-hole is intended "honest serving" (then manuals + dashboard chart continuity must say
 so: DASHBOARD-MANUAL claims "continuous across day boundaries") or a defect.
 
-### V3-F2/F4/F7 (+F8) — Scoring/legacy-path code-read  ⬜ (read-only investigation, then scoped fixes)
-One Explore round: (F2) trace swellDominance producer — why {0.2,0.6} bins vs documented
-ratio; (F4) trace forecast[].breakPoints producer — prove dead-or-alive, name what killed
-it; (F7) trace organizationWind glassy cap; (F8) identify the 404ing NDBC URL + why.
-Findings → lead dispositions; wire-contract changes (if any) → operator.
+### V3-F2/F4/F7 (+F8) — Scoring/legacy-path code-read  ✅ **INVESTIGATED 2026-08-02 (Explore agent + lead live checks) — dispositions below**
+**F2 (swellDominance): DOC DRIFT ×2, code is deliberate.** `_swell_dominance()`
+(surf_scorer.py:355-374) computes the energy ratio then BUCKETS it: >0.8→1.0, ≥0.5→0.6,
+else→0.2 (0.5 no-data default) — only the bucket is served. And the ratio itself is
+"all partitions with period >10 s / total", NOT "primary/total" as API-MANUAL:2049 claims.
+`organizationSwellDominance = swellDominance × 7.5` (0.25 weight × 30). **Disposition:
+doc-batch corrects manual + API-repo responses.py:1672 comment to as-built. If the
+operator would rather serve the true ratio, that's a formula change — say so in chat.**
+**F4 (breakPoints): ALIVE-BUT-STARVED + doc drift; reconciliation = OPERATOR.** The QB
+peak-picker (surf_pipeline_timestep.py:149-169, threshold 0.25) runs on SWAN CURVE points
+— but the SWAN domain's shoreward edge is ~1.78 m (design contour; HB CURVE spans
+3.40–15.8 m), so at today's Hs≈0.35-0.7 m QB≈0 everywhere seaward of the real break →
+permanently null except big-swell days. No commit killed it (unchanged since `fa1c482`).
+/profile's breakPoints = DIFFERENT producer (SwellTrack 1D pipeline, continues to shore,
+richer schema) — same field name, two unrelated producers. **Disposition: doc-batch fixes
+the manual's null-cause list (add "SWAN domain terminates seaward of the small-swell break
+line"); whether /surf should serve the pipeline's break points instead (contract change,
+trigger 4) is an OPERATOR decision — flagged.**
+**F7 (organizationWind): DOC DRIFT, code deliberate.** Glassy wind score = 1.1
+(surf_scorer.py:212, ×15 = 16.5); offshore-light = 1.2 (max 18.0). Scorer docstring
+anticipates >nominal-max multipliers. ADR-096's "15% effective" table and API-MANUAL:2073
+"0–~15" are wrong as written; true range 0–18. **Disposition: doc-batch.** CAVEAT
+(recorded): waveOrganization rounds to 0 dp while sub-factors round to 1 dp independently
+— the additive identity is not guaranteed by construction (can drift ~0.2-0.3); held 36/36
+today by luck. Track as a NOTE, not a defect, unless the operator wants construction-true.
+**F8 (NDBC 404s): ROOT CAUSE CONFIRMED BY LEAD LIVE PROBE — case-sensitivity.** The
+huntington-harbor location's `ndbc_station_ids` is stored lowercase `['prjc1']`; NDBC's
+file server is case-sensitive: `realtime2/prjc1.txt` → 404, `PRJC1.txt` → 200 (probed
+2026-08-02). Compounded by a code defect: `fetch()`'s 404 propagates BEFORE any cache
+write (ndbc.py:959-983) → no negative caching → every ~5-min dashboard poll re-404s.
+**Disposition: (i) config fix — uppercase the station ID (operator or wizard re-push;
+also check whether wizard DISCOVERY stored it lowercase — if so that's a wizard bug to
+fix); (ii) proposed small code hardening — normalize station IDs to uppercase at config
+parse (matches NDBC's documented ID format) ± negative-cache the 404; BOTH are behavior
+changes on a provider → operator nod requested.**
 
 ### V3-doc-batch — API-MANUAL corrections from V3  ⬜ (doc-sync round)
 waterTemp (document field + dual-provenance note), peelDirection in §18 per-entry table
@@ -662,15 +724,64 @@ name both call sites (or the shared component both render).
 
 ## PHASE C — Carry-forwards (small; mostly verify-then-close)
 
-### C1 — Concerns sweep  ⬜
+### C1 — Concerns sweep  ✅ **EVIDENCE + DISPOSITIONS 2026-08-02 (Explore sweep `c1-concerns-sweep`, coordinator dispositions below; OPERATOR rows await chat)**
 **Owner:** `Explore`-type read-only agent produces the evidence; coordinator writes dispositions;
-operator rules the OPERATOR-DECISION rows. Triage every still-OPEN entry in
-`archive/MARINE-WORKING-MODEL-CONCERNS.md` (TA-C21 — invariant-3 rescope, operator decision,
-note BD-8 made the flag metadata-only; TA-C22(b) transect-31 PT* gap) and
-`archive/MARINE-GEOMETRY-MODEL-CONCERNS.md` (TC-1..TC-20; TC-10→H2, TC-19→H3) and the
-restoration concerns' C-E survivors (C-E01/03/04/08/10/11/12, D7 parked-to-cutover).
-**Accept:** one report; every entry CLOSED-with-evidence / CARRIED-to-named-task /
-OPERATOR-DECISION. Reference for TA-C21: [briefs/T4.4-SHADOW-DIAGNOSIS-2026-07-30.md](briefs/T4.4-SHADOW-DIAGNOSIS-2026-07-30.md).
+operator rules the OPERATOR-DECISION rows. Reference for TA-C21:
+[briefs/T4.4-SHADOW-DIAGNOSIS-2026-07-30.md](briefs/T4.4-SHADOW-DIAGNOSIS-2026-07-30.md).
+Full evidence (file:line for every claim) in the sweep agent's report, session 2026-08-02.
+
+**Working-model concerns (TA-C*):**
+| Entry | Disposition |
+|---|---|
+| TA-C21 | CLOSED-with-evidence: rescope ALREADY LANDED (`6a8c18e`+`2597011`, G4.6) — invariant 3 now fires only on unevaluable structures, KAT-guarded. **OPERATOR paper-trail residual:** confirm G4.6's rescope WAS the criterion change you meant to sign off (code is done either way). |
+| TA-C22(a) | CARRIED → C4 (unchanged code, ruled thresholds ready). |
+| TA-C22(b) | Code path unchanged, but plausibly SUPERSEDED by `2087fc1`+`4e79d21` (no-L4-intersection now routes to L2 instead of empty components). Needs ONE live-cache observation to close — lead action at next convenient cycle. |
+| TA-C20 | CLOSED: both residuals implemented (T2.2 PART B truncation-follows-advanced-sample; T2.3 §11.3 combined metric verbatim). Larger-seas validation caveat → carried in V2. |
+| TA-C19 | CLOSED: dashboard D4.2 (`xMin = Math.min(0, ...)`, comment cites TA-C19). |
+| TA-C18 | CLOSED: ADR-093 Amendment 4 implemented (signed subaerial + HAT landward stop + shortfall guard) + manual. Live full-tide-cycle sanity → carried in V2-adjacent observation. |
+| TA-C16 | CLOSED: `a68215d` monotonicity + operator V4 ruling (accept-as-is); doc line landed via H3. |
+| TA-C15 | CLOSED: wizard+admin DO send coordinates (routes.py:2972-2983, step_marine.html, admin/marine.html) + API decode `9d1c10a`. Live api.conf durability unverified — minor. |
+| TA-C14 | **STILL-OPEN (real):** forced-full-run on unchanged HRRR cycle still silently no-ops as success (service.py:363/:461-468 clears signal on clean return; 4 DEBUG bare-returns in `_run_all_spots_locked` :2308-2331). → NEW TASK C8 below. |
+| TA-C12 | STILL-OPEN as filed (convergence-gate pooling; single-spot HB can't bite; R7.2 narrowed L4 to PT_ tables). Keep parked; revisit at multi-spot. |
+| TA-C11b | CLOSED: header/token match proven statically + real valid_fraction values recorded. |
+| TA-C06 | #3 CLOSED (norm_end positive-completion check, self-citing); #2 stays open-deferred (low reachability, acknowledged). |
+| TA-C05 | Unconditioned follow-on; trigger (sub-task F collapse) never occurred. Keep parked. |
+| TA-C04 | SUPERSEDED (target doc archived). |
+| TA-C08 | Informational; trace is gated off in prod. Parked. |
+| TA-C03 | reference/clearskies-dev.md port drift — folded into the next doc-batch (verify 8767/8770 vs 8780 and fix). |
+| TA-C01 | CLOSED: M1PASS converged artifact exists (close condition met). |
+
+**Geometry concerns (TC-1..20):** TC-6 SUPERSEDED (`73df829` deleted isobath ray-fit);
+TC-7/TC-15 CLOSED (G1.6 + G3 write-back + C7 `cbcfbb1`); TC-16 CLOSED (re-verified);
+TC-18 SUPERSEDED (`4e79d21` removed exposure from L4 sizing); TC-19 CLOSED (H3 `40a557c`);
+TC-9/TC-14/TC-8/TC-5/TC-11/TC-20 STILL-OPEN-low/trivial (parked, as filed; TC-11
+docstring-only); TC-10 mitigation landed (timeout+5 retries), mirror/self-host decision
+open → stays with H2.4 disposition; TC-4 parked pending any G2.4 (Great Lakes) dispatch.
+**File-integrity finding:** TC-2/TC-3 lost their `##` headers in a past edit (two orphaned
+`**What:**` blocks inside TC-4's section, :90-99); TC-12 exists only as a cross-reference;
+TC-13 absent entirely. → doc-batch repairs the archive file's headers (content preserved).
+**TC-17 → RESOLVED BY LEAD LIVE CHECK 2026-08-02:** deployed marine.conf has NO
+`directional_exposure` key for either location — the operator's E/SE/S/SW override is
+absent, fan-derived in force. **OPERATOR: re-add the override or accept fan-derived?**
+
+**Restoration C-E survivors + D7:** C-E01 partially superseded (AD-1R + persisted-key
+override; pre-chain `_perpendicular_bearing` +90° fallback remains; Bolsa live check
+deferred until Bolsa deploys); C-E03 STILL-OPEN (no transect-count cap; **OPERATOR:
+spacing value before any Bolsa deploy**); C-E04 parked (efficiency-only, as downgraded);
+C-E08 STILL-OPEN-low (L4 INPGRID WIND coverage — needs with/without comparison before any
+fix, as filed); C-E10 = C7a (same env-var/firewall decision, already OPERATOR-pending);
+C-E11 premise-contested (C-E12 says clock is real, C-E11 says future-dated — **OPERATOR:
+settle the clock question**, no code action either way yet); C-E12 partially resolved
+(option (b) ruled out by T3.0 byte-faithful proof; residual = the 2-D freq×dir watershed
+check, parked); D7 parked-to-cutover (confirmed no length/quality gate at the store site —
+policy question intact for Phase 5).
+
+### C8 — Forced-full-run false-success (TA-C14)  ⬜ *(NEW 2026-08-02 from C1)*
+`clearskies-api-dev`, small scoped round: a forced full run that inner-no-ops (4 DEBUG
+bare-returns in `_run_all_spots_locked`, swan.py:2308-2331) currently clears
+`force_full_run_signal` and reads as success. Fix per the original entry's option list
+(make the no-op loud and/or not clear the signal) + KAT asserting a forced run on an
+unchanged cycle actually executes or fails loudly. Dispatch after H5 deploys.
 
 ### C2 — D6a re-verify *(G7.1)*  ✅ **CLOSED 2026-08-02 (branch: GONE — already fixed)**
 `l4-rewrite` grep-relocation + lead spot-check: D6a WAS the real bug and was fixed
