@@ -165,7 +165,16 @@ BOUNDSPEC emission (R5 fixed it; frozen); cache fallback semantics.
 completes on cache with one WARNING; healthy fetch → zero extra calls, no WARNING.
 **Accept:** KATs + live journal over ≥2 cycles shows no hot loop; `/health` shows boundary age.
 
-### H3 — Residual doc-truth sweep *(was Restoration R9+R10 residuals; Gate R row 8)*  ⬜
+### H3 — Residual doc-truth sweep *(was Restoration R9+R10 residuals; Gate R row 8)*  ✅ DONE 2026-08-02 (meta `40a557c`; Gate H row 6 re-grep pending at phase gate)
+**Round record:** (a) 3 dated supersession notes (SURF-ZONE §2.6 ×1, STUDY-AREA §1+§5 ×2),
+originals byte-identical; (b) TC-19 CONFIRMED stale — PROVIDER-MANUAL carried a second,
+contradictory pier-TRANSM block (0.95 + a 5-row TRANSM-range table) — DELETED and replaced
+with an AD-8/§14.15 pointer per lead ruling (manuals are living guidance, not records;
+grep `TRANSM 0.95|0.8` 1→0, range values 5→0); (c) ARCHITECTURE.md L1 offshore margin 15 km
+→ **10 km** per `swan_domain.py:1131` (`offshore_km = shelf_dist_km + 10.0`), cited inline;
+separate lateral `level1_margin_km=5.0` correctly left alone; (d) V4 honest-window line added
+to API-MANUAL §17 (~:2499, `honestly shortened` 0→1). Lead verified all four greps
+independently.
 **Owner:** `clearskies-docs-author` (Sonnet). **QC:** `clearskies-auditor` at Gate H (doc rows).
 **Scope (exhaustive list, from TC-24):**
 (a) [briefs/SURF-ZONE-MODEL-BRIEF.md](briefs/SURF-ZONE-MODEL-BRIEF.md) §2.6 and
