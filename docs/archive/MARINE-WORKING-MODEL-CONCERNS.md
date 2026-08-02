@@ -1,5 +1,12 @@
 # Track A Execution — Out-of-Scope Concerns Log (2026-07-29)
 
+> ## ⛔ ARCHIVED 2026-08-02 with its plan (`MARINE-WORKING-MODEL-PLAN.md`)
+>
+> Still-open items were carried into **`docs/planning/MARINE-FORWARD-PLAN.md`** (2026-08-02):
+> TA-C21 (invariant-3 rescope, operator decision), TA-C22 (modelStatus grading + transect-31 PT* gap),
+> TA-C16 (66 h vs 72 h window). All other TA-C entries are closed or superseded — this file is the
+> historical record of each; read the forward plan for what is actionable.
+
 Findings surfaced while executing Track A of `MARINE-WORKING-MODEL-PLAN.md` that are **outside the
 scope of the current task** and deferred for later operator/coordinator attention. In-scope defects
 are fixed under their task; this file is only for things the plan does not already cover.

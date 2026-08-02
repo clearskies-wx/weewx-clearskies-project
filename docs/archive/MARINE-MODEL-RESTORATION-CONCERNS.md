@@ -1,5 +1,12 @@
 # Marine Model Restoration — Concerns Register
 
+> ## ⛔ ARCHIVED 2026-08-02 with its plan (`MARINE-MODEL-RESTORATION-PLAN.md`)
+>
+> Most entries were superseded 2026-07-29 by the MARINE-DIAGNOSIS brief (recorded in
+> `MARINE-WORKING-MODEL-PLAN.md`'s header); the surviving C-E items were carried through the
+> geometry plan's G7.6 and now live in **`docs/planning/MARINE-FORWARD-PLAN.md`** (task C1's
+> concerns sweep). Historical record only; execute nothing from here.
+
 **Opened:** 2026-07-28
 **Owner:** Coordinator
 **Purpose:** One place for every item the coordinator is concerned about while executing

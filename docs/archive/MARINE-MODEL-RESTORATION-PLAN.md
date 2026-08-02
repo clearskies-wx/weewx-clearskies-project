@@ -20,6 +20,17 @@ rows owed — deploy + config re-push, see Gate E preamble) → Phase F (F1–F5
 
 # ▶ START HERE
 
+> ## ✅ 2026-08-02: PLAN CLOSED — ARCHIVED. Live work moved to `MARINE-FORWARD-PLAN.md`
+>
+> Phase R completed and Gate R substantively passed (see the Gate R final record at the end of this
+> file). Status corrections applied 2026-08-02: **Phase F was actually implemented 2026-07-28 and is
+> wired in production** (stale ⬜ markers corrected in place); **R5 deployed** (`5581b0a`); **Phase D /
+> Gate D closed satisfied-by-events** (repeated verified cold full runs). Open work carried forward:
+> **R4** (loud no-publish) and **R6** (WW3 fetch hygiene) → forward plan H1/H2; **R9/R10 residual
+> doc sweep** → H3. The Gate E/Gate B relocated live rows are closed-superseded — the grids they
+> validated were rebuilt twice (Phase G, then the 2026-08-01 L4 shadow-envelope rewrite). This file
+> remains the historical record (incl. the decision log); execute nothing from it.
+
 > ## ⛔ 2026-07-31: ALL WORK REDIRECTED TO PHASE R (end of this document)
 >
 > On 2026-07-31 the marine model **stopped publishing entirely** after the 11:13 deploy of
@@ -1609,7 +1620,20 @@ no-structure spot.
 
 ---
 
-# PHASE F — Wind source term in the 1D model
+# PHASE F — Wind source term in the 1D model  ✅ **DONE 2026-07-28 (status corrected 2026-08-02 — the ⬜ markers below were stale)**
+
+> **STATUS CORRECTION (2026-08-02, coordinator, evidence-verified):** Phase F was implemented on
+> 2026-07-28 — F1 `7002ed1` (is_wind_sea through conversion), F3 `a802fdd` (finite-depth
+> fetch-limited growth kernel), F4 `466b1a0` (grow the wind-sea partition along the 1D run),
+> F5 `d1b3583` (synthesize fallback wind-sea partition) — and is **wired in production**
+> (`surf_1d_pipeline.py` calls `compute_wind_sea_growth()`; guard tests
+> `test_surf_pipeline_wind_sea_growth_f4.py` / `test_surf_pipeline_wind_sea_synthesis_f5.py`
+> green in the 2026-08-01 Round-2 verification set). The geometry plan's later carry-forward note
+> ("Phase F DROPPED, kernel unwired", 2026-07-30) is contradicted by the deployed code; operator
+> ruled 2026-08-02: **keep as done** — the wired path has passed every reality gate since.
+> Gate F was never formally walked; closed satisfied-by-events (the wind-sea path is exercised in
+> every production cycle and covered by its KATs). The per-task ⬜ markers below are left as
+> written for the record — do not re-implement.
 
 **Authority:** operator ruling, 2026-07-27, recorded in findings §0B.4. **This trips architectural
 trigger 1.** The coordinator recommended against it on height impact (2–3%); the operator overruled,
@@ -1764,9 +1788,17 @@ field; any change to a swell partition; and a second wind source.
 
 ---
 
-# PHASE D — Verify the whole chain
+# PHASE D — Verify the whole chain  ✅ **CLOSED SATISFIED-BY-EVENTS 2026-08-02**
 
-### D1 — Cold-start first hour  ⬜ **NOT STARTED**
+> **STATUS CORRECTION (2026-08-02, coordinator):** D1's purpose — prove a cold-started full chain
+> produces an honest, non-empty published forecast — has been demonstrated repeatedly since this
+> was written: T1.2 (2026-07-30, cold 4-level run, all levels converged honestly), the Phase-R
+> recovery runs, and the 2026-08-01 verification runs (143 transects × 67/67 timesteps,
+> valid_fraction 100%, published 206 MB, reality-gate PASS). Gate D's chain-verification intent is
+> carried forward as the standing reality gate in `MARINE-FORWARD-PLAN.md`. Do not execute D1 as
+> written — the grids and hotstart geometry it references were rebuilt twice since.
+
+### D1 — Cold-start first hour  ⬜ **NOT STARTED** *(superseded — see phase banner above)*
 Previously C5; **moved because its gate opened only post-deploy, making Phase C circular.**
 The first output row of every run is the empty initial field (`Hsig 0.014 m`, partitions zero,
 `Tm01 1.6 s`) and is published as a forecast hour. That is expected for a cold-started spectral
@@ -2339,7 +2371,7 @@ derivation inherits the same frame bug — diagnose against the 238°-era bbox
 push, L3 re-enabled, and the L4 sizing log's shoreward reach/along-span within 15% of the
 238°-era values (30 m / 483 m) OR a justified explanation of the delta.
 
-### R4 — No-publish paths must be loud and truthful  ⬜
+### R4 — No-publish paths must be loud and truthful  ⬜ **CARRIED 2026-08-02 → `MARINE-FORWARD-PLAN.md` (task H1)**
 **Owner:** `clearskies-api-dev`. **Design:** trace the 11:51 abort (gate PASSED, zero published
 entries, no ERROR naming the abort): follow "zero usable L3 handoff timesteps" through the
 publish/cache step; every path that ends a cycle with nothing published must (1) log ONE ERROR
@@ -2348,14 +2380,14 @@ admin status page. A viability-test failure at config push must likewise surface
 only the journal. **Guard:** a forced degraded cycle yields `degraded`/`failed` health, never
 silent `ok` + no-publish. **Must not touch:** the serve-nothing-on-failure rule (G1R.0 stands).
 
-### R5 — BOUNDSPEC `[len]` units fix (defect, latent)  ⏳ **IN PROGRESS 2026-08-01 (operator-directed; promoted ahead of R2/R3 because R1 measured it live-wrong)** — `clearskies-api-dev` implementing degrees→meters at the emitter + a known-answer guard; coordinator runs the reality-gate model check (does swell reach the 15 m reference) at acceptance. NOTE: fixes a confirmed defect + the west-side 3-station mangling for sure; whether it fully restores the south swell is settled by the acceptance model run (R1 caveat: single-spectrum south side may need more).
+### R5 — BOUNDSPEC `[len]` units fix (defect, latent)  ✅ **DONE — deployed `5581b0a`, measured on librewxr (see deploy-result block below); stale "⏳ IN PROGRESS 2026-08-01" marker corrected 2026-08-02.** (As originally tasked: operator-directed, promoted ahead of R2/R3 because R1 measured it live-wrong; `clearskies-api-dev` implemented degrees→meters at the emitter + a known-answer guard; the south-swell restoration was subsequently confirmed by the R2 deploy-verify block — swell reaches the 15 m reference.)
 **Owner:** `clearskies-api-dev`. **Design:** in Cartesian mode emit meters along the side
 (convert `len_deg` at the emitter or compute `len_m` in `select_boundary_stations()`); verify
 VARIABLE FILE semantics against the LOCAL manual (`docs/reference/swan-user-manual.txt`) §2.6.3
 — never web-fetch SWAN docs. **Guard:** KAT asserting emitted `[len]` equals the UTM distance
 of each station's projection along the side (known-answer from hand-computed geometry).
 
-### R6 — WW3 fetch hygiene  ⬜
+### R6 — WW3 fetch hygiene  ⬜ **CARRIED 2026-08-02 → `MARINE-FORWARD-PLAN.md` (task H2)**
 **Owner:** `clearskies-api-dev`. **Design:** exponential backoff + per-cycle retry cap on the
 NOMADS station-spectra fetches (403/404 observed with hot retry loops, journal Jul 30–31); a
 cycle that runs on cached boundary data logs it and reflects it in B3 `inputs.ww3_boundary`
@@ -2406,7 +2438,7 @@ gate semantics or L3-strip-era handoff). **Deliverable:** `docs/planning/briefs/
 "what tests exist." **Accept:** zero tests remain that assert superseded design; inventory
 committed.
 
-### R9 — Brief→plan reconciliation audit  ⏳ **DIVERGENCES LOGGED 2026-08-01 (TC-24); doc CORRECTIONS deferred to R7/R10 pending the R3 ruling**
+### R9 — Brief→plan reconciliation audit  ⏳ **DIVERGENCES LOGGED 2026-08-01 (TC-24); residual doc corrections CARRIED 2026-08-02 → `MARINE-FORWARD-PLAN.md` (task H3).** The R3 ruling the deferral waited on has since been made and implemented (L4 transect-shadow-envelope rewrite, marine `4e79d21`; AD-4/G4.2 marked superseded in the 2026-08-01 doc passes) — what remains of R9 is the TC-24 items those passes did not reach (facing method-of-record in SURF-ZONE §2.6 / STUDY-AREA §1/§5).
 
 > **R9 status 2026-08-01 (coordinator + read-only sweep agent):** all 9 brief↔plan divergences logged to `MARINE-GEOMETRY-MODEL-CONCERNS.md` **TC-24**. Key findings: (1) the briefs + geometry-plan OFF-LIMITS still assert the L4/per-transect-handoff machinery "already works / is off-limits," contradicted by the measured R3 reality (333/352 points outside L4) and the TC-23 operator ruling — but correcting them depends on the R3 A-vs-B decision, so DEFERRED; (2) facing method-of-record is stale in SURF-ZONE §2.6 + STUDY-AREA §1/§5 (still isobath-gradient; AD-1R replaced it) — safe R10 fix; (3) `ARCHITECTURE.md:117` "+15 km" L1 margin vs code/brief "+10 km" — safe R10 fix; (4) handoff-ladder + 1.78 m floor own no plan task — R7/R9 follow-up after R3. The "correct the plans" half of R9 is intentionally held until R3 is ruled (the geometry plan is suspended pending Gate R; editing it now pre-judges the facing decision).
 
@@ -2417,7 +2449,7 @@ divergence found to `MARINE-GEOMETRY-MODEL-CONCERNS.md`; correct the plans. Know
 to seed it: the handoff ladder (first-match L4→L3→L2 @ 15 m) and the 1.78 m shoreward-reach
 rationale appear in NO plan task; the geometry plan's G-phases never referenced the FIXED table.
 
-### R10 — Manual doc-sync (what the Sonnet agents actually read)  ⬜
+### R10 — Manual doc-sync (what the Sonnet agents actually read)  ⚠️ **LARGELY DONE via the 2026-08-01 doc-sync passes (G1R.4 + meta `d4a71ca`, `07bee6b`, `6f3c6c7` — AD-1R facing, handoff ladder, serve-nothing, §14.15 rewritten twice); residual verification sweep CARRIED 2026-08-02 → `MARINE-FORWARD-PLAN.md` (task H3, merged with R9's residual)**
 **Owner:** `clearskies-docs-author` after R7 designs are ruled. **Design:** update
 `docs/ARCHITECTURE.md` (marine section, :99–127) and `PROVIDER-MANUAL.md` §14.15 (+ OPERATIONS
 where touched) to state: AD-1R facing (setup-time, operator-overridable); the L4-coverage ruling
@@ -2457,7 +2489,28 @@ operator's architecture — no manual statement contradicts a ruling.
    surfaced to the operator — "the guard fired and we continued" (11:16, L3 disabled) is the
    exact shape this plan exists to end.
 
-## ⛔ QC GATE R
+## ⛔ QC GATE R — **SUBSTANTIVELY PASSED 2026-08-01/02 (final record below); geometry-plan suspension LIFTED**
+
+> **GATE R FINAL RECORD (2026-08-02, coordinator, evidence-cited):**
+> - **Row 1 (publishes on HEAD)** ✅ — publish restored with R7 (`2087fc1`, 2026-08-01); re-verified on
+>   every deploy since, latest `732e87d` (206 MB forecast_cache published 22:42Z 2026-08-01; scheduled
+>   cycle 23:37Z completed clean).
+> - **Row 2 (reality gate)** ✅ — matched-time comparisons 2026-08-01 (served faces vs Surfline/cam,
+>   meta `ffb6e28` "reality-gate PASS").
+> - **Row 3 (swell at 15 m reference)** ✅ — R2/R5 deploy-verify: real spectral DWR partitions at the
+>   reference (0.51 m @ 13.3 s @ 197.5° groundswell + wind-swell components, 2026-08-01 runs).
+> - **Row 4 (valid_fraction ≥ 80%)** ✅ — L4 valid_fraction **100.0%** on full nests, 2026-08-01
+>   (both the 19:06Z and 22:42Z verified runs, and the 23:37Z scheduled cycle).
+> - **Row 5 (no silent no-publish)** ⬜ — this IS task R4; carried to `MARINE-FORWARD-PLAN.md` H1.
+>   (The serve-nothing guard G1R.0 holds; what's missing is the loud ERROR/health/admin surfacing.)
+> - **Row 6 (test inventory + stale tests gone)** ✅ — R8: `TEST-INVENTORY.md` committed in the
+>   **marine repo** (`docs/planning/briefs/TEST-INVENTORY.md`, commit `5874578`; 58 tests classified),
+>   dead-KAT removal `cb0fe57`.
+> - **Row 7 (rules landed)** ✅ — R11, 2026-07-31.
+> - **Row 8 (manuals match rulings)** ⚠️ — largely met via the 2026-08-01 doc passes; residual sweep
+>   carried to forward plan H3.
+> **Ruling consequence:** the outstanding rows (5, 8) are carried work, not blockers — the geometry
+> plan's "no further G-phase work until Gate R passes" suspension is LIFTED as of this record.
 
 | # | Element | Evidence |
 |---|---|---|

@@ -176,6 +176,6 @@ near-zero there.
 
 - Related: ADR-093 (SWAN nearshore model) Amendment 5 (the model-derivation changes that consume this
   subsystem — AD-1/AD-3/AD-4/AD-5/AD-8); ADR-098 (datum match-at-source, which the Stage-2 bathymetry relies on)
-- Plan: `docs/planning/MARINE-GEOMETRY-MODEL-PLAN.md` (architecture decisions AD-2/AD-6/AD-7; Phases G0/G6;
+- Plan: `docs/archive/MARINE-GEOMETRY-MODEL-PLAN.md` (architecture decisions AD-2/AD-6/AD-7; Phases G0/G6;
   approval of the plan IS the acceptance of this ADR)
 - Brief: `docs/planning/briefs/STUDY-AREA-GEOMETRY-BRIEF.md` (Fable-reviewed x2, 24 findings incorporated)

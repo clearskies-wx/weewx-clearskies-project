@@ -1,6 +1,22 @@
 # Marine Working-Model Plan — get a real, validated surf forecast (2026-07-29)
 
-**Status:** DRAFT — Track A + Track B specified to the line; both SWAN-obstacle and bathymetry-structures
+> ## ⛔ ARCHIVED 2026-08-02 — SUPERSEDED, no open work remains here
+>
+> Superseded 2026-07-30 by `MARINE-GEOMETRY-MODEL-PLAN.md` (its "Carry-forward audit" section is the
+> authoritative task-by-task disposition of everything in this file — trust it over this file's own
+> execution-status summary, which it corrects). Every item still open at supersession was either
+> carried into that plan's Phase G7 or has since closed:
+> - **T2.2 PART B** — ✅ FIXED in marine `4e0a0ba` (seaward QB move advances `handoff_depth_m`),
+>   rule extended to the break-constraint path in `ea62e85` (2026-08-01 adversarial-audit remediation).
+> - **Phase F (wind-sea 1D term)** — implemented F1–F5 2026-07-28 (marine `7002ed1`, `a802fdd`,
+>   `466b1a0`, `d1b3583`) and WIRED in production `surf_1d_pipeline.py` — the later "dropped from
+>   scope / kernel unwired" note in the geometry plan's carry-forward audit is factually stale;
+>   operator ruled 2026-08-02: keep as done.
+> - All remaining live work now lives in **`docs/planning/MARINE-FORWARD-PLAN.md`** (2026-08-02).
+>
+> Kept as a historical record; do not execute tasks from this file.
+
+**Status:** ARCHIVED (see banner). Previously: DRAFT — Track A + Track B specified to the line; both SWAN-obstacle and bathymetry-structures
 research briefs are in hand; reviewed by a Fable agent 2026-07-29 and its 17 findings incorporated
 (see Decision log). Track B still gated on operator sign-off of its architectural items.
 **Created:** 2026-07-29

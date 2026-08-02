@@ -1,6 +1,16 @@
 # Marine Geometry-Model Plan — geography-aware study-area geometry (2026-07-30)
 
-**Status:** DRAFT — COMPLETE for operator review. Architecture decisions (AD-1..AD-8), OFF-LIMITS fence (incl. the
+> ## ⛔ ARCHIVED 2026-08-02 — executed through G4, remainder EXTRACTED
+>
+> Approved + executed 2026-07-31 (Phase D, G0, G1→G1R, G2, G3, most of G4); suspended same day by
+> the publish regression (Phase R); **suspension lifted and plan closed 2026-08-02** — see the
+> Execution-status section for the full closing record. **AD-4 (OMBB L4 axis) and G4.2 (primary-
+> structure clustering) are SUPERSEDED** by the 2026-08-01 L4 transect-shadow-envelope rewrite
+> (marine `4e79d21`, ADR-093 Amendments 6/7). Open remainder (G1R.3, G5, G6, G7, Gate GR) lives in
+> **`docs/planning/MARINE-FORWARD-PLAN.md`**. This file stays as the AD-1R..AD-8 architecture and
+> history record; execute nothing from it.
+
+**Status:** ARCHIVED (see banner). Previously: DRAFT — COMPLETE for operator review. Architecture decisions (AD-1..AD-8), OFF-LIMITS fence (incl. the
 SWAN-syntax rule), phases G0–G7 + per-phase gates + Gate GR, the verbatim SWAN-syntax appendix, and the full
 carry-forward audit are all written. **Approving this plan approves the architecture.**
 **Created:** 2026-07-30
@@ -114,11 +124,24 @@ non-blocking gap never justifies stalling.
 - **G2** (L1 aim + WW3 sides from open water) — ✅ implemented + deployed (`38f93ac`, `8f76af8`; deployed librewxr `4828d99`). Gate G2 (real SWAN L1 converged; D6c ≥2 stations) passed.
 - **G3** (exposure from fan → L4 sizing + surf-scorer + optional override + D6b L4 cold-start) — ✅ implemented + deployed (`edf831f`, `829d634`, `f788611`, `ab97929`). Gate G3 (sizing chain + D6b no-op) passed — **but did NOT re-validate a converged 4-level run** (see Critical finding 2).
 - **G4** (L4 axis from OMBB + obstacle route/coeffs + invariant-3 rescope + proximity clustering) — 🔄 code implemented + deployed (`37acb0c`, `418f1f5`, `5dbce94`, `6a8c18e`, `2597011`; clustering `02ef999` local-only). The obstacle emission (`OBSTACLE TRANSM 0.74` 2-vertex OMBB centerline) and the invariant-3 rescope validated live. **⛔ Gate G4 FAILED — see Critical finding 2.**
-- **G5 / G6 / G7 / Gate GR** — ⬜ not started.
+- **G5 / G6 / G7 / Gate GR** — ⬜ not started → **EXTRACTED 2026-08-02 to `MARINE-FORWARD-PLAN.md`**
+  (G1R.3 likewise). Execute them from there, not from this file.
 - **⛔ PLAN SUSPENDED 2026-07-31 (operator direction):** the 11:13 deploy of `4828d99` (G2 + the
   G1 facing wiring) broke publishing entirely — see the corrected TC-21/TC-23 and
   `MARINE-MODEL-RESTORATION-PLAN.md` **PHASE R**, which now owns recovery, the test audit, the
   brief→plan reconciliation, and the QC hardening. **No further G-phase work until Gate R passes.**
+- **✅ SUSPENSION LIFTED + PLAN CLOSED/ARCHIVED 2026-08-02:** Gate R substantively passed (final
+  record in `MARINE-MODEL-RESTORATION-PLAN.md`). **Gate G1R's failure is retroactively RESOLVED**:
+  the root cause (L4-grid-coverage vs transect-handoff envelope, TC-23) was fixed by Phase R (R7
+  handoff containment, `2087fc1`) and then properly by the **L4 transect-shadow-envelope rewrite**
+  (marine `4e79d21`, 2026-08-01 — supersedes AD-4's OMBB L4 sizing and G4.2's primary-structure
+  clustering; operator-approved architectural delta, recorded in ADR-093 Amendments 6/7). Verified
+  live 2026-08-01: facing 217.0° (AD-1R), **L4 valid_fraction 100%**, 143 transects × 67/67
+  timesteps on their own bands, publish + reality gate PASS. Still-open content of this plan
+  (G1R.3, G5, G6, G7, Gate GR) lives in **`docs/planning/MARINE-FORWARD-PLAN.md`** — G6 is
+  REWRITTEN there in plain terms (operator found this plan's AD-6/G6 wording impenetrable);
+  G5 carries an evaluate-benefit-first gate. This file remains the architecture/history record
+  for AD-1R..AD-8 (AD-4 superseded) — execute nothing from it.
 
 ### Critical findings — BLOCKING (surfaced to operator 2026-07-31; logged as TC-21 in `MARINE-GEOMETRY-MODEL-CONCERNS.md`)
 

@@ -1,5 +1,14 @@
 # Marine Geometry-Model — Concerns log
 
+> ## ⛔ ARCHIVED 2026-08-02 with its plan (`MARINE-GEOMETRY-MODEL-PLAN.md`)
+>
+> Closing dispositions: **TC-21 and TC-23 (the two Gate-blocking L4-coverage findings) are RESOLVED**
+> by the L4 transect-shadow-envelope rewrite (marine `4e79d21`, 2026-08-01 — valid_fraction 100%
+> verified live, vs the 27.3%/7.1% these entries measured). **TC-24**'s residual doc corrections are
+> carried to `MARINE-FORWARD-PLAN.md` task H3. The remaining OPEN low/medium entries (incl. TC-10
+> Overpass flakiness, TC-19 stale pier-TRANSM manual block) are carried collectively via the forward
+> plan's **concerns sweep (task C1)** — triage there, not here. Historical record only.
+
 Companion to `MARINE-GEOMETRY-MODEL-PLAN.md`. **Non-blocking** items that the governing docs (ARCHITECTURE.md, the
 manuals, the ADRs, the briefs) and the plan could not answer, logged here to keep the run moving and triaged later
 (at a phase boundary or after the plan lands) — per the plan's "Autonomy & escalation" section.

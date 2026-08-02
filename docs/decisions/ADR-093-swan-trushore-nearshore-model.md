@@ -241,7 +241,7 @@ spot. The reason to change the offshore edge no longer exists, so it does not ch
 **This amendment documents an already-made operator ruling — it is not a new decision.** The ruling was
 given in chat during the Marine Model Restoration Plan Phase E review session, 2026-07-27, and is
 recorded in full at `docs/planning/briefs/SWAN-GRID-STRATEGY-RESEARCH-FINDINGS.md` §0A (rulings D1–D8)
-and implemented per `docs/planning/MARINE-MODEL-RESTORATION-PLAN.md` Phase E, tasks E1–E9. This
+and implemented per `docs/archive/MARINE-MODEL-RESTORATION-PLAN.md` Phase E, tasks E1–E9. This
 amendment's job is only to reconcile ADR-093 itself with that ruling — Amendment 2 predates it and, on
 the point below, is superseded.
 
@@ -398,7 +398,7 @@ handles the new points).
 
 ### Amendment 5 (2026-07-31): Geography-aware study-area geometry — isobath-normal facing, open-water L1 aim, OMBB L4 axis, curvature-derived break-type, obstacle representation
 
-**Status: Accepted.** Approval of `docs/planning/MARINE-GEOMETRY-MODEL-PLAN.md` IS the acceptance of this
+**Status: Accepted.** Approval of `docs/archive/MARINE-GEOMETRY-MODEL-PLAN.md` IS the acceptance of this
 amendment's architecture (operator ruling 2026-07-30, recorded in that plan). This amendment records the
 SWAN-model-**derivation** changes of the Marine Geometry-Model Plan — architecture decisions **AD-1, AD-3,
 AD-4, AD-5, AD-8**. The net-new geography-**determination** subsystem those decisions consume (OSM coastline,
@@ -706,6 +706,6 @@ reality-gate result is claimed here.
 
 - Supersedes: ADR-084 (NWPS as primary nearshore source with supplementation)
 - Related: ADR-094 (HRRR forecast wind source for surf scoring); ADR-100 (geography-aware study-area geometry — the OSM coastline + fetch-fan subsystem Amendment 5's AD-1/AD-3/AD-4/AD-5 consume)
-- Plan (Amendment 5): `docs/planning/MARINE-GEOMETRY-MODEL-PLAN.md` (architecture decisions AD-1..AD-8; approval of the plan IS the acceptance of Amendment 5 and ADR-100)
+- Plan (Amendment 5): `docs/archive/MARINE-GEOMETRY-MODEL-PLAN.md` (architecture decisions AD-1..AD-8; approval of the plan IS the acceptance of Amendment 5 and ADR-100)
 - Research: `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md`, `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md`, `docs/planning/briefs/1D-MODEL-BENCHMARK-BRIEF.md`
 - Plan: `docs/archive/SWAN-TRUSHORE-PLAN.md`, `docs/archive/SURF-1D-IMPLEMENTATION-PLAN.md`, `docs/archive/SURF-MODEL-FIX-PLAN.md`
