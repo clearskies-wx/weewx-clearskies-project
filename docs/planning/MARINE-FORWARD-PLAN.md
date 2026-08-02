@@ -660,6 +660,20 @@ persisted per-transect `transect_bearings` (grid_sizing_chain) into the endpoint
 compute_spot_transects call — same computation, better input, likely non-architectural,
 NEEDS a design-first data-availability check. **Lead recommendation: (c) design-first; fall
 back to an (a)/(b) ruling only if (c)'s data isn't reachable without a new persisted field.**
+**C7b ✅ FIXED + DEPLOYED 2026-08-02** (marine `cbcfbb1`+`b5a4d01`, proc 09:41:05Z): option
+(c) — persisted `transect_bearings` (already in spot_profiles/{id}.json, 143 entries
+216.2-221.6° live-verified) threaded into both endpoints; beach_profile also gained the
+scalar correction it never had (shared helper). Audit PASS (4 mutations caught incl. the
+module-global-coupling probe; fallback path proven byte-identical vs pre-change worktree).
+LIVE: beach_profile request now logs `beach_facing=216.4°/29/114` (was 240.0°/25/118 on
+every request). 12 KATs + 119-test regression subset green.
+**C7a ⛔ BLOCKED ON OPERATOR (network infrastructure):** setting `CLEARSKIES_MARINE_API_URL`
+is pointless today — librewxr CANNOT reach weewx:8765 at all (IPv6 ULA and IPv4
+192.168.2.121 both time out; inter-VLAN 192.168.7.x→192.168.2.x:8765 firewall-blocked —
+which is WHY the var was never set). Operator decision: add a MikroTik allow rule
+(librewxr→weewx:8765) and then set the var (base URL, no auth needed for the two calls), or
+accept that fishing-solunar/station-wind remain 502/fallback on this topology. CONFIG.md
+already corrected either way.
 
 ### ⛔ QC GATE C — assigned: `clearskies-auditor`
 C1's report spot-audited (pick 3 CLOSED rows, independently re-verify); C2/C3 rounds get the
