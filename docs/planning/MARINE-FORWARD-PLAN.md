@@ -345,6 +345,27 @@ grouping per axe's allowed content model) with zero visual regression (grid clas
 **MUST NOT TOUCH:** anything beyond this block + its test. **Accept:** axe scan of SurfingTab
 render = 0 violations; visual snapshot/build unchanged; targeted vitest green.
 
+### D10 — Phantom SurfForecast fields = three silently-dead dashboard features *(NEW 2026-08-02, D4-audit MINOR finding, lead-escalated after cross-repo greps)*  ⬜
+**Owner:** investigation = `Explore`/read-only agent (API-repo git history); disposition =
+OPERATOR DECISION; any code = its own scoped round. **QC:** auditor at the owning gate.
+**Finding chain:** D4's audit flagged `partitionBreakInfo`, `shadowFaceHeight`,
+`waveShapeClassification` as having no live evidence (67-entry capture) and no API-MANUAL
+doc. Lead greps 2026-08-02: ZERO occurrences in the ENTIRE marine repo AND the API repo —
+the server has never (currently) emitted these names. BUT the dashboard carries null-guarded
+RENDER code for all three (`SurfingTab.tsx:1483` wave-shape chip, `:2154-2180` shadow face
+height, `:2350+` per-partition break rows) — three features that silently never render, the
+same failure class as D8's chevron. Origin claims in types.ts: T7.2b/T7.3 era. The marine
+service DOES serve a documented `perPartitionBreaks` (types.ts:1880's own comment calls it
+"related but separate").
+**D10.1 (read-only):** API-repo + marine-repo git history — did the pre-separation surf
+implementation ever emit these three? If yes, cite the commit where each stopped (separation
+casualty = lost capability); if no, they were never-implemented dashboard speculation.
+**D10.2 (OPERATOR DECISION):** per field — restore server-side (marine round) OR remove the
+dashboard render code + types + openapi entries (dashboard round). The D4 openapi catch-up
+entries for these 3 stay AS-IS (honest mirrors, descriptions already note their origin)
+until this decision.
+**MUST NOT TOUCH until ruled:** the three render blocks, the type/openapi entries.
+
 ### ⛔ QC GATE D — assigned: `clearskies-auditor`
 | # | Element | Evidence |
 |---|---|---|
