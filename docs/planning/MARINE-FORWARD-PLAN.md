@@ -240,6 +240,29 @@ stall); (d) API-side response caching for `/surf` (already partially exists per 
 handshakes from weewx complete < 1 s; dashboard surf page loads live; zero proxy handshake
 timeouts across ≥2 full cycles.
 
+### H4 — status 2026-08-02: 🔶 DEPLOYED (`1f7374a`+`277b223`, proc 07:56Z) + accept SUBSTANTIALLY PASSED, two tracked residuals
+**Live accept evidence:** read-path storm 20/20 handshakes 5.5-15.2 ms DURING 6 concurrent
+large reads (incl. one 33 s cold /surf) — pre-fix this combination was the 503 storm;
+publish-window storm 59/60 ≤27 ms with ONE 1.655 s outlier (localization pending: re-probe
+next publish window with per-probe timestamps); dashboard chain live: profile-all via proxy
+200/4.7 s/2.1 MB, /surf warm 200/0.46 s ×3. Audit PASS-WITH-FINDINGS (worktree byte-identity
+both directions; stride-sleep necessity unproven by tests — kept as cheap insurance, live
+numbers decisive). Residuals tracked: H5 (cold /surf), decode-side monolithic loads (ruled
+out of scope; re-examine only if the 1.655 s outlier localizes to it).
+
+### H5 — Cold /surf read exceeds proxy timeout once per cycle *(NEW 2026-08-02, found at H4 live accept)*  ⬜
+**Owner:** `clearskies-api-dev` (Sonnet), investigation-first. **QC:** auditor at Gate H
+addendum. **Defect:** the FIRST `/surf/{id}` after each forecast publish takes ~33 s
+(per-request swelltrack/deep-structure deserialization of the fresh cache) → the API
+companion proxy's 15 s read timeout → one 503 per cycle until a retry warms it (then 0.46 s).
+Distinct mechanism from H4's handshake starvation (handshakes stay <30 ms throughout).
+**Candidate designs (Stage-1 measurement decides; same-service only, no new deps):** warm the
+serving structures at publish time (the service KNOWS it just published — precompute what the
+first request would); memoize the deserialized form; narrow the cold work. Also fold in the
+H4-(d) proxy-cache factors (success-only warm + shared-LRU eviction + the dashboard
+query-param-variance grep). **MUST NOT TOUCH:** cache file shape, publish decisions, H4's
+chunked encoder.
+
 ### ⛔ QC GATE H — assigned: `clearskies-auditor` (adversarial), BEFORE the lead gate
 | # | Element | Evidence the auditor must independently produce |
 |---|---|---|
@@ -571,6 +594,24 @@ any qualifying-zone transect on bulk scalars (the headline is built from those t
 their degradation degrades the headline's trustworthiness). Then a normal scoped round
 (`endpoints/surf.py` `_determine_model_status` + pipeline bookkeeping + KATs; wire semantics
 change → API-MANUAL same round).
+
+### C7 — Bimodal beach_facing + non-surf endpoint anomalies *(NEW 2026-08-02, found during H4 live accept)*  ⬜
+**Owner:** `clearskies-api-dev` (Sonnet) investigation-first. **QC:** auditor at Gate C.
+**Evidence (coordinator, 2026-08-02):** `compute_spot_transects` logs BOTH
+`beach_facing=216.4°/29 structure-affected/114 open` (every SWAN-cycle line, all day, matches
+prior days) AND `beach_facing=240.0°/25/118` (interleaved, sometimes duplicated same-ms lines
+= concurrent second computation). 240.0 count: Jul 30/31 = 0, Aug 1 = 0, first hit Aug 2
+00:33:24Z under PID 2358409 (pre-Phase-H process, commit `732e87d` era) — NOT caused by
+today's deploys. One 240.0 hit at 05:25:26 same-second with `HTTP 502 /fishing/...` +
+`CLEARSKIES_MARINE_API_URL is not set` (that ERROR class: 11 hits on Aug 1, also
+pre-existing). Hypothesis to verify, not assume: a non-surf endpoint path (fishing /
+beach-safety) computes its own transects using the operator-typed config facing (240.0)
+instead of the AD-1R derived value (216.4), and began firing ~00:33Z Aug 2 (what changed —
+config push? first request? cache expiry?). **Scope:** find the 240.0 caller + its facing
+source (file:line); why it started Aug 2; whether any SERVED value consumes the 240.0
+transects; the CLEARSKIES_MARINE_API_URL unset + fishing-502 chain. Report first; fixes are
+their own scoped round. SWAN/surf path confirmed unaffected (216.4 stable through all
+deploys).
 
 ### ⛔ QC GATE C — assigned: `clearskies-auditor`
 C1's report spot-audited (pick 3 CLOSED rows, independently re-verify); C2/C3 rounds get the
