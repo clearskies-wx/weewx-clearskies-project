@@ -502,6 +502,83 @@ standard adversarial pass (falsifiable KATs, allowlist diff, baseline diff).
 
 ---
 
+## PHASE LM — Landmark spatial context for the heatmap *(operator-requested 2026-08-02, in chat — supplements D5 and G6.3)*
+
+**Why (operator):** the heatmap has no scale or landmarks — users can't tell where on the
+beach it represents. Two anchors fix that: identified shoreward structures (the HB pier)
+rendered as a labeled line, and operator-drawn non-structural markers (e.g. a guard tower)
+rendered as labeled markers. **Contract authorization:** the additive `landmarks` payload
+field (trigger 4) and the non-structural marker config key (trigger 7) were explicitly
+requested/approved by the operator 2026-08-02 in chat. **Hard rule: landmarks are
+DISPLAY-ONLY — nothing in this phase may feed SWAN, the 1D model, transect selection, or any
+physics path. Markers are not structures; they emit no OBSTACLE, affect no flag.**
+
+### LM-1 — Marine: landmark projection + additive payload  ⬜
+**Owner:** `clearskies-api-dev` (Sonnet, marine repo). **QC:** auditor (standard adversarial
+round). **Blocked on:** nothing (structures already in config; marker config may land later —
+design for both kinds now, structures first).
+**Change:** at config push, project each configured structure (and, once LM-3 exists, each
+non-structural marker) from its geographic geometry into the transect frame: alongshore span
+→ inclusive transect index range; cross-shore span → distance range in the SAME
+distance-from-reference metres the profile payload uses (negatives allowed landward, HAT
+convention). Serve as an additive top-level `landmarks` array on the
+`/surf/{id}/profile?transect_index=all` response (and nowhere else):
+`{label, kind: "structure"|"marker", transectStartIndex, transectEndIndex, distanceMinM,
+distanceMaxM}`. Label for structures = the structure's configured name/type (e.g.
+"Huntington Beach Pier"). Old-cache tolerance: absent key = no landmarks (never raise).
+**Files (verify at dispatch):** the transect-frame owner (`services/swan_formats.py`
+`compute_spot_transects` region — VALUES/metadata only, zero emission-grammar changes) or a
+new small `services/landmarks.py` (preferred — keeps swan_formats untouched); the profile
+endpoint serializer; cache codec if the projection is cached; tests.
+**MUST NOT TOUCH:** OBSTACLE emission, `is_structure_affected` production, transect
+generation itself, anything in the frozen core beyond read-only imports.
+**KATs:** (a) synthetic pier polyline perpendicular to a known transect frame → exact
+expected index range + distance range; (b) structure fully outside the frame → no landmark,
+no error; (c) old cached payload without `landmarks` → endpoint serves absent key cleanly;
+(d) projection is byte-stable across two identical config pushes.
+**Accept:** live `transect_index=all` payload for HB carries the pier landmark with plausible
+bounds (spot-check vs the 29 structure-affected transect indices); zero diff in every other
+payload field (baseline diff).
+
+### LM-2 — Dashboard: heatmap landmark overlay + alongshore scale *(supplements D5)*  ⬜
+**Owner:** `clearskies-dashboard-dev` (Sonnet). **QC:** auditor at Gate D (axe row included).
+**Blocked on:** LM-1 deployed (fixture work can start from LM-1's KAT fixtures).
+**Change (HeatMapCard only):** (a) render each `landmarks[]` entry as a labeled line — the
+centerline of its (transect-range × distance-range) box along the box's long axis; label
+text beside it, i18n'd, `aria-label`ed, DESIGN-MANUAL tokens, no new dependencies; (b) add
+the alongshore scale: Y-axis ticks in metres (transect index × the served spacing — use the
+real per-spot spacing from the payload if present, else 10 m constant with a code comment),
+plus end labels derived from the transect frame's endpoint bearing (e.g. "NW end"/"SE end");
+(c) null-safety: no `landmarks` key (old cache) → render exactly today's chart.
+**MUST NOT TOUCH:** the Hs colour mapping, `splitBreakPoints()`, BeachProfileChart (landmark
+overlay is heatmap-only this round), the fetch layer.
+**KATs:** fixture with the HB pier landmark → line + label at the expected rows/columns
+(assert coordinates in-canvas); fixture without `landmarks` → byte-identical render to
+pre-change snapshot; axe pass on the new markup.
+**Accept:** live render post-H4 shows the pier line + label + metre scale; operator
+eyeball-confirms the pier lands where the real pier is.
+
+### LM-3 — Wizard: non-structural labeled markers *(supplements G6.3; blocked on G6.3)*  ⬜
+**Owner:** `clearskies-dashboard-dev` (Sonnet, stack repo). **QC:** auditor at Gate G6.
+**Change:** extend G6.3's polygon/draw tool with a "marker" mode: operator draws a small
+polygon (or drops a point) + REQUIRED label field → persisted in marine config under a NEW
+`landmark_markers` key (same `[lon,lat]` JSON-string encoding contract as E13 — do not
+invent a new encoding), applied via the existing apply flow. Markers are display-only
+metadata: the apply path must NOT create structures, OBSTACLE lines, or any model input.
+LM-1's projection picks them up on the next config push.
+**MUST NOT TOUCH:** the structure/study-area draw flows (G6.3's polygon contract frozen once
+landed); anything that feeds the model.
+**KATs:** T4.5-style round-trip: draw marker + label → apply → marine config carries it
+byte-faithfully → re-open wizard shows it; apply with markers present produces ZERO diff in
+every SWAN input file (the display-only guarantee, asserted).
+**Accept:** operator draws a guard-tower marker on the dev wizard, it round-trips, and (with
+LM-1/LM-2 live) appears labeled on the heatmap.
+
+**Sequencing:** LM-1 → LM-2 (pier + scale ship first — most of the user value); LM-3 lands
+with/after G6.3, then markers flow through the same LM-1/LM-2 path with zero further work.
+
+---
+
 ## PINNED (operator-ruled, not scheduled — do NOT dispatch)
 
 - **G5 — break-type from shoreline curvature → L3 trigger** *(AD-5)* — **PINNED 2026-08-02
