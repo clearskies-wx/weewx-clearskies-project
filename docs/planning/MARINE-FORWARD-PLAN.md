@@ -142,6 +142,36 @@ annotate, never rewrite the original text.
 **Accept:** one commit, grep evidence pasted per item (the stale phrase count going to the
 annotated count), coordinator QC before push.
 
+### H4 — Marine event-loop stalls break the API proxy (the "dashboard surf is broken" defect)  ⬜
+**Owner:** `clearskies-api-dev` (Sonnet), marine repo (+ API repo timeout knob if ruled in).
+**QC:** `clearskies-auditor` at Gate H. **Sequencing (operator, 2026-08-02): model correctness
+first — this ships after H1/H2 unless the operator pulls it forward. It GATES D4/D5 live
+verification.**
+**Evidence (2026-08-02, coordinator-diagnosed live):** the dashboard's surf pages 503 because
+the API's companion proxy times out on the **TLS handshake** to the marine service
+(`weewx-clearskies-api` journal: `Companion proxy: request to
+https://192.168.7.22:8780/surf/... failed: _ssl.c:983: The handshake operation timed out`,
+then `HTTP 503 ... marine service is unreachable`). Ruled OUT by measurement: network path
+(TCP connects; 1472-byte DF pings pass; 8/8 probes handshake in 7–16 ms when the service is
+idle), the SWAN binary (563% CPU during a probe run — handshakes still fast; it is a
+subprocess), dashboard-side regressions (zero marine-component commits since 07-25). Ruled IN:
+failures cluster exactly when the marine service's PYTHON side handles the ~206 MB forecast
+cache (end-of-cycle publish serialization 01:51–02:01Z; large `/surf` reads 02:05–02:07Z) —
+the single-process async service blocks its event loop for tens of seconds, TLS accepts starve,
+the proxy's handshake timeout fires. Broken "this past week" because the cache grew ~10× with
+full-length bands + 143-transect payloads.
+**Design options (coordinator + operator pick at dispatch — moving where serialization runs
+inside the same service is methodology; adding a worker/process is trigger 5, needs explicit
+approval):** (a) stream/offload the big JSON serialization+file I/O to a thread
+(`asyncio.to_thread`) at the publish and read paths; (b) incremental/chunked cache read on
+request paths; (c) raise the API proxy's connect/handshake timeout (mitigation only, hides the
+stall); (d) API-side response caching for `/surf` (already partially exists per the 503 detail
+"no cached response is available" — investigate why the cache was empty).
+**MUST NOT TOUCH:** cache CONTENT/shape; publish decision logic; the SWAN runner.
+**Accept:** during an end-of-cycle publish AND a concurrent large `/surf` read, 10/10 probe
+handshakes from weewx complete < 1 s; dashboard surf page loads live; zero proxy handshake
+timeouts across ≥2 full cycles.
+
 ### ⛔ QC GATE H — assigned: `clearskies-auditor` (adversarial), BEFORE the lead gate
 | # | Element | Evidence the auditor must independently produce |
 |---|---|---|
@@ -152,6 +182,7 @@ annotated count), coordinator QC before push.
 | 5 | No fetch-content change | boundary bytes identical pre/post H2 on a recorded fixture |
 | 6 | H3 claims true | re-grep every H3 item; no governing doc contradicts a ruling |
 | 7 | Baseline diff clean | pre/post deploy baseline numbers (directive #2) within noise |
+| 8 | H4 stall fix holds under load | auditor reproduces the failure recipe (probe storm during end-of-cycle publish + concurrent large `/surf` read) → 10/10 handshakes < 1 s |
 **Charter:** assume the implementer cut corners; hunt can't-fail assertions (the Round-1 F1
 pattern — a green test pinning a defective value); verify allowlists vs `git show --stat`.
 
@@ -181,31 +212,66 @@ same discipline as R8). **MUST NOT TOUCH:** the live band-building code (`_TRANS
 constants, sentinel, grid-bbox clip — Round-1 frozen). **Accept:** grep shows zero references;
 full targeted suite green; production run byte-identical (baseline diff, directive #2).
 
-### D4 — Dashboard adoption of the BD-7/BD-9 wire fields  ⬜
+### D4 — Dashboard surf re-wiring, part 1: contract re-reconciliation + BD-7/BD-9 fields  ⬜
+**(BLOCKED for live verification on H4 — code + tests can land first against fixtures.)**
 **Owner:** `clearskies-dashboard-dev` (Sonnet). **QC:** auditor at Gate D.
-**Contract (already live, API-MANUAL updated 2026-08-01):** `mainBreakZoneFaceHeight`,
-`mainBreakZoneStartIndex`/`EndIndex`, `mainBreakZoneQualifyingCount`,
-`representativeTransectIndex`; `breakingFaceHeight` already follows the new headline server-side.
-**D4.1 (scoping, read-only):** locate every dashboard surf-page component reading
-`breakingFaceHeight`/`bestPeakFaceHeight`/`spotAverageFaceHeight`; report with file:line.
-**D4.2:** surface zone context where face height is shown (e.g. "main break zone: transects
-S–E, N qualifying") — presentation per DESIGN-MANUAL tokens; no new dependencies (trigger 7).
-**D4.3 (verify-only):** confirm the beach-profile cross-section needs NO dashboard change (the
-representative-transect switch happened server-side in `beach_profile.py`) — state it in the
-closeout with evidence, don't "fix" it.
-**MUST NOT TOUCH:** API repo; any non-surf dashboard page. **Null-safety:** all new fields are
-nullable (old caches) — render nothing, never `NaN`/`undefined` text.
-**Accept:** fields render on live data; null-field cache day renders cleanly; axe-core pass on
-the touched page (dashboard testing baseline).
+**Investigation findings (2026-08-02, coordinator — the operator's memory is right):** the
+piping EXISTS and was NOT reverted — zero dashboard marine-component commits since 07-25; the
+surf pages consume `/surf/{id}`, `/surf/{id}/profile`, `/surf/{id}/profile?transect_index=all`
+(`src/api/client.ts:457-494`), and `src/api/types.ts` already carries
+`bestPeakFaceHeight`/`spotAverageFaceHeight`/`openTransectCount` (the 07-25 T4A.6
+reconciliation). What broke is (a) transport — H4's proxy 503s — and (b) the marine payload
+moving on under a frozen dashboard: everything shipped server-side 07-26→08-01 (HAT profiles,
+R-phase, break-detection Rounds 1–2) landed after the dashboard's last reconciliation.
+**D4.1 — contract re-reconciliation audit (read-only, report first):** diff
+`src/api/types.ts` + `src/api/openapi-v1.yaml` against API-MANUAL @ marine `732e87d` for the
+three surf endpoints. Known deltas to confirm and list: the 5 new BD-7/BD-9 fields
+(`mainBreakZoneFaceHeight`, `mainBreakZoneStartIndex`/`EndIndex`,
+`mainBreakZoneQualifyingCount`, `representativeTransectIndex`); `breakingFaceHeight` semantics
+(now headline-fed); **TA-C19: `distanceFromShore` may be NEGATIVE since the HAT landward
+extension (2026-07-30) — `types.ts` has no such field/handling and the profile charts may
+assume ≥0** (prime suspect for vertical-section breakage beyond transport); any
+`breakingFraction`/zones/`primaryBreak` deltas from Rounds 1–2. Deliverable: the delta table in
+the scope-ack.
+**D4.2 — type + rendering updates from D4.1's table:** additive types; zone context shown where
+face height is shown ("main break zone: transects S–E, N qualifying" — presentation per
+DESIGN-MANUAL tokens; no new dependencies, trigger 7); negative-`distanceFromShore` handled
+wherever profile distances render.
+**D4.3 (verify-only):** confirm the cross-section transect choice needs NO dashboard change
+(BD-9 representative-transect selection is server-side in `beach_profile.py`) — evidence in
+closeout, don't "fix" it.
+**MUST NOT TOUCH:** API repo; marine repo; any non-surf dashboard page; the fetch layer
+(`client.ts` endpoints are correct — H4 owns transport).
+**Null-safety:** all new fields nullable (old caches) — render nothing, never `NaN`/`undefined`.
+**Accept:** KATs against recorded current-shape fixtures (incl. a negative-`distanceFromShore`
+profile and an old pre-Round-2 payload); axe-core pass; live render after H4 lands.
 
-### D5 — Birdseye break heatmap *(spec BD-6 — product does not yet exist)*  ⬜ **DESIGN FIRST**
-**Owner:** design pass = coordinator + operator (mockup in chat); build = `clearskies-dashboard-dev`.
-**Data contract (live):** `per_transect[]` with break points/zones per transect (alongshore) ×
-cross-shore distances — everything the alongshore×cross-shore break-zone view needs; see
-[briefs/SURF-ZONE-BREAK-DETECTION-SPEC-2026-08-01.md](briefs/SURF-ZONE-BREAK-DETECTION-SPEC-2026-08-01.md)
-BD-6 and the operator rulings in §2 ("birdseye view of the beach … so surfers know where the
-best breaks are occurring"). **Gate to start build:** operator-approved mockup. Not dispatched
-until then. Coordinate with D4 (shared components), but ship separately (directive #3).
+### D5 — Dashboard surf re-wiring, part 2: heatmap + vertical section back to live  ⬜
+**(Corrected 2026-08-02 — these products EXIST; the earlier "does not exist" note was wrong,
+based on a DASHBOARD-MANUAL statement now known stale. Operator confirmed both were
+implemented; verified in code.)**
+**Owner:** `clearskies-dashboard-dev` (Sonnet). **QC:** auditor at Gate D. **Blocked on H4 for
+live data; fixture work can start.**
+**What exists (verified 2026-08-02):** `src/components/marine/tabs/HeatMapCard.tsx` — the
+birdseye view (SVG grid, X = cross-shore, Y = transect index, colour = Hs) **already
+double-break-aware** (`splitBreakPoints()` sorts outer/inner at `:153`); fed by
+`/surf/{id}/profile?transect_index=all`. `src/components/marine/tabs/BeachProfileChart.tsx` +
+`BeachProfileCardBody.tsx` — the vertical cross-section (impact/foam/reform zones per the
+beach_profile payload). Both stale-frozen since 07-25, not reverted.
+**D5.1 — re-wire verification (after D4.1's delta table):** replay a CURRENT recorded
+`transect_index=all` payload through HeatMapCard and a current single-transect payload through
+BeachProfileChart; list every render breakage (candidates: negative `distanceFromShore` axis
+handling, zone-shape changes, `breakingFraction` nullability — `df60297` handled undefined,
+verify against current). Fix render-side only.
+**D5.2 — BD-7/BD-9 overlays (small, additive):** heatmap gains the main-break-zone band
+markers (rows S–E from `mainBreakZoneStartIndex/EndIndex`) and a representative-transect row
+marker; cross-section header states it renders the representative transect. Per DESIGN-MANUAL.
+**D5.3 — DASHBOARD-MANUAL correction (doc-sync, same round):** the manual's "no heatmap
+exists" claim is FALSE — correct it to describe HeatMapCard + BeachProfileChart as-built (this
+is the H3-class doc-truth fix that misled this very plan).
+**MUST NOT TOUCH:** marine/API repos; the data contract; non-surf pages.
+**Accept:** both products render current live data end-to-end after H4; double-break fixture
+shows two break markers in both views; manual corrected.
 
 ### ⛔ QC GATE D — assigned: `clearskies-auditor`
 | # | Element | Evidence |
@@ -345,12 +411,6 @@ transect fell back; `degraded_bulk` = ≥25% OR any qualifying-zone transect. Co
 this one question to the operator; then a normal scoped round (`endpoints/surf.py`
 `_determine_model_status` + `surf_1d_pipeline.py` fallback bookkeeping + KATs).
 
-### C5 — Track-B sign-off designs *(T4.2 bathymetry injection; T4.3 dynamic coefficients)*  ⬜
-PARKED until a spot needs them (submerged breakwater / DAM crest). Each requires an
-operator-signed design doc BEFORE any code (standing gate). Reference:
-[briefs/BATHYMETRY-STRUCTURES-BEST-PRACTICES-2026-07-29.md](briefs/BATHYMETRY-STRUCTURES-BEST-PRACTICES-2026-07-29.md),
-[briefs/SWAN-OBSTACLE-BEST-PRACTICES-2026-07-29.md](briefs/SWAN-OBSTACLE-BEST-PRACTICES-2026-07-29.md).
-
 ### ⛔ QC GATE C — assigned: `clearskies-auditor`
 C1's report spot-audited (pick 3 CLOSED rows, independently re-verify); C2/C3 rounds get the
 standard adversarial pass (falsifiable KATs, allowlist diff, baseline diff).
@@ -376,6 +436,12 @@ standard adversarial pass (falsifiable KATs, allowlist diff, baseline diff).
   TABLE_PT before the unlink loop → peak ~170 MB/cycle unchanged by parse-and-delete. No action
   unless a bigger config trips the box.
 - **D7 — publish policy** — parked to cutover (Phase 5 of the Clear Skies plan).
+- **C5 — Track-B sign-off designs** *(T4.2 bathymetry injection; T4.3 dynamic coefficients)* —
+  **PINNED 2026-08-02 (operator, in chat): add later only if ever needed** (a spot with a
+  submerged breakwater / DAM-crest structure). Each requires an operator-signed design doc
+  BEFORE any code (standing gate). References:
+  [briefs/BATHYMETRY-STRUCTURES-BEST-PRACTICES-2026-07-29.md](briefs/BATHYMETRY-STRUCTURES-BEST-PRACTICES-2026-07-29.md),
+  [briefs/SWAN-OBSTACLE-BEST-PRACTICES-2026-07-29.md](briefs/SWAN-OBSTACLE-BEST-PRACTICES-2026-07-29.md).
 
 ---
 
@@ -400,6 +466,16 @@ standard adversarial pass (falsifiable KATs, allowlist diff, baseline diff).
   remainder extracted here. Operator rulings same session: Phase F stays wired (done, not
   revisited); G6 rewritten in plain terms (this file's §G6 supersedes the archived AD-6/G6
   wording); G6.3 confirmed as the wizard polygon draw tool.
+- **2026-08-02 (later still) — D4/D5 investigation + H4 added + C5 pinned.** Operator flagged
+  that the dashboard heatmap/vertical-section WERE implemented and surf is currently broken.
+  Coordinator live-diagnosed: (1) dashboard NOT reverted (no marine-component commits since
+  07-25; old piping intact in types.ts/client.ts); (2) the break is the API companion proxy's
+  TLS handshake timing out against the marine service during its big-JSON event-loop stalls
+  (206 MB cache publish/reads) — new task H4 with the full evidence chain (TCP/MTU/SWAN-binary
+  ruled out by measurement); (3) HeatMapCard is already double-break-aware; D5's "product does
+  not exist" note was wrong (stale DASHBOARD-MANUAL claim — correction folded into D5.3);
+  (4) TA-C19 (negative distanceFromShore) never reached the dashboard — named prime suspect for
+  vertical-section render breakage, folded into D4.1/D5.1; (5) C5 pinned per operator.
 - **2026-08-02 (later) — Granularized + G5 pinned + separation plan archived.** Operator: (1)
   G5 pinned — the ray fan + AD-1R facing likely solved most of its purpose; only the L3-trigger
   residue remains, acceptable until a real spot mis-grids; (2) `MARINE-SERVICE-SEPARATION-PLAN.md`
