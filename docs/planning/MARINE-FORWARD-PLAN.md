@@ -856,12 +856,25 @@ that these are overrides." Two halves:
 `directional_exposure = E/SE/S/SW` (stripped by the Gate-G3 live test, TC-17) to the
 deployed marine config via config push; verify `directional_exposure_is_override=true`
 honored and the serve-time directional filter reflects it.
-**(b) UI labeling (stack repo, wizard/admin PARITY rule applies):** the exposure field in
-BOTH wizard step_marine and admin marine must be clearly labeled as an OVERRIDE of the
-fan-derived (measured) exposure — states: "Auto (measured coastline fan)" vs "Manual
-override"; show which is in effect; help content keys (`help.wizard.*`/`help.admin.*`) +
-Operator Manual per doc-code sync. No behavior change to the fan default (G3.3 stands:
-fan-derived is the default; the override is optional and honored if present).
+**(b) ✅ CODE-CLOSED 2026-08-02 (deploy pending — no config-service deploy script exists;
+post-restart lead action).** Stack `692ad76` (19 files, pushed) + meta `6f606dc`:
+Auto/Override radio toggle in BOTH wizard and admin (byte-identical core vocabulary,
+auditor-verified), admin per-location "Exposure" column, disabled-when-Auto checkboxes
+(server-rendered — JS-off safe, auditor-proven via no-JS client), Override→Auto
+expressible both surfaces, restore-path bug FIXED (all-8-boxes-on-rerun; dict/list/
+colon-string/empty/garbage shapes normalized — auditor 8/8 own constructions), display
+flag kept OUT of the surf dict (auditor proved the leak would have raised a real
+`extra_forbidden` ValidationError — fix load-bearing), 17 tests, 13 locale catalogs.
+AUDIT PASS-WITH-FINDINGS: 0 functional defects after 12 mutations/leak-constructions;
+1 accepted residual = mypy net+1 (union-attr narrowing false positive at
+admin/routes.py:2096, same class as 12 pre-existing in that function; runtime-proven
+safe) — fold into any future typing pass. FYI from audit regression run: 5 PRE-EXISTING
+unrelated failures in test_wizard_earthquake_config.py (4) + test_wizard_topology.py (1)
+(`topology_defaults(same_host=False)` returns "*" vs expected "0.0.0.0") — NOT C9b's,
+untouched files, tracked here so nobody re-finds them. 3 uncataloged English-only
+microcopy strings noted (matches partial precedent; en-only residual class).
+**Remaining for C9(a)+(b) close: config-service deploy (no script — document the
+procedure while doing it) → then (a) re-add E/SE/S/SW via the labeled admin UI + verify.**
 `clearskies-api-dev`, small scoped round: a forced full run that inner-no-ops (4 DEBUG
 bare-returns in `_run_all_spots_locked`, swan.py:2308-2331) currently clears
 `force_full_run_signal` and reads as success. Fix per the original entry's option list
