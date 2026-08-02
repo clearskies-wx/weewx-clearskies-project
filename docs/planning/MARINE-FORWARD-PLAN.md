@@ -968,7 +968,18 @@ scalar correction it never had (shared helper). Audit PASS (4 mutations caught i
 module-global-coupling probe; fallback path proven byte-identical vs pre-change worktree).
 LIVE: beach_profile request now logs `beach_facing=216.4°/29/114` (was 240.0°/25/118 on
 every request). 12 KATs + 119-test regression subset green.
-**C7a — UNBLOCKED 2026-08-02, ready to dispatch (queued behind V3-F4-IMPL, same repo):**
+**C7a ✅ CLOSED 2026-08-02 — deployed + live-verified.** Round: marine `f8f3157`
+(CLEARSKIES_MARINE_API_VERIFY_TLS, secure-default, disable set false/0/no per stack
+convention; both call sites; 25 KATs) + meta `457cb30`. AUDIT PASS 0 findings (21
+adversarial env probes; 3rd-call-site hunt clean; worktree real-execution byte-identity).
+Deployed 21:01:44Z with network.env values
+(`CLEARSKIES_MARINE_API_URL=https://192.168.2.121:8765/api/v1`, `VERIFY_TLS=false`).
+LIVE: /fishing 200 in 1.55 s; solunar calls 200 OK ×3 (were 502 since Jul 25). Full chain
+= operator's firewall addr-list fix + /api/v1 base path + verify-TLS mirror key.
+NOTE surfaced to operator (pending): network.env also carries
+`CLEARSKIES_MARINE_DEBUG_TRACE=1` — production spectrum trace is ON (TA-C08 relevance);
+awaiting keep-or-remove ruling.
+*(Superseded unblock record follows.)*
 (1) **Firewall FIXED by operator** (librewxr 192.168.7.22 added to `weather-api-src`
 addr-list 12:23; rule 58 `weather-api-src`→`weather-api-dst`:8765 covers it). Lead
 verified: TCP connect 2 ms; API answers HTTPS with problem+json; correct base path is
