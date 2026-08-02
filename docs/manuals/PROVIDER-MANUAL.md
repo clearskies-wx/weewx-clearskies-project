@@ -2427,8 +2427,114 @@ dedicated test. Full narrative: `MARINE-MODEL-RESTORATION-PLAN.md` decision log,
 `_transect_band_depths()`/`_TRANSECT_BAND_PAD_FRACTION` (the retired band-sizing helper) are kept, not deleted —
 `tests/test_swan_l4_intersection.py` still tests the helper directly and is outside this round's scope.
 
-**Live verification pending.** A full SWAN test run against this design was in progress at the time of this
-doc-sync pass. No run/convergence/reality-gate result is claimed here.
+**Round 1 live verification — CLOSED, PASSED (2026-08-01, post doc-sync).** The full SWAN test run that was
+"in progress" when this section was first written completed and passed: L4 accuracy 99.6%, valid_fraction
+100.0%, 0 NaN; 143 transects × 67/67 timesteps resolved on their own bands; 3,266 total band points (~23/
+transect average — full-length crossing chords vary per transect, no 150-cap hits, memory roughly half the
+170 MB/cycle estimate above); 143× "no suspected break zone … handoff selection unconstrained (byte-identical)"
+INFO lines — the case-(c)/`None`-constraint no-op path verified live, not just by known-answer test; forecast
+published. Round 1 gates: adversarial audit PASS, lead gate 141/141, docs committed+pushed.
+
+**Round 2 — main-break-zone headline (BD-7), representative transect (BD-9), BD-8 retirement (marine
+`9719db1`/`732e87d`, ADR-093 Amendment 7).**
+
+`_compute_main_break_zone()` (`services/surf_1d_pipeline.py`) is the single source of truth for the headline
+and the representative-transect pick, called once and shared by both aggregation paths
+(`_run_pipeline_per_transect()` and `run_pipeline()` Step 6 — never duplicated). Algorithm, exactly as
+implemented:
+1. `spot_mean` = mean `best_face_height_m` over every SUCCESSFUL transect (BD-8: structure-affected included).
+2. Candidate = `face >= spot_mean`.
+3. Maximal contiguous runs of candidates, by `transect_index` — a failed/missing transect breaks a run exactly
+   like a non-candidate does.
+4. Main zone = the candidate run with the highest MEAN face among runs of length `>= 5` (the operator-ruled
+   minimum-zone-width; spec §6.2).
+5. **Fallback A** (no candidate run reaches length 5, but `>= 5` successful transects total): the highest-mean
+   5-consecutive-transect window among ALL successful transects, still index-contiguous. **Fallback B**
+   (`< 5` successful transects total, OR — a residual case the spec names by ruling but not by number, operator-
+   approved 2026-08-01 — `>= 5` total but no contiguous block reaches length 5 because of scattered failures):
+   the main zone is every successful transect handed to the function. `main_zone_transect_count` is therefore a
+   MEMBER count, not necessarily an index span (Fallback B can leave gaps between `main_zone_start_index` and
+   `main_zone_end_index`).
+6. `zone_mean`/`zone_sigma` = mean and POPULATION standard deviation (`statistics.pstdev`) of in-zone faces.
+   Effective qualifying threshold = `min(zone_mean + 0.75 × zone_sigma, 5th_highest_in_zone_face)` — the
+   operator-ruled upper-tail semantics (spec §6.1: SWAN conveys hourly-averaged statistics, not individual
+   waves, so the upper tail of transects — not a symmetric band around the mean — is what corresponds to the
+   set waves surfers judge by). When the zone has fewer than 5 members (only reachable via Fallback B),
+   "5th-highest" degenerates to the zone's minimum face, so the threshold can never exclude every member.
+7. Qualifying = in-zone entries `>= ` that threshold. `main_zone_face_height_m` (THE headline) = mean of
+   qualifying faces — always non-empty by construction (the threshold is a `min()` against one of the zone's
+   own faces, so at least the zone maximum always qualifies; can admit more than 5 on ties).
+8. BD-9 representative transect = the in-zone entry (not just the qualifying subset) whose face is closest to
+   `main_zone_face_height_m`; ties broken by smallest `|transect_index − zone_alongshore_center_index|`, then
+   by lower `transect_index`.
+
+**`INVARIANT_10`** (`services/invariants.py`, `"10:main_zone_face_leq_best_peak"`) checks
+`main_zone_face_height_m <= best_peak_face_height_m + ε`, gated on a non-empty zone — a mean of a subset can
+never exceed the true whole-area max by construction; this is a sanity backstop, not a new rule.
+
+**BD-8 retirement — `is_structure_affected` is metadata/map-UI only.** Both aggregation call sites
+(`_run_pipeline_per_transect()` and `run_pipeline()` Step 6) were renamed from `open_transect_results` to
+`aggregation_transect_results` — the structure-affected filter that used to build that list is gone.
+`open_transect_count` is now computed SEPARATELY, purely as a reported count, and reads nothing into any
+aggregation path (best peak, spot average, peel angle, or the BD-7 zone algorithm above). The dead "no open
+transects" WARNING branches this filter used to trigger are removed. A structure-degraded transect simply
+fails to clear the candidate/threshold gates on its own merits; a structure-improved one legitimately
+qualifies — neither is special-cased.
+
+**`endpoints/surf.py` wire derivation.** `_swelltrack_face_m` (which feeds `breakingFaceHeight`,
+`waveHeightAtBreak`, `breakingHawaiianHeight`) = `main_zone_face_height_m` when `> 0.0`, else
+`best_peak_face_height_m` — the same "nothing broke this hour" trigger `modelStatus == "no_breaking"` already
+used. **`bestPeakFaceHeight` is decoupled** from this derivation (bugfix, not a behavior choice: it was
+previously silently aliased to whatever fed `breakingFaceHeight`, so at times it reported the open-transect
+max under a "best peak" label rather than the true whole-area max) — it is now always
+`PipelineResult.best_peak_face_height_m` directly, the true single-transect maximum over every successful
+transect. Five new camelCase wire fields (`mainBreakZoneFaceHeight`/`mainBreakZoneStartIndex`/
+`mainBreakZoneEndIndex`/`mainBreakZoneQualifyingCount`/`representativeTransectIndex`) are populated in both the
+data-present and `modelStatus: "unavailable"` (all-null) branches — see API-MANUAL.md §17/§18 for the full wire
+contract.
+
+**`endpoints/beach_profile.py` — `_select_best_transect()`.** `transect_index=best` now prefers
+`pipeline_result.representative_transect_index` when present; falls back BYTE-IDENTICAL to the legacy
+open-transect max-face selection only when that field is `None` or not found in the transect list (a pre-
+round-2 cache entry, or a degenerate case) — a deliberate coordinator ruling to leave the legacy path
+unchanged for old cache entries rather than reinterpret them.
+
+**Cache codec (`services/swelltrack_cache.py`) — 7 new `PipelineResult` fields + a Round-1 latent-defect fix.**
+`main_zone_face_height_m`/`main_zone_start_index`/`main_zone_end_index`/`main_zone_transect_count`/
+`main_zone_qualifying_count`/`main_zone_threshold_m`/`representative_transect_index` are serialized and
+deserialized; an old cache entry written before this round simply lacks these keys, and the decoder's `.get()`
+calls supply the dataclass's own defaults (`0.0`/`None`/`0` per field) — never raises on an old payload.
+**Separately, `primary_break_index` (BD-4, Round 1) is now round-tripped on `PartitionBreakResult`** — this
+closes a LATENT Round-1 defect: the encoder never wrote the field and the decoder never read it, so every
+cached `PartitionBreakResult` silently reset to `primary_break_index=0` (outermost) on every cache read, even
+when the pipeline had just computed and served a genuine non-zero primary index moments earlier in the same
+run. Found at this round's scope-ack review and confirmed live in the actual published forecast cache before
+the fix (not merely inferred from reading the code). Fixed the same way as the 7 new fields: encoder writes it,
+decoder reads `int(d.get("primary_break_index", 0))` — an old payload still defaults to 0, never raises.
+
+**Adversarial audit — PASS WITH FINDINGS (`732e87d`).** `9719db1`'s initial Round-2 implementation was audited
+before this round closed. **F1 (MAJOR, test-evidence gap):**
+`test_two_candidate_runs_both_geq_five_higher_mean_wins`'s fixture had a `spot_mean` that excluded one of the
+two supposed candidate runs from ever being a candidate at all, so "higher mean wins between two candidate
+runs" was never actually exercised by the test that claimed to prove it. Remediated: the fixture was rebuilt
+with an explicit low-background precondition (asserted in the test itself) pulling `spot_mean` below both
+runs, plus a position-variant test proving the winner is chosen by mean alone, not array position, in both
+directions. Re-audited PASS (19 passed, was 18; targeted 7-file set 84 passed, was 83). **F2 (the Fallback-B
+residual case — scattered failures leaving gaps within the zone's index span):** operator-APPROVED in chat
+2026-08-01 as a real, intentionally-scoped case, not a defect — the Fallback-B code itself is UNCHANGED by this
+audit. **F3 (MINOR):** `main_zone_transect_count`'s docstring corrected to state it is a member count, not
+necessarily an index-contiguous span — see the field's own docstring, above.
+
+**Full suite / targeted-test discipline (operator directive 2026-08-01).** `9719db1`'s own full-suite run
+(completed BEFORE the operator's "skip full suite going forward" directive landed) measured 627 passed / 2
+failed (pre-existing `test_serve_nothing_on_failure.py` failures, unrelated to this round) / 2 skipped — the
+608/2/2/1 baseline plus 19 new Round-2 tests. Not re-run after the directive. `732e87d`'s own remediation
+verification and the lead's gate both ran targeted sets only (per operator directive): `732e87d` itself
+verified via `tests/test_main_break_zone_headline.py` (19 passed) + a 7-file targeted set (84 passed); the
+lead's own gate ran 140 targeted tests including the Round-1 guard files, in its own separate shell.
+
+**Live verification pending (Round 2).** A full SWAN test run against this Round-2 implementation was being
+pushed/deployed at the time of this doc-sync pass. No run/convergence/reality-gate result is claimed here.
 
 ### §14.16 GFS wind provider (Phase 7 — supplements HRRR for 72-hour forecast)
 

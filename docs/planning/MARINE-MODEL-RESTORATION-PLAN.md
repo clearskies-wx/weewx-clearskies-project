@@ -1972,8 +1972,70 @@ gap was left open — it was closed in the very next commit, same day.
   finishes writing them, before `_check_convergence()` even runs, let alone before the T4B.3 delete-after-parse
   loop). Recorded as a known limitation of this round's fix, not a defect — see PROVIDER-MANUAL.md §14.15.
 
-**Live verification pending.** A full SWAN test run against this Round-1 implementation was in progress at the
-time of this doc-sync pass. No run/convergence/reality-gate result is claimed anywhere in this entry.
+**Live verification — CLOSED, PASSED (update, 2026-08-01, post doc-sync).** The full SWAN test run that was
+"in progress" when this entry was first written completed and passed: L4 accuracy 99.6%, valid_fraction 100.0%,
+0 NaN; 143 transects × 67/67 timesteps resolved on their own bands; 3,266 total band points (~23/transect
+average, no 150-cap hits, memory roughly half the 170 MB/cycle estimate); 143× byte-identical unconstrained-
+selection INFO lines (the no-suspected-break, `None`-constraint path verified live); forecast published.
+Round 1 gates: adversarial audit PASS, lead gate 141/141, docs committed+pushed.
+
+## 2026-08-01 — SURF-ZONE-BREAK-DETECTION-SPEC Round 2 (BD-7 main-break-zone headline, BD-9 representative
+transect, BD-8 retirement)
+
+Recorded during the doc-sync pass that followed Round 2. Cross-referenced from ADR-093 Amendment 7,
+PROVIDER-MANUAL.md §14.15, API-MANUAL.md, DASHBOARD-MANUAL.md, ARCHITECTURE.md, and
+`SURF-ZONE-BREAK-DETECTION-SPEC-2026-08-01.md`'s own implementation-status line.
+
+**Commits:** `9719db1` (feat, initial Round-2 implementation: `_compute_main_break_zone()` shared by both
+aggregation paths; `PipelineResult` gains 7 new fields; `INVARIANT_10`; cache codec for the 7 new fields;
+`endpoints/surf.py` headline derivation + `bestPeakFaceHeight` decoupling + 5 new wire fields;
+`endpoints/beach_profile.py` representative-transect selection; BD-8 retirement throughout) → `732e87d` (fix,
+adversarial audit remediation F1/F3).
+
+**Two latent defects found at this round's scope-ack review (docs-author, before code review even started) —
+both real, both pre-existing, neither introduced by Round 2:**
+1. **`bestPeakFaceHeight` aliasing.** Before this round, `bestPeakFaceHeight` was silently aliased to whatever
+   value fed `breakingFaceHeight` — so at times it reported the open-transect-only max under a "best peak"
+   label rather than the true whole-area single-transect maximum the field name promises. Round 2 decouples the
+   two: `bestPeakFaceHeight` is now always `PipelineResult.best_peak_face_height_m` directly.
+2. **`primary_break_index` codec omission (Round 1 latent defect).** Round 1 (BD-4) added
+   `PartitionBreakResult.primary_break_index`, but `services/swelltrack_cache.py`'s encoder never wrote it and
+   the decoder never read it — so every cached `PartitionBreakResult` silently reset to `primary_break_index=0`
+   (outermost) on every cache read, even moments after the pipeline had computed and served a genuine non-zero
+   primary index in the same run. **Confirmed LIVE in the actual published forecast cache before the fix** (not
+   merely inferred from reading the code) — the pipeline's own BD-4 selection was correct; only the round-trip
+   through the cache was silently discarding it. Fixed in `9719db1` alongside the 7 new Round-2 fields, same
+   codec functions.
+
+**Adversarial audit — PASS WITH FINDINGS (`732e87d`).**
+- **F1 (MAJOR, test-evidence gap):** `test_two_candidate_runs_both_geq_five_higher_mean_wins`'s fixture
+  (`[0.3]*2+[1.0]*5+[0.3]*2+[2.0]*6+[0.3]*2`) had `spot_mean=1.106`, so the 1.0-run was never itself a candidate
+  — `max(long_runs, key=_run_mean)` ran against a single-element list, and "higher mean wins between two
+  candidate runs" was never actually exercised by the test that claimed to prove it. **Remediated:** the
+  fixture was rebuilt with an explicit low-background precondition (now asserted IN the test itself) pulling
+  `spot_mean` well below both runs, and run A was made longer (7) but lower-mean (1.0) vs run B shorter (6) but
+  higher-mean (2.0), so the fixture also disambiguates "highest mean" from "longest run." A position-variant
+  test (higher-mean run placed EARLIER in the array) proves the winner is chosen by mean alone, not array
+  position, in both directions. **Re-audit PASS:** `tests/test_main_break_zone_headline.py` 19 passed (was 18);
+  targeted 7-file set 84 passed (was 83).
+- **F2 (Fallback-B residual case — scattered failures leaving gaps within the zone's index span, not enumerated
+  by name in the spec):** **operator-APPROVED in chat 2026-08-01** as a real, intentionally-scoped case — not a
+  defect. The Fallback-B code itself is UNCHANGED by this audit; only its docstring (F3) was corrected to say
+  so explicitly.
+- **F3 (MINOR):** `PipelineResult.main_zone_transect_count`'s docstring corrected — it is a member count, not
+  necessarily an index-contiguous span; the Fallback-B residual case can leave gaps within
+  `[main_zone_start_index, main_zone_end_index]`.
+
+**Operator directive — targeted tests only, full suite already run.** `9719db1`'s own full-suite run completed
+BEFORE the operator's "skip full suite going forward" directive landed: 627 passed / 2 failed (pre-existing
+`test_serve_nothing_on_failure.py` failures, unrelated to this round) / 2 skipped — the 608/2/2/1 baseline plus
+19 new tests. Not re-run after the directive. Per the directive, `732e87d`'s own verification and the lead's
+gate both ran targeted sets only: `732e87d` verified via `test_main_break_zone_headline.py` (19 passed) + a
+7-file targeted set (84 passed); **the lead's gate ran 140 targeted tests, including the Round-1 guard files,
+in its own separate shell.**
+
+**Live verification pending.** Marine commits `9719db1`+`732e87d` were being pushed/deployed at the time of
+this doc-sync pass. No run/convergence/reality-gate result is claimed anywhere in this entry.
 
 ---
 

@@ -4,6 +4,15 @@
 every open parameter (see §6, now RULINGS). Round 1 (BD-1/BD-2/BD-4) is GO. Round 2 =
 BD-7 + BD-9; BD-8 is RESCINDED as an exclusion (flag retired to metadata-only, see §6.3).
 
+**Implementation status (updated 2026-08-01):** **Round 1 (BD-1/BD-2/BD-4) — CLOSED, PASSED.** Marine
+`03b33e1`/`ea62e85`/`b60ef92`; adversarial audit PASS; live SWAN run completed and passed (L4 accuracy 99.6%,
+valid_fraction 100.0%, 143 transects × 67/67 timesteps, published); doc-sync committed+pushed. **Round 2
+(BD-7/BD-8/BD-9) — IMPLEMENTED, being pushed/deployed.** Marine `9719db1`/`732e87d`; adversarial audit PASS
+WITH FINDINGS (F1 remediated + re-audited PASS, F2 operator-approved as a real case not a defect, F3 docstring
+fix); this doc-sync pass records the code as it stands at `732e87d` — live verification of the deployed Round-2
+run is pending as of this line (see PROVIDER-MANUAL.md §14.15 and the plan decision log for the fuller
+narrative). See `docs/planning/MARINE-MODEL-RESTORATION-PLAN.md` decision log for both rounds' full entries.
+
 **Context:** written the same day the L4 shadow-envelope rewrite (marine `4e79d21`) passed its
 full-run reality gate (L4 valid_fraction 100%, 143/143×35/35 per-transect handoff, published).
 This spec covers the NEXT defect class, in the 1D/handoff layer: break detection.

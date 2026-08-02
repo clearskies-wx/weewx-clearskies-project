@@ -2439,13 +2439,26 @@ At each transect point: Hs_total = sqrt(sum(Hs_partition_i²))
 
 At each partition's break point:
   → face height = 1.27 × Hs (Rayleigh H1/10, source="break_point")
-  → store as breakingFaceHeight
+  → the PRIMARY break's face height (BD-4, ADR-093 Amendment 7 — largest
+    face, not unconditionally outermost) feeds every aggregate below
 
-Across open transects:
-  → best peak face height, spot average face height
+Across ALL successful transects (BD-8 retired, 2026-08-01 — no longer
+open-only; structure-affected transects participate on their own merits):
+  → bestPeakFaceHeight = single-transect max
+  → spotAverageFaceHeight = mean
   → peel angle from break point spatial variation
+  → _compute_main_break_zone() (BD-7/BD-9, ADR-093 Amendment 7): candidate
+    gate face >= spot mean → maximal contiguous runs (by transect index) →
+    main zone = highest-mean run of >= 5 (fallback: best 5-window, then all
+    successful transects) → qualifying threshold = min(zone_mean +
+    0.75*population_sigma, 5th-highest in-zone face) → mainBreakZoneFaceHeight
+    = mean of qualifying faces (THE headline) → representativeTransectIndex
+    = in-zone transect closest to that headline (tiebreak: zone-center
+    distance, then lower index)
+  → breakingFaceHeight = mainBreakZoneFaceHeight when > 0, else
+    bestPeakFaceHeight (falls back only when nothing broke anywhere)
 
-surf_scorer.score_surf(bestPeakFaceHeight, DSPR, partitions, ...) → quality score
+surf_scorer.score_surf(breakingFaceHeight, DSPR, partitions, ...) → quality score
 ```
 
 **Cross-shore transect reference point (what remains of the pre-SwellTrack path):**
@@ -2498,23 +2511,27 @@ SWAN cross-shore transect output for the timestep
 | Field | What it is | Source |
 |---|---|---|
 | `swellHeight` | Dominant deep-water swell partition height | Deep-water reference point at ~15m (L2), SWAN's own watershed partitions from TABLE PT* (T4B.2). Comparable to NDBC buoy reports. |
-| `waveHeightAtBreak` | Total wave height at the break point (backward-compatible field name) | `breakingFaceHeight ÷ 1.27` — the SwellTrack break-point Hs. **No SWAN fallback:** `null` whenever SwellTrack produced no face height (`endpoints/surf.py`). The former "or ~10m SWAN fallback" is void — ADR-095 Amendment 2 states the ~10 m reference point does not exist in the current architecture. |
-| `breakingFaceHeight` | Trough-to-crest breaking face height at actual break point | 1.27 × Hs at SwellTrack break point (H1/10 Rayleigh factor). Best peak across open transects. |
-| `breakingHawaiianHeight` | Back-of-wave height (×0.5 of face height) | breakingFaceHeight × 0.5 |
-| `bestPeakFaceHeight` | Highest face height among open transects | Max of breakingFaceHeight across non-structure-affected transects |
-| `spotAverageFaceHeight` | Mean face height across open transects | Mean of breakingFaceHeight across non-structure-affected transects |
-| `peelAngle` | Break line angle relative to wave crest | Computed from break point spatial variation across adjacent open transects (degrees) |
+| `waveHeightAtBreak` | Total wave height at the break point (backward-compatible field name) | `breakingFaceHeight ÷ 1.27`. **No SWAN fallback:** `null` whenever the 1D pipeline produced no face height anywhere (`endpoints/surf.py`). The former "or ~10m SWAN fallback" is void — ADR-095 Amendment 2 states the ~10 m reference point does not exist in the current architecture. |
+| `breakingFaceHeight` | Trough-to-crest breaking face height — THE reported/headline height | **Since 2026-08-01 (BD-7, ADR-093 Amendment 7, marine `9719db1`+`732e87d`): `mainBreakZoneFaceHeight` when > 0.0, else `bestPeakFaceHeight`** (`_swelltrack_face_m` in `endpoints/surf.py`) — no longer "best peak across open transects." The fallback to `bestPeakFaceHeight` only fires on the same "nothing broke anywhere" condition that used to zero out the old best-peak value; on any hour where something broke, this is the main-break-zone mean, not a single-transect peak. |
+| `breakingHawaiianHeight` | Back-of-wave height (×0.5 of face height) | `breakingFaceHeight × 0.5`, computed from the same `_swelltrack_face_m` as `breakingFaceHeight` above |
+| `bestPeakFaceHeight` | Highest single-transect face height across the WHOLE study area | **Since 2026-08-01: the true single-transect max over ALL successful transects** (`PipelineResult.best_peak_face_height_m`), structure-affected transects included (BD-8 retired the open-only filter) — decoupled from `breakingFaceHeight` (bugfix: previously silently aliased to whatever fed `breakingFaceHeight`, so at times it was actually reporting the open-transect max under a "best peak" label, not the true whole-area max). Now a genuine secondary/continuity field, not the headline. |
+| `spotAverageFaceHeight` | Mean face height across the WHOLE study area | **Since 2026-08-01: mean across ALL successful transects** (`PipelineResult.spot_average_face_height_m`), structure-affected transects included (BD-8) |
+| `mainBreakZoneFaceHeight` | **NEW 2026-08-01 (BD-7).** THE headline face height | Mean of the qualifying (upper-tail, or top-5-fallback) per-transect bigger-break face heights within the main break zone — the alongshore run of `>= 5` contiguous transects (by transect index) with the highest mean face among candidates (`face >= spot mean`); falls back to the highest-mean 5-transect window, then to every successful transect, when fewer than 5 candidates run contiguously. Qualifying threshold = `min(zone_mean + 0.75 × zone_population_σ, 5th-highest in-zone face)` (upper-tail: admits every transect above that threshold, always `>= 5` when the zone itself has `>= 5` members — ties can admit more). `0.0` when nothing broke anywhere (same trigger `bestPeakFaceHeight`/`breakingFaceHeight` share). |
+| `mainBreakZoneStartIndex` / `mainBreakZoneEndIndex` | **NEW 2026-08-01 (BD-7).** Inclusive transect-index bounds of the main break zone | `int \| null`; `null` only when no transects were computed at all. **Not guaranteed contiguous membership** in the rare scattered-failure fallback case (some transect indices between start and end may be missing/failed) — see PROVIDER-MANUAL.md §14.15. |
+| `mainBreakZoneQualifyingCount` | **NEW 2026-08-01 (BD-7).** Count of in-zone transects that met the qualifying threshold and fed `mainBreakZoneFaceHeight` | `int \| null`; always `>= 1` when non-null. The qualifying threshold itself (`main_zone_threshold_m`) is NOT exposed on the wire. |
+| `representativeTransectIndex` | **NEW 2026-08-01 (BD-9).** The transect index whose cross-section the beach-profile endpoint renders | `int \| null`; the in-zone transect whose own face height is closest to `mainBreakZoneFaceHeight` (deterministic tiebreak: zone-alongshore-center distance, then lower transect index). See §18/DASHBOARD-MANUAL.md — the cross-section always renders THIS transect's actual profile, never an averaged curve. |
+| `peelAngle` | Break line angle relative to wave crest | Computed from break point spatial variation across adjacent transects (degrees). **Since 2026-08-01: across ALL successful transects, not just open ones** (BD-8) |
 | `peelClassification` | Peel angle classification | `"closeout"` (<30°), `"fast"` (30-45°), `"good"` (45-66°), `"mellow"` (>66°) |
 | `transectCount` | Total transects in measurement zone | Integer |
-| `openTransectCount` | Transects not crossing any OBSTACLE | Integer |
+| `openTransectCount` | Transects not crossing any OBSTACLE | Integer. **Since 2026-08-01 (BD-8 rescinded, ADR-093 Amendment 7): metadata/map-UI count ONLY — plays no role in any aggregation field on this page.** A structure-affected transect qualifies for `mainBreakZoneFaceHeight`/`bestPeakFaceHeight`/`spotAverageFaceHeight`/`peelAngle` exactly like any other; a structure-degraded one simply fails to qualify on its own merits, never by exclusion on this flag. |
 | `degraded` | SwellTrack fallback indicator | `true` when SwellTrack failed and legacy SWAN pipeline used |
 | `setTimingMinutes` | float \| null | Set wave timing from SurfBeat IG spectral peak (minutes between sets). `null` when SurfBeat disabled or unavailable. |
 | `setAmplitudeM` | float \| null | IG wave height at shoreline (m). `null` when SurfBeat disabled or unavailable. |
 | `igWaveHeightM` | float \| null | Infragravity significant wave height at shoreline (m). `null` when SurfBeat disabled or unavailable. |
 
-**swellHeight and breakingFaceHeight are now from fundamentally different sources.** `swellHeight` is the dominant deep-water partition from SWAN's own watershed partitioning at ~15m (TABLE PT*, T4B.2) — what's arriving at the coast. `breakingFaceHeight` is H1/10 (1.27× Hs) at the actual break point from SwellTrack — what surfers see. The ratio varies with bathymetry, swell period, and tide.
+**swellHeight and breakingFaceHeight are now from fundamentally different sources.** `swellHeight` is the dominant deep-water partition from SWAN's own watershed partitioning at ~15m (TABLE PT*, T4B.2) — what's arriving at the coast. `breakingFaceHeight` is the main-break-zone headline (or the whole-area best peak, on a no-headline hour) — what surfers see. The ratio varies with bathymetry, swell period, and tide.
 
-All four fields are present in every response regardless of the operator's `surfHeightDisplay` preference. The API returns all representations; the dashboard selects which to show as primary.
+All four legacy fields (`swellHeight`/`waveHeightAtBreak`/`breakingFaceHeight`/`breakingHawaiianHeight`) are present in every response regardless of the operator's `surfHeightDisplay` preference, as are the five new `mainBreakZone*`/`representativeTransectIndex` fields (`null`, not omitted, whenever `modelStatus == "unavailable"`). The API returns all representations; the dashboard selects which to show as primary.
 
 **Breaker formulas (`enrichment/breaker_height.py`):**
 
@@ -2917,9 +2934,16 @@ The NWS SRF text product's `waterTemp` field (a manually-entered forecaster valu
 | `forecast[].windQuality` | str | "Offshore"/"Glassy"/"Cross-shore"/"Onshore" |
 | `forecast[].windSource` | str | `"hrrr"` or `"gfs"` for forecast timesteps, `"station"` or `"forecast_provider"` for `t=0` (ADR-096) |
 | `forecast[].swellHeight` | float | Dominant deep-water-reference partition height in display units (L2, the spot's measured ~15 m contour — marine `83f0205`); falls back to the transect reference point's HSWELL when that timestep has no deep-water reference |
-| `forecast[].waveHeightAtBreak` | float | SwellTrack break-point Hs (`breakingFaceHeight ÷ 1.27`) in display units, or `null` (backward-compatible field name) |
-| `forecast[].breakingFaceHeight` | float | Trough-to-crest breaking face height in display units |
-| `forecast[].breakingHawaiianHeight` | float | Back-of-wave height (×0.5 of face height) in display units |
+| `forecast[].waveHeightAtBreak` | float | `breakingFaceHeight ÷ 1.27` in display units, or `null` (backward-compatible field name) |
+| `forecast[].breakingFaceHeight` | float | Trough-to-crest breaking face height in display units — **since 2026-08-01, the main-break-zone headline (`mainBreakZoneFaceHeight`) when `> 0`, else the whole-area best peak (`bestPeakFaceHeight`); see the fuller height-fields table above** |
+| `forecast[].breakingHawaiianHeight` | float | Back-of-wave height (×0.5 of face height), derived from the same value as `breakingFaceHeight` above |
+| `forecast[].bestPeakFaceHeight` | float | Highest single-transect face height across the WHOLE study area (all successful transects, BD-8) — see the fuller height-fields table above |
+| `forecast[].spotAverageFaceHeight` | float | Mean face height across the WHOLE study area (all successful transects, BD-8) |
+| `forecast[].mainBreakZoneFaceHeight` | float \| null | **NEW 2026-08-01 (BD-7).** THE headline — see the fuller height-fields table above for the zone algorithm |
+| `forecast[].mainBreakZoneStartIndex` / `forecast[].mainBreakZoneEndIndex` | int \| null | **NEW 2026-08-01 (BD-7).** Inclusive transect-index bounds of the main break zone |
+| `forecast[].mainBreakZoneQualifyingCount` | int \| null | **NEW 2026-08-01 (BD-7).** Count of in-zone transects feeding the headline |
+| `forecast[].representativeTransectIndex` | int \| null | **NEW 2026-08-01 (BD-9).** Transect the beach-profile cross-section renders |
+| `forecast[].openTransectCount` | int | Transects not crossing any OBSTACLE — **since 2026-08-01, metadata/map-UI count only, no aggregation role (BD-8 rescinded)** |
 | `forecast[].period` | float | Dominant period in seconds |
 | `forecast[].direction` | float | Swell direction in degrees |
 | `forecast[].multiSwell` | list[object] \| null | Swell partitions at the deep-water reference per timestep (not NDBC — ADR-095/096); `null` when no deep-water reference exists for that timestep |
@@ -2948,7 +2972,7 @@ SWAN always produces multi-timestep output. The dashboard's 72-hour forecast cha
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `transect_index` | str (query) | `"best"` | `"best"` (open transect with the highest face height), `"all"` (array of every transect's profile), or a non-negative integer transect index. HTTP 422 on an unparseable or negative value. |
+| `transect_index` | str (query) | `"best"` | **Since 2026-08-01 (BD-9, ADR-093 Amendment 7, marine `9719db1`):** `"best"` renders the pipeline's own `representativeTransectIndex` (the main-break-zone representative — see the `/surf` height-fields table) when present; only a pre-round-2 cache entry with no `representativeTransectIndex` falls back to the legacy open-transect max-face-height selection (`_select_best_transect()`, byte-identical to the old behavior). `"all"` (array of every transect's profile), or a non-negative integer transect index. HTTP 422 on an unparseable or negative value. |
 
 **Response — `data` object, all modes:**
 
@@ -2993,7 +3017,7 @@ A handoff partition that matches no canonical partition still has its break poin
 | `axisUnits` | object | `{"x": <distance symbol>, "y": <distance symbol>}` |
 | `verticalDatum` | str \| null | Read from the per-spot profile cache. **Known, independently-tracked defect, not addressed by SURF-PUBLISH-RESULTS-ONLY:** this is currently always null, including on `modelStatus: "ok"` responses — the value does not yet reach the API. Do not read a null here as evidence the model has no answer. |
 | `transectCount` | int \| null | Total transects computed for this spot |
-| `openTransectCount` | int \| null | Transects not excluded as structure-affected |
+| `openTransectCount` | int \| null | Transects not crossing any OBSTACLE. **Since 2026-08-01 (BD-8 rescinded, ADR-093 Amendment 7): metadata/map-UI count only** — plays no role in transect selection on this endpoint (see `transect_index=best` above) or in the `/surf` aggregation fields. |
 | `handoffDepthM` | float \| null | Representative handoff depth (the "best" transect's) |
 | `handoffSourceLevel` | str \| null | Representative handoff source level — `"L4"`, `"L3"`, or `"L2"` (E5 ruling D3) |
 

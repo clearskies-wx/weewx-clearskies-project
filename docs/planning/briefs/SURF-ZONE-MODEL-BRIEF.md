@@ -788,3 +788,34 @@ The user received multi-1D architecture suggestions from Gemini. Fact-check agai
 - Wave breaking classification: https://geo.libretexts.org/Bookshelves/Oceanography/Coastal_Dynamics_(Bosboom_and_Stive)/05:_Coastal_hydrodynamics/5.02:_Wave_transformation/5.2.5:_Wave_breaking
 - Peel angle and surfability: Scarfe, B.E. (2002). "Categorising surfing manoeuvres using wave and reef characteristics." M.Sc. thesis, University of Waikato.
 - Diffraction theory: https://geo.libretexts.org/Bookshelves/Oceanography/Coastal_Dynamics_(Bosboom_and_Stive)/05:_Coastal_hydrodynamics/5.02:_Wave_transformation/5.2.4:_Diffraction
+
+---
+
+## ADDENDUM (2026-08-01) — superseded/implemented by SURF-ZONE-BREAK-DETECTION-SPEC-2026-08-01
+
+This brief's own defect analysis (§1: "break points are undetected due to undersampling"; the single-point
+breaker-formula critique) and its multi-transect/handoff-algorithm proposal are the direct ancestor of
+`docs/planning/briefs/SURF-ZONE-BREAK-DETECTION-SPEC-2026-08-01.md` — **read that spec, not this brief, for the
+current design and its implementation status.** As of this addendum, that spec's Round 1 (BD-1/BD-2/BD-4) and
+Round 2 (BD-7/BD-8/BD-9) are both implemented:
+
+- **Full-line break detection and the seaward-of-break handoff constraint (BD-1/BD-2)** — this brief's own
+  "the ENTIRE point of the 1D transects is to locate the peak, the break zone, the foam zones, AND double
+  breaks" (spec §2, quoting the operator) is now enforced at the handoff-selection boundary itself: the handoff
+  never lands inside or shoreward of a suspected break zone (marine `03b33e1`/`ea62e85`, ADR-093 Amendment 7).
+- **Primary-break reporting (BD-4)** — the reported break per transect/partition is the LARGER of the (possibly
+  multiple) detected breaks, not unconditionally the outermost (marine `03b33e1`/`ea62e85`/`b60ef92`).
+- **The headline metric this brief never specified** — §1's critique of "a single-point formula approximation"
+  is resolved differently than this brief's own multi-transect proposal originally implied: the SERVED headline
+  (`breakingFaceHeight` and friends) is now the main-break-zone mean (BD-7), not a raw best-peak or spot-average
+  pick, with a representative single transect (BD-9) rendered for the cross-section — see PROVIDER-MANUAL.md
+  §14.15 and API-MANUAL.md for the current algorithm and wire contract.
+- **Structure exclusion** — this brief predates the operator's BD-8 rescission (2026-08-01): structure-affected
+  transects are no longer excluded from any headline/aggregation metric; `is_structure_affected` is map/UI
+  metadata only.
+
+This brief's underlying physics content (breaker classification, Iribarren number, wave-shape formulas, jacking
+factor, the cited literature above) is UNCHANGED and still authoritative — only the detection-domain and
+aggregation-policy questions this addendum lists have moved. Do not treat this brief's own multi-transect/
+handoff proposal sections as the current design; treat them as the historical motivation for the spec that
+superseded them.
