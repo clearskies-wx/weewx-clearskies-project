@@ -58,7 +58,20 @@ closes before its next task round dispatches.
 
 ---
 
-## PHASE H — Operational hardening
+## PHASE H — Operational hardening — ✅ GATE H PASSED 8/8 (2026-08-02, independent auditor walk)
+
+**Gate record:** every row either re-verified live by the auditor's own fresh command (rows
+2,3,6,7,8) or backed by the auditor's own prior adversarial artifact (1,4,5) — zero rows on
+implementer/coordinator word. Highlights: row 2 — drill ERROR + recovery re-grepped live,
+and the 07:56 deploy-restart cycle-kill itself showed up as a recorded `swan_fatal` (SIGTERM)
+in the H1 registry — the loudness machinery catching our own deploy interruption; row 7 —
+SWAN-path baseline exact (143 transects / 216.4° / L4 valid_fraction 100.0% / accuracy
+99.6%), C7 anomaly correctly not re-flagged; row 8 — proxy handshake-timeout count **25
+pre-deploy (32 h window) vs 0 since**, plus the auditor's own 10/10 probe burst at 6.2-12.9
+ms taken mid-SWAN-cycle. Disclosed residuals (H4 1.655 s unlocalized outlier, H5 cold-read,
+decode-side holds, C7) are tracked tasks, not gate failures. Phase H tasks: H1 ✅ H2 ✅ H3 ✅
+H4 🔶 (accept closed; H5 spun off) — phase CLOSED; H5 remains an open Phase-H-addendum task
+audited at its own round.
 
 ### H1 — No-publish paths must be loud and truthful *(was Restoration R4; Gate R row 5)*  ✅ DONE 2026-08-02 — deployed + forced-degraded drill PASSED (second attempt, after the drill itself found and fixed a defect)
 **Live acceptance record (2026-08-02):** Drill #1 (grid-sizing-cache rename + restart,
