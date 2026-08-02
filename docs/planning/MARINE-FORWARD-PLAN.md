@@ -350,7 +350,20 @@ closeout, don't "fix" it.
 **Accept:** KATs against recorded current-shape fixtures (incl. a negative-`distanceFromShore`
 profile and an old pre-Round-2 payload); axe-core pass; live render after H4 lands.
 
-### D5 — Dashboard surf re-wiring, part 2: heatmap + vertical section back to live  ⬜
+### D5 — Dashboard surf re-wiring, part 2: heatmap + vertical section back to live  ✅ DONE 2026-08-02 (dashboard `fe0b8e9`+`6bc0573` DEPLOYED to weather-dev; meta `54553ae`) — operator visual eyeball pending
+**Round record:** D5.1 = EMPTY breakage list, evidence-backed, pinned with live-fixture tests
+(real transect-4 double-break; negative distances now 143/143 transects — D4's axis fix
+load-bearing). D5.2 = BD-7/9 overlays (purple gutter band + representative triangle + legend
++ sr-only/desc pairing). D5.3 = DASHBOARD-MANUAL "no heatmap" falsehood corrected as-built.
+Audit round 1 PASS-WITH-FINDINGS: MAJOR value-vs-position overlay geometry (SVG used /surf
+index VALUES as /profile array POSITIONS — diverges from the value-comparing sr-only table
+whenever marine filters a failed transect; right-by-accident on contiguous data) + MINOR
+unconditional font-weight breaking byte-identity. Remediation `6bc0573`: membership-based
+positions (SVG+table agree BY CONSTRUCTION), conditional font-weight; re-audit PASS (gap-KAT
+independently reproduced; mutation shows the exact 15px/1-row bug signature; byte-identity
+proven vs TRUE pre-D5 baseline). Accepted LOW nuance: "partial-overlap-bands" test name
+overstates solo coverage; class fully pinned by zero-overlap + gap-KAT siblings. 18/18 +
+42/42 + tsc/build clean; axe = exactly the 2 known D9 dl violations, zero new.
 **(Corrected 2026-08-02 — these products EXIST; the earlier "does not exist" note was wrong,
 based on a DASHBOARD-MANUAL statement now known stale. Operator confirmed both were
 implemented; verified in code.)**
