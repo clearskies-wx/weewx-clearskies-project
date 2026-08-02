@@ -633,6 +633,17 @@ with/after G6.3, then markers flow through the same LM-1/LM-2 path with zero fur
 
 ## Decision log
 
+- **2026-08-02 (autonomy grant + H4 pick).** Operator, in chat: "ok continue autonomously
+  with plan implementation." Under that grant, with the coordinator's recommendation twice
+  surfaced without objection: H4 proceeds as option (a) same-service serialization offload
+  (to_thread for GIL-releasing I/O + chunked-yield for GIL-bound encode, decided by Stage-1
+  measurement) + the (d) API-side cache investigation (read-only this round); option (c)
+  timeout raise rejected as stall-hiding. H1's forced-degraded live drill proceeds via
+  temporary grid-sizing-cache rename on librewxr (reversible, one cycle attempt), sequenced
+  AFTER the next natural cycle completes so H2's two-cycle evidence stays clean. Phase LM
+  added same day (landmarks; operator-authorized contract additions) with wizard/admin parity
+  binding on LM-3/G6.3 and recorded as a general setup-function requirement.
+
 - **2026-08-02 (execution, round H1+D2) — D2 closed; H1 code-complete + audited.** D2: marine
   `e8646d2`, fixture-only (one kwarg), serve-nothing suite 2F/7P → 9/9, lead-verified
   independently; Gate-D row-1 evidence banked. H1: Sonnet implementer (scope-ack with full
