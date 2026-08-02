@@ -263,17 +263,46 @@ both directions; stride-sleep necessity unproven by tests — kept as cheap insu
 numbers decisive). Residuals tracked: H5 (cold /surf), decode-side monolithic loads (ruled
 out of scope; re-examine only if the 1.655 s outlier localizes to it).
 
-### H5 — Cold /surf read exceeds proxy timeout once per cycle *(NEW 2026-08-02, found at H4 live accept)*  ⬜
+### H5 — Cold /surf read exceeds proxy timeout once per cycle *(NEW 2026-08-02, found at H4 live accept)*  ⛔ OPERATOR DECISION (Stage 1 ✅ done)
 **Owner:** `clearskies-api-dev` (Sonnet), investigation-first. **QC:** auditor at Gate H
-addendum. **Defect:** the FIRST `/surf/{id}` after each forecast publish takes ~33 s
-(per-request swelltrack/deep-structure deserialization of the fresh cache) → the API
+addendum. **Defect:** the FIRST `/surf/{id}` after each forecast publish takes ~33 s → the API
 companion proxy's 15 s read timeout → one 503 per cycle until a retry warms it (then 0.46 s).
 Distinct mechanism from H4's handshake starvation (handshakes stay <30 ms throughout).
-**Candidate designs (Stage-1 measurement decides; same-service only, no new deps):** warm the
-serving structures at publish time (the service KNOWS it just published — precompute what the
-first request would); memoize the deserialized form; narrow the cold work. Also fold in the
-H4-(d) proxy-cache factors (success-only warm + shared-LRU eviction + the dashboard
-query-param-variance grep). **MUST NOT TOUCH:** cache file shape, publish decisions, H4's
+
+**H5 Stage 1 ✅ DONE 2026-08-02 (`l4-rewrite`, measurement-only, no edits). The task's
+original hypothesis was WRONG — corrected by measurement:**
+- Swelltrack/deep-structure deserialization is CHEAP: `swan.fetch()` is a single in-process
+  cache lookup (no I/O, no JSON parse); live cache file (112.68 MB) has 100% swelltrack
+  coverage for all 36 distinct forecast timestamps (zero fallback misses); the ~1.3 s
+  `_load_forecast_cache_from_disk` decode runs once per PROCESS (startup), not per publish.
+- **Actual root cause: surf.py's own HRRR wind fetch** (`endpoints/surf.py:658` →
+  `providers/wind/hrrr.py`). On cache miss it downloads 19 sequential GRIB2 files (f00–f18,
+  `_MAX_FORECAST_HOURS=18`) with `time.sleep(0.55)` NOMADS pacing between each. Cache key
+  includes `cycle_time` (TTL 55 min) → every new HRRR cycle is a GUARANTEED first-request
+  miss; and a new HRRR cycle is the SAME event that triggers each SWAN publish (causal
+  correlation, two different cache keys — SWAN's own extended-cycle fetch does NOT warm
+  surf.py's key). Live-measured from librewxr against real NOMADS: ~1.14 s/fetch × 19 ≈
+  **21.7 s network+pacing alone** (GRIB2 parse/rotation unmeasured — the ~10 s gap to 33 s).
+- H4-(d) proxy factors: companion proxy success-only caching CONFIRMED
+  (`companion_proxy.py:466-558`, `cache.set` only on 200; stale-fallback served if a prior
+  200 survived); shared-LRU eviction risk REAL under default `MemoryCache`
+  (one process-wide TTLCache(1000) shared by ALL providers+proxy routes — stale fallback can
+  be evicted early); dashboard query-param variance RULED OUT for `/surf/{id}` (zero params;
+  note `/surf/{id}/profile` IS fragmented by two `transect_index` variants — adjacent,
+  out of scope). Open items: (a) parse-cost gap unmeasured; (b) librewxr API host
+  Redis-vs-MemoryCache unverified; (c) no live cold-miss capture (cycle timing 2 min–2h43).
+**⛔ OPERATOR DECISION (2026-08-02, lead ruling on the agent's own flag):** the recommended
+minimal fix — warm surf.py's HRRR cache key from the runner's post-publish step (same
+function, same params/key as the request path; best-effort; needs byte-identical-key KAT +
+called-once KAT + publish-never-blocked KAT) — is ARCHITECTURAL under triggers 5 (moves the
+fetch's lifecycle stage: request-time → publish-time) and 6 (adds a publish-event trigger
+for work that today runs only on client demand). The plan's own "warm at publish time"
+candidate text is lead-written and does not authorize. Alternatives all trip triggers too
+(reuse SWAN's wind data = data contract; cut forecast hours/bbox = fidelity criterion).
+Known risks if approved: publish-path duration (+~20-30 s if synchronous; wants
+fire-and-forget), bbox/key drift (the KAT above), NOMADS rate-limiter contention with
+SWAN's own fetch. **Awaiting operator ruling in chat before any Stage 2.**
+**MUST NOT TOUCH (carries to Stage 2):** cache file shape, publish decisions, H4's
 chunked encoder.
 
 ### ⛔ QC GATE H — assigned: `clearskies-auditor` (adversarial), BEFORE the lead gate
@@ -392,11 +421,19 @@ shows two break markers in both views; manual corrected.
 
 ### D8 — Peel-direction chevron re-wire *(NEW 2026-08-02, found by D4.1's contract audit)*  ⬜
 **Owner:** `clearskies-dashboard-dev` (Sonnet). **QC:** auditor at Gate D.
-**Defect:** `SurfingTab.tsx:2240/2243` renders the left/right peel chevron via
-`peelClassification.includes('right'/'left')` — but the served values are PLAIN
-(`closeout|fast|good|mellow`, confirmed live + API-MANUAL:2526), so the condition is always
-false and the chevron never renders (silent dead code). The live payload carries a separate
-`peelDirection` field (e.g. `a_frame`) that was absent from types.ts/openapi entirely.
+**Defect (PREMISE CORRECTED 2026-08-02, lead source-read + live query):** the original
+finding said served `peelClassification` values are plain — that was a sampling artifact
+(the D4 capture was all-closeout hours, and closeout is ALWAYS plain). Server truth
+(`surf_1d_pipeline.py:750-786` + golden fixture + live 36/36 `closeout`+`a_frame`):
+classification IS direction-suffixed (`fast_a_frame`, `fast_right`, `good_left`, …) when
+direction is determined and class ≠ closeout; plain base when direction undetermined.
+So the `.includes('right'/'left')` chevron is dead only for `a_frame` (and, correctly,
+closeout) — still a real defect, narrower than first stated. `peelDirection`
+(`right|left|a_frame|null`) is computed independently and served even on closeout hours
+(the pipeline docstring claiming "always None for closeout" was false — doc-only fix,
+marine `1967a74`). API-MANUAL:2526 stale twice over (plain-only values, no peelDirection
+row) — corrected in this round's doc-sync. D4's types.ts "plain, undirected" comment gets
+re-corrected here too.
 **Sequencing:** D4 Stage 2 lands the CONTRACT half (adds `peelDirection` to types.ts+openapi,
 corrects the stale `peelClassification` doc comment). This task is the RENDER half only:
 re-wire the chevron to consume `peelDirection`, with a per-value rendering decision table
