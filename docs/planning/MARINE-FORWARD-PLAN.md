@@ -443,7 +443,12 @@ implemented anywhere).
 openapi:3295 wrong date, this section's original T7.2b/T7.3-only origin attribution
 (partitionBreakInfo is T5.4).
 
-### D11 — Test-order pollution: tide-level tests leak state into health tests *(NEW 2026-08-02, found during H4, confirmed pre-existing via git-stash baseline)*  ⬜
+### D11 — Test-order pollution: tide-level tests leak state into health tests *(NEW 2026-08-02, found during H4, confirmed pre-existing via git-stash baseline)*  ✅ DONE 2026-08-02 (marine `92c2743`)
+**Round record:** root cause = `services/invariants.py` module-level firing counters never
+reset between test files (its `reset_invariants_for_tests()` existed but was uncalled);
+health's degraded-floor read them. Fix: 3-line conftest wiring into the existing autouse
+reset fixture. Falsifiability: 2-file repro failed pre-fix (2F/12P); post-fix 4-file H1 set
+45/45 in BOTH orders (lead re-ran both independently). Zero production code touched.
 **Owner:** `clearskies-test-author` (Sonnet). **QC:** auditor at Gate D.
 **Defect:** running `tests/test_surf_tide_level.py` BEFORE `tests/test_no_publish_reasons.py`
 or `tests/test_health.py` in one pytest session → 3 spurious failures (`assert 'degraded' ==
