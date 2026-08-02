@@ -115,7 +115,27 @@ against the inverse regression).
 **Accept:** all three KATs; live check = one forced degraded cycle on librewxr shows
 health != ok + admin row + single ERROR, then a normal cycle returns to `ok`.
 
-### H2 — Upstream fetch hygiene: WW3/NOMADS (+ same-class audit) *(was Restoration R6)*  ⬜
+### H2 — Upstream fetch hygiene: WW3/NOMADS (+ same-class audit) *(was Restoration R6)*  🔶 CODE-COMPLETE + AUDITED (2026-08-02) — live check (≥2 cycles) pending deploy
+**Round record (2026-08-02):** marine `498b6a8` (2 files: `services/ww3_station_selection.py`
++ new `tests/services/test_ww3_fetch_backoff.py`, 14 KATs). Adversarial audit PASS first pass
+(3/3 mutations caught incl. retry-count pinning by 3 independent assertions; auditor wrote its
+own multi-fallback storm probe — exactly ONE WARNING under a full 3-cycle storm; pure
+sleep-substitution verified against pre-commit code; config-time variant untouched).
+**Corrections to this section's original text, established by H2.1 evidence:**
+(1) the fetch does NOT live in `providers/marine/wavewatch.py` (that is a separate, untouched
+PacIOOS bulk-forecast module) — the real chain is `services/ww3_spectrum.py` (NOMADS HTTP GET)
+→ `services/ww3_station_selection.py` (retry wrapper) → `providers/_common/http.py` (shared
+client; its 4xx-never-retry is load-bearing global behavior and was not changed);
+(2) the "per-cycle retry cap" ALREADY existed (3 attempts/station × `_MAX_CYCLE_FALLBACKS=3`
+model-cycle fallbacks, both pre-existing and unchanged) — the Jul 30–31 "hot loop" (144
+bounded 404s) was fixed-interval burstiness, and this round changed retry SPACING only
+(exponential base 2.0 s × 2.0, cap 30 s, jitter ±25%) + ONE aggregated fallback WARNING;
+(3) H2.3 was PRE-SATISFIED: all four `/health` inputs (incl. `ww3_boundary` and `wind`)
+already carry `available`+`age_s` live — zero code, closed as a verification row;
+(4) H2.4 Overpass: DEFERRED with reasoning (already behind the shared client's backoff; no
+multi-candidate not-yet-published condition exists to wrap). Remaining for Accept: deploy
+(own deploy slot, after H1's live verification) + ≥2-cycle journal check + boundary age
+visible (Gate H rows 4–5 code evidence banked via audit).
 **Owner:** `clearskies-api-dev` (Sonnet). **QC:** `clearskies-auditor` at Gate H.
 **Origin/context:** archived restoration plan §R6; hot 403/404 retry loops in the Jul 30–31
 journals; brief: [briefs/WW3-SPECTRAL-BOUNDARY-DATA-BRIEF.md](briefs/WW3-SPECTRAL-BOUNDARY-DATA-BRIEF.md)
