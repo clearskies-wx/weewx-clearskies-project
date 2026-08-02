@@ -310,7 +310,15 @@ requirement, not an option). Required KATs stand: byte-identical-cache-key,
 warmed-then-first-request-does-not-refetch, publish-never-blocked-by-warming-failure.
 Stage 2 dispatches to `l4-rewrite` after its C2 round closes.
 
-**Stage 2 ✅ IMPLEMENTED 2026-08-02, marine `53b25d3` (local, deploy pending audit):**
+**✅ DEPLOYED 2026-08-02 19:26:23Z (marine `169b911`, clean window after the 19:25:05Z
+cycle completion; /health+/manifest 200, auth enforced). Reality gate: warming thread
+fired 7 s after startup (t18z f00... chain live), no new ERROR class (only the known
+NOMADS not-yet-posted 404s), Lambert WARNING pre-existing (472 hits pre-deploy). Observed
+live: the warming chain and SWAN's own extended chain fetch the same early files
+concurrently at startup — the recorded LOW single-flight residual, bounded by the shared
+rate limiter, accepted. Definitive post-hourly-rollover /surf timing check scheduled
+(20:03Z watcher).**
+**Stage 2 ✅ IMPLEMENTED 2026-08-02, marine `53b25d3` + remediation/Stage-3 `169b911`:**
 `bbox_for_location()` shared helper in hrrr.py; surf.py:652-657 refactored onto it
 (byte-identical); `_warm_hrrr_cache_for_locations()` + fire-and-forget daemon thread after
 the full-cycle "complete" log (full-cycle branch only); 8/8 new KATs
