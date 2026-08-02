@@ -548,12 +548,49 @@ Closes C6 (T1.3) with the same evidence. **Accept:** within tolerance at ≥1 re
   bigger face; merge-threshold behavior observed (tune ONLY if zones fragment, spec §6.4).
 - **Larger-seas magnitude revalidation** (validated at ~1 m only so far).
 
-### V3 — Formal blind audit of the served forecast  ⬜
+### V3 — Formal blind audit of the served forecast  ✅ **RUN 2026-08-02 — 7 findings, triaged below; follow-up tasks V3-F1/F2/F4/F7 + doc batch**
 **Owner:** `clearskies-auditor` (fresh instance, briefed on MANUALS ONLY — no session history,
 no this-plan access; that blindness is the point). Audits one live served forecast end-to-end
 for internal consistency + reality agreement; findings ranked. Anything it finds that the
 manuals can't explain is, definitionally, either a defect or doc drift — both are deliverables.
 This is also the backstop for anything the archived separation plan left genuinely unfinished.
+
+**RESULT (fresh `v3-blind-auditor`, 36-entry live payload, saved to scratchpad
+surf.json/profile.json):** PASSED a substantial invariant set (additive scoring identity
+36/36; ÷1.27/×0.5 breaker formulas exact; headline/best-peak/average ordering 36/36;
+SWAN-vs-NDBC frequencyRange convention; profile transectIndex 32 == representativeTransectIndex;
+/health coherent; NDBC 46222 Hs within pre-stated ±30% [0.72 vs 0.91 m]; Surfline band match).
+**7 findings, lead-triaged:**
+| # | Sev | Finding | Lead triage |
+|---|---|---|---|
+| F1 | BLOCKER | 32 h hole mid-forecast (Aug 3 00Z→Aug 4 06Z absent, not null-padded) | REAL + mechanism pinned by lead journal read: GFS wind fetched ONLY f048-f072 of the 06Z cycle (its designed far-window, "9 forecast hour(s)" 13:04:49Z) while HRRR (near/mid window) hit NOMADS 404s — t12z files past f11 not yet posted at 13:04Z → wind coverage 0-11 h + 48-72 h, hole = unfetched 12-47 h. Cycle published anyway. → **V3-F1 task** |
+| F2 | MAJOR | swellDominance bimodal {0.2, 0.6} ≠ documented energy ratio (true ratios 0.38-0.54); propagates ×7.5 into score | REAL discrepancy vs manual — code-read needed (binned score vs ratio?) → **V3-F2 task** |
+| F3 | MAJOR | Undocumented served fields: top-level `waterTemp`, per-entry `peelDirection` | peelDirection: KNOWN, D8 doc-sync landed meta `9bec177` same day (auditor read pre-commit manual); §18 table may still lack it. waterTemp: genuine doc gap → **doc batch** |
+| F4 | MAJOR | `forecast[].breakPoints` null 36/36 while waves actively break + /profile serves real break points | Likely dead legacy single-transect QB path (pre-SwellTrack); needs disposition (populate-vs-document-vs-remove is operator territory if contract changes) → **V3-F4 task** |
+| F5 | MINOR | `metadata.verticalDatum` = "LMSL" live vs manual "always null" | Doc drift (claim predates a fix) → **doc batch** |
+| F6 | NOTE | Two waterTemps differ 4.7 °C in one payload (resolver 24.7 vs SRF hand-typed 20.0) | Explained by documented provenance; fold provenance note into waterTemp doc → **doc batch** |
+| F7 | NOTE | organizationWind 16.5 > documented 15-pt cap (6/36, all "glassy"); additive identity intact | Likely undocumented glassy bonus; code-read then doc fix (or defect report) → **V3-F7 task** |
+**Lead-added F8 (journal read, same session):** NDBC provider 404s repeating every ~5 min
+since ~14:11Z (station realtime file) — not V3-flagged, needs a look (station file moved/
+retired vs transient). Folded into V3-F2/F4/F7 investigation round.
+
+### V3-F1 — Mid-forecast wind-coverage hole  ⬜ (investigation → likely OPERATOR for any fix)
+Marine: establish the wind-window design (HRRR near + GFS f048+ far — where is the 12-47 h
+mid-window supposed to come from when HRRR extended files aren't posted yet?), whether a
+prior-fully-posted HRRR cycle fallback exists/should exist (cycle-selection change would be
+ARCHITECTURAL — investigation reports, operator decides), and whether publishing with a
+mid-hole is intended "honest serving" (then manuals + dashboard chart continuity must say
+so: DASHBOARD-MANUAL claims "continuous across day boundaries") or a defect.
+
+### V3-F2/F4/F7 (+F8) — Scoring/legacy-path code-read  ⬜ (read-only investigation, then scoped fixes)
+One Explore round: (F2) trace swellDominance producer — why {0.2,0.6} bins vs documented
+ratio; (F4) trace forecast[].breakPoints producer — prove dead-or-alive, name what killed
+it; (F7) trace organizationWind glassy cap; (F8) identify the 404ing NDBC URL + why.
+Findings → lead dispositions; wire-contract changes (if any) → operator.
+
+### V3-doc-batch — API-MANUAL corrections from V3  ⬜ (doc-sync round)
+waterTemp (document field + dual-provenance note), peelDirection in §18 per-entry table
+(verify D8's `9bec177` row covers §16 only), verticalDatum stale "always null" claim.
 
 ### V4 — Forecast window 66 h vs 72 h *(TA-C16)*  ✅ **CLOSED — operator ruled 2026-08-02:
 accept as-is.** The honest shorter window when the newest GFS cycle is unpublished is correct
