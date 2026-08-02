@@ -2186,15 +2186,11 @@ When neither path yields a point the function logs at **ERROR** naming the spot 
 >
 > `run_1d_analytical`'s existing `depth = max(seabed + tide, 0.01)` clamp then wets/dries the new beach-face cells per forecast hour automatically — grid geometry stays frozen at setup, only the wet/dry state moves. The `depth_m > 0` filters in `providers/nearshore/swan.py` and `endpoints/beach_profile.py` are replaced with keep-if-not-None so the signed land points survive to SwellTrack. **Crucially, this touches only the per-transect 1-D profiles (`profiles_by_transect`, which take priority in SwellTrack) — the per-spot PCHIP `profile` that feeds `interpolate_profile_pchip()` and L4 SWAN-grid sizing is UNCHANGED** (PCHIP rejects negative depths by contract; SWAN grid geometry is out of Amendment 4's scope). A transect whose topobathy cannot reach HAT logs a WARNING naming the spot, shortfall, and transect index (guard, never a silent cap).
 
-**OBSTACLE TRANSM correction for pier pilings.** The default TRANSM for `pier` structure type changes from 0.8 to 0.95. Pier pilings are thin relative to wavelength — academic consensus is 5-7% energy loss for pile-supported piers. TRANSM 0.8 treats the pier like a partial breakwater (20% blocked). Corrected TRANSM values by structure type:
-
-| Structure type | TRANSM range | Rationale |
-|---|---|---|
-| Breakwater (impermeable) | 0.0–0.1 | Full or near-full blocking |
-| Jetty (rubble mound) | 0.3–0.5 | Significant partial blocking |
-| Pier (pilings) | 0.93–0.97 | Thin pilings, minimal blocking |
-| Seawall | 0.0–0.05 | Near-full blocking + reflection |
-| Groin (rubble) | 0.3–0.5 | Significant partial blocking |
+**OBSTACLE coefficients — superseded 2026-08-02 by AD-8 (see §14.15).** The per-type coefficients now in force
+are the AD-8 static cited values: pier `TRANSM 0.74` (Elgar et al. 2001, ~45% energy blocking, height-ratio
+converted); seawall `REFL 0.9 RSPEC` (JMSE 9(9):937, 2021); breakwater/jetty/groin keep their static `DAM
+GODA`/`DAM DANGremond` forms (`services/swan_formats.py` `_OBSTACLE_PARAMS`). No plain TRANSM range applies to
+breakwater/jetty/seawall/groin as of this correction.
 
 **Hotstart invalidation on grid resize.** When the L3 bbox changes (spot added/removed, segment moved, structure discovered/removed), detected by comparing new bbox hash against cached bathymetry hash. On change: delete old hotstart and bathymetry cache for that cluster. L1/L2 hotstarts unaffected.
 

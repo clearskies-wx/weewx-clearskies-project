@@ -271,6 +271,15 @@ Documented by Deltares (creators of both SWAN and XBeach):
 - **Multiple transects per spot** at 10-20m spacing (see §2.2.2).
 - **New SWAN INPUT commands (POINTS/SPECOUT) must go through the T7.GATE syntax verification process** (RULE 5, SWAN-L3-STABILITY-PLAN). Coordinator extracts syntax into `swan-commands-extract.md` before any agent writes INPUT-generation code.
 
+> **⛔ SUPERSEDED 2026-08-02 (H3, MARINE-FORWARD-PLAN.md).** The first bullet's "perpendicular to local depth
+> contours... isobath orientation from smoothed CUDEM gradients" method is NOT the current facing design — it
+> was superseded 2026-07-31 by **AD-1R** (`docs/decisions/ADR-093-swan-trushore-nearshore-model.md` Amendment
+> 5): beach facing = the seaward perpendicular of a **smoothed 0 m shoreline's** local tangent (USGS DSAS /
+> CliffMetrics v1.0 method, Payo et al. 2018) — NOT an isobath/depth-contour gradient. Computed at
+> spot-DEFINITION time (not during model runs) and **operator-overridable** (`beach_facing_source ∈ {operator,
+> computed, fallback_segment_perp}`). This bullet's original text is left unchanged above as the historical
+> record of the brief's own proposal — do not implement it as written.
+
 ---
 
 ## 3. Model Options Evaluated

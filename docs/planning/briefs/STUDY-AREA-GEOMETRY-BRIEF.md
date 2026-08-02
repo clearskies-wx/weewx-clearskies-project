@@ -34,6 +34,14 @@ aspect is already handled by the shipped partial-coverage clamp, not something t
 
 ## 1. What is genuinely broken vs. what is by design
 
+> **⛔ SUPERSEDED 2026-08-02 (H3, MARINE-FORWARD-PLAN.md).** Defect 1 below (and its "isobath-normal"/"local
+> isobaths"/"smoothed bathymetric gradients" framing) describes the facing derivation this brief judged
+> "documented but NOT implemented" — that design was never built. It was superseded 2026-07-31 by **AD-1R**
+> (`docs/decisions/ADR-093-swan-trushore-nearshore-model.md` Amendment 5), which uses a **smoothed 0 m shoreline
+> normal** (DSAS/CliffMetrics), not an isobath/depth-contour gradient, computed at spot-definition time and
+> operator-overridable. AD-1R is IMPLEMENTED (marine `73df829` and later). The text below is left unchanged as
+> the historical record of this brief's own diagnosis — do not read it as describing current behavior.
+
 **By design (approved — do NOT "fix"):**
 - L4 rotated to the structure principal axis; L1–L3 axis-aligned. (§0)
 - Grid geometry frozen at setup; the per-hour handoff *cell* moves, the grid does not.
@@ -296,6 +304,14 @@ securing a source is part of opening a region, so stage 2 always has bathymetry 
 ---
 
 ## 5. Relationship to the existing briefs/ADRs (do not re-litigate)
+
+> **⛔ SUPERSEDED 2026-08-02 (H3, MARINE-FORWARD-PLAN.md).** The second and third bullets below describe this
+> brief's transect-facing proposal as implementing "SURF-ZONE §2.6's documented-but-unbuilt isobath design" and
+> reopening ADR-093 Amendment 2 §3's deferral of *contour-orientation* derivation. Both bullets are superseded:
+> the facing question was closed 2026-07-31 by **AD-1R** (ADR-093 Amendment 5) with a **smoothed 0 m shoreline
+> normal**, not isobath/contour-orientation derivation — a different method than either this brief or SURF-ZONE
+> §2.6 proposed. Text below is left unchanged as the historical record — do not read it as describing current
+> behavior.
 
 - **Do not reopen L4 rotation as an efficiency question.** SWAN-GRID-STRATEGY-RESEARCH-BRIEF `:227-231` rejected
   rotating outer grids to the beach; FINDINGS D6 approved rotating **only L4** to the structure axis. Settled.
