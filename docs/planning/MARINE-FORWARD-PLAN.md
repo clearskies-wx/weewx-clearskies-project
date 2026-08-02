@@ -366,6 +366,17 @@ entries for these 3 stay AS-IS (honest mirrors, descriptions already note their 
 until this decision.
 **MUST NOT TOUCH until ruled:** the three render blocks, the type/openapi entries.
 
+### D11 — Test-order pollution: tide-level tests leak state into health tests *(NEW 2026-08-02, found during H4, confirmed pre-existing via git-stash baseline)*  ⬜
+**Owner:** `clearskies-test-author` (Sonnet). **QC:** auditor at Gate D.
+**Defect:** running `tests/test_surf_tide_level.py` BEFORE `tests/test_no_publish_reasons.py`
+or `tests/test_health.py` in one pytest session → 3 spurious failures (`assert 'degraded' ==
+'ok'`); each file green in isolation. Likely a missing autouse state-reset fixture (marine
+`state.py` module-level registries persist across test files). **Fix:** shared reset fixture
+(conftest-level autouse or equivalent) so file order never matters; prove by running the
+polluting order green. **MUST NOT TOUCH:** production code; assertions of existing tests.
+**Accept:** the previously-failing order passes; full combined run of the 4 files green both
+orders.
+
 ### ⛔ QC GATE D — assigned: `clearskies-auditor`
 | # | Element | Evidence |
 |---|---|---|
