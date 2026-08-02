@@ -87,11 +87,24 @@ to the operator. This file is for non-blocking gaps where a reasonable, document
 - **Why non-blocking:** the G0.3 KAT only checks "finite fetch value for a GL basin"; the exact definition isn't KAT-pinned and has no consumer until G2.4. Max-fetch and along-dominant-bearing both are "lake fetch"; max-fetch is arguably safer for SIZING (L1 must reach the farthest open water).
 - **Assumption made:** max-fetch-among-exposed stands for now.
 - **To revisit:** at **G2.4** — decide whether Great Lakes L1 sizing wants max-fetch or fetch-along-open_water_bearing, and align `fetch_value` (or have G2.4 read the ray it needs). Verify on the real GL config when one exists.
+
+## TC-3 — [OPEN 2026-07-31, low] Open-ocean/semi-enclosed/enclosed-basin regime-split threshold (`_OPEN_OCEAN_OPEN_FRACTION = 0.5`) not pinned by plan or ADR-100
+> **Editor's note (2026-08-02, H3 file-integrity repair):** this header was lost in a past edit — the
+> entry below is untouched content, restored under its own heading. See the note after TC-2 below
+> for the related TC-12/TC-13 numbering gap.
 - **What:** The open-ocean / semi-enclosed / enclosed-basin 3-way split (G0.3c, AD-2) needs a criterion that neither the plan nor ADR-100 pins.
 - **Where:** `services/geography.py` `classify_water_body_regime` (G0.3); constant `_OPEN_OCEAN_OPEN_FRACTION = 0.5`.
 - **Why non-blocking:** verified against the whole plan — the ONLY regime→physics-parameter binding in G0–G7 is the Great Lakes branch (200 km horizon cap, GLWU product, lake-fetch L1). Nothing branches on open-vs-semi-vs-enclosed ocean; that label is descriptive here and selects no physics parameter, so the threshold is a reasonable-default methodology call, not a trigger-1 change.
 - **Assumption made (coordinator ruling 2026-07-31):** great_lakes via classify_region; else fan fractions — exposed_frac==0 → enclosed_basin (== boxed-in/no-surf), open_frac ≥ 0.5 → open_ocean, else semi_enclosed.
 - **To revisit:** if a future phase wires the ocean-regime split to a physics parameter, the 0.5 threshold becomes trigger-1 architectural → needs operator sign-off then.
+
+## TC-2 — [OPEN 2026-07-31, trivial] Plan G0.3 mislabels `providers/_common/http.py` as "urllib-based" — it's the httpx-based `ProviderHTTPClient`
+> **Editor's note (2026-08-02, H3 file-integrity repair):** this header was also lost in the same past
+> edit as TC-3 above — entry content untouched, restored under its own heading. **Numbering-gap note:**
+> TC-12 has no standalone entry in this file — it exists only as a cross-reference inside TC-21's own
+> text ("2/32 dry at the G2 baseline (TC-12)"); its original entry (if one was ever filed) is lost, not
+> merely mis-headed like TC-2/TC-3 were. TC-13 was never filed at all. Documented here so the TC-2/
+> TC-3/TC-12/TC-13 numbering gaps read as accounted-for, not as further file damage.
 - **What:** Plan G0.3 describes `providers/_common/http.py` as "urllib-based"; it is actually `ProviderHTTPClient`, an httpx.Client wrapper.
 - **Where:** MARINE-GEOMETRY-MODEL-PLAN.md G0.3.
 - **Why non-blocking:** the actionable instruction — "use the existing shared client, do NOT add `requests`" — is correct and unaffected.

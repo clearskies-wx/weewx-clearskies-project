@@ -326,6 +326,17 @@ requests still pay the full ~22-33 s cold fetch. Options for operator: (a) accep
 (~5-min loop tick or the stationary-fill branch — a new trigger/cadence, architectural,
 needs approval); (c) something else (e.g. pin the request-path key to the published cycle —
 data-selection change, also architectural). Agent correctly held rather than deciding.
+**✅ OPERATOR RULED 2026-08-02 (chat: "h5 b is fine"): option (b) approved** — warming
+moves to every runner wake (~5-min tick, fire-and-forget unchanged; cache hit makes idle
+ticks cheap — the fetch only actually fires when the hourly key rolls or TTL lapses).
+Stage 3 dispatched with the audit's MAJOR remediation (wiring KAT). Audit record: PASS-
+WITH-FINDINGS — 0 functional defects across 9 mutations; MAJOR = wiring-KAT gap
+(remediation in flight); LOW residual RECORDED, no fix: no single-flight guard on
+overlapping warming threads (rate-limiter-bounded, non-blocking; slightly more relevant at
+5-min cadence, still acceptable — revisit only if NOMADS traffic becomes a concern).
+Process note: the auditor deleted the stray untracked `test_claim2.py` during hygiene —
+against the standing "never commit/delete" note; contents were an ad-hoc probe, loss
+accepted, noted for the record.
 **MUST NOT TOUCH (carries to Stage 2):** cache file shape, publish decisions, H4's
 chunked encoder.
 
@@ -632,6 +643,14 @@ richer schema) — same field name, two unrelated producers. **Disposition: doc-
 the manual's null-cause list (add "SWAN domain terminates seaward of the small-swell break
 line"); whether /surf should serve the pipeline's break points instead (contract change,
 trigger 4) is an OPERATOR decision — flagged.**
+**✅ OPERATOR RULED 2026-08-02 (chat): use the 1D model.** "Once the handoff happens we
+should be using the better 1D model for actually generating data" — /surf's breakPoints
+re-sources from the SwellTrack 1D pipeline. → **NEW TASK V3-F4-IMPL below.** Lead-proposed
+contract (minimal ripple): populate from the REPRESENTATIVE transect's pipeline break
+points (same transect /profile renders), keep the existing wire shape
+`{distance, depth, hs}` (map faceHeight→hs? NO — hs stays Hs at the break point; schema
+additions only if the operator asks); update API-MANUAL row + null-cause list in the same
+round. The legacy SWAN-CURVE QB picker path retires from this field.
 **F7 (organizationWind): DOC DRIFT, code deliberate.** Glassy wind score = 1.1
 (surf_scorer.py:212, ×15 = 16.5); offshore-light = 1.2 (max 18.0). Scorer docstring
 anticipates >nominal-max multipliers. ADR-096's "15% effective" table and API-MANUAL:2073
@@ -776,7 +795,33 @@ settle the clock question**, no code action either way yet); C-E12 partially res
 check, parked); D7 parked-to-cutover (confirmed no length/quality gate at the store site —
 policy question intact for Phase 5).
 
-### C8 — Forced-full-run false-success (TA-C14)  ⬜ *(NEW 2026-08-02 from C1)*
+### V3-F4-IMPL — /surf breakPoints re-sourced to the 1D pipeline  ⬜ *(OPERATOR-APPROVED 2026-08-02)*
+**Owner:** `clearskies-api-dev` (Sonnet). **QC:** auditor before lead gate.
+Per the operator ruling in §V3-F2/F4/F7: `forecast[].breakPoints` populates from the
+SwellTrack 1D pipeline's REPRESENTATIVE transect break points (the same transect /profile
+renders — consistency by construction), replacing the starved legacy SWAN-CURVE QB picker
+for this field. Wire shape UNCHANGED (`{distance, depth, hs}` — map the pipeline break
+point's distance/depth/Hs; no schema additions this round). Null only when the pipeline
+produced no break points for the representative transect that hour. Same round: API-MANUAL
+row rewrite (producer, null semantics — supersedes the doc-batch's interim null-cause
+text), KATs (populated-at-ordinary-conditions is the headline acceptance — the old path
+was null 36/36 at Hs≈0.5 m; new path must serve the same break points /profile shows).
+**MUST NOT TOUCH:** /profile's own producer; the pipeline itself; select_reference_point's
+OTHER consumers (reference-point choice stays as-is — only the breakPoints field re-sources).
+
+### C9 — Re-add HB directional_exposure override + explicit override labeling  ⬜ *(OPERATOR-APPROVED 2026-08-02)*
+**Ruling (chat):** "we should add back in the direction override BUT we need to be clear
+that these are overrides." Two halves:
+**(a) Config re-add (ops action, lead):** restore HB's operator-set override
+`directional_exposure = E/SE/S/SW` (stripped by the Gate-G3 live test, TC-17) to the
+deployed marine config via config push; verify `directional_exposure_is_override=true`
+honored and the serve-time directional filter reflects it.
+**(b) UI labeling (stack repo, wizard/admin PARITY rule applies):** the exposure field in
+BOTH wizard step_marine and admin marine must be clearly labeled as an OVERRIDE of the
+fan-derived (measured) exposure — states: "Auto (measured coastline fan)" vs "Manual
+override"; show which is in effect; help content keys (`help.wizard.*`/`help.admin.*`) +
+Operator Manual per doc-code sync. No behavior change to the fan default (G3.3 stands:
+fan-derived is the default; the override is optional and honored if present).
 `clearskies-api-dev`, small scoped round: a forced full run that inner-no-ops (4 DEBUG
 bare-returns in `_run_all_spots_locked`, swan.py:2308-2331) currently clears
 `force_full_run_signal` and reads as success. Fix per the original entry's option list

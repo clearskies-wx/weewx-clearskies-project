@@ -130,26 +130,29 @@ Owner: `ubuntu`. Container IP: `192.168.2.113` (DHCP/SLAAC on `br-vlan2`).
 
 Owner: `ubuntu`. Host IP: `192.168.7.22`. SSH: `ssh -F .local/ssh/config librewxr`.
 
-**SWAN is split out of the API. It does not run on the weewx host and it does not run on
-weather-dev.** Verified running on librewxr 2026-07-25:
+**SWAN runs inside the unified marine service. It does not run on the weewx host and it does
+not run on weather-dev.** Corrected 2026-08-02 — this section previously described a split
+`weewx-clearskies-swan.service` (8767) + `weewx-clearskies-compute.service` (8770) topology
+that has been superseded by a single unified service:
 
 | systemd unit | Port | ExecStart module | What it computes |
 |---|---|---|---|
-| `weewx-clearskies-swan.service` | 8767 | `weewx_clearskies_swan` | SWAN 3-level nested grid |
-| `weewx-clearskies-compute.service` | 8770 | `weewx_clearskies_api.services.compute_service` | SwellTrack + SurfBeat strip |
+| `weewx-clearskies-marine.service` | 8780 | `weewx_clearskies_marine` (`__main__.py`, default `--port 8780`) | SWAN nested grid (L1-L4) + SwellTrack + SurfBeat strip — all in one process |
 
-Both run from the **same interpreter**:
-`/home/ubuntu/repos/weewx-clearskies-api/.venv/bin/python`. The SWAN binary is at
-`/usr/local/bin/swan`. Both load `/etc/weewx-clearskies/secrets.env`, and the SWAN unit reads
-`/etc/weewx-clearskies/api.conf`.
+The interpreter, SWAN binary path, and secrets/config file locations for the unified service
+were not independently re-verified as part of this correction — confirm at `librewxr` before
+citing them if this section is extended.
 
-Two consequences that catch people out:
+One consequence that still applies: **the marine repo checkout on librewxr is the one that
+matters for any SWAN, SwellTrack, SurfBeat, or surf-endpoint change** — test there, not on the
+weewx host or weather-dev.
 
-- The **compute service is API-repo code running on librewxr.** A change to
-  `weewx_clearskies_api/services/` that the compute service imports takes effect on librewxr,
-  not on the weewx host. Test it there.
-- Because both services run from the API repo's venv, **the API repo checkout on librewxr is
-  the one that matters for any SWAN, SwellTrack, SurfBeat, or surf-endpoint change.**
+> **Known residual staleness (flagged 2026-08-02, not fixed in this pass — scoped to the
+> services/port table only):** the repo-directory listings above (this file's
+> `weewx-clearskies-swan-swelltrack` entries) and `docs/ARCHITECTURE.md`'s "Current deployment"
+> paragraph both still describe the same superseded split-service topology this table just
+> corrected. Both need their own verified pass — not corrected here to avoid rewriting repo
+> topology without dedicated verification.
 
 ### SWAN documentation is committed to this repo — NEVER download it
 
