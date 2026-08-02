@@ -849,15 +849,21 @@ was null 36/36 at Hs≈0.5 m; new path must serve the same break points /profile
 **MUST NOT TOUCH:** /profile's own producer; the pipeline itself; select_reference_point's
 OTHER consumers (reference-point choice stays as-is — only the breakPoints field re-sources).
 
-### C9 — Re-add HB directional_exposure override + explicit override labeling  ⬜ *(OPERATOR-APPROVED 2026-08-02)*
+### C9 — Re-add HB directional_exposure override + explicit override labeling  ✅ **CLOSED 2026-08-02**
 **Ruling (chat):** "we should add back in the direction override BUT we need to be clear
 that these are overrides." Two halves:
-**(a) Config re-add (ops action, lead):** restore HB's operator-set override
-`directional_exposure = E/SE/S/SW` (stripped by the Gate-G3 live test, TC-17) to the
-deployed marine config via config push; verify `directional_exposure_is_override=true`
-honored and the serve-time directional filter reflects it.
-**(b) ✅ CODE-CLOSED 2026-08-02 (deploy pending — no config-service deploy script exists;
-post-restart lead action).** Stack `692ad76` (19 files, pushed) + meta `6f606dc`:
+**(a) ✅ CLOSED 2026-08-02.** Config-service deployed (`692ad76` on weather-dev, `systemctl
+restart weewx-clearskies-config`, service healthy port 9876). Deploy procedure: `sudo -u
+ubuntu git pull origin main` + `sudo systemctl restart weewx-clearskies-config` on
+weather-dev (no deploy script — documented here). Operator verified the Auto/Override UI
+in the admin edit page (Override radio + direction checkboxes correctly displayed). Operator
+then set exposure to E/SE/S/SW via the labeled admin UI, verified it persisted in api.conf,
+then **reversed to Auto (measured)** — ruling: "remove those overrides, those are not correct
+for this surf area." Final state: `directional_exposure` key ABSENT from api.conf =
+fan-derived Auto. C9b live verification complete (both modes exercised, round-trip confirmed).
+Minor UI note: admin list page initially showed "Auto" before refresh (browser cache, not
+a code bug — edit page showed correct state throughout).
+**(b) ✅ CODE-CLOSED 2026-08-02.** Stack `692ad76` (19 files, pushed) + meta `6f606dc`:
 Auto/Override radio toggle in BOTH wizard and admin (byte-identical core vocabulary,
 auditor-verified), admin per-location "Exposure" column, disabled-when-Auto checkboxes
 (server-rendered — JS-off safe, auditor-proven via no-JS client), Override→Auto
@@ -873,8 +879,6 @@ unrelated failures in test_wizard_earthquake_config.py (4) + test_wizard_topolog
 (`topology_defaults(same_host=False)` returns "*" vs expected "0.0.0.0") — NOT C9b's,
 untouched files, tracked here so nobody re-finds them. 3 uncataloged English-only
 microcopy strings noted (matches partial precedent; en-only residual class).
-**Remaining for C9(a)+(b) close: config-service deploy (no script — document the
-procedure while doing it) → then (a) re-add E/SE/S/SW via the labeled admin UI + verify.**
 `clearskies-api-dev`, small scoped round: a forced full run that inner-no-ops (4 DEBUG
 bare-returns in `_run_all_spots_locked`, swan.py:2308-2331) currently clears
 `force_full_run_signal` and reads as success. Fix per the original entry's option list
@@ -1143,6 +1147,29 @@ with/after G6.3, then markers flow through the same LM-1/LM-2 path with zero fur
 | **Marine service separation** | Unified service live on librewxr:8780 (ADR-099, `deploy-marine.sh`); plan archived 2026-08-02 as overtaken |
 
 ## Decision log
+
+- **2026-08-02 (operator Q&A, 9 pending items + 2 extras resolved).** (1) Firewall: resolved
+  by operator. (2) D1/D10.2: delete `partitionBreakInfo` + `shadowFaceHeight` render code +
+  OpenAPI entries; `waveShapeClassification` is a REAL BUG (API not serving data the
+  dashboard correctly renders) → new task. (3) D5 eyeball: operator provided live screenshots;
+  three findings: missing outer (seaward) break point, remove transect markers from public
+  view, smooth heatmap into shapes instead of pixelated transects → new tasks. (4) NDBC fix:
+  approved (config case fix + `.upper()` normalize + negative-cache 404s). (5) TA-C21:
+  confirmed fine (operator didn't remember the detail, accepted after explanation). (6)
+  C-E11/C-E12: resolved by C3 design; fast cycle should restore 24h stationary scope (was
+  decided in T1.0 session 2026-07-29 but never applied to the fast fill — only single
+  snapshot). (7) Transect spacing: auto-set from geometry + operator slider override; L1/L2
+  skip for fast cycle PINNED (operator: "worried we would lose out on wind effects"). (8)
+  swellDominance: serve continuous 0.0-1.0 ratio instead of bucketed 0.2/0.6/1.0 scores
+  (zero compute cost — ratio already calculated). (9) Debug trace: keep on (still debugging).
+  (10) Single-flight guard: real task (observed 18.45s cold fetch racing warming). (11) H5
+  HRRR-at-request-time: operator investigation revealed surf.py's HRRR fetch is ONLY for
+  wind interpolation on forecast hours, and the pipeline already has the same wind field →
+  fix = pipeline persists interpolated wind, endpoint reads from cache, no NOMADS fetch on
+  request path at all (warming thread + single-flight guard become unnecessary).
+  **C9 fully closed same session:** config-service deployed (`692ad76`), operator exercised
+  both Auto and Override modes via admin UI, final state = Auto (fan-derived) — operator
+  ruled "remove those overrides, those are not correct for this surf area."
 
 - **2026-08-02 (autonomy grant + H4 pick).** Operator, in chat: "ok continue autonomously
   with plan implementation." Under that grant, with the coordinator's recommendation twice
