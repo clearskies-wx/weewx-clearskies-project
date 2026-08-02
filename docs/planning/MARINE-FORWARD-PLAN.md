@@ -318,6 +318,20 @@ live: the warming chain and SWAN's own extended chain fetch the same early files
 concurrently at startup — the recorded LOW single-flight residual, bounded by the shared
 rate limiter, accepted. Definitive post-hourly-rollover /surf timing check scheduled
 (20:03Z watcher).**
+**LIVE ACCEPT NUMBERS (20:03Z rollover probe + follow-up):** warm steady-state /surf =
+**0.60 s** (was 0.46 s pre-H5 — unchanged class). The 20:03Z probe deliberately landed
+inside the post-rollover warming window and hit the KNOWN no-single-flight race: the
+request ran its own cold chain concurrently with the warming thread (t19z f00-f07 each
+fetched ×2, rate-limiter interleaved) → **18.45 s** (was ~33 s). Honest residual exposure,
+quantified: after each hourly key roll there is up to ~5 min until the next runner wake
+(nothing warm yet) plus the ~30 s warming duration; a client request landing in that
+window still pays a slow (~18-33 s) read and can exceed the proxy's 15 s timeout —
+mitigated in practice by the proxy's 1800 s success-cache + stale-fallback (a user-visible
+503 needs a poll in the gap AND an evicted stale entry). **Optional follow-up for
+operator (NOT dispatched):** a single-flight guard (request-time fetch joins an in-flight
+warming fetch for the same key instead of re-fetching) would remove the double-fetch and
+the slow racing read; provider-behavior change → needs a nod. Accept-closed as deployed
+otherwise.
 **Stage 2 ✅ IMPLEMENTED 2026-08-02, marine `53b25d3` + remediation/Stage-3 `169b911`:**
 `bbox_for_location()` shared helper in hrrr.py; surf.py:652-657 refactored onto it
 (byte-identical); `_warm_hrrr_cache_for_locations()` + fire-and-forget daemon thread after
