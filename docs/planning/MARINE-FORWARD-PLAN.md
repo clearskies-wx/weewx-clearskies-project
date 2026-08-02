@@ -312,10 +312,10 @@ for internal consistency + reality agreement; findings ranked. Anything it finds
 manuals can't explain is, definitionally, either a defect or doc drift — both are deliverables.
 This is also the backstop for anything the archived separation plan left genuinely unfinished.
 
-### V4 — Forecast window 66 h vs 72 h *(TA-C16)*  ⬜ — **operator decision**
-Evidence packet (coordinator): how often the GFS-staleness fallback shortens the window, cost of
-each option (accept+document honest window / wait-and-retry / hybrid). One page, then the
-operator picks; implementation (if any) dispatches as its own scoped round.
+### V4 — Forecast window 66 h vs 72 h *(TA-C16)*  ✅ **CLOSED — operator ruled 2026-08-02:
+accept as-is.** The honest shorter window when the newest GFS cycle is unpublished is correct
+behavior, not a defect. One residual: H3's doc sweep adds a line to API-MANUAL stating the
+window is "up to 72 h, honestly shortened when the newest GFS cycle is not yet published."
 
 ---
 
@@ -404,12 +404,25 @@ assumptions). **MUST NOT TOUCH:** hotstart mechanics, convergence gate, anything
 **Accept:** KAT on the emitted compute list; full run wall-clock measured before/after; all
 V1-style baseline numbers unchanged at the shared hours.
 
-### C4 — modelStatus grading *(G7.5 / TA-C22(a))*  ⬜ — **BLOCKED on an operator re-ruling.**
-The pinned rule predates BD-7 ("…or the best-peak transect falls back"). Proposed update for
-ruling: `ok` = 0 fallback transects; `partial` = ≥1 but <25% AND no main-break-zone qualifying
-transect fell back; `degraded_bulk` = ≥25% OR any qualifying-zone transect. Coordinator brings
-this one question to the operator; then a normal scoped round (`endpoints/surf.py`
-`_determine_model_status` + `surf_1d_pipeline.py` fallback bookkeeping + KATs).
+### C4 — modelStatus grading *(G7.5 / TA-C22(a))*  ⬜ — **awaiting operator ruling on the
+threshold rule (definition clarified 2026-08-02)**
+**What "fallback" means here — VERIFIED in code, and it is NOT grid routing:** a transect's
+handoff level (L4 vs L3 vs L2, `handoff_source_level`) is legitimate routing — a transect that
+doesn't intersect an L4 grid is SUPPOSED to use L2; never counted as degradation (operator
+reaffirmed 2026-08-02). The fallback C4 grades is the **bulk-parameter fallback**
+(`surf_1d_pipeline.py:1314-1332`): a transect with NO measured per-transect spectral partitions
+(PT*) at its handoff point that hour runs the 1D model on three bulk scalars (Hs/Tp/Dir)
+instead of its real measured spectrum — a genuine measured→approximation degradation, logged
+per-transect ("bulk-falling-back for THIS transect only").
+**The defect:** today even ONE bulk-fallback transect sets `degraded=True` for the whole result
+(`:1655`) → the entire spot-hour serves `modelStatus="degraded_bulk"`. 1 of 143 transects on
+scalars should not brand the whole hour degraded.
+**Proposed rule (needs operator yes/amend):** `ok` = 0 bulk-fallback transects; `partial` =
+≥1 but <25% AND no main-break-zone qualifying transect among them; `degraded_bulk` = ≥25% OR
+any qualifying-zone transect on bulk scalars (the headline is built from those transects, so
+their degradation degrades the headline's trustworthiness). Then a normal scoped round
+(`endpoints/surf.py` `_determine_model_status` + pipeline bookkeeping + KATs; wire semantics
+change → API-MANUAL same round).
 
 ### ⛔ QC GATE C — assigned: `clearskies-auditor`
 C1's report spot-audited (pick 3 CLOSED rows, independently re-verify); C2/C3 rounds get the
