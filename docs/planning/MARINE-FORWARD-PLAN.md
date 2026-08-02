@@ -404,8 +404,8 @@ assumptions). **MUST NOT TOUCH:** hotstart mechanics, convergence gate, anything
 **Accept:** KAT on the emitted compute list; full run wall-clock measured before/after; all
 V1-style baseline numbers unchanged at the shared hours.
 
-### C4 — modelStatus grading *(G7.5 / TA-C22(a))*  ⬜ — **awaiting operator ruling on the
-threshold rule (definition clarified 2026-08-02)**
+### C4 — modelStatus grading *(G7.5 / TA-C22(a))*  ⬜ — **UNBLOCKED: threshold rule
+operator-APPROVED 2026-08-02 (chat, "yes unblock") — ready to dispatch as a normal scoped round**
 **What "fallback" means here — VERIFIED in code, and it is NOT grid routing:** a transect's
 handoff level (L4 vs L3 vs L2, `handoff_source_level`) is legitimate routing — a transect that
 doesn't intersect an L4 grid is SUPPOSED to use L2; never counted as degradation (operator
@@ -417,7 +417,7 @@ per-transect ("bulk-falling-back for THIS transect only").
 **The defect:** today even ONE bulk-fallback transect sets `degraded=True` for the whole result
 (`:1655`) → the entire spot-hour serves `modelStatus="degraded_bulk"`. 1 of 143 transects on
 scalars should not brand the whole hour degraded.
-**Proposed rule (needs operator yes/amend):** `ok` = 0 bulk-fallback transects; `partial` =
+**RULED rule (operator-approved 2026-08-02):** `ok` = 0 bulk-fallback transects; `partial` =
 ≥1 but <25% AND no main-break-zone qualifying transect among them; `degraded_bulk` = ≥25% OR
 any qualifying-zone transect on bulk scalars (the headline is built from those transects, so
 their degradation degrades the headline's trustworthiness). Then a normal scoped round
@@ -479,6 +479,11 @@ standard adversarial pass (falsifiable KATs, allowlist diff, baseline diff).
   remainder extracted here. Operator rulings same session: Phase F stays wired (done, not
   revisited); G6 rewritten in plain terms (this file's §G6 supersedes the archived AD-6/G6
   wording); G6.3 confirmed as the wizard polygon draw tool.
+- **2026-08-02 (final) — V4 closed, C4 ruled + unblocked.** Operator: V4 accept-as-is (honest
+  shorter window is correct behavior; doc line via H3). C4 threshold rule APPROVED after the
+  fallback definition was clarified (bulk-parameter fallback only — L4/L3/L2 handoff routing is
+  legitimate selection, never graded as degradation): ok = 0 bulk-fallback; partial = <25% and
+  no main-break-zone qualifying transect; degraded_bulk = ≥25% or any qualifying transect.
 - **2026-08-02 (later still) — D4/D5 investigation + H4 added + C5 pinned.** Operator flagged
   that the dashboard heatmap/vertical-section WERE implemented and surf is currently broken.
   Coordinator live-diagnosed: (1) dashboard NOT reverted (no marine-component commits since
