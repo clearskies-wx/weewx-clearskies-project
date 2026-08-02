@@ -1,205 +1,381 @@
 # Marine Forward Plan — consolidated live work (2026-08-02)
 
-**Created:** 2026-08-02 (operator-approved consolidation, in chat)
-**Status:** ACTIVE — this is the ONLY live marine planning document. Everything else in
-`docs/planning/` marine-wise is archived history.
-**Supersedes / consolidates:** the still-open remainders of three archived plans —
-`docs/archive/MARINE-MODEL-RESTORATION-PLAN.md` (R4, R6, R9/R10 residuals),
-`docs/archive/MARINE-GEOMETRY-MODEL-PLAN.md` (G1R.3, G5, G6, G7, Gate GR),
-`docs/archive/MARINE-WORKING-MODEL-PLAN.md` (nothing directly — its survivors flowed through
-the geometry plan's G7) — plus the deferred items from the 2026-08-01 surf-zone break-detection
-rounds (`briefs/SURF-ZONE-BREAK-DETECTION-SPEC-2026-08-01.md`, Rounds 1–2 both DEPLOYED).
+**Created:** 2026-08-02 (operator-approved consolidation, in chat). **Granularized same day**
+(operator direction: line-level tasks, per-task agent assignments, per-phase adversarial QC
+gates, briefs tied back in, zero regression tolerance).
+**Status:** ACTIVE — this is the ONLY live marine planning document. Everything else marine-wise
+in `docs/planning/` is archived history in `docs/archive/`.
+**Supersedes / consolidates:** the open remainders of `docs/archive/MARINE-MODEL-RESTORATION-PLAN.md`
+(R4, R6, R9/R10 residuals), `docs/archive/MARINE-GEOMETRY-MODEL-PLAN.md` (G1R.3, G5→pinned, G6,
+G7, Gate GR), `docs/archive/MARINE-WORKING-MODEL-PLAN.md` (via the geometry plan's G7), and
+`docs/archive/MARINE-SERVICE-SEPARATION-PLAN.md` (archived 2026-08-02, overtaken by events) —
+plus the deferred items from the 2026-08-01 break-detection rounds
+([briefs/SURF-ZONE-BREAK-DETECTION-SPEC-2026-08-01.md](briefs/SURF-ZONE-BREAK-DETECTION-SPEC-2026-08-01.md),
+Rounds 1–2 DEPLOYED, marine `732e87d`).
 
 **Where we are (2026-08-02):** the model WORKS. Full 4-level SWAN nest converges (L4
-valid_fraction 100%), 143 transects × all forecast hours resolve their own handoffs, the 1D layer
-detects breaks at physically correct depths (including real double-breaks), publish + reality gate
-PASS, and the BD-7 main-break-zone headline + BD-9 representative transect are live (marine
-`732e87d`). This plan is hardening, validation, and the remaining geometry-automation features —
-**not** model recovery.
-
-**Standing process (operator mandates, carried forward):** implementation by a **Sonnet coding
-agent**; **adversarial QC agent pass BEFORE the lead gate** on every round; doc-sync pass closes
-every round (CLAUDE.md doc-code sync); architectural-change block per CLAUDE.md — the trigger
-list binds every task here; local commits, push/deploy only on operator grant.
+valid_fraction 100%), 143 transects × all forecast hours resolve their own handoffs, the 1D
+layer detects breaks at physically correct depths (incl. real double-breaks), publish + reality
+gate PASS, BD-7 main-break-zone headline + BD-9 representative transect live. This plan is
+hardening, validation, and setup-automation — **not** model recovery.
 
 ---
 
-## H — Operational hardening
+## PRIME DIRECTIVE — two steps forward, ZERO steps back
+
+Every regression of the past two weeks came from a change that touched more than its task named,
+or shipped without a matched-time reality check. Therefore, binding on every task below:
+
+1. **The working chain is OFF LIMITS unless a task names the exact file.** The frozen core:
+   `swan_domain.py` (L4 shadow-envelope sizing, `4e79d21`), `transect_handoff.py` (BD-2
+   selection + T2.2-PART-B depth rule), `surf_1d_analytical.py` (break engine),
+   `swan_formats.py` emission grammar, `geography.py` ray fan, `shoreline_normal_bearing`
+   (AD-1R), the convergence gate, the serve-nothing guard (G1R.0), hotstart mechanics. **No task
+   in this plan authorizes touching ANY of these** unless its "Files" list says so explicitly.
+2. **Baseline before, diff after.** Before any deploy: record facing, DWR Hs, valid_fraction,
+   per-transect resolution count, publish size from the current cycle. After: diff them in the
+   gate record. (rules/coordinator.md §7 deploy discipline.)
+3. **One functional change per deploy.** Doc/test-only commits may ride along; two behavior
+   changes never ship together.
+4. **Reality gate on every deploy** (rules/verification.md): within one cycle, matched-time
+   comparison vs NDBC 46222/Surfline/cam, quantity chosen before looking; plus publish-liveness
+   (a publish or a health-visible refusal within one cycle).
+5. **Stale tests:** a failing test that pins superseded behavior → STOP and surface; never bend
+   code to a stale test; never delete a test without listing it in the closeout.
+6. **Agent discipline:** every implementation task runs on a **Sonnet** `clearskies-api-dev` /
+   `clearskies-dashboard-dev` / `clearskies-test-author` agent with a written brief; scope-ack
+   before code; **adversarial `clearskies-auditor` pass BEFORE the lead gate** on every round;
+   doc-sync closes every round (CLAUDE.md doc-code sync). Architectural-change trigger list
+   (CLAUDE.md) binds everyone; the pre-approvals recorded per-task below are the ONLY ones.
+7. **Line numbers in this plan are hints, not gospel.** First action of every implementation
+   agent: verify the quoted file/function state. If the code does not match, STOP and report
+   drift — do not hunt for "what was probably meant."
+
+**Execution order:** Phase H → (D2 early, it is tiny and guards H1's test surface) → Phase D →
+Phase V as weather/evidence allows → Phase G6 → Phase C. G1R.3 and pinned/parked items whenever
+the operator says so. Phases are independent enough to interleave, but each phase's QC gate
+closes before its next task round dispatches.
+
+---
+
+## PHASE H — Operational hardening
 
 ### H1 — No-publish paths must be loud and truthful *(was Restoration R4; Gate R row 5)*  ⬜
-**Owner:** `clearskies-api-dev`. **Original task detail:** archived restoration plan §R4 — read it.
-**Summary:** every path that ends a cycle publishing nothing must (1) log ONE ERROR naming the
-reason, (2) set B3 `/health` `status != ok` with a `reasons` entry, (3) show on the admin status
-page. Config-push viability failures surface via `/health` too. **Must not touch** the
-serve-nothing-on-failure guard itself (G1R.0 stands). **Accept:** forced degraded cycle →
-`degraded`/`failed` health, never silent `ok` + no-publish.
+**Owner:** `clearskies-api-dev` (Sonnet). **QC:** `clearskies-auditor` at Gate H.
+**Origin/context:** archived restoration plan §R4; the 2026-07-31 11:51 abort (gate PASSED, zero
+published entries, no ERROR naming why) is the motivating incident — its diagnosis is in the
+archived plan §R-DIAGNOSIS.
 
-### H2 — WW3 fetch hygiene *(was Restoration R6)*  ⬜
-**Owner:** `clearskies-api-dev`. **Original task detail:** archived restoration plan §R6.
-**Summary:** exponential backoff + per-cycle retry cap on NOMADS station-spectra fetches
-(403/404 hot-retry loops observed in the July 30–31 journals); a cycle running on cached
-boundary data logs it and reflects it in `/health` `inputs.ww3_boundary` (age + available).
-**Accept:** blocked NOMADS never hot-loops; staleness visible in `/health` without the journal.
-**Note:** TC-10 (public Overpass API flakiness in the geography fetch, raise-no-fallback) is the
-same failure class — fix or explicitly defer it in this task's closeout.
+**H1.1 — Enumerate every no-publish exit.** Read-only sub-task, report first, code second.
+Trace `providers/nearshore/swan.py` `run_all_spots()` (the `spots_cached` counter: init ~`:3214`,
+increment ~`:3347`, publish decision ~`:3354`) and list EVERY code path that ends a cycle with
+`spots_cached == 0` or a spot skipped: convergence-gate failure (serve-nothing guard), zero
+usable handoff timesteps, viability-test failure at config push, upstream fetch failure, SWAN
+fatal. Deliverable: the list with file:line for each, in the scope-ack.
+**H1.2 — One ERROR per no-publish path.** Each path from H1.1 logs exactly ONE
+`logger.error("no-publish: <machine-readable reason> ...")` naming the path. No stack-trace spam,
+no repeated per-transect errors.
+**H1.3 — `/health` truthfulness.** `endpoints/health.py`: a cycle that published nothing sets
+`status != ok` and appends a `reasons` entry carrying the H1.2 reason string + timestamp; a
+config-push viability failure does the same (persisted so a later `/health` call still sees it,
+not journal-only). Verify the existing B3 health contract in API-MANUAL before changing shape —
+additive only; renaming/removing existing health fields is a data-contract change and is NOT
+pre-approved.
+**H1.4 — Admin status page.** Surface the same reason on the admin status page (B4). Additive
+row only.
+**Files (exhaustive):** `providers/nearshore/swan.py` (logging + health-report wiring ONLY — the
+publish/cache DECISION logic and the convergence gate are frozen), `endpoints/health.py`,
+`service.py` if the health state store lives there (name it in scope-ack), the admin status
+template, `tests/` (new + existing health tests).
+**MUST NOT TOUCH:** the serve-nothing-on-failure guard's decision (G1R.0 — a failed run still
+publishes NOTHING; H1 only makes the silence loud); the convergence gate; anything in the
+PRIME-DIRECTIVE frozen core.
+**Known-answer tests:** (a) forced convergence-fail cycle → nothing published AND health
+`degraded`/`failed` with the right reason AND one ERROR line (assert count == 1); (b) forced
+viability failure at config push → same; (c) healthy cycle → `ok`, zero H1.2 ERRORs (guards
+against the inverse regression).
+**Accept:** all three KATs; live check = one forced degraded cycle on librewxr shows
+health != ok + admin row + single ERROR, then a normal cycle returns to `ok`.
+
+### H2 — Upstream fetch hygiene: WW3/NOMADS (+ same-class audit) *(was Restoration R6)*  ⬜
+**Owner:** `clearskies-api-dev` (Sonnet). **QC:** `clearskies-auditor` at Gate H.
+**Origin/context:** archived restoration plan §R6; hot 403/404 retry loops in the Jul 30–31
+journals; brief: [briefs/WW3-SPECTRAL-BOUNDARY-DATA-BRIEF.md](briefs/WW3-SPECTRAL-BOUNDARY-DATA-BRIEF.md)
+(what the boundary fetch does and why it matters).
+
+**H2.1 — Locate + instrument.** The WW3 station-spectra fetch lives in
+`providers/marine/wavewatch.py` / the boundary-fetch path of `providers/nearshore/swan.py`
+(verify which does the NOMADS HTTP calls; `providers/_common/http.py` is the shared client).
+Report current retry behavior with journal evidence before changing it.
+**H2.2 — Backoff + cap.** Exponential backoff with jitter + a per-cycle retry cap on NOMADS
+spectra fetches. A cycle that exhausts the cap proceeds on cached boundary data (existing
+behavior) and LOGS it at WARNING once.
+**H2.3 — Staleness visible.** `/health` `inputs.ww3_boundary` gains `age_s` + `available`
+(additive). Same for the GFS/HRRR wind fetches ONLY IF they share the same helper — do not
+refactor separate fetch paths to unify them (that is a rewire, not in scope).
+**H2.4 — TC-10 disposition.** Overpass (OSM geography fetch) is the same failure class but runs
+at SETUP, not per-cycle. In closeout: either apply the same backoff via the shared helper (if
+it already flows through `_common/http.py`) or write one paragraph deferring it with the reason.
+Do NOT build an Overpass mirror/fallback — that is new architecture (trigger 7).
+**Files (exhaustive):** the fetch module(s) named in H2.1 scope-ack, `providers/_common/http.py`
+(only if the backoff naturally lives in the shared client), `endpoints/health.py` (additive
+fields), tests.
+**MUST NOT TOUCH:** boundary CONTENT processing (`ww3_spectrum_to_swan_boundary()` is
+byte-faithful, T3.0-verified — see [briefs/T3.0-BOUNDARY-GROUNDTRUTH-2026-07-30.md](briefs/T3.0-BOUNDARY-GROUNDTRUTH-2026-07-30.md));
+BOUNDSPEC emission (R5 fixed it; frozen); cache fallback semantics.
+**Known-answer tests:** mocked 403 storm → call count ≤ cap, backoff intervals grow, cycle
+completes on cache with one WARNING; healthy fetch → zero extra calls, no WARNING.
+**Accept:** KATs + live journal over ≥2 cycles shows no hot loop; `/health` shows boundary age.
 
 ### H3 — Residual doc-truth sweep *(was Restoration R9+R10 residuals; Gate R row 8)*  ⬜
-**Owner:** `clearskies-docs-author` (coordinator QC). The 2026-08-01 doc passes (meta `d4a71ca`,
-`07bee6b`, `6f3c6c7`) covered most of R10's list. Remaining, from TC-24: (a) facing
-method-of-record still described as isobath-gradient in `briefs/SURF-ZONE-MODEL-BRIEF.md` §2.6
-and `briefs/STUDY-AREA-GEOMETRY-BRIEF.md` §1/§5 — correct to AD-1R (setup-time smoothed-shoreline
-normal, operator-overridable), as supersession notes (briefs are records: annotate, don't
-rewrite history); (b) TC-19's stale PROVIDER-MANUAL pier-TRANSM block vs AD-8 — verify current
-state, fix if still stale; (c) verify `ARCHITECTURE.md` L1 margin figure matches code.
-**Accept:** grep evidence pasted per item; no governing doc contradicts a ruling.
+**Owner:** `clearskies-docs-author` (Sonnet). **QC:** `clearskies-auditor` at Gate H (doc rows).
+**Scope (exhaustive list, from TC-24):**
+(a) [briefs/SURF-ZONE-MODEL-BRIEF.md](briefs/SURF-ZONE-MODEL-BRIEF.md) §2.6 and
+[briefs/STUDY-AREA-GEOMETRY-BRIEF.md](briefs/STUDY-AREA-GEOMETRY-BRIEF.md) §1/§5 still describe
+the facing as isobath-gradient — add dated SUPERSESSION notes pointing to AD-1R (ADR-093
+Amendment 5): setup-time smoothed-shoreline normal, operator-overridable. Briefs are records —
+annotate, never rewrite the original text.
+(b) TC-19: PROVIDER-MANUAL pier-TRANSM block vs AD-8 — verify current state at `732e87d` (the
+§14.15 rewrites may have fixed it), fix if still stale.
+(c) `ARCHITECTURE.md` L1 margin figure vs code (`+10 km` vs `+15 km`, TC-24 item 3).
+**MUST NOT TOUCH:** code; the archived plans (their banners are final); decision-log history.
+**Accept:** one commit, grep evidence pasted per item (the stale phrase count going to the
+annotated count), coordinator QC before push.
+
+### ⛔ QC GATE H — assigned: `clearskies-auditor` (adversarial), BEFORE the lead gate
+| # | Element | Evidence the auditor must independently produce |
+|---|---|---|
+| 1 | H1 KATs falsifiable | mutate each no-publish reason path in a scratch copy → test fails |
+| 2 | No silent no-publish remains | force an H1.1-listed path live → health != ok + single ERROR |
+| 3 | Serve-nothing guard untouched | diff of `4e79d21`-frozen files empty; G1R.0 test suite green |
+| 4 | H2 cap holds under attack | mock a permanent 403 → bounded calls, cycle completes on cache |
+| 5 | No fetch-content change | boundary bytes identical pre/post H2 on a recorded fixture |
+| 6 | H3 claims true | re-grep every H3 item; no governing doc contradicts a ruling |
+| 7 | Baseline diff clean | pre/post deploy baseline numbers (directive #2) within noise |
+**Charter:** assume the implementer cut corners; hunt can't-fail assertions (the Round-1 F1
+pattern — a green test pinning a defective value); verify allowlists vs `git show --stat`.
 
 ---
 
-## V — Validation gates (some weather-dependent — they stay OPEN until the ocean cooperates)
+## PHASE D — Small high-value fixes from the break-detection rounds
 
-### V1 — Gate GR: reality re-validation of the NEW headline *(was Geometry Gate GR + T3.1)*  ⬜
-The headline definition changed 2026-08-01 (BD-7 main-break-zone upper-tail mean). Re-run the
-matched-time reality comparison against the cam/Surfline **on the new headline field**
-(`mainBreakZoneFaceHeight` → served `breakingFaceHeight`), comparison quantity chosen before
-looking (`rules/verification.md`). Also re-assert: no flat output; a full 4-level run converges.
-**Accept:** pasted matched-time comparison within stated tolerance, ≥1 real sea state.
+### D2 — Repair `test_serve_nothing_on_failure.py` (2 pre-existing failures) — **DO FIRST**  ⬜
+**Owner:** `clearskies-test-author` (Sonnet). **QC:** auditor at Gate D.
+The two failures (`AttributeError: 'SimpleNamespace' object has no attribute
+'open_water_bearing_deg'`, broken since `51543b1`) mean the serve-nothing GUARD — load-bearing
+for H1 — currently has dead tests. Fix the FIXTURE (add the missing field with a realistic
+value; check for other fields added since) so the guard's tests run again.
+**Files:** `tests/test_serve_nothing_on_failure.py` ONLY. **MUST NOT TOUCH:** the guard code
+itself — if the repaired tests then FAIL against production code, STOP and surface (that would
+mean the guard regressed unnoticed; do not "fix" either side without a ruling).
+**Accept:** 9/9 in that file green at HEAD, zero production-code changes in the diff.
 
-### V2 — Standing weather-dependent gates  ⬜ (open until first qualifying day; non-blocking)
-- **Multi-swell day** *(T2.3 residual + G7.3)*: validate the §11.3 combined-face metric + BD-7
-  headline on a genuine multi-swell day; auditor CLAIM-2 check (dominant-by-energy divergence)
-  same day.
-- **HB double-break day** *(break-detection spec §4.1)*: first swell that puts an outer break
-  ~mid-pier — verify cross-section (representative transect) and per-transect data show BOTH
-  break zones, handoff seaward of the outer, headline from the bigger face. Check the break-zone
-  merge behavior the same day (spec §6.4 — tune ONLY if zones fragment).
-- **Larger-seas magnitude revalidation** *(G7.3)*: magnitude was validated at ~1 m swell only.
-
-### V3 — Formal blind audit of the full served forecast *(G7.3, M1 closure)*  ⬜
-One adversarial agent, briefed on the manuals only (not the session history), audits a live
-served forecast end-to-end for internal consistency + reality agreement, and reports findings.
-
-### V4 — Forecast window: 66 h vs 72 h *(TA-C16)*  ⬜
-GFS staleness fallback shortens coverage honestly. Decide: accept + document the honest window,
-or add a fill strategy. Small, operator-decision-shaped.
-
----
-
-## G — Geometry remainder (extracted from the archived geometry plan)
-
-### G1R.3 — Wizard facing flow *(AD-1R definition-time UX)*  ⬜
-**Owner:** `clearskies-api-dev` + `clearskies-dashboard-dev`. **Original detail:** archived
-geometry plan §PHASE G1R. **Summary:** `/geometry/facing` endpoint + API pass-through + apply
-models + wizard pre-fill so the computed AD-1R facing shows at spot setup, operator-overridable.
-Not urgent (the chain recomputes facing at config-push regardless) — UX completeness.
-
-### G5 — Break-type from shoreline curvature → L3 trigger *(AD-5)* — ⬜ **EVALUATE FIRST**
-**Operator framing (2026-08-02, chat):** the point of G5 is a better understanding of the shape
-of the beach and how waves come in, to best align the grids and model the break-type. **Before
-any code: an evaluation task** — does deriving point-break/headland/bay from measured shoreline
-curvature still add value on top of what now works (AD-1R facing + AD-2 fan + shadow-envelope
-L4)? Concretely: today L3 fires off the operator-typed `topographic_feature` config field; G5
-would derive it from geometry and demote the config field to an override.
-**Step 1 (coordinator + operator):** pick 2–3 real candidate spots (a point break, a bay) and
-check whether the current pipeline mis-grids them without G5. If yes → implement per archived
-§G5.1–G5.3 (KAT-gated, L3 emitter untouched — trigger-only change) **carefully, without
-disturbing the working chain**; if no → close G5 as not-beneficial with the evidence.
-
-### G6 — Two-stage setup geometry: OSM bootstrap → bathymetry refine *(AD-6, REWRITTEN in plain
-terms 2026-08-02 — the archived plan's wording was impenetrable; this section supersedes it)*  ⬜
-
-**The problem it solves (chicken-and-egg at setup/admin time):** to compute the study area,
-facing, and grids you need bathymetry — but you can't know WHICH bathymetry tiles to download
-until you know roughly where the coastline runs and which way the water faces. Today that
-bootstrap is implicit/fragile.
-
-**The design, in order:**
-1. **Stage 1 — OSM bootstrap (cheap, instant):** from OpenStreetMap coastline + water-body data
-   (already fetched by `geography.py`): trace the coastline, classify the water body, run the
-   72-ray fetch fan, compute a provisional facing and study-area footprint. **Freeze L1** and
-   the bathymetry **download footprint** from this.
-2. **Stage 2 — bathymetry refine (authoritative):** with the bathymetry now downloaded for the
-   Stage-1 footprint, recompute the real facing (AD-1R smoothed-shoreline normal), transects,
-   L3/L4 — the same production chain that runs today.
-3. **Self-check:** compare the Stage-1 OSM heading vs the Stage-2 bathymetry heading. Agreement
-   → trust; divergence beyond threshold → WARN + flag for operator review at setup (catches bad
-   OSM data or bad bathymetry before the model runs on it).
-- **G6.3 — wizard polygon draw tool** *(the part the operator couldn't reconstruct — it is UI,
-  not algorithm)*: the wizard's map today only lets the operator draw a **polyline** (the beach
-  segment). This enables **closed-polygon drawing** in the same map (`L.Draw.Polygon` alongside
-  the polyline, `templates/wizard/step_marine.html`), capturing the ring into the existing
-  `_coordinates` field — so the operator can draw closed outlines (study-area boundary /
-  structure rings) by hand where OSM tracing is wrong or missing. Round-trips through the
-  existing apply contract (guarded by the T4.5 coord round-trip test).
-**Accept:** stage order enforced (L1 frozen after Stage 1; Stage 2 uses Stage-1's footprint);
-self-check flags a synthetic divergent pair; polygon round-trips.
-
----
-
-## C — Carry-forwards (small, mostly verify-then-close)
-
-### C1 — Concerns sweep  ⬜
-Triage the still-OPEN entries in the two archived concerns files against current code, one
-closeout report: `archive/MARINE-WORKING-MODEL-CONCERNS.md` — **TA-C21** (invariant-3 rescope:
-operator decision — options (a) alongshore-span condition / (b) downgrade to INFO / (c) leave;
-note BD-8 retirement made the flag metadata-only, which may change the operator's preference),
-**TA-C22(b)** (transect-31 PT* gap root-cause; TA-C22(a) is C4 below); `archive/
-MARINE-GEOMETRY-MODEL-CONCERNS.md` — TC-1..TC-20 (many likely closed by events; TC-10 is H2's,
-TC-19 is H3's), and the restoration concerns' surviving C-E items (C-E01/03/04/08/10/11/12, D7
-parked-to-cutover). **Accept:** every entry gets CLOSED-with-evidence / CARRIED-to-named-task /
-OPERATOR-DECISION, in one report.
-
-### C2 — D6a re-verify *(G7.1)*  ⬜ — the `grid_sizing_chain` StructureConfig-vs-dict type bug:
-old cite is stale; re-locate by grep; fix with a failing-first guard test, or confirm gone and
-close.
-
-### C3 — Cadence/performance lever *(G7.4, approved + gate-cleared 2026-07-30)*  ⬜ — hourly
-0–24 then ~6-hourly to 72 (~52% fewer solves, ~41→~25 min). Producer-only (`swan_formats.py`
-compute list + TABLE schedule). Chain is timestamp-driven (verified 2026-07-30) — re-confirm at
-implementation. Worth doing now that magnitude is validated.
-
-### C4 — modelStatus grading *(G7.5 / TA-C22(a); data-contract change pre-approved via the
-geometry plan)*  ⬜ — pinned rule: `ok` = 0 transects fall back; `partial` = ≥1 but <25% and not
-the best-peak transect; `degraded_bulk` = ≥25% OR the best-peak transect. **Check interaction
-with BD-7 first:** "best-peak transect" should likely read "any main-break-zone qualifying
-transect" now — surface the delta to the operator before coding.
-
-### C5 — Track-B sign-off designs *(T4.2 bathymetry injection; T4.3 dynamic coefficients)*  ⬜ —
-each needs an operator-signed design before any code (standing gates from the working-model
-plan). Parked until a spot needs them (submerged breakwater / DAM crest cases).
-
-### C6 — T1.3 re-verify C-E07 + curve-clip at more sea states  ⬜ — folds naturally into V1/V2
-evidence collection; close it there.
-
----
-
-## D — Deferred items from the 2026-08-01 break-detection rounds
-
-### D1 — `_transect_band_depths()` deletion  ⬜ — dead in production since the full-length-band
-rewrite; deletion blocked by `tests/test_swan_l4_intersection.py` imports. Needs its own scoped
-round (update the importing tests in the same commit). Operator sign-off to dispatch.
-
-### D2 — `test_serve_nothing_on_failure.py` — 2 pre-existing failures  ⬜ — stale fixture missing
-`open_water_bearing_deg` (broken since `51543b1`). The GUARD it tests (serve-nothing) is live and
-important — fix the fixture so the guard's tests actually run. Small, high-value.
-
-### D3 — tmpfs peak headroom *(known limitation, recorded)* — `_check_convergence` reads all
-TABLE_PT files before the parse-and-delete loop, so peak tmpfs is unchanged by the unlink
-(~170 MB/cycle at full-length bands). No action unless a bigger config trips the box; noted here
-so nobody rediscovers it.
+### D1 — Delete dead `_transect_band_depths()`  ⬜ (operator sign-off to dispatch — it is a
+deletion round)
+**Owner:** `clearskies-api-dev` (Sonnet). **QC:** auditor at Gate D.
+Dead in production since the full-length-band rewrite (Round 1, `03b33e1`); deletion blocked by
+`tests/test_swan_l4_intersection.py` imports. **Change:** delete the function from
+`services/swan_runner.py`; update the importing tests to exercise the live band path (or delete
+only the cases that exist purely to call the dead function — classify each in the scope-ack,
+same discipline as R8). **MUST NOT TOUCH:** the live band-building code (`_TRANSECT_BAND_*`
+constants, sentinel, grid-bbox clip — Round-1 frozen). **Accept:** grep shows zero references;
+full targeted suite green; production run byte-identical (baseline diff, directive #2).
 
 ### D4 — Dashboard adoption of the BD-7/BD-9 wire fields  ⬜
-**Owner:** `clearskies-dashboard-dev`. The API now serves `mainBreakZoneFaceHeight`,
+**Owner:** `clearskies-dashboard-dev` (Sonnet). **QC:** auditor at Gate D.
+**Contract (already live, API-MANUAL updated 2026-08-01):** `mainBreakZoneFaceHeight`,
 `mainBreakZoneStartIndex`/`EndIndex`, `mainBreakZoneQualifyingCount`,
-`representativeTransectIndex` (API-MANUAL updated 2026-08-01) — the dashboard does not yet
-consume them. Scope: surface the zone context where face height is shown; the beach-profile
-cross-section already follows the representative transect server-side (no dashboard change
-needed there — verify).
+`representativeTransectIndex`; `breakingFaceHeight` already follows the new headline server-side.
+**D4.1 (scoping, read-only):** locate every dashboard surf-page component reading
+`breakingFaceHeight`/`bestPeakFaceHeight`/`spotAverageFaceHeight`; report with file:line.
+**D4.2:** surface zone context where face height is shown (e.g. "main break zone: transects
+S–E, N qualifying") — presentation per DESIGN-MANUAL tokens; no new dependencies (trigger 7).
+**D4.3 (verify-only):** confirm the beach-profile cross-section needs NO dashboard change (the
+representative-transect switch happened server-side in `beach_profile.py`) — state it in the
+closeout with evidence, don't "fix" it.
+**MUST NOT TOUCH:** API repo; any non-surf dashboard page. **Null-safety:** all new fields are
+nullable (old caches) — render nothing, never `NaN`/`undefined` text.
+**Accept:** fields render on live data; null-field cache day renders cleanly; axe-core pass on
+the touched page (dashboard testing baseline).
 
-### D5 — Birdseye break heatmap *(spec BD-6 — product does not exist yet)*  ⬜
-DASHBOARD-MANUAL confirms no heatmap exists. The data contract (`per_transect` with break
-points/zones per transect) is complete and live. Design + build the alongshore × cross-shore
-break-zone view (the "where are the best breaks along the beach" product the operator has
-described repeatedly). Needs a design pass before implementation; coordinate with D4.
+### D5 — Birdseye break heatmap *(spec BD-6 — product does not yet exist)*  ⬜ **DESIGN FIRST**
+**Owner:** design pass = coordinator + operator (mockup in chat); build = `clearskies-dashboard-dev`.
+**Data contract (live):** `per_transect[]` with break points/zones per transect (alongshore) ×
+cross-shore distances — everything the alongshore×cross-shore break-zone view needs; see
+[briefs/SURF-ZONE-BREAK-DETECTION-SPEC-2026-08-01.md](briefs/SURF-ZONE-BREAK-DETECTION-SPEC-2026-08-01.md)
+BD-6 and the operator rulings in §2 ("birdseye view of the beach … so surfers know where the
+best breaks are occurring"). **Gate to start build:** operator-approved mockup. Not dispatched
+until then. Coordinate with D4 (shared components), but ship separately (directive #3).
+
+### ⛔ QC GATE D — assigned: `clearskies-auditor`
+| # | Element | Evidence |
+|---|---|---|
+| 1 | D2 zero production-code diff | `git show --stat` = one test file |
+| 2 | D1 truly dead code | pre-deletion grep proves no live caller; post run byte-identical |
+| 3 | D4 null-safety | replay an OLD (pre-Round-2) cached payload through the dashboard → clean |
+| 4 | No API-repo drift | marine repo HEAD unchanged by D4/D5 work |
+
+---
+
+## PHASE V — Validation gates (evidence collection; weather-dependent rows stay OPEN)
+
+**Owner:** coordinator runs V1/V2/V4 measurement; V3 is an agent. **QC:** V-rows are themselves
+the QC — each requires pasted numbers, matched-time, quantity chosen before looking
+(rules/verification.md). Method reference for matched-time ground-truthing:
+[briefs/T3.0-BOUNDARY-GROUNDTRUTH-2026-07-30.md](briefs/T3.0-BOUNDARY-GROUNDTRUTH-2026-07-30.md).
+
+### V1 — Gate GR: reality re-validation of the NEW headline  ⬜
+The headline changed 2026-08-01 (BD-7 upper-tail zone mean). At the next ordinary conditions:
+paste served `breakingFaceHeight` (+ zone fields) beside the contemporaneous cam/Surfline at
+matched hour; tolerance stated BEFORE looking; also confirm headline sits between
+`spotAverageFaceHeight` and `bestPeakFaceHeight` (INVARIANT_10 live check) and zone width ≥5.
+Closes C6 (T1.3) with the same evidence. **Accept:** within tolerance at ≥1 real sea state.
+
+### V2 — Standing weather-dependent gates  ⬜ (non-blocking; close each at first qualifying day)
+- **Multi-swell day:** §11.3 combined-face + BD-7 headline validated vs reality; auditor CLAIM-2
+  (dominant-by-energy divergence) same day. *(T2.3 residual, G7.3.)*
+- **HB double-break day** (outer break ~mid-pier, spec §4.1): per-transect data + representative
+  cross-section show BOTH zones; handoff seaward of the outer (log evidence); headline from the
+  bigger face; merge-threshold behavior observed (tune ONLY if zones fragment, spec §6.4).
+- **Larger-seas magnitude revalidation** (validated at ~1 m only so far).
+
+### V3 — Formal blind audit of the served forecast  ⬜
+**Owner:** `clearskies-auditor` (fresh instance, briefed on MANUALS ONLY — no session history,
+no this-plan access; that blindness is the point). Audits one live served forecast end-to-end
+for internal consistency + reality agreement; findings ranked. Anything it finds that the
+manuals can't explain is, definitionally, either a defect or doc drift — both are deliverables.
+This is also the backstop for anything the archived separation plan left genuinely unfinished.
+
+### V4 — Forecast window 66 h vs 72 h *(TA-C16)*  ⬜ — **operator decision**
+Evidence packet (coordinator): how often the GFS-staleness fallback shortens the window, cost of
+each option (accept+document honest window / wait-and-retry / hybrid). One page, then the
+operator picks; implementation (if any) dispatches as its own scoped round.
+
+---
+
+## PHASE G6 — Two-stage setup geometry: OSM bootstrap → bathymetry refine *(AD-6, rewritten)*
+
+**Why (operator, 2026-08-02):** solves the setup-time chicken-and-egg — you can't know which
+bathymetry tiles to download until you know roughly where the coast runs and which way the
+water faces. Stage 1 = cheap OSM answer; Stage 2 = authoritative bathymetry answer; self-check
+catches bad inputs at setup, before the model runs on them.
+**Design references:** [briefs/STUDY-AREA-GEOMETRY-BRIEF.md](briefs/STUDY-AREA-GEOMETRY-BRIEF.md)
+(study-area geometry model; read WITH its H3 supersession notes), archived geometry plan §AD-6
+(history), ADR-100 (geography subsystem), ADR-093 Amendment 5 (AD-1R facing — Stage 2's method,
+FROZEN, not re-derived here).
+
+### G6.1 — Stage wiring in the sizing chain  ⬜
+**Owner:** `clearskies-api-dev` (Sonnet). **QC:** auditor at Gate G6.
+**Current state to verify first:** `services/grid_sizing_chain.py` — establish (read-only
+report) the CURRENT order of: geography fan (`geography.py`), L1 sizing, bathymetry
+availability checks, AD-1R facing, transects, L3/L4. Name where the bathymetry download
+footprint is decided today.
+**Change:** enforce the two-stage order as an explicit chain structure: Stage 1 (OSM coastline
++ water-body classification + 72-ray fan + provisional facing → freeze L1 + download
+footprint) then Stage 2 (bathymetry-derived AD-1R facing, transects, L3/L4 from the Stage-1
+footprint). This is an ORDERING/wiring change of existing steps — creating new computation or
+changing any formula inside a step is NOT in scope and NOT pre-approved.
+**MUST NOT TOUCH:** the AD-1R facing math; the fan math; L1/L3/L4 sizing formulas; SWAN
+emission. **Accept (KAT):** chain-order test proves L1 params are fixed before any bathymetry
+read; Stage 2 provably consumes the Stage-1 footprint (assert on the passed bbox).
+
+### G6.2 — OSM-vs-bathymetry heading self-check  ⬜
+**Owner:** `clearskies-test-author` (Sonnet), after G6.1.
+**Change:** at config-push, compare Stage-1 provisional facing vs Stage-2 AD-1R facing; |Δ| >
+threshold → WARN + persisted flag surfaced in `/health` (additive field) and the wizard/admin.
+Threshold: reuse TC-8's existing 30° diagnostic constant — introducing a NEW constant is an
+architectural trigger; if 30° proves wrong, surface to operator.
+**Accept (KAT):** synthetic agreeing pair → no flag; synthetic divergent pair (>30°) → WARN +
+flag; flag visible in `/health` fixture test.
+
+### G6.3 — Wizard polygon draw tool *(confirmed 2026-08-02: UI feature — closed-polygon drawing)*  ⬜
+**Owner:** `clearskies-dashboard-dev` (Sonnet; stack repo).
+**Current state:** wizard map draws polyline only (`templates/wizard/step_marine.html`,
+`polygon:false` ~`:1287`, `L.Draw.Polyline` ~`:1456` — verify, cites from 2026-07-30).
+**Change:** enable `L.Draw.Polygon` alongside the polyline; captured ring goes into the existing
+`_coordinates` hidden field, SAME `[lon,lat]` JSON-string contract (T4.5 round-trip guard is
+the regression net — run it). Purpose: operator hand-draws closed outlines (study area /
+structure rings) where OSM tracing is wrong or missing.
+**MUST NOT TOUCH:** the apply/config contract shape (the JSON-string encoding decided at E13 is
+frozen); the polyline flow. **Accept:** polygon draw → apply → marine config round-trips
+byte-faithfully (T4.5 test extended with a polygon case); polyline flow byte-identical.
+
+### ⛔ QC GATE G6 — assigned: `clearskies-auditor`
+| # | Element | Evidence |
+|---|---|---|
+| 1 | Stage order real, not cosmetic | trace a config push on librewxr: download footprint decided before any bathymetry read (journal) |
+| 2 | No formula drift | AD-1R facing + fan outputs byte-identical pre/post G6.1 on the HB fixture |
+| 3 | Self-check falsifiable | mutate the divergent-pair fixture → test fails |
+| 4 | Polygon contract safe | T4.5 round-trip green incl. polygon; polyline path diff empty |
+| 5 | Full-nest regression | one full 4-level run post-deploy: valid_fraction / resolution counts match baseline |
+
+---
+
+## PHASE C — Carry-forwards (small; mostly verify-then-close)
+
+### C1 — Concerns sweep  ⬜
+**Owner:** `Explore`-type read-only agent produces the evidence; coordinator writes dispositions;
+operator rules the OPERATOR-DECISION rows. Triage every still-OPEN entry in
+`archive/MARINE-WORKING-MODEL-CONCERNS.md` (TA-C21 — invariant-3 rescope, operator decision,
+note BD-8 made the flag metadata-only; TA-C22(b) transect-31 PT* gap) and
+`archive/MARINE-GEOMETRY-MODEL-CONCERNS.md` (TC-1..TC-20; TC-10→H2, TC-19→H3) and the
+restoration concerns' C-E survivors (C-E01/03/04/08/10/11/12, D7 parked-to-cutover).
+**Accept:** one report; every entry CLOSED-with-evidence / CARRIED-to-named-task /
+OPERATOR-DECISION. Reference for TA-C21: [briefs/T4.4-SHADOW-DIAGNOSIS-2026-07-30.md](briefs/T4.4-SHADOW-DIAGNOSIS-2026-07-30.md).
+
+### C2 — D6a re-verify *(G7.1)*  ⬜ — `clearskies-api-dev`: the `grid_sizing_chain`
+StructureConfig-vs-dict bug's old cite is stale; grep-relocate; if found → failing-first guard
+test + fix; if gone → close with the grep evidence. Files: `services/grid_sizing_chain.py` +
+one test file. Nothing else.
+
+### C3 — Cadence/performance lever *(G7.4; approved + gate-cleared 2026-07-30)*  ⬜
+**Owner:** `clearskies-api-dev`. Hourly 0–24 then ~6-hourly to 72 (~52% fewer solves,
+~41→~25 min). Producer-only: `swan_formats.py` compute-list + TABLE output schedule — a VALUE
+change, no command-grammar change (SWAN syntax appendix rules apply; local manual
+`docs/reference/swan-user-manual.txt` is the only SWAN reference). Pre-verified 2026-07-30: the
+whole chain is timestamp-driven — re-confirm in scope-ack (grep consumers for uniform-spacing
+assumptions). **MUST NOT TOUCH:** hotstart mechanics, convergence gate, anything per-grid.
+**Accept:** KAT on the emitted compute list; full run wall-clock measured before/after; all
+V1-style baseline numbers unchanged at the shared hours.
+
+### C4 — modelStatus grading *(G7.5 / TA-C22(a))*  ⬜ — **BLOCKED on an operator re-ruling.**
+The pinned rule predates BD-7 ("…or the best-peak transect falls back"). Proposed update for
+ruling: `ok` = 0 fallback transects; `partial` = ≥1 but <25% AND no main-break-zone qualifying
+transect fell back; `degraded_bulk` = ≥25% OR any qualifying-zone transect. Coordinator brings
+this one question to the operator; then a normal scoped round (`endpoints/surf.py`
+`_determine_model_status` + `surf_1d_pipeline.py` fallback bookkeeping + KATs).
+
+### C5 — Track-B sign-off designs *(T4.2 bathymetry injection; T4.3 dynamic coefficients)*  ⬜
+PARKED until a spot needs them (submerged breakwater / DAM crest). Each requires an
+operator-signed design doc BEFORE any code (standing gate). Reference:
+[briefs/BATHYMETRY-STRUCTURES-BEST-PRACTICES-2026-07-29.md](briefs/BATHYMETRY-STRUCTURES-BEST-PRACTICES-2026-07-29.md),
+[briefs/SWAN-OBSTACLE-BEST-PRACTICES-2026-07-29.md](briefs/SWAN-OBSTACLE-BEST-PRACTICES-2026-07-29.md).
+
+### ⛔ QC GATE C — assigned: `clearskies-auditor`
+C1's report spot-audited (pick 3 CLOSED rows, independently re-verify); C2/C3 rounds get the
+standard adversarial pass (falsifiable KATs, allowlist diff, baseline diff).
+
+---
+
+## PINNED (operator-ruled, not scheduled — do NOT dispatch)
+
+- **G5 — break-type from shoreline curvature → L3 trigger** *(AD-5)* — **PINNED 2026-08-02
+  (operator, in chat):** the 72-ray fan + AD-1R facing likely solved most of what G5 was for
+  (orientation/exposure understanding of the beach). **Operator clarification (same day): L3 and
+  L4 are inseparable — whenever L4 exists, L3 MUST exist as the L2→L3 step-down that keeps
+  SWAN's nesting grid ratios; there is no standalone "should L3 exist" decision on a structure
+  spot.** The trigger question G5 addressed therefore only applies to the STRUCTURELESS
+  curved-shore case (a point break / headland / bay with no L4, where the fine nest would be
+  wanted for the shore shape alone) — and that case still reads the operator-typed
+  `topographic_feature` config field, which is acceptable for now. Revisit ONLY if a real
+  structureless spot mis-grids on setup (that event un-pins it; then: evaluation first, per the
+  archived plan's §G5.1–G5.3, trigger-only change, L3 emitter untouched).
+- **G1R.3 — wizard facing pre-fill flow** *(AD-1R UX)* — not urgent (the chain recomputes facing
+  at config-push regardless). Bundle with G6.3's wizard work if the operator wants it then.
+- **D3 — tmpfs peak headroom** *(known limitation, recorded)*: `_check_convergence` reads all
+  TABLE_PT before the unlink loop → peak ~170 MB/cycle unchanged by parse-and-delete. No action
+  unless a bigger config trips the box.
+- **D7 — publish policy** — parked to cutover (Phase 5 of the Clear Skies plan).
 
 ---
 
@@ -214,6 +390,7 @@ described repeatedly). Needs a design pass before implementation; coordinate wit
 | **TC-21 / TC-23** (L4 coverage vs handoff envelope) | L4 transect-shadow-envelope rewrite `4e79d21`; valid_fraction 100% live 2026-08-01 |
 | **Gate R rows 1–4, 6, 7** | Final record in `archive/MARINE-MODEL-RESTORATION-PLAN.md` §QC GATE R |
 | **Break-detection Rounds 1–2** (BD-1/2/4 + bands; BD-7/9 + BD-8 retirement) | Marine `03b33e1..b60ef92`, `9719db1`+`732e87d`, both deployed; docs meta `07bee6b`, `6f3c6c7` |
+| **Marine service separation** | Unified service live on librewxr:8780 (ADR-099, `deploy-marine.sh`); plan archived 2026-08-02 as overtaken |
 
 ## Decision log
 
@@ -221,5 +398,13 @@ described repeatedly). Needs a design pass before implementation; coordinate wit
   archived (fully superseded); restoration status-corrected (Phase F/R5 markers were stale) and
   archived with Gate R substantively passed; geometry plan closed with G4/AD-4 superseded and
   remainder extracted here. Operator rulings same session: Phase F stays wired (done, not
-  revisited); G5 gets an evaluate-benefit-first gate; G6 rewritten in plain terms (this file's
-  §G6 supersedes the archived AD-6/G6 wording); G6.3 confirmed as the wizard polygon draw tool.
+  revisited); G6 rewritten in plain terms (this file's §G6 supersedes the archived AD-6/G6
+  wording); G6.3 confirmed as the wizard polygon draw tool.
+- **2026-08-02 (later) — Granularized + G5 pinned + separation plan archived.** Operator: (1)
+  G5 pinned — the ray fan + AD-1R facing likely solved most of its purpose; only the L3-trigger
+  residue remains, acceptable until a real spot mis-grids; (2) `MARINE-SERVICE-SEPARATION-PLAN.md`
+  archived as overtaken (too old to triage; V3 blind audit + C1 sweep are the backstop for any
+  genuinely-missing pieces); (3) plan rewritten to granular per-task specs with agent
+  assignments, per-phase adversarial QC gates (`clearskies-auditor`), brief cross-references,
+  and the PRIME-DIRECTIVE anti-regression rules (frozen-core list, baseline-diff, one change
+  per deploy, reality gate per deploy).

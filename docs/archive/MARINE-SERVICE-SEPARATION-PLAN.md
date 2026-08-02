@@ -1,6 +1,16 @@
 # Marine Service Separation Plan
 
-**Status:** DRAFT — awaiting review
+> ## ⛔ ARCHIVED 2026-08-02 (operator direction, in chat) — OVERTAKEN BY EVENTS
+>
+> The separation this plan drove HAPPENED: the unified `weewx-clearskies-marine` companion service
+> (ADR-099) runs on librewxr:8780 and replaced both partial services (8767/8770) — see
+> `scripts/deploy-marine.sh` and ARCHITECTURE.md. The plan predates four subsequent marine plans
+> (remediation → restoration → working-model → geometry, all also archived) and its unfinished
+> pieces are too stale to execute as written; operator ruled it too old to triage line-by-line.
+> Anything genuinely still missing will surface through `docs/planning/MARINE-FORWARD-PLAN.md`'s
+> gates (blind audit V3, concerns sweep C1) rather than from this file. Historical record only.
+
+**Status:** ARCHIVED (see banner). Previously: DRAFT — awaiting review
 **Created:** 2026-07-22
 **Origin:** User-ordered full audit of the marine/surf system. The audit (documented in `docs/planning/briefs/SURF-MODEL-SEPARATION-BRIEF.md`) found that the ~28,000-line marine system was improperly embedded in the API instead of being a standalone companion service. A partial extraction was attempted (SWAN service on librewxr:8767, compute service on librewxr:8770) but left the surf page empty for 24+ hours due to cascading failures: TLS cert rejection, local SWAN fallback producing no cached data, and two-service fragmentation.
 **Governing brief:** `docs/planning/briefs/SURF-MODEL-SEPARATION-BRIEF.md`
