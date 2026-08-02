@@ -630,6 +630,36 @@ source (file:line); why it started Aug 2; whether any SERVED value consumes the 
 transects; the CLEARSKIES_MARINE_API_URL unset + fishing-502 chain. Report first; fixes are
 their own scoped round. SWAN/surf path confirmed unaffected (216.4 stable through all
 deploys).
+**INVESTIGATION ✅ DONE 2026-08-02 (l4-rewrite, read-only). Findings:**
+(1) 240.0° = the segment-perpendicular FALLBACK (`marine_config.py:527-533`,
+`beach_facing_source="fallback_segment_perp"` — no `beach_facing_degrees` key in
+marine.conf). The AD-1R 216.4° correction is applied by grid_sizing_chain via the setter,
+IN-MEMORY ONLY (deliberate: "config is operator-owned; only the wizard rewrites the stored
+key", marine_config.py:643-646) — the SWAN runner's long-lived config object keeps it;
+`endpoints/surf.py:764` + `beach_profile.py:995` fresh-parse config PER REQUEST
+(`_resolve_marine_config`, deliberate "until a config-push invalidation hook" per its own
+docstring) and always recompute 240.0.
+(2) Started 00:33Z Aug 2 because /beach-profile had never been requested in journal
+retention (dashboard 503-dark since ~Jul 26); first-request event (Round-2's own live
+verification), not a state change.
+(3) **WRONG DATA IS SERVED:** beach-profile responses — ALWAYS (no cache-hit path);
+`/surf`'s SurfBeat fields (`setTimingMinutes`/`setAmplitudeM`/`igWaveHeightM`) — ALWAYS
+(gated on surfbeat_enabled only); headline metrics — only on SWAN-cache MISS (cache-hit path
+serves the correct 216.4° precompute). Frequency shielded by the API proxy's 1800 s cache.
+(4) `CLEARSKIES_MARINE_API_URL`: never set on librewxr (neither env file); C-47 (`5b52ede`,
+Jul 25) added hard-require consumers (station-wind + fishing solunar → 502); INDEPENDENT of
+the facing anomaly (same-second hits were one page load's parallel fetches). CONFIG.md:52
+actively misleads ("unset is normal/silent" — pre-C-47 truth).
+**→ C7a (small scoped round, ready):** set `CLEARSKIES_MARINE_API_URL` in
+`/etc/weewx-clearskies/marine/network.env` (correct URL value to be confirmed against
+api_client.py's expectations at dispatch) + CONFIG.md correction (two unset behaviors).
+**→ C7b (OPERATOR DECISION — facing-divergence fix shape):** (a) persist AD-1R value into
+marine.conf — conflicts with the operator-owned-config boundary (G1R.3's domain); (b) config
+invalidation hook / share runner's corrected object — trigger-5-adjacent; (c) thread the
+persisted per-transect `transect_bearings` (grid_sizing_chain) into the endpoints'
+compute_spot_transects call — same computation, better input, likely non-architectural,
+NEEDS a design-first data-availability check. **Lead recommendation: (c) design-first; fall
+back to an (a)/(b) ruling only if (c)'s data isn't reachable without a new persisted field.**
 
 ### ⛔ QC GATE C — assigned: `clearskies-auditor`
 C1's report spot-audited (pick 3 CLOSED rows, independently re-verify); C2/C3 rounds get the
