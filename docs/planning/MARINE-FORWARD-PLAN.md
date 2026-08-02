@@ -669,9 +669,17 @@ fix); (ii) proposed small code hardening — normalize station IDs to uppercase 
 parse (matches NDBC's documented ID format) ± negative-cache the 404; BOTH are behavior
 changes on a provider → operator nod requested.**
 
-### V3-doc-batch — API-MANUAL corrections from V3  ⬜ (doc-sync round)
-waterTemp (document field + dual-provenance note), peelDirection in §18 per-entry table
-(verify D8's `9bec177` row covers §16 only), verticalDatum stale "always null" claim.
+### V3-doc-batch — API-MANUAL corrections from V3  ✅ **DONE 2026-08-02 (doc-sync, 8 items)**
+Meta commit `3c084ec` (items 1-7; landed under the lead's commit via a benign staged-file
+sweep — all items verified complete, ledger in closeout) + API repo `f10e8ce` (item 8,
+pushed): swellDominance bucketed truth (+API-repo comment), organizationWind 0-18 truth +
+waveOrganization rounding-identity note, breakPoints null-cause + dual-producer interim
+text (superseded when V3-F4-IMPL lands), verticalDatum as-built, waterTemp §16+§18 +
+provenance, §18 gains all three peel rows, clearskies-dev.md services table → unified
+marine service :8780, TC-2/TC-3 archive headers restored + TC-12/13 numbering note.
+**Flagged follow-up (new doc task, not yet dispatched):** repo-directory listings in
+clearskies-dev.md (~:98-129) + ARCHITECTURE.md "Current deployment" paragraph still
+describe the superseded split swan/compute topology — dedicated verified doc round.
 
 ### V4 — Forecast window 66 h vs 72 h *(TA-C16)*  ✅ **CLOSED — operator ruled 2026-08-02:
 accept as-is.** The honest shorter window when the newest GFS cycle is unpublished is correct
