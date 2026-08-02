@@ -301,7 +301,14 @@ candidate text is lead-written and does not authorize. Alternatives all trip tri
 (reuse SWAN's wind data = data contract; cut forecast hours/bbox = fidelity criterion).
 Known risks if approved: publish-path duration (+~20-30 s if synchronous; wants
 fire-and-forget), bbox/key drift (the KAT above), NOMADS rate-limiter contention with
-SWAN's own fetch. **Awaiting operator ruling in chat before any Stage 2.**
+SWAN's own fetch.
+**✅ OPERATOR APPROVED 2026-08-02 (chat: "h5 approve change")** — the publish-time HRRR
+warming design is authorized as scoped above (same function, same params/key as
+`endpoints/surf.py:658`'s request-time call; best-effort/never blocks or fails a publish;
+must not delay the next cycle's start — non-blocking placement is a Stage-2 design
+requirement, not an option). Required KATs stand: byte-identical-cache-key,
+warmed-then-first-request-does-not-refetch, publish-never-blocked-by-warming-failure.
+Stage 2 dispatches to `l4-rewrite` after its C2 round closes.
 **MUST NOT TOUCH (carries to Stage 2):** cache file shape, publish decisions, H4's
 chunked encoder.
 
@@ -628,10 +635,21 @@ restoration concerns' C-E survivors (C-E01/03/04/08/10/11/12, D7 parked-to-cutov
 **Accept:** one report; every entry CLOSED-with-evidence / CARRIED-to-named-task /
 OPERATOR-DECISION. Reference for TA-C21: [briefs/T4.4-SHADOW-DIAGNOSIS-2026-07-30.md](briefs/T4.4-SHADOW-DIAGNOSIS-2026-07-30.md).
 
-### C2 — D6a re-verify *(G7.1)*  ⬜ — `clearskies-api-dev`: the `grid_sizing_chain`
-StructureConfig-vs-dict bug's old cite is stale; grep-relocate; if found → failing-first guard
-test + fix; if gone → close with the grep evidence. Files: `services/grid_sizing_chain.py` +
-one test file. Nothing else.
+### C2 — D6a re-verify *(G7.1)*  ✅ **CLOSED 2026-08-02 (branch: GONE — already fixed)**
+`l4-rewrite` grep-relocation + lead spot-check: D6a WAS the real bug and was fixed
+2026-07-28 by marine `29eb499` ("iterate StructureConfig.coordinates as attribute, not dict
+.get()" — the study-area bbox block iterated `spot_cfg.structures` with
+`_struct.get("coordinates", [])` on dataclass objects). Fix confirmed still in place at
+HEAD (grid_sizing_chain.py:1821-1822, attribute access; lead re-read). The archived cite
+"grid_sizing_chain.py:1270" is stale from post-fix insertions (H1's
+`_record_l3_viability_failures` + 1787b6a/5524e1f/38f93ac); current :1270 is unrelated
+shoreline-strip bathymetry content. Full consistency sweep: exactly 2 raw structure-access
+sites in the file (attr at :1822 on StructureConfig; `.get` at :2122 on the dict-shaped
+`build_obstacle_structures()` output) — the two shapes never cross; every consumer typed
+and accessed to match (swan.py:1143-1179, swan_domain.py:336-380, bathymetry.py:2105-2169,
+transect_handoff.py:298-316 all verified). `_record_l3_viability_failures` (H1-gated)
+touches no structure fields directly — no STOP needed. Zero code changes; repo clean.
+Evidence banks to Gate C.
 
 ### C3 — Cadence/performance lever *(G7.4; approved + gate-cleared 2026-07-30)*  ⬜
 **Owner:** `clearskies-api-dev`. Hourly 0–24 then ~6-hourly to 72 (~52% fewer solves,
