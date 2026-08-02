@@ -882,6 +882,17 @@ measured curvature. `topographic_feature` and `directional_exposure` are demoted
 edits (Marine Geometry-Model Plan G3.3 / G5.3 / G6.3); the sizing formulas, the SWAN→SwellTrack handoff, and all
 SWAN command syntax are unchanged (off-limits).
 
+**Directional exposure is presented as an explicit manual override in both the wizard and admin UI (C9b,
+MARINE-FORWARD-PLAN).** The stack repo's `step_marine.html` (wizard) and `marine.html` (admin) show a mode
+toggle per surf location — **Auto (measured)** (default; the checkbox directions are disabled and excluded from
+the submitted form so the config key stays absent) or **Manual override** (the operator picks directions, which
+are sent as the `directional_exposure` dict above). The admin location list additionally shows a per-location
+**Exposure** column with the mode currently in effect and, for overrides, the chosen directions — computed
+display-only from whether the on-disk config carries the key at all (`directional_exposure_is_override`, kept
+outside the `surf` payload sub-dict so neither apply-payload builder ever forwards it to the API). Switching a
+location back to Auto and saving removes the key, restoring the fan-derived measurement. The wire shape and the
+absent-key-means-Auto / present-key-means-override contract above are unchanged by this UI work.
+
 **Structure configuration (within `[[surf]]`):**
 
 | Field | Type | Valid values | Description |
