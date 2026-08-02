@@ -1,60 +1,75 @@
 # Session state — MARINE-FORWARD-PLAN execution (2026-08-02)
 
-## ═══ RESUME HERE (rewritten pre-compaction #2, 2026-08-02 ~10:05 UTC) ═══
+## ═══ RESUME HERE (rewritten pre-restart/compaction #3, 2026-08-02 ~21:15 UTC) ═══
 
 **Role:** Coordinator (Fable). **Mission:** CONTINUE EXECUTING
-`docs/planning/MARINE-FORWARD-PLAN.md` (meta repo, the ONLY live marine plan — re-read it in
-full first; every phase/task/gate status below is ALSO recorded there with round records).
-**Operator's standing directive: "ok continue autonomously with plan implementation"** (in
-chat, 2026-08-02 — recorded in the plan decision log). The progress log at the bottom of this
-file is the chronological truth of the whole session; read it before acting.
+`docs/planning/MARINE-FORWARD-PLAN.md` (meta repo, the ONLY live marine plan — re-read it
+first; every status below also has a full round record there). **Standing directive:
+"ok continue autonomously with plan implementation"** (chat 2026-08-02, in plan decision
+log). Progress log below = chronological truth; read before acting.
+**NOTE: the operator restarted the session so NEW PERMISSIONS take effect** —
+`.local/.claude/settings.local.json` (symlinked from .claude/) now allows ~36 Bash
+prefixes (cat/ssh/git/python/bash/rm/npm/curl/etc.) — shell work should no longer prompt.
 
-## ── CURRENT STATE SNAPSHOT (2026-08-02 ~10:05Z) ──
-**Deployed:** marine = `b5a4d01` (librewxr proc 09:41:05Z, healthy, all live-verified);
-dashboard = `6bc0573` (weather-dev, bundle index-WLu25L_n.js). ALL repos pushed (meta
-`c458dee`, marine `b5a4d01`, dashboard `6bc0573`). test_claim2.py = known stray in marine
-repo, untracked, never commit/delete.
-**Phase status:** PHASE H ✅ CLOSED (Gate H 8/8, auditor walk; records in plan). Phase D:
-D2✅ D4✅ D5✅(operator visual eyeball pending) D11✅; OPEN: D8 (chevron render, blocked
-on nothing — D4 landed the contract half), D9 (dl a11y one-block fix), D10 (awaiting
-operator's 3 D10.2 rulings), D1 (awaiting operator deletion sign-off); Gate D NOT yet
-formally closed (close after remaining D rounds). C7b ✅ fixed+deployed+live-verified
-(beach_profile now 216.4°); C7a ⛔ OPERATOR (librewxr→weewx:8765 firewall-blocked — MikroTik
-rule needed before env var is meaningful). H5 open (cold /surf ~33s first-read-per-cycle →
-one 503; investigation-first task in plan). Remaining phases: V (V1 ordinary-conditions
-check; V2 weather-gated; V3 blind audit dispatchable; V4✅), G6, LM (operator-requested
-landmarks; LM-1 dispatchable after D), C (C1 sweep, C2, C3 dispatchable; C4 ready; C5/G5
-pinned).
-**OPERATOR-PENDING (do not proceed on these without chat ruling):** C7a firewall; D1
-sign-off; D10.2 three rulings (perPartitionBreaks shape reuse / BD-8 shadow-aggregate /
-waveShape real round with trigger-1 cut points); D5 visual eyeball; V2 weather days.
-**Dispatchable next (autonomy grant covers):** D8, D9, H5, C2, C3, V3, LM-1.
-**Known residuals (tracked, don't re-find):** H5 cold-read; H4's single 1.655s unlocalized
-probe outlier; decode-side monolithic json.loads (~1.3s hourly-fill GIL hold — STOP-and-
-surface if it alone breaks an accept); C7's en-only locale keys note; D9's 2 dl axe
-violations (tracked); bimodal-facing SOLVED (C7b) — 240.0 lines should no longer appear
-(if they do, that's a NEW finding).
-**Agent roster (SendMessage by name, context intact):** `l4-rewrite` (Sonnet marine coder —
-H1/H2/H4/C7 context), `round1-auditor` (adversarial — audited every round this session),
-`d4-dashboard` (Sonnet dashboard — D4/D5 context+fixtures), `d2-test-fix` (test-author —
-D2/D11), `doc-sync` (docs — H3), `d10-history` (Explore, done). Dispatch pattern + mandatory
-blocks: see briefs in this scratchpad (d2/h1/h2/h3/h4/d4/d5-brief.md + audit briefs) — every
-implementation prompt carries git/architectural/stale-test blocks verbatim.
+## ── CURRENT STATE SNAPSHOT (2026-08-02 ~21:15Z) ──
+**Deployed:** marine = `f8f3157` (librewxr proc 21:01:44Z, healthy; carries H5 warming
+169b911 + V3-F4 breakPoints f925d77 + C7a verify-TLS); dashboard = `d667c7c` (weather-dev,
+bundle index-C5xzLiyY.js, D8+D9 live); config service (stack) = OLD code — stack `692ad76`
+is PUSHED but NOT DEPLOYED (no deploy script exists for it — first post-restart lead
+action, document the procedure while doing it).
+**ALL repos pushed:** meta `87ec111`, marine `f8f3157`, dashboard `d667c7c`, stack
+`692ad76`, api `f10e8ce`.
+**librewxr network.env (set this session):** CLEARSKIES_MARINE_API_URL=
+https://192.168.2.121:8765/api/v1 + CLEARSKIES_MARINE_API_VERIFY_TLS=false + pre-existing
+CLEARSKIES_MARINE_DEBUG_TRACE=1 (⛔ operator keep-or-remove pending).
 
-**Standing operator grants (2026-08-02, in chat — survive compaction, session-scoped):**
-1. **Push/deploy as necessary for TESTING purposes** — coordinator discretion; production
-   cutover still excluded.
-2. **Every implementation task → Sonnet coding agent; adversarial `clearskies-auditor` pass
-   BEFORE the lead gate; doc-sync closes every round.** (Permanent process mandate.)
-3. **Keep THIS scratch file updated as execution proceeds** (operator ordered scratch-file
-   progress guarding against session limits/compaction). Update the Progress log below after
-   every gate event; rewrite the RESUME HERE header whenever the "next action" changes.
+**CLOSED THIS SESSION (all with round records in plan):** Phase H (Gate H 8/8) incl. H1-H4;
+H5 (warming, operator-picked option b every-wake; live: warm 0.60s, rollover-race 18.45s
+residual quantified in plan; optional single-flight follow-up OFFERED, not ruled); D2, D4,
+D5, D8, D9, D11; C2 (D6a already fixed by 29eb499); C7b; C7a (firewall fixed BY OPERATOR
++ verify-TLS key round; live solunar 200s — 502s gone since Jul 25); V3 blind audit run
+(7 findings triaged); V3-F2/F4/F7/F8 investigation; V3-F4-IMPL (breakPoints → 1D pipeline,
+LIVE 55/55 entries serving break points); V3-doc-batch (8 items); C1 concerns sweep
+(dispositions in plan; new task C8 born); C9b CODE-closed (audit PASS; deploy pending).
 
-**MANDATORY reads before FIRST dispatch (operator instruction "read architecture and follow
-all rules"):** `docs/ARCHITECTURE.md` (marine section ~:99-127), `rules/agents.md`,
-`rules/verification.md`, `rules/coordinator.md`, `rules/clearskies-process.md` (agent-prompt
-architectural block section), `reference/clearskies-dev.md`. The plan's PRIME DIRECTIVE
-restates the deploy discipline; the rules files are the canonical text.
+**OPERATOR-PENDING (chat rulings needed; the operator was mid-way through a one-by-one
+Q&A — Q1 firewall RESOLVED; Qs 2-9 UNANSWERED, re-present on request):**
+Q2 D1 deletion sign-off; Q3 D10.2 three rulings (a: reuse perPartitionBreaks shape
+[recommended] / b: delete shadowFaceHeight render [recommended] / c: defer waveShape
+[recommended]); Q4 D5 visual eyeball (weather-test surf tab); Q5 NDBC fix (config
+prjc1→PRJC1 + normalization+negative-cache code, needs nod); Q6 TA-C21 rescope paper-trail
+confirm; Q7 clock contradiction (C-E11 vs C-E12); Q8 Bolsa spacing (only if Bolsa
+deploys); Q9 swellDominance buckets-vs-ratio (recommend leave). PLUS new: trace flag
+keep/remove (above); optional H5 single-flight guard.
+
+**DISPATCHABLE NEXT (autonomy grant covers, in order):**
+1. Config-service deploy of stack `692ad76` (lead, manual — document procedure) → then
+   C9a: re-add HB directional_exposure override E/SE/S/SW VIA the newly-labeled admin UI
+   (this is also C9b's live verification). Then C9 fully closes.
+2. C8 (forced-full-run false-success, marine, plan §C8 — small scoped round).
+3. C3 (SWAN cadence lever, plan-approved), C4 (modelStatus grading, operator-ruled
+   thresholds in plan), V3-F1 investigation (mid-forecast hole — mechanism already pinned
+   in plan §V3, HRRR-latency + GFS far-window; investigation-first, fixes likely operator),
+   LM-1 (landmarks, operator-requested), D10.2 rounds once ruled.
+4. Gate D formal close after D1/D10; Gate C after C-rounds; V1/V2 weather-dependent.
+**Known residuals (tracked in plan, don't re-find):** H5 rollover-race window; decode-side
+monolithic json.loads; en-only locale strings (incl. C9b's 3 microcopy); D10 phantom
+fields; 5 PRE-EXISTING wizard test failures (earthquake ×4, topology ×1 — NOT C9b's);
+mypy net+1 accepted residual admin/routes.py:2096; C9b uncataloged microcopy.
+
+**Agent roster (SendMessage by name; contexts intact):** `l4-rewrite` (marine coder —
+H1/H2/H4/H5/C2/C7a/V3-F4 context), `round1-auditor` (every audit this session; STANDING
+INSTRUCTION: never delete untracked files, report them), `d4-dashboard` (D4/D5/D8/D9),
+`c9b-stack` (stack/config-UI context — reuse for stack rounds), `d2-test-fix`, `doc-sync`
+(H3 + doc-batch). Dispatch pattern + mandatory verbatim blocks: see briefs in scratchpad
+(d8d9/h5/c2/v3f4/c9b-brief.md + audit briefs). Every implementation round: scope-ack →
+GO → closeout → adversarial audit → lead gate → push → deploy (cycle-window discipline:
+NEVER restart marine mid-SWAN-cycle — journal-watch "cycle complete" first) → reality
+gate → plan record → session-state log.
+
+**Standing grants (chat, survive compaction):** push/deploy for testing purposes;
+Sonnet coding agents + adversarial audit before lead gate + doc-sync every round; keep
+THIS file updated after every gate event.
 
 ## Execution order (from the plan)
 Phase H → (D2 EARLY — tiny, guards H1's test surface) → Phase D → Phase V as evidence allows →
@@ -541,3 +556,217 @@ H1.1 enumeration + scope-ack. Then H2 → H3 → Gate H (auditor) → H4 → Gat
   (firewall), D1, D10.2; weather-gated = V1/V2. All repos pushed; marine deployed b5a4d01;
   dashboard deployed 6bc0573.
 ═══════════════════════════════════════════════════════════════════
+- 2026-08-02 ~post-compaction#2 — RESUMED. Lead pre-dispatch investigation for D8 found the
+  plan's D8 premise partly wrong: peelClassification IS suffixed server-side
+  (fast_a_frame/fast_right/... ; closeout always plain) per surf_1d_pipeline.py:750-786 +
+  golden fixture; live query 36/36 hours closeout+peelDirection=a_frame. So the old chevron
+  is dead only for a_frame/closeout, D4's types.ts "plain, undirected" comment was a
+  sampling artifact (all-closeout capture), API-MANUAL:2526 stale (no suffixes, no
+  peelDirection row). Second finding: pipeline docstring "peel_direction always None for
+  closeout" is FALSE vs code — lead-direct doc-only fix committed marine `1967a74` (LOCAL,
+  rides next deploy). DISPATCHED in parallel: D8+D9 combined round → `d4-dashboard`
+  (brief: d8d9-brief.md, includes lead chevron decision table: closeout gates OFF first;
+  right→›, left→‹, a_frame→‹›, null/unknown→none; sr-only i18n direction phrases) and
+  H5 Stage-1 investigation → `l4-rewrite` (brief: h5-brief.md). H5 scope-ack received,
+  correct, Stage 1 running. Awaiting d4-dashboard scope-ack.
+- 2026-08-02 (cont.) — D8+D9 scope-ack GOOD → GO with rulings: locale repurpose approved
+  (right/left phrase values + a_frame key); FOLD-INS granted: SurfingTab:1466-1468 one-line
+  _a_frame handling in 72h row replace-chain (+1 test), locale peelClassification plain +
+  _a_frame keys; path correction public/locales/en/marine.json. Agent flagged adjacent
+  peelClassification locale gaps + closeout-warning block (peelAngle<30) — latter untouched.
+  H5 STAGE-1 REPORT: plan hypothesis WRONG — swelltrack deserialize cheap (measured);
+  REAL root cause = surf.py:658 HRRR fetch, 19 sequential GRIB2 files w/ 0.55s NOMADS
+  pacing, cache key includes cycle_time → guaranteed miss each new HRRR cycle = the same
+  event that triggers SWAN publish; measured ~21.7s network alone. Proxy: success-only
+  caching confirmed; shared-LRU eviction risk real (MemoryCache, Redis unverified);
+  /surf/{id} query-param variance ruled out (/surf/{id}/profile IS fragmented — adjacent
+  note). LEAD RULING: recommended publish-time warming = ARCHITECTURAL (trigger 5
+  lifecycle move + trigger 6 new publish-trigger) → H5 ⛔ OPERATOR-GATED, agent stood
+  down clean. Plan §H5 + §D8 updated. Marine docstring fix committed `1967a74` (local).
+  C2 dispatched to `l4-rewrite` (both branches pre-approved). In flight: D8+D9, C2.
+- 2026-08-02 (cont.) — Meta commit `f27285d` (plan: H5 stage-1 record + D8 premise
+  correction; LOCAL, push pending with round closes). FOUR rounds now in flight:
+  (1) D8+D9 → `d4-dashboard` (implementing, GO'd); (2) C2 → `l4-rewrite` (scope-ack good,
+  grep-relocating D6a from archive cite grid_sizing_chain.py:1270); (3) V3 blind audit →
+  NEW fresh agent `v3-blind-auditor` (manuals-only brief v3-brief.md, deliberately no
+  session history — started); (4) C1 concerns-sweep evidence → NEW Explore agent
+  `c1-concerns-sweep` (read-only, evidence only, coordinator writes dispositions).
+- 2026-08-02 (cont.) — OPERATOR RULING in chat: "h5 approve change" → H5 publish-time HRRR
+  warming APPROVED (recorded plan §H5 with binding reqs: shared-bbox helper, non-blocking
+  mandatory, 3 KATs incl. byte-identical-key). C2 CLOSED ✅ branch-GONE: D6a already fixed
+  2026-07-28 marine `29eb499`, lead spot-check confirmed in-place at :1821-1822; zero code
+  changes; evidence banked to Gate C; plan updated. H5 Stage 2 DISPATCHED to `l4-rewrite`
+  (scope-ack + WAIT-for-GO). Still in flight: D8+D9, V3 blind audit, C1 sweep.
+- 2026-08-02 (cont.) — D8+D9 CLOSEOUT received (dashboard `d667c7c` +214/-34, meta `9bec177`
+  API-MANUAL; 16/16 vitest incl. 12 new; axe 0 violations across 5 scenarios; falsifiability
+  proven; agent honestly flagged the peelDirection TS union tightening) → adversarial audit
+  DISPATCHED to `round1-auditor` (brief d8d9-audit-brief.md; attack lines: decision-table
+  completeness, openapi 13-value enum arithmetic, union fallout + runtime tolerance, dl DOM
+  + own axe runs, mutation re-runs, behavior freeze). H5 Stage-2 scope-ack received —
+  design pinned (service.py:470-473 full-cycle branch, bbox_for_location() in hrrr.py,
+  surf.py:652-657 refactor onto helper, daemon-thread fire-and-forget, 3 KATs) → GO issued
+  with ONE mandatory verification: trace what drives surf.py's cache-key cycle_time; if key
+  rolls hourly (not just at full publishes) the warming is PARTIAL coverage — report+HOLD,
+  fill-branch decision is lead/operator. In flight: D8+D9 audit, H5 impl, V3, C1.
+- 2026-08-02 (cont.) — V3 BLIND AUDIT delivered: 7 findings (payloads saved scratchpad
+  surf.json/profile.json). Lead triage in plan §V3: F1 BLOCKER 32h mid-forecast hole —
+  MECHANISM PINNED by lead journal read (GFS wind = f048-072 far-window only by design;
+  HRRR near/mid hit NOMADS 404s, t12z >f11 unposted at 13:04Z → wind 0-11h + 48-72h, hole
+  12-47h, cycle published anyway) → V3-F1 task (investigation → operator for fix; any HRRR
+  cycle-selection fallback change is architectural). F2 swellDominance {0.2,0.6} vs ratio;
+  F4 breakPoints dead-null 36/36; F7 glassy 16.5>15 cap; F8 (lead) NDBC 404 every ~5min →
+  one Explore round DISPATCHED (`v3-followup-invest`). F3/F5/F6 → V3-doc-batch task.
+  Auditor also validated big invariant set + reality agreement (NDBC ±30% pass, Surfline
+  band pass). In flight: D8+D9 audit, H5 impl, C1 sweep, V3-followup invest.
+- 2026-08-02 (cont.) — BIG BATCH CLOSED: (1) D8+D9 audit PASS 0 findings → lead gate green
+  (tsc/16-16/build/stat) → dashboard pushed `d667c7c` + meta pushed → DEPLOYED weather-dev
+  bundle index-C5xzLiyY.js verified 200/active. (2) H5 stage-2 closeout: marine `53b25d3`
+  LOCAL, 8/8 KATs + 157-sweep green; MANDATORY VERIFICATION → key rolls HOURLY by wall
+  clock (hrrr.py:641-666) ⇒ warming = PARTIAL coverage → NEW OPERATOR ITEM (accept / extend
+  cadence [architectural] / re-pin key [architectural]); adversarial audit IN FLIGHT.
+  (3) V3-followup investigation: F2 bucketed-score doc drift ×2; F4 breakPoints
+  alive-but-starved (SWAN edge 1.78m vs break line; /profile = different producer) —
+  reconciliation OPERATOR; F7 true wind range 0-18 doc drift + rounding-identity caveat;
+  F8 ROOT CAUSE lead-probed: lowercase 'prjc1' config vs case-sensitive NDBC (PRJC1=200,
+  prjc1=404) + no negative caching → config fix + proposed normalization (operator nod).
+  (4) C1 dispositions WRITTEN in plan (TA-C14 → NEW TASK C8; TC-17 lead-checked: no
+  exposure override deployed → operator question; TC-2/3 header damage → doc-batch;
+  operator rows: TA-C21 paper trail, C-E03 spacing, C-E11 clock, TC-17 override).
+  Meta committed+pushed. IN FLIGHT: H5 audit only. NEXT after H5 audit: deploy marine
+  (1967a74+53b25d3), reality-gate, then V3-doc-batch round + C8 + C3/C4/LM-1 per order.
+- 2026-08-02 (cont.) — THREE OPERATOR RULINGS in chat: (1) "h5 b is fine" → every-wake
+  warming approved; Stage-3 scope sent to l4-rewrite (folded into MAJOR remediation:
+  wiring KAT + spawn moves to every runner iteration; LOW single-flight residual
+  recorded-accepted). (2) V3-F4: use 1D pipeline for /surf breakPoints ("once handoff
+  happens use the better 1D model") → NEW TASK V3-F4-IMPL (representative transect, wire
+  shape unchanged {distance,depth,hs}; legacy SWAN QB picker retires from this field).
+  (3) TC-17: re-add E/SE/S/SW exposure override BUT label clearly as overrides → NEW TASK
+  C9 (a: lead config push re-add + verify; b: wizard+admin override labeling, parity rule,
+  help keys). H5 audit PASS-WITH-FINDINGS recorded (0 functional defects; MAJOR test-gap
+  remediation in flight; auditor deleted stray test_claim2.py — against standing note,
+  loss accepted+logged). Meta pushed. IN FLIGHT: l4-rewrite (H5 remediation+stage3),
+  doc-sync (8-item doc-batch). NEXT: H5 lead gate → marine deploy (1967a74+53b25d3+stage3)
+  → reality gate; then V3-F4-IMPL, C8, C9, C3, C4, LM-1.
+- 2026-08-02 (cont.) — PROCESS LAPSE (lead, logged): meta commit `3c084ec` swept up
+  doc-sync's staged in-progress files (API-MANUAL, archive concerns, clearskies-dev.md) —
+  lead committed in the shared meta repo without checking for foreign staged files.
+  Pushed; no rewrite. doc-sync notified: finish + closing commit "completes doc-batch
+  begun in 3c084ec" + per-item ledger + fix any mid-edit text to final state.
+  LESSON (route to rules/coordinator.md at round close): before ANY meta-repo commit while
+  a doc agent is in flight, run `git status` and stage-check; commit ONLY your own paths
+  (`git commit -- <path>` or verify index clean first).
+- 2026-08-02 (cont.) — V3-DOC-BATCH ✅ CLOSED: all 7 meta items complete in `3c084ec`
+  (sweep was benign — items were finished pre-sweep, ledger verified by lead spot-check:
+  5 new table rows, TC-2/TC-3 headers restored, services table 8780); API repo `f10e8ce`
+  comment fix PUSHED by lead. Flagged follow-up: repo-topology staleness in
+  clearskies-dev.md ~:98-129 + ARCHITECTURE.md "Current deployment" — dedicated doc round
+  queued (recorded in plan §V3-doc-batch). IN FLIGHT: l4-rewrite only (H5 MAJOR
+  remediation + operator-approved Stage 3 every-wake warming). NEXT on its closeout:
+  lead gate → marine deploy (1967a74 + 53b25d3 + stage3) → reality gate → then
+  V3-F4-IMPL, C8, C9(a lead config push + b stack labeling), C3, C4, LM-1.
+- 2026-08-02 (cont.) — H5 REMEDIATION + STAGE 3 CLOSED: `169b911` (wiring KAT joins thread
+  by name + asserts fetch invoked, mutation-checked 2x; spawn MOVED to after locations
+  resolution = fires every wake incl. no-new-cycle skips; 9/9 KATs; single-flight guard
+  correctly not added). LEAD GATE GREEN (independent 9/9 + 66-test guard sweep + source
+  spot-read of placement). Marine PUSHED b5a4d01..169b911. DEPLOY HELD: full SWAN cycle
+  in flight (started 19:03:37Z) — background watcher `bgkcs1pi0` polls for completion;
+  ON FIRE: bash scripts/deploy-marine.sh → verify proc restart + /health + next-wake
+  "marine-hrrr-cache-warm" behavior + reality gate (no ERROR, publish liveness).
+  Then dispatch V3-F4-IMPL (l4-rewrite free), C8, C9a lead config push, C9b stack round.
+- 2026-08-02 (cont.) — MARINE DEPLOYED: cycle completed 19:25:05Z, deploy 19:26:23Z (clean
+  window, no cycle killed), running `169b911`, /health+/manifest 200, auth enforced.
+  Reality-gate watcher `bfzprducb` (6-min sleep then journal grep: warming-thread HRRR
+  activity + any ERROR). V3-F4-IMPL DISPATCHED to `l4-rewrite` (brief v3f4-brief.md:
+  rep-transect pipeline break points, wire shape unchanged, 4 KAT classes; scope-ack +
+  WAIT-for-GO). Operator was given the consolidated open-questions list (9 items:
+  C7a, D1, D10.2 a/b/c, D5 eyeball, NDBC fix, TA-C21 confirm, clock contradiction,
+  Bolsa spacing, swellDominance ratio-vs-buckets) — awaiting answers in chat.
+- 2026-08-02 (cont.) — C7a PROGRESS: operator FIXED the firewall themselves (librewxr
+  192.168.7.22 added to `weather-api-src` addr-list 12:23 router time; rule 58 covers
+  port 8765; TCP verified 2ms from librewxr). REMAINING BLOCKER = TLS: API cert is
+  self-signed CN=clearskies-api, NO SANs → httpx default verify fails for any hostname.
+  Path prefix confirmed: /api/v1 (200 on /api/v1/current). PRECEDENT FOUND: deployed
+  api.conf has `marine_verify_tls = false` (API→marine skip-verify for the same reason).
+  PROPOSED to operator: (A) mirror pattern — new env/config key in marine api_client to
+  skip verify + set CLEARSKIES_MARINE_API_URL=https://192.168.2.121:8765/api/v1
+  (trigger-7 new config key → needs approval); or (B) regen API cert with SANs + trust.
+  Recommendation (A). V3-F4-IMPL GO'd (4 design decisions approved, in flight).
+- 2026-08-02 (cont.) — OPERATOR: "a" → C7a option (A) APPROVED: new env key
+  CLEARSKIES_MARINE_API_VERIFY_TLS (default true) in api_client.get_json +
+  fetch_config_from_api, mirroring api.conf's marine_verify_tls=false precedent. Round
+  QUEUED behind V3-F4-IMPL (same repo, avoid interleaved commits). Deploy-time env values:
+  CLEARSKIES_MARINE_API_URL=https://192.168.2.121:8765/api/v1 + VERIFY_TLS=false in
+  network.env, restart w/ cycle-window discipline, verify solunar/station-wind 502s cease.
+  Plan updated+pushed (ad6a216, then this). Watcher b32cqz163 pending (20:03Z /surf
+  post-rollover timing = H5 definitive accept).
+- 2026-08-02 (cont.) — V3-F4-IMPL CLOSEOUT: marine `f925d77` (surf.py sourcing block +
+  helper + 10 KATs incl. end-to-end cache-hit path + mutation check 4F/6P) + meta `2a284ec`
+  (API-MANUAL breakPoints rewrite + pre-existing waveHeight→hs doc error fixed; PUSHED).
+  154-test sweep green. ADVERSARIAL AUDIT DISPATCHED (v3f4-audit-brief.md; new standing
+  instruction added: auditor must NOT delete untracked files, report instead). C7a-TLS
+  round holds until audit clears (same-repo mutation risk). After C7a code: lead env-file
+  push + restart + 502-cease verify. Watcher b32cqz163 (20:03Z H5 rollover timing) pending.
+- 2026-08-02 (cont.) — V3-F4 AUDIT PASS (0 functional; 2 LOW doc-precision: null-semantics
+  3rd disjunct + commit-msg §-slip; /profile point-set agreement proven by shared-fixture
+  set-equality). Auditor's 4 declared scratch probes deleted by LEAD (standing rule =
+  auditor doesn't delete; lead disposes of declared strays). H5 LIVE ACCEPT: warm 0.60s;
+  20:03Z rollover probe raced warming (f00-f07 ×2) → 18.45s (was ~33s); residual window
+  quantified in plan (≤~5min gap to next wake + ~30s warming; proxy stale-fallback
+  mitigates); OPTIONAL single-flight follow-up flagged for operator, NOT dispatched.
+  C7a TLS round DISPATCHED to l4-rewrite (spec in message: env key VERIFY_TLS both call
+  sites, 4 KAT classes, CONFIG.md doc-sync; scope-ack + WAIT-for-GO). V3-F4 lead gate
+  still pending (after C7a maybe — do lead gate NOW actually, marine repo clean).
+- 2026-08-02 (cont.) — V3-F4-IMPL FULLY CLOSED: lead gate 28/28 → pushed → DEPLOYED
+  20:17:00Z (f925d77, clean window post-20:00:49 cycle) → REALITY GATE: 55/55 live entries
+  serve pipeline break points (was 0/36 always-null; rep idx 35; outer {9.84m,0.78m,0.57m}
+  + inner {1.25m,0.44m,0.32m} bars on the wire). C7a GO issued with 2 rulings: broader
+  ("false","0","no") parse set (codebase convention beats brief wording); CONFIG.md =
+  marine repo same-commit, OPERATIONS-MANUAL = meta separate commit. C7a IN FLIGHT.
+  After C7a closeout: audit → lead gate → deploy w/ env values
+  (CLEARSKIES_MARINE_API_URL=https://192.168.2.121:8765/api/v1, VERIFY_TLS=false in
+  network.env) → verify solunar/station-wind 502s cease. Then queue: C8, C9a/b, C3, C4,
+  LM-1, V3-F1 investigation. Operator Q&A: through question 1 (done); 2-9 pending.
+- 2026-08-02 (cont.) — C7a CLOSEOUT (marine `f8f3157` code+CONFIG.md, meta `457cb30`
+  OPS-MANUAL row; 25 KATs, mutation 23F/2P, 194-sweep green) → AUDIT DISPATCHED
+  (compact charter in message: adversarial env values, third-call-site grep, behavior
+  freeze, own mutation, doc truth). C9b DISPATCHED to NEW stack agent `c9b-stack`
+  (brief c9b-brief.md: override labeling wizard+admin parity, wire contract FROZEN,
+  Override→Auto expressible, help keys + Operator Manual; scope-ack + WAIT-for-GO).
+  C8 holds until C7a audit clears the marine repo. C9a (lead config push of E/SE/S/SW
+  override) deliberately AFTER C9b lands — the newly-labeled admin UI then serves as
+  C9a's own verification path. After C7a audit: lead gate → deploy marine (f8f3157) +
+  set network.env values → verify 502s cease.
+- 2026-08-02 (cont.) — C9b scope-ack EXCELLENT (all 4 send paths already honor absent=Auto,
+  cited; UI has zero override labeling anywhere; FOUND real restore-path bug: wizard re-run
+  renders all-8-boxes-checked for override locations — dict key-membership vs list). GO
+  issued with rulings: restore-fix APPROVED in-scope (+1 test), implementer writes the
+  route-level tests, display-only is_override field approved, locale placeholder
+  convention approved. C9b implementing. Still awaiting C7a audit verdict.
+- 2026-08-02 (cont.) — C7a AUDIT PASS 0 findings (21 own adversarial env probes; 3rd-site
+  hunt clean — 3 other httpx sites all unrelated systems, one hardcoded verify=True with
+  never-disable comment; worktree real-execution byte-identity proof). Lead gate 34/34 →
+  auditor probes deleted by lead → marine PUSHED f925d77..f8f3157. network.env UPDATED
+  (sudo append): CLEARSKIES_MARINE_API_URL=https://192.168.2.121:8765/api/v1 +
+  CLEARSKIES_MARINE_API_VERIFY_TLS=false. FINDING while there: network.env carries
+  CLEARSKIES_MARINE_DEBUG_TRACE=1 → the spectrum trace (TA-C08 126MB concern) is LIVE in
+  prod — surfaced to operator, NOT touched (deliberate setting, operator's call).
+  DEPLOY HELD: cycle in flight since 20:18:09Z → watcher `begp2h42n`; ON FIRE:
+  deploy-marine.sh → verify 502s cease (journal: solunar/current succeed; probe /fishing).
+  C9b implementing in stack repo.
+- 2026-08-02 (cont.) — C9b CLOSEOUT (stack `692ad76` 19 files + meta `6f606dc`, local):
+  Auto/Override toggle wizard+admin, admin Exposure column, restore-path bug fixed with a
+  load-bearing guard against empty-present overrides (config_writer isinstance-gate
+  interaction caught), display-only is_override kept OUT of surf dict (extra=forbid leak
+  avoided), 17 tests + mutation check, 13 locale catalogs synced. AUDIT DISPATCHED
+  (9-line charter incl. wire-freeze across all 4 send paths + extra=forbid load-bearing
+  proof + all-false-dict variant + 19-file classification). Awaiting: C9b audit, C7a
+  deploy watcher `begp2h42n` (cycle in flight since 20:18:09Z). After C9b audit: lead
+  gate → push stack+meta → deploy config service (weather-dev? stack runs where — config
+  UI on weather-dev :9876 per CLAUDE.md) → C9a lead config push of E/SE/S/SW via labeled
+  UI → verify. Operator Qs 2-9 pending; trace-flag question pending.
+- 2026-08-02 (cont.) — C7a ✅ FULLY CLOSED: cycle completed 21:00:34Z → deployed f8f3157
+  21:01:44Z → LIVE VERIFY: /fishing 200/1.55s, solunar https://192.168.2.121:8765/api/v1
+  200 OK ×3 (502s gone — first success since Jul 25). Plan updated+pushed. Awaiting C9b
+  audit; then C9b lead gate → push stack+meta → deploy config service → C9a exposure
+  override re-add via labeled admin UI. Remaining queue: C8 (marine now free), C3, C4,
+  LM-1, V3-F1. Operator pending: Qs 2-9, trace flag keep/remove.
