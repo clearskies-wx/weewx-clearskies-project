@@ -437,6 +437,9 @@ structure rings) where OSM tracing is wrong or missing.
 **MUST NOT TOUCH:** the apply/config contract shape (the JSON-string encoding decided at E13 is
 frozen); the polyline flow. **Accept:** polygon draw → apply → marine config round-trips
 byte-faithfully (T4.5 test extended with a polygon case); polyline flow byte-identical.
+**Wizard/admin parity (operator, 2026-08-02):** the polygon draw tool must be available in
+BOTH the wizard map step and the corresponding admin panel editing surface — scope-ack must
+name both call sites (or the shared component both render).
 
 ### ⛔ QC GATE G6 — assigned: `clearskies-auditor`
 | # | Element | Evidence |
@@ -566,6 +569,14 @@ polygon (or drops a point) + REQUIRED label field → persisted in marine config
 invent a new encoding), applied via the existing apply flow. Markers are display-only
 metadata: the apply path must NOT create structures, OBSTACLE lines, or any model input.
 LM-1's projection picks them up on the next config push.
+**Wizard/admin parity (operator, 2026-08-02 in chat — binding on this task AND general):**
+the marker draw/label/edit capability must work in BOTH the setup wizard AND the admin panel
+— not wizard-only. The same rule applies to every setup-time function this plan adds or
+touches (G6.3's polygon draw included): any capability offered at setup must be reachable
+post-setup from admin. Where the wizard and admin already share an implementation surface,
+reuse it; where they don't, the task's scope includes both surfaces. (Doc-sync: record this
+parity principle in the OPERATIONS-MANUAL wizard/admin section at this task's round close —
+verify first whether it is already stated there.)
 **MUST NOT TOUCH:** the structure/study-area draw flows (G6.3's polygon contract frozen once
 landed); anything that feeds the model.
 **KATs:** T4.5-style round-trip: draw marker + label → apply → marine config carries it
