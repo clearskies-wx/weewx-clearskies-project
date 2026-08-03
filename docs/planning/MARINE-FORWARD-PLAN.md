@@ -953,7 +953,11 @@ HEAD (grid_sizing_chain.py:1821-1822, attribute access; lead re-read). The archi
 `_record_l3_viability_failures` + 1787b6a/5524e1f/38f93ac); current :1270 is unrelated
 shoreline-strip bathymetry content. Full consistency sweep: exactly 2 raw structure-access
 sites in the file (attr at :1822 on StructureConfig; `.get` at :2122 on the dict-shaped
-`build_obstacle_structures()` output) — the two shapes never cross; every consumer typed
+`build_obstacle_structures()` output) *(Gate C 2026-08-03 LOW-finding correction: the second
+site is `bathymetry.py:2145`, NOT grid_sizing_chain.py:2122 — that file has exactly ONE raw
+access site; the type-separation property itself was independently re-verified across all 9
+access sites in 5 files and HOLDS. Do not re-cite the ":2122" sentence verbatim.)* — the two
+shapes never cross; every consumer typed
 and accessed to match (swan.py:1143-1179, swan_domain.py:336-380, bathymetry.py:2105-2169,
 transect_handoff.py:298-316 all verified). `_record_l3_viability_failures` (H1-gated)
 touches no structure fields directly — no STOP needed. Zero code changes; repo clean.
@@ -1079,9 +1083,19 @@ deploy-time: set `CLEARSKIES_MARINE_API_URL=https://192.168.2.121:8765/api/v1` +
 restart (cycle-window discipline), verify solunar/station-wind 502s cease. CONFIG.md +
 OPERATIONS-MANUAL document the new key same round.
 
-### ⛔ QC GATE C — assigned: `clearskies-auditor`
+### ✅ QC GATE C — PASSED 2026-08-03 (auditor `gate-c`, adversarial, read-only)
 C1's report spot-audited (pick 3 CLOSED rows, independently re-verify); C2/C3 rounds get the
 standard adversarial pass (falsifiable KATs, allowlist diff, baseline diff).
+**Verdict 2026-08-03: PASS, 1 LOW finding.** TA-C14 (9 no-op False-return paths counted,
+service.py branches on the bool), TA-C18 (Amendment 4's three parts present in code + doc),
+TA-C15 (payload fields verified in stack routes + wizard writer; api `9d1c10a` as described)
+— all re-verified accurate. C2 core claim verified at HEAD; LOW finding = the ":2122"
+line-citation error (corrected in place above). C3 trail complete: F1 fix independently
+re-proven (8/8), F2 doc sync `0c621e3` matches code verbatim, F3 honestly pending, F4 landed;
+full ancestry to `5cc8f1f` confirmed. Not independently re-executed: AUD-C3's pre-fix
+scratch-copy run (verified logically from the diff instead — flagged, low risk). **Scope note:
+this gate covered C1/C2/C3 per its own text; C4's round (in flight 2026-08-03) gets its own
+adversarial audit before its deploy.**
 
 ---
 
