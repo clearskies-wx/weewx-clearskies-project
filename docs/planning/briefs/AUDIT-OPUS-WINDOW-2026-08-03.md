@@ -103,19 +103,118 @@ match its authorized contract, completing a ruled design) PROCEED with the reaso
 changes making a NEW architectural decision (new formula/boundary/responsibility/contract) still
 PARK here. Each discretionary call gets a one-line entry in this file as it's made.
 
-1. **H5 remediation shape** (plan §H5, ⛔ pre-existing): Stage 1 done; Stage 2 ruling outstanding.
-2. **D1 deletion sign-off** (plan §D1): delete dead `_transect_band_depths()` — deletion needs
-   operator sign-off per the plan's own gate (trigger-2-adjacent).
-3. **C-E03 transect-count cap** (plan Phase C carry-forward): no cap exists today; add one or not.
-4. **`CLEARSKIES_MARINE_DEBUG_TRACE=1` in production network.env** (C7a NOTE): keep-or-remove.
-5. **TA-C21 paper-trail residual**: confirm G4.6's invariant-3 rescope was the criterion change
-   you intended (code done either way).
+1. **H5 remediation shape** — ✅ **DISSOLVED 2026-08-03 by the decision-9 wind-architecture
+   ruling** (decoupled gatherer + assembled store): the surf card's request-time HRRR fetch
+   path ceases to exist — display wind reads the assembled store like every other consumer.
+   No separate remediation needed; the interim reopened state (no ruling on (a)/(b)/(c)) is
+   moot. History: a coordinator error briefly recorded option (c) as ruled from the operator's
+   cache-behavior question; struck same day.
+2. **D1 deletion sign-off** — ✅ **RULED 2026-08-03 (operator chat: "delete")**. Coordinator
+   re-verified dead at HEAD pre-ruling (grep: definition + 2 comments + test-file imports only,
+   zero production callers). Round d1-delete DISPATCHED same day (scope-acked, GO given).
+   **NEW deletion candidate surfaced by the round (operator sign-off wanted, next batch):**
+   `_TRANSECT_BAND_PAD_FRACTION` (swan_runner.py:1610) becomes provably dead once the function
+   goes — coordinator-verified: its only 3 uses are INSIDE the deleted function (:403/:425/:427).
+   Kept this round per plan §D1's Round-1 freeze text (stale-doc-is-a-finding rule); disposition
+   under never-keep-dead-code = delete, pending your word.
+3. **C-E03 transect-count cap** — ✅ **RULED 2026-08-03 (operator chat): reframed design-first.**
+   Operator: the 5-consecutive-transect agreement rule (surf_1d_pipeline.py:1203) and heatmap
+   smoothing were designed around 10 m spacing — fewer transects weakens checks-and-balances;
+   spacing is NOT a free knob. Authorized: READ-ONLY investigation inventorying every criterion/
+   constant/rendering assumption expressed in transect COUNTS vs alongshore METRES (5-window,
+   qualifying thresholds, invariant percentages, heatmap smoothing) → conversion table + physics
+   intent → operator rules each re-expression (trigger 1, jacking 10 m/50 m as precedent).
+   Cap/guard AND Bolsa spacing PARKED behind that report. Live compute basis recorded: full cycle
+   14-42 min; 1-D chain ~55 ms/transect/forecast-hour (~5 min of the 22.5 min 19z cycle); SWAN
+   grids scale with segment AREA not transect count.
+4. **`CLEARSKIES_MARINE_DEBUG_TRACE=1`** — ✅ **RULED 2026-08-03 (operator chat): flag STAYS ON
+   until testing is done, but the trace must be SIZE-CAPPED** ("We should not be just freely
+   logging everything… keep the log file to that, drop older information"). Approved round design
+   (trace.py + tests): (a) retention = current day + 2 prior daily files AND hard 10 GB total cap,
+   whichever smaller; enforced at startup + day-rollover, oldest-first deletion; (b) if the
+   CURRENT day's file alone hits the cap → ONE WARNING naming the cap, tracing stops for the day
+   (visible refusal, never breaks a cycle); (c) deploy-time prune of the existing 27 GB to the
+   same policy. Round queued (marine repo). Basis: 27 GB accumulated Jul 27→Aug 3 at 3-8 GB/day,
+   no rotation, nothing ever read the older files.
+5. **TA-C21 paper-trail residual** — ✅ **CONFIRMED 2026-08-03 (operator chat: "ok")**: the G4.6
+   invariant-3 rescope (fires only on UNEVALUABLE structures, not on evaluated-zero-shadow) IS the
+   criterion change the operator intended. Field evidence cited at confirmation: the rescoped
+   invariant correctly named the Aug-2 pier-coordinates loss ("excluded for missing depth/
+   coordinate data"). TA-C21 CLOSED permanently.
 6. **Operator actions pending**: eyeball admin structure tools on weather-dev (`7a27e3e`);
    `prjc1`→`PRJC1` in api.conf via admin (V3-F8 residual).
-7. **Smart-L3 disposition**: investigation scoped (handoff wiring + 40 m size criterion);
-   coordinator may RUN the read-only investigation autonomously, ruling stays operator's.
-8. **Wizard-resets-study-area defect** (tracked 2026-08-03): remediation shape undecided.
-9. **V3-F1 mid-forecast wind-coverage hole**: investigation → likely operator for any fix.
+7. **Smart-L3 disposition** — 📋 investigation COMPLETE 2026-08-03 → report saved at
+   [briefs/SMART-L3-INVESTIGATION-2026-08-03.md](SMART-L3-INVESTIGATION-2026-08-03.md).
+   Headlines: record contains AFFIRMATIVE keep decisions (ADR-093 Am.3 preserved role (b);
+   G5 pin 2026-08-02 w/ revisit condition); NO retire decision anywhere; SWAN manual does NOT
+   require an intermediate grid (the "§3.5 2-3x" claim in swan-nesting-reference.md:47 is
+   MIS-ATTRIBUTED — not in the manual); both L3 roles run at 40 m — the journal's "10 m" is a
+   HARDCODED LOG LITERAL (swan_runner.py:3974/:4062, no placeholder); /health l3_viability_failed
+   is persisted BEFORE the containment-nest overwrite (grid_sizing_chain.py:1725 vs :2397) =
+   root cause of the misleading health reason; no feature-size threshold existed anywhere; smart
+   L3 never exercised on any spot.
+   **✅ RULED 2026-08-03 (operator chat: "ok let's keep it then. Your recommendations make
+   sense") — KEEP, with two conditions attached to the FIRST real structureless featured spot:**
+   (1) SIZE GATE on the l3_enabled=auto topographic trigger — classified feature must be
+   ≥~200 m (5 cells at 40 m per the now-sourced Deltares 5-10-cells-per-feature rule) or L3
+   refuses with a named reason; (2) RESOLUTION RE-CHECK at that first spot — if its controlling
+   feature is 100-250 m, decide THEN whether it warrants ~25 m (measured compute cost in hand).
+   Supporting research: briefs/L3-RESOLUTION-RESEARCH-2026-08-03.md (40 m inside USACE 30-300 m
+    practice band; gross feature resolvable at ~90% of 15-break census). Truth-fixes queued
+   regardless: 10 m log literals, /health stale viability reason, doc corrections incl. the
+   mis-attributed swan-nesting-reference.md §3.5 claim.
+8. **Wizard-resets-study-area defect** — 📋 investigation COMPLETE 2026-08-03 → report saved at
+   [briefs/WIZARD-STUDY-AREA-RESET-INVESTIGATION-2026-08-03.md](WIZARD-STUDY-AREA-RESET-INVESTIGATION-2026-08-03.md).
+   Mechanism: marine pre-fill has ONE call site (rerun-mode step-1 POST only) → any other re-entry
+   renders a BLANK marine step (Path A, matches observed symptom); AND the restore returns
+   structures as ConfigObj dict → Jinja loop 500s on any location WITH a structure (Path B,
+   live defect, empirically confirmed); AND the wizard server-render has NO coordinates field at
+   all (C2 — drops pier geometry on every wizard save; worse than the admin clobber). Full
+   C1-C11 silent-reset inventory in the report (incl. max_hs_m reset to 4.0 by BOTH surfaces on
+   every save; beach_slope deleted by any apply; [swan] knobs clobbered unconditionally).
+   Fix-of-authorized-mechanism (queued, no ruling needed): R1 pre-fill fallback + R2 dict→list
+   normalise (MUST ship together) + R3 coordinates render + R7 round-trip KATs.
+   **✅ RULED 2026-08-03 (operator chat, read-back confirmed "ok") — replace-whole-section
+   STANDS; R5 merge-not-overwrite REJECTED.** Operator supplied the deciding history ("we have
+   had, in the past, issues with the merge function not deleting changes — that is why the
+   wizard/admin has always used read-the-config, collect changes, rewrite it all"), confirmed by
+   setup.py:1946's own comment. Design invariant made explicit: every config field either
+   ROUND-TRIPS through the form or sits on the PRESERVE LIST. Ruled remediation: (a) extend the
+   existing _PRESERVE_KEYS pattern to the UI-less surf fields (max_hs_m, beach_slope,
+   transect_spacing_m, l3_enabled, breaker_formula, surf_height_display) → these are
+   CONFIG-FILE-OWNED, untouched by UI saves (closes C4-C8 incl. the max_hs_m-resets-to-4.0 and
+   beach_slope-deletion defects); (b) wizard sends [swan] ONLY when that step was completed this
+   session (closes C9, no contract change; response-field visibility addition DEFERRED until
+   actually needed); (c) round-trip fixes for UI-carried fields = the queued R1/R2/R3/R7 batch.
+9. **V3-F1 mid-forecast wind-coverage hole** — 📋 investigation COMPLETE 2026-08-03 → report
+   saved at [briefs/V3-F1-WIND-HOLE-INVESTIGATION-2026-08-03.md](V3-F1-WIND-HOLE-INVESTIGATION-2026-08-03.md).
+   Mechanism pinned end-to-end (posted-cycle detection = f00-only; partial cycle returns as
+   SUCCESS at DEBUG; fallback never fires; stitcher gap-agnostic; /health not-None check; publish
+   path cannot see absent hours; 36 grids → 36-entry payload exact). TWO NEW FINDINGS: (§3b)
+   gapped wind field violates the hardcoded 1-hour INPGRID cadence → SWAN consumes wind blocks
+   positionally → far-window entries possibly forced with wind ~30 h out of place (SUSPECT, not
+   just sparse — needs run confirmation); (13) hourly stationary fill appears UNREACHABLE in
+   production (always-extended cycles → run_quick_update never runs) — C3-cadence concern.
+   Options (a)-(f) w/ trigger classifications in the report.
+   **✅ RULED 2026-08-03 (operator chat, explicit read-back → "yes, let's stick with 12 hours.
+   That is half a day."): WIND-PROVIDER DECOUPLING + ASSEMBLY ARCHITECTURE** — supersedes
+   options (a)/(b); (f) cadence fix folds in; (c) refuse-publish survives only as double-failure
+   backstop. Operator's directives verbatim: "you need to decouple the HRRR gathering from the
+   runs… This is an external API provider just like any other and needs treated as such. It
+   should have its own independent timings, not be tied into the surf system, especially if that
+   information may be used by other portions of the marine service. Second, if we have to
+   assemble our information, then we need a mechanism to do that. Third… We need to cut back
+   our hourly runs to 12 hours." Confirmed shape: (1) standalone background wind gatherer with
+   its own schedule — model runs NEVER fetch inline; all consumers (SWAN input, surf-card
+   display, future marine consumers) read the same assembled store; (2) gatherer owns assembly:
+   per-cycle completeness tracking, top-up fetches of only-missing hours, per-hour
+   freshest-available field; (3) hourly fast cycle covers 12 forecast hours (was 24 — C3
+   amendment; "half a day", margin inside the 18 h an hourly HRRR cycle carries); (4) full
+   48 h runs trigger on "extended cycle assembled complete" (~4×/day, ~90 min after cycle
+   start), not on first-detection. CONSEQUENCE: decision item 1 (H5 residual) is DISSOLVED —
+   the request-time HRRR fetch path ceases to exist under this architecture. NEXT: coordinator
+   produces the design (component boundaries, store shape, schedules, migration) for operator
+   review BEFORE any build round.
 10. **Invariant 4 recalibration (NEW 2026-08-03, post-tip-deploy):** `4:distinct_handoff_depths_
     across_transects` now fires EVERY timestep in the low-Hs regime ("only 1 distinct handoff
     depth across 162 transects"). Root cause verified in journal: all 162 transects clamp
@@ -129,15 +228,27 @@ PARK here. Each discretionary call gets a one-line entry in this file as it's ma
     flag — don't fire when all contributing transects' HandoffSelections are clamped (the
     uniformity is then explained); still fire when uniform WITHOUT uniform clamping. This is a
     verification-criterion change → parked for your ruling, not made under discretion.
-11. **LM-3 attribution toggle (NEW 2026-08-03):** plan §LM-3(c) sketched an "attribution display
-    toggle (default on)" but no backend key exists (deployed ImagerySettings = provider/api_key/
-    tile_cache_ttl_seconds only). Shipped WITHOUT it — attribution renders unconditionally.
-    **Coordinator recommendation: drop the toggle permanently** — ESRI's ToS requires
-    attribution; a hide-toggle invites a violation with no upside. Alternative: add an
-    `[imagery]` key API-side in a follow-up. Your call; plan text updated only after it.
-12. **Lessons-capture routing table (drafted 2026-08-03, autonomous window — per CLAUDE.md the
-    routing needs your sign-off BEFORE rule-file edits land; nothing below is committed to a
-    rules file yet):**
+    **✅ RULED 2026-08-03 (operator chat: "ok"): clamped-flag gate APPROVED** — don't fire when
+    ALL contributing transects' HandoffSelections are clamped (uniformity explained by the grid
+    floor); still fire on uniform-without-uniform-clamping (the scalar-bug class). Blind spot
+    named at ruling: a scalar bug during all-clamped regimes is masked but output-
+    indistinguishable there, and trips the invariant when clamping breaks. Round queued
+    (marine repo: invariants.py + KATs incl. both firing/non-firing shapes).
+11. **LM-3 attribution toggle** — ✅ **RULED 2026-08-03 (operator chat): toggle DROPPED
+    permanently.** "That should always be displayed, not a choice for the operator… similar
+    format to how it is displayed in leaflet… It also needs to be displayed on the About page…
+    include as standard practice like we do the other attributes." Unconditional map attribution
+    (as shipped) is the intended end state. **NEW TASK queued:** imagery-provider attribution
+    (ESRI / NAIP-USDA per active provider) added to the dashboard About page's data-source
+    credits, matching the existing attribution pattern (dashboard repo, small round).
+12. ✅ **RULED 2026-08-03 (operator chat) — routing LANDED, trimmed hard on the operator's
+    "you start ignoring rules when you have too many" principle.** Final disposition: KEPT
+    L3+L5+L10 (folded into rules/coding.md exception/logging section), L4 (one sentence in
+    verification.md KAT mandate), L7 (one sentence in verification.md deploy-gate row 3),
+    L9 (scope line in .claude/agents/clearskies-dashboard-dev.md). DROPPED: L1 (operator:
+    "my fault"), L2 (fact learned once, lives in this brief), L6-practice + L8 (behavior
+    already happens); L6's sudo-journalctl FACT recorded in reference/clearskies-dev.md.
+    Original draft table below retained for the record:
 
     | # | Lesson | Proposed destination | Draft rule text (one line) |
     |---|---|---|---|
@@ -151,26 +262,25 @@ PARK here. Each discretionary call gets a one-line entry in this file as it's ma
     | L8 | Ledger line numbers drift as commits land; briefs must say 'verify against HEAD' (both rounds hit this benignly) | `rules/agents.md` (fold into reading-list rule) | "Cited line numbers in briefs are anchors, not truth — agents verify against HEAD and report drift." |
     | L9 | clearskies-dashboard-dev declined stack-repo work TWICE (radmin-parity 08-02, g63-polygon 08-03) — role text says React SPA only, but the plan/convention assigns ALL UI surfaces (React + config-service templates) to it (C9b, G6.3, R-ADMIN, LM-3 precedents) | `.claude/agents/clearskies-dashboard-dev.md` (one line) | "Scope includes the stack repo's config-service UI (wizard/admin Jinja templates + Leaflet JS) — 'dashboard' in the name is historical." |
 
-13. **D10.2 — three rulings on the phantom SurfForecast fields** (plan §D10, investigation
-    COMPLETE, investigator recommends RESTORE for all three): (1) `partitionBreakInfo` — emit
-    existing `perPartitionBreaks` shape on SurfForecast + re-point dashboard type (kills the
-    duplicate schema; investigator-preferred) vs build the bespoke shape (data-contract
-    choice); (2) `shadowFaceHeight` — is a non-headline shadow aggregate a legitimate
-    `is_structure_affected` consumer under BD-8 (investigator: yes, secondary readout)?
-    (3) `waveShapeClassification` — authorize the real round (regime threading + 4-way cut
-    points = NEW formula criteria, trigger 1) or defer/pin. Full detail in plan §D10.
-14. **G6.2 facing-comparison mod-180 blind spot (NEW 2026-08-03):** the delivered TC-8/G1.5
-    comparison (`check_heading_consistency`, geography.py:671-709, KAT-pinned) folds headings
-    mod-180 (undirected LINES). G6.2 wires it — per the explicit design lineage (the constant's
-    own docstring says delivered-for-G6.2) — to compare two FACINGS (vectors: fan open-water
-    bearing vs AD-1R beach facing). Consequence: a 180° facing FLIP (water on the wrong side,
-    the worst-case bad input this check exists to catch) folds to 0° and does NOT flag
-    (example: 10° vs 190°). Implemented as-designed with a KAT that PINS the flip case
-    visibly. **Your ruling wanted:** keep mod-180 (if AD-1R's water-side sign choice makes a
-    flip structurally impossible, the fold is harmless robustness) or switch the G6.2 call to
-    a mod-360 circular difference (criterion change, trigger 1 — needs your approval either
-    way). Coordinator has NO recommendation without knowing whether AD-1R's sign selection is
-    fan-independent — that's the deciding fact, checkable on request.
+13. **D10.2 — three rulings** — ✅ **RULED 2026-08-03 (operator chat: "ok" to all three
+    coordinator recommendations):** (1) `partitionBreakInfo` = emit the EXISTING
+    `perPartitionBreaks` shape on SurfForecast + re-point the dashboard type (duplicate schema
+    dies); (2) `shadowFaceHeight` = RESTORED as a secondary (non-headline) readout — ruled a
+    legitimate `is_structure_affected` consumer under BD-8's metadata-only demotion;
+    (3) `waveShapeClassification` full version (regime threading + 4-way cut points, trigger 1)
+    = PINNED; the live audited partial (peel+Iribarren per-hour) stands as v1. Rounds (1)+(2)
+    queue as one scoped cross-repo round (marine emit + dashboard re-point); D10 doc fixes ride
+    with it (openapi:3664 false claim, openapi:3295 date, origin attribution).
+14. **G6.2 facing-comparison mod-180 blind spot** — ✅ **RULED 2026-08-03 (operator chat: "ok"
+    to coordinator recommendation): switch the G6.2 call to a mod-360 circular difference.**
+    Deciding fact established by coordinator code-read pre-ruling: AD-1R's water-side sign
+    choice is FAN-INDEPENDENT (bathymetry.py:1621-1648 — seaward sense from a signed-depth
+    probe, deeper candidate wins; fallback probes the same way; unresolvable → ValueError,
+    never the fan). Therefore a 180° flip IS structurally reachable (anomalous bathymetry probe,
+    or an operator-typed facing 180° off — stored "operator" source is used unchanged) — exactly
+    the anomaly classes the check exists for, and mod-180 catches neither. Round queued (marine:
+    G6.2 call site mod-360; mod-180 helper retained for genuine line-heading callers; the
+    flip-pinning KAT flips from documenting the blind spot to asserting the catch).
 15. *(append as found)*
 
 **Additional tracked (2026-08-03 evening):** wizard has NO /health-reasons display at all
@@ -472,6 +582,16 @@ candidate (second occurrence per operator: "that was a problem before").
 
 | C4 modelStatus grading (marine) | `0946ed8` | PASS (my run 13/13; stat exact 4-file; diff read: grading branch exactly per ruled rule, zero-bulk path falls through unchanged, WARNING both grades; agent's own 17-file/229-test sweep clean; `.degraded` semantics untouched for beach_profile consumer; API-proxy pass-through verified by lead pre-GO) | pending (batch with LM-1 audit) | **ACCEPTED — NOT YET PUSHED/DEPLOYED** (rides next marine window after audit). Lead-direct doc sync landed: API-MANUAL:2967 rewritten (also fixed stale "fall back to L2" draft), dashboard types.ts union + openapi enum + tsc clean (`59674fd`), meta pushed. **TRACKED doc-gap:** `docs/contracts/openapi-v1.yaml` carries NO modelStatus field at all (pre-existing drift vs dashboard copy) — contracts-sync candidate, not folded into this round. |
 
+| **AUD-R1 batch (stack `c7f7593` + api `c5afa6f`)** | — | (per-row above) | **CLOSED-with-remediation: A1-A4 + B5-B7 MET via genuine behavioral probes** (swan-gate 4-scenario incl. real-disk resumed session; XSS neutralized on raw coordinates render; pre-change 500 + unconditional-swan both stash-reproduced; rename/nesting-depth/half-population all ruled out). **B8 DISPROVEN (F1 MEDIUM):** fresh location silently lost breaker_formula/surf_height_display vs pre-change output, and the shipped KAT-3 pinned the deviation while claiming byte-identity (vacuous-KAT class, L4) — traced to the LEAD's design listing only 3 of 5 defaulted fields. **Fixed lead-direct api `2f84bbf`** (defaults added + KAT-3 truthed, 20/20); auditor re-verification of the fix REQUESTED. **F2 LOW:** "no UI exists" rationale wrong for 4/6 fields (TruShore step + admin marine page carry UI) — comments truthed in `2f84bbf`; the ruling record's own "UI-less" phrasing corrected herewith. **F2b (LEAD-derived NEW follow-up, tracked):** admin's omit-when-default payload heuristic + preserve semantics = a field can never be set BACK to its default via admin (preserve keeps the old custom value) — fix candidate: admin sends fields it has UI for unconditionally (stack, small round, queued). | **F1 CLOSED by auditor re-verify** (byte-diff pre-change vs `2f84bbf` = zero lines; truthed KAT-3 fails against F1-defective code = non-vacuous; B5-B7 re-probed no-regression; F2 wording verified accurate) — **BATCH AUDIT-CLEAN, DEPLOY UNGATED** |
+| **AUD-MARINE batch (5 commits `38673ba`..`38d4e42`)** | — | (per-row) | **0 BLOCKER/MAJOR. Claims 1/3/4/5 PASS with named rule-outs (incl. auditor's own multi-cluster discrimination probe + deterministic mod-360 boundary probes). Claim 2 partially DISPROVEN: F1 MEDIUM trace-cap file-count off-by-one (steady state 4 files not 3, reproduced) + F2 LOW mid-loop OSError aborts both trim phases + F3 LOW G6.2 commit message claims a nonexistent "G1.5 caller" — `check_heading_consistency` is now NEWLY-DEAD production code (tests-only refs) + health.py:177 stale comment.** Fixed lead-direct marine `f38a8f3` (reserved today-slot retention + phase independence + health comment truthed; day-cap test arithmetic updated same-commit); auditor re-verify requested. **Dead mod-180 helper → OPERATOR deletion sign-off list** (joins _TRANSECT_BAND_PAD_FRACTION). Commit-message inaccuracy recorded here (history not rewritten). | **F1/F2 CLOSED by auditor re-probing at `f38a8f3`** (7-rollover steady state = 3 files never 4 under production constants; byte-phase OSError independence + accounting confirmed by independent probe; budget arithmetic regression-free). **MARINE BATCH AUDIT-CLEAN — DEPLOY UNGATED** (6 commits `38673ba`..`f38a8f3`) |
+| L3-TRUTH (marine) | `38d4e42` | **PASS** (lead independent: pytest 12/12 pasted; stat 5 files exact; spot-checks: log line interpolates `cluster.grid.resolution_m`, `_record_l3_viability_failures` single call site at :2527 post-overwrite w/ moved-from comment; test-first falsifiability: 3 KATs failed pre-change incl. the genuine stale-persist observation) | dispatched (aud-marine batch) | **LEAD-ACCEPTED 2026-08-03** — closes the marine batch at 5 commits |
+| G62-MOD360 (marine) | `9f09941` | **PASS** (lead independent: pure two-call transcript reproduced — mod180(10,190)=False vs mod360(10,190)=True, wraparound 350/10=False, live pair 216.95/217.0=False; 24 deterministic tests green; call-site swap confirmed in diff; stat 3 files exact) | pending (marine batch audit) | **LEAD-ACCEPTED 2026-08-03**. Full-chain KAT run network-gated locally — LEAD OWES `pytest tests/test_facing_divergence_check.py -q` ON LIBREWXR at batch deploy (pre-stated, expect all green incl. flipped flip-KAT). NEW tracked (test-hardening): facing-check tests make live unstubbed NOAA WW3 calls — stub boundary-station selection |
+| INV4-GATE (marine) | `4a70a66` | **PASS** (lead independent: pytest 49/49 pasted; stat 4 files = corrected allowlist exact; code-read spot-check: fire condition + all-clamped suppression + DEBUG explained-quiet + N/M-clamped diagnostic all per ruling, blind spot named in comment; falsifiability: pre-change fires on the exact all-clamped input + ValueError proves zero pre-change clamped-awareness) | pending (marine batch audit) | **LEAD-ACCEPTED 2026-08-03**. Round also banked two brief-error catches at scope-ack (wrong module cite, unscoped pinned-shape test) — dispatch-gate working as designed |
+| TRACE-CAP (marine) | `b02af86` | **PASS** (lead independent: pytest 14/14 pasted; stat 2 files exact; code-read spot-check: day-budget = cap − prior-files-total at rollover per lead correction, never-raise fallbacks; falsifiability: all 5 KATs fail pre-change, transcript in closeout) | pending (marine batch audit) | **LEAD-ACCEPTED 2026-08-03**. Agent-flagged corner (single near-cap day starves successors until aged out) = matches ruled design, tracked as NOTE. Deploy-time: lead prunes existing 27 GB |
+| WIZ-RT (stack) | `c7f7593` | **PASS** (lead independent: pytest 29/29 pasted; stat 5 files = allowlist + 2 lead-extended; code-read spot-checks: swan gate = third AND clause non-inverted w/ ruling comment, template input `{% if %}`-guarded + raw-render per verified no-double-encode design; falsifiability transcript: 5/6 new tests fail pre-change incl. the live Path-B 500 verbatim) | dispatched (aud-r1 batch w/ c5afa6f); NAMED TARGET: test (d) is source-inspection not behavioral — auditor to build the behavioral payload probe | **LEAD-ACCEPTED 2026-08-03** — deploy gated on audit. D4 mechanism (swan_step_completed field) lead-authorized as the minimal implementation of the operator's ruled behavior |
+| D1-DELETE (marine) | `38673ba` | **PASS** (lead independent: pytest 13/13 pasted, repo-wide grep = zero callable/import refs (one truthful historical comment only), `git show --stat` 2 files/8+/101−, `_TRANSECT_BAND_PAD_FRACTION = 0.5` untouched at :1567) | pending (marine batch audit) | **LEAD-ACCEPTED 2026-08-03** — operator-approved deletion executed; orphaned PAD_FRACTION constant tracked for operator sign-off |
+| SURF-PRESERVE (api) | api `c5afa6f` | **PASS** (lead independent run 20/20 pasted; `git show --stat` = exactly the 2 allowlisted files; spot-check by code-read: preserve loop absence-only + payload-wins + no-resurrection (iterates new payload only) + fresh-defaults outside the existing-config guard, comment cites the operator ruling; stash-falsifiability transcript in closeout: pre-change max_hs_m 6.5→4.0 + beach_slope deleted, both predicted defects reproduced) | pending (batch audit with WIZ-RT when it lands) | **LEAD-ACCEPTED 2026-08-03** — deploy gated on adversarial audit. Guard noted by agent: pre-existing OFS-discovery WARNING in test harness (no marine_service_url), not introduced. |
+
 **Trailer artifact finding (2026-08-03, lessons-capture candidate):** subagent commits `052906f`/
 `46d55e0`/`4db71c6`/`6c013d2` carry "Co-Authored-By: Claude Opus 4.6 (1M context)" — investigated:
 agent definitions all pin `claude-sonnet-5`, no hardcoded trailer anywhere in `.claude/agents/`,
@@ -689,6 +809,27 @@ stack/api repos).
   (b) no code — durability now fixed forward by the restore + R-ADMIN-1/2. Operator picks.
   R-DOC: PROVIDER-MANUAL §14.9 missing the coordinates output field (E13 drift);
   bearing_to_spot_degrees disposition.
+
+## MARINE BATCH DEPLOY — 2026-08-03 23:19:19 UTC (running commit `f38a8f3`)
+
+Pushed `a934e9f..f38a8f3` (6 commits) + deploy-marine.sh; /health + /manifest 200, auth enforced.
+**Immediate gates PASSED:** journal sweep since restart = ZERO error lines; **librewxr run of
+`tests/test_facing_divergence_check.py` = 10 passed (164 s)** incl. the flipped flip-KAT — the
+lead's owed G6.2 full-chain check is CLOSED.
+
+**CYCLE-DEPENDENT GATES — run at/after the next full cycle (next 00z extended HRRR ≈ 01:00-01:40Z),
+commands + expected values pre-stated:**
+1. inv-4 quiet: `sudo journalctl -u weewx-clearskies-marine --since '<cycle start>' | grep -c "invariant 4:"`
+   → expect 0 on low-surf timesteps (baseline: ~67/cycle); the DEBUG explained-quiet line appears
+   only if DEBUG logging is on (it isn't — absence of ERROR is the check).
+2. "40 m" log: journal shows `SWAN L3[0]: …at 40 m (middle grid…` → expect 40, not 10.
+3. /health: NO `l3_viability_failed` reason while level3_0 runs (smart-L3 WARNING still in journal
+   at sizing time).
+4. NDBC reality gate (±30%, pre-stated): served waveHeightAtBreak at matched hour vs NDBC 46222
+   WVHT.
+5. Trace prune: first emit of the cycle triggers retention → `/var/log/weewx-clearskies/` drops
+   from 27 GB to ≤3 files/≤10 GB. Verify with `sudo ls -lah` + `du -sh`.
+6. Preserve-list live proof rides the operator's first admin save (api.conf surf fields unchanged).
 
 ## Next after audits
 Remediate findings (scoped rounds) → C3 push+deploy w/ reality gate → C4 → C7 → Phase LM → heatmap smoothing → Gate D/C closes. Push/deploy authorized for testing by operator this session ("You have permission, as coordinator, for push/deploy as needed for testing").

@@ -51,6 +51,9 @@ Applies to shoaling, refraction, breaking, and wave setup as they are touched. A
 implementation's own algebra is **not** an independent reference — if the test would still pass with
 the same sign error, it is testing nothing.
 
+**Every KAT closeout states which tests FAIL against the pre-change code, with the transcript** — a
+KAT that passes pre-change proves nothing; non-falsifiable pins are declared as such (2026-08-03).
+
 ## Validate against reality, never against the model's own output
 
 A physical model's own output is **never** evidence that the model is right. It is evidence about the
@@ -119,7 +122,9 @@ Surfline. These rules make that check mandatory and mechanical.
    refuses loudly (health ≠ `ok`, reason named, visible on the admin page). Silent `ok` +
    no-publish = FAILED deploy. "The gate passed" does not answer "did it publish."
 3. **Every phase gate carries one end-to-end row** — a full nest run → valid_fraction → publish →
-   reality comparison — however component-scoped the phase. Gate G2 (L1-only) and Gate G3
+   reality comparison — however component-scoped the phase. When a deploy changes published
+   semantics, enumerate the invariants whose firing criteria reference the changed quantity and
+   pre-state which will move — before deploy, not after (2026-08-03: inv-4 vs d0d0077). Gate G2 (L1-only) and Gate G3
    (sizing-only) both passed while the system was breaking; a component gate with no system row
    is how four regressions stack before the first end-to-end measurement.
 

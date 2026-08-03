@@ -319,6 +319,15 @@ If a comment just restates the code, delete it. Default to no comments. Multi-pa
 
 ## 3. Organization & architecture
 
+### Never keep dead code (operator directive, 2026-08-03)
+
+Dead code's ONLY disposition is deletion — "keep it just in case," "it might be useful later," or
+"a test still imports it" are never reasons to retain a function with zero production callers.
+Deletion still goes through the standing deletion-round gate (operator sign-off to dispatch,
+pre-deletion grep proving no live caller, post-deletion byte-identical/green accept — and a
+"this is dead" claim gets MORE verification than a "this is fine" claim, per rules/agents.md).
+The rule sets the disposition, not the process: once code is proven dead, the answer is delete.
+
 ### Single responsibility
 
 If a function does X *and* Y, split it. Heuristics that flag a needed split:
@@ -337,6 +346,16 @@ If a file passes ~500 lines and contains multiple unrelated concerns, split it. 
 - `except Exception:` is rarely right. Catch the actual class.
 - User-facing error messages: brief, no stack trace, no DB schema names, no internal paths.
 - Operator-facing logs: full context (stack, request ID, inputs).
+- **Exception isolation is per-unit in per-unit work loops.** A shared catch around N independent
+  units lets one bad unit kill all N — a finding, not a style choice. (2026-08-03: one try/except
+  around 162 transects converted single degenerate transects into whole forecast hours lost.)
+- **Any code path that silently declines to do scheduled work logs WARNING or higher**, naming the
+  unit skipped and the reason. DEBUG-level skips are invisible in production. (2026-08-03: a
+  DEBUG-logged dedup skip produced a forced-run livelock nobody could see; a DEBUG-logged partial
+  HRRR fetch hid a 30-hour forecast hole.)
+- **Never hardcode in a log string a value the code holds as a variable — interpolate it.**
+  (2026-08-03: a log literal said "L3 at 10 m" for a grid actually running at 40 m; it misled the
+  operator and two planning briefs.)
 
 ### Dispatch on exception state via attributes, not message strings
 

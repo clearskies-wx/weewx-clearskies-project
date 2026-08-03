@@ -130,6 +130,10 @@ Owner: `ubuntu`. Container IP: `192.168.2.113` (DHCP/SLAAC on `br-vlan2`).
 
 Owner: `ubuntu`. Host IP: `192.168.7.22`. SSH: `ssh -F .local/ssh/config librewxr`.
 
+**`journalctl -u weewx-clearskies-marine` requires `sudo` on librewxr** — without it the claude
+user gets an EMPTY stream (not an error), so an unsudo'd journal watch silently sees nothing
+(2026-08-03: a monitor watched an empty stream for hours; silence looked like health).
+
 **SWAN runs inside the unified marine service. It does not run on the weewx host and it does
 not run on weather-dev.** Corrected 2026-08-02 — this section previously described a split
 `weewx-clearskies-swan.service` (8767) + `weewx-clearskies-compute.service` (8770) topology

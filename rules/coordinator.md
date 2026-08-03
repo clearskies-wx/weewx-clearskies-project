@@ -83,6 +83,19 @@ being finished or a gate passing. The full rule — including agent git prohibit
 when the remote has diverged — is in [rules/agents.md](agents.md) §"Git safety". Deploying is a
 separate authorization from committing, and each deploy needs its own.
 
+## 4b. Read-only investigation needs no authorization — just run it
+
+Authorization gates CHANGES: code, config, deploys, criteria, dispositions. It never gates
+research. If a question can be answered by reading docs, code, git history, or the local SWAN
+manual, dispatch the investigation (or do the reading) without asking — the operator rules on the
+*findings*, not on whether to look. Presenting "may I investigate?" as a decision item is
+offloading the coordinator's own work onto the operator.
+
+**Why (2026-08-03):** the smart-L3 disposition was presented to the operator as "authorize the
+read-only investigation" — operator: "This is not architecture, I do not need to authorize this
+kind of shit. I expect it to be done." The investigation had been scoped for days and needed no
+ruling to start; only the eventual vestige-vs-future disposition is the operator's.
+
 ## 5. Stop and surface — do not resolve these yourself
 
 Halt the affected work and bring it to the operator when any of these appear:

@@ -333,6 +333,11 @@ operator (NOT dispatched):** a single-flight guard (request-time fetch joins an 
 warming fetch for the same key instead of re-fetching) would remove the double-fetch and
 the slow racing read; provider-behavior change → needs a nod. Accept-closed as deployed
 otherwise.
+**⛔ REOPENED 2026-08-03 — NO operator ruling.** A coordinator error recorded a "serve-previous-
+cycle" ruling here on the strength of the operator's cache-behavior question; the operator has
+confirmed they never ruled on the wind issue. The residual and its options ((a) accept-as-is /
+(b) single-flight guard / (c) serve-previous-cycle-while-warming) remain OPEN. Nothing
+dispatched. See AUDIT-OPUS-WINDOW-2026-08-03.md decision item 1.
 **Stage 2 ✅ IMPLEMENTED 2026-08-02, marine `53b25d3` + remediation/Stage-3 `169b911`:**
 `bbox_for_location()` shared helper in hrrr.py; surf.py:652-657 refactored onto it
 (byte-identical); `_warm_hrrr_cache_for_locations()` + fire-and-forget daemon thread after
@@ -398,8 +403,10 @@ itself — if the repaired tests then FAIL against production code, STOP and sur
 mean the guard regressed unnoticed; do not "fix" either side without a ruling).
 **Accept:** 9/9 in that file green at HEAD, zero production-code changes in the diff.
 
-### D1 — Delete dead `_transect_band_depths()`  ⬜ (operator sign-off to dispatch — it is a
-deletion round)
+### D1 — Delete dead `_transect_band_depths()`  ⬜ **APPROVED 2026-08-03 (operator chat:
+"delete")** — dispatch when the marine repo frees up. Coordinator pre-ruling verification: grep at
+HEAD shows definition (swan_runner.py:397) + 2 comment lines + test_swan_l4_intersection.py imports
+only; zero production callers.
 **Owner:** `clearskies-api-dev` (Sonnet). **QC:** auditor at Gate D.
 Dead in production since the full-length-band rewrite (Round 1, `03b33e1`); deletion blocked by
 `tests/test_swan_l4_intersection.py` imports. **Change:** delete the function from
@@ -567,7 +574,11 @@ by surf.py" is false); `shadowFaceHeight` = `292216e` T7.3 (aggregate over
 `waveShapeClassification` = `292216e` T7.2b (peel+Iribarren live on PipelineResult, but
 Stokes/cnoidal `WaveShape.regime` is NOT — real plumbing + the 4-way cut points were never
 implemented anywhere).
-**D10.2 (OPERATOR DECISION — three rulings needed, investigator recommends RESTORE for all):**
+**D10.2 ✅ RULED 2026-08-03 (operator chat, per coordinator recommendations): (1) emit existing
+`perPartitionBreaks` shape on SurfForecast + re-point dashboard type; (2) restore
+`shadowFaceHeight` as secondary readout (legitimate BD-8 metadata consumer); (3) full
+waveShapeClassification PINNED — live peel+Iribarren partial stands as v1. Rounds (1)+(2) queue
+as one cross-repo round with the doc fixes below.** Original decision text for the record:
 1. `partitionBreakInfo`: restore by emitting the EXISTING `perPartitionBreaks` shape on
    SurfForecast and re-pointing the dashboard type at it (kills the duplicate schema —
    investigator-preferred), or build the dashboard's bespoke shape? (Data-contract choice.)
@@ -656,7 +667,15 @@ SWAN-vs-NDBC frequencyRange convention; profile transectIndex 32 == representati
 since ~14:11Z (station realtime file) — not V3-flagged, needs a look (station file moved/
 retired vs transient). Folded into V3-F2/F4/F7 investigation round.
 
-### V3-F1 — Mid-forecast wind-coverage hole  ⬜ (investigation → likely OPERATOR for any fix)
+### V3-F1 — Mid-forecast wind-coverage hole  ✅ **RULED 2026-08-03 — superseded by the
+wind-provider decoupling + assembly architecture** (AUDIT-OPUS-WINDOW-2026-08-03.md item 9,
+operator-confirmed): standalone background wind gatherer with independent schedule; per-cycle
+completeness tracking + top-up fetching; per-hour freshest-available assembled store consumed by
+ALL wind users (SWAN, surf card, future consumers); hourly fast cycle 12 h; full runs trigger on
+extended-cycle-assembled-complete. Investigation report:
+[briefs/V3-F1-WIND-HOLE-INVESTIGATION-2026-08-03.md](briefs/V3-F1-WIND-HOLE-INVESTIGATION-2026-08-03.md).
+Coordinator to produce the component design for operator review BEFORE any build. Original task
+text follows (historical):
 Marine: establish the wind-window design (HRRR near + GFS f048+ far — where is the 12-47 h
 mid-window supposed to come from when HRRR extended files aren't posted yet?), whether a
 prior-fully-posted HRRR cycle fallback exists/should exist (cycle-selection change would be
@@ -819,7 +838,7 @@ Full evidence (file:line for every claim) in the sweep agent's report, session 2
 **Working-model concerns (TA-C*):**
 | Entry | Disposition |
 |---|---|
-| TA-C21 | CLOSED-with-evidence: rescope ALREADY LANDED (`6a8c18e`+`2597011`, G4.6) — invariant 3 now fires only on unevaluable structures, KAT-guarded. **OPERATOR paper-trail residual:** confirm G4.6's rescope WAS the criterion change you meant to sign off (code is done either way). |
+| TA-C21 | CLOSED-with-evidence: rescope ALREADY LANDED (`6a8c18e`+`2597011`, G4.6) — invariant 3 now fires only on unevaluable structures, KAT-guarded. **✅ Operator CONFIRMED the criterion 2026-08-03 (chat)** — paper trail closed; field evidence: rescoped shape correctly named the Aug-2 pier-coordinate loss. |
 | TA-C22(a) | CARRIED → C4 (unchanged code, ruled thresholds ready). |
 | TA-C22(b) | Code path unchanged, but plausibly SUPERSEDED by `2087fc1`+`4e79d21` (no-L4-intersection now routes to L2 instead of empty components). Needs ONE live-cache observation to close — lead action at next convenient cycle. |
 | TA-C20 | CLOSED: both residuals implemented (T2.2 PART B truncation-follows-advanced-sample; T2.3 §11.3 combined metric verbatim). Larger-seas validation caveat → carried in V2. |
@@ -852,8 +871,12 @@ absent, fan-derived in force. **OPERATOR: re-add the override or accept fan-deri
 
 **Restoration C-E survivors + D7:** C-E01 partially superseded (AD-1R + persisted-key
 override; pre-chain `_perpendicular_bearing` +90° fallback remains; Bolsa live check
-deferred until Bolsa deploys); C-E03 STILL-OPEN (no transect-count cap; **OPERATOR:
-spacing value before any Bolsa deploy**); C-E04 parked (efficiency-only, as downgraded);
+deferred until Bolsa deploys); C-E03 **REFRAMED 2026-08-03 (operator ruling): spacing-dependence
+investigation FIRST** — read-only round inventories every criterion in transect-counts vs metres
+(5-consecutive window surf_1d_pipeline.py:1203, qualifying thresholds, invariant %, heatmap
+smoothing) → operator rules re-expressions in metres (trigger 1; jacking 10/50 m precedent);
+cap/guard + Bolsa spacing value PARKED behind that report (measured basis: 1-D ≈ 55 ms/transect/
+hour, SWAN grids scale with area not count — see AUDIT-OPUS-WINDOW-2026-08-03 item 3); C-E04 parked (efficiency-only, as downgraded);
 C-E08 STILL-OPEN-low (L4 INPGRID WIND coverage — needs with/without comparison before any
 fix, as filed); C-E10 = C7a (same env-var/firewall decision, already OPERATOR-pending);
 C-E11 premise-contested (C-E12 says clock is real, C-E11 says future-dated — **OPERATOR:
@@ -999,7 +1022,7 @@ transect_handoff.py:298-316 all verified). `_record_l3_viability_failures` (H1-g
 touches no structure fields directly — no STOP needed. Zero code changes; repo clean.
 Evidence banks to Gate C.
 
-### C3 — Restore 24h stationary fast-cycle scope *(G7.4; operator-approved trigger-6 cadence change)*  🔶 IMPLEMENTATION COMPLETE — audit in flight
+### C3 — Restore 24h stationary fast-cycle scope *(G7.4; operator-approved trigger-6 cadence change)*  🔶 **AMENDED 2026-08-03 (operator ruling, wind-architecture decision — AUDIT-OPUS-WINDOW item 9): fast cycle covers 12 hours, NOT 24** ("yes, let's stick with 12 hours. That is half a day") — hourly HRRR cycles carry only 18 forecast hours, so a 24 h fill ran on data we do not hold. ALSO: the wind-hole investigation found the fast-cycle trigger is UNREACHABLE in production (every fetch requests 48 h → always resolves to an extended cycle → `run_quick_update()` never fires; live-confirmed 0 fast cycles in journal since deploy). Both are absorbed into the ruled wind-provider decoupling + assembly architecture (standalone gatherer, run-on-assembled) — see AUDIT-OPUS-WINDOW-2026-08-03.md item 9; C3's 24 h scope text below is historical.
 **Owner:** `clearskies-api-dev` (Sonnet). Marine `052906f` (not yet pushed/deployed).
 **What changed (operator direction 2026-08-02/03):** the fast fill now runs 24 stationary
 snapshots (hours 0-24h) per intervening HRRR cycle, instead of 1 snapshot. Hours 25-72
@@ -1253,8 +1276,12 @@ Stack `159731d` (9 files, 16 tests). Audit (aud-lm23): **PASS, 0 findings** — 
 probe through the real handler confirmed Jinja autoescape on the api_key echo (both surfaces);
 allowlist-diff mutation-verified; `_PROVIDER_DOMAINS` exclusion reasoning verified against
 code (that path would silently drop api_key from display); wizard/admin provider parity traced
-end-to-end. Shipped TOGGLE-LESS per decision item 11 (attribution renders unconditionally —
-operator ruling pending on dropping the plan's toggle permanently). Wizard re-run pre-fill
+end-to-end. Shipped TOGGLE-LESS per decision item 11 — **✅ operator RULED 2026-08-03: toggle dropped
+PERMANENTLY; attribution is standard practice, never operator-optional** (Leaflet-style on
+the map, as shipped). Item (c) below is void. **NEW follow-up task (same ruling):
+About-page imagery attribution** — the dashboard About page's data-source credits must list
+the active imagery provider (ESRI / NAIP-USDA), matching the existing attribution pattern
+(dashboard repo, small round; queued). Wizard re-run pre-fill
 fixed API-side lead-direct (`b369ee6`, deployed). Tracked: wizard-path api_key drop
 (_provider_secrets() gap, unused v1). Pre-existing failures surfaced (untouched): earthquake
 wizard ×4, registry branding field-count.
@@ -1289,6 +1316,15 @@ pier line on the heatmap) could be added later as a supplement, but are not in s
 
 ## PINNED (operator-ruled, not scheduled — do NOT dispatch)
 
+- **SMART-L3 DISPOSITION — ✅ RULED 2026-08-03 (operator: "ok let's keep it then"): KEEP**,
+  with two conditions bound to the FIRST real structureless featured spot: (1) size gate on the
+  topographic trigger — feature ≥~200 m (Deltares 5-10-cells-per-feature rule at 40 m) or L3
+  refuses with a named reason; (2) resolution re-check at that spot (100-250 m controlling
+  feature → consider ~25 m, with measured compute). Evidence: briefs/SMART-L3-INVESTIGATION-
+  2026-08-03.md + briefs/L3-RESOLUTION-RESEARCH-2026-08-03.md. Truth-fixes queued now: stale
+  "10 m" log literals (swan_runner.py:3974/:4062), /health stale l3_viability_failed persistence
+  (recorded pre-overwrite), swan-nesting-reference.md:47 mis-attributed manual claim, stale 10 m
+  docstrings/ARCHITECTURE.md:119.
 - **G5 — break-type from shoreline curvature → L3 trigger** *(AD-5)* — **PINNED 2026-08-02
   (operator, in chat):** the 72-ray fan + AD-1R facing likely solved most of what G5 was for
   (orientation/exposure understanding of the beach). **Operator clarification (same day): L3 and
