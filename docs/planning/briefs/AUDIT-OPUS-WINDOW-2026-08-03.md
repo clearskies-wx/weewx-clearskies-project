@@ -147,7 +147,22 @@ PARK here. Each discretionary call gets a one-line entry in this file as it's ma
     `is_structure_affected` consumer under BD-8 (investigator: yes, secondary readout)?
     (3) `waveShapeClassification` — authorize the real round (regime threading + 4-way cut
     points = NEW formula criteria, trigger 1) or defer/pin. Full detail in plan §D10.
-14. *(append as found)*
+14. **G6.2 facing-comparison mod-180 blind spot (NEW 2026-08-03):** the delivered TC-8/G1.5
+    comparison (`check_heading_consistency`, geography.py:671-709, KAT-pinned) folds headings
+    mod-180 (undirected LINES). G6.2 wires it — per the explicit design lineage (the constant's
+    own docstring says delivered-for-G6.2) — to compare two FACINGS (vectors: fan open-water
+    bearing vs AD-1R beach facing). Consequence: a 180° facing FLIP (water on the wrong side,
+    the worst-case bad input this check exists to catch) folds to 0° and does NOT flag
+    (example: 10° vs 190°). Implemented as-designed with a KAT that PINS the flip case
+    visibly. **Your ruling wanted:** keep mod-180 (if AD-1R's water-side sign choice makes a
+    flip structurally impossible, the fold is harmless robustness) or switch the G6.2 call to
+    a mod-360 circular difference (criterion change, trigger 1 — needs your approval either
+    way). Coordinator has NO recommendation without knowing whether AD-1R's sign selection is
+    fan-independent — that's the deciding fact, checkable on request.
+15. *(append as found)*
+
+**Additional tracked (2026-08-03 evening):** wizard has NO /health-reasons display at all
+(admin renders them generically; wizard renders none) — parity gap, future round candidate.
 
 **Additional tracked follow-ups (2026-08-03 afternoon, non-decision):** wizard-path imagery
 `api_key` silently dropped at apply (`_provider_secrets()` has no imagery branch and no plain-
