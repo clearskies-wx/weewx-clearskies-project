@@ -557,7 +557,9 @@ doc. Lead greps 2026-08-02: ZERO occurrences in the ENTIRE marine repo AND the A
 the server has never (currently) emitted these names. BUT the dashboard carries null-guarded
 RENDER code for all three (`SurfingTab.tsx:1483` wave-shape chip, `:2154-2180` shadow face
 height, `:2350+` per-partition break rows) — three features that silently never render, the
-same failure class as D8's chevron. Origin claims in types.ts: T7.2b/T7.3 era. The marine
+same failure class as D8's chevron. Origin claims in types.ts: T7.2b/T7.3 era — *corrected by
+D10.1 below: `partitionBreakInfo` is actually T5.4 (`c021bc3`), only the other two are T7-era
+(queued doc fix, applied 2026-08-03)*. The marine
 service DOES serve a documented `perPartitionBreaks` (types.ts:1880's own comment calls it
 "related but separate").
 **D10.1 ✅ DONE 2026-08-02 (Explore agent, full-graph `git grep` across every ref of both
@@ -872,11 +874,15 @@ absent, fan-derived in force. **OPERATOR: re-add the override or accept fan-deri
 **Restoration C-E survivors + D7:** C-E01 partially superseded (AD-1R + persisted-key
 override; pre-chain `_perpendicular_bearing` +90° fallback remains; Bolsa live check
 deferred until Bolsa deploys); C-E03 **REFRAMED 2026-08-03 (operator ruling): spacing-dependence
-investigation FIRST** — read-only round inventories every criterion in transect-counts vs metres
-(5-consecutive window surf_1d_pipeline.py:1203, qualifying thresholds, invariant %, heatmap
-smoothing) → operator rules re-expressions in metres (trigger 1; jacking 10/50 m precedent);
-cap/guard + Bolsa spacing value PARKED behind that report (measured basis: 1-D ≈ 55 ms/transect/
-hour, SWAN grids scale with area not count — see AUDIT-OPUS-WINDOW-2026-08-03 item 3); C-E04 parked (efficiency-only, as downgraded);
+investigation FIRST** — **investigation ✅ DONE 2026-08-03, report saved verbatim at
+[briefs/C-E03-SPACING-DEPENDENCE-INVENTORY-2026-08-03.md](briefs/C-E03-SPACING-DEPENDENCE-INVENTORY-2026-08-03.md)
+(17 criteria C1-C17; C1-C6 = five spacing-blind counts inside `_compute_main_break_zone()` alone,
+all >2x drift at 25 m; fractions C11/C12 scale-free; NO alongshore heatmap smoothing exists
+anywhere — that concern has no code object; `transect_spacing_m` has no upper bound and is
+undocumented; coordinator spot-checked 4 cites against HEAD). NEXT: operator rules per-criterion
+re-expressions in metres (trigger 1; jacking 10/50 m precedent)** — cap/guard + Bolsa spacing
+value PARKED behind that ruling (measured basis: 1-D ≈ 55 ms/transect/hour, SWAN grids scale
+with area not count — see AUDIT-OPUS-WINDOW-2026-08-03 item 3); C-E04 parked (efficiency-only, as downgraded);
 C-E08 STILL-OPEN-low (L4 INPGRID WIND coverage — needs with/without comparison before any
 fix, as filed); C-E10 = C7a (same env-var/firewall decision, already OPERATOR-pending);
 C-E11 premise-contested (C-E12 says clock is real, C-E11 says future-dated — **OPERATOR:

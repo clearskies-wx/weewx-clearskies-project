@@ -143,6 +143,11 @@ that has been superseded by a single unified service:
 |---|---|---|---|
 | `weewx-clearskies-marine.service` | 8780 | `weewx_clearskies_marine` (`__main__.py`, default `--port 8780`) | SWAN nested grid (L1-L4) + SwellTrack + SurfBeat strip — all in one process |
 
+**Port 8780 serves TLS** (verified live 2026-08-03): `curl http://127.0.0.1:8780/health` gets an
+empty reply; use `curl -sk https://127.0.0.1:8780/health`. The unit name for journal reads is
+`weewx-clearskies-marine` (NOT `clearskies-marine` — that returns "-- No entries --" and
+`systemctl is-active` reports `inactive`, which reads like an outage but is just a wrong name).
+
 The interpreter, SWAN binary path, and secrets/config file locations for the unified service
 were not independently re-verified as part of this correction — confirm at `librewxr` before
 citing them if this section is extended.
