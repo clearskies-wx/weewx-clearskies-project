@@ -51,10 +51,11 @@ or shipped without a matched-time reality check. Therefore, binding on every tas
    agent: verify the quoted file/function state. If the code does not match, STOP and report
    drift — do not hunt for "what was probably meant."
 
-**Execution order:** Phase H → (D2 early, it is tiny and guards H1's test surface) → Phase D →
-Phase V as weather/evidence allows → Phase G6 → Phase C. G1R.3 and pinned/parked items whenever
-the operator says so. Phases are independent enough to interleave, but each phase's QC gate
-closes before its next task round dispatches.
+**Execution order:** Phase H ✅ → (D2 ✅) → Phase D (in progress) → Phase C (C3 🔶 audit pending,
+C4/C7 ready) → Phase LM (ortho imagery, scoped 2026-08-03) → Phase V as weather/evidence
+allows → Phase G6. G1R.3 and pinned/parked items whenever the operator says so. Phases are
+independent enough to interleave, but each phase's QC gate closes before its next task round
+dispatches.
 
 ---
 
@@ -958,15 +959,22 @@ transect_handoff.py:298-316 all verified). `_record_l3_viability_failures` (H1-g
 touches no structure fields directly — no STOP needed. Zero code changes; repo clean.
 Evidence banks to Gate C.
 
-### C3 — Cadence/performance lever *(G7.4; approved + gate-cleared 2026-07-30)*  ⬜
-**Owner:** `clearskies-api-dev`. Hourly 0–24 then ~6-hourly to 72 (~52% fewer solves,
-~41→~25 min). Producer-only: `swan_formats.py` compute-list + TABLE output schedule — a VALUE
-change, no command-grammar change (SWAN syntax appendix rules apply; local manual
-`docs/reference/swan-user-manual.txt` is the only SWAN reference). Pre-verified 2026-07-30: the
-whole chain is timestamp-driven — re-confirm in scope-ack (grep consumers for uniform-spacing
-assumptions). **MUST NOT TOUCH:** hotstart mechanics, convergence gate, anything per-grid.
-**Accept:** KAT on the emitted compute list; full run wall-clock measured before/after; all
-V1-style baseline numbers unchanged at the shared hours.
+### C3 — Restore 24h stationary fast-cycle scope *(G7.4; operator-approved trigger-6 cadence change)*  🔶 IMPLEMENTATION COMPLETE — audit in flight
+**Owner:** `clearskies-api-dev` (Sonnet). Marine `052906f` (not yet pushed/deployed).
+**What changed (operator direction 2026-08-02/03):** the fast fill now runs 24 stationary
+snapshots (hours 0-24h) per intervening HRRR cycle, instead of 1 snapshot. Hours 25-72
+remain untouched until the next 6-hourly full run. Uses the existing T1.0
+`stationary_sequence` path (`MODE NONSTATIONARY` + one `COMPUTE STAT` per forecast hour).
+**Changes:** (1) `swan_runner.py` `run_stationary_full_nest()`: trims HRRR wind to first
+24 grids, passes `stationary_sequence=True` to `run_3level()`. (2) `swan.py`
+`_run_quick_update_locked()`: builds 24 hourly CO-OPS tide predictions (was 1 closest),
+merges all 24 returned forecast points into cache (same closest-time-replace logic, looped),
+passes full list to `_precompute_swelltrack_for_spot()`. (3) 4 KATs in
+`tests/test_c3_24h_fill.py`. Lead gate: 4/4 KATs + 39 regression tests pass independently.
+**Adversarial auditor dispatched** — awaiting report before push/deploy.
+**Doc-code sync residual:** PROVIDER-MANUAL.md §"Two-tier schedule" still describes fill as
+"single snapshot" — update pending with or after push.
+**MUST NOT TOUCH:** hotstart mechanics, convergence gate, `swan_formats.py` (already correct).
 
 ### C4 — modelStatus grading *(G7.5 / TA-C22(a))*  ⬜ — **UNBLOCKED: threshold rule
 operator-APPROVED 2026-08-02 (chat, "yes unblock") — ready to dispatch as a normal scoped round**
@@ -1077,88 +1085,115 @@ standard adversarial pass (falsifiable KATs, allowlist diff, baseline diff).
 
 ---
 
-## PHASE LM — Landmark spatial context for the heatmap *(operator-requested 2026-08-02, in chat — supplements D5 and G6.3)*
+## PHASE LM — Orthophoto imagery for heatmap geographic context *(operator-requested 2026-08-02, rethought 2026-08-02 same session)*
 
-**Why (operator):** the heatmap has no scale or landmarks — users can't tell where on the
-beach it represents. Two anchors fix that: identified shoreward structures (the HB pier)
-rendered as a labeled line, and operator-drawn non-structural markers (e.g. a guard tower)
-rendered as labeled markers. **Contract authorization:** the additive `landmarks` payload
-field (trigger 4) and the non-structural marker config key (trigger 7) were explicitly
-requested/approved by the operator 2026-08-02 in chat. **Hard rule: landmarks are
-DISPLAY-ONLY — nothing in this phase may feed SWAN, the 1D model, transect selection, or any
-physics path. Markers are not structures; they emit no OBSTACLE, affect no flag.**
+**Why (operator, 2026-08-02):** the heatmap has no scale or landmarks — users can't tell
+where on the beach it represents. Original approach was projected structure lines + operator
+markers. **Operator rethink (same session):** "instead of a complicated system of logging more
+markers and polygons, why do we not just drop an orthophotographic image in the heat map and
+draw our heat map on top? We would make sure to capture enough additional context at the
+boundaries of our study area to include sufficient portions of the beach to capture guard
+towers, etc." — the ortho image itself provides geographic orientation.
 
-### LM-1 — Marine: landmark projection + additive payload  ⬜
-**Owner:** `clearskies-api-dev` (Sonnet, marine repo). **QC:** auditor (standard adversarial
-round). **Blocked on:** nothing (structures already in config; marker config may land later —
-design for both kinds now, structures first).
-**Change:** at config push, project each configured structure (and, once LM-3 exists, each
-non-structural marker) from its geographic geometry into the transect frame: alongshore span
-→ inclusive transect index range; cross-shore span → distance range in the SAME
-distance-from-reference metres the profile payload uses (negatives allowed landward, HAT
-convention). Serve as an additive top-level `landmarks` array on the
-`/surf/{id}/profile?transect_index=all` response (and nowhere else):
-`{label, kind: "structure"|"marker", transectStartIndex, transectEndIndex, distanceMinM,
-distanceMaxM}`. Label for structures = the structure's configured name/type (e.g.
-"Huntington Beach Pier"). Old-cache tolerance: absent key = no landmarks (never raise).
-**Files (verify at dispatch):** the transect-frame owner (`services/swan_formats.py`
-`compute_spot_transects` region — VALUES/metadata only, zero emission-grammar changes) or a
-new small `services/landmarks.py` (preferred — keeps swan_formats untouched); the profile
-endpoint serializer; cache codec if the projection is cached; tests.
-**MUST NOT TOUCH:** OBSTACLE emission, `is_structure_affected` production, transect
-generation itself, anything in the frozen core beyond read-only imports.
-**KATs:** (a) synthetic pier polyline perpendicular to a known transect frame → exact
-expected index range + distance range; (b) structure fully outside the frame → no landmark,
-no error; (c) old cached payload without `landmarks` → endpoint serves absent key cleanly;
-(d) projection is byte-stable across two identical config pushes.
-**Accept:** live `transect_index=all` payload for HB carries the pier landmark with plausible
-bounds (spot-check vs the 29 structure-affected transect indices); zero diff in every other
-payload field (baseline diff).
+**Design (operator-directed, 2026-08-02):**
+- **Two imagery providers:** NAIP (US only, public domain, no usage limits, cacheable
+  server-side) and ESRI World Imagery (global, non-commercial, 2M tiles/month, attribution
+  required, no caching).
+- **General-purpose API provider** — NOT marine-specific. Imagery is an API-level provider
+  module (like forecast, AQI, etc.) so any future card/feature can use it, not just the
+  marine heatmap. Configured through wizard/admin like other external providers.
+- **NAIP: API proxies + caches tiles.** Browser → Caddy → API → USGS. Public domain, no
+  restrictions. API caches locally for fast repeat access.
+- **ESRI: direct browser fetch.** API provides config only (tile URL template + attribution
+  text). Browser fetches tiles directly from ESRI. No proxy, no cache, no terms issue.
+  ESRI World Imagery does not require an API key for non-commercial use.
+- **Provider selection:** NAIP preferred for US locations (higher resolution, cacheable, no
+  limits). ESRI for non-US locations. Both configurable through admin. API key field for
+  future providers that may require one.
+- **Dashboard:** heatmap renders as semi-transparent overlay on the ortho tiles. Visitor sees
+  the real beach (guard towers, piers, parking lots) with wave data painted on top.
 
-### LM-2 — Dashboard: heatmap landmark overlay + alongshore scale *(supplements D5)*  ⬜
-**Owner:** `clearskies-dashboard-dev` (Sonnet). **QC:** auditor at Gate D (axe row included).
-**Blocked on:** LM-1 deployed (fixture work can start from LM-1's KAT fixtures).
-**Change (HeatMapCard only):** (a) render each `landmarks[]` entry as a labeled line — the
-centerline of its (transect-range × distance-range) box along the box's long axis; label
-text beside it, i18n'd, `aria-label`ed, DESIGN-MANUAL tokens, no new dependencies; (b) add
-the alongshore scale: Y-axis ticks in metres (transect index × the served spacing — use the
-real per-spot spacing from the payload if present, else 10 m constant with a code comment),
-plus end labels derived from the transect frame's endpoint bearing (e.g. "NW end"/"SE end");
-(c) null-safety: no `landmarks` key (old cache) → render exactly today's chart.
-**MUST NOT TOUCH:** the Hs colour mapping, `splitBreakPoints()`, BeachProfileChart (landmark
-overlay is heatmap-only this round), the fetch layer.
-**KATs:** fixture with the HB pier landmark → line + label at the expected rows/columns
-(assert coordinates in-canvas); fixture without `landmarks` → byte-identical render to
-pre-change snapshot; axe pass on the new markup.
-**Accept:** live render post-H4 shows the pier line + label + metre scale; operator
-eyeball-confirms the pier lands where the real pier is.
+**Contract authorization:** new imagery provider module + endpoint (trigger 2, 7), new admin
+config keys for provider selection (trigger 7), new data contract between API and dashboard
+for imagery config (trigger 4) — all explicitly requested/approved by the operator 2026-08-02
+in chat. **Hard rule: imagery is DISPLAY-ONLY — nothing in this phase may feed SWAN, the 1D
+model, transect selection, or any physics path.**
 
-### LM-3 — Wizard: non-structural labeled markers *(supplements G6.3; blocked on G6.3)*  ⬜
-**Owner:** `clearskies-dashboard-dev` (Sonnet, stack repo). **QC:** auditor at Gate G6.
-**Change:** extend G6.3's polygon/draw tool with a "marker" mode: operator draws a small
-polygon (or drops a point) + REQUIRED label field → persisted in marine config under a NEW
-`landmark_markers` key (same `[lon,lat]` JSON-string encoding contract as E13 — do not
-invent a new encoding), applied via the existing apply flow. Markers are display-only
-metadata: the apply path must NOT create structures, OBSTACLE lines, or any model input.
-LM-1's projection picks them up on the next config push.
-**Wizard/admin parity (operator, 2026-08-02 in chat — binding on this task AND general):**
-the marker draw/label/edit capability must work in BOTH the setup wizard AND the admin panel
-— not wizard-only. The same rule applies to every setup-time function this plan adds or
-touches (G6.3's polygon draw included): any capability offered at setup must be reachable
-post-setup from admin. Where the wizard and admin already share an implementation surface,
-reuse it; where they don't, the task's scope includes both surfaces. (Doc-sync: record this
-parity principle in the OPERATIONS-MANUAL wizard/admin section at this task's round close —
-verify first whether it is already stated there.)
-**MUST NOT TOUCH:** the structure/study-area draw flows (G6.3's polygon contract frozen once
-landed); anything that feeds the model.
-**KATs:** T4.5-style round-trip: draw marker + label → apply → marine config carries it
-byte-faithfully → re-open wizard shows it; apply with markers present produces ZERO diff in
-every SWAN input file (the display-only guarantee, asserted).
-**Accept:** operator draws a guard-tower marker on the dev wizard, it round-trips, and (with
-LM-1/LM-2 live) appears labeled on the heatmap.
+### LM-1 — API: imagery provider modules (NAIP + ESRI)  ⬜
+**Owner:** `clearskies-api-dev` (Sonnet, API repo). **QC:** auditor (standard adversarial
+round). **Blocked on:** nothing.
+**Change:** (a) New provider module(s) under `providers/imagery/` — NAIP provider (proxy +
+cache: fetches from USGS WMS/WMTS, caches tiles to Redis or disk with configurable TTL) and
+ESRI provider (config-only: returns the tile URL template + attribution, never proxies).
+(b) New endpoint `GET /api/v1/imagery/config` — returns the active provider's tile source
+info: `{provider, tileUrl, attribution, proxyMode: "api"|"direct", bounds?}`. For NAIP
+(`proxyMode: "api"`), the tileUrl points to our own proxy endpoint. For ESRI
+(`proxyMode: "direct"`), the tileUrl is the ESRI XYZ URL template for the browser.
+(c) For NAIP: new proxy endpoint `GET /api/v1/imagery/tiles/{z}/{x}/{y}` — fetches from
+USGS, caches, serves the tile bytes. ESRI tiles never flow through this endpoint.
+(d) Provider selection logic: if the spot's coordinates are within CONUS and NAIP is enabled,
+use NAIP; otherwise use ESRI. Configurable override in admin.
+**Files:** new `providers/imagery/naip.py`, `providers/imagery/esri.py`,
+`providers/imagery/__init__.py`, new `endpoints/imagery.py`; `api.conf` schema addition for
+`[imagery]` section; router registration.
+**MUST NOT TOUCH:** anything in `providers/nearshore/`, any marine/surf endpoint, any model
+code.
+**KATs:** (a) NAIP proxy returns a valid PNG/JPEG tile for a known CONUS tile coordinate;
+(b) NAIP cache hit returns identical bytes on second request without upstream fetch;
+(c) ESRI config returns the correct XYZ URL template + attribution text;
+(d) non-CONUS coordinates with NAIP-preferred config → falls back to ESRI;
+(e) imagery endpoint with no imagery config → 404 or empty config, no crash.
+**Accept:** dev-site `/api/v1/imagery/config` returns correct provider config for HB
+coordinates; NAIP proxy serves a recognizable tile of Huntington Beach.
 
-**Sequencing:** LM-1 → LM-2 (pier + scale ship first — most of the user value); LM-3 lands
-with/after G6.3, then markers flow through the same LM-1/LM-2 path with zero further work.
+### LM-2 — Dashboard: heatmap ortho background rendering  ⬜
+**Owner:** `clearskies-dashboard-dev` (Sonnet). **QC:** auditor (axe row included).
+**Blocked on:** LM-1 deployed.
+**Change (HeatMapCard only):** (a) on mount, fetch `/api/v1/imagery/config` for the spot's
+location; (b) if `proxyMode: "api"`, fetch tiles through the API proxy path (Caddy); if
+`proxyMode: "direct"`, fetch tiles from the returned `tileUrl` directly in the browser;
+(c) render the ortho tile(s) as the heatmap background, with the heatmap data as a
+semi-transparent colour overlay on top — the geographic alignment uses the spot's transect
+frame coordinates to map tile pixels to heatmap cells; (d) render the required attribution
+text from the config response; (e) null-safety: no imagery config or fetch failure → render
+exactly today's chart (graceful degradation, no crash).
+**MUST NOT TOUCH:** the Hs colour mapping, `splitBreakPoints()`, BeachProfileChart, the
+fetch layer for surf data.
+**KATs:** (a) fixture with imagery config → ortho tiles render behind heatmap data;
+(b) fixture without imagery config → byte-identical render to pre-change chart;
+(c) ESRI attribution text renders when ESRI provider is active;
+(d) axe pass on the new markup (alt text on imagery, attribution in accessible text).
+**Accept:** live render shows HB heatmap with recognizable beach imagery behind the wave
+data; operator eyeball-confirms the pier and beach features are visible and correctly
+aligned with the transect grid; attribution displays.
+
+### LM-3 — Config UI: imagery provider admin section  ⬜
+**Owner:** `clearskies-dashboard-dev` (Sonnet, stack repo). **QC:** auditor at gate.
+**Change:** new "Imagery" section in the admin panel (wizard/admin parity applies per
+operator ruling 2026-08-02): (a) provider dropdown (NAIP / ESRI / Auto — Auto = NAIP for
+US, ESRI otherwise); (b) API key field (empty for ESRI non-commercial / NAIP; future-
+proofing for providers that need one); (c) attribution display toggle (default on — ESRI
+requires it); (d) config round-trips through the existing apply flow to `api.conf [imagery]`.
+**Wizard/admin parity (operator, 2026-08-02 in chat — binding):** the imagery config
+capability must work in BOTH the setup wizard AND the admin panel. Where the wizard and
+admin already share an implementation surface, reuse it; where they don't, the task's scope
+includes both surfaces.
+**MUST NOT TOUCH:** any model config, structure/study-area draw flows, anything that feeds
+the model.
+**KATs:** (a) select NAIP → apply → api.conf `[imagery]` section carries provider=naip;
+(b) select ESRI → apply → provider=esri; (c) round-trip: save → reload → values preserved;
+(d) apply with imagery config produces ZERO diff in any SWAN input file.
+**Accept:** operator selects a provider in admin, it persists, and LM-1/LM-2 use the
+selection.
+
+**Sequencing:** LM-1 → LM-2 (API provider + dashboard rendering ship together for testable
+value); LM-3 can ship independently (defaults work without admin config — Auto mode).
+
+**Superseded tasks (original landmark approach, 2026-08-02 morning):** the original LM-1
+(landmark projection), LM-2 (landmark overlay + scale), and LM-3 (non-structural markers)
+are DROPPED in favour of the ortho-imagery approach above. The ortho image provides the
+geographic context the landmarks were meant to deliver. Structure-specific overlays (e.g.
+pier line on the heatmap) could be added later as a supplement, but are not in scope here.
 
 ---
 
@@ -1281,3 +1316,20 @@ with/after G6.3, then markers flow through the same LM-1/LM-2 path with zero fur
   assignments, per-phase adversarial QC gates (`clearskies-auditor`), brief cross-references,
   and the PRIME-DIRECTIVE anti-regression rules (frozen-core list, baseline-diff, one change
   per deploy, reality gate per deploy).
+- **2026-08-03 (session resume + continued execution).** (1) Segment geometry ~~verified~~ —
+  **CORRECTED by the 2026-08-03 audit:** the cited log line's "162 open" meant zero
+  structure-affected transects; the pier had been wiped from config at 22:12:54Z (admin-save
+  clobber over a never-round-tripped API copy) and invariants 3+7 were firing when this
+  "verification" was recorded. See briefs/AUDIT-OPUS-WINDOW-2026-08-03.md for the incident
+  chain, the 06:11Z interim restore, and all Opus-window audit findings. (2) Phase LM rethought by operator: original landmark/marker
+  approach replaced with orthophoto imagery background for the heatmap. Two providers: NAIP
+  (US, public domain, cached through API proxy) and ESRI World Imagery (global, non-commercial,
+  direct browser fetch — no proxy, per ESRI terms). General-purpose API provider, not marine-
+  specific. Phase LM tasks rewritten (LM-1 = API imagery provider modules, LM-2 = dashboard
+  heatmap ortho background, LM-3 = config UI imagery admin section). Operator rulings: ESRI
+  direct browser fetch fine; NAIP proxied through API with caching fine; Mapbox rejected (no
+  server-side caching permitted by terms). (3) C3 implementation complete (marine `052906f`):
+  fast fill restored to 24 stationary snapshots (hours 0-24h) using the existing T1.0
+  `stationary_sequence` path. 3 production files changed, 4 KATs + 39 regression tests pass.
+  Adversarial audit dispatched. Doc-code sync residual: PROVIDER-MANUAL.md §"Two-tier schedule"
+  still describes fill as "single snapshot."

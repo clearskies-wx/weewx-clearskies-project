@@ -1,6 +1,6 @@
 # Session state — MARINE-FORWARD-PLAN execution (2026-08-02/03)
 
-## ═══ RESUME HERE (rewritten pre-compaction, 2026-08-03 ~03:00 UTC) ═══
+## ═══ RESUME HERE (rewritten 2026-08-03 ~06:00 UTC, post-C3 implementation) ═══
 
 **Role:** Coordinator. **Mission:** CONTINUE EXECUTING `docs/planning/MARINE-FORWARD-PLAN.md`.
 **Standing directive:** "ok continue autonomously with plan implementation" (chat 2026-08-02).
@@ -10,77 +10,73 @@
 resolution refinement 1m/0.5m, waveShapeClassification, swellDominance ratio, NDBC fix,
 C8 bool-return); dashboard = `fc93876` (weather-dev; carries D1 phantom deletion, chart
 tier fix, transect marker removal); config service = `692ad76` (weather-dev port 9876).
-**ALL repos pushed:** marine `2e67966`, dashboard `fc93876`, stack `692ad76`,
-meta `c3f7505`, api `f10e8ce`.
+**ALL repos pushed (except marine C3 commit):** marine deployed=`2e67966`, local HEAD=`052906f`
+(C3 not yet pushed); dashboard `fc93876`, stack `692ad76`, meta needs push, api `f10e8ce`.
 
-**Segment geometry:** operator re-drew the HB segment to 1,610m / 162 transects (was 315m/32
-after an admin save truncated it). Next cycle will pick up the new geometry via forced full
-run (geometry change → cold start). This is the FIRST thing to verify on resume.
+**Segment geometry:** ~~VERIFIED... Working correctly~~ **CORRECTED 2026-08-03 (audit):** the
+"162 open" in that very log line meant ZERO structure-affected transects — the pier had been
+wiped from config at 22:12:54Z (admin-save clobber; API copy never carried coordinates) and the
+transect count was verified while invariants 3+7 were firing. Pier restored 06:11Z (interim
+manual restore, both configs). Full story + all Opus-window audit findings:
+[AUDIT-OPUS-WINDOW-2026-08-03.md](AUDIT-OPUS-WINDOW-2026-08-03.md) — READ THAT FIRST on resume.
 
-**CLOSED THIS SESSION (10 tasks, all deployed):**
-1. C9 — Auto/Override exposure labeling + config-service deploy (stack `692ad76`)
-2. C8 — forced-full-run false-success fix (marine `f2b3ce0`, audit PASS)
-3. D1 — delete phantom fields partitionBreakInfo + shadowFaceHeight (dashboard `54b1563`)
-4. NDBC V3-F8 — station ID .upper() normalization + negative-cache 404s (marine `02feb1d`)
-5. swellDominance — continuous 0.0-1.0 ratio instead of buckets (marine `a751c9a`)
-6. Beach profile + heatmap chart tier fix — Math.abs on break distances (dashboard `9aa67a8`)
-7. waveShapeClassification — per-hour wave shape on surf forecast (marine `6d489da`)
-8. Remove transect markers from public view (dashboard `fc93876`)
-9. 1D transect resolution — PCHIP 1m analytical + 0.5m SurfBeat (marine `f13e475`,
-   operator-approved trigger 3)
-10. H5 — HRRR wind interpolation moved from request-time to pipeline-time (marine `ba515ed`
-    + dead imports `2e67966`, audit PASS 0 functional defects, 2 findings remediated)
+**CLOSED THIS SESSION (continuation, 10 tasks from previous compaction + this session):**
+Previous 10 tasks: C9, C8, D1, NDBC V3-F8, swellDominance, chart tier fix,
+waveShapeClassification, transect markers, 1D resolution, H5 — all deployed.
 
-**OPERATOR Q&A RULINGS (all recorded in plan decision log, meta `3c47bcd`):**
-Q1 firewall resolved. Q2 D1 delete 2 phantom fields (waveShape is real bug → fixed).
-Q3 covered by Q2. Q4 D5 eyeball: 3 findings (outer break=bathy resolution, transect
-markers=removed, smoothing=pending). Q5 NDBC fix approved+deployed. Q6 TA-C21 confirmed.
-Q7 C-E11/C-E12 resolved by C3 (24h stationary restore). Q8 transect spacing: auto+slider
-future task, L1/L2 skip pinned. Q9 swellDominance ratio deployed. Debug trace: keep on.
-Single-flight: superseded by H5 pipeline-wind fix. H5 HRRR wind: pipeline-persisted,
-endpoint fetch removed, warming thread deleted.
+**THIS SESSION:**
+1. Segment geometry verified (162 transects, 1,610m)
+2. Phase LM rewritten — ortho imagery approach replaces landmarks (NAIP + ESRI)
+3. C3 implementation complete (marine `052906f`) — audit needed before push/deploy
 
-**DISPATCHABLE NEXT (autonomy grant, in order):**
-1. **C3 — restore 24h stationary fast-cycle scope** (APPROVED, both H5 and C3 approved
-   this session). The fast fill currently does 1 stationary snapshot per hour. Should do
-   24 stationary snapshots (one per forecast hour, 0-24h). The `stationary_sequence`
-   code path already exists in `swan_formats.py` (T1.0, implemented 2026-07-29) but is
-   only used by the FULL run, not the fast fill. The fast fill uses
-   `run_stationary_full_nest()` → `run_3level(stationary=True)` which does a single
-   `COMPUTE STAT`. Need to change it to use the sequence path for 24 timesteps.
-   Key constraint: each stationary snapshot needs its own HRRR wind for that forecast
-   hour. The fast fill currently gets ONE HRRR wind field. Needs 24.
-   Operator context: "running 24 stationary runs for each transect will still be faster
-   than running it non-stationary." L1 is 37×27 km (well under 100km threshold for
-   stationary per SWAN manual). All 4 levels already use stationary sequence in the
-   full run (T1.0). Estimated fast-cycle time: 24 × ~33s/snapshot = ~13 min SWAN +
-   ~12-14s 1D pipeline = ~14 min total (vs current ~33s for 1 snapshot).
-   L1/L2 skip for fast cycle: PINNED by operator ("worried about losing wind effects").
-2. **Heatmap smoothing** — interpolate discrete transect columns into smooth shapes
-   (dashboard). Operator: "instead of showing these as pixelated individual transects,
-   would it be better to smooth these into shapes." Not yet scoped.
-3. **Config prjc1 → PRJC1** — operator admin UI action (code fix deployed).
-4. **Outer break detection** — root cause = CUDEM bathy resolution doesn't capture
-   sandbars. Resolution refinement (1m) may help slightly but won't create features
-   that aren't in the data. Needs real survey data for bar-driven breaks.
-5. Gate D formal close, Gate C after C3/C4, V1/V2 weather-dependent.
+## ── C3 STATUS ──
+**Implementation:** COMPLETE. Marine `052906f` (local, not pushed).
+- `swan_runner.py`: `run_stationary_full_nest()` trims wind to 24h, passes
+  `stationary_sequence=True` to `run_3level()`
+- `swan.py`: `_run_quick_update_locked()` builds 24 hourly tide predictions, merges all
+  24 returned forecast points into cache
+- `tests/test_c3_24h_fill.py`: 4 KATs all pass
+- 39 regression tests pass (stationary sequence, quickupdate merge, H5, serve-nothing)
 
-**Known findings/residuals (tracked, don't re-find):**
-- `hrrr.py` `bbox_for_location()` orphaned (no production callers after H5; not deleted,
-  MUST-NOT-TOUCH in H5 scope)
-- `test_surf_spectral_extractions.py` vestigial `hrrr_provider.fetch` monkeypatch (harmless
-  no-op, not on any task's allowlist)
-- SurfBeat strip at 0.5m = ~400-1000 points, 1D SWAN grid — runtime not yet measured live
-- PROVIDER-MANUAL cache payload table updated to 9 keys (was stale at 6)
-- `_is_station_active()` dead 404-status-code branch (ProviderHTTPClient always raises)
-- HeatMapCard break-zone-band overflow near x-domain minimum (pre-existing)
-- 4 orphaned locale keys from transect marker removal (cleanup pass queued)
+**Lead gate:** PASSED (independent verification of tests, code spot-check of all 5 design
+elements, allowlist diff clean).
+
+**Adversarial audit:** NEEDED — was dispatched but may have been killed by compaction. Re-
+dispatch before push/deploy. The audit brief is in the previous session context (commit
+`052906f`, 3 files, focus areas: wind trimming edge cases, tide/valid_times alignment,
+cache merge collision, swelltrack merge, scope violations, doc-code sync).
+
+**Doc-code sync residual:** PROVIDER-MANUAL.md §"Two-tier schedule" still describes fill as
+"single snapshot" — update needed with or after push.
+
+## ── DISPATCHABLE NEXT (in order) ──
+1. **C3 audit + push + deploy** — re-dispatch auditor, remediate findings, push, deploy via
+   `scripts/deploy-marine.sh`, reality gate (verify 24 forecast points per fill in the
+   service journal).
+2. **C4 — modelStatus grading** (UNBLOCKED, operator-approved threshold rule). Owner:
+   `clearskies-api-dev`. `endpoints/surf.py` `_determine_model_status` + pipeline
+   bookkeeping. Wire semantics change → API-MANUAL same round.
+3. **C7 — bimodal facing investigation** (investigation-first, then fixes). 240.0° vs 216.4°
+   transect dual-computation from non-surf endpoints.
+4. **Phase LM — ortho imagery** (3 tasks: API provider, dashboard background, config UI).
+   Multi-repo. NAIP proxied+cached, ESRI direct-browser. See plan §LM.
+5. **Heatmap smoothing** — interpolate discrete transect columns. Not yet scoped.
+6. Gate D formal close → Gate C after C3/C4 → V1/V2 weather-dependent.
+
+## ── PHASE LM DESIGN (operator-directed 2026-08-03) ──
+Ortho imagery replaces the original landmark/marker approach for heatmap geographic context.
+- **NAIP (US):** API provider proxies + caches tiles. Browser → Caddy → API → USGS.
+  Public domain, no limits. Cached server-side.
+- **ESRI (global):** API provides config only (tile URL + attribution). Browser fetches
+  tiles directly from ESRI. No proxy, no cache, no terms issue. Non-commercial, 2M tiles/mo.
+- **Provider selection:** NAIP preferred for US, ESRI for non-US. Configurable in admin.
+- **Dashboard:** heatmap renders ortho as background, wave data as semi-transparent overlay.
+- All operator rulings recorded in plan §LM and decision log.
+
+## ── KNOWN RESIDUALS (don't re-find) ──
+Same as previous resume state plus:
+- PROVIDER-MANUAL.md "Two-tier schedule" stale (C3 doc-sync)
+- 4 orphaned locale keys from transect marker removal
 - 5 pre-existing wizard test failures (earthquake ×4, topology ×1)
-
-**Agent roster:** `l4-rewrite` (marine coder, deep context), `d4-dashboard` (dashboard),
-`round1-auditor` (adversarial auditor). All resumable via SendMessage by name.
-
-## Execution pattern (proven this session)
-Brief → scope-ack → GO → implement → closeout → adversarial audit (for significant
-changes) → lead gate (independent pytest + stat + spot-check) → push → deploy
-(cycle-window discipline) → reality gate → plan record.
+- `hrrr.py` `bbox_for_location()` orphaned (H5 residual)
+- HeatMapCard break-zone-band overflow near x-domain minimum (pre-existing)
