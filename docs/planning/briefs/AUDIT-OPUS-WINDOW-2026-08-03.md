@@ -443,7 +443,28 @@ fetch gracefully per-transect. (iii) parked to geometry-phase work; (ii) rejecte
 **✅ OPERATOR APPROVED 2026-08-03 (chat: "1. ok. 2. ok")** — round dispatches after fix-jacking2
 frees the marine repo.
 
-**PRE-DEPLOY BASELINE (captured 2026-08-03 ~09:55Z, deployed=2e67966, marine last_run 07:17:45Z)
+**✅ TIP DEPLOY GATE — PASSED 2026-08-03 (pushed 2e67966..5cc8f1f 08:38Z, deployed 08:39:19Z,
+first post-deploy full cycle 08:40:27→09:18:44Z = 38m17s):**
+1. Journal sweep: ZERO unexplained ERRORs. **Invariant 1: 0 fires (was every cycle) — phantom-
+   depth class CURED.** Invariant 7: quiet all cycle. F5 negative-fetch crash class: absent.
+   Only ERROR = invariant 4 ×67 (explained, decision item 10). NDBC spectral QuotaExhausted
+   tracebacks = pre-existing WARNING-level noise class, non-blocking.
+2. Publish-liveness: PASS (cycle complete, /health last_run=09:18:44Z).
+3. 29/31-unavailable CURE: **67/67 hours modelStatus=ok** (baseline: 2/31; window itself grew
+   back to full 67 timesteps because the pipeline no longer dies mid-run).
+4. Reality gate (PRE-STATED ±30%): NDBC 46222 WVHT 0.8 m @08:56Z vs served waveHeightAtBreak
+   0.758 m @09:00Z = **-5.3% — PASS** (comparison basis: total breaking Hs vs buoy total Hs;
+   swellHeight 0.39 m is the swell-partition-only HSWELL, not the comparator).
+5. Matched-hour before/after (expected-shift evidence, NOT regression): 11:00Z whb 0.579→0.743,
+   12:00Z 0.419→0.748 — un-amputated 1D domains, direction consistent with restored physics.
+6. jackingFactors: key present on /profile wire, [] across sampled hours while breakPoints=4 —
+   plausible at 0.5 m surf / 3.27 m start depth; mechanism KAT-proven. **WATCH (V2-style,
+   weather-dependent): first ≥1.5 m swell should show non-empty jacking on barred transects.**
+7. C3 fill runtime (AUD-C3 F3): NOT measurable this cycle (full cycle, not fast+fill) —
+   **pending next fast-cycle event**; tracked.
+
+**PRE-DEPLOY BASELINE (captured 2026-08-03 ~09:55Z — clock note: actual push 08:38Z, so this
+capture was ~08:25Z; deployed=2e67966, marine last_run 07:17:45Z)
 — the "before" half of the matched-hour reality-gate evidence:** `GET /surf/huntington-city-beach-pier`
 serves 31 forecast entries, **29 unavailable / 2 ok** — the 2 ok: 2026-08-03T11:00Z
 (whb 0.579 m, bestPeak 0.802 m) and 12:00Z (whb 0.419 m, bestPeak 0.581 m) = the
