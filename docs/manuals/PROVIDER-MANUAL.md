@@ -1276,9 +1276,11 @@ No scipy dependency — at most ~100 values per station, not a signal processing
 
 Return stations sorted by haversine distance from the target coordinates, with capabilities and distances.
 
-**Cache:** Key = `(provider_id, station_id, file_type)`. TTL = 60 min for all three file types. Station discovery (`activestations.xml`) cached 24 hr.
+**Cache:** Key = `(provider_id, station_id, file_type)`. TTL = 60 min for all three file types. Station discovery (`activestations.xml`) cached 24 hr. **Negative cache (V3-F8, 2026-08-02):** a standard-met 404 is cached as empty (`observation=None`) at a shorter 30-min TTL (`_NEGATIVE_CACHE_TTL = 1800`), preventing repeated network requests for misconfigured or non-existent station IDs.
 
-**Error handling:** HTTP 404 for non-existent station → `ProviderProtocolError`. Empty file body → log WARNING, return empty observation (not error). Network errors → canonical taxonomy via `ProviderHTTPClient`.
+**Station ID casing (V3-F8):** NDBC's flat-file server is case-sensitive (`PRJC1.txt` → 200, `prjc1.txt` → 404). All URL construction applies `.upper()` to the station ID; cache keys, `MarineObservation.stationId`, and log messages retain the original configured casing.
+
+**Error handling:** HTTP 404 for standard-met file → `observation=None` (negative-cached, see above; formerly raised `ProviderProtocolError`). Spectral file 404 → `available=False` (not an error — station lacks that sensor). Empty file body → log WARNING, return empty observation (not error). Network errors → canonical taxonomy via `ProviderHTTPClient`.
 
 **Rate limiting:** 1 req/s per module instance. NDBC has no documented rate limit, but the server is a flat-file host with modest capacity — be polite.
 
