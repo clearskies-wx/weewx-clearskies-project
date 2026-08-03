@@ -428,6 +428,18 @@ fetch gracefully per-transect. (iii) parked to geometry-phase work; (ii) rejecte
 **✅ OPERATOR APPROVED 2026-08-03 (chat: "1. ok. 2. ok")** — round dispatches after fix-jacking2
 frees the marine repo.
 
+**PRE-DEPLOY BASELINE (captured 2026-08-03 ~09:55Z, deployed=2e67966, marine last_run 07:17:45Z)
+— the "before" half of the matched-hour reality-gate evidence:** `GET /surf/huntington-city-beach-pier`
+serves 31 forecast entries, **29 unavailable / 2 ok** — the 2 ok: 2026-08-03T11:00Z
+(whb 0.579 m, bestPeak 0.802 m) and 12:00Z (whb 0.419 m, bestPeak 0.581 m) = the
+wind-not-onshore hours where F5 was skipped, exactly per root cause. /health degraded, reasons:
+l3_viability_failed (misleading-but-accurate wording, doc'd), invariant 1 (phantom-depth class,
+cure expected), **invariant 7 fired at/after 07:17 last_run (NEW at this capture — was quiet
+post-cycle earlier; watch at post-deploy sweep, do not assume same cause as the 08-02 firing)**.
+Post-deploy expectation (PRE-STATED): most/all 29 unavailable hours become populated; small-surf
+served numbers SHIFT broadly (un-amputated 1D domains) — judged against NDBC 46222 matched hour
+±30%, not against this baseline's 2 surviving values.
+
 **DIAG-FETCH FOLLOW-UP — SYSTEMIC quantification (2026-08-03):** 162/162 transects clamped at
 least once in the 06z run (5,022 clamp WARNINGs parsed): Hs 0.36-0.56 m → target depth
 0.64-1.09 m, ALWAYS shallower than the L4 grid's shallowest usable station (~2.8-3.3 m
