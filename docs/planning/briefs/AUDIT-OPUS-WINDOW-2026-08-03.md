@@ -157,6 +157,16 @@ stash-falsifiable KAT, deployed same hour — LM-3 finding 3; discretion-directi
 authorized imagery domain joining an existing generic mechanism, silent-reset defect class).
 
 **Discretionary calls made under the directive (running):**
+- **2026-08-03 ~14:15Z, G6.3 ring-closure ruling:** the E13 `_coordinates` JSON-string contract
+  has NO ring-closure convention (both parsers accept any non-empty [lon,lat] list verbatim).
+  Ruled: hand-drawn polygon rings are written CLOSED (first==last appended before stringify).
+  Basis: OSM's own closed-way convention is first==last, and Overpass-discovered closed ways
+  already flow through this contract in that shape — so this resolves an ambiguity using the
+  reading the contract's own data source supports (permitted class), not a contract change.
+  Also geometrically load-bearing: downstream consumers (OBSTACLE emission, shadows) treat
+  coordinates as a polyline sequence — an open ring silently loses the closing segment. KAT
+  asserts first==last on the wire. Also authorized: NEW wizard-side round-trip test (parity
+  coverage gap found — wizard had NO coordinates round-trip net at all).
 - **2026-08-03 ~09:00Z, fetch-fix round:** authorized fixing the `clamped` flag to match its own
   documented contract (comment: "clamped means the target genuinely wanted the real grid edge,
   not that a break zone happened to limit the search" — implementation computed the check over
