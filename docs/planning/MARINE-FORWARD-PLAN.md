@@ -409,8 +409,18 @@ same discipline as R8). **MUST NOT TOUCH:** the live band-building code (`_TRANS
 constants, sentinel, grid-bbox clip — Round-1 frozen). **Accept:** grep shows zero references;
 full targeted suite green; production run byte-identical (baseline diff, directive #2).
 
-### D4 — Dashboard surf re-wiring, part 1: contract re-reconciliation + BD-7/BD-9 fields  ⬜
-**(BLOCKED for live verification on H4 — code + tests can land first against fixtures.)**
+### D4 — Dashboard surf re-wiring, part 1: contract re-reconciliation + BD-7/BD-9 fields  ✅ **CLOSED 2026-08-03 (verified already-delivered across the 2026-08-02 D4.2/D5.2/D8/D9 rounds — plan row was stale)**
+Coordinator verification at dashboard HEAD `fed72f8`: **D4.2** — all 5 BD-7/BD-9 fields typed
+(types.ts:1343+, nullable, doc-commented); zone-context text rendered at the face-height
+display exactly per spec (SurfingTab.tsx:2189-2199, `surfing.mainBreakZoneLabel` = "Main break
+zone: transects {{start}}–{{end}}, {{qualifyingCount}} qualifying", null-gated on all three
+fields); negative-`distanceFromShore` handled (BeachProfileChart.tsx:271 `xMin = Math.min(0,…)`,
+TA-C19 row already recorded this). **D4.1**'s delta-table outcomes all landed (fields +
+headline semantics + TA-C19); the standalone table artifact was overtaken by delivery.
+**D4.3** — representative-transect choice is server-side by design and live-verified (V3-F4-IMPL
+closed: /surf + /profile share ONE producer family and the SAME representative transect).
+H4 transport landed; D5 deployed the charts; operator visual eyeball remains the open tail
+(already tracked with D5's own eyeball item).
 **Owner:** `clearskies-dashboard-dev` (Sonnet). **QC:** auditor at Gate D.
 **Investigation findings (2026-08-02, coordinator — the operator's memory is right):** the
 piping EXISTS and was NOT reverted — zero dashboard marine-component commits since 07-25; the
