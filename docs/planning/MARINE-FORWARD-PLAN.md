@@ -906,6 +906,42 @@ via new `_swell_dominance_score()`. `_swell_summary_key()` compares ratio thresh
 directly. 20 KATs, 2 mutations caught. Operator ruling: "zero compute cost — ratio
 already calculated."
 
+### waveShapeClassification ✅ **CLOSED 2026-08-02**
+Marine `6d489da` (deployed 01:35:04Z). Per-hour `waveShapeClassification` on the surf
+forecast — combines Iribarren, local-dispersion regime, peel angle, and deep-water
+steepness into `hollow_plunging`/`steep_crumbly`/`walled_closeout`/`mushy_slow`. Scope-ack
+caught 3 design gaps: (1) brief's "small Hs/d" was unreachable at break points (proven
+mathematically — Hs/d >= gamma by construction); replaced with deep-water steepness
+Hs/L₀ < 0.025. (2) Deep-water L₀ vs local dispersion for regime classification gives
+opposite answers for short-period wind-swell; ruled local `_dispersion()`. (3) Dominant
+partition = largest face_height_m. 20 KATs, 2 mutations caught, 222-test collateral clean.
+
+### D1 — Delete phantom fields ✅ **CLOSED 2026-08-02**
+Dashboard `54b1563` (deployed). Deleted `partitionBreakInfo` + `shadowFaceHeight` render
+code, types, OpenAPI entries, and 13 locale orphaned keys. 16 files, -291 lines. Operator
+ruling: "`waveShapeClassification` is definitely legitimate and is broken" (separate task
+above); the other two were never implemented.
+
+### Transect marker removal ✅ **CLOSED 2026-08-02**
+Dashboard `fc93876` (deployed). Removed BD-9 representative-transect markers from public
+view (HeatMapCard triangle/bold/legend/sr-only/desc + BeachProfileCardBody header).
+Operator: "There is no need to show the transect markers... the user of the site will
+not [know what those are]." 5 files, -43 net lines.
+
+### Beach profile + heatmap chart tier fix ✅ **CLOSED 2026-08-02**
+Dashboard `9aa67a8` (deployed). `selectTier()` used `Math.max` on signed break distances;
+all-negative breaks (-223m, -240m) fell through to Extended tier (1000m). Fix: `Math.abs()`
+on break distances. HeatMapCard got matching tier logic (had none — always full extent).
+Existing tiers (100m/300m/1000m) unchanged per operator ruling. 4 files, mutation-checked.
+
+### 1D transect resolution refinement ✅ **CLOSED 2026-08-02 (operator-approved trigger 3)**
+Marine `f13e475` (deployed 02:11:32Z). Analytical model: PCHIP-interpolated to 1m uniform
+(was ~8.57m CUDEM native). SurfBeat strip: `config.dx` 5.0→0.5m + internal resample
+upgraded from linear to PCHIP. Scope-ack found the brief's literal SurfBeat approach
+(variable-resolution input) would have been silently discarded by SWAN's uniform REG-grid
+constraint — resolved by changing `config.dx` itself. 7 files, 18 KATs, 3 mutations,
+275-test collateral clean. Operator research: "1-5m wave-averaged, 0.2-1m phase-resolving."
+
 ### C2 — D6a re-verify *(G7.1)*  ✅ **CLOSED 2026-08-02 (branch: GONE — already fixed)**
 `l4-rewrite` grep-relocation + lead spot-check: D6a WAS the real bug and was fixed
 2026-07-28 by marine `29eb499` ("iterate StructureConfig.coordinates as attribute, not dict
