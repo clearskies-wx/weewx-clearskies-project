@@ -62,6 +62,35 @@ verification}.md before dispatching; scope-ack before GO; adversarial audit befo
 stash-falsifiability required in closeouts; never full pytest; agents never push/pull; one
 implementation agent at a time in the marine repo.
 
+## ⛔ DECISIONS FOR OPERATOR — running list (autonomous window, 2026-08-03)
+
+Operator stepped away 2026-08-03 ~08:45Z with: "continue with the remainder of the plan items…
+operate autonomously… Log major issues that I need to decide on." Items below are PARKED for
+operator ruling — work continues around them; nothing here is decided by the coordinator.
+
+**Operator discretion directive (chat, 2026-08-03 ~08:50Z):** "just try to use discretion of what
+is truly architectural, and what is really something that is a fix for something already
+previously authorized." Coordinator's operating interpretation for this window: fixes that
+implement/repair an ALREADY-AUTHORIZED design (extending an approved rule uniformly, making code
+match its authorized contract, completing a ruled design) PROCEED with the reasoning recorded;
+changes making a NEW architectural decision (new formula/boundary/responsibility/contract) still
+PARK here. Each discretionary call gets a one-line entry in this file as it's made.
+
+1. **H5 remediation shape** (plan §H5, ⛔ pre-existing): Stage 1 done; Stage 2 ruling outstanding.
+2. **D1 deletion sign-off** (plan §D1): delete dead `_transect_band_depths()` — deletion needs
+   operator sign-off per the plan's own gate (trigger-2-adjacent).
+3. **C-E03 transect-count cap** (plan Phase C carry-forward): no cap exists today; add one or not.
+4. **`CLEARSKIES_MARINE_DEBUG_TRACE=1` in production network.env** (C7a NOTE): keep-or-remove.
+5. **TA-C21 paper-trail residual**: confirm G4.6's invariant-3 rescope was the criterion change
+   you intended (code done either way).
+6. **Operator actions pending**: eyeball admin structure tools on weather-dev (`7a27e3e`);
+   `prjc1`→`PRJC1` in api.conf via admin (V3-F8 residual).
+7. **Smart-L3 disposition**: investigation scoped (handoff wiring + 40 m size criterion);
+   coordinator may RUN the read-only investigation autonomously, ruling stays operator's.
+8. **Wizard-resets-study-area defect** (tracked 2026-08-03): remediation shape undecided.
+9. **V3-F1 mid-forecast wind-coverage hole**: investigation → likely operator for any fix.
+10. *(append as found)*
+
 ---
 
 **Why:** Operator restarted VS Code 2026-08-02 ~21:13Z for permission changes; model selection
