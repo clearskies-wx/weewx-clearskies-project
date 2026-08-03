@@ -790,7 +790,7 @@ Full evidence (file:line for every claim) in the sweep agent's report, session 2
 | TA-C18 | CLOSED: ADR-093 Amendment 4 implemented (signed subaerial + HAT landward stop + shortfall guard) + manual. Live full-tide-cycle sanity → carried in V2-adjacent observation. |
 | TA-C16 | CLOSED: `a68215d` monotonicity + operator V4 ruling (accept-as-is); doc line landed via H3. |
 | TA-C15 | CLOSED: wizard+admin DO send coordinates (routes.py:2972-2983, step_marine.html, admin/marine.html) + API decode `9d1c10a`. Live api.conf durability unverified — minor. |
-| TA-C14 | **STILL-OPEN (real):** forced-full-run on unchanged HRRR cycle still silently no-ops as success (service.py:363/:461-468 clears signal on clean return; 4 DEBUG bare-returns in `_run_all_spots_locked` :2308-2331). → NEW TASK C8 below. |
+| TA-C14 | **CLOSED via C8** (marine `f2b3ce0`, deployed 2026-08-02). `run_all_spots` returns `bool`; `service.py` checks it. 9 no-op paths return `False`, forced runs retry. |
 | TA-C12 | STILL-OPEN as filed (convergence-gate pooling; single-spot HB can't bite; R7.2 narrowed L4 to PT_ tables). Keep parked; revisit at multi-spot. |
 | TA-C11b | CLOSED: header/token match proven statically + real valid_fraction values recorded. |
 | TA-C06 | #3 CLOSED (norm_end positive-completion check, self-citing); #2 stays open-deferred (low reachability, acknowledged). |
@@ -879,11 +879,32 @@ unrelated failures in test_wizard_earthquake_config.py (4) + test_wizard_topolog
 (`topology_defaults(same_host=False)` returns "*" vs expected "0.0.0.0") — NOT C9b's,
 untouched files, tracked here so nobody re-finds them. 3 uncataloged English-only
 microcopy strings noted (matches partial precedent; en-only residual class).
-`clearskies-api-dev`, small scoped round: a forced full run that inner-no-ops (4 DEBUG
-bare-returns in `_run_all_spots_locked`, swan.py:2308-2331) currently clears
-`force_full_run_signal` and reads as success. Fix per the original entry's option list
-(make the no-op loud and/or not clear the signal) + KAT asserting a forced run on an
-unchanged cycle actually executes or fails loudly. Dispatch after H5 deploys.
+### C8 — Forced-full-run false-success fix ✅ **CLOSED 2026-08-02**
+Marine `f2b3ce0` (deployed 22:38:16Z). `_run_all_spots_locked()` + `run_all_spots()`
+now return `bool` (full parity with `run_quick_update`): 9 total no-op paths return
+`False`, success path returns `True`. `service.py` full-run branch checks return:
+`False`+forced → signal kept, WARNING, retry; `False`+non-forced → advance cycle but
+not `last_run_time`, WARNING. 4 config-missing paths upgraded DEBUG→WARNING. 3 existing
+test stubs fixed (falsy `{}` → `True`). Audit PASS 0 findings (295-test sweep, 2
+mutations). Scope-ack caught 6 inner paths (not 4 as originally scoped) + 3 wrapper
+paths; dedup-skip at :2428 ruled `return False`; HRRR-fetch-failure :2364 ruled `return
+False` (already ERROR). Latent finding from NDBC scope-ack: `_is_station_active()` has
+dead 404-status-code branch (ProviderHTTPClient always raises, never returns 404
+response) — tracked for future fix.
+
+### V3-F8 — NDBC station ID case-sensitivity fix ✅ **CLOSED 2026-08-02**
+Marine `02feb1d` (deployed 00:30:44Z). `.upper()` at all 3 URL construction sites;
+negative-cache 404s at 30-min TTL (operator-approved Option A: silent `None` return,
+not raise). PROVIDER-MANUAL §14.1 updated (meta `abbd1e6`). Config fix
+(`prjc1`→`PRJC1`) = operator action via admin UI (pending).
+
+### swellDominance continuous ratio ✅ **CLOSED 2026-08-02**
+Marine `a751c9a` (deployed 00:40:14Z). `swellDominance` on the wire now carries the
+continuous 0.0-1.0 swell/total energy ratio instead of bucketed 0.2/0.6/1.0 scores.
+Internal quality scoring (`org_score`/`org_swell_pts`) still uses the bucketed values
+via new `_swell_dominance_score()`. `_swell_summary_key()` compares ratio thresholds
+directly. 20 KATs, 2 mutations caught. Operator ruling: "zero compute cost — ratio
+already calculated."
 
 ### C2 — D6a re-verify *(G7.1)*  ✅ **CLOSED 2026-08-02 (branch: GONE — already fixed)**
 `l4-rewrite` grep-relocation + lead spot-check: D6a WAS the real bug and was fixed
