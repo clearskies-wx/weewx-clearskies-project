@@ -330,6 +330,40 @@ origin/main. Plan: when all commits are audit-clean, push INCREMENTALLY (git pus
 preserves one-functional-change-per-deploy without history rewriting. C3 (052906f) sits first
 on the branch, so its remediation commit must land BEFORE any push; jacking follow-up ditto.
 
+## DIAG-FETCH CLOSEOUT (negative-fetch + L3 contradiction) — root cause PINNED
+
+**A. Root cause:** `select_hourly_handoff()` (transect_handoff.py L4 branch ~:790-865; L3 branch
+:983-990 identical gap): when the target depth (1.3·Hs/0.73) falls outside the grid's usable
+range it CLAMPS the station pick to the nearest interior station (real depth e.g. 3.27 m) but
+still RETURNS `handoff_depth_m = target_depth_m` (raw 0.85-1.00 m). The same function's BD-2
+branch got exactly this fixed on 2026-08-01 (F1: "returned handoff_depth_m is the selected
+station's own station_depth_m, mirroring T2.2 PART B") — never extended to the plain-clamp case.
+Downstream: `_truncate_bathy_at_handoff()` truncates the 1D profile at the phantom shallow depth →
+on transects with non-monotonic near-waterline DEM (pier-adjacent), the snap point lands
+SUBAERIAL → fetch = bathy[:,0].max() is NEGATIVE → F5's wind_sea_growth raises. Named transects:
+156 (fetch -1.17), 157 (-0.52), latent 160 (-0.04) — all in the clamped structure band T140-161.
+Transect 83's 0.75 m handoff (inv-1 fire) = same phantom-depth class.
+**B.** Kill radius confirmed: ONE try/except around all 162 transects (surf_pipeline_timestep.py
+:544-578); zero per-transect isolation. 2 surviving hours = wind not onshore → F5 skipped.
+**C.** Latent since E5 (2026-07-27); F5 (2026-07-30) is the first input-validating consumer.
+Pre-F5 the phantom depth silently over-truncated the 1D domain (coverage loss, no crash).
+**D. L3 contradiction RESOLVED — not a bug:** two L3 roles. Smart L3 (handoff-source candidate)
+failed viability (bbox ...-118.021...) and is NOT wired into the run path anyway (documented KNOWN
+GAP transect_handoff.py:888-902). Coarse L3 nest (L4 containment, D2 item 1) succeeded (bbox
+33.6413-33.6577 — matches sizing cache) and is what ran as level3_0; containment assertions
+passed. /health's l3_viability_failed = accurate about the smart L3, misleading wording only.
+MINOR tracked: grid_sizing_chain.py:2385-2389 completion log reuses pre-overwrite `n_l3_enabled`
+(stale count); wording gap for the health reason → doc-batch.
+**E. Options:** (i) skip F5 per-transect when fetch≤0 w/ WARNING (methodology, minimal);
+(ii) blanket per-transect catch (rejected by lead: silences future bugs, anti fail-loud);
+(iii) setup-time degenerate-transect validation (design-first, trigger-3 adjacent, parked);
+(iv) ROOT FIX: publish clamped station's real depth whenever clamped (extends the operator-
+approved 2026-08-01 BD-2 rule uniformly; L4+L3 branches) — moves the 1D start depth for ALL
+clamped transect-hours (currently the T140-161 band) → trigger-3 adjacent, OPERATOR ASKED.
+**Lead recommendation to operator:** approve (iv)+(i) together, one round: (iv) fixes the lie
+(the 1D model must start where SWAN actually handed off), (i) guards any residual degenerate
+fetch gracefully per-transect. (iii) parked to geometry-phase work; (ii) rejected.
+
 ## Operator rulings 2026-08-03 (second batch, chat)
 
 - **Jacking follow-up APPROVED ("1. yes. 2. yes"):** (1) decouple same-sample requirement —
