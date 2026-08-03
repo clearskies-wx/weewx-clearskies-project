@@ -1820,6 +1820,8 @@ Each tier is independently wrapped in try/except — failure at one tier does no
 
 SWAN uses only the 4 extended cycles (00/06/12/18Z) to get the full 48-hour HRRR range. GFS wind (§14.16) supplements hours 48–72 to fill the 72-hour surf forecast card. See §14.15 for the blended wind architecture.
 
+**Posting is not atomic.** NOAA posts an extended cycle's forecast-hour files sequentially over roughly 60–90 minutes after the nominal cycle hour, not all at once. A fetch made while posting is still in progress returns only the hours posted so far, and the current code does not verify it received all 49 grids before accepting the cycle as complete — a live journal survey (2026-08-03) found every extended-cycle first fetch partial, ranging 7–31 of 49 grids.
+
 **Extracted variables:**
 
 | GRIB2 parameter | Variable | Description |
@@ -1838,11 +1840,11 @@ Source the exact HRRR Lambert parameters (`lov`, `latin1`, `latin2`) from the GR
 
 Python formula approach preferred (eliminates wgrib2 binary requirement for wind rotation). If wgrib2 subprocess is used, log a clear error if wgrib2 is not found on PATH.
 
-**Cycle fallback:** If the most recent cycle (e.g., 15Z) returns 404 (not yet posted), try the previous cycle (14Z). Log at INFO level which cycle was used.
+**Cycle fallback:** "Posted" is determined by f00 alone — if f00 returns data, the cycle is treated as posted regardless of how many later forecast hours are actually available. The per-hour fetch loop stops at the first 404 *after* f00 and returns whatever hours it collected as a success (logged at DEBUG); the cycle-fallback loop (up to 2 earlier cycles, stepped back 6 h at a time for extended cycles) is reached only when f00 itself 404s. A partially-posted extended cycle is therefore indistinguishable from a fully-posted one and never triggers fallback to an earlier, fully-posted cycle. This fetch-and-fallback behavior is superseded by the approved (not yet built) wind-provider rework — a decoupled gatherer + assembled timeline store tracking per-cycle completeness (`docs/planning/briefs/WIND-PROVIDER-ARCHITECTURE-DESIGN-2026-08-03.md`, approved 2026-08-03) — once implemented.
 
 **Bounding box:** Configurable per marine location. Default: spot coordinates ± 0.2° (configurable via wizard SWAN grid bbox settings).
 
-**Cache:** Key = `(provider_id, bbox_hash, cycle_time)`. TTL = 21600s (6 hours) — matches the extended cycle interval (4×/day at 00/06/12/18Z). Previous TTL was 3300s (55 min) when SWAN ran hourly; now aligned with the 6-hour extended cycle cadence.
+**Cache:** Key = `(provider_id, bbox_hash, cycle_time)`. TTL = 3300s (55 min) (`hrrr.py:101` `_CACHE_TTL_SECONDS`).
 
 **Error handling:** 404 on all attempted cycles → `ProviderUnavailableError`. Network errors → canonical taxonomy. GRIB2 parse error → `ProviderProtocolError`.
 
@@ -1889,8 +1891,8 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 - `run(hrrr_wind_field, gfs_wind_field, ww3_boundary, cudem_bathymetry, tide_predictions, ofs_currents)`: orchestrates the full nested SWAN run (L1 → L2 → L3), returns transect data per spot keyed by spot_id (ADR-095)
 - `_run_level1(tmpdir, blended_wind, ww3_boundary, cudem_bathymetry, wlevel, current)`: runs Level 1 (1 km) SWAN with WLEVEL/CURRENT inputs, writes `NESTOUT` boundary files for Level 2
 - `_run_level2(tmpdir, blended_wind, cudem_bathymetry, wlevel, current)`: runs Level 2 (100 m) SWAN with WLEVEL/CURRENT inputs, writes `NESTOUT` boundary files for Level 3
-- `_run_level3(tmpdir, blended_wind, cudem_bathymetry, wlevel, current, obstacles)`: runs Level 3 (10 m) SWAN with WLEVEL/CURRENT/OBSTACLE inputs, outputs CURVE transect TABLE and the **handoff** SPECOUT/`TABLE PT*` at each unique per-transect handoff cell. *Previously described as "SPECOUT at ~10m depth points"; void — ADR-095 Amendment 2 states the ~10 m reference point does not exist in the current architecture. The deep-water-reference SPECOUT is written by `_run_level2()`, not here.*
-- `_stitch_wind(hrrr_wind_field, gfs_wind_field)`: blends HRRR (hours 0–48) and GFS (hours 48–72) into a single continuous 72-hour wind input
+- `_run_level3(tmpdir, blended_wind, cudem_bathymetry, wlevel, current, obstacles)`: runs Level 3 (40 m) SWAN with WLEVEL/CURRENT/OBSTACLE inputs, outputs CURVE transect TABLE and the **handoff** SPECOUT/`TABLE PT*` at each unique per-transect handoff cell. *Previously described as "SPECOUT at ~10m depth points"; void — ADR-095 Amendment 2 states the ~10 m reference point does not exist in the current architecture. The deep-water-reference SPECOUT is written by `_run_level2()`, not here.*
+- `_stitch_wind(hrrr_wind_field, gfs_wind_field)`: blends HRRR (hours 0–48) and GFS (hours 48–72) into a single 72-hour wind input; continuity is asserted by construction, not verified — a partial HRRR fetch produces a series with missing hours that is passed through unchecked
 - `_write_input_files(tmpdir, wind_field, boundary, bathymetry, grid_level)`: writes SWAN INPUT, BOTTOM.txt, WIND.txt, BOUND_SPEC.txt for a given grid level; returns grid_info dict
 - `_spawn_swan(tmpdir)`: subprocess `swan < INPUT`, captures stdout/stderr, raises `SWANRunError` on non-zero exit or severe errors in Errfile
 - `_check_convergence(tmpdir, grid_level)`: health checks after each SWAN run — PRINT scan for `******`, NaN scan in hotstart/TABLE output, and valid-point fraction check; raises `SWANConvergenceError` on failure (see convergence gate subsection below)

@@ -1191,7 +1191,7 @@ Surfaces the surf scoring system (`enrichment/surf_scorer.py`). Data sources fro
      - **Score:** time buttons + 0-100 score (colored by star-tier mapping via `scoreTierColor`, not raw percentage)
      - **Current Conditions:** WeatherIcon + air temp (with unit) + precip % + WindSymbol + wind quality label (text wraps to second line, row height 34px for long labels like "Cross-Offshore") — all time-matched from `useForecast({ hours: 72 })`
      - **Swells (T5.4):** water temp (1 decimal, with unit) + swell height area chart (smooth cubic bezier curve, blue fill `#3b82f6`, Y-axis 0–12 ft minimum with auto-scale, gridlines at 3 ft intervals, 140px height) + **Surf Height row** (bold foreground, face/Hawaiian height from `getDisplayHeight`; label renamed from "Swell Height" in T5.4) + **Swell Height row** (muted foreground, raw offshore SWAN Hsig from `entry.swellHeight`; new row in T5.4) + dom direction + period + energy + **Set Timing row** (when SurfBeat enabled: `setTimingMinutes` at each timestep; intermediate hours show carried-forward value at 3-hour resolution — not interpolated, visually identical. Hidden when SurfBeat disabled.)
-   - Swell height chart line is continuous across day boundaries (unified Y-axis scale across all days)
+   - Swell height chart line is continuous across day boundaries (unified Y-axis scale across all days) — continuity holds only when the served data itself has no gaps; missing timesteps render as gaps in the line, since the chart adds no interpolation of its own
    - Click any time column to expand a detail panel below with chip data and swell component breakdown
 9. **Tide Forecast** — `Card footprint="full"` with `TideChart`
 

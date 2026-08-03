@@ -44,13 +44,13 @@ NESTOUT 'sname' 'fname' OUTPUT [tbeg] [delt] SEC|MIN|HR|DAY
 
 2. **Resolution mismatch effects:** The NGRID resolution determines how many boundary spectral points are written. Coarser NGRID → fewer boundary points → SWAN interpolates between them for the child. A parent-side NGRID with ~5-10 boundary points per child-grid side is adequate. There's no need for 1:1 resolution matching.
 
-3. **Nesting ratio guidance (§3.5):** The SWAN manual recommends nesting ratios of 2-3x (e.g., 300m parent → 100m child). Our system uses:
-   - Level 1 (1km) → Level 2 (100m): **10:1 ratio** — exceeds recommendation
-   - Level 2 (100m) → Level 3 (10m): **10:1 ratio** — exceeds recommendation
+3. **Nesting ratio guidance:** No SWAN manual section states a nesting-ratio recommendation — checked directly against `docs/reference/swan-user-manual.txt` (no §3.5 nesting-ratio guidance exists there; Chapter 3 is "Input and output files"). The 2-3x figure below is unsourced community/practitioner guidance (e.g., 300m parent → 100m child), not a manual citation. Our system uses:
+   - Level 1 (1km) → Level 2 (100m): **10:1 ratio** — exceeds the 2-3x guideline
+   - Level 2 (100m) → Level 3 (40m): **2.5:1 ratio** — meets the 2-3x guideline
 
 4. **Consequences of high nesting ratios:** The primary risk is that the parent grid's coarse resolution doesn't resolve bathymetric features that matter at the child scale. Wave refraction and shoaling over unresolved features in the parent produce incorrect boundary spectra. For our use case, this is mitigated by:
    - Level 1→2: The parent (1km) covers the continental shelf where bathymetry is relatively smooth. The 10:1 jump is acceptable because there are few sharp bathymetric features at the shelf scale.
-   - Level 2→3: The parent (100m) covers the nearshore where sandbars and reefs exist at scales < 100m. The 10:1 jump means these features are absent from the Level 2 solution. This is a known limitation — the Level 3 grid resolves them locally but the boundary conditions from Level 2 don't account for them.
+   - Level 2→3: The parent (100m) covers the nearshore where sandbars and reefs exist at scales < 100m. At a 2.5:1 ratio this is a known but reduced limitation — the Level 3 grid resolves those features locally but the boundary conditions from Level 2 don't account for them.
 
 **Implications for our code:**
 - The high nesting ratios are acceptable for a first implementation but produce less accurate results than 3:1 nesting

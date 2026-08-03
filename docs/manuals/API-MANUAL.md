@@ -1822,7 +1822,7 @@ The following current-conditions systems are preserved intact. The GFE engine do
 
 NWS 6am/6pm fixed periods in the operator's local time. "Today" = 6am–6pm, "Tonight" = 6pm–6am. Sunrise/sunset are used for day/night VOCABULARY selection only (e.g., cloud cover < 25% produces "Sunny" during daytime and "Mostly Clear" at nighttime). Sunrise/sunset do NOT define period boundaries.
 
-72 hourly forecast points aggregate into 6 `ForecastPeriod` instances: Today, Tonight, Tomorrow, Tomorrow Night, weekday, weekday Night.
+72 hourly forecast points is the intended full window, not a guarantee — fewer points are aggregated when upstream coverage is short. Whatever points are available aggregate into 6 `ForecastPeriod` instances: Today, Tonight, Tomorrow, Tomorrow Night, weekday, weekday Night.
 
 ### Forecast input traceability
 
@@ -3002,7 +3002,7 @@ The NWS SRF text product's `waterTemp` field (a manually-entered forecaster valu
 
 **`scoring` fields (ADR-096):** `waveHeight` (out of 35), `wavePeriod` (out of 35), `waveOrganization` (out of 30), `organizationWind`, `organizationSwellDominance`, `organizationDirectionalSpread`, `organizationCrossSwell` (sub-factors), `beachAlignment` (signed penalty), `directionalExposure` (signed penalty), `timeOfDay` (signed bonus/penalty).
 
-SWAN always produces multi-timestep output. The dashboard's 72-hour forecast chart shows `breakingFaceHeight` (or `breakingHawaiianHeight` per operator config) — not `swellHeight` or `waveHeightAtBreak`.
+SWAN is designed to produce multi-timestep output, but the timestep range is bounded by upstream wind coverage — a wind-coverage gap produces fewer timesteps than the full window. The dashboard's 72-hour forecast chart shows `breakingFaceHeight` (or `breakingHawaiianHeight` per operator config) — not `swellHeight` or `waveHeightAtBreak`.
 
 ### Beach profile endpoint (ADR-097, corrected 2026-07-25)
 
