@@ -3291,7 +3291,6 @@ The marine service never parses `api.conf` directly. This ensures the API remain
             "0": {
               "type": "jetty", "material": "impermeable",
               "length_m": 120.0, "bearing_degrees": 45.0, "distance_m": 300.0,
-              "bearing_to_spot_degrees": 90.0,
               "coordinates": [[-77.7964, 34.2085], [-77.7960, 34.2090]]
             }
           }
