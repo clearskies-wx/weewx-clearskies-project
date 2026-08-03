@@ -1618,6 +1618,34 @@ The API-side dataclass (`ProviderAttribution`) lives in `providers/_common/capab
 
 ---
 
+## §12a Imagery Endpoints (Phase LM, 2026-08-03)
+
+Orthophoto imagery for display backgrounds (PROVIDER-MANUAL §16 for the provider modules and the
+DISPLAY-ONLY hard rule). Two endpoints, `endpoints/imagery.py`, wired via
+`wire_imagery_settings()` (radar mirror):
+
+**`GET /api/v1/imagery/config?lat=&lon=`** → 200
+`{provider: "naip"|"esri", tileUrl, attribution, proxyMode: "api"|"direct", bounds: {south,west,north,east}|null}`.
+NAIP: `tileUrl = "/api/v1/imagery/tiles/{z}/{x}/{y}"` (our proxy path, never the upstream USGS
+URL), `proxyMode: "api"`, `bounds = CONUS_BOUNDS`. ESRI: `tileUrl` = the ESRI XYZ template,
+`proxyMode: "direct"`, `bounds = null`. No `[imagery]` config / `provider` unset → 404
+problem+json. Params model `ImageryConfigQueryParams` (lat ±90, lon ±180, `extra="forbid"`).
+Response model `ImageryConfigResponse` — **flat shape, not the usual data+envelope wrapper**
+(intentional deviation per the plan's pinned contract sketch; noted in the model docstring).
+
+**`GET /api/v1/imagery/tiles/{z}/{x}/{y}`** → binary tile (Content-Type from upstream,
+`image/png`). NAIP only — `[imagery] provider` absent or `esri` → 404 (ESRI tiles never
+transit the API). Input validation (amplification-surface guard, lead-ruled 2026-08-03):
+`z` Path-constrained [0, 20] → 422 outside; `x`/`y` validated against `[0, 2**z)` → 400
+outside; the upstream host/path is a constant — only validated integers feed the bbox math.
+Error mapping: upstream 429 → 503 + Retry-After; upstream 404 → 404; other upstream 4xx/5xx →
+502.
+
+**`api.conf [imagery]`:** `provider` (`auto` | `naip` | `esri`; absent = domain disabled),
+`api_key` (future-proofing, unused v1), `tile_cache_ttl_seconds` (default 604800).
+
+---
+
 ## §13 Anti-Patterns
 
 Never do any of the following.

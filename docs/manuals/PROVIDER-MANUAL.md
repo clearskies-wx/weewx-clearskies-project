@@ -2718,3 +2718,49 @@ All NOAA marine data sources are public domain — attribution is recommended bu
 ### Source ADR
 
 §15 is governed by ADR-099 (marine service separation — pending user acceptance as of 2026-07-22). The module-level implementation details (fetch interfaces, error taxonomy, cache rules, test patterns) are unchanged from §14 and continue to be governed by the ADRs listed in §14's "Source ADRs" section.
+
+---
+
+## §16 Imagery Providers (Phase LM, 2026-08-03)
+
+General-purpose orthophoto imagery for display backgrounds (first consumer: the marine heatmap's
+geographic-context underlay, MARINE-FORWARD-PLAN Phase LM). **HARD RULE: imagery is DISPLAY-ONLY —
+nothing in this domain may feed SWAN, the 1D model, transect selection, or any physics path.**
+
+Two providers, deliberately asymmetric in data flow (operator-directed design 2026-08-02):
+
+### §16.1 NAIP (US orthophotos — API proxies + caches)
+
+**Module identity:** `providers/imagery/naip.py`, `PROVIDER_ID = "naip"`, `DOMAIN = "imagery"`.
+**CAPABILITY:** `geographic_coverage = "CONUS"` (lat 24.396308–49.384358, lon −125.0–−66.93457,
+documented constant `CONUS_BOUNDS`), `auth_required = []`. Public domain, keyless.
+
+**Upstream is DYNAMIC, not tiled** (live-verified 2026-08-03: `exportTilesAllowed:false`, no
+`tileInfo`): `https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer` —
+tile bytes come from `exportImage` with a Web-Mercator bbox computed from slippy z/x/y
+(`_tile_to_web_mercator_bbox()`), 256×256 PNG. See the USGS dynamic-vs-cached FAQ cited in the
+module docstring. Polite-use `RateLimiter` 5 req/s. Tiles cached via the ADR-017 pluggable cache
+(base64 envelope), TTL `[imagery] tile_cache_ttl_seconds`, default 604 800 s (7 days) — static
+imagery. Cache key spans (z, x, y), TTL-independent.
+
+### §16.2 ESRI World Imagery (global — config-only, browser-direct)
+
+**Module identity:** `providers/imagery/esri.py`, `PROVIDER_ID = "esri"`, `DOMAIN = "imagery"`.
+**CAPABILITY:** `geographic_coverage = "global"`, `auth_required = []` (non-commercial use).
+**The module has NO HTTP client at all** — it only returns configuration: the XYZ template
+`https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`
+(live-verified `tileInfo`: cached, 256 px, JPEG, zoom 0–23) and the attribution string taken
+verbatim from the live service `copyrightText` ("Source: Esri, Vantor, Earthstar Geographics,
+and the GIS User Community"). The browser fetches ESRI tiles directly; they never transit the
+API (terms-of-service posture: no proxying, no caching, attribution required and served on the
+config wire for the dashboard to render).
+
+### §16.3 Selection, endpoints, config
+
+Per-request auto-selection (NOT an operator single-pick like other domains): `[imagery]
+provider = auto` → NAIP when the requested lat/lon is inside `CONUS_BOUNDS`, else ESRI;
+`naip`/`esri` force one; key absent → domain disabled (`/imagery/config` 404s). `api_key` is
+stored-and-passed future-proofing only (unused at v1). Both modules ARE registered in
+`providers/_common/dispatch.py` and the capability registry (the flat dispatch dict accommodated
+the two-module auto-selected domain without distortion — §1's convention holds; no exception
+needed). Endpoint wire detail: API-MANUAL §12a.
