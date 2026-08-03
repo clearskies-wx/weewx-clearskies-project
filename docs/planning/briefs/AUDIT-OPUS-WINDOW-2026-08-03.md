@@ -1,5 +1,59 @@
 # Opus-window audit — 2026-08-03
 
+## ═══ RESUME HERE (written pre-compaction, 2026-08-03 ~07:45Z) ═══
+
+**Role:** Coordinator (Fable). **Mission:** finish the Opus-window remediation queue, then resume
+MARINE-FORWARD-PLAN (C4 → C7 → Phase LM). Operator grants this session: push/deploy for testing;
+TIP-deploy strategy DELEGATED to coordinator ("whatever you think is best").
+
+**Marine repo:** deployed = `2e67966`; local = 7 unpushed audited commits `052906f → 53d10d2 →
+46d55e0 → 7be3c9e → 33dd56b → 4db71c6 → 370e142` (ledger below; ALL adversarially audit-clean
+except 53d10d2 whose two follow-ups are the fix-jacking2 round).
+
+**IN FLIGHT at compaction (background agents — results arrive as task notifications):**
+1. `fix-jacking2` (clearskies-api-dev, GO given): _compute_jacking decoupling (peak within ±window
+   of crest, NOT same sample) + constants 10 m/50 m + edge clamp; allowlist surf_1d_analytical.py
+   `_compute_jacking`+constants + tests/test_jacking_resolution.py; ONE commit; closeout must have
+   stash falsifiability (offset-extrema KAT: 0 detections at 1 m pre-change) + per-test ledger.
+2. `diag-fetch` (read-only investigation): (A) negative-fetch crash — wind_sea_growth ValueError
+   (fetch_m=-0.52, depth 0.98 m) at surf_1d_pipeline.py:1457 F5 path kills whole spot-hours
+   (29/31 unavailable live NOW); which transect, why, remediation options w/ trigger classification;
+   (B) L3 viability contradiction — 06:12:31 log "FAILED, unreachable ~235 m, disabled" vs sizing
+   cache carrying L3/L4 clusters (different bbox) vs run executing L3+L4 fine.
+
+**NEXT STEPS in order (after those two land):**
+1. Accept fix-jacking2 (independent test run + stat), surface diag-fetch findings to operator →
+   likely one ruling on the negative-fetch remediation shape → dispatch that fix round.
+2. Lead-direct: marine-side `bearing_to_spot_degrees` deletion (marine_config.py ~:337 annotation,
+   ~:354 decode, ~:379-386 validate + tolerance KAT — mirror API repo commit `858279b` pattern).
+3. Adversarial audit (one auditor) of fix-jacking2 + fetch-fix commits.
+4. TIP push (`git push origin main`, operator-delegated) + `scripts/deploy-marine.sh` + post-deploy
+   battery: journal sweep (new ERROR classes), publish-liveness, reality gate PRE-STATED: served
+   Hs vs NDBC 46222 matched hour, tolerance ±30%; verify jackingFactors non-empty if bars exist;
+   verify 29/31-unavailable is cured; C3 fill runtime measured (AUD-C3 F3 evidence).
+5. Doc-batch (meta): swellDominance truth ×4 (API-MANUAL:2049, api responses.py:1672 comment is
+   API-repo, dashboard openapi:3243, contracts openapi:3484), wave_transform.py:39-45 false
+   docstring, PROVIDER-MANUAL §14.15 fetch()-returns-8-keys row, §14.9 missing coordinates field.
+6. Operator actions pending: eyeball admin structure tools on weather-dev (Discover + Draw,
+   deployed `7a27e3e`); prjc1→PRJC1 in api.conf via admin (V3-F8 residual).
+7. Then plan queue: C4 (modelStatus grading, ruled thresholds in plan §C4) → C7 → Phase LM (ortho).
+8. Lessons capture at close (CLAUDE.md routing): model-selection check on session start; silent
+   DEBUG no-publish paths; vacuous KAT shapes; per-unit exception isolation pattern.
+
+**Live system state at compaction:** marine /health degraded (persisted l3_viability_failed reason
++ possibly stale — see diag-fetch B); 06z full run COMPLETE (L1-L4 converged, L4 vf 100%, pier
+shadowing 23/162, inv-7 QUIET post-cycle) but 29/31 served hours modelStatus=unavailable from the
+negative-fetch crash (PRE-EXISTING defect exposed by new geometry, NOT our commits). Dashboard =
+fc93876, stack = 7a27e3e (both deployed). Monitor on marine journal may lapse — re-arm with the
+ABSOLUTE ssh config path (c:/CODE/weather-belchertown/.local/ssh/config).
+
+**Hard rules refresher for post-compaction self:** read CLAUDE.md + rules/{coordinator,agents,
+verification}.md before dispatching; scope-ack before GO; adversarial audit before round close;
+stash-falsifiability required in closeouts; never full pytest; agents never push/pull; one
+implementation agent at a time in the marine repo.
+
+---
+
 **Why:** Operator restarted VS Code 2026-08-02 ~21:13Z for permission changes; model selection
 silently reverted to Opus 4.6. All work coordinated 2026-08-02T21:13:31Z → 2026-08-03T05:29:34Z
 (session `5051fc94`) is under mandatory re-audit before further plan execution
@@ -221,6 +275,97 @@ candidate (second occurrence per operator: "that was a problem before").
 - Breaking parameter check queued after resolution change ("let's check... whether that may also be set too high") — NOT yet done; tracked.
 - LM: ortho imagery design (NAIP proxied+cached via API/dashboard proxy chain; ESRI direct-browser; wizard/admin provider config). Operator corrected Opus twice: API is NOT public — NAIP tiles go browser→dashboard proxy→API; marine service is on librewxr.
 - Post-compaction Opus failed to retain architecture; operator ordered re-read of ARCHITECTURE.md before continuing plan.
+
+## Jacking remediation status (2026-08-03)
+
+- `53d10d2` (local, unpushed): _compute_jacking metre-based windows + dedupe. Lead gate PASSED
+  (allowlist exact, 9 KATs + 60 collateral green, coordinator independent probe: no false
+  negatives on smooth profiles; BONUS confirmed — old code diluted factors toward 1.0 at fine
+  spacing [1.84→1.00]; new code stable [1.84→1.64]).
+- AUD-NUM re-verification vs its own F1 repro: **PARTIAL**.
+  - FIXED: resolution collapse for coincident-extremum bars (control: 1 detection at every
+    spacing 8.57→0.5 m) + factor dilution.
+  - NOT FIXED (2nd, PRE-EXISTING defect, masked at native res): `_compute_jacking` requires
+    Hs-peak AND depth-trough at the SAME array index. Real/synthetic profiles offset the two by
+    ~metres (auditor's: 3.9 m); native 8.57 m quantization coincidentally merged them, 1 m
+    resolves them to different indices → 0 detections. Likely bites REAL 1 m profiles in
+    production. Candidate fix (OPERATOR DECISION, trigger-1 criterion change): decouple — bar
+    (depth-trough) candidate + Hs peak within the ±8.57 m window, not same sample. Docstring's
+    own intent ("local Hs peak before breaking" at "each bar crest") supports proximity.
+  - NEW REGRESSION (c1, introduced by 53d10d2): full-window-fit gate silently drops bars within
+    8.57 m of profile ends; OLD code degraded gracefully with partial windows (detected 1.377 on
+    a 30 m truncated profile; new: 0). Real case: short handoff-truncated transects. Candidate
+    fix: clamp windows at array edges (restores old graceful degradation) — methodology.
+- HOLD jacking deploy until follow-up ruled + landed; deployed prod still has the original
+  (fully broken) jacking, so no live regression from holding.
+
+## Remediation round ledger (2026-08-03, running)
+
+| Round | Commit | Lead gate | Adversarial | Status |
+|---|---|---|---|---|
+| bearing_to_spot deletion (API) | api `858279b` | PASS (my run 9/9, stat exact, grep 0) | **PASS**, 1 MINOR (API-MANUAL:3294 example) → fixed lead-direct, meta committed | **CLOSED** (deploy rides next api push) |
+| Jacking fix (marine) | `53d10d2` | PASS | PARTIAL (aud-num re-verify) — 2 follow-ups, deploy HELD | Open: operator ruling on same-index decoupling; edge-clamp fix queued |
+| Livelock fix (marine) | `46d55e0` | PASS (my run 14/14, stat exact) | **PASS 0 findings** (1 NOTE: "no-publish-skip:" prefix ≠ record_no_publish contract — intentional, KAT-pinned). Auditor's mutation pinned BEHAVIOR (return-False-with-log → KAT fails), stronger than implementer's TypeError evidence. Ruled out: double-run storm (marker rewrite unconditional), sub-5-min hot loop (unconditional sleep on every exit), log-order race (synchronous). Pre-existing residual noted: force_full_run_signal is an Event, a 2nd concurrent push during a forced run could coalesce — NOT worsened, tracked. | **AUDIT-CLEAN** (deploy pending stack order) |
+| Period-0 guard (marine) | `7be3c9e` | PASS (my run 23/23, stat exact; pre-fix ZeroDivisionError repro via stash) | pending (batch with next marine audit) | Landed |
+| NaN guard (marine) | — | — | — | Implementing (GO given) |
+| Admin parity (stack) | `7a27e3e` | PASS (my run 25/25, stat exact) | **PASS**, 2 MINOR both INHERITED from wizard (F1: type/material/material_source data-attrs unescaped — real breakout primitive, proven, but unreachable via API's fixed maps; F2: `_marine_esc` lacks quote-escaping). → tracked hardening item BOTH surfaces (wizard routes.py:3397-3399 + admin routes.py:3020-3025 + widen _marine_esc), future round. Known limitation disclosed: admin map doesn't re-paint saved structure geometry on reload (paint step = candidate follow-up). | **CLOSED** — deploying to weather-dev |
+| NaN guard (marine) | `33dd56b` | PASS (my run 25/25; bonus: pre-fix silently DROPPED distance-NaN rows) | **PASS** (aud-batch; MINOR: guard's own astype crashes on dtype=object-with-strings — unreachable via all 3 real call sites, tracked residual) | **AUDIT-CLEAN** |
+| C3 merge remediation (marine) | `4db71c6` | PASS (my run 8/8; KAT-a proven to fail pre-fix) | **PASS** (aud-batch; extra adversarial shapes incl. a real randomized 6-way collision handled correctly where old code silently botched it; MINOR: test-file labels stale → fixed lead-direct `370e142`, comment/msg strings only, 8/8 green) | **AUDIT-CLEAN**; PROVIDER-MANUAL synced (`0c621e3`) |
+| Period-0 guard (adversarial) | `7be3c9e` | (above) | **PASS** (aud-batch; other _dispersion callers confirmed different period source, unexposed; 0.1 s classifies; mutation kills 2/23) | **AUDIT-CLEAN** |
+
+**Marine branch state (7 local commits, ALL adversarially audited except 53d10d2's two follow-ups):**
+052906f → 53d10d2 → 46d55e0 → 7be3c9e → 33dd56b → 4db71c6 → 370e142.
+**Deploy-strategy decision for operator:** the branch is linear and fixes stack on their defects
+(C3's fix is 5 commits after C3; jacking's follow-up will be at the tip) — every pre-tip deploy
+point carries a known-defective intermediate state, so strict one-functional-change-per-deploy
+is IMPOSSIBLE without history rewriting. Coordinator recommendation: single TIP deploy after the
+jacking follow-up lands, with full journal sweep + reality gate; deviation from deploy-discipline
+rule #1 justified by: every change individually adversarially audited w/ falsifiability evidence,
+attribution preserved by the per-commit audit trail. Operator to approve/deny.
+
+**Marine deploy-ordering note:** local marine branch is linear 2e67966 → 052906f (C3, needs
+remediation) → 53d10d2 (jacking, held) → 46d55e0 (livelock) → …; deploy-marine.sh pulls
+origin/main. Plan: when all commits are audit-clean, push INCREMENTALLY (git push origin
+<sha>:main one commit at a time) with a deploy + journal sweep + reality gate between each —
+preserves one-functional-change-per-deploy without history rewriting. C3 (052906f) sits first
+on the branch, so its remediation commit must land BEFORE any push; jacking follow-up ditto.
+
+## Operator rulings 2026-08-03 (second batch, chat)
+
+- **Jacking follow-up APPROVED ("1. yes. 2. yes"):** (1) decouple same-sample requirement —
+  Hs peak qualifies within ±window of the bar crest; (2) window constants 10 m extremum /
+  50 m approach (one / five L4 cells; operator asked why 8.57 — answer: it was a fidelity
+  constant, not physics; 10/50 remain provably native-equivalent). Round dispatched
+  (`fix-jacking2`): decoupling + 10/50 + edge-clamp (aud-num c1) in one commit.
+- **Deploy strategy DELEGATED ("whatever you think is best")** → coordinator proceeding with
+  single TIP deploy after fix-jacking2 + negative-fetch remediation land, full journal sweep +
+  reality gate; deviation from one-change-per-deploy documented here (linear branch, fixes
+  stack on own defects, every commit individually adversarially audited w/ falsifiability).
+
+## FIRST 162-TRANSECT FULL RUN (06z, completed 07:17:45Z) — verdict MIXED, new live defect
+
+**Good:** forced run executed once 06z rolled the dedup key; L1 100% / L2 99.6% / L3_0 99.5% /
+L4_0 99.9% + valid_fraction 100% (pre-incident baseline matched); 23 structure-affected/139 open
+every transect computation; **invariant 7 QUIET post-cycle (0 fires)** — spectral_dwr channel
+restored; no new ERROR classes post-cycle other than the below; run 867 s, 1/1 spots cached.
+
+**NEW LIVE DEFECT (pre-existing latent, exposed by the redrawn geometry — NOT from our unpushed
+commits; deployed=2e67966):** 1D pipeline raises per-timestep:
+`wind_sea_growth: fetch_m and depth_m must both be > 0 (got fetch_m=-0.52, depth_m=0.979...)`
+via surf_1d_pipeline.py:1457 `compute_wind_sea_growth(_onshore, _fetch, handoff_depth)` on the
+F5 wind-sea-synthesis path (onshore wind 1.2 m/s @ 239°, seed Tp 0.3 s). Per-timestep catch
+(surf_pipeline_timestep.py:555 region) converts ONE degenerate transect → whole spot-hour
+`modelStatus=unavailable`. Served: 31 entries, 29 unavailable, 2 ok. Same kill-radius class as
+the period-0 BLOCKER. Negative fetch + ~1 m handoff depth suggest a degenerate transect at the
+new segment's south end (handoff nearly beached / landward of datum).
+
+**UNRESOLVED CONTRADICTION (same investigation):** 06:12:31 sizing: "L3 viability FAILED —
+structure unreachable by ~235 m (bbox 33.630-33.655 × -118.021--118.004); L3 disabled" +
+"0 of 1 clusters enabled" + persisted /health reason. YET swan_grid_sizing.json (06:12 mtime)
+carries level3_clusters + level4_clusters (L4 corners rotated 216.95°), and the 07:0x run RAN
+level3_0 + level4_0 to convergence with structure effects served. Which decision governed, and
+is the ~235 m unreachability computed against the RIGHT grid? Ties into the operator's standing
+design concern: structures just outside the drawn study area must still shadow into it.
 
 ## Operator rulings 2026-08-03 (post-synthesis chat)
 
