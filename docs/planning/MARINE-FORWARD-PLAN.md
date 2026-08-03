@@ -381,7 +381,13 @@ pattern — a green test pinning a defective value); verify allowlists vs `git s
 
 ## PHASE D — Small high-value fixes from the break-detection rounds
 
-### D2 — Repair `test_serve_nothing_on_failure.py` (2 pre-existing failures) — **DO FIRST**  ⬜
+### D2 — Repair `test_serve_nothing_on_failure.py` (2 pre-existing failures) — ✅ **CLOSED 2026-08-03 (verified already-fixed — the C2 pattern)**
+Coordinator pre-dispatch verification found the premise stale: **9/9 pass at HEAD `0946ed8`**
+(independent run). Fix landed 2026-08-01 19:33 PT as marine `e8646d2` ("test(marine): D2 fix
+stub missing open_water_bearing_deg…"), 1 file / 1 insertion, test-only — guard code untouched
+(stat-verified). Predates the Opus window (started 2026-08-02 21:13Z), so no re-audit exposure.
+Plan row was never flipped when the fix landed; closed on verification evidence, no dispatch
+needed.
 **Owner:** `clearskies-test-author` (Sonnet). **QC:** auditor at Gate D.
 The two failures (`AttributeError: 'SimpleNamespace' object has no attribute
 'open_water_bearing_deg'`, broken since `51543b1`) mean the serve-nothing GUARD — load-bearing
