@@ -91,6 +91,18 @@ PARK here. Each discretionary call gets a one-line entry in this file as it's ma
 9. **V3-F1 mid-forecast wind-coverage hole**: investigation → likely operator for any fix.
 10. *(append as found)*
 
+**Discretionary calls made under the directive (running):**
+- **2026-08-03 ~09:00Z, fetch-fix round:** authorized fixing the `clamped` flag to match its own
+  documented contract (comment: "clamped means the target genuinely wanted the real grid edge,
+  not that a break zone happened to limit the search" — implementation computed the check over
+  the BD-2-restricted prefix instead of the full range). Exposure: `max_seaward_break_index ==
+  n-1` + below-grid target → phantom depth leaked through BOTH the clamp and BD-2 conditions.
+  Classification: code-diverges-from-own-stated-contract (explicitly permitted fix class) +
+  same authorized publish-real-depth rule extended to one more constrained-selection corner.
+  Selection logic untouched. KAT-7 pins the corner with stash falsifiability. Found via
+  fetch-fix agent's KAT-6 unreachability analysis; leak derivation verified by lead code-read
+  and independently re-derived by the agent before implementing.
+
 ---
 
 **Why:** Operator restarted VS Code 2026-08-02 ~21:13Z for permission changes; model selection
