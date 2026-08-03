@@ -1188,7 +1188,16 @@ code.
 **Accept:** dev-site `/api/v1/imagery/config` returns correct provider config for HB
 coordinates; NAIP proxy serves a recognizable tile of Huntington Beach.
 
-### LM-2 — Dashboard: heatmap ortho background rendering  ⬜
+### LM-2 — Dashboard: heatmap ortho background rendering  ✅ **CLOSED 2026-08-03 — deployed to weather-dev; OPERATOR EYEBALL PENDING**
+Dashboard `fed72f8` (9 files, 49 tests, tsc clean). Audit (aud-lm23): **PASS, 0 findings** —
+4 mutation probes incl. proving `normalizeReactIds()` cannot mask a real DOM change (0.3→0.31
+caught through it); MUST-NOT-TOUCH held; no new npm dep; 1 non-blocking coverage note (KAT (c)
+doesn't pin exact tile x/y values; implementation code-review-verified). DASHBOARD-MANUAL §7
+synced. **EYEBALL ITEMS (operator):** mosaic is north-up UNROTATED bounding-circle stretch —
+NOT rotated to beach facing, not per-cell warped (consistent with the card's quasi-2D framing);
+pier/guard-tower orientation may read sideways until a rotation refinement; tuning constants
+(tile cap, zoom clamp, overlay opacity 0.55) in one block at HeatMapCard.tsx ~:155-190. Expect
+a tweak round. Tracked: generated-types.ts not regenerated (codegen artifact unused in src/).
 **Owner:** `clearskies-dashboard-dev` (Sonnet). **QC:** auditor (axe row included).
 **Blocked on:** LM-1 deployed.
 **Change (HeatMapCard only):** (a) on mount, fetch `/api/v1/imagery/config` for the spot's
@@ -1209,7 +1218,16 @@ fetch layer for surf data.
 data; operator eyeball-confirms the pier and beach features are visible and correctly
 aligned with the transect grid; attribution displays.
 
-### LM-3 — Config UI: imagery provider admin section  ⬜
+### LM-3 — Config UI: imagery provider admin section  ✅ **CLOSED 2026-08-03 — deployed to weather-dev (both surfaces)**
+Stack `159731d` (9 files, 16 tests). Audit (aud-lm23): **PASS, 0 findings** — XSS breakout
+probe through the real handler confirmed Jinja autoescape on the api_key echo (both surfaces);
+allowlist-diff mutation-verified; `_PROVIDER_DOMAINS` exclusion reasoning verified against
+code (that path would silently drop api_key from display); wizard/admin provider parity traced
+end-to-end. Shipped TOGGLE-LESS per decision item 11 (attribution renders unconditionally —
+operator ruling pending on dropping the plan's toggle permanently). Wizard re-run pre-fill
+fixed API-side lead-direct (`b369ee6`, deployed). Tracked: wizard-path api_key drop
+(_provider_secrets() gap, unused v1). Pre-existing failures surfaced (untouched): earthquake
+wizard ×4, registry branding field-count.
 **Owner:** `clearskies-dashboard-dev` (Sonnet, stack repo). **QC:** auditor at gate.
 **Change:** new "Imagery" section in the admin panel (wizard/admin parity applies per
 operator ruling 2026-08-02): (a) provider dropdown (NAIP / ESRI / Auto — Auto = NAIP for
