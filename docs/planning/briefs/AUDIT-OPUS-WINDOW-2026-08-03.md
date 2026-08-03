@@ -385,6 +385,14 @@ for such future spots. Deletion would be architectural (trigger 2) and needs a d
 investigation first. TRACKED plan item: "smart-L3 disposition — investigate vestige-vs-future
 before any ruling." Near-term: doc-batch fixes the misleading /health wording + stale
 n_l3_enabled summary count.
+**Operator guidance for that investigation (chat 2026-08-03):** today's handoff is strictly
+L2/L4 — activating smart L3 for topographic-feature spots would require WIRING an L3 handoff
+path (the documented unwired gap becomes real work, not just a flag). And because L3 is a 40 m
+grid, the qualification criterion must be size-aware: only features large enough for 40 m to be
+the appropriate resolution belong in that category — the current `l3_enabled=auto` trigger list
+(point_break/headland/bay_break) should be re-examined against that bar (a small point break
+does not warrant a 40 m grid). Both points scope the investigation: (1) what wiring would an L3
+handoff need; (2) what feature-size threshold qualifies; (3) only then vestige-vs-future ruling.
 
 ## Operator rulings 2026-08-03 (second batch, chat)
 
