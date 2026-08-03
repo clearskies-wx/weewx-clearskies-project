@@ -89,7 +89,20 @@ PARK here. Each discretionary call gets a one-line entry in this file as it's ma
    coordinator may RUN the read-only investigation autonomously, ruling stays operator's.
 8. **Wizard-resets-study-area defect** (tracked 2026-08-03): remediation shape undecided.
 9. **V3-F1 mid-forecast wind-coverage hole**: investigation → likely operator for any fix.
-10. *(append as found)*
+10. **Invariant 4 recalibration (NEW 2026-08-03, post-tip-deploy):** `4:distinct_handoff_depths_
+    across_transects` now fires EVERY timestep in the low-Hs regime ("only 1 distinct handoff
+    depth across 162 transects"). Root cause verified in journal: all 162 transects clamp
+    (target ~1.0 m below grid floor) and the L4 station ladder carries COMMON depth values
+    across transects (stations 22/23/24 all depth=3.27 m, boundary 2.82 m everywhere) — so one
+    distinct depth is the TRUE clamped state. The invariant was calibrated against the phantom
+    per-transect-varying depths the operator-approved d0d0077 fix removed; it can no longer
+    distinguish legitimate uniform clamping from the scalar-uniform bug class it exists to
+    catch. Consequence: /health shows degraded on every low-Hs cycle (standing false alarm;
+    truthful data underneath). **Coordinator recommendation:** gate the invariant on the clamped
+    flag — don't fire when all contributing transects' HandoffSelections are clamped (the
+    uniformity is then explained); still fire when uniform WITHOUT uniform clamping. This is a
+    verification-criterion change → parked for your ruling, not made under discretion.
+11. *(append as found)*
 
 **Discretionary calls made under the directive (running):**
 - **2026-08-03 ~09:00Z, fetch-fix round:** authorized fixing the `clamped` flag to match its own
