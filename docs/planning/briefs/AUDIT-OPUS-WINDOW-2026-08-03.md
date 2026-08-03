@@ -102,7 +102,22 @@ PARK here. Each discretionary call gets a one-line entry in this file as it's ma
     flag — don't fire when all contributing transects' HandoffSelections are clamped (the
     uniformity is then explained); still fire when uniform WITHOUT uniform clamping. This is a
     verification-criterion change → parked for your ruling, not made under discretion.
-11. *(append as found)*
+11. **Lessons-capture routing table (drafted 2026-08-03, autonomous window — per CLAUDE.md the
+    routing needs your sign-off BEFORE rule-file edits land; nothing below is committed to a
+    rules file yet):**
+
+    | # | Lesson | Proposed destination | Draft rule text (one line) |
+    |---|---|---|---|
+    | L1 | Model silently reverted to Opus on VS Code restart; cost a full re-audit | user-global `CLAUDE.md` (cross-project) | "At session start (and after any IDE restart the user mentions), state which model is coordinating; if it is not the intended coordinator model, stop and surface before any work." |
+    | L2 | Commit trailers are copied text, not model telemetry (agents copied 2e67966's Opus trailer) | `rules/verification.md` | "Never use commit trailers as model-identity or authorship evidence — transcripts' model fields are the only reliable source." |
+    | L3 | Skip/no-op paths logged at DEBUG are invisible in production (C8 livelock, F5 class) | `rules/coding.md` | "Any code path that silently declines to do scheduled work logs WARNING or higher, naming the unit skipped and the reason." |
+    | L4 | Vacuous KATs: a KAT that passes pre-change proves nothing (multiple rounds this window) | `rules/verification.md` (fold into KAT mandate) | "Every KAT closeout states which tests FAIL against pre-change code, with the transcript; non-falsifiable pins are declared as such." |
+    | L5 | One try/except around 162 units killed whole spot-hours (surf_pipeline_timestep.py:544-578) | `rules/coding.md` | "Exception isolation is per-unit for per-unit work loops; a shared catch around N independent units is a finding." |
+    | L6 | Blind monitor: `journalctl -u` without sudo returns empty for the claude user on librewxr — monitor watched an empty stream; silence looked like health | `reference/clearskies-dev.md` (fact: sudo needed) + `rules/coordinator.md` (practice) | "Before trusting any watch/monitor, prove it can see a known-present line first; a filter that would stay silent on crash or permission failure is not armed." |
+    | L7 | An authorized behavior change can invalidate an invariant's calibration premise (inv-4 vs d0d0077) | `rules/verification.md` | "When changing published semantics, enumerate invariants whose firing criteria reference the changed quantity and pre-state which will move — before deploy, not after." |
+    | L8 | Ledger line numbers drift as commits land; briefs must say 'verify against HEAD' (both rounds hit this benignly) | `rules/agents.md` (fold into reading-list rule) | "Cited line numbers in briefs are anchors, not truth — agents verify against HEAD and report drift." |
+
+12. *(append as found)*
 
 **Discretionary calls made under the directive (running):**
 - **2026-08-03 ~09:00Z, fetch-fix round:** authorized fixing the `clamped` flag to match its own
