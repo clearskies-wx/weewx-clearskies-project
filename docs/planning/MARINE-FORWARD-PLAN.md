@@ -980,8 +980,17 @@ passes full list to `_precompute_swelltrack_for_spot()`. (3) 4 KATs in
 "single snapshot" — update pending with or after push.
 **MUST NOT TOUCH:** hotstart mechanics, convergence gate, `swan_formats.py` (already correct).
 
-### C4 — modelStatus grading *(G7.5 / TA-C22(a))*  ⬜ — **UNBLOCKED: threshold rule
-operator-APPROVED 2026-08-02 (chat, "yes unblock") — ready to dispatch as a normal scoped round**
+### C4 — modelStatus grading *(G7.5 / TA-C22(a))*  ✅ **CLOSED 2026-08-03 — deployed + live-verified**
+Marine `0946ed8` (13 KAT tests, stash-falsifiable KAT-B, 229-test collateral sweep clean).
+Adversarial audit (aud-c4lm1): **PASS, 0 findings** — 2 independent mutation probes each
+isolated exactly their KAT (25%-boundary flip; qualifying-OR drop); zone algorithm proven
+untouched; no bypass producers (beach_profile's own binary ok/unavailable modelStatus is
+pre-existing separate design, ruled out). Deployed 10:10:42Z; legacy-cache decode verified
+live (67/67 ok through the codec-tolerant path). Doc sync: API-MANUAL:2967 rewritten (also
+fixed the row's stale "fall back to L2" draft), dashboard types.ts union + openapi enum +
+`partial` (dash `59674fd`), tsc clean. TRACKED: contracts openapi carries no modelStatus at
+all (pre-existing drift). Wire `partial` first serves when a real bulk-fallback minority hour
+occurs — journal WARNING will name it.
 **What "fallback" means here — VERIFIED in code, and it is NOT grid routing:** a transect's
 handoff level (L4 vs L3 vs L2, `handoff_source_level`) is legitimate routing — a transect that
 doesn't intersect an L4 grid is SUPPOSED to use L2; never counted as degradation (operator
@@ -1133,7 +1142,20 @@ for imagery config (trigger 4) — all explicitly requested/approved by the oper
 in chat. **Hard rule: imagery is DISPLAY-ONLY — nothing in this phase may feed SWAN, the 1D
 model, transect selection, or any physics path.**
 
-### LM-1 — API: imagery provider modules (NAIP + ESRI)  ⬜
+### LM-1 — API: imagery provider modules (NAIP + ESRI)  ✅ **CLOSED 2026-08-03 — deployed + accept criteria met live**
+API `36d06f6` (16 files all-additive, 66 tests) + `ec04c3e` (audit-F1 boundary KATs).
+Adversarial audit (aud-c4lm1): PASS-with-findings — 1 MEDIUM (F1: x/y-vs-2^z boundary not
+pinned by the shipped KATs; an off-by-one mutation escaped all 66 tests, caught by the
+auditor's independent probe; SHIPPED CODE CORRECT). Remediated lead-direct same hour
+(`ec04c3e`): 2 boundary KATs, mutation reproduced → exactly those 2 fail → restored clean.
+NAIP upstream is DYNAMIC exportImage (no tile cache upstream — live-verified), ESRI
+config-only/browser-direct with live-pinned attribution. Deployed via deploy-api.sh;
+`[imagery] provider=auto` set in api.conf (deploy-time config, C7a precedent; backup taken).
+LIVE ACCEPT: HB coords → NAIP proxy config + CONUS bounds; London → ESRI direct + live
+attribution; tile proxy 200 image/png 64,924 bytes (byte-length-identical to the pre-deploy
+direct-USGS fetch of the same z/x/y). Manuals: PROVIDER-MANUAL §16 + API-MANUAL §12a.
+Pre-existing findings surfaced (tracked, untouched): stale radar `aeris` tests (6 fail at
+HEAD), sklearn/joblib missing in local env (3 collection errors).
 **Owner:** `clearskies-api-dev` (Sonnet, API repo). **QC:** auditor (standard adversarial
 round). **Blocked on:** nothing.
 **Change:** (a) New provider module(s) under `providers/imagery/` — NAIP provider (proxy +
