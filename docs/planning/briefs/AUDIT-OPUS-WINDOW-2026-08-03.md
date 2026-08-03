@@ -102,7 +102,13 @@ PARK here. Each discretionary call gets a one-line entry in this file as it's ma
     flag — don't fire when all contributing transects' HandoffSelections are clamped (the
     uniformity is then explained); still fire when uniform WITHOUT uniform clamping. This is a
     verification-criterion change → parked for your ruling, not made under discretion.
-11. **Lessons-capture routing table (drafted 2026-08-03, autonomous window — per CLAUDE.md the
+11. **LM-3 attribution toggle (NEW 2026-08-03):** plan §LM-3(c) sketched an "attribution display
+    toggle (default on)" but no backend key exists (deployed ImagerySettings = provider/api_key/
+    tile_cache_ttl_seconds only). Shipped WITHOUT it — attribution renders unconditionally.
+    **Coordinator recommendation: drop the toggle permanently** — ESRI's ToS requires
+    attribution; a hide-toggle invites a violation with no upside. Alternative: add an
+    `[imagery]` key API-side in a follow-up. Your call; plan text updated only after it.
+12. **Lessons-capture routing table (drafted 2026-08-03, autonomous window — per CLAUDE.md the
     routing needs your sign-off BEFORE rule-file edits land; nothing below is committed to a
     rules file yet):**
 
@@ -117,7 +123,14 @@ PARK here. Each discretionary call gets a one-line entry in this file as it's ma
     | L7 | An authorized behavior change can invalidate an invariant's calibration premise (inv-4 vs d0d0077) | `rules/verification.md` | "When changing published semantics, enumerate invariants whose firing criteria reference the changed quantity and pre-state which will move — before deploy, not after." |
     | L8 | Ledger line numbers drift as commits land; briefs must say 'verify against HEAD' (both rounds hit this benignly) | `rules/agents.md` (fold into reading-list rule) | "Cited line numbers in briefs are anchors, not truth — agents verify against HEAD and report drift." |
 
-12. *(append as found)*
+13. *(append as found)*
+
+**Additional tracked follow-ups (2026-08-03 afternoon, non-decision):** wizard-path imagery
+`api_key` silently dropped at apply (`_provider_secrets()` has no imagery branch and no plain-
+api.conf write path for any domain's api_key; field unused v1 — LM-3 finding 2; admin path
+writes it correctly). Wizard re-run pre-fill for imagery FIXED lead-direct (api `b369ee6`,
+stash-falsifiable KAT, deployed same hour — LM-3 finding 3; discretion-directive class:
+authorized imagery domain joining an existing generic mechanism, silent-reset defect class).
 
 **Discretionary calls made under the directive (running):**
 - **2026-08-03 ~09:00Z, fetch-fix round:** authorized fixing the `clamped` flag to match its own
