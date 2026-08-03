@@ -21,6 +21,21 @@ except 53d10d2 whose two follow-ups are the fix-jacking2 round).
    (B) L3 viability contradiction — 06:12:31 log "FAILED, unreachable ~235 m, disabled" vs sizing
    cache carrying L3/L4 clusters (different bbox) vs run executing L3+L4 fine.
 
+**STATUS UPDATE 2 (2026-08-03 ~13:30Z, autonomous window — supersedes update 1 below):**
+EVERYTHING through Phase LM is CLOSED, AUDITED, DEPLOYED, PUSHED. Live state: marine `0946ed8`
+on librewxr (inv-1 cured, 67/67 hours ok, C4 grading live, inv-4 = decision item 10); API
+`b369ee6` on weewx (imagery domain live, `[imagery] provider=auto` in api.conf, pre-fill fix);
+weather-dev = dashboard `fed72f8` + stack `159731d` (ortho heatmap + imagery config UI, both
+surfaces). Closed this window: Opus-audit remediation tip (11 commits), fix-jacking2, fetch-fix
+(+clamp-detection leak-fix), bearing_to_spot deletion (both repos), doc-batch, C4, LM-1/2/3,
+Gate C, D2 + D4 (both verified already-done, stale rows), all manual syncs. OPERATOR QUEUE:
+decisions items 1-13 in this file + eyeball items (heatmap ortho alignment — unrotated mosaic,
+expect tweak; admin imagery; admin structures; prjc1→PRJC1). NEXT WORK: G6.1/G6.2 (sizing-chain
+geometry — careful briefs, read phase header first), D10.2 awaits rulings, D1/H5 parked,
+V1/V2 weather-dependent. Tracked-follow-ups list lives in the todo + this file's tracking
+paragraphs. Monitors: none armed (journal monitor was stopped — journalctl needs sudo; use
+Bash+ssh with sudo for sweeps).
+
 **STATUS UPDATE (post-compaction, 2026-08-03 ~08:30Z):** fix-jacking2 ACCEPTED (`6c013d2`, ledger
 row below); doc-batch LANDED (meta `94b4148`, api `c29b85b`, dashboard `8d6e733`, ledger row
 below; item 2c l3-wording DEFERRED to marine-side batch — lives at API-MANUAL §H1:3386-3388);
@@ -123,7 +138,15 @@ PARK here. Each discretionary call gets a one-line entry in this file as it's ma
     | L7 | An authorized behavior change can invalidate an invariant's calibration premise (inv-4 vs d0d0077) | `rules/verification.md` | "When changing published semantics, enumerate invariants whose firing criteria reference the changed quantity and pre-state which will move — before deploy, not after." |
     | L8 | Ledger line numbers drift as commits land; briefs must say 'verify against HEAD' (both rounds hit this benignly) | `rules/agents.md` (fold into reading-list rule) | "Cited line numbers in briefs are anchors, not truth — agents verify against HEAD and report drift." |
 
-13. *(append as found)*
+13. **D10.2 — three rulings on the phantom SurfForecast fields** (plan §D10, investigation
+    COMPLETE, investigator recommends RESTORE for all three): (1) `partitionBreakInfo` — emit
+    existing `perPartitionBreaks` shape on SurfForecast + re-point dashboard type (kills the
+    duplicate schema; investigator-preferred) vs build the bespoke shape (data-contract
+    choice); (2) `shadowFaceHeight` — is a non-headline shadow aggregate a legitimate
+    `is_structure_affected` consumer under BD-8 (investigator: yes, secondary readout)?
+    (3) `waveShapeClassification` — authorize the real round (regime threading + 4-way cut
+    points = NEW formula criteria, trigger 1) or defer/pin. Full detail in plan §D10.
+14. *(append as found)*
 
 **Additional tracked follow-ups (2026-08-03 afternoon, non-decision):** wizard-path imagery
 `api_key` silently dropped at apply (`_provider_secrets()` has no imagery branch and no plain-
