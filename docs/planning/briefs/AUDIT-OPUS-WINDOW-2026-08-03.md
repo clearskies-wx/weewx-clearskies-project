@@ -21,9 +21,19 @@ except 53d10d2 whose two follow-ups are the fix-jacking2 round).
    (B) L3 viability contradiction — 06:12:31 log "FAILED, unreachable ~235 m, disabled" vs sizing
    cache carrying L3/L4 clusters (different bbox) vs run executing L3+L4 fine.
 
+**STATUS UPDATE (post-compaction, 2026-08-03 ~08:30Z):** fix-jacking2 ACCEPTED (`6c013d2`, ledger
+row below); doc-batch LANDED (meta `94b4148`, api `c29b85b`, dashboard `8d6e733`, ledger row
+below; item 2c l3-wording DEFERRED to marine-side batch — lives at API-MANUAL §H1:3386-3388);
+fetch-fix round DISPATCHED (agent `fetch-fix`, generic type pinned model=sonnet, scope-ack
+pending). Remaining order: accept fetch-fix → lead-direct marine bearing_to_spot deletion +
+marine-side doc remainders (wave_transform :39-45 docstring, stale n_l3_enabled log,
+§H1 l3-wording) → ONE adversarial audit over 6c013d2 + fetch-fix + doc-batch → TIP push/deploy +
+gate battery (step 4 below). 06z run re-confirmed pier-inclusive (162/23) across cycles; transect
+83 inv-1 fired again 08:00Z valid-time = phantom-depth class, cured by fetch-fix as predicted.
+
 **NEXT STEPS in order (after those two land):**
-1. Accept fix-jacking2 (independent test run + stat), surface diag-fetch findings to operator →
-   likely one ruling on the negative-fetch remediation shape → dispatch that fix round.
+1. ~~Accept fix-jacking2 (independent test run + stat), surface diag-fetch findings to operator →
+   likely one ruling on the negative-fetch remediation shape → dispatch that fix round.~~ DONE.
 2. Lead-direct: marine-side `bearing_to_spot_degrees` deletion (marine_config.py ~:337 annotation,
    ~:354 decode, ~:379-386 validate + tolerance KAT — mirror API repo commit `858279b` pattern).
 3. Adversarial audit (one auditor) of fix-jacking2 + fetch-fix commits.
@@ -312,6 +322,17 @@ candidate (second occurrence per operator: "that was a problem before").
 | NaN guard (marine) | `33dd56b` | PASS (my run 25/25; bonus: pre-fix silently DROPPED distance-NaN rows) | **PASS** (aud-batch; MINOR: guard's own astype crashes on dtype=object-with-strings — unreachable via all 3 real call sites, tracked residual) | **AUDIT-CLEAN** |
 | C3 merge remediation (marine) | `4db71c6` | PASS (my run 8/8; KAT-a proven to fail pre-fix) | **PASS** (aud-batch; extra adversarial shapes incl. a real randomized 6-way collision handled correctly where old code silently botched it; MINOR: test-file labels stale → fixed lead-direct `370e142`, comment/msg strings only, 8/8 green) | **AUDIT-CLEAN**; PROVIDER-MANUAL synced (`0c621e3`) |
 | Period-0 guard (adversarial) | `7be3c9e` | (above) | **PASS** (aud-batch; other _dispersion callers confirmed different period source, unexposed; 0.1 s classifies; mutation kills 2/23) | **AUDIT-CLEAN** |
+| Jacking follow-up (marine) | `6c013d2` | PASS (my run 15/15; stat exact 2-file; design-conformance diff read: two-stage decouple, strict-inequality edge rejection kills monotone-shoaling false positives, 10/50 native-equivalent, distance_m=crest, dedupe by factor; stash falsifiability: pre-change 1@native/0@1m vs post 1@all, factors within 3.4%; bonus edge-clamp before/after proof) | pending (batch with fetch-fix audit) | **ACCEPTED** — closes 53d10d2's two follow-ups; deploy at tip |
+| Doc-batch (meta/api/dash) | meta `94b4148`, api `c29b85b`, dash `8d6e733` | PASS (stat exact ×3; repo-wide grep "never an intermediate" = 0; content spot-check of API-MANUAL:2049 row + §14.9 geometry paragraph — accurate, wire-vs-internal crisp, axis-order foot-gun documented) | pending (batch) | **LANDED**. Brief correction accepted: §14.9 wire field is `geometry` `[[lat,lon],...]` (NOT `coordinates` — that's /setup/apply's field, `[[lon,lat],...]`). Item 2c l3-wording deferred to marine-side batch (API-MANUAL §H1:3386-3388) |
+
+**Trailer artifact finding (2026-08-03, lessons-capture candidate):** subagent commits `052906f`/
+`46d55e0`/`4db71c6`/`6c013d2` carry "Co-Authored-By: Claude Opus 4.6 (1M context)" — investigated:
+agent definitions all pin `claude-sonnet-5`, no hardcoded trailer anywhere in `.claude/agents/`,
+and the ONLY Opus-window commit with that trailer is `2e67966` (the Opus coordinator's lead-direct
+commit, top of git log when remediation began). Conclusion: agents copied the trailer style from
+git history — trailers are TEXT, not model telemetry; do not use them as model-identity evidence
+(the transcript's model fields are the only reliable source, as used for the window boundary).
+Definitive per-agent model check via transcript remains available if the operator wants it.
 
 **Marine branch state (7 local commits, ALL adversarially audited except 53d10d2's two follow-ups):**
 052906f → 53d10d2 → 46d55e0 → 7be3c9e → 33dd56b → 4db71c6 → 370e142.
