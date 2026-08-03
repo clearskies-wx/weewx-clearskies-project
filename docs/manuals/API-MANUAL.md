@@ -77,7 +77,7 @@ When `settings.configured = False`, the API starts in setup mode. In setup mode:
 - No database connection is established. No provider modules load. No data routers run.
 - The SSE stream is not available.
 
-After the operator completes the setup wizard and the API receives `POST /setup/apply`, the API writes its config files and restarts into normal mode.
+After the operator completes the setup wizard and the API receives `POST /setup/apply`, the API writes its config files and restarts into normal mode. `[marine]` is written replace-whole-section, with a narrow preserve-list exception for fields with no form round-trip — see "Surf-field apply semantics (preserve-list)" under §19.5.
 
 ### Startup sequence
 
@@ -3357,6 +3357,39 @@ Notes:
 - **`station.lat` / `station.lon` (C-51, DECIDED 2026-07-25):** the weewx station's own coordinates, sourced from `services/station.py`'s `get_station_info()`. Added so the marine service's `is_station_served()` spatial test (C-47's t=0 station-wind fetch, `endpoints/surf.py`) has something to compare a marine location's distance against — before this, `resolve_station_distances()` was never called and every location was unconditionally treated as not station-served. **Absence is a normal state, not an error.** If station metadata isn't loaded when the payload is built, `station` is simply omitted — never defaulted to `0,0` or any other placeholder. The marine side (`config/marine_config.py`) treats a missing `station` key exactly like every location being outside `dedup_radius_km`: `is_station_served()` returns `False` for every location and every location takes the forecast-provider wind path, same behavior as before C-51.
 - **Station timezone and elevation are deliberately excluded.** The marine service's fishing endpoint has no consumer for either field — sunrise/sunset moved to the API's `GET /almanac/solunar` (C-47, DECIDED 2026-07-25), which resolves them for whatever lat/lon it's given, dissolving the station-timezone question C-27 raised. Elevation remains unattached — no marine-service consumer as of this writing.
 - **`structures[].coordinates` (E13, ADR-095 Decision 3):** the structure's real outline from the wizard's Overpass API discovery, `[[lon, lat], ...]` — the marine `StructureConfig.coordinates` contract. Optional on `POST /setup/apply`'s `MarineStructureApplyConfig`; absent when no discovery geometry was captured (e.g. a hand-entered structure with only the five scalar fields). On `api.conf`, `[[[structures]]][[[[N]]]]` stores it as one JSON-encoded string value (`configobj` cannot round-trip a native nested list into a shape a plain `float()` reader can parse — it comes back as a flat list of per-element strings); `_serialize_marine_locations_section()` decodes it back to `[[lon, lat], ...]` for the push/pull payload. The API stores and forwards whatever order arrives — it does not convert `[lat, lon]` (OSM's order) to `[lon, lat]`; that conversion happens once, at the wizard.
+
+### Surf-field apply semantics (preserve-list)
+
+**Deployed behavior as of api HEAD `2f84bbf` (2026-08-03).** `POST /setup/apply`'s `[marine]` write (§19.5 above) is **replace-whole-section by design**: when `apply.marine` is present, the API builds a fresh `marine` config tree from the payload and assigns it wholesale (`cfg["marine"] = new_marine`), rather than merging key-by-key into whatever was already on disk. This is deliberate, not an oversight — a merge-style apply cannot reliably delete a key the operator removed (a key absent from a merge payload is indistinguishable from "operator didn't touch this field" vs. "operator deleted this field"), and this codebase has hit that failure mode before. Operator ruling 2026-08-03 (`docs/planning/briefs/AUDIT-OPUS-WINDOW-2026-08-03.md`, decision item 8) explicitly kept replace-whole-section and rejected a merge-not-overwrite alternative (R5) for this reason, citing the same history: *"we have had, in the past, issues with the merge function not deleting changes — that is why the wizard/admin has always used read-the-config, collect changes, rewrite it all."*
+
+**The problem this creates:** several config fields have no wizard/admin UI at all, or UI on only one of the two saving surfaces. A field with no round-trip path would be silently dropped (reset to whatever `_build_marine_conf_section()` defaults it, or omitted entirely) on every apply, because replace-whole-section has no way to distinguish "not sent because unchanged" from "not sent because there's no form field for it." The fix is a targeted, absence-preserving carry-forward for exactly those fields — not a general merge.
+
+**Two preserve tiers, at two nesting depths, in `endpoints/setup.py`'s marine-apply block (~line 1976 onward):**
+
+| Tier | Constant | Keys | Operates on |
+|------|----------|------|-------------|
+| Location-level | `_PRESERVE_KEYS` | `ndbc_station_ids`, `coops_station_ids`, `nws_marine_zone_id` | each `marine.locations.<location_id>` dict |
+| Surf-level | `_SURF_PRESERVE_KEYS` | `max_hs_m`, `beach_slope`, `transect_spacing_m`, `l3_enabled`, `breaker_formula`, `surf_height_display` | the nested `marine.locations.<location_id>.surf` dict — one level deeper than the location tier |
+
+**Mechanism ("absence-preserving"), identical at both tiers:** for each key in the tier's tuple, if the key is **present** in the new payload's location (or surf sub-block), the payload value is written — the preserve list never overrides a value the caller actually sent. If the key is **absent** from the new payload but was present in the corresponding location in the *existing* on-disk config, the old value is carried forward into the new tree. A key absent from both is simply absent from the result (falls through to whatever read-time default the consuming code applies).
+
+**No resurrection — the concrete proof replace-whole-section still deletes correctly.** The preserve loop iterates `new_marine["locations"]` — the *new* payload's locations — and looks up each one's old counterpart only to backfill preserve-listed keys. It never iterates the *old* config's locations. A location present in the old config but absent from the new payload (i.e., the operator deleted that surf spot) has no entry in `new_marine["locations"]` at all, so none of its keys — preserve-listed or not — are carried forward. Deleting a location, or deleting any non-preserved field within a location that survives, still works exactly as replace-whole-section intends; the preserve list only rescues the handful of fields with no round-trip path.
+
+**Fresh-location defaults — `_SURF_FRESH_DEFAULTS`:** applied after the preserve loop, to every surf sub-block in the new payload, for any of these five keys still absent (i.e., absent from the payload AND with no existing location to preserve from — a first-time save of a location):
+
+| Key | Default |
+|-----|---------|
+| `max_hs_m` | `4.0` |
+| `transect_spacing_m` | `10.0` |
+| `l3_enabled` | `auto` |
+| `breaker_formula` | `komar_gaughan` |
+| `surf_height_display` | `face` |
+
+This keeps a brand-new location's `api.conf` write byte-identical to what pre-preserve-list code always wrote explicitly for these fields (a first cut of this change omitted `breaker_formula`/`surf_height_display` from the fresh-default set — aud-r1 finding F1, fixed in `2f84bbf`, the commit this subsection describes). `beach_slope` deliberately has **no** write-time default — pre-change code never wrote one either; an absent `beach_slope` falls through to the read-time default applied in `_serialize_marine_locations_section()`, not to anything written here.
+
+**Governing invariant for future field additions:** every `[marine]` config field must either (a) round-trip through a wizard or admin form field on every save, or (b) sit on one of the two preserve-list tuples above. A new config-file-owned field — one a saving surface has no UI for, or has UI for on only one of the two surfaces — **must be added to the appropriate preserve-list tuple in the same change that introduces it**, or the next apply from the surface lacking UI for it will silently drop the field back to its default (or delete it outright). This is the mechanism decision item 8 ruled into place; it is not merge-not-overwrite, it is a short, explicit exception list layered on top of replace-whole-section.
+
+**Open question (F2b, tracked, not yet implemented as of this writing):** the admin UI's save path only sends a field when its value differs from that field's default (an omit-when-default heuristic). Combined with the preserve mechanism above, this means a field currently holding a non-default value can never be reset *back* to its default through the admin UI — the preserve loop sees the field absent from the payload and carries the old (non-default) value forward instead of accepting the omission as "set to default." This subsection documents deployed behavior as of 2026-08-03; F2b is an open follow-up that may change the admin surface's send behavior, not a change to the apply semantics described above.
 
 ### §19.6 Marine alerts remain in the API
 

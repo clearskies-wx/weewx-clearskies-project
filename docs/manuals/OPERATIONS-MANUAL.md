@@ -658,6 +658,8 @@ Each wizard step follows this contract:
 - Partial progress is persisted to disk when each step's form is submitted — a partial wizard run produces a valid partial config, not an empty or corrupt file.
 - Re-running the wizard pre-populates all fields from the existing config.
 
+**Surf-field re-run semantics:** `POST /setup/apply`'s `[marine]` write is replace-whole-section (deletions must stick, per operator ruling 2026-08-03 decision item 8), with a narrow preserve-list exception for surf fields the wizard/admin has no form field for. See API-MANUAL.md "Surf-field apply semantics (preserve-list)" (§19.5) for the preserve-key lists and fresh-location defaults.
+
 #### AQI provider selection
 
 The wizard presents the following AQI provider options. The wizard suggests observed-data providers when haze detection is enabled.
