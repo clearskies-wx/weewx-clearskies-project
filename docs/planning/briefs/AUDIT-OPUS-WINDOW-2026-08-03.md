@@ -363,6 +363,28 @@ clamped transect-hours (currently the T140-161 band) → trigger-3 adjacent, OPE
 **Lead recommendation to operator:** approve (iv)+(i) together, one round: (iv) fixes the lie
 (the 1D model must start where SWAN actually handed off), (i) guards any residual degenerate
 fetch gracefully per-transect. (iii) parked to geometry-phase work; (ii) rejected.
+**✅ OPERATOR APPROVED 2026-08-03 (chat: "1. ok. 2. ok")** — round dispatches after fix-jacking2
+frees the marine repo.
+
+**DIAG-FETCH FOLLOW-UP — SYSTEMIC quantification (2026-08-03):** 162/162 transects clamped at
+least once in the 06z run (5,022 clamp WARNINGs parsed): Hs 0.36-0.56 m → target depth
+0.64-1.09 m, ALWAYS shallower than the L4 grid's shallowest usable station (~2.8-3.3 m
+everywhere). So in low-Hs regimes the phantom-depth defect amputates the 1D domain on the WHOLE
+segment; 156/157/160 additionally crash (non-monotonic near-waterline DEM → subaerial snap),
+transect 83 trips invariant 1 instead (break depth 0.77 > phantom handoff 0.75; NOT wave-shadowed,
+mid-segment — L4 GRID MEMBERSHIP [162/162] ≠ wave-shadowed classification [23]). Post-deploy
+reality gate must EXPECT broad served-number shifts in small surf (domains un-amputated) —
+capture matched-hour before/after as gate evidence, not as regression alarm. Also explains the
+inv-1 fire class.
+
+**Smart-L3 disposition (operator Q 2026-08-03):** largely pre-L4 vestige AT THIS SPOT (L4 took
+structure resolution + handoff; L3's live role = containment nest; smart-L3-as-handoff-source
+documented unwired), BUT `l3_enabled=auto` also triggers on topographic features
+(point_break/headland/bay_break) with no structure/L4 — smart L3 may be the intended fine grid
+for such future spots. Deletion would be architectural (trigger 2) and needs a dead-code-grade
+investigation first. TRACKED plan item: "smart-L3 disposition — investigate vestige-vs-future
+before any ruling." Near-term: doc-batch fixes the misleading /health wording + stale
+n_l3_enabled summary count.
 
 ## Operator rulings 2026-08-03 (second batch, chat)
 
