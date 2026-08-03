@@ -777,7 +777,27 @@ byte-faithfully (T4.5 test extended with a polygon case); polyline flow byte-ide
 BOTH the wizard map step and the corresponding admin panel editing surface — scope-ack must
 name both call sites (or the shared component both render).
 
-### ⛔ QC GATE G6 — assigned: `clearskies-auditor`
+### ✅ QC GATE G6 — PASSED 2026-08-03 (auditor `gate-g6`; F1 remediated same hour)
+All three commits PASS on every dimension: G6.1 (`c52562e`) relocation independently re-proven
+byte-identical at source level (dedent-normalized diff; only the 6 declared return deltas) +
+67-logger-literal sequence diff = zero order drift + pin-only KATs mutation-verified non-vacuous;
+G6.2 (`dac07f7`) threshold reuse grep-proven (zero new 30. literals, geography.py untouched),
+flip-pin KAT proven to exercise the real helper, degraded-floor mutation caught; G6.3 (`2abb5ef`)
+polyline byte-identity proven by isolating all removed lines (4/file, comment/toggle only),
+zero new Jinja sinks, ring-closure mutation caught by source guard. **F1 MEDIUM (remediated
+`a934e9f`):** nothing proved Stage 1 CALLS the reset functions — two-push real-chain KATs added
+for BOTH the new facing mechanism and the inherited l3_viability gap, each mutation-proven
+against its specific reset call site. F2 = decision item 14's pin confirmed honest. **Auditor's
+reset-placement analysis (recorded, inherited-not-new):** reset sits after 3 of 6 Stage-1 abort
+points — abort-before keeps stale flags (defensible: old geometry still live), abort-after
+(transient download failure) clears without re-evaluating (can mask a real divergence until the
+next successful push) — verbatim-inherited from the l3/H1.3 pattern. **DEPLOYED 2026-08-03:**
+marine `a934e9f` on librewxr 13:25:30Z; stack `2abb5ef` on weather-dev. **Accept line 5
+(post-deploy full-nest run vs baseline) PENDING the next config push** — the sizing chain runs
+at push time, not per-cycle; expected to occur naturally at the operator's eyeball session
+(admin imagery save / any config apply). Deploy-restart artifact noted: the restart SIGTERMed
+the in-flight SWAN run (swan_fatal -15, last-good preserved, honest /health failed until next
+cycle) — hardening behaved as designed.
 | # | Element | Evidence |
 |---|---|---|
 | 1 | Stage order real, not cosmetic | trace a config push on librewxr: download footprint decided before any bathymetry read (journal) |
