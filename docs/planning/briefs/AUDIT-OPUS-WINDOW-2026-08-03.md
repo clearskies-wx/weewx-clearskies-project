@@ -21,6 +21,18 @@ except 53d10d2 whose two follow-ups are the fix-jacking2 round).
    (B) L3 viability contradiction — 06:12:31 log "FAILED, unreachable ~235 m, disabled" vs sizing
    cache carrying L3/L4 clusters (different bbox) vs run executing L3+L4 fine.
 
+**STATUS UPDATE 3 — AUTONOMOUS WINDOW CLOSED CLEAN (2026-08-03 ~14:05Z, supersedes 2 & 1):**
+**Phase G6 COMPLETE** on top of everything in update 2: G6.1 `c52562e` (two-stage wiring,
+relocation independently re-proven), G6.2 `dac07f7` (facing self-check, decision item 14
+pinned), G6.3 `2abb5ef` (polygon draw both surfaces, closed-ring convention), Gate G6 PASSED,
+F1 remediated `a934e9f` (two-push reset KATs, incl. the inherited l3 gap). Marine `a934e9f`
+live on librewxr (post-restart cycle recovered 13:58Z: 55/55 hours ok, only inv-4 reason —
+decision item 10); stack `2abb5ef` + dashboard `fed72f8` live on weather-dev. ALL repos pushed,
+ALL plan rows current. **Gate G6 accept line 5 (full-nest run vs baseline) rides the NEXT
+config push** — expected naturally at the operator's eyeball session. **NO WORK REMAINS that
+doesn't need the operator** (decisions 1-14, lessons L1-L9, eyeball ×4, D1/D10.2/H5) **or
+weather** (V1/V2). Coordinator idles pending operator return.
+
 **STATUS UPDATE 2 (2026-08-03 ~13:30Z, autonomous window — supersedes update 1 below):**
 EVERYTHING through Phase LM is CLOSED, AUDITED, DEPLOYED, PUSHED. Live state: marine `0946ed8`
 on librewxr (inv-1 cured, 67/67 hours ok, C4 grading live, inv-4 = decision item 10); API
