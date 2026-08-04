@@ -127,6 +127,7 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | [ADR-097](ADR-097-beach-profile-endpoint.md) | Beach profile endpoint — cross-shore transect visualization | 2026-07-18 |
 | [ADR-099](ADR-099-marine-service-separation.md) | Marine service separation — unified standalone companion service replacing SWAN+compute half-services | 2026-07-22 |
 | [ADR-100](ADR-100-geography-aware-study-area-geometry.md) | Geography-aware study-area geometry — OSM coastline, wrap-aware fetch fan, classification-first, two-stage basis (AD-2/AD-6/AD-7; consumed by ADR-093 Amendment 5) | 2026-07-31 |
+| [ADR-101](ADR-101-surf-score-geometric-mean.md) | Surf score rebuild — weighted geometric mean of five components (Size/Shape/Conditions/Power/Consistency), no penalties, single-use rule, admin-adjustable weights; supersedes ADR-096's formula (its per-category bar rule survives) | 2026-08-04 |
 
 ## Accepted — pending manual consolidation
 

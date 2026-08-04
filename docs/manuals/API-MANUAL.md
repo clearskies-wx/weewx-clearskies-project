@@ -2093,6 +2093,8 @@ Surf quality forecast for one spot at one timestep.
 
 Per-factor scoring detail returned inside each `SurfForecast` entry. Three weighted factors (max 100) plus three signed adjustments. Additive identity: `total = waveHeight + wavePeriod + waveOrganization + beachAlignment + directionalExposure + timeOfDay`.
 
+**Adjustments are multipliers, not point pools — they have NO fixed maximum.** Each adjustment is a percentage multiplier applied sequentially to the running score, and its wire field reports the signed point delta that multiplication produced (`surf_scorer.py:701-719`): `subtotal = waveHeight + wavePeriod + waveOrganization`, then `post_beach = subtotal × beach_mult`, `post_dir = post_beach × dir_mult`, `total = post_dir × time_mult`. An adjustment's magnitude therefore scales with how many points are on the table: the same >60° beach angle costs 90 points off a 100 subtotal but 9 points off a 10 subtotal. Only `timeOfDay` can be positive — `beachAlignment` and `directionalExposure` are penalty-only (≤ 0). Documented 2026-08-04; display consequences (a max-relative bar is undefined for these fields) are operator decision D3 in EYEBALL-FIX-PLAN-2026-08-04.
+
 | Field | Type | Description |
 |---|---|---|
 | `waveHeight` | int | Wave height factor score (0–35) |
@@ -2102,9 +2104,9 @@ Per-factor scoring detail returned inside each `SurfForecast` entry. Three weigh
 | `organizationSwellDominance` | float | Swell dominance contribution (0–7.5; 25% of 30) |
 | `organizationDirectionalSpread` | float | Directional spread contribution (0–4.5; 15% of 30). From SWAN DSPR. |
 | `organizationCrossSwell` | float | Cross-swell interference contribution (0–3; 10% of 30). From SPECOUT. |
-| `beachAlignment` | int | Signed; beach angle alignment adjustment (0 = direct hit, negative = misaligned) |
-| `directionalExposure` | int | Signed; 0 when open, negative when blocked by headland/bathymetry |
-| `timeOfDay` | int | Signed; positive at dawn (bonus), negative in afternoon (penalty), 0 otherwise |
+| `beachAlignment` | int | Signed, **≤ 0 always** — never a bonus. Delta from multiplying the component subtotal by the beach-angle factor (angle between swell direction and beach-facing direction, normalized to [0, 180]): ≤ 15° → ×1.0 (0 pts), ≤ 30° → ×0.8, ≤ 45° → ×0.6, ≤ 60° → ×0.3, > 60° → ×0.1 (`_BEACH_ALIGNMENT_RANGES`, `surf_scorer.py:242-248`). Worst case removes 90% of the subtotal. |
+| `directionalExposure` | int | Signed, **≤ 0 always** — never a bonus. Binary: ×1.0 (0 pts) when the swell's 8-point compass direction is marked open in the spot's fan-derived `directional_exposure` map, ×0.1 when blocked (`_DIRECTIONAL_FILTER_BLOCKED`, `surf_scorer.py:254`) — a further 90% cut of what remains after `beachAlignment`. |
+| `timeOfDay` | int | Signed; the ONLY adjustment that can be positive. ×1.1 within 1 h of dawn (+10% of the running score, so at most ≈ +10 pts), ×0.9 between 14:00–17:00 local (−10%), ×1.0 otherwise (`surf_scorer.py:262-267`). **Currently always 0 in practice:** the surf endpoint hardcodes the sunrise/sunset/timezone inputs to `None` (C-47, 2026-07-25; `endpoints/surf.py:876-886`), which skips both windows. Wiring it is operator decision D4 in EYEBALL-FIX-PLAN-2026-08-04. |
 
 #### FishingForecast
 
