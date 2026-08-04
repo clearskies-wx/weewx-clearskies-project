@@ -4,9 +4,29 @@
 (AUDIT-OPUS-WINDOW-2026-08-03.md — "investigation-first: inventory transect-count vs metres
 criteria before any change is considered"). **Coordinator spot-check:** cites at
 surf_1d_pipeline.py:1295/:1331, marine_config.py:544, surf.py:475 verified verbatim against HEAD
-(marine `f38a8f3`). **Status: FINDINGS ONLY — no code change proposed or authorized. Awaits
-operator review; any follow-on change to the count criteria is trigger 1 (criterion inside a
-detection formula) and needs explicit operator approval per criterion.**
+(marine `f38a8f3`). **Status: OPERATOR RULINGS IN PROGRESS (2026-08-04).**
+- **C1–C6 RULED (operator: "fine", after choosing the 50 m coverage convention over 40 m span):
+  re-express the five count criteria as ONE constant = 50 meters of beach coverage, converted to
+  a transect count at run time from `transect_spacing_m`. Behavior-identical at the 10 m default
+  (50/10 = 5 exactly). The conversion arithmetic — rounding rule + minimum count floor for ragged
+  divisions (operator: "you will have to figure out the transect count") — is DELEGATED to the
+  coordinator, to be designed with worked examples in the implementation brief.**
+- **Heatmap smoothing CORRECTION (2026-08-04): the coordinator wrongly presented "no smoothing
+  code exists" as "nothing to rule on". Smoothing IS an open operator-created task (D5 eyeball
+  finding 3, 2026-08-02: "smooth heatmap into shapes instead of pixelated transects"; in plan,
+  not yet scoped, sequenced before Gate D/C). Its future design brief MUST take
+  `transect_spacing_m` as an input — no hardcoded 10 m row assumption.**
+- **C7 RULED (operator 2026-08-04: "yes" to leave as-is): the peel-angle >=2-transect gate stays
+  a count — it is "two points define a line" geometry, not a physical agreement window; the
+  downstream angle arithmetic already measures real distances and self-corrects for spacing.**
+- **BOUNDS GAP RULED (operator 2026-08-04: "that is fine", correcting the coordinator's
+  validate-the-free-field proposal): implement the ORIGINAL 2026-08-02 decision-log item 7
+  design — spacing is auto-set from geometry per location, overridable only via a SLIDER
+  bounded 5 m min / 25 m max in the admin/wizard surf settings, with the same bounds enforced
+  server-side (hand-edited config rejected outside range). CONFIG.md documentation (incl.
+  bearing-override invalidation note) lands with it. NOTE: the operator flagged that the
+  2026-08-02 slider decision was never scoped into a task — coordination tracking failure,
+  now remedied by this task.**
 
 **Operator's question this answers:** "right now we have a hardcoded 5 transects needed to agree
 in order to find high surf... less transects means less checks and balances... Changing this

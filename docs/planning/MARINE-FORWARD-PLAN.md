@@ -903,11 +903,19 @@ deferred until Bolsa deploys); C-E03 **REFRAMED 2026-08-03 (operator ruling): sp
 investigation FIRST** — **investigation ✅ DONE 2026-08-03, report saved verbatim at
 [briefs/C-E03-SPACING-DEPENDENCE-INVENTORY-2026-08-03.md](briefs/C-E03-SPACING-DEPENDENCE-INVENTORY-2026-08-03.md)
 (17 criteria C1-C17; C1-C6 = five spacing-blind counts inside `_compute_main_break_zone()` alone,
-all >2x drift at 25 m; fractions C11/C12 scale-free; NO alongshore heatmap smoothing exists
-anywhere — that concern has no code object; `transect_spacing_m` has no upper bound and is
-undocumented; coordinator spot-checked 4 cites against HEAD). NEXT: operator rules per-criterion
-re-expressions in metres (trigger 1; jacking 10/50 m precedent)** — cap/guard + Bolsa spacing
-value PARKED behind that ruling (measured basis: 1-D ≈ 55 ms/transect/hour, SWAN grids scale
+all >2x drift at 25 m; fractions C11/C12 scale-free; no smoothing CODE exists — but heatmap
+smoothing IS an open operator task, D5 finding 3 below, its future brief must take
+`transect_spacing_m` as an input; coordinator spot-checked 4 cites against HEAD).
+**RULED PER-CRITERION 2026-08-04 (operator, one at a time): (a) C1-C6 → ONE constant = 50 m of
+beach COVERAGE (operator chose coverage over 40 m span), converted to a transect count at run
+time from `transect_spacing_m`; behavior-identical at the 10 m default; rounding rule + minimum
+count floor DELEGATED to coordinator ("you will have to figure out the transect count"), worked
+examples required in the implementation brief; code+tests same-commit (tests re-pin 50 m not 5).
+(b) C7 stays count-of-2 ("yes" — two points define a line). (c) Spacing bounds: implement the
+ORIGINAL 2026-08-02 item-7 design, never scoped into a task (tracking failure, operator-caught) —
+auto-set from geometry + admin/wizard SLIDER bounded 5-25 m ("that is fine"), same bounds
+enforced server-side, CONFIG.md docs incl. bearing-override invalidation.** Bolsa spacing value
+still parked behind implementation (measured basis: 1-D ≈ 55 ms/transect/hour, SWAN grids scale
 with area not count — see AUDIT-OPUS-WINDOW-2026-08-03 item 3); C-E04 parked (efficiency-only, as downgraded);
 C-E08 STILL-OPEN-low (L4 INPGRID WIND coverage — needs with/without comparison before any
 fix, as filed); C-E10 = C7a (same env-var/firewall decision, already OPERATOR-pending);
