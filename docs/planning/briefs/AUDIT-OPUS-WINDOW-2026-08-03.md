@@ -831,5 +831,29 @@ commands + expected values pre-stated:**
    from 27 GB to ≤3 files/≤10 GB. Verify with `sudo ls -lah` + `du -sh`.
 6. Preserve-list live proof rides the operator's first admin save (api.conf surf fields unchanged).
 
+**GATE RESULTS — 2026-08-04 00:05-00:15Z, first full post-deploy cycle (started ~23:20Z,
+completed 00:05:14Z, ~45 min):**
+1. ✅ **inv-4 quiet**: `grep -c "invariant 4:"` over 23:19→00:06 = **0** (baseline ~67/cycle).
+   Stronger: zero firings of ANY invariant (all 74 "invariant N" journal mentions are INFO
+   prose; `/health` `fired_total: 0`, `reasons: []`, `status: ok`). The cycle contained the
+   exact trigger scenario (Hs≈0.5 m, every L4 handoff clamped to the same interior station —
+   the all-clamped low-surf case) and the clamped gate correctly suppressed it.
+2. ✅ **40 m log**: `SWAN L3[0]: 51×46 cells at 40 m (middle grid, nests L4)` at 23:38:19.
+3. ✅ **/health during level3_0 run**: `status: ok`, `reasons: []` (no `l3_viability_failed`)
+   while the L3 grid was actively executing (23:38-23:52 window, checked live).
+4. ✅ **NDBC 46222 reality gate**: served `waveHeightAtBreak` @ 2026-08-04T00:00Z = 2.151 ft
+   (API path, units block = ft) vs NDBC 46222 WVHT @ 23:26Z = 0.8 m = 2.62 ft → **−18%**,
+   within ±30%. (API serving chain fresh: lastRunTime 23:23:25Z, 73 entries, modelStatus ok.)
+5. ✅ **Trace prune**: `/var/log/weewx-clearskies/` = 27 GB → **5.1 GB, exactly 1 file**
+   (today's, within the 10 GB day budget); all prior-day files pruned at first emit.
+6. ⏳ rides operator's first admin save (unchanged).
+Journal ERROR classes during the cycle: 12× ww3_spectrum 404 + 1× ndbc 404 — both pre-existing
+daily provider noise (historical counts 60/24/84 per day), no new classes.
+**Tracked curiosity (audit pile, not a gate failure):** a bare parameterless
+`GET /surf/{id}` direct to the marine service (auth'd) returned a STALE single-entry payload
+(generatedAt 2026-07-29) while the API-path response was fresh — some parameterless/on-demand
+request shape appears to hit a 6-day-old cache. User-facing chain unaffected; worth a look in
+the next marine round.
+
 ## Next after audits
 Remediate findings (scoped rounds) → C3 push+deploy w/ reality gate → C4 → C7 → Phase LM → heatmap smoothing → Gate D/C closes. Push/deploy authorized for testing by operator this session ("You have permission, as coordinator, for push/deploy as needed for testing").
