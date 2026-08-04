@@ -34,11 +34,11 @@ Answer questions plainly, attach nothing. (Binding communication rules from 2026
    undocumented. Any re-expression in metres is trigger-1, per-criterion operator approval.
    Suggest walking C1-C6 as one decision (same function, same fix shape), then C7, then the
    validation/bounds gap.
-5. **Process note (surface only, NOT a rule per no-rule-accumulation ruling):** D10.2's F3 class
-   — my two implementation briefs scoped marine+dashboard but the field crossed an API-proxy hop
-   neither could touch (conversion table gap caught at deploy prep). Lesson shape: a cross-repo
-   contract round enumerates every hop the field crosses, including proxies. Operator decides if
-   it's worth writing down.
+5. **Process note — CLOSED 2026-08-04, no rule written (operator):** enumerating every hop a
+   field crosses (incl. proxies) is not architecture and not rule-worthy — "that is just doing
+   your job." Coordinator owns hop-enumeration as baseline duty in every cross-repo brief,
+   unwritten. RULINGS QUEUE FULLY DRAINED 2026-08-04 (items 1-5 all ruled/closed above and in
+   AUDIT-OPUS-WINDOW + C-E03 inventory + MARINE-FORWARD-PLAN).
 
 ## 2. EYEBALL SESSION (after rulings)
 
