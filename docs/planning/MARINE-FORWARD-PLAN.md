@@ -548,7 +548,33 @@ grouping per axe's allowed content model) with zero visual regression (grid clas
 **MUST NOT TOUCH:** anything beyond this block + its test. **Accept:** axe scan of SurfingTab
 render = 0 violations; visual snapshot/build unchanged; targeted vitest green.
 
-### D10 — Phantom SurfForecast fields = three silently-dead dashboard features *(NEW 2026-08-02, D4-audit MINOR finding, lead-escalated after cross-repo greps)*  ⬜
+### D10 — Phantom SurfForecast fields = three silently-dead dashboard features *(NEW 2026-08-02, D4-audit MINOR finding, lead-escalated after cross-repo greps)*  ✅ D10.2 rounds (1)+(2) DONE 2026-08-04 (audit-clean; deploy pending)
+**D10.2 BUILD RECORD (2026-08-04):** marine `69d831a` (SurfForecast gains `shadowFaceHeight` —
+MEAN over structure-affected transects, recorded lead call, None when none — and
+`perPartitionBreaks` reusing the beach-profile serializer, relocated to
+services/surf_1d_pipeline.py; cache codec legacy-tolerant; trace provenance tags) + dashboard
+`d2ceee1` (type reuses BeachProfilePerPartitionBreak, openapi, secondary shadow readout +
+per-partition rows at the deleted block's home, 13-locale i18n). **Adversarial audit
+(aud-d102): 11/13 targets cleared; F1 HIGH** (dashboard `?? pb.heightM` fallback rendered
+deep-water Hs under "AT BREAK" for no-break partitions) **fixed `d2ee1c6`**; **F2 MEDIUM**
+(no test drove the real mean formula) **fixed marine `69a041a`** (`_shadow_face_height_m()`
+extraction + 4 direct formula tests, max-flip falsifiability). Both re-verified CLOSED by the
+auditor with independent falsifiability probes. **F3 (coordinator-caught at deploy prep,
+outside both agents' repo scopes): API converter had no `shadowFaceHeight` entry → would have
+served raw meters labeled ft; fixed api `c1a8212`** (one `_FIELD_GROUPS` entry + first direct
+tests of convert_marine_payload; perPartitionBreaks sub-fields verified already-covered by
+name-keyed recursion). Both flagged openapi defects (:3664 false claim, :3295 wrong date)
+verified ALREADY DEAD — deleted whole-cloth by dashboard `54b1563`; nothing remained to fix.
+Ruling (3) pin verified held (zero waveShapeClassification diff).
+**PRE-STATED POST-DEPLOY GATES (deploy order api → marine → dashboard):** (1) all three
+services active + health 200 post-restart, journal sweeps clean; (2) IMMEDIATELY after marine
+restart: served API /surf entries carry BOTH new keys with no 500s — values may be null
+(legacy warm swelltrack cache deserializes shadow as None by design — the codec's
+legacy-tolerance path); (3) after the NEXT marine cycle publishes: Huntington (pier spot,
+structure-affected transects exist) serves non-null `shadowFaceHeight` in display units with
+`units.shadowFaceHeight == "ft"`, and `perPartitionBreaks` non-null while breaking is present
+(modelStatus ok); (4) dashboard: deploy script build+publish success, site 200; component
+tests/tsc/build already green pre-deploy.
 **Owner:** investigation = `Explore`/read-only agent (API-repo git history); disposition =
 OPERATOR DECISION; any code = its own scoped round. **QC:** auditor at the owning gate.
 **Finding chain:** D4's audit flagged `partitionBreakInfo`, `shadowFaceHeight`,
