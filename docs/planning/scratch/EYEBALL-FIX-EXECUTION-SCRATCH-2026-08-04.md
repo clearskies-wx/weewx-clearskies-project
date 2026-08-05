@@ -1049,3 +1049,28 @@ gate incl. S1b overrule option + S-GAP-1, §5 DQ-W1..W3, §6 lesson-triage propo
   building stack side against the final contract in parallel.
 - For the operator gate: both the refusal and the overrule reasoning are preserved
   here verbatim-in-substance; adjudicate if the lead's chain reading was wrong.
+
+## Round S legs 2/3/4 ACCEPTED (2026-08-05 ~13:10Z) — all gated on operator review
+
+- LEG 3 dashboard (e57eb84 on round-s-scoring off f85505b; docs 5938524 on meta branch
+  round-s-scoring-dashboard-docs): 5-bar UI, adjustments deleted, explainer, qualityScore
+  read-only (never client-computed). Lead-verified: tsc -b 0, SurfingTab 30/30, 16-file
+  scope, FishingTab untouched. Visual/axe deferred to Gate S BY NECESSITY (live API still
+  serves old shape) — Gate S must include live axe + screenshot sign-off post-deploy.
+  HAZARD fixed: dev left META repo checked out on its docs branch — restored to main.
+- LEG 2 api (8150d6c + 3988106 on round-s-scoring off c99f6d5; docs 4cf4289 on the meta
+  docs branch): breakdown reshape + dead score-collision-suppression removal +
+  qualityScore mirror + deltas a+b+c ([surf_scoring] apply/serializer/current-config).
+  Lead-verified: 12/12 new tests, scope exact. Dev's full-suite: 117 fail/51 error ALL
+  proven pre-existing at c99f6d5 via worktree (env gaps: sklearn, API keys, fixtures) —
+  TRIAGE ITEM: api repo test-env debt, its own repair round.
+- LEG 4 stack (9030f13 on round-s-scoring off c7f7593): /admin/surf-scoring form,
+  21/21 tests lead-verified, +1022 purely additive, 13-locale real translations, axe
+  clean (2 wrapper artifacts), correct 422 degradation until LEG 2 deploys. Payload
+  asserts "marine" absent (can never clobber locations).
+- GATE-TIME DOC LIST (land with the gate merges): Operator Manual "Surf Score Weights"
+  section; ARCHITECTURE.md config-UI route inventory (+/admin/surf-scoring); meta docs
+  branch round-s-scoring-dashboard-docs (DESIGN-MANUAL 5938524 + API-MANUAL §19.5
+  4cf4289) merges to main at Gate S.
+- REMAINING: marine S1c/S1d closeout → relay hash to rounds-tests → tests run/commit →
+  full-round acceptance → operator gate (packet §4).
