@@ -103,6 +103,22 @@ mean's honest floor; levers if too generous are harsher clamps or admin weights,
 decided AT THE GATE.
 **[DECIDE] S-2:** S-SPEC-1's six fixture scores vs your intuition and Surfline — the
 gate question, including the spec's own ⚠ row above. Say adjust/accept per scenario.
+**Blind audit result (post-build):** the adversarial auditor could NOT disprove
+conformance — hand-verified all six worked-example totals, every curve boundary,
+rounding order, clamp ordering, single-use, and the config path end-to-end; 254
+scoring-scoped tests pass across all four repos. Four findings: one stale contract
+doc and one stale docstring (both fixed on their branches same-day), plus the two
+disclosed items below (S-3 and S-5).
+**[DECIDE] S-5 (audit F3 — a real conflict between your two design documents):** the
+research brief §7.2 (binding inventory) says Size's beach-alignment gate keys off the
+"dominant partition direction (from multiSwell)"; the plan's locked S-SPEC-1 says
+"keep as-is", and the pre-existing code keyed off the top-level `wave_direction`
+reference. The implementation follows S-SPEC-1 ("keep as-is" = `wave_direction`),
+disclosed in code comments. Rule which document wins: (a) keep `wave_direction`
+(current, status quo), or (b) switch the alignment gate to the dominant partition's
+direction (one small change + test update). Recommendation: (b) at the same time you
+rule S-3 — the partition direction is the more physically meaningful reference for
+which swell is actually breaking, and §7.2 was written as binding.
 **[DECIDE] S-3 (S-GAP-1):** the jacking-factor "sweetener" for Shape is built but
 UNWIRED — the data lives in the beach-profile path and reaching it from the scoring
 path needs either logic duplication or a new pipeline output field (an internal
