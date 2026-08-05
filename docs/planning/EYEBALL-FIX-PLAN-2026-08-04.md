@@ -162,8 +162,9 @@ compute placement = D7, untouched.)
 | **Round A** (A1 bars, A2 card strip, A3 labels, A4 resilience, A-T guards, A-Q audit) | **CLOSED 2026-08-04** | dashboard `a35373d`/`ca0689e`/`c39fe30`+`8f035cd`+`96f5478`/`0debd2a`; guards `963d311`/`6a8c6a2`; 27/27 canonical; Gate A walked; deployed weather-dev `96f5478` |
 | **Round B** (B1 proxy timeout 45 s, B2 contention numbers) | **CLOSED 2026-08-04** | api `d818461` deployed; Gate B walked (honest marginality recorded — 45 s is marginal under co-tenant load; D7 precompute is the real fix, normal order) |
 | **Round P** — beach-profile unification (mid-session authorized round: side-run deletion + zones/shapes/jacking from pipeline + tideLevel/waterlineDistance/beachElevation) | **CLOSED 2026-08-05** | marine `4e0ff18`+`8c2def8` deployed (proc start 03:14:25Z); api `ac96064` deployed; live checks pass (zones anchor exactly to published breaks; waterline math exact in m and ft); guards `7ee5a3c`/`1d6c9b0`/`541644d`, 67 pass local + canonical librewxr; blind audit: main claim COULD NOT DISPROVE (5 rule-outs); reality gate: period/direction/class PASS, Hs leg indicts pre-deploy state (accepted, coordinator disposition); doc sync in API-MANUAL |
-| **D5** — beach-profile card redesign | **IN PROGRESS** | design direction approved 2026-08-04; data prerequisites shipped (Round P); mockup **iteration 3 built from the live unified payload** (docs/planning/mockups/beach-profile-redesign-mockup.html) — AWAITING operator sign-off, then the dashboard implementation round |
-| **D6** — per-break zones (contract y/n) | **AWAITING OPERATOR** | re-presented with iteration-3 mockup's "D6 DEMO" toggle |
+| **D5** — beach-profile card redesign | **SIGNED OFF → implementation GO** (operator 2026-08-05: "overall it looks so much better... much more readable" + "4. yes") | iteration-3 mockup approved; dashboard implementation round queued (sequenced with Round Z so the card lands on corrected zone/break data) |
+| **Round Z** — surf-zone truthing (marine) | **AUTHORIZED 2026-08-05** ("1. yes. 2. yes.") | Z1 foam zone → tide-aware waterline; Z2 break-detection rework (kill saturation jitter + detect the real shorebreak; HB double break is the norm, per operator) |
+| **D6** — per-break zones (contract y/n) | **AWAITING EXPLICIT CONFIRM** | operator's correction ("HB is notorious for its double break") argues FOR it; explicit yes/no requested since it shapes the Round Z contract |
 | **Round S** — surf score rebuild (S1–S7, ADR-101) | **NOT STARTED** | next major round after D5/D6 |
 
 **Parking lot (pre-existing findings, tracked for future rounds — none block Round P):**
@@ -191,7 +192,17 @@ compute placement = D7, untouched.)
    depth minima). No defect; recorded so nobody "fixes" it.
 5. **Radar co-tenant container re-pinning CPU** (librewxr-librewxr-1; operator investigating).
 6. **Proxy 503 at 45 s on uncached keys under co-tenant load** — stands until D7 precompute.
-7. **Break geometry vs reality (operator webcam ground truth, 2026-08-05 01:27Z Duke's cam):**
+7. **→ PROMOTED TO ROUND Z (operator rulings 2026-08-05: "1. yes. 2. yes."):**
+   (a) foam zone extends to the tide-aware waterline — APPROVED criterion change;
+   (b) break-detection rework APPROVED — with the operator's domain correction folded in:
+   **HB is notorious for its double break; it is rare for there NOT to be one** (operator
+   2026-08-05). So Z2 is NOT "suppress inner breaks": it is (i) kill the saturated-profile
+   jitter artifact via crossing hysteresis, AND (ii) make the REAL inner shorebreak
+   detectable (current `depths[i] > 0.3 m` filter excludes the shallow band where HB's
+   shorebreak actually breaks). Specific constants (hysteresis δ, revised depth floor) are
+   design details presented at the Round Z gate with worked examples.
+   Original finding text follows for the record.
+   **Break geometry vs reality (operator webcam ground truth, 2026-08-05 01:27Z Duke's cam):**
    real surf shows foam running to the sand and the outer break out near a pier bumpout;
    payload shows foam ending at 137 ft and breaks at 206/222 ft. Three mechanisms found:
    (a) **foam-zone end is a classifier threshold, not physics** — `_classify_zones`
