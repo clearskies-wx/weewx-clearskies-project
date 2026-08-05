@@ -52,7 +52,12 @@ future, deletes it and cold-starts with a log line naming the direction. Verifie
 the guard caught and deleted a future-stamped file at 09:01, the cycle completed clean,
 published 09:27.
 
-**[DECIDE] DQ-1a (parked from Round P, now sharpened):** SWAN can save its wave
+**RESOLVED 2026-08-05 (operator ruling in chat): warm starts must work, for the
+6-hourly full runs AND the hourly quick updates. Fix for the full runs is built and
+tested; the hourly extension is in progress under full process (agent + adversarial
+QC). Original decision text kept below for the record.**
+
+**[was DECIDE] DQ-1a (parked from Round P, now sharpened):** SWAN can save its wave
 state at the end of a run and reload it at the start of the next run, skipping the slow
 spin-up. That reload never actually happens between cycles, because the saved file is
 stamped with the END time of the previous run while the next run wants to start from a
@@ -91,20 +96,20 @@ The spec's own ⚠ judgment row applies: isolated-worst-case closeout ~50 and bl
 at once and land ~25–35); levers if too generous = harsher clamps or admin weights —
 your call at this gate, per the spec's own instruction.
 
-**COORDINATOR ERROR, disclosed:** the plan's §1 S-SPEC-1 is YOUR locked Round S
-design (exact curves, ruin clamps, null policy, wire shape, config keys, six
-worked-example fixtures) — and I briefed the build from ADR-101 + the research brief
-WITHOUT it, then "resolved" a closeout-severity question the spec had already answered
-(with different numbers than I picked). Caught it mid-session; every leg was halted
-and conformed to S-SPEC-1 verbatim (task S1c + corrected briefs); the manuals I'd
-written against my wrong spec are fixed. Nothing I invented ships: no dataState
-field, no exponent renormalization, spec's own clamp thresholds (peel <15° →
-shape ≤ 0.10; blown-out → conditions = 0.05), spec's config keys. The worked-examples
-table you review at this gate is S-SPEC-1's own six fixtures (Perfect 100 / Balanced
-84 / Small clean 60 / Closeout 50 / Blown-out 47 / Flat 0) — with the spec's own ⚠
-judgment row: isolated-worst-case closeout 50 and blown-out 47 are the geometric
-mean's honest floor; levers if too generous are harsher clamps or admin weights,
-decided AT THE GATE.
+**MY MISTAKE, disclosed:** you wrote and locked an exact design for the new surf
+score (plan §1, "S-SPEC-1"): the exact scoring curves, the penalty rules, what
+happens when data is missing, the exact field and config names, and six worked
+examples with expected scores. When I sent the build teams their instructions, I
+worked from two OLDER documents and never re-read your locked design — so my
+instructions contradicted it in several places (I invented a field you never asked
+for, made up different penalty numbers, and used wrong config names). I caught this
+mid-build, stopped all four teams, and had everything redone to match your locked
+design word for word. The manuals I had written from my wrong version are also
+fixed. Nothing I invented is in the final code. The worked-examples table you review
+at this gate is your own six examples (Perfect 100 / Balanced 84 / Small clean 60 /
+Closeout 50 / Blown-out 47 / Flat 0) — with one flag your spec itself raises: the
+worst-case days (closeout 50, blown-out 47) may feel too generous; if so, the fix
+is harsher penalties or different weights, your call at this gate.
 **[DECIDE] S-2:** S-SPEC-1's six fixture scores vs your intuition and Surfline — the
 gate question, including the spec's own ⚠ row above. Say adjust/accept per scenario.
 **Blind audit result (post-build):** the adversarial auditor could NOT disprove
@@ -139,13 +144,15 @@ show a slightly-wrong number). The plan's "total unchanged" note was therefore
 erroneous. Ruled: marine now publishes `qualityScore` (int 0-100, the same value
 stars derive from) beside `qualityStars` — implementing the ADR's own display line
 ("score + stars + five bars"). Confirm or rename at the gate.
-**Also at this gate — an authority episode you should adjudicate:** the api agent
-initially refused the config-carry contract change (new `[surf_scoring]` keys) as an
-unauthorized architectural change; I overruled citing your recorded chat approval of
-ADR-101 + its Consequences bullet naming these keys + the plan §S3 row assigning the
-work; the agent then verified the chain itself and proceeded. Both positions are
-preserved in the scratch log — if my chain reading overstepped, say so and the rules
-get tightened accordingly.
+**Also at this gate — a judgment call of mine to check:** one of the build agents
+refused an instruction twice. The instruction was to add the new scoring config
+settings, and the agent refused because adding config settings is on the "needs
+operator approval" list. I told it you had already approved this — the design
+document you accepted (ADR-101) names these exact settings, and the plan section you
+locked assigns exactly this work. The agent checked those documents itself, agreed,
+and did the work. The question for you: was pointing at your earlier written
+approval enough, or should I have come back and asked you directly in chat? If I
+overstepped, say so and I'll tighten the rule.
 
 ## 5. Round W decision queue (from the audit — none urgent, all documented in code)
 
