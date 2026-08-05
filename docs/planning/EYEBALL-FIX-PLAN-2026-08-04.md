@@ -129,11 +129,22 @@ labels already have (`:656-670` pattern — rounded rect, card-glass fill) + min
 separation: labels closer than 56 px stagger vertically in 14 px steps (2-pass greedy from
 seaward). No other visual changes (D5 owns the redesign).
 
+> **AS SHIPPED (2026-08-04, supersedes the above):** stagger + background rects landed
+> (`c39fe30`), then bounding-box collision + y-clamp (`8f035cd`) — but the algorithm still
+> saturated at ≥5 clustered breaks (audit F1). Operator ruling in chat ("why are we wasting
+> time on the old chart?"): the two colliding label rows (per-partition annotation +
+> breaker-type text) were DELETED outright (`96f5478`, lead-direct) rather than iterated.
+> The old chart keeps markers/zones only; all labeling design moves to the D5 redesign.
+
 ### S-SPEC-4 — Client resilience (items 7/8/12 client half)
 
 `useApiQuery` (dashboard hook): on fetch error, schedule retry with exponential backoff 5 s → 10 →
 20 → 40 → cap 60 s, and KEEP the normal refresh timer armed after first success. Marine hooks
-(`useMarine*`): `pollInterval: 120_000` so a transient 503 self-heals. No contract change.
+(`useMarine*`): `pollInterval: 120` so a transient 503 self-heals. No contract change.
+
+> **ERRATUM (caught at dispatch 2026-08-04):** this spec originally said `120_000` — wrong
+> units. `useApiQuery`'s `pollInterval` takes SECONDS (×1000 internally at
+> `useApiQuery.ts:307-308`); `120_000` would poll every 33 hours. Shipped value: `120`.
 
 ### S-SPEC-5 — Proxy timeout (mechanism M1)
 
@@ -150,7 +161,7 @@ compute placement = D7, untouched.)
 |---|---|---|---|---|
 | A1 | Score bars fill per-category (standing ADR-096; interim until S4) | `SurfingTab.tsx:219` `ScoreBar` fillPct; DESIGN-MANUAL:1343 SURF-1 text deleted | dashboard-dev | fillPct divides by the factor's own max. FAIL: any `/100` denominator on component bars; FAIL: "SURF-1" appears in DESIGN-MANUAL |
 | A2 | Swell card strip per S-SPEC-2 | SurfingTab.tsx Current Swell card block | dashboard-dev | Removed sections absent from JSX; peel row + D2-exception rows present. FAIL: SurfBeat/wave-shape/best-peak markup remains |
-| A3 | Label collisions per S-SPEC-3 | `BeachProfileChart.tsx:740-850` | dashboard-dev | Background rects on every break-point label; stagger logic present; screenshot with 3+ break points shows zero overlap |
+| A3 | Label collisions per S-SPEC-3 (as-shipped: label rows deleted per operator ruling — see S-SPEC-3 AS SHIPPED note) | `BeachProfileChart.tsx` | dashboard-dev + lead-direct `96f5478` | Zero label overlap by construction (annotation + breaker-type rows removed); markers/zones intact |
 | A4 | Client resilience per S-SPEC-4 | `useApiQuery` hook + marine hooks | dashboard-dev | Error path schedules retry (test: mock 503 → recovers without reload). FAIL: retry only on success path |
 | A-T | Guards for A1–A4 | dashboard tests | test-author | fillPct regression test (denominator = category max); useApiQuery 503-recovery test |
 | A-Q | Blind audit + visual sign-off | — | auditor + coordinator | Gate A below |
