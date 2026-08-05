@@ -418,6 +418,185 @@ verification transcript, confirmation zero source files and zero passing tests t
   Recommend `scripts/deploy-librewxr.sh` (mirroring this round's manual procedure) if the
   operator wants it.
 
+## ROUND 3 — reprocessed-scan adoption (P3) + multi-satellite coverage test (P2)
+## (added 2026-08-05 after operator rulings: P2 "ok fix", P3 "ok yes that needs fixed")
+
+Baseline for this round: HEAD `9b34775` (deployed image is `60ffa81`; `9b34775` is docs-only).
+
+### Problem (P3, confirmed by the adversarial auditor, inherited from upstream baseline)
+
+NOAA occasionally republishes the same scan timestamp under a new S3 key (same `_s` start
+token, newer `_c` creation token — a reprocessed/corrected product). Current behavior keeps
+the FIRST key per timestamp (lexicographically smallest = earliest-created) and, once a
+timestamp is resident in `self._frames`, never revisits it — the corrected product is
+ignored forever. Operator ruled the corrected product must win.
+
+### Allowlist (round 3)
+
+1. `src/librewxr/sources/satellite/_geo_base.py` — R3-A
+2. `src/librewxr/data/fetcher.py` — R3-A wiring (ONLY inside `_fetch_satellite_background`)
+3. `src/librewxr/tiles/cache.py` — R3-A invalidation helper
+4. `tests/test_satellite_goes.py` — guards G-R3a/b/c + the P2 coverage test (R3-B)
+5. `tests/test_renderer.py` — guard G-R3d (TileCache tests live here, marker `tiles`)
+
+NOT to touch: `warmer.py`, all other sources, routes.py, config.py, compose/Dockerfile,
+any other test. Same git/container/architectural blocks as rounds 1–2.
+
+### R3-A design (lead calls)
+
+**A1 — latest key wins per timestamp.** In `_fetch_sync`, the per-timestamp key choice
+changes from first-wins (`setdefault`) to latest-wins: iterate `sorted(keys)` and
+unconditionally assign, so the lexicographically LARGEST key per timestamp is chosen
+(GOES/Himawari filenames zero-pad the `_c` creation token, so lexicographic max = latest
+created). Rename the dict `best_key_by_ts`. Trim to newest `max_frames` distinct
+timestamps stays exactly as in `60ffa81`.
+
+**A2 — replacement detection for resident timestamps.** New instance state
+`self._frame_keys: dict[int, str]` (ts → the s3 key that produced the stored frame).
+Ingest loop per `(unix_ts, s3_key)`:
+- Not resident → download as today; on success record `self._frame_keys[unix_ts] = s3_key`.
+- Resident with `self._frame_keys.get(unix_ts)` **None** (frame came from the disk cache /
+  snapshot restore, key unknown) → ADOPT the listed key without re-downloading (prevents a
+  re-download storm after every restart; a republish that happened entirely during downtime
+  is accepted as missed — document this in the method docstring).
+- Resident with a recorded key and `s3_key <= recorded` → skip (today's dedup).
+- Resident with a recorded key and `s3_key > recorded` → REPLACEMENT: re-download; on
+  success overwrite `self._frames[unix_ts]`, update `self._frame_keys`, `_write_cache` the
+  new array (verify it overwrites the same path), append `unix_ts` to a replacement list,
+  and log INFO: `"%s: replaced reprocessed frame ts=%d (%s)"`.
+- Eviction (the trim loop at the end) also pops `self._frame_keys`.
+- `_fetch_sync` returns `new_count > 0 or bool(replaced)` so a replacement fires the
+  cycle-complete hook and warm.
+- New method `consume_replaced_timestamps(self) -> list[int]` — returns and clears the
+  replacement list. `_frame_keys` is NOT persisted to the snapshot/disk cache (WORKERS=1
+  deploy; the adopt rule covers restore).
+
+**A3 — tile-cache invalidation.** Satellite tile/geometry cache keys are
+`("sat", backing, timestamp, z, x, y, tile_size, ext)` (routes.py:622) — timestamp at
+index 2, so the existing `invalidate_timestamp` (matches `k[0] == ts`) does NOT reach
+them. Add to `TileCache`:
+
+**AMENDED 2026-08-05 after the implementer's STOP finding (lead-verified by grep):** TWO
+satellite key shapes are in live use — single-family `("sat", backing, ts, z, x, y,
+tile_size, fmt)` (ts at index 2; warmer.py:452/639, routes.py:622) and multi-family
+`("sat", "multi", families_tag, ts, z, x, y, tile_size, fmt)` (ts at index 3;
+warmer.py:449/636, routes.py:608). The production BBOX overlaps both GOES disks, so the
+multi shape is what actually runs — an index-2-only match would silently invalidate zero
+entries in production. The helper must match BOTH shapes. Positions 2–3 are always
+(str, int) or (str-tag, int), so an `in`-membership check is type-safe:
+
+```python
+def invalidate_satellite_timestamp(self, timestamp: int) -> None:
+    """Remove satellite entries for a timestamp, covering both key shapes:
+    ("sat", backing, ts, ...) and ("sat", "multi", families_tag, ts, ...).
+    Positions 2-3 are (str, int) in both shapes, so int membership in
+    k[2:4] cannot false-positive on the string fields."""
+    with self._lock:
+        keys_to_remove = [
+            k for k in self._cache
+            if len(k) >= 4 and k[0] == "sat" and timestamp in k[2:4]
+        ]
+        for k in keys_to_remove:
+            self._total_bytes -= _size_of(self._cache[k])
+            del self._cache[k]
+```
+
+G-R3d is amended accordingly: seed BOTH shapes at the target ts, both shapes at a
+different ts, and a radar-shaped key at the target ts — invalidation removes exactly the
+two satellite entries at the target ts, `total_bytes` stays consistent.
+
+**A4 — fetcher wiring.** In `_fetch_satellite_background` (fetcher.py:380–402), after a
+successful `fetch()` that returned True and BEFORE `_fire_cycle_complete()`/warm:
+
+```python
+replaced = getattr(contrib.instance, "consume_replaced_timestamps", None)
+if replaced is not None and self._cache is not None:
+    for ts in replaced():
+        self._cache.invalidate_satellite_timestamp(ts)
+```
+
+(Order matters: invalidate before the warm fires so the warm re-computes those tiles
+instead of skip-as-cached.) Log WARNING nothing — the source already logs INFO per
+replacement; the fetcher stays quiet. Verify `self._cache` is the TileCache attribute name
+used at fetcher.py:576 and reuse it exactly.
+
+### R3-B — multi-satellite default-path coverage test (P2)
+
+In `tests/test_satellite_goes.py`: one new test pinning ADR-079's default disk-overlap
+selection — settings mock with the SoCal bbox, `multi_satellite = True`, the same integer
+attrs as the repaired provider tests, VIS enabled. Assert `satellite_provider()` returns
+4 contributions (GOES-18 IR+VIS, GOES-19 IR+VIS — both disks overlap the bbox) and that
+both families' slugs appear. Comment: pins the default multi-family path the repaired
+tests deliberately exclude. Declared new-pin (non-falsifiable-vs-pre-change).
+
+### Guards (must FAIL against `9b34775`, transcripts required; tests-first order)
+
+- **G-R3a (latest wins in one listing):** listing with `(ts, "..._c20250101010101.nc")`
+  and `(ts, "..._c20250101010999.nc")` → the LATER key is downloaded, the earlier never.
+  Fails at baseline (first-key-wins downloads the earlier).
+- **G-R3b (resident replacement):** poll 1 ingests ts with key A; poll 2 lists key B > A
+  for the same ts → exactly one re-download, frame data replaced (distinguishable stub
+  arrays), `consume_replaced_timestamps()` == [ts]; poll 3 with the same listing → no
+  further download and `consume_replaced_timestamps()` == []. Fails at baseline
+  (AttributeError / no replacement).
+- **G-R3c (adopt-after-restore):** resident frame with no recorded key + listing with one
+  key for that ts → zero downloads, key adopted (a subsequent poll with a NEWER key then
+  triggers G-R3b behavior). Fails at baseline (AttributeError on the key map).
+- **G-R3d (satellite invalidation, in test_renderer.py):** seed a TileCache with a
+  satellite key `("sat", "goes18_ir_grid", 1000, 3, 1, 2, 256, "png")`, a radar-shaped key
+  `(1000, 3, 1, 2, 256, 1, 0)`, and a satellite key at a different ts.
+  `invalidate_satellite_timestamp(1000)` removes ONLY the first; `total_bytes` stays
+  consistent. Fails at baseline (method missing).
+
+### Verification command (round 3)
+
+```
+.venv\Scripts\python -m pytest tests/test_satellite_goes.py tests/test_renderer.py tests/test_fetcher.py tests/test_warmer_satellite.py -q
+```
+
+Expected: 0 failed (1 skip in test_fetcher.py on Windows, itemized). Lead runs the full
+suite at acceptance (expected ≥1113 passed / 6 skipped / 0 failed).
+
+### Deliverable (round 3)
+
+Two local commits, NOT pushed: `fix(satellite): adopt reprocessed scans — latest key wins,
+replace resident frames, invalidate stale tiles` (3 source files) and `test(satellite):
+guards for reprocessed-scan adoption + multi-satellite default-path coverage` (2 test
+files). Closeout via SendMessage: per-guard falsification transcript, the warmer key-shape
+verification result (A3), full verification transcript, files-touched confirmation.
+
+## Verification evidence — round 3 close (2026-08-05, lead-run)
+
+- Implementation: `460e857` (A1–A4 per amended spec) + `a43ad03` (guards G-R3a/b/c/d +
+  R3-B). Lead independent full suite: 1113 / 6 / 0 matching closeout; commits exactly on
+  the 5-file allowlist; A2 replacement diff spot-checked. One existing test modified (the
+  round-1-remediation tie-break guard) — required by the ruled A1 reversal, surfaced by
+  name in the closeout, diff verified to touch only the tie-break assertion.
+- Implementer STOP finding (accepted, lead-verified by grep): TWO satellite cache-key
+  shapes exist; production runs the multi shape; original A3 snippet would have
+  invalidated nothing live. A3/G-R3d amended before any code.
+- Blind adversarial audit round 3: C5 COULD-NOT-DISPROVE (incl. failed-download retry,
+  eviction bounds, no-churn, 20k-op thread-handoff stress); **C6 DISPROVEN twice**:
+  (1) `k[2:4]` matcher also removed entries whose zoom == target timestamp;
+  (2) an exception after an in-memory replacement permanently lost the pending tile
+  invalidation (key map already advanced → undetectable forever). C7 1113/6/0 confirmed.
+- Remediation `4c2cc36` (lead-direct): shape-discriminated matcher (k[1]=="multi" → ts at
+  index 3, else index 2); replacement appended to the persistent pending list the moment
+  the in-memory frame changes (before `_write_cache`); pending unconsumed replacements
+  force fetch()→True so the next clean poll consumes them. Both guards falsified
+  pre-remediation. Full suite: **1115 / 6 / 0**.
+- Auditor re-verification at `4c2cc36`, own scripts unmodified: false-positive fixed,
+  dropped-replacement now "at worst a one-cycle delay" (end-to-end probe), no warm-loop,
+  no double-invalidation, no new defect. COULD-NOT-DISPROVE.
+- Doc-sync: fork CLAUDE.md ingest bullet updated to latest-wins + replacement +
+  invalidation (`0c4c698`).
+- Push: `9b34775..0c4c698`. Deploy: **first live run of `scripts/deploy-librewxr.sh`
+  (P4) — all 5 steps green**, health 200 attempt 2, `DEPLOYED_COMMIT=0c4c698` verified
+  on the container. Post-deploy signature capture scheduled (one-time ~25-min cold-cache
+  rebuild expected again).
+- P2 CLOSED (`test_provider_returns_both_families_for_multi_satellite_default`),
+  P3 CLOSED (this round), P4 CLOSED (script live-verified). P1 closed in round 2.
+
 ## Post-acceptance (lead-run, not the implementer's job)
 
 - Lead independently re-runs pytest, diffs commits vs allowlist, spot-checks D1 in the file.
