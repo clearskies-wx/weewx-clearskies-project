@@ -529,6 +529,29 @@ doc sync (API-MANUAL new fields, plan §S-SPEC-3 A3-as-shipped) → round close.
   (lead-direct doc fix in code comment), _MIN_BREAK_HS_M change = operator option
   (recommend keep); F3 accept → recommend D5 card skips zero-width bands (display),
   contract unchanged; document in API-MANUAL.
+- **GATE RULINGS (operator 2026-08-05, in chat):** (1) δ 0.15→0.05 YES + wave-reform
+  physics investigation ordered ("that is what needs to happen"); (2) _MIN_BREAK_HS_M
+  0.15→0.10 YES; (3) zero-width foam bands: card-side skip, tied to operator's standing
+  heat-map SMOOTHING want ("so a few transects zeroing out does not make a difference" —
+  fold into D5/D7 design). Operator communication flag (3rd tonight): explain in plain
+  words, no invented terms.
+- RETUNE SHIPPED lead-direct (operator-approved constants): marine 36fab04 (two
+  constants + provenance comments + guard pins/hand-traces updated). Local 73 passed;
+  pushed 59f5e49..36fab04; deployed, process start 06:07:06 UTC; canonical librewxr
+  35 passed at 36fab04.
+- **FIRED GUARD (gate event, investigated, benign):** 06:05:35 "SWAN level1: crashed
+  with hotstart loaded — deleting stale hotstart and retrying cold" — same journal
+  second shows `systemd: Stopping` — the RETUNE DEPLOY's restart killed SWAN
+  mid-compute; the crash-retry heuristic misattributed the SIGTERM to the hotstart and
+  deleted a good file. The 05:26:05 warm start completed cleanly (no crash signals
+  05:26-05:31). Warm starts WORK. NEW parking-lot note: crash-retry cannot distinguish
+  crash from shutdown → every mid-compute deploy costs one cold start (fix: check
+  shutdown flag/exit signal before deleting; small, non-urgent).
+- Wave-reform investigation: OPERATOR-ORDERED — post-breaking decay keeps Hs pinned at
+  γ·d (waves never back off/reform); ~68% of transects can never show the real double
+  break at any detector setting. Investigation = read our breaking/roller decay code vs
+  the standard published treatment (broken waves decay toward a LOWER stable height,
+  Dally-type reforming); findings + options to operator BEFORE any physics change.
 - PROCESS CORRECTION (2nd over-escalation tonight, both operator-flagged): reality-gate
   disposition + hotstart stamp comparison were both coordinator calls presented as
   operator decisions. Lesson candidate for round close (surface triage per lesson-capture
