@@ -433,3 +433,18 @@ doc sync (API-MANUAL new fields, plan §S-SPEC-3 A3-as-shipped) → round close.
   Rollback NOT executed: it would not restore baseline state (state is regenerated, not
   in the code), would re-trigger another cold start, and the buoy evidence says the
   current value is the better one. Operator rules on disposition.
+  **DISPOSITION (2026-08-05, operator: "is this architecture? No... so why am I being
+  bothered about it?"):** deploy ACCEPTED, no rollback — coordinator's call, per the
+  evidence above. Inflated pre-deploy heightM folded into the chronic-hotstart
+  investigation (auditor side-investigation #3). Corroborating second sample: the
+  original hung fetch completed with identical partitions (14.3145 s @ 197.225°).
+  PROCESS-LESSON CANDIDATE (triage to operator at round close, per lesson-capture rule):
+  a verification-gate failure whose evidence clearly indicts the baseline — and where no
+  actual rollback would be executed — is a coordinator disposition to record, not an
+  operator escalation. Candidate edit to rules/verification.md reality-gate wording.
+- **Radar container re-pin:** operator 2026-08-05 "i will look into it" — theirs; no
+  restart by coordinator; watch item stays.
+- **D5 GO (operator 2026-08-05 "D5 yes at it"):** build the mockup from the live unified
+  payload now (not held for audit close). D6 (per-break zones y/n) still UNANSWERED —
+  re-present WITH the rebuilt mockup via its per-break-zones demo toggle, per the
+  original "re-present after unified data + corrected mockup" instruction.
