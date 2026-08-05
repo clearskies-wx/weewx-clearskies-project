@@ -239,17 +239,23 @@ compute placement = D7, untouched.)
    round close: correct physics over clamps/bandaids, project-wide. → ROUND W
    (wave-reform physics) opens; bathymetry check remains queued separately in
    inv-break-geometry (not a substitute).**
-   **ROUND W GROUND TRUTH (operator 2026-08-05, current conditions at HB pier):** the
-   real seaward break sits ≈300 ft FROM THE WATERLINE; the real second break ≈100 ft
-   from the waterline; the model's published outer-break position is approximately
-   correct per operator eyeball. Gate consequences: (1) Round W acceptance compares
-   modeled break positions measured FROM THE TIDE-AWARE WATERLINE (convert from the
-   survey-zero distances the payload publishes: waterline-relative = distance −
-   waterlineDistance), at matched time/tide, against ≈300 ft (outer) and ≈100 ft
-   (inner); (2) the outer-bar bathymetry is corroborated ≈correct — the reform/second
-   break question lives in the 100–300 ft-off-waterline band, which is exactly the
-   stretch inv-break-geometry's pier calibration covers if the physics alone doesn't
-   put the inner break at ≈100 ft.
+   **ROUND W GROUND TRUTH (operator 2026-08-05, with the operator's own error bars):**
+   real seaward break ≈300 ft and second break ≈100 ft from the waterline; the double
+   break is a LONG-STANDING persistent feature; the model's published outer-break
+   position is approximately correct per operator eyeball. **Measurement provenance
+   (operator caveat, same date): these are ESTIMATES from visual orthophotography of
+   UNKNOWN DATE, measured from the waterline VISIBLE IN THE PHOTO — not the official
+   zero line and not a known tide state.** Gate consequences, adjusted accordingly:
+   (1) treat 300/100 ft as SCALE-AND-STRUCTURE anchors, not exact thresholds — the
+   photo's unknown tide alone moves the waterline reference by up to ~±100 ft on this
+   flat beach (observed sensitivity: ~55 ft of waterline shift per foot of tide), so
+   the checkable claims are: two distinct breaks; outer roughly 3× the inner's
+   waterline distance; reform gap of order 200 ft; both well seaward of the sand.
+   (2) The SHARP instrument for exact positions remains a matched-time webcam
+   observation at known tide (inv-break-geometry's method); use that at the Round W
+   gate for the precise comparison, with the orthophoto numbers as the coarse prior.
+   (3) Waterline-relative conversion still applies (waterline-relative = published
+   distance − waterlineDistance).
    Original finding text follows for the record.
    **Break geometry vs reality (operator webcam ground truth, 2026-08-05 01:27Z Duke's cam):**
    real surf shows foam running to the sand and the outer break out near a pier bumpout;
