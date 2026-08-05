@@ -223,5 +223,78 @@ survives compaction. Update after every state change.
   elevations + tide-aware waterline. Round P (profile unification) is now fully authorized:
   side-run deletion + zones/shapes/jacking from pipeline + new waterline/elevation fields.
 
+## ROUND P (unification) — acceptance + deploy (2026-08-04 evening)
+- Implementation ACCEPTED: marine 4e0ff18 (P1.1-P1.3) + 8c2def8 (P1.4), api ac96064 (P2).
+  Allowlist clean (4 files/2 repos). Coordinator grep re-runs: zero run_1d_analytical call
+  sites in beach_profile.py; no live tide_level=0.0; new fields in response dict +
+  conversion table. Spot-checks: zones fed seaward-first published breaks (sort :658 →
+  classifier outer=[0] ✓); waterline helper keeps seaward-most crossing on ascending
+  signed profile ✓; jacking gamma=0.73 unchanged ✓. P1.3 extraction declared
+  (_compute_wave_shapes, byte-identical). Brief over-spec caught by agent: tideLevel
+  already in conversion table (marine_response_conversion.py:229, lead-verified) — only
+  waterlineDistance/elevation added.
+- BASELINE (pre-deploy, fresh timestep): impact zone 155.0→112.3 ft vs breaks
+  [219.8, 200.2, 137.9, 118.3] ft (disjoint = the defect); waveShapes N=31 max dist
+  7008.7 ft; new fields absent.
+- EXPECTED post-deploy (stated pre-look): impactZone.startDistance ≈ 219.8 ±5 ft;
+  waveShapes max distance ≤ ~463 ft; tideLevel finite; waterlineDistance ∈ [−297, 0] ft
+  (or null + WARNING); beachElevation present, signed.
+- Pushed both repos; deploy-marine.sh running (47c8084 dead-code + Round P ride together);
+  deploy-api.sh next; then live checks + journal sweep + reality gate + publish-liveness.
+
+## ══════════ RESUME POINT (session compressed 2026-08-04 ~20:20 PT) ══════════
+
+**WHERE WE STOPPED:** Round P deployed to librewxr — verified running commit 8c2def8,
+process started Wed 2026-08-05 03:14:25 UTC, /health + /manifest 200, auth enforced
+(deploy-marine.sh transcript). 47c8084 dead-code deletion deployed with it.
+deploy-api.sh (Round P conversion entries, api ac96064) was LAUNCHED in background at
+stop time — VERIFY IT COMPLETED on resume (`ssh weewx` → API health, or re-run
+`./scripts/deploy-api.sh --skip-pull` if unclear; API warm-up 130 s).
+
+**IMMEDIATE NEXT STEPS (in order):**
+1. Verify deploy-api.sh completed (health 200) — if not, re-run it.
+2. Round P LIVE CHECKS against the pre-stated expected numbers (baseline + expectations
+   recorded in the "ROUND P acceptance + deploy" section above):
+   `ssh -F .local/ssh/config weewx "curl -sk 'https://localhost:8765/api/v1/surf/huntington-city-beach-pier/profile'"`
+   → impactZone.startDistance ≈ outermost breakPoint distance ±5 ft (baseline defect:
+   155 vs 220); waveShapes max distance ≤ ~463 ft (was 7,009); tideLevel finite;
+   waterlineDistance ∈ [−297, 0] ft or null+WARNING in journal; beachElevation present
+   signed; units block has waterlineDistance/elevation in ft.
+3. Post-deploy journal sweep (sudo!): `ssh librewxr "sudo journalctl -u
+   weewx-clearskies-marine --since '2026-08-05 03:14' --no-pager | grep -iE
+   'error|warning'"` — new classes vs pre-deploy = findings.
+4. Publish-liveness + reality gate (rules/verification.md): forecast still publishing
+   within one cycle; paste our dominant partition Hs/Tp/dir beside NDBC 46253 obs (state
+   comparison quantity + tolerance BEFORE looking). This deploy didn't touch model
+   physics — expect unchanged vs pre-deploy.
+5. Dispatch test-author for Round P guards (P-T): waterline-crossing KAT (hand-computed
+   fixture; new function → pre-change proof = ImportError, declare non-falsifiable pin);
+   zones-anchor-to-published-breaks guard; _compute_wave_shapes extraction-fidelity pin.
+   Then blind auditor for Round P (include the surf.py:389-423 median-bathy land-points
+   investigation in its scope).
+6. Rebuild the D5 mockup from the UNIFIED live payload (real zones, real waterline, real
+   beachElevation — no synthesized anything) → operator final D5 sign-off → then the
+   dashboard profile-card implementation round. Mockup source PERSISTED at
+   docs/planning/mockups/beach-profile-redesign-mockup.html (+ data json). Artifact URL
+   (same one throughout): https://claude.ai/code/artifact/86d75d59-5fc7-42b2-890c-5820dd3db374
+7. Then D6 re-present (zones per break — now meaningful), D7 in normal plan order,
+   Round S (surf score rebuild per plan §S-SPEC-1) next major round.
+
+**STANDING SESSION FACTS:**
+- Operator authorized push/deploy for testing all session. All agent rounds used
+  scope-ack protocol; all agents completed (none in flight at stop).
+- Repos at stop: meta local main 9ae2dea+1 uncommitted scratch edit (commit on resume);
+  dashboard main 96f5478 (pushed/deployed); marine main 8c2def8 (pushed/deployed);
+  api main ac96064 (pushed; deploy launched).
+- Rounds A/B CLOSED (evidence above). Round P: implementation accepted, deploy done
+  (marine)/in-flight (api), QC (guards+audit+gates) NOT yet done.
+- Radar container librewxr-librewxr-1 restarted this session (runaway 8-core python);
+  watch for re-pin — if compute times degrade again, check it first.
+- Plan erratum fixed in flight: S-SPEC-4 pollInterval units (seconds not ms). Brief
+  erratum: restore steps must use `git checkout HEAD -- <file>`.
+- DESIGN-MANUAL synced for A1/A2 (SURF-1 removed, provenance note added, Swell Card row
+  rewritten). API-MANUAL/plan §S-SPEC-3 text sync for A3-as-shipped still owed at Round P
+  close (add to doc-sync checklist).
+
 ## Evidence log
 (append gate rows / command outputs here as rounds close)
