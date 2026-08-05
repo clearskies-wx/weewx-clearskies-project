@@ -221,12 +221,15 @@ compute placement = D7, untouched.)
    K=0.30)** — because the CUDEM profiles' trough relief (0.03-0.3 m) is too subtle for
    waves to back off below even Γ·d. Cost side: 5 functions/2 files, 2 new physics
    constants, both clamps redone, reshapes face-height/zones/jacking on EVERY transect.
-   **Implication surfaced to operator: reality shows a reliable double break; correct
-   physics on OUR seabed data cannot produce one → the likelier culprit is the seabed
-   data itself (CUDEM's bar-trough vs the CURRENT sandbar — sandbars migrate
-   seasonally). Recommended order: bathymetry-vs-reality check (fold into
-   inv-break-geometry: webcam break positions at known tide ⇒ implied depths) BEFORE
-   any physics change.** Operator decision pending.
+   **RETRACTED (operator correction 2026-08-05): the coordinator's "CUDEM is stale,
+   sandbars migrated" explanation was speculation stated as likelihood — the operator
+   confirms the double break at these positions is LONG-STANDING and precedes the
+   bathymetry data; it is a persistent feature, not recent sandbar migration. What
+   remains established: our transect profiles show only 0.03-0.3 m of relief in the
+   100-300 ft-off-waterline band while reality reliably double-breaks there. The CAUSE
+   of that data-vs-persistent-feature discrepancy is UNESTABLISHED (candidates include
+   surf-zone smoothing inherent in the CUDEM compilation or our transect
+   interpolation — to be settled by the inv-break-geometry measurement, not assumed).** Operator decision pending.
    **OPERATOR RULING 2026-08-05 (chat): implement the REAL physics — "You will make the
    changes to our model to promote real physics and not fake clamping... I have asked
    more than once that this be done correctly and all time, I find fake clamps,
@@ -236,6 +239,17 @@ compute placement = D7, untouched.)
    round close: correct physics over clamps/bandaids, project-wide. → ROUND W
    (wave-reform physics) opens; bathymetry check remains queued separately in
    inv-break-geometry (not a substitute).**
+   **ROUND W GROUND TRUTH (operator 2026-08-05, current conditions at HB pier):** the
+   real seaward break sits ≈300 ft FROM THE WATERLINE; the real second break ≈100 ft
+   from the waterline; the model's published outer-break position is approximately
+   correct per operator eyeball. Gate consequences: (1) Round W acceptance compares
+   modeled break positions measured FROM THE TIDE-AWARE WATERLINE (convert from the
+   survey-zero distances the payload publishes: waterline-relative = distance −
+   waterlineDistance), at matched time/tide, against ≈300 ft (outer) and ≈100 ft
+   (inner); (2) the outer-bar bathymetry is corroborated ≈correct — the reform/second
+   break question lives in the 100–300 ft-off-waterline band, which is exactly the
+   stretch inv-break-geometry's pier calibration covers if the physics alone doesn't
+   put the inner break at ≈100 ft.
    Original finding text follows for the record.
    **Break geometry vs reality (operator webcam ground truth, 2026-08-05 01:27Z Duke's cam):**
    real surf shows foam running to the sand and the outer break out near a pier bumpout;
