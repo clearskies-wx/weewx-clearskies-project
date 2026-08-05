@@ -299,6 +299,77 @@ stop time — VERIFY IT COMPLETED on resume (`ssh weewx` → API health, or re-r
 ## Evidence log
 (append gate rows / command outputs here as rounds close)
 
+## ══════════ RESUME POINT 2 (session compressed 2026-08-05 ~07:45Z / ~00:45 PT) ══════════
+
+**IN FLIGHT AT STOP: roundw-dev (clearskies-api-dev agent, named "roundw-dev") is
+mid-implementation of Round W.** Scope ack CONFIRMED; expect its closeout via
+SendMessage/task-notification. Its brief:
+docs/planning/briefs/ROUND-W-WAVE-REFORM-BRIEF-2026-08-05.md — READ IT before acting on
+the closeout. NOTE: the marine repo may gain W1/W2/W3 commits at any time; do not touch
+that repo until the closeout lands.
+
+**RESUME CHECKLIST (in order):**
+1. Process roundw-dev closeout → ACCEPTANCE GATE: independent local pytest re-run
+   (expect listed Z2-pin failures ONLY — each must be explainable as pinning superseded
+   clamp/hysteresis behavior; any other failure = investigate); allowlist diff (2 files:
+   surf_1d_analytical.py, surf_1d_pipeline.py); verify its 3 throwaway-script outputs
+   (closed-form shelf agreement, bar-trough double onset, real-transect run); grep
+   checks (both clamps gone, no B-J/roller call sites).
+2. Dispatch clearskies-test-author for W guards: KAT vs the paper's closed-form shelf
+   relaxation H²(x)=Γ²h²+(H_b²−Γ²h²)·exp(−K(x−x_b)/h) with hand-computed literals;
+   bar-trough double-onset guard; constants pins (Γ=0.40, K=0.15); UPDATE the Z2 pins
+   that the state-based path supersedes (document supersession); invariant-warning test.
+3. Blind auditor (fresh brief; auditor must attack: numerical stability of forward-Euler
+   on nonuniform dx, energy conservation sanity, behavior at clamp-removal edge cases,
+   the combined-profile saturation helper, unexpected reshaping of faces/zones/jacking).
+4. Push + deploy-marine.sh + canonical librewxr pytest + journal sweep.
+5. REALITY GATE (pre-state expectations BEFORE looking): (a) structural test vs operator
+   orthophoto anchors — two distinct breaks, outer ≈3× inner's waterline distance
+   (~300 ft vs ~100 ft, approximations sufficient to judge); waterline-relative =
+   published distance − waterlineDistance; (b) matched-time webcam at known tide for
+   sharpening (inv-break-geometry method); (c) NDBC 46253 beside; (d) OPERATOR
+   worked-examples review MANDATORY before round close (every surf number reshapes).
+6. After W closes: D5 dashboard implementation round (card consumes the reshaped
+   payload; skips zero-width bands; smoothing direction per operator), then Round S
+   (surf score rebuild, ADR-101).
+7. LESSON TRIAGE to operator (owed): 2 over-escalations (reality-gate disposition,
+   hotstart comparison); invented vocabulary ("model-run-semantics"); 3
+   speculation-as-fact incidents (ankle-deep dismissal, bathymetry-staleness story,
+   fabricated ±100 ft tide figure — all operator-corrected); standing directive "real
+   physics over clamps/bandaids, project-wide". Proposed rules-file edits go to
+   operator BEFORE landing.
+
+**REPO STATE AT STOP:** dashboard main 96f5478 (pushed/deployed weather-dev). marine
+main 36fab04 (pushed/deployed librewxr 06:07:06Z; roundw-dev will add local commits).
+api main c99f6d5 (pushed/deployed weewx). meta local main (not pushed — no instruction).
+
+**STANDING FACTS (this session):**
+- Round W authorization is explicit and total: operator ordered real physics replacing
+  the fake clamps; bathymetry-first recommendation REJECTED; DDD constants Γ=0.40
+  K=0.15 verified from the ORIGINAL paper (PDF fetched; recommended pair for varying
+  slopes; closed-form shelf solution exists → KAT basis). Onset γ=0.73 UNCHANGED.
+- Operator ground truth: HB double break is LONG-STANDING; outer ≈300 ft / inner
+  ≈100 ft from the (orthophoto) waterline; approximations sufficient to judge the
+  model. NO uncertainty figure on record (coordinator's ±100 ft claim STRUCK as
+  fabricated). Real HB tide movements are not extreme on average (operator).
+- Rounds A/B/P/Z CLOSED with full evidence (see blocks above). First-ever warm start
+  proven 05:26:05Z; foam-to-waterline live; perBreakZones live in ft.
+- Radar container: operator repaired; post-repair radar 64% CPU (was 211%); load avg
+  still ~9 → RE-CHECK after rebuild settles; open finding if unexplained.
+- Deploy scripts: ./scripts/deploy-marine.sh (meta root; --no-restart exists),
+  ./scripts/deploy-api.sh (meta root). Marine tests on librewxr:
+  `sudo -u ubuntu bash -c "cd /home/ubuntu/repos/weewx-clearskies-marine && .venv/bin/python -m pytest <files> -q"`.
+  LOCAL marine unit tests work (Python 3.14 + pytest, from repo root).
+- Marine-direct payload: ssh librewxr, bearer from /etc/weewx-clearskies/marine/secrets.env,
+  https://localhost:8780/surf/huntington-city-beach-pier/profile (slow under load; use
+  --max-time 300). Proxy cache-bust: ?cb=<nonce> on the weewx API URL.
+- Agent names still addressable: roundw-dev (in flight), roundz-dev, roundz-tests,
+  roundz-audit, roundp-tests, roundp-audit, inv-wave-reform (all completed).
+- OPERATOR STYLE (hard-learned tonight): plain words, no invented vocabulary, define
+  terms; never state unverified reasoning as fact — label hypotheses or omit; do not
+  escalate operational-code dispositions (only genuine physics/architecture); the
+  operator's domain knowledge outranks model-derived estimates about this beach.
+
 ## ROUND P LIVE CHECKS — completed 2026-08-05 03:14–03:27 UTC (coordinator)
 
 **Deploys verified complete:**
