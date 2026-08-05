@@ -2071,6 +2071,7 @@ Surf quality forecast for one spot at one timestep.
 | `period` | float | `group_wave_period` | No | Dominant period |
 | `direction` | float | — | No | Dominant swell direction (degrees true north) |
 | `qualityStars` | int | — | No | 1–5 star rating |
+| `qualityScore` | int | — | Yes | **Added 2026-08-05 (Round S S1d, gated with the Round S merge).** The 0–100 surf score as a real wire field — the same raw unrounded total stars derive from, rounded once at publication (`round(raw)`). Stars are NOT derivable from this field (`stars = round(raw/20, 1)` from raw, independently — double-rounding via `qualityScore/20` differs in edge cases, e.g. raw 46.86 → score 47 but stars 2.3, not 2.4). Exists because the old dashboard SUMMED the additive breakdown for its "XX/100" display, which the geometric mean invalidates; clients must read this field, never reconstruct. Null exactly when scoring is absent. |
 | `qualityLabel` | str | — | No | (locale) Text label: "Poor", "Fair", "Good", "Very Good", "Epic" |
 | `conditionsText` | str | — | No | (locale) Natural-language conditions summary |
 | `windQuality` | str | — | No | (locale) "glassy", "offshore", "cross_offshore", "cross", "cross_onshore", "onshore" |

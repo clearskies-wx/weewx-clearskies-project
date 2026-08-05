@@ -66,14 +66,26 @@ Score = weighted geometric mean of five 0–100 factors (Size 0.25 / Shape 0.25 
 Conditions 0.20 / Power 0.20 / Consistency 0.10, admin-adjustable later leg). Worked
 examples, computed by the real committed code:
 
-| Scenario | Size | Shape | Cond | Power | Cons | Score | Stars |
-|---|---|---|---|---|---|---|---|
-| Balanced good day (1.8 m face, 14 s, offshore, clean) | 100 | 100 | 100 | 100 | 100 | **100** | 5 |
-| Clean CLOSEOUT day (same but peel ~0°) | 100 | **5** | 100 | 100 | 100 | **47.3** | 2 |
-| BLOWN-OUT epic swell (4.5 m face, 16 s, onshore gale) | 60 | 100 | **5** | 88 | 100* | **47.1** | 2 |
-| Small clean day (0.6 m face, 11 s, light offshore) | 80 | 100 | 91 | 73 | 100 | **87** | 4 |
-| Flat day | 0 | — | 100 | — | — | **0** | 1 |
-(*Consistency by swell-dominance fallback — SurfBeat off in this scenario.)
+FINAL numbers, computed by the conformed (S1c) scorer against S-SPEC-1's own six
+fixtures — with one honest finding: several of the spec table's per-component values
+(0.90/0.95-type entries) are mathematically UNREACHABLE from the spec's own discrete
+curve buckets (brute-force-enumerated); the implementer used the closest reachable
+inputs rather than inventing curve values, and the aggregates still land exact or
+within 1 point:
+
+| Scenario | Spec score/stars | ACHIEVED score/stars |
+|---|---|---|
+| Perfect day | 100 / 5.0 | **100 / 5.0** exact |
+| Balanced good day | 84 / 4.2 | **84 / 4.2** exact |
+| Small clean day (1.5 ft, 14 s, glassy) | 60 / 3.0 | **60 / 3.0** exact |
+| Clean closeout (6 ft, peel 8°) | 50 / 2.5 | **51 / 2.55** (+1) |
+| Blown-out epic | 47 / 2.3 | **46 / 2.3** (−1) |
+| Flat day | 0 / 1 (floor) | **0 / 1 (floor)** exact |
+
+The spec's own ⚠ judgment row applies: isolated-worst-case closeout ~50 and blown-out
+~47 are the geometric mean's honest floor (real ruined days degrade multiple factors
+at once and land ~25–35); levers if too generous = harsher clamps or admin weights —
+your call at this gate, per the spec's own instruction.
 
 **COORDINATOR ERROR, disclosed:** the plan's §1 S-SPEC-1 is YOUR locked Round S
 design (exact curves, ruin clamps, null policy, wire shape, config keys, six
