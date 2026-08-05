@@ -75,17 +75,22 @@ examples, computed by the real committed code:
 | Flat day | 0 | — | 100 | — | — | **0** | 1 |
 (*Consistency by swell-dominance fallback — SurfBeat off in this scenario.)
 
-**[DECIDE] S-1, the one ruling I made that changes ADR arithmetic:** implemented
-faithfully to the ADR's §7.2 internal weights, the closeout day scored **81/100** —
-WORSE than the ~66 the ADR itself calls unacceptable (a good breaker-type rating
-diluted the ruined peel angle inside the Shape blend). I invoked the
-contradiction-resolution rule: a documented ruin state (closeout peel; blown-out wind)
-now pins its WHOLE component at 0.05, which is the only reading that satisfies the
-ADR's own motivating example. That's what produces 47.3/47.1 above. The pre-ruling
-behavior (81.0 / 72.5) is preserved in the record — **overrule me and it reverts in
-one commit.**
-**[DECIDE] S-2:** the five scores vs your intuition and Surfline — the ADR's gate
-question. Say adjust/accept per scenario.
+**COORDINATOR ERROR, disclosed:** the plan's §1 S-SPEC-1 is YOUR locked Round S
+design (exact curves, ruin clamps, null policy, wire shape, config keys, six
+worked-example fixtures) — and I briefed the build from ADR-101 + the research brief
+WITHOUT it, then "resolved" a closeout-severity question the spec had already answered
+(with different numbers than I picked). Caught it mid-session; every leg was halted
+and conformed to S-SPEC-1 verbatim (task S1c + corrected briefs); the manuals I'd
+written against my wrong spec are fixed. Nothing I invented ships: no dataState
+field, no exponent renormalization, spec's own clamp thresholds (peel <15° →
+shape ≤ 0.10; blown-out → conditions = 0.05), spec's config keys. The worked-examples
+table you review at this gate is S-SPEC-1's own six fixtures (Perfect 100 / Balanced
+84 / Small clean 60 / Closeout 50 / Blown-out 47 / Flat 0) — with the spec's own ⚠
+judgment row: isolated-worst-case closeout 50 and blown-out 47 are the geometric
+mean's honest floor; levers if too generous are harsher clamps or admin weights,
+decided AT THE GATE.
+**[DECIDE] S-2:** S-SPEC-1's six fixture scores vs your intuition and Surfline — the
+gate question, including the spec's own ⚠ row above. Say adjust/accept per scenario.
 **[DECIDE] S-3 (S-GAP-1):** the jacking-factor "sweetener" for Shape is built but
 UNWIRED — the data lives in the beach-profile path and reaching it from the scoring
 path needs either logic duplication or a new pipeline output field (an internal

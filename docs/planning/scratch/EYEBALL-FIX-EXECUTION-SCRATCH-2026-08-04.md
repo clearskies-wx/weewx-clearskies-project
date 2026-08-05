@@ -996,3 +996,32 @@ DQ-W3. Energy-conservation bound (W1b-3): while "breaking", the combined-profile
 (§1 live state, §2 W reality gate + webcam ask, §3 Z5b incident + DQ-1a, §4 Round S
 gate incl. S1b overrule option + S-GAP-1, §5 DQ-W1..W3, §6 lesson-triage proposals,
 §7 watching/parked.)
+
+## COORDINATOR ERROR + CORRECTION: Round S briefed without plan S-SPEC-1 (2026-08-05 ~11:40Z)
+
+- DISCOVERY: plan §1 S-SPEC-1 (lines ~45-113) is the operator-LOCKED Round S design.
+  My post-compaction briefs were written from ADR-101 + research brief §7.2 only —
+  S-SPEC-1 was never read. Root cause: compaction summary carried the plan's §2 STATUS
+  and Round S row but not §1; I never re-read §1 before briefing. Deviations shipped
+  into the marine leg + briefs: (1) invented null policy (renormalization) vs spec's
+  neutral-0.5-no-renorm; (2) invented dataState wire object vs spec's int+weights-only;
+  (3) S1b ruin ruling re-derived what the spec already contained, with WRONG numbers
+  (10°/0.05 vs spec 15°/0.10 shape; blown-out same 0.05); (4) config naming
+  [marine][[surf_score_weights]]/size vs spec [surf_scoring]/weight_*; (5) power energy
+  = height-scaling vs spec energy-share buckets; (6) consistency fallback = raw ratio
+  vs spec bucket mapping; (7) missed spec worked-example fixtures (Balanced 84,
+  Small-clean 60, Closeout 50, Blown-out 47) and fractional stars.
+- CORRECTION: all 4 S agents halted/corrected within minutes of discovery. S1c
+  conformance rework dispatched (marine dev); tests leg re-briefed to S-SPEC-1 +
+  holding for S1c hash (4 draft files parked uncommitted); api leg corrected pre-code
+  (ack re-sent, confirmed — also independently found+removing the now-dead
+  score-collision-suppression mechanism in marine_response_conversion.py); dashboard
+  leg self-verified against the plan text and proceeding correctly; admin leg
+  unaffected except spec key names (in S-SPEC-1, carried in OPERATIONS-MANUAL fix).
+- Manuals re-fixed to S-SPEC-1: API-MANUAL §SurfScoringBreakdown (int + weights only,
+  spec clamps, spec null policy, S-SPEC-1 named as binding); OPERATIONS-MANUAL
+  [surf_scoring]/weight_* + admin section naming + help.admin.surf_scoring.*.
+- Packet §4 rewritten: honest error disclosure replaces the earlier S1b framing.
+- LESSON (packet §6 addition): after compaction, re-read a plan's DESIGN SPECIFICATIONS
+  section IN FULL before briefing any round it governs — a summary's mention of a plan
+  is not the plan. Proposed rule for rules/coordinator.md (operator approval required).
