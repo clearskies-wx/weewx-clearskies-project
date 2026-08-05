@@ -227,6 +227,15 @@ compute placement = D7, untouched.)
    seasonally). Recommended order: bathymetry-vs-reality check (fold into
    inv-break-geometry: webcam break positions at known tide ⇒ implied depths) BEFORE
    any physics change.** Operator decision pending.
+   **OPERATOR RULING 2026-08-05 (chat): implement the REAL physics — "You will make the
+   changes to our model to promote real physics and not fake clamping... I have asked
+   more than once that this be done correctly and all time, I find fake clamps,
+   bandaids and duct tape." Bathymetry-first recommendation REJECTED; the
+   Dally-Dean-Dalrymple stable-height treatment replaces the clamps. This is the
+   explicit trigger-1 approval. STANDING DIRECTIVE captured for the rules files at
+   round close: correct physics over clamps/bandaids, project-wide. → ROUND W
+   (wave-reform physics) opens; bathymetry check remains queued separately in
+   inv-break-geometry (not a substitute).**
    Original finding text follows for the record.
    **Break geometry vs reality (operator webcam ground truth, 2026-08-05 01:27Z Duke's cam):**
    real surf shows foam running to the sand and the outer break out near a pier bumpout;
