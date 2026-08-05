@@ -864,3 +864,25 @@ DQ-W3. Energy-conservation bound (W1b-3): while "breaking", the combined-profile
   signals are preserved — but you banned clamps, so this bound is explicitly surfaced
   for your review rather than slipped in. Already shipped in W1b; say the word and it
   gets reworked if you disagree.
+
+## Round W DEPLOYED (2026-08-05 08:44:26Z) — awaiting post-deploy cycle for reality gate
+
+- Test round CLOSED: 9 commits e54b7ba..0dc6aa7 (7 new files T-W1..T-W8 + 2 T-W7 repairs,
+  1140 lines). Author full suite 840 pass; LEAD-INDEPENDENT re-run at final tree: 841
+  pass 0 fail (discrepancy explained: author's run raced their last test addition; my
+  841 collected all 8 T-W4 tests). Fail-pre-change proofs supplied per group (incl.
+  T-W7.1 pre-fix AssertionError paste; T-W7.2 fails at 36fab04 = pre-existing proof;
+  T-W8 declared non-falsifiable-vs-Euler in docstring per verification.md).
+- Steep-slope finding (test-author): literal 1:20 (12m/220-240m) exceeds H/d 1.0 and
+  trips runaway warning at HEAD → dispositioned OUT-OF-CALIBRATION LIMITATION (HB real
+  slopes ~1:40-60 verified clean; warning firing there = intentional signaling). Pinned
+  by an honest interior positive test; W1c docstring applicability note (0525394).
+- Audit round CLOSED (see prior entry). W1c accepted (docstring-only, 11 insertions).
+- Pushed 36fab04..0525394 (14 commits); deploy-marine.sh OK; running commit 0525394,
+  proc start 08:44:26Z; /health 200; canonical librewxr pytest of the 11 Round W/Z test
+  files: 78 pass.
+- Post-deploy: HRRR cycle 06Z fetched; full SWAN cycle started 08:45:35Z; background
+  watcher armed for completion → then journal sweep (runaway warnings must be ABSENT
+  at steady state per E5) + live payload vs bands E1-E6 + operator packet.
+- Round S marine leg DISPATCHED (rounds-marine-dev) — marine repo free after test round;
+  commits stay local, merge gated on operator worked-examples review.
