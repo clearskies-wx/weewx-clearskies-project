@@ -185,5 +185,43 @@ survives compaction. Update after every state change.
   with per-category fill rule + provenance/denial note; factor-bar bullet + additive-identity
   line updated; Swell Card row rewritten to stripped baseline with NOT-on-card list.
 
+## GATE A/B CLOSE-OUT SYNTHESIS (2026-08-04 ~01:20Z)
+- A3 follow-up 8f035cd deployed; live 3-point screenshot (decisive.png) STILL shows
+  overlaps: stray glyph behind "2.8 ft"; 2nd break's partition/breaker rows overprint the
+  x-axis title + zone chips. ROOT CAUSE (confirmed by blind audit F1): collision set only
+  contains OTHER break-point labels — axis title/zone chips are not obstacles; algorithm
+  saturates at BP_LABEL_MAX_LEVELS=6 with clamp collapsing rows onto identical Y (auditor
+  simulated with real constants: 5 clustered points → 10 residual overlapping pairs).
+- Kill test (A4/Gate A row 4): marine stopped 01:03:52-01:06:28Z (156 s); client polls
+  (120 s cadence) returned 200 throughout — API response cache absorbed the outage; tab
+  never degraded, no reload needed. PASS (retry path itself proven by fake-timer guard that
+  fails pre-change). Post-restart transient: profile card showed "empty" text ~20-60 s while
+  marine recomputed; resolves itself (90 s check: unavailable-text 0, svg present).
+- BLIND AUDIT (round-a-audit closeout): A1/A2/A4 PASS adversarial review (ruled out /100
+  regression, orphaned i18n, strip overreach, pollInterval units, timeout leakage, retry
+  hammering). F1 MAJOR (A3, above). F1b MEDIUM: no BeachProfileChart regression test (A3
+  guard was never in the plan's A-T row — lead omission to note). F2 BLOCKER (Gate B): at
+  ~01:13Z two consecutive all-transects requests hit the 45 s timeout and were served by
+  the proxy's STALE-CACHE fallback (journal: "read operation timed out" + "serving cached
+  response") — 200 masking a failing live compute. Lead synthesis on F2 evidence: the
+  auditor's "timestep 4 h old = stale" sub-claim is miscalibrated (21:00Z is the model
+  cycle timestep; fresh computes return the same value) — but the journal cache-fallback
+  evidence is solid. Timing context: auditor measured minutes after the kill-test restart
+  (cold marine caches). Coordinator's genuine live measurements (00:40Z): 26.6 s direct /
+  28.1 s proxy / 30.4 s Caddy fresh 200s. VERDICT: compute sits 26-50 s depending on load
+  → 45 s budget is knife-edge; structural impossibility fixed, reliability not guaranteed.
+- Audit process note accepted: shipped A3 algorithm differs from S-SPEC-3's literal 56px/
+  14px text (lead-authorized during remediation) — plan spec text needs sync whenever A3
+  disposition lands.
+- OPERATOR RULINGS (2026-08-04, chat): (1) A3/F1 → drop the partition-annotation +
+  breaker-type text rows from the interim chart; stop investing in the old chart ("why are
+  we wasting time on the old chart?"). Lead-direct (mechanical deletion). (2) F2/Gate B →
+  D7 precompute is the proper fix, done in NORMAL plan order ("does not need accelerated,
+  everything in the plan is a priority"). Coordinator's conservative read: NO timeout bump
+  (45 s stays; cache-fallback behavior stands until D7) — flagged to operator for cheap
+  correction if misread. (3) Unification contract addition APPROVED: publish signed beach
+  elevations + tide-aware waterline. Round P (profile unification) is now fully authorized:
+  side-run deletion + zones/shapes/jacking from pipeline + new waterline/elevation fields.
+
 ## Evidence log
 (append gate rows / command outputs here as rounds close)
