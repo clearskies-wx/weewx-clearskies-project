@@ -1074,3 +1074,26 @@ gate incl. S1b overrule option + S-GAP-1, §5 DQ-W1..W3, §6 lesson-triage propo
   4cf4289) merges to main at Gate S.
 - REMAINING: marine S1c/S1d closeout → relay hash to rounds-tests → tests run/commit →
   full-round acceptance → operator gate (packet §4).
+
+## Round S: ALL FIVE LEGS COMPLETE + GUARDED (2026-08-05 ~14:20Z); blind audit dispatched
+
+- Tests leg ACCEPTED: 6 commits 20cfd36..299305a atop 468a5d2 (marine main local).
+  Lead-INDEPENDENT full suite at 299305a: 881 passed / 0 failed (matches author).
+  Guard-fails-pre-change proven via git-show file extraction (repo-safe method).
+  Two design findings documented in-file: spec worked-example table illustrative
+  (unreachable per-component values); qualityScore/qualityStars round independently.
+- FULL ROUND S STATE (everything LOCAL/branch, operator-gated):
+  marine main local: 0560c41(origin) + 53d4315..468a5d2(scorer) + 20cfd36..299305a
+  (guards) = 13 unpushed commits;
+  api round-s-scoring: 8150d6c + 3988106 (off c99f6d5);
+  dashboard round-s-scoring: e57eb84 (off f85505b);
+  stack round-s-scoring: 9030f13 (off c7f7593);
+  meta round-s-scoring-dashboard-docs: 5938524 (DESIGN-MANUAL) + 4cf4289 (API-MANUAL
+  §19.5) — merge at gate.
+- Blind auditor rounds-audit dispatched (S-SPEC-1 fidelity, single-use, arithmetic/
+  rounding, null/edge, clamp bypass, cross-repo contract consistency, config path,
+  qualityScore). Runs while the operator gate waits.
+- GATE SEQUENCE when operator returns: packet §4 review (worked examples + S-GAP-1 +
+  authority episode + qualityScore) → audit findings disposition → push/deploy marine
+  + api + dashboard + stack per scripts → live Gate S checks (axe + screenshots per
+  LEG 3 deferral; admin form live save round-trip) → merge meta docs branch.
