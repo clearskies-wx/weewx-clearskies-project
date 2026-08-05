@@ -155,6 +155,43 @@ compute placement = D7, untouched.)
 
 ## 2. ROUNDS AND TASKS
 
+### STATUS (as of 2026-08-05 ~04:30Z — detail + evidence in the execution scratch file)
+
+| Round / item | Status | Evidence |
+|---|---|---|
+| **Round A** (A1 bars, A2 card strip, A3 labels, A4 resilience, A-T guards, A-Q audit) | **CLOSED 2026-08-04** | dashboard `a35373d`/`ca0689e`/`c39fe30`+`8f035cd`+`96f5478`/`0debd2a`; guards `963d311`/`6a8c6a2`; 27/27 canonical; Gate A walked; deployed weather-dev `96f5478` |
+| **Round B** (B1 proxy timeout 45 s, B2 contention numbers) | **CLOSED 2026-08-04** | api `d818461` deployed; Gate B walked (honest marginality recorded — 45 s is marginal under co-tenant load; D7 precompute is the real fix, normal order) |
+| **Round P** — beach-profile unification (mid-session authorized round: side-run deletion + zones/shapes/jacking from pipeline + tideLevel/waterlineDistance/beachElevation) | **CLOSED 2026-08-05** | marine `4e0ff18`+`8c2def8` deployed (proc start 03:14:25Z); api `ac96064` deployed; live checks pass (zones anchor exactly to published breaks; waterline math exact in m and ft); guards `7ee5a3c`/`1d6c9b0`/`541644d`, 67 pass local + canonical librewxr; blind audit: main claim COULD NOT DISPROVE (5 rule-outs); reality gate: period/direction/class PASS, Hs leg indicts pre-deploy state (accepted, coordinator disposition); doc sync in API-MANUAL |
+| **D5** — beach-profile card redesign | **IN PROGRESS** | design direction approved 2026-08-04; data prerequisites shipped (Round P); mockup **iteration 3 built from the live unified payload** (docs/planning/mockups/beach-profile-redesign-mockup.html) — AWAITING operator sign-off, then the dashboard implementation round |
+| **D6** — per-break zones (contract y/n) | **AWAITING OPERATOR** | re-presented with iteration-3 mockup's "D6 DEMO" toggle |
+| **Round S** — surf score rebuild (S1–S7, ADR-101) | **NOT STARTED** | next major round after D5/D6 |
+
+**Parking lot (pre-existing findings, tracked for future rounds — none block Round P):**
+1. **SWAN hotstart chronic cold-start — ROOT CAUSE FOUND (audit 2026-08-05):**
+   `swan_runner.py` `_read_hotfile_timestamp()` reads only the first 4096 bytes, but the
+   hotfile "date and time" record sits AFTER the LOCATIONS coordinate block at byte offsets
+   32,885–258,389 in all 4 live level hotfiles → token=None 100% of the time → every level
+   cold-starts every cycle (223 journal hits since Jul 28; wasted compute; ~40 min of
+   degraded all-transect bulk-fallback after every restart; likely source of the inflated
+   pre-deploy partition Hs the reality gate caught). Companion finding: the existing
+   `tests/services/test_hotstart_timestamp.py` fixture writes the date line first in a tiny
+   synthetic file — it can never reproduce the failure, so the suite stays green while the
+   defect fires in production. Fix (read window / scan-to-record + honest test fixture) is
+   methodology, not architecture — recommend its own small round soon.
+2. **`surf.py:389-423` `_compute_median_bathy_profile` feeds SurfBeat land points** (audit,
+   quantified live: all 162 transects include land, median domain starts 47.71 m onto dry
+   beach; the downstream 0.01 m clamp turns real dune into a flat near-zero-depth "canal",
+   wasting SurfBeat grid resolution and mis-placing the shoreward Hs_ig station). Violates
+   the consumer's own "depths must be positive" contract — fix is contract-restoring.
+3. **`transect_index=best` docstring drift** (beach_profile.py:856-857 still describes the
+   pre-BD-9 "highest-face-height open transect" selection; live default returned a
+   structure-affected transect via BD-9's representative index). Doc-code sync fix.
+4. **jackingFactors on the default transect is legitimately empty** (audit: detection works —
+   14/162 transects carry real bar factors 1.04–1.11; default transect 14 has zero local
+   depth minima). No defect; recorded so nobody "fixes" it.
+5. **Radar co-tenant container re-pinning CPU** (librewxr-librewxr-1; operator investigating).
+6. **Proxy 503 at 45 s on uncached keys under co-tenant load** — stands until D7 precompute.
+
 ### ROUND A — dashboard quick fixes (before Round S; A1 is an interim fix Round S supersedes)
 
 | Task | Spec | Files/loci | Agent | Acceptance (grep-checkable where possible) |

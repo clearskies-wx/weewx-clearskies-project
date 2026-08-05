@@ -448,3 +448,32 @@ doc sync (API-MANUAL new fields, plan §S-SPEC-3 A3-as-shipped) → round close.
   payload now (not held for audit close). D6 (per-break zones y/n) still UNANSWERED —
   re-present WITH the rebuilt mockup via its per-break-zones demo toggle, per the
   original "re-present after unified data + corrected mockup" instruction.
+
+## Verification evidence — Round P (ROUND CLOSED 2026-08-05 ~04:30Z)
+- Scope walkthrough (brief ROUND-P-UNIFICATION-BRIEF-2026-08-04.md): P1.1 side-run
+  deletion DONE (marine 4e0ff18); P1.2 zones-from-pipeline DONE (4e0ff18); P1.3
+  shapes/jacking extraction DONE (4e0ff18, byte-identical declared + T3-pinned); P1.4
+  three new fields DONE (8c2def8); P2 API conversion DONE (ac96064; tideLevel entry
+  pre-existed). Guards leg (brief ROUND-P-TESTS-BRIEF-2026-08-05.md): T0–T4 DONE
+  (7ee5a3c/1d6c9b0/541644d). 0 MISSING, 0 DEFERRED from scope.
+- pytest: local `python -m pytest <5 files> -q` → 67 passed (coordinator re-run);
+  canonical `ssh librewxr sudo -u ubuntu ... .venv/bin/python -m pytest <5 files> -q`
+  → 67 passed at 541644d (py3.12).
+- Auditor findings: main claim COULD NOT DISPROVE (5 named rule-outs, live in both unit
+  systems at matching timestep 04:00Z). 4 findings, ALL pre-existing (median-bathy land
+  points; hotstart 4096-byte read window root cause + vacuous test fixture; best-transect
+  docstring drift; jacking-empty-by-selection non-defect) → all promoted to the plan §2
+  STATUS parking lot (tracked, not narrative). 0 introduced-by-round findings.
+- Lead synthesis: accept all 4 as parking-lot items; no remediation owed inside Round P
+  (none introduced by the round); hotstart fix recommended as its own small round (also
+  explains the reality-gate Hs anomaly and the 40-min post-restart degradation).
+- Reality gate: period/direction/classification PASS vs baseline + NDBC 46253 beside;
+  Hs leg out-of-tolerance → disposed ACCEPTED (state-driven; buoy sides with new value;
+  operator declined escalation as non-architectural).
+- Lead spot-check: waterline hand-interpolation reproduced published value exactly in m
+  AND ft (audit reproduced independently to the last digit — two independent checks).
+- ADR spot-check: ADR-093 Amendment 4 (signed landward sampling) — beachElevation now
+  publishes the signed profile unclamped, consistent, PASS. ADR-097 (profile endpoint) —
+  contract addition documented in API-MANUAL single-transect table + units, PASS.
+- Doc-code sync: API-MANUAL (3c74170) matches shipped payload (fields verified live);
+  plan §S-SPEC-3 as-shipped + S-SPEC-4 erratum notes committed same session.
