@@ -1097,3 +1097,24 @@ gate incl. S1b overrule option + S-GAP-1, §5 DQ-W1..W3, §6 lesson-triage propo
   authority episode + qualityScore) → audit findings disposition → push/deploy marine
   + api + dashboard + stack per scripts → live Gate S checks (axe + screenshots per
   LEG 3 deferral; admin form live save round-trip) → merge meta docs branch.
+
+## Round S audit remediations closed (2026-08-05 ~15:00Z) — SESSION WORK COMPLETE
+
+- Audit verdict: could NOT disprove conformance (all 6 worked-example totals hand-
+  reproduced; every curve boundary checked; rounding order, clamp order, single-use,
+  config path end-to-end all clean; 254 scoring tests across 4 repos). 4 findings.
+- F2 LOW fixed: api 62ee7b2 (payload docstring third case). Dev correctly scope-held a
+  SECOND stale mention in the same sentence ("[providers] compute-offload", removed by
+  T6.8) — PARKING ITEM: setup.py docstring [providers] mention.
+- F1 MEDIUM fixed: dashboard a89c4fc on round-s-scoring (openapi SurfForecastScoring →
+  5-factor schema + qualityScore). Agent died mid-task (API 529) leaving an uncommitted
+  edit; lead reviewed line-by-line, CAUGHT+FIXED one error (shape ruin pin said <= 5,
+  is <= 10 post-S1c), yaml-validated, committed with attribution. Agent's dying finding
+  → TRIAGE ITEM: openapi-v1.yaml is broadly stale on UNRELATED endpoints (pre-existing;
+  needs its own sync round).
+- F3 → packet [DECIDE] S-5 (wave_direction vs dominant-partition direction — §7.2 vs
+  S-SPEC-1 conflict, operator rules). F4 = S-GAP-1 already queued.
+- FINAL SESSION STATE: W + Z5b + D5 deployed and operator-gated for review; Round S
+  fully built/guarded/audited across marine(13 local commits)+api(3)+dashboard(2)+
+  stack(1) branches + meta docs branch, NOTHING deployed, everything awaiting the
+  operator worked-examples gate. All decisions in OPERATOR-REVIEW-PACKET-2026-08-05.md.
