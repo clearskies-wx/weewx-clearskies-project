@@ -97,10 +97,23 @@ path needs either logic duplication or a new pipeline output field (an internal
 contract change = your call). Options: (a) leave unwired (Shape = peel+breaker only,
 current state), (b) authorize the pipeline field. Recommendation: (b) at the next
 marine round.
-Also for the record: Power reads the dominant partition's height rather than raw
-energy (height IS energy's public expression — mathematically equivalent for one
-partition); stars floor at 1 even at score 0 (ADR said stars unchanged — flag if you
-want a true 0-star tier); windSource is provenance metadata, not a scoring input.
+Also for the record: stars floor at 1 even at score 0 (ADR said stars unchanged —
+flag if you want a true 0-star tier); windSource is provenance metadata, not a
+scoring input.
+**[DECIDE] S-4 (new wire field `qualityScore`):** the dashboard leg proved the "XX/100"
+number on the surf card was never a wire field — the old client SUMMED the additive
+parts, which the geometric mean breaks (and reconstructing from rounded ints would
+show a slightly-wrong number). The plan's "total unchanged" note was therefore
+erroneous. Ruled: marine now publishes `qualityScore` (int 0-100, the same value
+stars derive from) beside `qualityStars` — implementing the ADR's own display line
+("score + stars + five bars"). Confirm or rename at the gate.
+**Also at this gate — an authority episode you should adjudicate:** the api agent
+initially refused the config-carry contract change (new `[surf_scoring]` keys) as an
+unauthorized architectural change; I overruled citing your recorded chat approval of
+ADR-101 + its Consequences bullet naming these keys + the plan §S3 row assigning the
+work; the agent then verified the chain itself and proceeded. Both positions are
+preserved in the scratch log — if my chain reading overstepped, say so and the rules
+get tightened accordingly.
 
 ## 5. Round W decision queue (from the audit — none urgent, all documented in code)
 
