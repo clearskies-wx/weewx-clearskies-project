@@ -560,6 +560,30 @@ doc sync (API-MANUAL new fields, plan §S-SPEC-3 A3-as-shipped) → round close.
   ban invented vocabulary ("model-run-semantics") — plain English rule applies to
   coordinator reports.
 
+## Verification evidence — Round Z (ROUND CLOSED 2026-08-05 ~06:30Z)
+- Scope walkthrough (ROUND-Z-SURF-ZONE-TRUTHING-BRIEF + follow-ons): Z0 DONE f4354b2;
+  Z1+Z2 DONE 4c0f7e7 (gate retune 36fab04: δ 0.05, Hs floor 0.10 — operator-approved);
+  Z3 DONE b551d03; Z4 DONE c99f6d5 (api); Z5 DONE d0075fe (+ test update 59f5e49);
+  guards DONE 6a4851e/a3a0ae9/1321d8d (+ pins updated in 36fab04). 0 MISSING.
+- pytest: local 73 passed at 36fab04 (7-file set); canonical librewxr 35 passed at
+  36fab04 (5-file Z set). Fail-pre-change proven non-vacuously in worktree (3 failed at
+  assertions: T-Z0 4096-prefix, T-Z2 jitter, T-Z2 shorebreak).
+- Auditor findings: 3 (F1 HIGH hysteresis over-suppression → REMEDIATED by gate retune
+  to the measured knee 0.05; F2 MED floor overclaim → REMEDIATED, floor 0.10 + comments
+  corrected; F3 LOW-MED zero-width foam → dispositioned card-side skip per operator,
+  documented in API-MANUAL consumer note). 0 unremediated introduced findings.
+- Live checks: single break on saturated profile (26.29 m), foam 21.29→9.29 m vs
+  waterline 9.30 m, perBreakZones consistent in SI + ft (units.breakDistance=ft);
+  Z0 read proven live; FIRST-EVER warm start 05:26:05 completed cleanly; 06:05 "crash"
+  = deploy-restart interruption (investigated, benign; parking-lot note filed).
+- Doc sync: API-MANUAL 149133b (perBreakZones + foam/detection semantics + known reform
+  limitation + Z4 conversion note).
+- Deferred/parked out of this round (all tracked in plan §2 STATUS parking lot):
+  wave-reform physics investigation (inv-wave-reform, operator-ordered, IN FLIGHT);
+  crash-retry-vs-shutdown note; parking lot 1a (stamp semantics) RESOLVED by Z5.
+- ADR spot-check: ADR-093 Amendment 4 signed profile → waterline crossing consistent
+  PASS; ADR-097 profile contract → manual updated same-round PASS.
+
 ## Verification evidence — Round P (ROUND CLOSED 2026-08-05 ~04:30Z)
 - Scope walkthrough (brief ROUND-P-UNIFICATION-BRIEF-2026-08-04.md): P1.1 side-run
   deletion DONE (marine 4e0ff18); P1.2 zones-from-pipeline DONE (4e0ff18); P1.3
