@@ -804,6 +804,8 @@ The wizard displays a degradation note when RainViewer is selected so operators 
 
 Marine locations are configured in the `[marine]` section of `api.conf`. This section is additive and optional — its absence has zero impact on the rest of the API.
 
+**Surf score weights (Round S, ADR-101, 2026-08-05 — marine service config):** the marine service reads an optional `[marine][[surf_score_weights]]` subsection with five positive floats — `size`, `shape`, `conditions`, `power`, `consistency` — the exponents of the surf score's weighted geometric mean, one set for the whole system (never per spot). Defaults (0.25/0.25/0.20/0.20/0.10) live in code; an absent section means defaults. Weights are normalized by their sum at computation time, so any positive values are valid; a zero, negative, or malformed value logs a warning and falls back to that key's default (scoring never crashes on config). The admin UI leg (weight form with effective-percentage display and reset-to-defaults) is a later Round S leg; until it lands this section is hand-edited.
+
 **Config schema:**
 
 ```ini
