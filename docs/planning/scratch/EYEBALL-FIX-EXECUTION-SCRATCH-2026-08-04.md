@@ -769,3 +769,46 @@ own precision; operator may override at review):
   the PHYSICS (reform capability + no clamps), proven by the synthetic two-bar KAT.
 - Webcam check: matched-time screenshot at known tide beside the rendered profile;
   operator worked-examples review MANDATORY before W formally closes (queued).
+
+## Round W audit round — 4 findings, DEPLOY BLOCKED, W1b remediation in flight (2026-08-05 ~09:05Z)
+
+Blind audit (roundw-audit) findings + lead dispositions:
+- F1 HIGH CONFIRMED: forward-Euler unstable at depth < ds*K/2 = 0.075 m on the 1 m grid
+  (inside the eps=0.01 floor); reproduced spike H/d=2.486 then snap-to-zero tail on 1:20
+  slope. THE EULER STEP WAS THE LEAD'S OWN BRIEF SPEC — design error caught by audit.
+  Fix W1b-1: exact integrating-factor step y_i = Γ²h^2.5 + (y_prev−Γ²h^2.5)·exp(−K·ds/h)
+  in both march + apply_ddd_saturation (same ODE, different arithmetic — LC-22 precedent,
+  methodology).
+- F2 HIGH SPLIT: steep-slope H/d holding 0.75–0.88 (not relaxing to 0.40) judged REAL DDD
+  behavior (stable target falls with depth; ratio equilibrium > Γ until depth stops
+  falling — reform lives in troughs/flats; consistent w/ dev's real-transect decay).
+  Miscalibrated-invariant sub-finding CONFIRMED (1.02·γd premise is wrong physics — γd is
+  onset, not a during-breaking cap; ALSO the lead's own brief spec). Fix W1b-2: warn iff
+  Hs > 1.5·γ·d at depths > _MIN_BREAK_DEPTH_M, in BOTH functions (also resolves F4).
+  Supersedes W1a d373375 (which landed mid-race; interim, accepted, replaced).
+- F3 MED-HIGH CONFIRMED: apply_ddd_saturation published up to 18% ABOVE raw RSS input
+  (ratio>1) and goes blind to raw drops while BREAKING (6.8× stale demonstrated). Fix
+  W1b-3: BREAKING output = min(marched, raw input) — energy-conservation bound (satur-
+  ation may only remove energy vs its input; tracks drops). NOT the banned γd-flattening
+  clamp (nothing flattens to γd; both physics signals preserved) — FLAG PROMINENTLY AT
+  OPERATOR REVIEW anyway given clamp history. Dead hs_stack redistribution: pre-existing
+  (old code also discarded), stays.
+- F4 LOW-MED CONFIRMED: pipeline path had no invariant check → resolved inside W1b-2.
+- Audit's clean rulings: equation/constants transcription faithful; Kr bookkeeping faith-
+  ful; boundary-condition contract holds; no >/>= mismatch across detection paths; no
+  scope creep (pipeline :750 face clamp is pre-existing/unrelated/untouched).
+- Test-author independent pre-finding (same theme, before audit landed): old 1.02 check
+  fired via honest public API on ~38% of a 42-combo sweep (onset detection-lag transient
+  up to 1.064; floored-terminal degenerate to 2.2×). Consistent with audit F2's ~90%-of-
+  points under some conditions.
+
+Sequencing: W1a (d373375) accepted as interim, superseded. W1b in flight with roundw-dev.
+roundw-tests: T-W2/T-W3/T-W6/T-W7 proceeding now; T-W1/T-W4/T-W5/T-W8 (new: auditor's
+1:20 regression pin) HELD until W1b hashes relay. roundw-audit: standing by to re-verify
+F1/F3 kill + warning silence on ordinary conditions once W1b lands. DEPLOY BLOCKED until:
+W1b accepted + tests 0-fail + audit re-verify clean. Reality-gate bands E1–E6 unchanged.
+
+LESSON (for operator triage): two of four audit findings trace to the LEAD'S brief design
+(forward-Euler spec; 1.02 invariant premise) — the blind audit + independent test-author
+sweep caught both before deploy. Process worked; brief-level numerics deserve the same
+adversarial check as implementer code.
