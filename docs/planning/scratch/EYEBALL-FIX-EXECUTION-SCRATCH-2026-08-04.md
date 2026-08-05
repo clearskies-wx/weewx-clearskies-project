@@ -912,3 +912,28 @@ DQ-W3. Energy-conservation bound (W1b-3): while "breaking", the combined-profile
   ready but unwired this leg — surfaced by name in the operator packet; no
   surf_1d_pipeline.py touch, no logic duplication) + wire shape approved (five factors
   + weights{} + dataState{}). Dev proceeding.
+
+## Z5b + D5 accepted and DEPLOYED (2026-08-05 ~08:57Z)
+
+- Z5b (0560c41) lead-verified (diff scope 2 files, equality check :5153, 10/10 hotstart
+  tests) → pushed alone (scorer commits not yet on main — ordering checked first) →
+  deploy-marine.sh OK, service restart 08:57:11Z. Restart killed the in-flight retry
+  cycle mid-L2/L3 (level1 had completed cold + saved 08:56:56); under Z5b this is
+  self-healing (future-stamped level1 file gets deleted, clean cold start) — watcher
+  armed for level3_0 hotstart-save (success) or convergence FAILED.
+- D5/D6/D7s dashboard (f85505b, 20 files +1344/-885) ACCEPTED: lead tsc -b exit 0;
+  lead-independent FULL vitest: 569 pass / 12 fail — all 12 PROVEN PRE-EXISTING via
+  worktree at clean 96f5478 (identical failures: alert-icon-map 9, Grid gap token 1,
+  useRealtimeObservation 2). Dev's 76 scoped tests pass. Pushed + redeploy-weather-dev.sh
+  complete. LIVE VISUAL CHECK still owed (lead, against dev site + webcam).
+- NEW pre-existing finding for triage: dashboard full suite has 12 failing tests
+  (3 files, none marine) that predate D5 — prior rounds ran targeted suites only and
+  never saw them. Needs its own small repair round (test-author) — NOT D5's.
+- D5 dev also surfaced 2 tooling lessons for rules routing (operator triage queue):
+  (a) `npx tsc --noEmit` at dashboard repo root checks NOTHING (root tsconfig has
+  files:[] + project refs) — `npx tsc -b` is the only build-equivalent check;
+  (b) Tailwind v4 Vite plugin corrupts CSS custom-property parsing when a nearby
+  comment contains literal `--name`-shaped text — silently DROPS the next declaration.
+- Doc-sync owed for D5 (lead-routed, this round): DESIGN-MANUAL (--beach-profile-*
+  token family, new card pattern), DASHBOARD-MANUAL (Y-axis now LMSL-relative
+  elevation; D7s median-5 display smoothing, raw data unmutated).
