@@ -967,3 +967,32 @@ DQ-W3. Energy-conservation bound (W1b-3): while "breaking", the combined-profile
   flake. Round S test-author leg (guards + stale repairs) queued after S1b.
 - Doc-sync owed after S1b: API-MANUAL SurfScoringBreakdown section, OPERATIONS-MANUAL
   [marine][[surf_score_weights]].
+
+## Round W REALITY GATE — walked 2026-08-05 ~10:45Z (post-publish 09:27:56Z payload)
+
+- E1 PASS: 31/162 transects publish multi-breaks live (histogram 1:131, 2:30, 3:1) —
+  vs Round Z audit's proof that a second onset was impossible on ~2/3 at any setting.
+- E2 PASS: representative transect 24 single spilling break at 25.7 m grid /
+  26.85 m ≈ 88 ft waterline-relative (waterlineDistance −1.152 m, tide 0.081 m) —
+  inner anchor ~100 ft, band 50–200 ft.
+- E3/E4 DEFERRED per band's own clause: conditions small (multiSwell 0.36 m/13.8 s/
+  200.6° + 0.28 m/5.5 s/261°); re-check on next SW groundswell (inv-break-geometry is
+  the instrument). Today's multi-break ratios ~2–2.3 (e.g. t0 49.2/25.2, t118 16.1/8.1).
+- E5 PASS: foam end −1.3155 vs waterline −1.1524 = 0.163 m < one 1.0 m grid step
+  (lead's ±0.1 m band was sub-grid — band miscalibration acknowledged, model behavior
+  correct at grid resolution); ZERO runaway warnings since deploy; t0 face 0.95 m sane;
+  jackingFactors 1 transect (conditions-dependent, cf. 14 at 2 m/16 s); NDBC 46253
+  08:26Z: WVHT 0.6 m DPD 14 s MWD 174° vs model dominant 0.36 m/13.8 s/200.6° —
+  period excellent, Hs/direction within Round P tolerance family.
+- E6 as predicted (single break near inner anchor at small energy). Operator webcam
+  half queued.
+- Access notes for future gates: marine-direct = https://localhost:8780/surf/<id>/profile
+  (NO /api/v1 prefix), bearer $MARINE_SERVICE_SECRET from /etc/weewx-clearskies/marine/
+  secrets.env; transect_index=all → top key 'profiles' (162 entries).
+- Watcher post-mortem: my cache watcher used a wrong epoch threshold (compared against
+  tomorrow) — publish at 09:27:56 went unnoticed ~40 min; killed, gate run manually.
+
+## OPERATOR PACKET WRITTEN: docs/planning/OPERATOR-REVIEW-PACKET-2026-08-05.md
+(§1 live state, §2 W reality gate + webcam ask, §3 Z5b incident + DQ-1a, §4 Round S
+gate incl. S1b overrule option + S-GAP-1, §5 DQ-W1..W3, §6 lesson-triage proposals,
+§7 watching/parked.)
