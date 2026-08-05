@@ -106,6 +106,7 @@ Six curated accents, AA-verified in both themes. No free-form picker. Operator s
 | `--gauge-fill` | `#3b82f6` | — | Gauge filled arc |
 | `--gauge-unfill` | `rgba(0,0,0,0.22)` | — | Gauge unfilled arc |
 | `--gauge-indicator` | `#1e40af` | — | Gauge needle/indicator |
+| `--beach-profile-*` (family, 11 tokens: `sand`, `sand-edge`, `water-deep`, `water-mid`, `whitewater`, `impact`, `impact-ink`, `foam`, `foam-ink`, `waterline-marker`, +1) | see `src/index.css` | see `src/index.css` | Beach-profile card scene rendering (D5 redesign, 2026-08-05, dashboard `f85505b`). Values map from the approved D5 mockup palette; both themes defined independently in `src/index.css` (the code is the source of truth for exact values). All `-ink` text tokens AA-checked against the card background in both themes. Caution: do not write literal `--name`-shaped text in CSS comments near these declarations — the Tailwind v4 Vite plugin can silently drop the following declaration (found during D5). |
 
 ### Score Tier Colors
 
