@@ -205,10 +205,13 @@ compute placement = D7, untouched.)
    saturated-region suppression — touches detection criteria, OPERATOR DECISION; the
    detector also can't register the real shorebreak (min-depth 0.3 m / min-Hs 0.15 m
    filters exclude the last ~90 ft);
-   (c) **outer-break cross-shore distance (222 ft) vs reality (near a pier bumpout)** —
-   open bathymetry-scale question; ground-truth via HB pier geometry (known length/bumpout
-   stations) vs the CUDEM transect profile. NEW INVESTIGATION (inv-break-geometry).
-   Confound noted: cam frame 01:27Z vs model timestep 04:00Z (different tide).
+   (c) **outer-break cross-shore distance — calibration check, NO defect asserted**
+   (operator 2026-08-05: "I am not saying the 222ft is wrong, that may be correct... 222
+   feet may be close"): real outer break observed near the gift-shop bumpout (Kite
+   Connection, on-pier); its station distance isn't in public listings — measure from the
+   pier's mapped deck polygon (OSM) to the tide-aware waterline at a matched hour and
+   compare to the published break distance. INVESTIGATION (inv-break-geometry), verify-
+   not-fix. Confound noted: cam frame 01:27Z vs model timestep 04:00Z (different tide).
 
 ### ROUND A — dashboard quick fixes (before Round S; A1 is an interim fix Round S supersedes)
 
