@@ -191,6 +191,24 @@ compute placement = D7, untouched.)
    depth minima). No defect; recorded so nobody "fixes" it.
 5. **Radar co-tenant container re-pinning CPU** (librewxr-librewxr-1; operator investigating).
 6. **Proxy 503 at 45 s on uncached keys under co-tenant load** — stands until D7 precompute.
+7. **Break geometry vs reality (operator webcam ground truth, 2026-08-05 01:27Z Duke's cam):**
+   real surf shows foam running to the sand and the outer break out near a pier bumpout;
+   payload shows foam ending at 137 ft and breaks at 206/222 ft. Three mechanisms found:
+   (a) **foam-zone end is a classifier threshold, not physics** — `_classify_zones`
+   (surf_1d_analytical.py:564) ends foam where bore Hs < 0.3 m or depth < 0.2 m, while the
+   model's own Hs profile is depth-saturated (Hs = 0.73·d) continuously from the outer
+   break to the waterline, i.e. the physics already says whitewater-to-the-sand; extending
+   the zone to the waterline is a criterion change (trigger 1) — OPERATOR DECISION;
+   (b) **the 206-ft "inner break" + reform trough is a detection artifact** — crossing
+   detection (:519-526) re-fires on numeric jitter around γ on a saturated profile; the Hs
+   data shows no actual reform (monotonic, ratio pinned at γ). Fix = crossing hysteresis /
+   saturated-region suppression — touches detection criteria, OPERATOR DECISION; the
+   detector also can't register the real shorebreak (min-depth 0.3 m / min-Hs 0.15 m
+   filters exclude the last ~90 ft);
+   (c) **outer-break cross-shore distance (222 ft) vs reality (near a pier bumpout)** —
+   open bathymetry-scale question; ground-truth via HB pier geometry (known length/bumpout
+   stations) vs the CUDEM transect profile. NEW INVESTIGATION (inv-break-geometry).
+   Confound noted: cam frame 01:27Z vs model timestep 04:00Z (different tide).
 
 ### ROUND A — dashboard quick fixes (before Round S; A1 is an interim fix Round S supersedes)
 
