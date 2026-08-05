@@ -886,3 +886,29 @@ DQ-W3. Energy-conservation bound (W1b-3): while "breaking", the combined-profile
   at steady state per E5) + live payload vs bands E1-E6 + operator packet.
 - Round S marine leg DISPATCHED (rounds-marine-dev) — marine repo free after test round;
   commits stay local, merge gated on operator worked-examples review.
+
+## INCIDENT: Z5 hotstart guard fataled the first post-deploy cycle (2026-08-05 08:48Z)
+
+- Journal: level1 warm-start attempted from hotfile stamped 20260808.000000 (END of the
+  previous forecast horizon) for requested start 20260805.060000 → SWAN fatal
+  "** Error: [time] before current time" → convergence gate → NOTHING published;
+  runner retries the SAME poisoned file each interval → indefinite staleness
+  (last-good cache serving). NOT a Round W physics issue — Round W never touched SWAN.
+- Root cause: Z5's ordering rule (delete only when stamp PREDATES start) keeps
+  future-stamped files, which SWAN cannot initialize from. Z5 converted chronic
+  "never warm-starts" into "fatals at every cross-cycle boundary". (First-ever warm
+  start on 05:26Z was same-cycle — stamp matched; cross-cycle is where it breaks.)
+- Mitigation (lead, 09:0xZ): removed /run/weewx-clearskies/swan/{level1,level2,
+  level3_0}_hotstart.dat (evidence-backed: journal proves the file fatals SWAN; files
+  regenerate each cycle). Cold retry under way; watcher armed for first
+  "hotstart saved" or failure.
+- Fix Z5b dispatched to roundw-dev (authorized under the operator's earlier ruling
+  that hotfile save/read correctness is the lead's): hotfile USABLE only when stamp
+  EQUALS requested start; any mismatch (earlier OR later) → delete + cold start with
+  direction-naming log. tests/services/test_hotstart_timestamp.py pins updated to
+  equality-only with incident citation. Cross-cycle warm start remains PARKED (1a,
+  operator design ruling still needed — Z5b is safe-not-clever).
+- Round S dev rulings issued mid-incident: S-GAP-1 (jacking sweetener structurally
+  ready but unwired this leg — surfaced by name in the operator packet; no
+  surf_1d_pipeline.py touch, no logic duplication) + wire shape approved (five factors
+  + weights{} + dataState{}). Dev proceeding.
