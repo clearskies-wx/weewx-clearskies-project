@@ -683,3 +683,89 @@ doc sync (API-MANUAL new fields, plan §S-SPEC-3 A3-as-shipped) → round close.
   contract addition documented in API-MANUAL single-transect table + units, PASS.
 - Doc-code sync: API-MANUAL (3c74170) matches shipped payload (fields verified live);
   plan §S-SPEC-3 as-shipped + S-SPEC-4 erratum notes committed same session.
+
+## Round W — implementation ACCEPTED (2026-08-05 ~08:10Z); guards + audit IN FLIGHT
+
+**OPERATOR AUTONOMY GRANT (2026-08-05 ~08:05Z, in chat, verbatim intent):** "please
+continue autonomously for as much as you can, including D5, D6 and completion of Round
+S." → Proceed through W close, D5/D6 dashboard round, and Round S without waiting.
+The Round W reality-gate operator worked-examples review remains MANDATORY before W is
+*formally* closed — prepare it fully, queue for operator return; do not block D5/S on it.
+
+**Acceptance gate on roundw-dev closeout — PASS:**
+- Commits e048494 (W1) / 71f6bff (W2) / c09a78c (W3) on marine main atop 36fab04, ahead
+  3, NOT pushed. Allowlist diff verified by lead: only the 2 permitted files; pipeline
+  diff = import + signature + docstring + body + 2 call sites, exactly the amended
+  allowlist. Deviation accepted: apply_ddd_saturation takes gamma as 4th arg (existing
+  onset gamma threaded, not a new constant).
+- Lead-independent pytest (local, at c09a78c): 2 failed, 804 passed, 2 skipped —
+  IDENTICAL to dev's tail. Failure dispositions (lead-verified):
+  1. test_every_partition_gets_the_same_truncated_grid — pins superseded clamp
+     monotonicity ("adding energy can only raise combined Hs"); not a property of real
+     DDD physics. Supersession repair = guards brief T-W7.1.
+  2. test_beach_profile_module_imports_and_calls_refinement — PRE-EXISTING (lead proof:
+     `git show 36fab04:...beach_profile.py | grep -c refine` → 0; refinement moved in
+     Round P to surf_1d_pipeline.py:2343 + endpoints/surf.py:951, both alive). Stale
+     wiring pin, NOT a dropped-refinement regression. Repair = T-W7.2.
+- Greps (lead-independent): both clamps gone; _battjes_janssen/_roller_model have zero
+  call sites (defs + prose mentions only).
+- Dev KAT outputs (accepted): shelf vs closed form <0.5% at 3 points; synthetic two-bar
+  → 2 onsets [48,161], cessation ratio ≤0.40 in trough, min ratio 0.252 (real reform);
+  real HB transect 2m/16s → SINGLE onset at 30.02 m (~98 ft), no outer break (ratio
+  ~0.48 at ~91 m < 0.73 onset). CARRY TO REALITY GATE: inner break lands near the
+  operator's ~100 ft anchor; the ~300 ft outer break does NOT appear at these standalone
+  inputs. Measurement only — cause UNESTABLISHED (inv-break-geometry is the instrument;
+  do not theorize). Production runs per-partition + SurfBeat blending, so live payload
+  is the true test.
+- Lead observations passed to auditor as attack vectors: (a) _combine_partition_hs
+  redistribution ratio hs_total/hs_total_raw can exceed 1 (scales partitions UP where
+  DDD relaxation > raw RSS); (b) apply_ddd_saturation cessation resumes RAW pass-through
+  (discontinuity).
+
+**In flight:** roundw-tests (clearskies-test-author; brief
+docs/planning/briefs/ROUND-W-GUARDS-BRIEF-2026-08-05.md: T-W1..T-W6 new guards + T-W7
+repairs the 2 stale tests; expects 0 failures at close) and roundw-audit
+(blind adversarial; attack surface: forward-Euler stability on nonuniform dx, unbroken
+flux march energy sanity, clamp-removal edge cases, combined-profile saturation +
+redistribution>1 + cessation discontinuity, downstream faces/zones/jacking/perBreakZones
+reshaping, scope). Both dispatched ~08:12Z, running in parallel (tests write only test
+files; audit read-only).
+
+**Next after both close:** push+deploy-marine.sh, canonical librewxr pytest, journal
+sweep, reality gate w/ PRE-STATED expectations (structural: two breaks where present,
+outer ≈3× inner waterline distance, ~300/~100 ft anchors ±slop for undated-orthophoto
+waterline; matched-time webcam at known tide; NDBC 46253 beside) → operator
+worked-examples review QUEUED for operator return. In parallel: D5/D6 dashboard round
+(payload SHAPE unchanged by W — perBreakZones/zones/waterline fields already live from
+Z; W changes values only), then Round S (ADR-101) after W deploy.
+
+## Round W reality gate — PRE-STATED expectations (recorded 2026-08-05 ~08:30Z, BEFORE deploy/live look)
+
+Ground truth (operator, 2026-08-05): HB pier double break is the persistent norm; outer
+break ≈300 ft and inner ≈100 ft from the waterline — estimates measured off an UNDATED
+orthophoto's visible waterline, "approximation... sufficient to judge whether or not our
+model is approximate or not". Tide shifts the waterline some tens of ft per ft of tide,
+and HB does not average extreme tide swings (operator).
+
+Pre-registered PASS bands (coordinator's, coarse by design to match the ground truth's
+own precision; operator may override at review):
+- E1 STRUCTURE: at least one transect family near the pier shows TWO distinct published
+  breaks (perBreakZones length 2) under swell conditions comparable to the orthophoto's
+  (SW groundswell present). If live conditions are small/short-period, note and defer
+  rather than fail.
+- E2 INNER: inner-break waterline-relative distance (published distance −
+  waterlineDistance) within 50–200 ft (0.5×–2× of the 100 ft anchor).
+- E3 OUTER: outer break, when present, within 150–600 ft (0.5×–2× of 300 ft).
+- E4 RATIO: outer/inner waterline-relative ratio within 2–4 (anchor 3.0).
+- E5 NO-REGRESSION: foam zone still ends at the tide-aware waterline (±0.1 m of the
+  crossing); faces/zones/jacking present and finite; no invariant WARNINGs in the
+  journal at steady state; NDBC 46253 offshore Hs/Tp within the same tolerance bands
+  used in the Round P gate.
+- E6 KNOWN CARRY-IN: standalone kernel at 2 m/16 s produced a single break at ~98 ft
+  (inner anchor ≈ match; no outer break — ratio at 300 ft was ~0.48 < 0.73 onset). If
+  the LIVE payload also shows a single break while a matched-time webcam shows a double
+  break, that is a FINDING routed to inv-break-geometry (bathymetry/inputs question,
+  cause UNESTABLISHED — do not theorize), not a silent pass/fail; Round W's own claim is
+  the PHYSICS (reform capability + no clamps), proven by the synthetic two-bar KAT.
+- Webcam check: matched-time screenshot at known tide beside the rendered profile;
+  operator worked-examples review MANDATORY before W formally closes (queued).
