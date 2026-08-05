@@ -937,3 +937,33 @@ DQ-W3. Energy-conservation bound (W1b-3): while "breaking", the combined-profile
 - Doc-sync owed for D5 (lead-routed, this round): DESIGN-MANUAL (--beach-profile-*
   token family, new card pattern), DASHBOARD-MANUAL (Y-axis now LMSL-relative
   elevation; D7s median-5 display smoothing, raw data unmutated).
+
+## Round S marine leg — closeout received; S1b remediation ordered (2026-08-05 ~10:20Z)
+
+- Commits 53d4315/4124bed/cad577d/9361d66 (4 files, +877/-474), LOCAL ONLY — HAZARD:
+  marine main local is ahead of origin with GATED scorer commits; ANY marine push/deploy
+  before the operator worked-examples review would ship Round S. If an urgent marine fix
+  is needed pre-gate, push surgically (git push origin <fix-sha>:main only if ordering
+  allows) or branch.
+- Lead gate: diff scope exact (4 files); worked-example math hand-verified EXACT
+  (ex2 = 81.0, ex3 = 72.5); independent full pytest running in my env (dev's env needed
+  3 extra ignores for sandbox network/deps — mine ran those files fine pre-S).
+- S5 worked examples: #1 balanced 100/5-star; #2 CLEAN CLOSEOUT 81/4-star FLAG;
+  #3 BLOWN-OUT 72.5/4-star FLAG; #4 small-clean 87/4-star; #5 flat 0 (veto holds,
+  stars floor at 1-star — PARKED operator item).
+- S1b RULING (lead, contradiction-resolution rule invoked, stated openly): ADR-101's own
+  motivating defect is "clean closeout still scored ~66 — unacceptable"; the faithful
+  §7.2 implementation scores it 81 (arithmetic blend dilutes peel-ruin 0.05 with
+  breaker 1.0). ADR guidance 1's ruin mappings ("blown out <= 0.05, closeout <= 0.05")
+  read as COMPONENT-pinning (min(blend, 0.05) when any documented ruin state active:
+  Shape/peel-closeout, Conditions/wind-blown-out ONLY) — the only reading satisfying
+  the ADR's acceptance criterion. Expected: closeout ~47.3, blown-out ~47.1 (hand math).
+  OPERATOR CAN OVERRULE at the mandatory gate — both behaviors (81 vs 47) go in the
+  packet. Dev implementing S1b now.
+- Dev judgment calls ACCEPTED (packet items): Power reads dominant-partition height not
+  raw energy (height = 4*sqrt(energy) — tautology otherwise); windSource = provenance
+  metadata, not a curve input. S-GAP-1 stands (jacking sweetener built, unwired).
+- Supersessions: 7 old-scorer pins in test_swell_dominance_ratio.py + 1 isolated-pass
+  flake. Round S test-author leg (guards + stale repairs) queued after S1b.
+- Doc-sync owed after S1b: API-MANUAL SurfScoringBreakdown section, OPERATIONS-MANUAL
+  [marine][[surf_score_weights]].
