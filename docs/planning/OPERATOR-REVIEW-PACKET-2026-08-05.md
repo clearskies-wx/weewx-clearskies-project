@@ -118,7 +118,16 @@ rounding order, clamp ordering, single-use, and the config path end-to-end; 254
 scoring-scoped tests pass across all four repos. Four findings: one stale contract
 doc and one stale docstring (both fixed on their branches same-day), plus the two
 disclosed items below (S-3 and S-5).
-**[DECIDE] S-5 (audit F3 — a real conflict between your two design documents):** the
+**OPERATOR RULING 2026-08-05 (in chat) covering S-3, S-4, S-5 and the agent-refusal
+item: "not my issue — the coordinator decides these; fix the rules; update the docs
+so they agree." Executed: rules fixed (agents comply with coordinator rulings,
+commit e5fa8e2). Coordinator rulings: S-5 = dominant-partition direction (option b);
+S-4 = qualityScore confirmed as ruled; S-3 = wire the jacking pipeline field next
+marine round. The S-5 code change + making S-SPEC-1/research-brief/manuals agree
+land in ONE commit on the Round S branch before its deploy (doc-code sync rule).
+Original decision text kept below for the record.**
+
+**[was DECIDE] S-5 (audit F3 — a real conflict between your two design documents):** the
 research brief §7.2 (binding inventory) says Size's beach-alignment gate keys off the
 "dominant partition direction (from multiSwell)"; the plan's locked S-SPEC-1 says
 "keep as-is", and the pre-existing code keyed off the top-level `wave_direction`
