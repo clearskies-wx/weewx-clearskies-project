@@ -52,13 +52,17 @@ future, deletes it and cold-starts with a log line naming the direction. Verifie
 the guard caught and deleted a future-stamped file at 09:01, the cycle completed clean,
 published 09:27.
 
-**[DECIDE] DQ-1a (parked from Round P, now sharpened):** cross-cycle warm start is
-IMPOSSIBLE under current stamps (SWAN stamps the horizon END; the next cycle wants the
-START — never equal). Today's fix makes this safe (cold start every cycle — the
-long-standing behavior). If you WANT cross-cycle warm starts (saves ~minutes of SWAN
-compute per cycle), that needs a design decision about what state SWAN may legally
-start from. Options: leave as-is (safe, wasteful) / design a re-stamp or per-timestep
-hotfile scheme (its own small round). No urgency.
+**[DECIDE] DQ-1a (parked from Round P, now sharpened):** SWAN can save its wave
+state at the end of a run and reload it at the start of the next run, skipping the slow
+spin-up. That reload never actually happens between cycles, because the saved file is
+stamped with the END time of the previous run while the next run wants to start from a
+START time — the timestamps never match, so the file is always rejected. Today's fix
+makes that rejection safe and deliberate: every cycle starts from scratch, which is what
+has always really happened. If you want the reload to work across cycles (saves
+~minutes of SWAN compute per cycle), we need to decide how to make the timestamps line
+up — either re-stamp the saved file, or have SWAN save a snapshot at the moment the
+next cycle will start from. Options: leave as-is (safe, slightly wasteful) / design one
+of those two schemes (its own small round). No urgency.
 
 ## 4. Round S — surf score rebuilt; YOUR GATE before it deploys (ADR-101 mandate)
 
