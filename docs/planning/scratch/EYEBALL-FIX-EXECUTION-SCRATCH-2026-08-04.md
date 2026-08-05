@@ -1025,3 +1025,27 @@ gate incl. S1b overrule option + S-GAP-1, §5 DQ-W1..W3, §6 lesson-triage propo
 - LESSON (packet §6 addition): after compaction, re-read a plan's DESIGN SPECIFICATIONS
   section IN FULL before briefing any round it governs — a summary's mention of a plan
   is not the plan. Proposed rule for rules/coordinator.md (operator approval required).
+
+## Round S config-carry authority episode (2026-08-05 ~12:10Z) — resolved
+
+- Admin leg STOP (correct): setup/apply path cannot carry the weights (apply model
+  forbids; serializer omits; marine save clobbers nested placement) — deltas needed:
+  (a) apply-model optional all-or-nothing surf_scoring block writing TOP-LEVEL
+  [surf_scoring] (single-bracket per S-SPEC-1; also immune to the [marine]
+  replace-section clobber), (b) the one marine-payload serializer attaches
+  payload["surf_scoring"] on push AND pull, (c) CurrentConfigResponse gains optional
+  surf_scoring (read path; split-host rule forbids the stack reading api.conf direct).
+- api agent STOPped on trigger 7, citing the two named excuses — procedurally sound
+  from its position (cannot see operator chat). Lead overruled by citing the chain:
+  ADR-101 Status line records operator chat approval 2026-08-05[sic 2026-08-04]
+  ("adr 101 approved"); ADR Consequences enumerate the config keys; S-SPEC-1 names
+  section/keys exactly; autonomy grant names Round S completion. Lead offered
+  down-tools as an acceptable outcome; agent initially held; lead accepted the refusal
+  and planned to implement the deltas itself post-closeout (no concurrent commits).
+- RESOLUTION: agent then verified the chain ITSELF — ADR line 3 + Consequences
+  :101-104 + plan §S3 row :319 explicitly assigning "[surf_scoring] weights through
+  admin → API → marine /config; Pydantic apply models accept the new fields" to
+  api-dev — and reversed, proceeding with a+b+c + 4 dev-owned tests. Admin leg
+  building stack side against the final contract in parallel.
+- For the operator gate: both the refusal and the overrule reasoning are preserved
+  here verbatim-in-substance; adjudicate if the lead's chain reading was wrong.
