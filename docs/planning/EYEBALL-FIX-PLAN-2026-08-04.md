@@ -116,9 +116,11 @@ factors — they average together, but one very poor factor sinks the whole scor
 
 Strip to the a49059d 2026-07-16 baseline (title + 3 stat tiles + component table + compass) +
 KEEP the existing peel row (SurfingTab.tsx:2257). REMOVE: best-peak/average headline,
-main-break-zone text, wave-shape row, SurfBeat section. **EXCEPTION (D2 pending):** the shadow
-line + AT BREAK rows were restored by the operator's D10.2 ruling this week — do NOT touch those
-two until D2 is decided.
+main-break-zone text, wave-shape row, SurfBeat section, **AND the shadow line + AT BREAK rows
+(D2 RULED 2026-08-04, operator chat: "no user will know what the hell that is… these were
+computed for other parts of the dashboard, NOT for the Current Swell conditions card").** Render
+removal only — marine/API keep emitting `shadowFaceHeight`/`perPartitionBreaks` (D10.2 wire
+contract untouched; they serve other dashboard consumers).
 
 ### S-SPEC-3 — Beach-profile break-point label collisions (item 9d, confirmed bug)
 
@@ -207,12 +209,13 @@ profile compute (B2 numbers recorded).
 
 ## 4. REMAINING OPERATOR DECISION QUEUE (one at a time, in order)
 
-- **D2:** shadow line + AT BREAK rows vs strip order (blocks the S-SPEC-2 exception only).
 - **D5:** beach profile design set (items 9a/b/c/e/f/h) — needs mockups; separate design session.
 - **D6:** zones per break (item 10) — contract shape change, yes/no.
 - **D7:** heatmap long-term (precompute vs synchronous) — non-urgent after B1.
 
-RESOLVED (recorded): D1, D3, D4, D8-display → ADR-101 (Accepted 2026-08-04). D8's fan-derived
+RESOLVED (recorded): D1, D3, D4, D8-display → ADR-101 (Accepted 2026-08-04). **D2 → strip both
+rows from the Current Swell card (operator 2026-08-04; render-only removal, wire fields stay —
+folded into S-SPEC-2, no exception remains).** D8's fan-derived
 sector-map live check remains in §5.
 
 ## 5. OPEN VERIFICATION TAILS

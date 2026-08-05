@@ -1332,7 +1332,7 @@ Fishing tab solunar display follows the `SunMoonDetailCard` arc + `MoonPhaseIcon
 
 Surf and fishing tabs display scoring factor breakdowns as horizontal bar segments showing **weighted contributions** (raw score × weight), not raw scores:
 
-- Each factor bar: label + weighted score + colored fill proportional to weighted score
+- Each factor bar: label + weighted score + colored fill proportional to the factor's share of its own category max (see "Score bar fill rule" below)
 - Bar fill uses score tier tokens (`--score-1` through `--score-5`): 0–20 orange, 20–40 amber, 40–60 lime, 60–80 green, 80–100 purple
 - Weighted factors shown as "Label (N%)" (e.g., "Wave Height (35%)")
 - Beach alignment shown as "Beach Alignment (penalty)" with negative value (e.g., "−29") — orange bar fill
@@ -1340,9 +1340,11 @@ Surf and fishing tabs display scoring factor breakdowns as horizontal bar segmen
 - Star rating: 5 star SVG icons, filled stars use the score tier color, unfilled stars use `--muted-foreground` at 25% opacity
 - Quality label text below stars in the matching tier color
 
-### Score bar normalization rule (SURF-1, supersedes ADR-096 bar rule)
+### Score bar fill rule (ADR-096; operator-affirmed 2026-08-04)
 
-**Score bars fill relative to 100 (the total possible score).** Fill width = `Math.min(100, Math.abs(score))%`. A Wave Height score of 35 fills 35% of the bar. A Beach Alignment penalty of −16 fills 16%. This shared scale makes all six items visually proportional and their widths add up to explain the total score.
+**Factor (component) bars fill relative to their own category max.** Fill width = `|score| / max × 100` — a Wave Height score of 28/35 fills 80% of its bar; 35/35 fills 100%. Adjustment bars (signed modifiers) keep the 0–100 scale (`|score|%`) as an interim state — the adjustments column is deleted wholesale by the ADR-101 scoring rebuild.
+
+> Provenance note (2026-08-04): a previous revision of this section recorded a "/100 shared scale" rule attributed to a user specification ("SURF-1"). The operator has explicitly denied that ruling ("that was not my ruling at all") — the /100 fill was a session-invented detail, and a manual section cannot supersede an ADR without operator approval. Per-category fill (ADR-096) is the standing rule; a regression guard pins it (`SurfingTab.test.tsx`).
 
 **Two-column layout with headers:**
 - Column 1: **"COMPONENTS"** — the three weighted factors (Wave Height max 35, Wave Period max 35, Wave Organization max 30)
@@ -1359,7 +1361,7 @@ Surf and fishing tabs display scoring factor breakdowns as horizontal bar segmen
 - Factors: "35/35", "21/35", "26/30"
 - Adjustments: "−16 pts", "0 pts", "+5 pts"
 
-**Additive identity:** Six displayed values must visibly sum to the total score.
+**Additive identity:** The six displayed *values* still sum to the total score; bar *widths* do not (each factor bar is scaled to its own max).
 
 ### Scoring explainer modal (surf tab)
 
@@ -1384,7 +1386,7 @@ Grid notation `CxR` maps to the `Card` component's `footprint` (column span) and
 |---|---|---|---|---|
 | Marine landing | Location card | `wide` | — | Photo alongside wave/wind/temp data |
 | Surf | Surf Score Card (hero) | `wide` | `2` | 2x2 hero: 5-star rating + XX/100 total + quality label + conditions text. Two-column scoring breakdown: Col 1 = Wave Height (35%), Wave Period (35%), Wave Organization (30%) with bars normalized to each factor's max. Col 2 = Beach Alignment, Directional Exposure, Time of Day (signed penalties/bonuses). ADR-096. |
-| Surf | Swell Card | `wide` | `2` | 2×2: **Row 1 — CONDITIONS AT BREAK**: 3 top-row stats (Swell Height, Breaking Face Height, Period — no Direction in top row). **Row 2**: left 2/3 = "INCOMING SWELL (offshore)" section label + SwellBreakdown component (Type/Dir/Height/Period); if `partitionBreakInfo` present, show "AT BREAK" sub-section: one line per swell partition ("16s SSW groundswell → outer bar (200m), 5ft plunging"). Right 1/3 = Dominant Direction compass (sole direction display). ADR-095/096; T5.4. |
+| Surf | Swell Card | `wide` | `2` | 2×2 (stripped to the a49059d baseline + peel per the operator's 2026-08-04 eyeball ruling item 6 + D2, S-SPEC-2): **Row 1 — CONDITIONS AT BREAK**: 3 top-row stats (Swell Height, Breaking Face Height, Period — no Direction in top row), then the peel-angle row. **Row 2**: left 2/3 = "INCOMING SWELL (offshore)" section label + SwellBreakdown component (Type/Dir/Height/Period). Right 1/3 = Dominant Direction compass (sole direction display). NOT on this card (D2, render-only removal — wire fields remain for other consumers): best-peak/average headline, shadow face-height line, main-break-zone text, wave-shape row, SurfBeat set-timing section, AT BREAK per-partition rows. Regression guards pin the omissions (`SurfingTab.test.tsx`). ADR-095/096. |
 | Surf | Wind Card | `wide` | `"half"` | 2×half compact strip: wind speed, direction, quality label, gust (from MarineObservation) |
 | Surf | Current Conditions Card | `wide` | `"half"` | 2×half 5-column grid: weather icon, air temp (Thermometer, station), dewpoint (Drop icon, station), water temp (WaterThermometerIcon, marine observation), UV index (UvIndex, station) |
 | Surf | Beach Profile Card | `full` | — | Cross-shore beach profile visualization (T5.3). **SVG layout** (viewBox 820×292, PAD_LEFT=72, PAD_BOTTOM=72, PAD_TOP=32, PAD_RIGHT=12): shore on right, offshore on left. **9 elements**: (1) Seafloor — CUDEM bathymetry, tan/brown polygon + stroke. (2) Water column — blue fill at 0.25 opacity (SURF-20 fix). (3) Hs envelope — wave height polygon, blue fill 0.32 opacity + 1.5px stroke. (4) Wave shapes — optional toggle button; Stokes/cnoidal/bore cross-sections at break points. (5) Surf zone overlays — impact zone (red, `rgba(220,38,38,0.14)`, "IMPACT ZONE" label in `var(--destructive)`) + foam zone (amber, `rgba(234,179,8,0.14)`, "FOAM ZONE" label in `var(--score-2)`) + reform trough (muted dashed boundary, no fill). (6) Break point markers — dashed red vertical line, wave-crest triangle, face/wave height label above, distance-from-shore label below, per-partition label, breaker type mini SVG icon + text. (7) Jacking annotation — amber badge "N.N× jacking" when jacking factor > 1.3. (8) Axis labels — Y-axis title (rotated -90°, "Depth (unit, datum)" or "Depth (unit)"), X-axis title ("Distance from shore (unit)"), depth tick labels on Y, distance tick labels on X. (9) Transect selector — `<label>` + `<select>` above SVG: Best Peak / Average / numbered transects; controlled by `selectedTransect` state in SurfingTab. Wave shapes `<button aria-pressed>` toggle shows when API provides `waveShapes` data. All new props optional for graceful degradation when T5.2 API data absent. `role="img"` + `aria-labelledby` + sr-only data table. ADR-097; T5.3. |
