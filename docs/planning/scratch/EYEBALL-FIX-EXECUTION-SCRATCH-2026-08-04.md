@@ -449,6 +449,36 @@ doc sync (API-MANUAL new fields, plan §S-SPEC-3 A3-as-shipped) → round close.
   re-present WITH the rebuilt mockup via its per-break-zones demo toggle, per the
   original "re-present after unified data + corrected mockup" instruction.
 
+## ROUND Z (surf-zone truthing) — acceptance + deploy (2026-08-05 ~04:40Z →)
+- Authorized: operator "1. yes. 2. yes." + D6 "yes" + domain ruling "HB is notorious for
+  its double break". Brief: docs/planning/briefs/ROUND-Z-SURF-ZONE-TRUTHING-BRIEF-2026-08-05.md.
+- Implementation: marine f4354b2 (Z0 hotstart bounded line-scan, cap 2 MB), 4c0f7e7
+  (Z1 waterline foam-end + Z2 hysteresis 0.15 / depth floor 0.15 m / _MIN_BREAK_HS_M),
+  b551d03 (Z3 perBreakZones + unavailable mirror), api c99f6d5 (Z4 breakDistance entry —
+  converter mechanism VERIFIED by agent and lead independently: _walk recurses
+  unconditionally by structure, _resolve_group matches leaf key names, nested zone keys
+  pre-covered at _FIELD_GROUPS:218-222).
+- ACCEPTANCE PASS: (1) independent pytest re-run 99 passed (marine, 7 files);
+  (2) allowlist diffs clean (4 commits, exactly the 4 allowed files); (3) spot-checks:
+  hysteresis armed-state machine correct (filtered crossings don't disarm), Z0
+  incremental line-iterate (no slurp, cap enforced, None-safe); (4) behavioral proof on
+  live SI arrays (transect 14, 04:00Z): old breaks [67.7, 62.7] m → NEW detector returns
+  EXACTLY [67.68] (jitter inner break eliminated); aggregate + per-break foam end 19.66 m
+  = first sample inside waterline 20.52 m (one 4-m sample spacing, as specced);
+  perBreakZones single entry consistent. NOTE: coordinator's pre-statement misremembered
+  the older payload's break distances (25.6/16.6) — corrected to this payload's actual
+  67.7/62.7 before judging; substance identical. (5) beach_profile reorder deviation
+  (flagged by agent): 49+/38− consistent with pure move + threading; confirmed via live
+  payload checks post-deploy.
+- DEPLOYED: marine b551d03, process start 04:52:26 UTC, health/manifest 200, auth 401.
+  Near-miss recorded: first push pair hit the marine repo twice (cwd error) — api push
+  initially skipped, caught by reading push output; api pushed ac96064..c99f6d5 after.
+  deploy-api.sh re-run from meta root (first attempt used wrong path from api repo cwd).
+- Z-gate pre-stated live expectations: journal ZERO "hotstart timestamp unparseable"
+  post-04:52 once SWAN levels run; single-entry breakPoints (no jitter pair) on saturated
+  profiles; foam end within one sample of waterlineDistance; perBreakZones in marine SI +
+  API ft payloads with units.breakDistance = ft.
+
 ## Verification evidence — Round P (ROUND CLOSED 2026-08-05 ~04:30Z)
 - Scope walkthrough (brief ROUND-P-UNIFICATION-BRIEF-2026-08-04.md): P1.1 side-run
   deletion DONE (marine 4e0ff18); P1.2 zones-from-pipeline DONE (4e0ff18); P1.3

@@ -168,6 +168,15 @@ compute placement = D7, untouched.)
 | **Round S** — surf score rebuild (S1–S7, ADR-101) | **NOT STARTED** | next major round after D5/D6 |
 
 **Parking lot (pre-existing findings, tracked for future rounds — none block Round P):**
+1a. **Hotstart follow-up — stamp semantics (found live 2026-08-05 after Z0 deployed):**
+   the read fix works (journal now parses the stamp: "stamped 20260807.180000 !=
+   requested start 20260805.000000" — a line impossible pre-Z0), but SWAN stamps a
+   hotfile with the END of the preceding compute (= the forecast-horizon end under our
+   all-stationary sequence), while the runner compares against the next cycle's START.
+   Those can never match ⇒ cross-cycle warm start never engages even with a working
+   reader. What the comparison SHOULD accept (any stamp ≥ requested start? per-timestep
+   hotfiles? same-cycle-only warm start by design?) is a SWAN-run-semantics decision —
+   OPERATOR ruling needed before anyone "fixes" it.
 1. **SWAN hotstart chronic cold-start — ROOT CAUSE FOUND (audit 2026-08-05):**
    `swan_runner.py` `_read_hotfile_timestamp()` reads only the first 4096 bytes, but the
    hotfile "date and time" record sits AFTER the LOCATIONS coordinate block at byte offsets
