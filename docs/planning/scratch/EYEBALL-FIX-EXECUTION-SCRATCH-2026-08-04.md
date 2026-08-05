@@ -352,3 +352,58 @@ partitions). Pre-dates Round P and 47c8084. Deserves its own investigation item.
 _compute_wave_shapes extraction pin) → blind auditor (scope: + surf.py:389-423 median-bathy,
 jackingFactors-always-empty, chronic hotstart) → reality gate after fallback clears →
 doc sync (API-MANUAL new fields, plan §S-SPEC-3 A3-as-shipped) → round close.
+
+## ROUND P QC session 2 (2026-08-05 03:30Z →)
+
+- Doc sync DONE (meta 3c74170): API-MANUAL single-transect table — 3 new field rows
+  (tideLevel/waterlineDistance/beachElevation), waveShapes/surfZones/jackingFactors rows
+  re-provenance'd to the unified pipeline arrays, units paragraph extended; plan
+  S-SPEC-3 "AS SHIPPED" note (label rows deleted per operator ruling, 96f5478) +
+  S-SPEC-4 pollInterval erratum note (120 s, not 120_000).
+- Targeted marine pytest vs deployed 8c2def8 (librewxr, cmd:
+  `sudo -u ubuntu bash -c "cd /home/ubuntu/repos/weewx-clearskies-marine && .venv/bin/python -m pytest <5 files> -q"`):
+  **10 failed, 85 passed** — all 10 = `TypeError: _build_transect_profile() missing
+  required arg 'tide_level'` in test_beach_profile_partition_index_spaces.py. Introduced
+  stale call sites (contract change per brief; implementer correctly barred from tests).
+  BLOCKS round close until repaired. Reproduced locally (local Python 3.14 + deps CAN run
+  marine unit tests — "no local toolchain" assumption in Round P brief was WRONG; canonical
+  run stays librewxr py3.12).
+- test-author DISPATCHED (brief docs/planning/briefs/ROUND-P-TESTS-BRIEF-2026-08-05.md):
+  T0 repair 10 call sites (tide_level=0.0, lead call), T1 waterline KAT (hand-computed,
+  non-falsifiable-vs-pre-change declared), T2 zones-anchor guard (must fail vs 47c8084 —
+  coordinator verifies via read-only checkout at acceptance), T3 _compute_wave_shapes pin,
+  T4 new-fields guard. Scope ack received + confirmed 03:33Z.
+- **GUARDS ACCEPTED (2026-08-05 ~03:57Z).** test-author commits 7ee5a3c (T0, 9 call
+  sites +tide_level=0.0), 1d6c9b0 (T1 waterline KAT, 6 tests), 541644d (T2-T4, 6 tests).
+  Acceptance evidence: (1) independent local re-run `67 passed in 0.21s`; (2) allowlist
+  diff clean — 3 commits touch exactly the 3 allowed test files, 0 source files;
+  (3) fail-against-pre-change verified by coordinator in read-only worktree at 47c8084:
+  raw run = collection ImportError (helpers absent); with T3-imports+tide_level kwargs
+  harness-stripped, T2 fails AT ITS ASSERTION (`response["surfZones"] is None` — old
+  side-run yields no zones from pipeline-shaped fixtures) and T4 fails KeyError
+  'tideLevel' — 4 failed, 2 deselected; worktree removed; (4) T1 hand-math spot-check
+  (tide −1.0 → frac 3/5 → 6.0 m) verified independently; T1 declared
+  non-falsifiable-vs-pre-change (new function) per rule. (5) CANONICAL librewxr run at
+  541644d (pushed 8c2def8..541644d; deploy-marine.sh --no-restart, STALE PROCESS banner
+  expected — test-only commits, running 8c2def8 source identical): `67 passed, 1 warning
+  in 0.55s`. No-restart chosen deliberately: a restart re-triggers the chronic hotstart
+  cold-start and would wreck the just-recovered partitions.
+- **SWAN partitions RECOVERED 03:53:02Z** (monitor caught `bulk-fallback transect(s)=none`,
+  best_peak 0.79 m) — ~40 min after restart, consistent with the 01:06 precedent.
+- **Radar container RE-PINNING (watch item FIRED, surfaced to operator):** librewxr-
+  librewxr-1 python at 211% CPU, 408 CPU-min since 00:44 start; load 7-9. NOT restarted —
+  no standing authority; last restart was a one-time operator order. Marine endpoint
+  recompute currently slow (>45 s → proxy 503 on uncached keys, known Gate B marginality).
+- Blind auditor DISPATCHED (brief docs/planning/briefs/ROUND-P-AUDIT-BRIEF-2026-08-05.md):
+  disprove unification claim + 3 side-investigations (surf.py:389-423 median-bathy land
+  points; jackingFactors always empty; chronic hotstart token=None).
+- **REALITY GATE — PRE-STATED (before looking at post-recovery numbers):**
+  Comparison quantity: dominant partition at handoff, HB pier, first post-recovery cycle
+  (bulk-fallback=none) vs pre-deploy baseline (physics untouched ⇒ structure preserved).
+  PRE-DEPLOY BASELINE (timestep 03:00Z, generated 03:13:50Z, stale payload): PT0
+  groundswell 14.33 s @ 197.2°, heightM 1.242 at handoff, meanFace 2.56 m, meanBreakDist
+  123.2 m; PT1 wind_swell 5.40 s @ 257.6° (no breaks). TOLERANCE: period ±2 s, direction
+  ±15°, Hs ±30%, classification unchanged (allows hourly evolution across model cycles).
+  NDBC 46253 obs pasted BESIDE for the record — NOT gated (model-vs-ocean belongs to the
+  parked inv-swell investigation). Out-of-tolerance vs baseline = deploy FAILED → rollback
+  first, diagnose second.
