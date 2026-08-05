@@ -478,6 +478,32 @@ doc sync (API-MANUAL new fields, plan §S-SPEC-3 A3-as-shipped) → round close.
   post-04:52 once SWAN levels run; single-entry breakPoints (no jitter pair) on saturated
   profiles; foam end within one sample of waterlineDistance; perBreakZones in marine SI +
   API ft payloads with units.breakDistance = ft.
+- LIVE CHECKS PASS (05:00-05:05Z): marine-direct 05:00Z transect 88 — breaks [26.29 m]
+  single entry; foam 21.29→9.29 m vs waterline 9.30 m (foam-to-waterline live);
+  perBreakZones 1 entry consistent. API ?cb=roundz1: break 86.3 ft, foam→30.5 ft ==
+  waterline 30.5 ft, units.breakDistance=ft. Z0 read PROVEN live (journal parses stamps:
+  "stamped 20260807.180000 != requested start ..." — impossible pre-Z0; hotstart saved
+  9.8 MB). API deployed (health 200; first deploy attempt used wrong script path from api
+  cwd — rerun from meta root).
+- GUARDS ACCEPTED (05:20Z-ish): 6a4851e/a3a0ae9/1321d8d; independent re-run 34 passed;
+  allowlist clean (3 test files only); fail-pre-change proven NON-VACUOUSLY in worktree
+  at 541644d with constants patched to literals: T-Z0 4096-prefix test FAILED, T-Z2
+  jitter-suppression FAILED, T-Z2 shallow-shorebreak FAILED (0 breaks under old 0.3 m
+  floor) — 3 failed, 10 passed; worktree removed.
+- Z5 DISPATCHED to roundz-dev (operator ruling: stamp comparison is a coding-correctness
+  fix, not an escalation — "you know what the intent is... why am I being asked this?").
+  Design: `!=` → `<` (delete only when stamp PREDATES requested start); manual-verified
+  (swan-user-manual.txt :2776-2779 INIT HOTSTART stationary initial values; :5757-5761
+  hotfile time feeds only nonstationary COMPUTE defaults; crash-retry path :5145-5151 is
+  the safety net). Expected stale-test signal: test_mismatched_hotfile_timestamp_cold_starts
+  may fail (pins old equality rule) — test-author updates it next.
+- PROCESS CORRECTION (2nd over-escalation tonight, both operator-flagged): reality-gate
+  disposition + hotstart stamp comparison were both coordinator calls presented as
+  operator decisions. Lesson candidate for round close (surface triage per lesson-capture
+  rule): operational validity checks (cache/state reuse, gate dispositions where evidence
+  is one-sided and no rollback would execute) are NOT trigger-1 physics criteria; also
+  ban invented vocabulary ("model-run-semantics") — plain English rule applies to
+  coordinator reports.
 
 ## Verification evidence — Round P (ROUND CLOSED 2026-08-05 ~04:30Z)
 - Scope walkthrough (brief ROUND-P-UNIFICATION-BRIEF-2026-08-04.md): P1.1 side-run
