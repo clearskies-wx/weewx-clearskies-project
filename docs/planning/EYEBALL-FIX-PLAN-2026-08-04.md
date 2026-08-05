@@ -9,6 +9,14 @@ items) · [briefs/SURF-SCORE-REBUILD-RESEARCH-BRIEF.md](briefs/SURF-SCORE-REBUIL
 (research + §7.2 binding variable inventory) ·
 [ADR-101](../decisions/ADR-101-surf-score-geometric-mean.md) (Accepted 2026-08-04).
 
+**⇒ ALL PHYSICS / SELECTION / HEAT-MAP WORK FROM 2026-08-05 ONWARD lives in
+[SURF-PHYSICS-REMODEL-PLAN-2026-08-05.md](SURF-PHYSICS-REMODEL-PLAN-2026-08-05.md)** — rounds Y
+(spectral boundary — the measured ⅓-energy starvation), X (statistical breaking + one-sided decay
++ roller + cap deletion, operator-ruled), Z (bar-aware sticky transect selection, fine-grid
+shoreline anchor, heat-map orthophoto registration), plus the documentation catch-up debts
+(DOC-0/DOC-1) and the S-5 direction-source change. This plan's own remaining items (inv-swell,
+DQ-W1/W2, E3/E4 groundswell re-check) are subsumed there.
+
 **Agent roster:** `clearskies-dashboard-dev` (React), `clearskies-api-dev` (API + marine Python),
 `clearskies-test-author` (guards/known-answer), `clearskies-auditor` (blind adversarial),
 `clearskies-docs-author` (manuals). Every implementation prompt carries the architectural-change
