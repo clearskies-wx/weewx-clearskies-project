@@ -298,3 +298,57 @@ stop time — VERIFY IT COMPLETED on resume (`ssh weewx` → API health, or re-r
 
 ## Evidence log
 (append gate rows / command outputs here as rounds close)
+
+## ROUND P LIVE CHECKS — completed 2026-08-05 03:14–03:27 UTC (coordinator)
+
+**Deploys verified complete:**
+- marine: commit 8c2def8, process start 03:14:25 UTC, health/manifest 200, auth 401 ✓
+- api: deploy-api.sh exit 0, "API health check: 200 OK" after 130s cache-warm ✓
+
+**First proxy fetch was STALE CACHE** (generatedAt 03:13:50Z, predates restart; showed all
+baseline defects). Bypassed two ways: (a) marine direct on librewxr:8780 with bearer secret,
+(b) proxy with cache-buster `?cb=roundp1` → fresh generatedAt 03:24:30Z. Un-busted proxy URL
+serves stale until 03:43:50Z (TTL by design).
+
+**Check results (fresh payload, timestep 2026-08-05T03:00:00Z):**
+1. Zones anchor to published breaks: impactZone.startDistance 25.55 m vs outermost break
+   25.6 m (Δ 0.05 m, well within ±1.5 m) — **PASS** (baseline defect was 47 m disjoint).
+2. tideLevel: −0.34 m, finite — **PASS**. API converts → −1.1155 ft exact.
+3. waterlineDistance: +9.44 m (→ +30.98 ft). Pre-stated range [−297, 0] ft was written for
+   an above-datum tide; tide is −0.34 m so the waterline sits SEAWARD of the LMSL zero —
+   sign convention verified: interpolated beachElevation at 9.44 m = −0.339 m ≈ tideLevel
+   exactly — **PASS, range expectation superseded by sign-consistency proof**.
+4. beachElevation: 261 pts, signed, dist −73.5..2157.6 m, elev +2.91..−15.03 m — **PASS**.
+   Per-item ft conversion exact (−73.5 m → −240.98 ft).
+5. units block: tideLevel/waterlineDistance/elevation all "ft" — **PASS** (P2 verified).
+6. waveShapes max distance: 2157.6 m ≈ 7078 ft vs pre-stated "≤ ~463 ft" — **EXPECTATION
+   ERRATUM, not a defect**: _compute_wave_shapes emits 31 evenly-spaced samples across
+   whatever arrays it receives; baseline behaved identically (−275..7009 ft). The ≤463 ft
+   figure wrongly assumed pipeline arrays were trimmed to the nearshore domain. Unification
+   goal (shapes from same arrays as transect/breaks) IS met. Whether to trim shapes for the
+   card is a D5 display decision — flag to operator.
+7. jackingFactors: 0 entries — SAME in baseline (pre-deploy payload also 0). Pre-existing,
+   not a Round P regression. Note for auditor.
+
+**Journal sweep (since 03:14):** no tracebacks/marine errors. Only ERRORs = HRRR NOMADS
+404s (t02z f13–f18 not yet published upstream; pre-existing pattern).
+
+**Reality gate: PENDING — restart transient.** Post-restart cycles run with bulk-fallback
+on ALL 162 transects (Hs 0.49 m Tp 4.7 s Dir 219°) because SWAN L1/L2 cold-started
+("persistent hotstart timestamp unparseable" → stale hotstart deleted). Pre-restart cycles
+(02:57, 03:13) had bulk-fallback=none. Precedent: 01:06 restart showed same pattern,
+recovered clean by 02:57 (~1 warm SWAN cycle). Expect recovery ~04:30–05:00Z; run reality
+gate (dominant Hs/Tp/dir vs NDBC 46253, tolerance stated before looking) AFTER fallback
+clears. Fresh-vs-baseline break differences ([84,54] ft vs [220..118] ft, same timestep)
+are explained by this input-state transient, NOT Round P code (pipeline/SWAN untouched).
+
+**NEW parked finding (for auditor / backlog):** "hotstart timestamp unparseable
+(token=None)" is CHRONIC — 223 journal hits since Jul 28, across multiple process
+instances, recurring even mid-process (Jul 30 04:42 AND 07:05 same PID). Every occurrence
+forces a SWAN cold start (wasted compute + transient all-transect bulk fallback + degraded
+partitions). Pre-dates Round P and 47c8084. Deserves its own investigation item.
+
+**Remaining Round P QC:** test-author guards (waterline KAT, zones-anchor guard,
+_compute_wave_shapes extraction pin) → blind auditor (scope: + surf.py:389-423 median-bathy,
+jackingFactors-always-empty, chronic hotstart) → reality gate after fallback clears →
+doc sync (API-MANUAL new fields, plan §S-SPEC-3 A3-as-shipped) → round close.
