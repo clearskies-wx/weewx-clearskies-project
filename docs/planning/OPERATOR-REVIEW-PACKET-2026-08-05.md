@@ -172,7 +172,20 @@ reform" below the 15 cm floor (edits your approved cessation criterion — hence
 call). Recommendation: yes, next marine round.
 **[DECIDE] DQ-W2:** one-grid-point height transient exactly at the 1 cm depth floor,
 self-correcting, below the publication floor. Recommendation: accept as documented.
-**[DECIDE] DQ-W3:** the combined profile is now bounded by its own raw input
+**RESOLVED 2026-08-05 (operator ruling in chat): "yes you need to remodel the energy
+correctly." Scope of the ruled remodel (Round X, brief finalizes when the transect-27
+break-suppression investigation reports): (1) breaking decay becomes strictly
+one-sided — dissipation can remove energy, never add it (kills the two-sided
+relaxation that pumped waves back up toward Γ·h in troughs/deep spots); (2) the
+DQ-W3 min() energy cap below is DELETED, replaced by a fire-only invariant
+(output ≤ input as an alarm, not a control); (3) an explicit roller energy budget
+is restored on top of the DDD breaking model — energy leaves the wave into the
+roller at breaking, decays shoreward, feeds the trough re-form — so shed energy is
+tracked, not dropped (the pre-Round-W roller was removed with the clamps; the
+transport physics itself was legitimate). Full process: design → agents →
+adversarial QC → KATs → reality gate vs webcam. Original decision text below.**
+
+**[was DECIDE] DQ-W3:** the combined profile is now bounded by its own raw input
 (saturation can only remove energy, never add — the audit caught it publishing 18%
 ABOVE the partitions' physics). This is a bound, NOT the banned flatten-to-γd clamp
 (nothing pins to γd; both signals preserved) — surfaced here because you banned
