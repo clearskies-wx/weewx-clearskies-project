@@ -812,3 +812,55 @@ LESSON (for operator triage): two of four audit findings trace to the LEAD'S bri
 (forward-Euler spec; 1.02 invariant premise) — the blind audit + independent test-author
 sweep caught both before deploy. Process worked; brief-level numerics deserve the same
 adversarial check as implementer code.
+
+## W1b verification + reachability ruling (2026-08-05 ~09:45Z) — DEPLOY UNBLOCKED pending tests
+
+Audit re-verify of W1b (d373375+c88fa5a): scope PASS; F2/F4 KILLED (silent on ordinary
+conditions incl. 1:20 traces; fires on artificial runaway H/d=9.75); F3 KILLED (ratio
+caps at exactly 1.0; raw drops tracked immediately); F1 MIXED — kernel divergence fixed
+(converges to 0.400 and holds), residual one-point transient at the eps-floor crossing
+(sub-publication-floor, self-correcting); pipeline path: auditor characterized a
+PRE-EXISTING structural gap in apply_ddd_saturation (cessation→raw-pass-through→instant
+re-onset ping-pong at d≈eps when raw ≥ γ·d there; old Euler code had the identical
+behavior; H/d≈90 possible on adversarial flat-raw input, invisible to the invariant's
+depth gate).
+
+LEAD EMPIRICAL REACHABILITY CHECK (production-shaped, local): shallowest real transect
+(43, wet depths 14.62→0.005 m, 251 pts) × 4 realistic partitions (1.2m/16s, 0.8m/12s,
+0.5m/8s, 0.4m/6s) through the real run_1d_analytical + _combine_partition_hs at
+c88fa5a: ZERO sawtooth points (no adjacent jump >2×); tail decays smoothly
+0.39→0.31→0.23→0.15→0.11 m; terminal floored point publishes Hs=0.11 m (H/d ratio 11 is
+meaningless by construction at the 0.01 m depth floor — height itself smooth/plausible).
+Also: 94/162 transects have wet points < 0.15 m, so swash DEPTHS are in-domain — but the
+ping-pong additionally needs raw ≥ γ·d exactly where marched reached Γ·d, which realistic
+relaxed partitions do not produce (auditor's own caveat, now confirmed on the real path).
+
+RULING: deploy UNBLOCKED once roundw-tests closes at 0 failures. The structural gap is
+PARKED + goes to the OPERATOR DECISION QUEUE (below) because the candidate fix (gate
+cessation on depths > _MIN_BREAK_DEPTH_M) modifies the operator-approved cessation
+criterion (H ≤ Γ·d) — trigger-1 gray zone; not self-authorized (7/25 history).
+
+### OPERATOR DECISION QUEUE (Round W, plain English)
+DQ-W1. Swash-zone state machine (apply_ddd_saturation): in water shallower than 15 cm
+  (our own minimum-depth floor for publishing breaks), the combined-profile treatment
+  can in principle flip rapidly between "breaking" and "passing the raw value through",
+  which on ADVERSARIAL inputs publishes garbage heights unflagged. Real inputs cannot
+  currently produce it (verified on the real shallowest transect). Options:
+  (a) leave as-is, documented + monitored (current state);
+  (b) forbid "the wave has reformed" below the 15 cm floor — one-line guard; physically:
+      waves do not reform in ankle-deep water; reform exists for troughs/deep spots.
+      This edits the approved cessation criterion, so it needs your yes/no.
+  Recommendation: (b) at the next natural marine round, not urgent.
+DQ-W2. Kernel one-point transient at the depth floor: at the single grid step where
+  depth crosses to the 1 cm floor, the marched height can spike for exactly one point
+  then self-correct (sub-floor, sub-publication, invisible in the smooth real-transect
+  tails). Options: accept+document (current), or task a discretization tweak (same
+  equation, endpoint choice). Recommendation: accept+document; revisit only if the
+  reality gate shows visible artifacts.
+DQ-W3. Energy-conservation bound (W1b-3): while "breaking", the combined-profile value
+  is now bounded by its own raw input (min(marched, raw)) so saturation can only remove
+  energy, never add it (audit had shown it publishing 18% ABOVE the partitions' own
+  physics). This is NOT the banned flatten-to-γd clamp — nothing is pinned to γd, both
+  signals are preserved — but you banned clamps, so this bound is explicitly surfaced
+  for your review rather than slipped in. Already shipped in W1b; say the word and it
+  gets reworked if you disagree.
