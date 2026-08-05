@@ -1,5 +1,9 @@
 # SURF PHYSICS REMODEL PLAN — 2026-08-05
 
+**AUTHORIZED — operator, 2026-08-05, in chat: "the plan is permission for the architectural
+modifications." All trigger-list items enumerated in this plan are pre-approved; only NEW
+architectural territory discovered mid-build (not described here) still stops and surfaces.**
+
 **Operator mandate (2026-08-05, in chat, verbatim anchors):** "yes you need to remodel the energy
 correctly" · "It is not showing breaks where breaks are occurring… nature is right, you are not…
 it is most definitely a physics issue" · "make sure we are picking a transect that has identified
@@ -112,7 +116,9 @@ dispatch gate's "design to file and line" is satisfied by Y-D1..D3 + Y0's anchor
   break point is marked at the local maximum of dissipation within that zone. Cessation when
   Q_b falls through `Q_B_CESSATION = 0.02` AND H < Γ·d (existing cessation retained as the AND
   term). Re-break = a new rise through Q_B_VISIBLE after a cessation (multi-bar profiles get one
-  break point per bar — the distinct-onset guarantee).
+  break point per bar — the distinct-onset guarantee). **Re-formation is FORBIDDEN in depth
+  < 0.15 m** (operator ruling 3, closes DQ-W1): shoreward of the 15 cm contour a ceased wave
+  never re-enters the breaking state machine — that water is swash, not surf.
 - Both constants are DESIGN CONSTANTS reviewed at the X gate with worked examples; they are not
   admin config.
 
@@ -176,6 +182,19 @@ With X-D2 one-sided, marched > raw is mathematically impossible; a fire-only inv
 - Every KAT's fail-pre-change transcript recorded (X-K2's double-break row MUST fail against
   current HEAD).
 
+### X tasks
+
+| # | Task | Owner | Accept criteria |
+|---|---|---|---|
+| X0 | Fact-pin: re-anchor every X-D5 file:line on current HEAD; inventory all Round-W guard tests pinning hard-onset semantics | Sonnet (read-only) | Anchor + test-inventory tables, file:line-cited |
+| X1 | `_breaking_fraction()` (B-J Q_b, Brent) + Q_b-based onset/cessation/re-break state machine incl. 15 cm reform floor | Sonnet dev | X-K1 passes; X-K2 fixture rows |
+| X2 | One-sided Q_b-weighted dissipation (exact integrator, identity step when bracket ≤ 0) | Sonnet dev | X-K4 passes |
+| X3 | Roller march + closure accounting; whitewater/impact extents derived from E_r | Sonnet dev | X-K3 passes; zone extents change only via E_r |
+| X4 | Delete W1b cap; add the two fire-only invariants | Sonnet dev | Cap gone; invariants registered + logged |
+| X5 | Tests: X-K1..K4 + state-machine unit tests + updates to superseded Round-W guards (each listed/justified) | Sonnet test-author | Fail-pre-change transcript per KAT |
+| X6 | Docs per table below + ADR-102 | Sonnet docs | Doc-sync checklist green |
+| X7 | **X-QC gate** (below) then deploy + reality gate | Lead | All gate rows pass, raw output pasted |
+
 ### X reality gate (pre-stated)
 - **Row 1 (the operator's standard):** on the first day with Surfline-reported groundswell ≥ 3 ft
   / ≥ 12 s: webcam shows bar-zone breaking ⇔ card + heat map show an outer break within ±40 ft of
@@ -204,17 +223,25 @@ spot pin" is the fallback if the operator prefers determinism]).*
 - The served payload's `transectIndex` is already on the wire; the dashboard card labels the
   displayed transect ("Line N of 162, x ft from pier") — one i18n string, 13 locales.
 
-**Z-D2. Shared shoreline anchor on the FINE grid.** `grid_sizing_chain.py:1485-1488` computes the
-per-spot coastline anchor with `find_shoreline_from_grid(coarse_grid, …)`; change to the fine
-grid (`bathymetry.py:1338-1380` same function, fine input — the per-transect path at
-`grid_sizing_chain.py:2168-2171` already does exactly this). Accept: rebuilt anchor lands within
-15 m of the median of the 162 per-transect anchors; the top-level "profile" array's depth at
-distance 0 ≤ 0.5 m (was 2.822 m). Downstream: L4 sizing consumes this anchor — full sizing-chain
-re-run + grid-diff pasted at the gate (grid extents expected stable within one cell; any larger
-movement = STOP, surface).
-- **Z-D2 is bathymetry-reference repair, not a grid redesign** — but because trigger 3 is
-  adjacent, the grid-diff gate row is mandatory and any extent change beyond one cell goes to the
-  operator before deploy.
+**Z-D2. Shared shoreline anchor on the FINE grid, rolled out by full spot re-establishment
+(decision-register ruling 6).** Two parts:
+1. **The fix:** `grid_sizing_chain.py:1485-1488` computes the per-spot coastline anchor with
+   `find_shoreline_from_grid(coarse_grid, …)`; change to the fine grid (`bathymetry.py:1338-1380`
+   same function, fine input — the per-transect path at `grid_sizing_chain.py:2168-2171` already
+   does exactly this). Accept: rebuilt anchor within 15 m of the median of the 162 per-transect
+   anchors; top-level "profile" depth at distance 0 ≤ 0.5 m (was 2.822 m).
+2. **The rollout mechanism — `reestablish_spot(spot_id)`:** delete EVERY persisted artifact of
+   the spot (spot_profiles JSON, grid-sizing caches, bathymetry-derived per-spot caches,
+   transect/anchor data, all hotstart files, the spot's forecast-cache entries), then rebuild
+   from configuration exactly as a newly-created spot would be. No incremental invalidation, no
+   surviving files — operator ruling: "we need to treat it as deleting the old surf spot and
+   re-establishing it… too many instances where something OLD is carried over." This routine is
+   permanent infrastructure: every future spot-geometry redefinition goes through it (config UI
+   wiring for that is the same next phase as the sampling-marker override).
+   `_clear_stale_swan_run_state()` survives only as an internal step of the teardown. Grid
+   extents after re-establishment are whatever the corrected inputs produce — no
+   stop-and-ask tolerance (pre-authorized, ruling 6); the before/after grid diff is pasted in
+   the gate record.
 
 **Z-D3. Heat-map double-break truthfulness.** With X live, verify `HeatMapCard` renders both
 break bands (it consumes the published zones; expected: no code change — this is a verification
@@ -262,18 +289,66 @@ operator screenshot check; segment-length scale agreement ≤1%).
 | Operator Manual + `help.admin.surf_scoring.*` | catch-up NOW | **Outstanding Gate-S debt: "Surf Score Weights" operator-manual section + ARCHITECTURE route inventory (`/admin/surf-scoring`) — task DOC-1, lands before Round Y dispatch.** |
 | `docs/planning/EYEBALL-FIX-PLAN-2026-08-04.md` | NOW | STATUS points here for all physics work; S-5 code change (dominant-partition direction, ruled 2026-08-05) scheduled as task DOC-2/S-5 in Round Y's window (small, marine repo now unfrozen). |
 
+## QC GATES — one per round; a round is CLOSED only when every row of its gate passes
+
+**Gate template (identical rows for Y-QC, X-QC, Z-QC; a round that skips a row is not closed):**
+
+| Row | Check | Evidence required |
+|---|---|---|
+| 1 | Scope walkthrough | Every brief in-scope item DONE (commit hash) / DEFERRED (tracked) / else round stays open; `git show --stat` diffed against the allowlist |
+| 2 | Guards + KATs | Lead independently re-runs the round's targeted tests from a fresh shell (never trusts agent counts); every KAT's fail-pre-change transcript on record |
+| 3 | **Blind adversarial audit** | A separate Sonnet auditor briefed to DISPROVE the round's claims; sees the design (this plan + brief) and the code — NEVER the dev's tests, commits, or report. Passes only with "could not disprove" PLUS a named list of what it ruled out and how; every finding lead-synthesized (accept/push-back/defer) and remediations re-audited |
+| 4 | Doc-code sync | The round's doc-delta table rows all landed in the SAME commits as their code; lead spot-opens one doc claim against the code |
+| 5 | Deploy discipline | deploy script only; running commit + process start-time recorded; post-deploy journal sweep for new ERROR/WARNING classes (pre/post counts pasted) |
+| 6 | Reality gate | The round's pre-stated reality rows, raw output pasted beside the external reference; tolerances as written in this plan, never restated after seeing numbers |
+
+**Per-round adversarial briefs (what row 3's auditor is told to break):**
+- **Y-QC:** "Prove the boundary loses or invents energy: force each tier, integrate the written
+  spectra independently, hunt a partition that vanishes, a direction/period bin shift, a silent
+  tier-3 fallback, a stale-spectrum reuse across cycles."
+- **X-QC:** "Prove energy is created or lost untracked: adversarial bathymetries (bar–trough–bar,
+  knife-edge crests, the 15 cm floor boundary); prove Q_b wrong against your own independent
+  solve; prove a second bar can still be swallowed; prove the deleted cap was hiding something
+  that now publishes garbage; prove the roller books energy twice or never."
+- **Z-QC:** "Prove something OLD survives `reestablish_spot()` — enumerate every file the marine
+  service can persist for a spot, re-establish, then find ANY artifact with a pre-teardown
+  timestamp (operator ruling 6 is the claim under attack). Prove the selection flaps hour-to-hour
+  despite stickiness; prove the imagery transform is off by more than 1% scale or misregisters
+  the pier."
+
 ## Standing process (applies to every round above)
 - Dispatch gate: allowlist, design-to-file-and-line (this document + the round's fact-pin table),
   prohibition list, live check with expected numbers — written in the round brief before any agent
   starts. Mandatory blocks (git, architectural, stale-test) verbatim in every brief.
-- Sonnet for all delegated work; blind adversarial audit per round; lead re-runs every claim.
+- Sonnet for all delegated work; the lead re-runs every claim before accepting it.
 - Never the full test suite — targeted files only.
-- One functional change per deploy; post-deploy journal sweep; reality gate rows pasted raw.
-- Any trigger-list hit not already covered by this operator-approved design → STOP and surface.
+- One functional change per deploy; reality gate rows pasted raw.
+- Any trigger-list hit not described in this operator-approved plan → STOP and surface.
 
-## Decision register for this plan
-- Ruled 2026-08-05: energy remodel (X-D1..D4 scope), spectral boundary priority (Y before X),
-  transect must be "best surf" (Z-D1 intent), docs-in-plan mandate.
-- OPEN at Z gate: Z-D1 option (a) vs (b). Lead recommendation: (a).
-- Gate-reviewed constants (not open, but explicitly shown at their gates): Q_B_VISIBLE,
-  Q_B_CESSATION, β_D, stickiness 20%, anchor accept 15 m / 0.5 m.
+## Decision register for this plan — ALL RULED, operator 2026-08-05 (nothing open)
+1. **Z-D1 = option (a)** (quality-scored sticky selection) as the DEFAULT, **plus a next-phase
+   operator override**: a per-spot "sampling marker" the operator can pin at a specific location
+   (e.g., HB: expert surfers' spot ~100 yards south of the pier) that overrides the algorithm and
+   forces the displayed/sample transect. NOT built in this plan — recorded as the first item of
+   the next phase; Z-D1's implementation must not preclude it (selection function takes an
+   optional override index so the marker becomes a config lookup later).
+2. **Constants approved as shipped defaults** (Q_B_VISIBLE 0.05, Q_B_CESSATION 0.02, β_D 0.10,
+   stickiness 20%, anchor accept 15 m / 0.5 m). Tuning later only with gate evidence.
+3. **Ankle-deep reform block approved** — no wave re-formation in depth < 15 cm (folded into
+   X-D1 cessation/re-break semantics; closes DQ-W1).
+4. **configobj approved** as a declared dev/test dependency (task M-1: add to pyproject dev
+   extra, install on librewxr venv, un-exclude the test).
+5. Round W's separate webcam sign-off item is dissolved into Round X's webcam gate (Row 1) —
+   one visual standard, checked once, there.
+6. **Spot lifecycle ruling (supersedes Z-D2's incremental approach): NO grid "adjustments."
+   Redefining a surf spot = DELETE the old spot and RE-ESTABLISH it fresh** — all persisted
+   artifacts destroyed (spot_profiles JSON, grid sizing caches, bathymetry-derived caches,
+   transect/anchor data, hotstarts, forecast cache entries for the spot), then rebuilt from
+   configuration as if newly created. Rationale (operator): "There has just been too many
+   instances where something OLD is carried over." Z2 therefore implements a
+   `reestablish_spot(spot_id)` teardown-and-rebuild routine, uses it to roll out the fine-grid
+   anchor fix, and it becomes THE mechanism for every future spot-geometry change (the partial
+   `_clear_stale_swan_run_state()` invalidation is subsumed — it remains only as the internal
+   final step of teardown). Grid extents after re-establishment are whatever the corrected
+   inputs produce — no tolerance gate, but the before/after grid diff is still pasted in the
+   gate record. OPERATIONS-MANUAL documents the lifecycle; ARCHITECTURE.md states the rule.
