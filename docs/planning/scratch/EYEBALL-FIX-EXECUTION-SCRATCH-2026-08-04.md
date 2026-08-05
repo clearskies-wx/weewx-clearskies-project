@@ -497,6 +497,16 @@ doc sync (API-MANUAL new fields, plan §S-SPEC-3 A3-as-shipped) → round close.
   hotfile time feeds only nonstationary COMPUTE defaults; crash-retry path :5145-5151 is
   the safety net). Expected stale-test signal: test_mismatched_hotfile_timestamp_cold_starts
   may fail (pins old equality rule) — test-author updates it next.
+- Z5 test-update ACCEPTED (59f5e49; independent 10 passed; supersession documented in
+  docstring). Full stack PUSHED b551d03..59f5e49, DEPLOYED 05:21:53 UTC (running commit
+  59f5e49); canonical librewxr pytest 35 passed at 59f5e49.
+- **FIRST-EVER WARM START PROVEN LIVE 05:26:05 UTC:** "SWAN level1: using hotstart from
+  previous run (stamped 20260808.000000, requested start 2026...)". Zero crashes/
+  predates/unparseable since deploy. Post-restart bulk-fallback window in progress —
+  recovery timer running (cold-start baseline ~40 min; warm should beat it).
+- Blind Z auditor dispatched (brief ROUND-Z-AUDIT-BRIEF-2026-08-05.md); priority
+  question: quantitative over-suppression check of the 0.15 hysteresis on real HB
+  bar-trough CUDEM profiles.
 - PROCESS CORRECTION (2nd over-escalation tonight, both operator-flagged): reality-gate
   disposition + hotstart stamp comparison were both coordinator calls presented as
   operator decisions. Lesson candidate for round close (surface triage per lesson-capture
