@@ -507,6 +507,28 @@ doc sync (API-MANUAL new fields, plan §S-SPEC-3 A3-as-shipped) → round close.
 - Blind Z auditor dispatched (brief ROUND-Z-AUDIT-BRIEF-2026-08-05.md); priority
   question: quantitative over-suppression check of the 0.15 hysteresis on real HB
   bar-trough CUDEM profiles.
+- **Z AUDIT CLOSEOUT (05:50Z-ish):** claims 1/3/4 could-not-disprove (waterline
+  no-off-by-one; perBreakZones contract + null mirror; hotstart read+ordering incl.
+  down-past-horizon path traced). Claim 2 DISPROVEN in part: F1 [HIGH] δ=0.15
+  over-suppresses genuine double breaks (auditor ran DEPLOYED code on real CUDEM, 162
+  transects: 4-18% re-arm at 2m/12-16s; most transects' trough ratio never drops below
+  γ at all — roller momentum keeps Hs pinned ≥ γd, so most of the loss is PHYSICS
+  ceiling, not tuning). F2 [MED] "0.15-0.3 m shorebreak registers" overclaim —
+  saturation + _MIN_BREAK_HS_M=0.15 gives effective floor 0.2055 m (crossover verified
+  numerically). F3 [LOW-MED] zero-width foamZone when impact clamp hits next break
+  (5/162 transects live). Notes: waterline None-fallback dead-in-practice at this spot;
+  hotstart accept path unbounded above (assumption documented, no live scenario).
+- **COORDINATOR δ-SENSITIVITY SCAN (same method, monkeypatched deployed module,
+  2m/16s SW/tide 0):** δ 0.15→7, 0.10→23, 0.05→46, 0.03→48, 0.01→52 (of 162).
+  Detector ceiling ≈ 32%; δ=0.05 captures 88% of ceiling and keeps 2.5× margin over
+  the ±2% jitter class. Knee = 0.05. Remaining ~68% unreachable by ANY δ (model's
+  saturated Hs never dips below γ over HB's subtle trough relief — physics-level item,
+  related to roller/decay modeling; candidate future round, NOT detector tuning).
+- Lead synthesis: F1 accept → recommend δ 0.15→0.05 (operator judges at gate — the
+  constant was explicitly gate-presented); F2 accept → fix overclaiming comment
+  (lead-direct doc fix in code comment), _MIN_BREAK_HS_M change = operator option
+  (recommend keep); F3 accept → recommend D5 card skips zero-width bands (display),
+  contract unchanged; document in API-MANUAL.
 - PROCESS CORRECTION (2nd over-escalation tonight, both operator-flagged): reality-gate
   disposition + hotstart stamp comparison were both coordinator calls presented as
   operator decisions. Lesson candidate for round close (surface triage per lesson-capture
