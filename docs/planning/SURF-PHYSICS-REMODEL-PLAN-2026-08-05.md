@@ -1,8 +1,12 @@
 # SURF PHYSICS REMODEL PLAN — 2026-08-05
 
-**AUTHORIZED — operator, 2026-08-05, in chat: "the plan is permission for the architectural
-modifications." All trigger-list items enumerated in this plan are pre-approved; only NEW
-architectural territory discovered mid-build (not described here) still stops and surfaces.**
+**STATUS: DRAFT — AWAITING OPERATOR APPROVAL. Execution is BLOCKED until the operator approves
+this plan explicitly in chat.** The operator has pre-ruled the plan's six decision items (register
+below) so that, ONCE APPROVED, the plan itself constitutes permission for the architectural
+modifications it enumerates and nothing further waits on the operator except the QC/reality
+gates. Approval of the plan is that grant; it has not yet been given. (Coordinator error
+2026-08-05, on record: execution was briefly started before approval — two read-only/reading
+agents were dispatched and stopped on operator order; no files or commits resulted.)
 
 **Operator mandate (2026-08-05, in chat, verbatim anchors):** "yes you need to remodel the energy
 correctly" · "It is not showing breaks where breaks are occurring… nature is right, you are not…
