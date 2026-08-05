@@ -220,14 +220,21 @@ profile compute (B2 numbers recorded).
 
 ## 4. REMAINING OPERATOR DECISION QUEUE (one at a time, in order)
 
-- **D5:** beach profile design set (items 9a/b/c/e/f/h) — needs mockups; separate design session.
-- **D6:** zones per break (item 10) — contract shape change, yes/no.
-- **D7:** heatmap long-term (precompute vs synchronous) — non-urgent after B1.
+- **D5:** beach profile design set (items 9a/b/c/e/f/h) — design DIRECTION approved 2026-08-04
+  (chart ends at the tide-aware waterline, visible shoaling sea surface, double break drawn,
+  sleek redesign; operator: "yes this is what I was expecting"). Data prerequisites shipped in
+  Round P (unified zones/shapes + tideLevel/waterlineDistance/beachElevation live 2026-08-05).
+  REMAINING: operator sign-off on the mockup rebuilt from the live unified payload, then the
+  dashboard implementation round.
+- **D6:** zones per break (item 10) — contract shape change, yes/no. Operator 2026-08-04:
+  re-present AFTER unified data exists — that precondition is now met.
 
 RESOLVED (recorded): D1, D3, D4, D8-display → ADR-101 (Accepted 2026-08-04). **D2 → strip both
 rows from the Current Swell card (operator 2026-08-04; render-only removal, wire fields stay —
-folded into S-SPEC-2, no exception remains).** D8's fan-derived
-sector-map live check remains in §5.
+folded into S-SPEC-2, no exception remains).** **D7 → RULED 2026-08-04 (operator chat: "Yes the
+D7 is the proper fix and needs done, but does not need accelerated"): heatmap long-term =
+PRECOMPUTE, executed in normal plan order, not accelerated; B1's 45 s timeout stands until then.**
+D8's fan-derived sector-map live check remains in §5.
 
 ## 5. OPEN VERIFICATION TAILS
 

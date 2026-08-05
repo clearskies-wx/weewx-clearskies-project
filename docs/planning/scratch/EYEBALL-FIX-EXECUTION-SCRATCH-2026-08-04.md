@@ -407,3 +407,29 @@ doc sync (API-MANUAL new fields, plan §S-SPEC-3 A3-as-shipped) → round close.
   NDBC 46253 obs pasted BESIDE for the record — NOT gated (model-vs-ocean belongs to the
   parked inv-swell investigation). Out-of-tolerance vs baseline = deploy FAILED → rollback
   first, diagnose second.
+
+- **REALITY GATE RUN (2026-08-05 04:05Z, post-recovery payload: timestep 04:00Z,
+  transect 14, marine-direct, cmd + json in scratchpad roundp-postrecovery.json):**
+  | quantity | baseline (03:00Z, pre-deploy) | post-recovery (04:00Z) | tolerance | verdict |
+  | PT0 period | 14.330 s | 14.315 s | ±2 s | **PASS** (Δ0.02 s) |
+  | PT0 direction | 197.20° | 197.23° | ±15° | **PASS** (Δ0.03°) |
+  | PT0 class | groundswell | groundswell | unchanged | **PASS** |
+  | PT1 | wind_swell 5.40 s @ 257.6° | wind_swell 5.40 s @ 257.7° | — | **PASS** |
+  | PT0 heightM @ handoff | 1.242 m | 0.378 m | ±30% | **OUT OF TOLERANCE (−70%)** |
+  NDBC 46253 beside (03:26Z obs): WVHT 0.7 m, DPD 13 s, MWD 178°; spectral: swell 0.3 m
+  @ 13.3 s S, wind-wave 0.7 m @ 8.3 s W (cmd: curl ndbc.noaa.gov/data/realtime2/46253.txt|.spec).
+  **Analysis (surfaced to operator, disposition PENDING — NOT auto-rolled-back):** the
+  Hs shift is state-driven, not code-driven: (a) Round P diff = 3 files
+  (endpoint/bathymetry-helper/extraction), 0 lines in the partition-handoff/SWAN path
+  that produces heightM (`git diff 47c8084..8c2def8 --stat`); extraction pinned by T3 +
+  pre-existing test_wave_shape_classification.py 23 tests still pass unchanged;
+  (b) the buoy SIDES WITH THE NEW VALUE: NDBC swell 0.3-0.4 m vs new PT0 0.378 m
+  (match) vs baseline 1.242 m (3-4× buoy) while the ocean barely moved between obs
+  hours (0.8→0.7 m); (c) baseline state was produced downstream of the CHRONIC hotstart
+  corruption (223× "timestamp unparseable" → perpetual cold-start cycling), the deploy
+  restart re-derived SWAN state from scratch. Hypothesis for auditor/operator: the
+  pre-deploy inflated heightM is a SYMPTOM of the chronic hotstart defect (stale/corrupt
+  SWAN state), i.e. the gate's failing leg indicts the BASELINE, not the deploy.
+  Rollback NOT executed: it would not restore baseline state (state is regenerated, not
+  in the code), would re-trigger another cold start, and the buoy evidence says the
+  current value is the better one. Operator rules on disposition.
