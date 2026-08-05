@@ -246,11 +246,16 @@ compute placement = D7, untouched.)
    (operator caveat, same date): these are ESTIMATES from visual orthophotography of
    UNKNOWN DATE, measured from the waterline VISIBLE IN THE PHOTO — not the official
    zero line and not a known tide state.** Gate consequences, adjusted accordingly:
-   (1) treat 300/100 ft as SCALE-AND-STRUCTURE anchors, not exact thresholds — the
-   photo's unknown tide alone moves the waterline reference by up to ~±100 ft on this
-   flat beach (observed sensitivity: ~55 ft of waterline shift per foot of tide), so
-   the checkable claims are: two distinct breaks; outer roughly 3× the inner's
-   waterline distance; reform gap of order 200 ft; both well seaward of the sand.
+   (1) treat 300/100 ft as APPROXIMATIONS sufficient to judge whether the model is
+   approximately right (operator 2026-08-05): two distinct breaks; outer roughly 3× the
+   inner's waterline distance; reform gap of order 200 ft; both well seaward of the
+   sand. **The coordinator's "±100 ft photo-waterline uncertainty from tide" claim is
+   STRUCK (operator correction ×2, 2026-08-05): it was fabricated reasoning (assumed
+   tide swing, assumed linearity, assumed the model profile matches the real beach
+   face) presented as fact, followed by a deflection blaming the profile data. No
+   uncertainty figure is on record for the orthophoto measurements beyond the
+   operator's own words: they are approximations, good enough to judge whether the
+   model is approximate or not.**
    (2) The SHARP instrument for exact positions remains a matched-time webcam
    observation at known tide (inv-break-geometry's method); use that at the Round W
    gate for the precise comparison, with the orthophoto numbers as the coarse prior.
