@@ -210,6 +210,23 @@ compute placement = D7, untouched.)
    detectable (current `depths[i] > 0.3 m` filter excludes the shallow band where HB's
    shorebreak actually breaks). Specific constants (hysteresis δ, revised depth floor) are
    design details presented at the Round Z gate with worked examples.
+   **INV-WAVE-REFORM RESULTS (2026-08-05, read-only investigation, full report in agent
+   closeout):** mechanism confirmed — TWO unconditional ceilings pin Hs at γ·d
+   (surf_1d_analytical.py:1029-1030 kernel clamp; surf_1d_pipeline.py:649-658 combine
+   clamp), and the clamp is load-bearing (raw Battjes-Janssen+roller output diverges
+   up to 37 m without it; SWAN manual :4117 corroborates). The published fix
+   (Dally-Dean-Dalrymple 1985 stable-height relaxation, Γ≈0.35-0.4, K≈0.15
+   literature-recall NOT primary-verified) was prototyped read-only over the real 162
+   transects: **payoff only 6-9/162 transects at K=0.15 (0 at K=0.075, 15-19 at
+   K=0.30)** — because the CUDEM profiles' trough relief (0.03-0.3 m) is too subtle for
+   waves to back off below even Γ·d. Cost side: 5 functions/2 files, 2 new physics
+   constants, both clamps redone, reshapes face-height/zones/jacking on EVERY transect.
+   **Implication surfaced to operator: reality shows a reliable double break; correct
+   physics on OUR seabed data cannot produce one → the likelier culprit is the seabed
+   data itself (CUDEM's bar-trough vs the CURRENT sandbar — sandbars migrate
+   seasonally). Recommended order: bathymetry-vs-reality check (fold into
+   inv-break-geometry: webcam break positions at known tide ⇒ implied depths) BEFORE
+   any physics change.** Operator decision pending.
    Original finding text follows for the record.
    **Break geometry vs reality (operator webcam ground truth, 2026-08-05 01:27Z Duke's cam):**
    real surf shows foam running to the sand and the outer break out near a pier bumpout;
