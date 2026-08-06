@@ -677,6 +677,14 @@ sections that were later struck):**
       diluted transient step cannot fake a wrong coefficient, and a wrong coefficient
       shifts EVERY step so the aggregate trips decisively (demonstrated with a
       deliberately-wrong coefficient before shipping). The 1% bar is untouched.
+      **Participation floor (2026-08-06, closing addendum):** a zone's aggregate drives
+      the alarm only when it spans at least 25 checked steps — an aggregate over fewer
+      steps, squeezed between its two transient ends, cannot statistically resolve a 1%
+      question (measured: the stress fixture's two short zones, 19 and 22 checked steps,
+      read 1.44%/1.15% on healthy physics; its three long zones, 37-45 steps, all read
+      under 0.8%). Short zones are still computed and logged per-zone for visibility —
+      they just cannot page the alarm. A wrong coefficient still trips decisively via
+      every profile's long primary zones (~12% vs ~0.08% measured).
     - **(h) Whitewater self-check scoping, part 3 (2026-08-06, second F2 stop):** in the
       last few steps before the shoreline the whitewater drain term grows without bound
       as wave speed dies (a "stiff" equation, in numerical-methods terms), so the
