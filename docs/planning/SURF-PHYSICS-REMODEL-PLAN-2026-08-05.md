@@ -622,6 +622,20 @@ sections that were later struck):**
       data for them entirely. Surf spots are unaffected either way — they get the model's
       own numbers. Building the surf-spot side now; this fork only gates the final
       deletion of the old provider.
+    - **(NEW, 2026-08-06) OPEN QUESTION — the aerial-photo alignment fix (Z-D4) cannot be
+      built as designed; pick a path.** The investigation (Z3b fact-pin) proved the
+      approved design's assumptions are wrong in the code: the two alignment reference
+      points it needs don't exist anywhere in the dashboard's data; the heat-map's
+      vertical axis is just a row number with no real-world spacing (so the "lengths
+      agree within 1%" check has nothing to measure); the beach lines fan out radially
+      from one center rather than lying along a straight segment; and the imagery
+      service provides no georeference. Options: (i) build it RIGHT — add the few
+      missing geometry fields to the API response (an additive data-contract change) and
+      register the imagery to the fan's real geometry (recommendation; it is the only
+      path that actually delivers the operator's "the imagery conforms to the data"
+      ruling); (ii) defer the imagery alignment to a later phase and leave the photo
+      layer as-is (visibly misaligned); (iii) hide the photo layer under the heat map
+      until (i) can be done (honest but loses the imagery). Say (i)/(ii)/(iii).
     - **(d) Should the wave model sit and wait when NOAA is late?** The wave model — the
       physics engine that computes the surf forecast — needs offshore wave data to start
       each run. Today it always uses the newest data NOAA has actually posted, and never
