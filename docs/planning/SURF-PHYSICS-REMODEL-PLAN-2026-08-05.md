@@ -606,7 +606,21 @@ sections that were later struck):**
       forecast at all, it fetches the newest run NOAA has already published (bounded
       search back through at most 3 runs) instead of showing empty cards for hours; once
       any run has succeeded, the strict wait-and-check-back rule governs forever after.
+      *(Covered by ruling 12 below — the service decides what it serves; stands unless
+      specifically overruled.)*
     - **(f) Whitewater self-check scoping (Round X):** the energy-balance self-check
       skips the single artificial grid point at the water's edge where the approved
       formula divides by a vanishing speed — the 1% accuracy bar itself is untouched.
       Without this the alarm would cry wolf every cycle on healthy runs.
+
+12. **The display layer is source-blind; the marine service/API owns the data (operator,
+    2026-08-06, in chat).** Operator's words: "The forecast cards should not care or have
+    knowledge about what data they are getting, they ask for data, the API delivers the
+    data. it is up to the marine service/API to determine what it should be serving. The
+    cadence for processing NOAA data should not change, the cards should not care or know
+    about the data. They should ask for break height, we deliver break height." Standing
+    principle for ALL current and future work: sourcing, cadence, freshness, and
+    what-to-serve decisions live entirely in the marine service/API; the dashboard/cards
+    never embed source knowledge or timing logic. (SW-2 as shipped conforms: no dashboard
+    code was touched; the served forecast cadence is unchanged; the 10-minute
+    publication-poll is internal to the service.)
