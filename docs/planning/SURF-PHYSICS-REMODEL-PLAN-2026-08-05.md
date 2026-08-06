@@ -65,36 +65,54 @@ never close a round on their own; the reality gate does.
   **Task H-1.** (Collapsed hours would also corrupt Round X's reality-gate evidence — hence H-1
   precedes X's gate.)
 
-## DECIDE — open operator items (nothing executes until ruled; rulings join the register)
+## DECIDE — the seven decisions (ALL RULED — operator "ok approved", 2026-08-06)
 
-- **D-1 (OOM remediation; gates everything):** (a) move aside the 223 MB `forecast_cache.json`
-  and restart via `scripts/deploy-marine.sh` (immediate relief; one forecast-gap cycle until the
-  next full run repopulates); (b) bound what the transect cache persists / stream the load (real
-  fix; persisted-file change → architectural trigger 7, needs this ruling); (c) raise the librewxr
-  container memory cap (infrastructure). **Lead recommendation: (a) now + (b) as the ruled fix.**
-- **D-2 (execution order):** **M-0 → H-1 → X → Z** is the lead recommendation (stability first;
-  honest hours before the webcam gate; breaking physics is the verified cause of the operator's
-  symptom; selection/display last so it presents physics that is already right).
-- **D-3 (boundary failure policy — confirmation only):** the 2026-07-26 operator ruling stands as
-  implemented: too few qualifying boundary stations → refuse the cycle (`BoundaryNotViableError`),
-  never a parametric fallback. This rewrite adds NO fallback tiers. H-1 verifies a refusal is
-  visibly named in `/health` and adds the reason string only if missing. Confirm, or rule otherwise.
-- **D-4 (H-1 approval):** instrumenting the three silent exit points and adding a health flag is
-  new architectural territory (not in the original plan). Approve H-1's scope as written below.
-- **D-5 (second γ·d cap):** `surf_1d_pipeline.py:754` (`min(hs_break, gamma*d_break)`,
-  `_combine_partition_faces_11_3`, BD-4) is a face-height depth cap DISTINCT from the W1b cap
-  X-D4 deletes. **Lead recommendation: OUT of X's scope** (no evidence case against it); recorded
-  as an explicit X non-goal either way.
-- **D-6 (X allowlist correction):** `endpoints/beach_profile.py` joins the X allowlist — X0
-  proved zone construction lives there (imports `_classify_zones*` at :113-114, call ~:732-745);
-  the original X-D5's "pipeline plumbs zones" claim was wrong (`Analytical1DResult.surf_zones`
-  has zero readers).
-- **D-7 (Z transect label):** the original Z-D1 display label conflicts with the operator's
-  2026-08-02 ruling that removed a transect header from the same card ("the user of the site will
-  not know what that means", `BeachProfileCardBody.tsx:108-114`). Options: (i) no label — the
-  selection fix ships invisibly; (ii) a plain-language label (e.g. "Surf shown at the sandbar,
-  ~260 ft south of the pier") — explicitly not "Line N of 162". **Lead recommendation: (ii)**,
-  exact wording operator-approved at the Z gate.
+Plain-English record of what each decision was and what was chosen. **Nothing here is still
+open** — this section stays only so the record of the choices is readable. (Register item 8
+holds the same rulings in summary form.)
+
+- **D-1 — the crashing service.** The service kept getting killed for using too much memory,
+  traced to a saved-forecast file that had bloated to 223 MB and gets loaded whole at startup.
+  Options were: (a) immediately move the bloated file out of the way and restart — instant
+  relief, one forecast gap until the next run rebuilds it; (b) the real fix — stop the service
+  from saving the enormous raw wave data that made the file that big (it saves a trimmed file
+  now, about 17 MB); (c) just give the machine more memory. **Chosen: (a) right away AND (b)
+  as the real fix. Both are built and running; the four-clean-cycles proof (task M-0) is what
+  remains.**
+
+- **D-2 — the order of the work.** Fix stability first (M-0), then add alarms to the places
+  where the model silently gives up (H-1), then fix the breaking-wave physics (Round X), then
+  fix which part of the beach the site shows (Round Z). Reason: there's no point polishing
+  physics on a service that's crashing, and the webcam comparison only proves anything once
+  hours aren't being silently corrupted. **Chosen: yes, that order.**
+
+- **D-3 — what happens when the offshore wave data is bad.** When too few trustworthy
+  offshore data stations are available, the service refuses to produce a forecast for that
+  run rather than inventing a stand-in. No backup tiers, ever. This was already the
+  operator's July 26 ruling; the ask here was only to confirm it still stands. **Chosen:
+  confirmed. It stands.**
+
+- **D-4 — approving the alarm work.** Wiring alarms into the silent-failure spots (H-1) was
+  new work not in the original plan, so it needed an explicit yes before being built.
+  **Chosen: approved as written.**
+
+- **D-5 — a second, look-alike height cap.** The code has two similar-looking caps on wave
+  height. Round X deletes one of them (the one proven to cause wrong results). The other does
+  a different job — limiting a wave's face height by the water depth it breaks in — and
+  nothing was found wrong with it. **Chosen: leave the second cap alone. Written down as an
+  explicit "do not touch" so nobody 'fixes' it in passing.**
+
+- **D-6 — one more file on Round X's allowed-files list.** The pre-work investigation proved
+  the surf-zone drawing (where the whitewater and impact zones start and end) actually
+  happens in a different file than the plan assumed, so that file (the beach-profile page
+  code) had to join the short list of files Round X is allowed to edit. **Chosen: approved.**
+
+- **D-7 — what to call the chosen beach line on the site.** The old plan wanted a technical
+  label for the measurement line the site displays; the operator had already ruled (Aug 2)
+  that site visitors won't understand jargon like that. Options were: no label at all, or a
+  plain-language one such as "Surf shown at the sandbar, about 260 ft south of the pier" —
+  explicitly never "Line N of 162". **Chosen: the plain-language label, with the exact
+  wording brought to the operator for approval at the Round Z gate.**
 
 ## Task M-0 — service stability (FIRST; per D-1 ruling)
 
