@@ -138,6 +138,7 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | [ADR-081](ADR-081-license-change-polyform.md) | License change — PolyForm Noncommercial 1.0.0 (supersedes ADR-003) | 2026-07-09 |
 | [ADR-093](ADR-093-swan-trushore-nearshore-model.md) | SWAN + SwellTrack replaces NWPS as nearshore wave model (supersedes ADR-084) | 2026-07-16 |
 | [ADR-094](ADR-094-hrrr-surf-wind-source.md) | HRRR forecast wind as surf quality scoring source for SWAN + SwellTrack forecasts | 2026-07-16 |
+| [ADR-102](ADR-102-statistical-breaking-roller.md) | Statistical breaking fraction (Q_b, Battjes & Janssen 1978) and roller energy balance replace the hard-trigger DDD cap — Q_b-weighted one-sided dissipation, whitewater/impact-zone extent from roller energy, closure + no-gain invariants (Round X) | 2026-08-06 |
 | [ADR-103](ADR-103-spectral-boundary.md) | Multi-station real spectral boundary for the SWAN L1 domain — WW3 station selection, refuse-don't-degrade (no fallback tiers), distinct `/health` refusal naming (H-1); catch-up document for design shipped 2026-07-26 | 2026-07-26 |
 
 ## Archived — consolidated into PROVIDER-MANUAL.md (marine)
