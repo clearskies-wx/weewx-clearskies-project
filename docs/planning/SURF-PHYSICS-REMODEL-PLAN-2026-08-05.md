@@ -698,6 +698,18 @@ sections that were later struck):**
       and every zone now logs its line even when fully excluded, so "no comparison
       happened" can never masquerade as "clean". After the fix a large one-site edit to
       EITHER copy trips the alarm (audit-verified across the sweep).
+      **Fourth-pass structural close (2026-08-06):** the audit proved the relocation
+      pattern — whichever live coefficient steers the window, a large edit to THAT one
+      collapses the windows and self-masks. Two structural changes end the class:
+      (1) the window gets its own fixed nominal constant (a third, window-only copy of
+      0.10) that co-varies with NEITHER live coefficient — a legitimate physics change
+      is now a three-named-site edit, all cross-referenced, gate-reviewed per ruling 2;
+      (2) COMPARISON STARVATION IS ITSELF AN ALARM: a zone spanning ≥25 raw breaking
+      steps that ends with zero performed comparisons fires the closure invariant (not
+      just a journal line) — so any window-collapse mechanism, known or future, announces
+      itself in /health instead of reading as a perfect score. With (2), there is no
+      silent path: big edits either get measured (divergence trips) or starve the
+      measurement (starvation trips).
       **Participation floor (2026-08-06, closing addendum):** a zone's aggregate drives
       the alarm only when it spans at least 25 checked steps — an aggregate over fewer
       steps, squeezed between its two transient ends, cannot statistically resolve a 1%
