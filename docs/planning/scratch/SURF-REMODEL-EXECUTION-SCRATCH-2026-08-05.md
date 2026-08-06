@@ -715,3 +715,35 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
   fine gap probe at 9afda8f; adversarial hunt for a NEW relocation (combined edits,
   boundary cases, second call site); healthy-baseline and short-zone no-over-fire
   checks. Clean verdict → row 3 CLOSES → deploy train. Relocation → STOP → design pass.
+
+### 2026-08-06 — PASS 6: DISPROVED (2 HIGH, both lead-confirmed) — ESCALATION ACTIVATED, patch path CLOSED, design pass to operator
+- **F1-p6 [HIGH]** (lead-confirmed by code read :1125-1153): `zone_open` set only in the
+  onset branch (needs prev point non-breaking) → a zone already breaking at the march's
+  first grid point NEVER opens; `_finalize_zone` gated on `zone_open` → entire zone
+  bypasses every check and every log line. Auditor: β_D at 200× stock byte-identical to
+  stock on a 199-raw-step index-0 zone, both call sites, fired_total=0, zero log lines.
+  The in-code comment (:1136-1138) claiming the first-point-breaking case is handled is
+  WRONG. Production reachability unresolved (handoff is designed pre-break per
+  INVARIANT_1, but apply_ddd_saturation takes raw arrays) — the checker must handle it
+  regardless.
+- **F2-p6 [HIGH]** (lead-confirmed by code logic + dev's own step-0 table showing the
+  included=raw−1 pattern throughout): onset excluded + true-cessation rollback ⇒
+  included = raw−1 deterministic on clean zones ⇒ raw==25 always fires starvation on
+  stock physics (auditor: 3 independent bar widths, both call sites, fired_total=1;
+  raw=24 → short tier not fired; raw=26 → included=25 standard not fired). Falsifies
+  the XF5 ruling's measured-clean-separation premise (fixtures contained no raw-25
+  zone — the boundary value was unsampled). Healthy-cycle false-positive risk to
+  reality-gate Row 2.
+- **Pass-6 clean results on record**: XF5's own fix HELD (fine window-nominal sweep
+  monotone, no silent band; not-fired points verified standard-tier/<1%/included≥25);
+  both physics-constant sweeps fire everywhere; two-site combined grids (window×ref,
+  window×prod full re-march) produced no masked cell; short zones still alarm; partial
+  starvation reaches the registry; exactly one WARNING per starved zone.
+- **DISPOSITION (per the operator-approved escalation clause, register 11(g))**:
+  incremental-patch path CLOSED — no XF6 dispatched. Deploy train stays HELD. Round X
+  row 3 remains OPEN. Lead is preparing the checker design-pass proposal (two-phase:
+  march records per-step arrays only; a standalone pure function partitions zones from
+  the regime array — index-0 starts included by construction — and scores
+  tier/starvation from expected-comparable counts, dissolving both defect classes) —
+  going to the operator for approval BEFORE any implementation. Physics, both
+  comparison methods, and all bars/constants unchanged in the proposal.

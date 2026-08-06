@@ -738,6 +738,28 @@ sections that were later struck):**
       implemented). One narrow pass-6 audit re-verifies; if the hole has merely
       relocated again, the incremental-patch path is CLOSED and the checker gets a
       deliberate design pass (operator-approved escalation, same ruling).
+      **Sixth-pass outcome (2026-08-06): DISPROVED again — ESCALATION ACTIVATED.**
+      Pass 6 (fresh blind auditor, at `9afda8f`) confirmed XF5 closed the fifth-pass
+      band (fine sweep monotone, no silent band; two-site combined sweeps clean; short
+      zones still covered; starvation reaches the registry; WARNING hygiene clean) but
+      found TWO new HIGH defects, both lead-confirmed in code: (1) a zone already
+      breaking at the march's FIRST grid point never sets `zone_open`, so the entire
+      zone silently bypasses every check and every log line — a 200× coefficient edit
+      is byte-identical to stock on such a zone (complete bypass, worse in kind than
+      any masked band; the in-code comment claiming the case is handled is wrong);
+      (2) the onset-exclusion + cessation-rollback arithmetic makes included = raw−1
+      deterministic on clean zones, so raw==25 ALWAYS lands at 24 < floor and fires
+      starvation on 100% stock physics — falsifying the fifth-pass ruling's own
+      "measured clean separation" premise (the fixtures simply contained no raw-25
+      zone) and threatening reality-gate Row 2 with healthy-cycle false positives.
+      Per this ruling's own escalation clause the incremental-patch path is CLOSED:
+      no XF6, deploy train stays HELD, and the checker's zone-detection/eligibility
+      machinery goes to a deliberate design pass — design to the operator for
+      approval before any implementation. Physics constants, the two-method
+      comparison, and all bars (1%/10%/25/k·ds/window nominal) are NOT in question —
+      the six passes have converged on the same lesson: the hand-rolled in-loop state
+      machine (zone_open/window_closed/checkpoint-rollback) is the disease; every
+      patch relocated it.
     - **(h) Whitewater self-check scoping, part 3 (2026-08-06, second F2 stop):** in the
       last few steps before the shoreline the whitewater drain term grows without bound
       as wave speed dies (a "stiff" equation, in numerical-methods terms), so the
