@@ -1148,7 +1148,7 @@ pip install weewx-clearskies-marine
 sudo systemctl enable --now weewx-clearskies-marine
 ```
 
-SWAN 41.45 must be compiled and on PATH (`/usr/local/bin/swan`) on whichever host runs the marine service. Use `scripts/install_swan.sh` or the Docker image. The API startup check that verifies the SWAN binary moves to the marine service in the target state.
+SWAN 41.51AB must be compiled and on PATH (`/usr/local/bin/swan`) on whichever host runs the marine service. Use `scripts/install_swan.sh` or the Docker image. The API startup check that verifies the SWAN binary moves to the marine service in the target state.
 
 #### Configuration
 

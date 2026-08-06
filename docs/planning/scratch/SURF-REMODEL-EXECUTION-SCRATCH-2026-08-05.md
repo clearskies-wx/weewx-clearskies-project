@@ -70,8 +70,21 @@ restarting the radar container and raising the cap are both outside-project or i
 1. Extend X allowlist with `endpoints/beach_profile.py` (zone plumbing actually lives there; plan's X-D5 is stale on this point).
 2. Second γ·d cap at `surf_1d_pipeline.py:754` — inside or outside X-D4's cap-deletion scope? (Different mechanism: face-height depth cap at the break, not the W1b marched-vs-raw cap.)
 
+| 02:00 | **Operator rulings on swan-commands-extract executed (commit `caf49e8`, lead-verified + pushed).** File stripped to pure manual extract (598-line diff), FROZEN header added (operator's verbatim language; may not be amended w/o direct authorization; may not contain non-manual language); project content → new PROVIDER-MANUAL §14.15 "Measured deviations of the deployed SWAN binary (41.51AB)"; duplicates deleted (agent inventory maps every block); CLAUDE.md routing row + clearskies-dev.md descriptions fixed; plan's extract doc-row struck with dated note. Gate: stat clean vs allowlist (5 files; ARCHITECTURE untouched — nothing unique needed placement); residual-content greps zero; TABLE HEADER|NOHEADER correction grounded at manual :5054. Version corrections ruled+applied: manual is v41.51 (file line 5), NOT v41.45 as older labels claimed. | DONE caf49e8 |
+| 02:05 | **Deployed SWAN binary version settled by ground truth:** PRINT output self-reports **41.51AB** (librewxr, level2/PRINT). Fixed stale "SWAN 41.45" binary claims: PROVIDER-MANUAL:1859, OPERATIONS-MANUAL:1151 (lead-direct, mechanical). | DONE (this commit) |
+| 02:10 | **Z-PREMISE-AUDIT DONE (lead spot-verified).** Root causes #1/#3 + all Round Z: 9 VERIFIED / 3 PARTLY / 1 reproduced-live / **0 STALE, 0 contradicted** — plan damage confined to Round Y. Spot-checks: pulled-label operator ruling REAL (BeachProfileCardBody.tsx:108-114, 2026-08-02 BD-9 header removal); coexisting hash-keyed bathy cache generations REAL (Aug1/2/3/5 siblings live). Two pre-dispatch corrections: Z-D2 teardown list missing 5 artifact classes; Z-D1 transect label conflicts w/ 2026-08-02 ruling → DECIDE item. "Index 27" selection failure reproduced live in current forecast cache (2026-08-08 forecast hours). Full table: scratch/Z-PREMISE-AUDIT-2026-08-06.md. | Audit done |
+
 ## Parking lot
 
 - `repos/weewx-clearskies-swan-swelltrack` local checkout confusion risk: legacy repo shares
   "SWAN" naming with live marine repo. reference/clearskies-dev.md repo tables still list the
   superseded topology (known residual staleness flagged 2026-08-02).
+- Stale brief refs to moved extract sections (flagged by extract-strip closeout, outside its
+  allowlist): `docs/planning/briefs/MARINE-L4-DEGRADED-HANDOFF-2026-07-29.md:57,103` (cites former
+  "§WHY THE HOTSTART ACTUALLY FAILS"), `P4B-AGENT-A-BRIEF.md:151` / `P4B-AGENT-B-BRIEF.md:113`
+  (cite former PARSER TRAP/PT* content). Content now lives at PROVIDER-MANUAL §14.15.
+- Marine repo `pyproject.toml` comment block still says "SWAN 41.45" — binary is 41.51AB
+  (PRINT-verified 2026-08-06). Fix in a future marine-repo commit, not doc-only.
+- Proposed rule additions NOT yet written (awaiting operator word): (1) plan claims carry
+  file:line at a named commit verified at drafting; (2) coordinator reads (not greps)
+  ARCHITECTURE's relevant section at dispatch.

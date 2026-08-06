@@ -1856,7 +1856,7 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 
 **Module identity:** `providers/nearshore/swan.py`, `PROVIDER_ID = "swan"`, `DOMAIN = "nearshore"` (ADR-096 renamed from `trushore`).
 
-**SWAN binary:** SWAN 41.45 (Fortran). Compiled from source via `scripts/install_swan.sh` or included in the Docker image. Binary on PATH at `/usr/local/bin/swan`. Marine service startup check: if `[nearshore]` extra is installed but SWAN binary is not found, log CRITICAL with installation instructions. The surf endpoint returns null surf data until SWAN is available — no fallback to any other model.
+**SWAN binary:** SWAN 41.51AB (Fortran; version self-reported in PRINT output, verified on librewxr 2026-08-06 — docs previously claimed 41.45). Compiled from source via `scripts/install_swan.sh` or included in the Docker image. Binary on PATH at `/usr/local/bin/swan`. Marine service startup check: if `[nearshore]` extra is installed but SWAN binary is not found, log CRITICAL with installation instructions. The surf endpoint returns null surf data until SWAN is available — no fallback to any other model.
 
 **Input sources (all from cache — they run on their own schedules):**
 
