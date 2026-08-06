@@ -453,3 +453,23 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
   service partitions the model's ingested 2-D spectra itself (standard watershed method,
   same family NOAA uses) — one source of truth AND multi-swell display. Design proposal
   going to operator; new computation = architectural, needs explicit go.
+
+### 2026-08-06 — MEM-3 COMPLETE; M0c dispatched (next RAM cuts)
+- **MEM-3 #2 (LIFECYCLE, biggest churn)**: `_align_watershed_partitions_to_curve()` at
+  swan_runner.py:826-832 re-parses the SAME unchanged 1273-row CURVE table on EVERY
+  transect (162×/spot/parse), and its result is PROVABLY DEAD on the live path (read only
+  in the `else` branch of `if pt_table_text:` at :1041-1058; caller :6189-6210 always
+  supplies pt_table_text). ~160-320 MB allocate-then-discard churn per spot per parse,
+  ~24×/day — the arena-ratchet mechanism. Fix: gate call on `not pt_table_text`.
+- **MEM-3 #1 (+#3)**: `parse_specout_file_multi` materializes full 35×72 energy matrices
+  for ~37 stations × 34 ts (~89 MB/spot/parse) though production reads ONLY
+  station_lonlat + time (energy readers = TRACE only, default off; zero prod readers —
+  same evidence family as M0b). Fix: positions/time-only parse mode for the L3/L4
+  handoff call site (full parse when trace enabled; default behavior unchanged) — dev
+  re-verifies zero readers before cutting (M0b precedent: dropping provably-dead payload
+  = methodology).
+- MEM-3 #5 (profiles as list-of-dicts → numpy, 20-80MB/spot) = ARCHITECTURAL dtype
+  change, backlogged for operator. #4 (`_precompute_swelltrack_for_spot` loop) verified
+  ALREADY CLEAN. COULD-NOT-VERIFY: live station count, spot count, TRACE env flag,
+  arena-return behavior (needs live profiling post-deploy).
+- **M0c dispatched** (marine repo @ 46f4d1a): the two cuts above + targeted tests.
