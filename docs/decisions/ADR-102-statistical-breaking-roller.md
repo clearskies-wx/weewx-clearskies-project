@@ -171,18 +171,29 @@ normalized by total dissipated energy; worst alarm-eligible zone must be `<= 0.0
 Scoping (decision-register 11(f)/(g)/(h) + participation floor, all measured-justified):
 water's-edge floored steps excluded; the single regime-transition step at each zone's entry
 AND exit excluded (both-endpoint discontinuity); stiffness-dominated steps excluded
-(`k·ds >= 0.5` as phase speed dies); TWO-TIER alarm bar (re-audit hardening, marine `93096c1`):
-zones with >= 25 checked steps alarm at 1%; shorter zones alarm at their own coarser 10% bar
+(`k·ds >= 0.5` as phase speed dies); TWO-TIER alarm bar (re-audit hardening, marine `93096c1`;
+tier basis corrected fifth pass, `9afda8f`): tier membership follows the zone's PHYSICAL span
+(raw both-breaking step count) — physically long zones (>= 25 raw steps) alarm at 1% on their
+included-step aggregate; physically short zones (< 25 raw) alarm at their own coarser 10% bar
 (healthy short zones measured <= 1.5%, wrong-coefficient ~100% — an order of magnitude clear
-each way; closes the re-audit's demonstrated short-zone hiding spot). The reference side also
-declares its OWN copy of the fade coefficient (`_ROLLER_BETA_D_REFERENCE = 0.10`) so a careless
-one-site edit to either constant trips the alarm; deliberate physics changes are a two-site
-edit gated by register ruling 2 (closes the re-audit's shared-constant masking). Detection
-power demonstrated before shipping: doubled β_D reads 11.8% vs 0.081% clean (~145×), and a
-one-site-edit test pins the dual-constant behavior.
+each way). A physically long zone whose comparison window ends with FEWER included steps than
+the 25-step participation floor — zero (full) or 1–24 (partial) — is COMPARISON STARVATION and
+fires the invariant outright (XF5, closing the fifth audit pass's silent band: tiering by the
+post-exclusion count let a window edit shrink — not zero — the window and silently demote a
+long zone to the lenient bar; detection was non-monotonic across 2.4–2.65× window edits).
+The window's step-eligibility criterion is calibrated by its OWN frozen window-only nominal
+(`_ROLLER_KDS_WINDOW_BETA_NOMINAL = 0.10`, fourth-pass structural close, `2549011`) that
+co-varies with NEITHER live coefficient; the reference side declares its OWN copy of the fade
+coefficient (`_ROLLER_BETA_D_REFERENCE = 0.10`). A careless one-site edit to ANY of the three
+constants trips the alarm via divergence or starvation; a deliberate physics change is a
+three-named-site edit gated by register ruling 2. Every zone emits its per-zone log line even
+when fully excluded ("no comparison happened" is never indistinguishable from "clean").
+Detection power demonstrated before shipping: doubled β_D reads 11.8% vs 0.081% clean (~145×);
+window-nominal sweep fires at every tested value >= 0.25 via divergence or starvation.
 Known limitations recorded: near-terminal roller values are locally imprecise by construction
-(stiff regime — harmless, E_r is draining to zero there); short bump-shaped zones (<25 steps)
-are monitored but not alarm-eligible. Wired at both production sites (post-loop, per march).
+(stiff regime — harmless, E_r is draining to zero there); physically short bump-shaped zones
+(<25 raw steps) alarm only at their coarser 10% bar. Wired at both production sites
+(post-loop, per march).
 
 **Floored-step scoping (decision-register item 11(f), a lead ruling under delegated authority):**
 `D_r = g·β_D·E_r/c` diverges as the floored phase speed `c → 0` at the numerical depth floor

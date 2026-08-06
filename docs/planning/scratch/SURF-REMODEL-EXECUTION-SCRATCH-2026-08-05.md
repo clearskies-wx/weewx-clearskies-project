@@ -680,3 +680,38 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
   measured margins + narrow pass-6 (rec), (2) deliberate design pass on the checker,
   (3) operator-accepted documented residual → row 3 closes, deploy train fires.
   Deploy train HELD pending the ruling; librewxr healthy on 9535e8a.
+
+### 2026-08-06 — Operator ruled option 1 ("recommendations are sound"); XF5 ACCEPTED (9afda8f, pushed); pass 6 dispatched
+- **Ruling recorded in register 11(g)** (meta dca226b): tier by physical span + partial
+  starvation; measure-first gate; pass-6 narrow audit; relocation → incremental path
+  CLOSED, deliberate design pass (pre-authorized). Operator forks (non-surf locations,
+  Z-D4) NOT treated as ruled — explicit word still pending.
+- **XF5 step-0 measurement PASSED** (dev table on record in transcript): across every
+  fixture on stock physics, NO zone has raw ≥25 with included <25; the register's
+  19/22-included stress zones are physically short (raw 20/23); worst long-zone margin
+  37 included on 38 raw. Clean separation → implementation authorized per brief.
+- **XF5 ACCEPTED**: commit exactly the 3 allowlist files (invariants.py comment-only);
+  lead fresh-shell re-run **72 passed in 0.47s** (66 baseline + 6 new; 3 silent-band
+  tests fail-pre-change confirmed by dev with method stated). Lead spot-open verified:
+  `is_long_zone` starvation guard BEFORE tier scoring with strict `< 25` (included==25
+  → standard tier, boundary pinned); single WARNING naming raw span + included count +
+  floor; zero-included SKIPPED semantics preserved; short-tier unreachable for long
+  zones (`is_standard_tier = is_long_zone`). Lead re-ran the PASS-5 AUDITOR'S OWN sweep
+  script at 9afda8f: previously-silent band now fires (0.25 monotone was
+  worst=0.0/False, now fires; every value ≥0.25 fires on both fixtures; 0.20/0.22
+  correctly measured-below-bar at 0.46%/0.91% on standard tier — continuous coverage:
+  measured-under-bar → divergence → starvation). Note: the script's mechanism LABEL for
+  the fixed values reads "SHORT-ZONE-ALARM" — stale label (it greps the old
+  zero-included WARNING string); the dev's live-path tests assert the true mechanism
+  (comparison_starved=True) and the code makes short-tier unreachable there.
+- **ADR-102 doc-drift fixed** (this commit): scoping paragraph had stopped at the XF2
+  state — now describes raw-span tiers, partial/full starvation, the three-constant
+  regime (window-only nominal), no-silent-zones logging, XF5 sweep evidence.
+- **Dev-flagged pre-existing surprise, PARKED**: transect55 fixture at hs=0.65/tp=16
+  logs a pre-existing "Hs exceeds 1.5*gamma*depth (physically-impossible runaway) at
+  index 250" line (Round W1b-era message, untouched by XF5) — candidate investigation
+  item, not blocking.
+- **Pass 6 (final, narrow) DISPATCHED** (fresh blind auditor): re-run the C sweep incl.
+  fine gap probe at 9afda8f; adversarial hunt for a NEW relocation (combined edits,
+  boundary cases, second call site); healthy-baseline and short-zone no-over-fire
+  checks. Clean verdict → row 3 CLOSES → deploy train. Relocation → STOP → design pass.
