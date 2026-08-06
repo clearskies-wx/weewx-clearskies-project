@@ -659,3 +659,24 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
   nominal) must trip INVARIANT_11 via divergence OR starvation; starvation reaches the
   registry (not bare logging); one WARNING per physical zone; E_r attribution accurate.
   Clean verdict closes gate row 3 → deploy train.
+
+### 2026-08-06 — AUDIT PASS 5: DISPROVED (1 HIGH, F1-p5) — row 3 FAIL, deploy train HELD, surfaced to operator
+- **F1-p5 [HIGH], lead-CONFIRMED** (code inspection :1003/:1029 + independent re-run of the
+  auditor's sweep script, silent band reproduced): tier selection reads post-exclusion
+  `use_included`, starvation fires only at included==0. A window-nominal edit at ~2.4–2.65×
+  stock shrinks (not zeroes) the window on a 111-raw-step zone → silent demotion to the 10%
+  short tier (ratios 1.8–8% hidden, worst_ratio 0.0000, not starved). Non-monotonic: fires
+  at 2.35×, silent 2.4–2.65×, fires ≥2.7×. Falsifies register 11(g) fourth-pass "no silent
+  path" AS STATED.
+- **Severity framing (lead)**: the production-safety property SURVIVED all attacks — both
+  physics constants (`_ROLLER_BETA_D`, `_ROLLER_BETA_D_REFERENCE`) fired via genuine
+  divergence at EVERY tested value on both fixtures (1.4–66%); registry reachability,
+  per-zone WARNING dedup, E_r attribution, baseline health, three-site residual all
+  verified clean. The remaining hole is confined to the checker's own window constant,
+  which affects NO published number — an edit there degrades detector sensitivity only.
+- **Fifth finding on the same ~80-line function** → per "fails twice, STOP" + the XF4 dev's
+  own design-pass flag, NO XF5 dispatched on lead authority. Options + recommendation
+  surfaced to operator: (1) targeted tier-by-physical-span/partial-starvation fix with
+  measured margins + narrow pass-6 (rec), (2) deliberate design pass on the checker,
+  (3) operator-accepted documented residual → row 3 closes, deploy train fires.
+  Deploy train HELD pending the ruling; librewxr healthy on 9535e8a.
