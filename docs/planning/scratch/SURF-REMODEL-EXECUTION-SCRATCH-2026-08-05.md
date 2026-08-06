@@ -349,3 +349,20 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
   cycle-long vs released, name the top 3 holders with file:line.
 - No new kill since 05:00:43Z. No state-changing action taken on the server (nothing
   pre-authorized).
+
+### 2026-08-06 ~08:40Z — SW-1b ACCEPTED (8bb268a, pushed); M0b in finalization
+- **SW-1b ACCEPTED**: commit `8bb268a` = exactly surf_scorer.py + new test file (m0b's
+  uncommitted swan_runner.py untouched/unstaged — parallel discipline held). Lead re-run:
+  **68 passed** (8 new + 60 pre-existing surf-scorer suites). Semantics = 5be33fc verbatim
+  (0.75/0.5 constants restored, no formula change); guard = 4 wiring-pinning integration
+  tests through public score_surf() that fail on the exact 66c9634 disconnect shape.
+  API-MANUAL already described the restored behavior ("Dominant period") — no doc delta.
+- **CAVEAT for operator (ties to SW-1a)**: for the pinned complaint hour, upstream multiSwell
+  itself ranks the 1.83m/3.8s wind swell above the 1.15m/13.1s groundswell by energy
+  (0.0195 vs 0.0077) → restored selector still headlines the wind swell THAT hour (its own
+  numbers now, not bulk TM01). Root cause remains the missing 9s train in the NOAA gfswave
+  station input = SW-1a source decision (options a/b/c, still open).
+- **M0b**: production edit done + verified (controls 9/9, 18/18); stale-proxy test at
+  test_swan_handoff_guards.py:583 ruled option (b) — scoped discriminator swap authorized;
+  dev finalizing single fix(m0b) commit.
+- SW-2 GO fires at m0b's landing commit (HEAD pin = that commit).
