@@ -534,3 +534,17 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
   mislabeled (content verified correct; noted in 24ef58e).
 - X gate rows 1 (scope) + 2 (guards/KATs re-run) COMPLETE. Row 3 blind adversarial audit
   DISPATCHED. Rows 5-6 (deploy discipline + reality) follow the audit.
+
+### 2026-08-06 — Z4 ACCEPTED (3a3e39d, pushed); Z3b pin saved; Z-D4 fork opened
+- **Z4 ACCEPTED**: 1 new file, 24 tests; lead re-run 50 passed (24 + 26 headline control).
+  Stickiness boundary pinned to the code's strict > at exactly 1.20 (double-precision
+  verified); not-in-zone incumbent case documented as OBSERVED behavior for Z6 to judge;
+  seed nearest = absolute-delta (can pick a LATER entry — documented, more precise than
+  the function name implies; Z6 judgment candidate). Fail-pre-change: collection-level
+  ImportError at b924c90 via worktree.
+- **Z-D4 fork in register** (Z3b pin: premises disproved — no control points, index-only
+  Y axis, radial fan geometry, no imagery georef). Z3 verify premise DOUBTFUL (card
+  ignores perBreakZones — likely fix-promotion post-deploy, plan's own failure path).
+- Remaining: X-AUDIT (in flight, deploy gate) → deploy train → live gates → Z3/Z3b build
+  (fork-gated)/Z5 docs/Z6 audit/Z7 gate. Operator forks open: non-surf locations;
+  Z-D4 path (i)/(ii)/(iii).
