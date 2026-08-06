@@ -430,3 +430,26 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
 - Marine main: ...181a221 → b924c90 → 46f4d1a (pushed). In flight: sw2b-dev (marine,
   wavewatch/grib_processor), MEM-3 (read-only). Next: Z2 brief (anchor fix at REAL site
   :1629-1632 + reestablish_spot per Z0), X5 awaiting operator word.
+
+### 2026-08-06 — ING-1 COMPLETE (register 13 step 1): INGESTION IS CLEAN — energy ledger verified
+- Method: fresh NOMADS fetch of raw gfswave.46253.spec (00z, f006 — same cycle/hour as the
+  gridded ground truth); INDEPENDENT from-scratch parser (zero repo imports) vs our
+  ww3_spectrum.py parser vs our generated SWAN boundary file round-tripped through the
+  repo's own SPECOUT reader.
+- LEDGER: Hs 0.5047 → 0.5047 → 0.5046 m; swell bands identical to 4 decimals at every
+  stage; 8-11.7s band Hs≈0.15 m PRESENT at every stage (matches NOAA gridded 0.14m@9.23s
+  partition within ~10%); direction 185° vs gridded 186°. **No energy loss anywhere in
+  our chain (<0.03%). SWAN receives 100% of what NOAA's station file contains — the model
+  was NOT underfed.**
+- The "missing 9s swell" is a PARTITIONING phenomenon: at this station the raw 1-D
+  spectrum has one smooth 12.7s peak with the 9s energy on its tail (no valley), so a
+  frequency-domain split can't separate it; NOAA's gridded product splits it (their 2-D
+  partitioner; directions 186°/220°/178°). SW-1A's core claim (no separable 9s peak in
+  the raw file) re-confirmed independently; its "no energy" framing corrected (energy IS
+  present, merged). Ingestion-defect hypothesis: NOT SUPPORTED by evidence.
+- Could-not-verify: SWAN's internal boundary-grid interpolation (needs live run); whether
+  NOAA's own partitioner would split the station point's spectrum.
+- IMPLICATION for register-13 card rewiring: to show swell 1/2/3 from OUR OWN data, the
+  service partitions the model's ingested 2-D spectra itself (standard watershed method,
+  same family NOAA uses) — one source of truth AND multi-swell display. Design proposal
+  going to operator; new computation = architectural, needs explicit go.
