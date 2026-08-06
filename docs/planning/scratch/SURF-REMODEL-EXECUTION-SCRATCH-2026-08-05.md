@@ -400,3 +400,33 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
 - Marine main: 2bb1cd1 → 8bb268a → 181a221 → b924c90, all pushed. Deploy still gated on
   X5+X7 (operator word open). Next in marine repo: Z1 (brief from Z0 fact-pin + plan
   Round Z section).
+
+### 2026-08-06 ~06:40Z (clock CORRECTED — earlier ~08:00-10:00Z stamps in this file were wrong)
+- **TIMEKEEPING CORRECTION**: deploy-script output pinned real time at 06:14Z; several
+  earlier entries' "~HH:MMZ" stamps ran hours fast. Durations quoted from those stamps
+  ("5h stalled") were WRONG — the post-05:00:48 stall was ~1h at restart time. The
+  saturation/SSH-wedge evidence was real regardless.
+- **Operator rulings (chat)**: 11a RULED — NO infra change; memory footprint is our
+  regression; "computations done → RELEASE THE RAM" = standing mandate (MEM-3 dispatched:
+  static hunt for retained-after-use + transient giants beyond MEM-2). 11c CHALLENGED by
+  operator and they were RIGHT — lead live-checked NOMADS gfswave 00z f006 at Huntington:
+  partitions 12.4s/186°, 14.2s/220°, 9.2s/178° + wind 3.7s ALL PRESENT in gridded GRIB.
+  SW-1a reframed: station .spec (SWAN boundary) vs gridded GRIB discrepancy to be
+  investigated with this evidence; no operator decision needed now. Register 11b/11d
+  rewritten in plain English (operator: "ENGLISH!").
+- **Service restarted** via `deploy-marine.sh --skip-pull` (no code shipped): process
+  06:14:05Z at 9535e8a, /health 200. Justification: container saturated (0 free), SSH
+  banner-timeouts, thrash; restart resets ratcheted RSS.
+- **NEW DEFECT found by the 11c live check**: nearest grid cell to Huntington pier is
+  LAND-MASKED in gfswave (all 9999); SW-2's plain nearest-cell extraction would serve
+  blanks at the flagship spot. **SW-2b dispatched**: nearest-valid-water-cell fallback,
+  same-cell-for-all-fields per timestep; fixture's pier case is the ideal test.
+- **Z1 ACCEPTED** (46f4d1a, pushed): 5 authorized files; lead re-run 74 passed /
+  3 failed = exactly the pinned-old-BD-9-tiebreak tests (Z4 disposition). Sticky
+  selection LIVE-WIRED (not inert): swan.py loop carries incumbent in time order,
+  cross-cycle seed from persisted swelltrack cache, on-demand path reads same cache so
+  beach-profile page and cards can never disagree. Dev self-caught+fixed an unguarded
+  seed-read violating precompute's never-raises contract (203-test broader sweep clean).
+- Marine main: ...181a221 → b924c90 → 46f4d1a (pushed). In flight: sw2b-dev (marine,
+  wavewatch/grib_processor), MEM-3 (read-only). Next: Z2 brief (anchor fix at REAL site
+  :1629-1632 + reestablish_spot per Z0), X5 awaiting operator word.

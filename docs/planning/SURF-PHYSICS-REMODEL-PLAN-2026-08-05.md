@@ -591,16 +591,34 @@ sections that were later struck):**
       REGRESSION and reducing it is in-scope M-0 work: find what is being held that
       doesn't need holding, and stop holding it. M0b (dead spectral fields) was the
       first cut; the hunt continues (MEM-3) until the service fits with wide margin.
-    - **(b) X5 go-ahead (the deploy bottleneck for EVERYTHING):** the deploy script ships
-      the whole main branch, and main now carries the new Round X physics, which the plan
-      bars from deploying without its known-answer tests (X5) and gate (X7). You ordered
-      testing backed off, so X5 sits undispatched — but no fix (memory, swell display,
-      GRIB provider) can reach the live server until X5+X7 run. Say "run X5" to unblock.
-    - **(c) SW-1a — which NOAA wave input to use:** the ~9-second-plus swell energy the
-      other sites show is genuinely absent from the NOAA station feed we read. Options:
-      (i) accept and document; (ii) investigate NOAA's finer regional wave-model product
-      as input (recommendation); (iii) blend buoy data in (not recommended).
-    - **(d) The wave-model boundary "waits too" question** — item 10 above.
+    - **(b) Say "run the tests" to unlock shipping.** Plainly: the memory fix, the swell
+      fix, and the NOAA-files rewrite are all finished — but NONE of it can go to the
+      server yet. Our deploy tool ships everything at once, and "everything" now includes
+      the new wave-breaking math. The plan's own rule (which you approved) says new math
+      does not go live until its checking tests — tests with known right answers — are
+      written and pass. Those tests don't exist yet because you ordered testing paused.
+      One phrase from you — "run the tests" — and they get written and run; when they
+      pass, everything ships.
+    - **(c) RESOLVED 2026-08-06 — the operator was right: NOAA's GRIB files carry all
+      the swells.** Live check at Huntington (lead, against NOAA's own file): swells of
+      12.4 s, 14.2 s, AND 9.2 s all present, plus the wind chop, all separate. The
+      earlier "NOAA doesn't have it" finding applied only to a DIFFERENT NOAA product
+      (the per-station spectrum files the wave model reads at its offshore edge), not to
+      these files. The rewritten card provider reads exactly these files, so the cards
+      get the full picture once it ships. The same check exposed one real defect: the
+      grid square nearest the pier is blanked-out land in NOAA's file, and the provider
+      as first written would have served blanks there — a fix (use the nearest square
+      that actually has ocean data) is in progress (SW-2b). Whether the wave model's own
+      offshore-edge input also needs a better source is being investigated with this new
+      evidence; no decision needed from the operator right now.
+    - **(d) Should the wave model sit and wait when NOAA is late?** The wave model — the
+      physics engine that computes the surf forecast — needs offshore wave data to start
+      each run. Today it always uses the newest data NOAA has actually posted, and never
+      ignores newer data. The question: when NOAA is late posting (they take 3.5–5 hours
+      after each run time), should the model sit idle waiting instead of running with
+      the newest posted data? Waiting would stop surf updates for most of every day,
+      and there is nothing newer to wait for during that window. Recommendation: leave
+      it alone. Say "boundary waits too" only if you want the waiting behavior anyway.
 
     **STANDING LEAD RULINGS — made under delegated authority, in force now, say the word
     to overrule:**
