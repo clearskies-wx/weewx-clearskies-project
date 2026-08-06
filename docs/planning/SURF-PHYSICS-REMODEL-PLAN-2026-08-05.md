@@ -577,3 +577,36 @@ sections that were later struck):**
     roughly 60% of all hours — with nothing newer existing to wait for. Recommendation:
     the boundary stays as-is, because it already lives on NOAA's timeline. Say "boundary
     waits too" to override.
+
+11. **Everything currently waiting on the operator, in one place (added 2026-08-06 after
+    the operator was surprised by an unrecorded question — every open item and every
+    standing lead-call now lives HERE, updated as they open and close).**
+
+    **OPEN QUESTIONS — nothing ships on these without your word:**
+    - **(a) Memory unblock for the crashing container (work-stopper for M-0/H-1):** the
+      6 GB container cannot hold the service (~3.1 GB mid-cycle), the radar program
+      (~2 GB), and the model's RAM-disk scratch files at once. The dead-weight code fix
+      is done (M0b) but can't deploy yet — see (b). Quick options needing your word:
+      raise the container's memory cap, and/or evict/cap the radar program, and/or move
+      the model's scratch files to real disk.
+    - **(b) X5 go-ahead (the deploy bottleneck for EVERYTHING):** the deploy script ships
+      the whole main branch, and main now carries the new Round X physics, which the plan
+      bars from deploying without its known-answer tests (X5) and gate (X7). You ordered
+      testing backed off, so X5 sits undispatched — but no fix (memory, swell display,
+      GRIB provider) can reach the live server until X5+X7 run. Say "run X5" to unblock.
+    - **(c) SW-1a — which NOAA wave input to use:** the ~9-second-plus swell energy the
+      other sites show is genuinely absent from the NOAA station feed we read. Options:
+      (i) accept and document; (ii) investigate NOAA's finer regional wave-model product
+      as input (recommendation); (iii) blend buoy data in (not recommended).
+    - **(d) The wave-model boundary "waits too" question** — item 10 above.
+
+    **STANDING LEAD RULINGS — made under delegated authority, in force now, say the word
+    to overrule:**
+    - **(e) SW-2 cold-start exception:** when the provider starts with NO processed
+      forecast at all, it fetches the newest run NOAA has already published (bounded
+      search back through at most 3 runs) instead of showing empty cards for hours; once
+      any run has succeeded, the strict wait-and-check-back rule governs forever after.
+    - **(f) Whitewater self-check scoping (Round X):** the energy-balance self-check
+      skips the single artificial grid point at the water's edge where the approved
+      formula divides by a vanishing speed — the 1% accuracy bar itself is untouched.
+      Without this the alarm would cry wolf every cycle on healthy runs.
