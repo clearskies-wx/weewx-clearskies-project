@@ -633,6 +633,18 @@ sections that were later struck):**
       formula divides by a vanishing speed — the 1% accuracy bar itself is untouched.
       Without this the alarm would cry wolf every cycle on healthy runs.
 
+13. **ONE source of offshore truth (operator, 2026-08-06, in chat — RULED, supersedes the
+    two-feed arrangement).** Operator's words: "EVERYTHING WE NEED IS IN OUR GOD DAMNED
+    MODELS, WHAT THE FUCK ARE WE PULLING SEPARATE INFORMATION FOR?" The offshore wave data
+    the wave model ingests IS the offshore wave data the cards report. There is no second,
+    separate NOAA download for display. The card provider's separate pull (including the
+    SW-2 rewrite of it) is to be retired and the cards fed from the model's own ingested
+    data. Additionally the operator states, and the lead's own live check supports, that
+    the station-data INGESTION is defective (energy present in NOAA's model is missing
+    from what we feed SWAN) — fixing the ingestion comes first, then the card rewiring.
+    ALL WORK IS STOPPED (operator order) — nothing executes on this until the operator
+    lifts the stop.
+
 12. **The display layer is source-blind; the marine service/API owns the data (operator,
     2026-08-06, in chat).** Operator's words: "The forecast cards should not care or have
     knowledge about what data they are getting, they ask for data, the API delivers the
