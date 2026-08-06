@@ -314,3 +314,19 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
 - Per the two-named-excuses rule: NOT proceeding on any of these without explicit operator
   approval — surfaced with evidence instead. Coding tracks (SW-1b, SW-2 read-phase, Z0)
   unaffected and running.
+
+### 2026-08-06 ~06:45Z — SW-2 design rulings; Z0 saved; SW-2 GO pending SW-1b landing
+- **Z0 FACT-PIN saved** (scratch/Z0-FACT-PIN-2026-08-06.md @ 2bb1cd1). Headline: plan's
+  anchor-fix site (:1485-1488 COARSE) is superseded at :1629-1632 (MEDIUM) — real fix surface
+  is the second write + consumers; hysteresis confirmed ABSENT; teardown inventory resolved
+  (wind_timeline/incoming GLOBAL-exclude; precleanup dirs have no in-repo writer).
+- **SW-2 lead rulings sent to dev**: (1) additive swell2*/swell3* optional fields CONFIRMED
+  (authorized by register 10 "swell-1/2/3 breakdown"; dashboard display of them = separate
+  follow-up); (2) REDIRECT on failure semantics — probe/fetch failure with last-good present
+  = WARN (distinct slugs ww3_cycle_unpublished vs ww3_fetch_failed) + poll-gate + keep
+  serving last-good (ruling 10: previously processed stays served; "no fallbacks" bans other
+  SOURCES, not our own NOAA last-good); refusal (RFC9457, serve nothing) only when NO valid
+  last-good (cold+bootstrap exhausted, or TTL-expired >24h — loud refusal by design);
+  (3) cold-start bounded lookback (3 cycles) confirmed as the bootstrap ruling's
+  implementation; (4) cadence preserved (72h/3-hourly/25 steps); level-aware keying design +
+  except-shape approved. GO + HEAD pin flashes when SW-1b lands (one dev per repo).
