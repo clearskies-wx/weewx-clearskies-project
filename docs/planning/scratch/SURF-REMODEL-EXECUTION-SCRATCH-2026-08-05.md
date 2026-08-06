@@ -216,6 +216,36 @@ restarting the radar container and raising the cap are both outside-project or i
   allowlist services/surf_1d_analytical.py + services/invariants.py, STOP if wiring needs
   a third file.
 
+### 2026-08-06 ~05:10Z — X4 ACCEPTED; M-0 cycle 1/4 CLEAN; D-7 re-ruled; X5 dispatched
+
+- **X4 ACCEPTED** (commit `2bb1cd1`, pushed). Lead's own runs: `git show --name-only` =
+  exactly the 2 allowlist files; exact cap expression `min(marched, float` = 0 occurrences
+  (3 remaining greps are historical docstring text describing the deletion — acceptable);
+  second γ·d cap intact at pipeline :828; combined 5-file targeted run → **31 passed**;
+  fallout w1_kat/w5_saturation unchanged → **8 failed** same TypeError-missing-T mechanism.
+  Closure-scoping ruling verified working: dev showed UNSCOPED worst ratio 0.3444 exactly at
+  the eps-floored (0.01 m) last grid point, SCOPED ratio 3.4e-15 — exclusion does real work,
+  march is honest away from the floor. INVARIANT_11 wired in both marches; INVARIANT_12 in
+  apply_ddd_saturation only (the only march with an interior raw reference — accepted
+  rationale).
+- **Stale comment found by lead during acceptance (X6 sweep item):** surf_1d_pipeline.py
+  :738-741 still says "apply_ddd_saturation now bounds its own output by min(marched,
+  hs_total_raw)" — describes the cap X4 just deleted. The redistribution ratio there is
+  now guarded by INVARIANT_12 (≤ raw + 1 mm) instead of a hard bound; comment must be
+  rewritten by X6 (file was outside X4's allowlist, correctly not touched).
+- **M-0: cycle 1 of 4 CLEAN** — journal shows `1 × "full SWAN cycle complete"` since
+  03:21:56Z, KILLS: 0. Slow (~90 min, GIL-contention diagnosis stands) but completed.
+- **D-7 RE-RULED (operator, in chat): NO beach-line label at all** — selection fix ships
+  invisibly; Z-gate wording approval dropped. Plan DECIDE + register item 8 updated
+  (abdd4d0). D-4 wording corrected: log warnings, not "alarms".
+- **Operator D-5 follow-up answered** (in chat): combined RSS total is run through the full
+  breaking physics (`apply_ddd_saturation` at pipeline :732) — addition-induced breaking IS
+  registered (dissipation, roller/whitewater, zones); the D-5 cap only clips the reported
+  face-height figure at the primary swell's already-registered break point.
+- **X5 dispatched** (Sonnet, test-author, marine repo @ 2bb1cd1): X-K1..K4 KATs +
+  state-machine units + X0 Table 2 dispositions + T-signature call-site fixes in
+  w1_kat/w5_saturation; fail-pre-change transcripts vs pre-Round-X commit `27bb9b3`.
+
 ### Standing constraints (unchanged, from plan + kickoff)
 Sonnet agents only for delegated work; never full pytest; every brief carries git/arch/stale
 blocks verbatim; deploys only via scripts/deploy-marine.sh; one functional change per deploy;
