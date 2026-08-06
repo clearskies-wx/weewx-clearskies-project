@@ -1048,6 +1048,16 @@ The next full run will cold-start (first 3-6 hours show reduced accuracy, then t
 
 Stationary quick updates (hourly) never save hotstart files. Only full nonstationary runs (every 6 hours) write `level{N}_hotstart.dat`. This prevents a diverged quick-update snapshot from contaminating the nonstationary warm-start chain.
 
+#### Forecast cache lifecycle (M-0/D-1b, 2026-08-06)
+
+`forecast_cache.json` (`/var/run/weewx-clearskies/swan/forecast_cache.json`) persists each spot's forecast payload — `forecast`, `spectral`, `spectral_dwr`, `transect`, `swelltrack`, and related keys — across marine-service restarts, so `fetch()` can serve immediately without waiting for the next full SWAN run. A full run replaces the file wholesale; the hourly quick update merges only the spots it touched, leaving others untouched.
+
+**M-0 remediation (OOM kill-loop, production outage 2026-08-05/06):** the per-transect handoff carrier form introduced late July grew the cached `spectral` key to 5,508 per-transect 2-D spectra per spot per full run — 95.5% of a measured 223 MB file, none of it read by any live consumer (M0-D1B fact-pin: every reader of a cached `spectral` entry touches only `components`, `handoff_depth_m`, `handoff_source_level`, and `clamped` — never the `freqs_hz`/`dirs_deg`/`energy` 2-D arrays). `providers/nearshore/swan.py`'s `_trim_spectral_for_cache()` now drops those three fields from every `spectral` entry — at the entry's own top level and inside every `handoff_by_transect` value — before it reaches the cache or the disk file. This bounds both the 7-day in-memory last-good cache and the persisted file; nothing downstream changes, since nothing downstream read the dropped fields.
+
+**Size-guard WARNING.** Both `_persist_forecast_cache_to_disk()` and `_update_forecast_cache_on_disk()` log a WARNING (`SWAN: forecast cache size ... exceeds ... MB warn threshold`) if the serialized payload exceeds `_FORECAST_CACHE_WARN_MB` (64 MB, a monitoring threshold, not admin config). This is a fire-only regression tripwire, not a hard cap — the persist still completes. A firing WARNING after this change means an unbounded field has likely rejoined the payload (the same class of defect this task fixed); investigate what new key was added to the per-spot payload and whether it needs the same trim-at-write treatment.
+
+**D-1a preserved-aside artifact.** The immediate-relief step ahead of this fix moved the 223 MB pre-trim file aside on librewxr rather than deleting it: `/home/ubuntu/forecast_cache.json.oom-m0-aside-20260806`. This is a historical artifact of the OOM incident — do not delete it without operator say-so.
+
 #### Surf-spot data-completeness conditions worth alerting on
 
 These are model-completeness signals, not crashes: the service keeps running and keeps serving, but a spot in one of these states publishes less than a full surf card. All are greppable in the marine service log.
