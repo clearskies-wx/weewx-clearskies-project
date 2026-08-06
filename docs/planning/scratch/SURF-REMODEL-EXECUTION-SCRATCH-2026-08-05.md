@@ -586,3 +586,21 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
   impossibility-claim correction + bound description, F4 wording. Doc-code sync intact.
 - **RE-AUDIT dispatched**: x-audit re-verifies F1/F2 against its own reproductions + fresh
   adversarial pass on the new aggregate check. Deploy train fires on its clean verdict.
+
+### 2026-08-06 — XF2 ACCEPTED (93096c1 + comment fix cd28fe2, pushed); ADR-102 updated; audit third pass dispatched
+- **XF2 ACCEPTED**: 3 allowlist files; lead re-run **57 passed** (10-file sweep). Dual-constant
+  (_ROLLER_BETA_D_REFERENCE) closes masking #1 (one-site edit trips INVARIANT_11; two-site =
+  deliberate change, register-2-gated). Two-tier bar (_ROLLER_ZONE_SHORT_ALARM_THRESHOLD=0.10)
+  closes masking #2 (99.77% short-zone divergence now alarms; healthy 1.15-1.44% doesn't).
+  F5: INVARIANT_12 removed from registry; engagement WARNING (count + worst PRE-bound excess)
+  replaces it; gate Row 2 restated (11-only + engagement counts reported) — recorded in
+  register 11(i) BEFORE live data. F1 docstring propagation caveat tightened.
+- **Discrepancy flagged by dev, honest number shipped**: E_r divergence at shoreline 57.2%
+  (dev) vs ~82% (audit) on same-described repro — normalization difference suspected; third
+  audit pass reconciles. Dev shipped its own verified 57%.
+- **Lead-direct fix**: surf_1d_pipeline.py:738 twice-stale comment corrected (comment-only,
+  import-smoked). ADR-102 updated (two-tier, dual-constant, INVARIANT_12 retirement, both
+  divergence figures, Row 2 checklist).
+- **Audit third pass dispatched** (narrow): re-run both masking attacks vs cd28fe2, verify F5,
+  reconcile divergence figure, verdict on gate row 3. Marine main: ...20c2711 → 93096c1 →
+  cd28fe2 (pushed).
