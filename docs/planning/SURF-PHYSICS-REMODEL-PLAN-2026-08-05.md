@@ -611,6 +611,17 @@ sections that were later struck):**
       that actually has ocean data) is in progress (SW-2b). Whether the wave model's own
       offshore-edge input also needs a better source is being investigated with this new
       evidence; no decision needed from the operator right now.
+    - **(NEW, 2026-08-06) OPEN QUESTION — what do boating/fishing locations show once the
+      separate pull dies?** Some configured marine locations are boating- or fishing-only
+      points with no surf spot — the wave model does not cover them, so there is no
+      "model's own data" for them. Today their wave numbers (the boating tab's forecast
+      chart, the landing-page wave height) come from the separate NOAA map-file pull that
+      ruling 13 retires. Options: (i) keep the map-file source ONLY for these no-model
+      locations — where the model doesn't run, there is no model truth to disagree with
+      (recommendation); (ii) show buoy observations only, no forecast; (iii) drop wave
+      data for them entirely. Surf spots are unaffected either way — they get the model's
+      own numbers. Building the surf-spot side now; this fork only gates the final
+      deletion of the old provider.
     - **(d) Should the wave model sit and wait when NOAA is late?** The wave model — the
       physics engine that computes the surf forecast — needs offshore wave data to start
       each run. Today it always uses the newest data NOAA has actually posted, and never
@@ -639,11 +650,17 @@ sections that were later struck):**
     the wave model ingests IS the offshore wave data the cards report. There is no second,
     separate NOAA download for display. The card provider's separate pull (including the
     SW-2 rewrite of it) is to be retired and the cards fed from the model's own ingested
-    data. Additionally the operator states, and the lead's own live check supports, that
-    the station-data INGESTION is defective (energy present in NOAA's model is missing
-    from what we feed SWAN) — fixing the ingestion comes first, then the card rewiring.
-    ALL WORK IS STOPPED (operator order) — nothing executes on this until the operator
-    lifts the stop.
+    data. **[Updated 2026-08-06: the stop was lifted by ruling 11(b) ("yes, do both, and
+    then finish everything in the plan"). The ingestion-defect premise was then DISPROVED
+    by measurement (ING-1's energy ledger: <0.03% loss end-to-end; the model was never
+    underfed — the "missing" 9-second swell is a labeling/partitioning phenomenon, not
+    lost energy). The ONE-SOURCE-OF-TRUTH goal of this ruling stands on its own and is
+    being built. Implementation per the RW-0 fact-pin: for surf spots the cards read the
+    wave model's OWN computed swell breakdown — SWAN's built-in partitioning is already
+    running in production for other purposes, so no new physics is invented and the cards
+    cannot disagree with the model. One fork is open for the operator: what non-surf
+    marine locations (boating/fishing points the model doesn't cover) should show — see
+    item 11's open question.]**
 
 12. **The display layer is source-blind; the marine service/API owns the data (operator,
     2026-08-06, in chat).** Operator's words: "The forecast cards should not care or have
