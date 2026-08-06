@@ -138,6 +138,7 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | [ADR-081](ADR-081-license-change-polyform.md) | License change — PolyForm Noncommercial 1.0.0 (supersedes ADR-003) | 2026-07-09 |
 | [ADR-093](ADR-093-swan-trushore-nearshore-model.md) | SWAN + SwellTrack replaces NWPS as nearshore wave model (supersedes ADR-084) | 2026-07-16 |
 | [ADR-094](ADR-094-hrrr-surf-wind-source.md) | HRRR forecast wind as surf quality scoring source for SWAN + SwellTrack forecasts | 2026-07-16 |
+| [ADR-103](ADR-103-spectral-boundary.md) | Multi-station real spectral boundary for the SWAN L1 domain — WW3 station selection, refuse-don't-degrade (no fallback tiers), distinct `/health` refusal naming (H-1); catch-up document for design shipped 2026-07-26 | 2026-07-26 |
 
 ## Archived — consolidated into PROVIDER-MANUAL.md (marine)
 
