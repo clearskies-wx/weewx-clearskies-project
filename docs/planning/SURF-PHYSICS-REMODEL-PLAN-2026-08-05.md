@@ -718,6 +718,26 @@ sections that were later struck):**
       under 0.8%). Short zones are still computed and logged per-zone for visibility —
       they just cannot page the alarm. A wrong coefficient still trips decisively via
       every profile's long primary zones (~12% vs ~0.08% measured).
+      **Fifth-pass finding and ruling (2026-08-06, operator-approved in chat — "your
+      recommendations are sound"):** the fifth blind pass DISPROVED the fourth-pass "no
+      silent path" claim as stated: tier selection read the post-exclusion included-step
+      count, so a window-nominal edit at ~2.4–2.65× stock shrank (not zeroed) the window
+      on a physically long zone (111 raw steps) and silently demoted it to the lenient
+      10% short tier — detection non-monotonic (fires at 2.35×, silent at 2.4–2.65×,
+      fires again ≥2.7×; lead-confirmed by independent re-run of the auditor's sweep).
+      Production safety HELD: both live physics constants fired via genuine divergence at
+      every tested value on every fixture; the residual hole was confined to the
+      checker's own physics-inert window constant (no published number affected).
+      **Ruled fix (XF5): tier membership follows the zone's PHYSICAL span.** A zone
+      spanning ≥25 raw breaking steps that ends with fewer than 25 included steps is
+      PARTIAL STARVATION and fires the alarm exactly like full starvation; the 10% short
+      tier belongs only to zones physically shorter than 25 raw steps. The dev MEASURES
+      FIRST on every existing fixture that healthy stock physics never yields a
+      physically-long zone with an included count under the floor (clean separation
+      reported with margins; no clean separation → STOP and report, nothing
+      implemented). One narrow pass-6 audit re-verifies; if the hole has merely
+      relocated again, the incremental-patch path is CLOSED and the checker gets a
+      deliberate design pass (operator-approved escalation, same ruling).
     - **(h) Whitewater self-check scoping, part 3 (2026-08-06, second F2 stop):** in the
       last few steps before the shoreline the whitewater drain term grows without bound
       as wave speed dies (a "stiff" equation, in numerical-methods terms), so the
