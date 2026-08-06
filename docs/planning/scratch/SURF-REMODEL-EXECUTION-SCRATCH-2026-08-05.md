@@ -473,3 +473,15 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
   ALREADY CLEAN. COULD-NOT-VERIFY: live station count, spot count, TRACE env flag,
   arena-return behavior (needs live profiling post-deploy).
 - **M0c dispatched** (marine repo @ 46f4d1a): the two cuts above + targeted tests.
+
+### 2026-08-06 — M0c ACCEPTED (2bf825b, pushed)
+- Lead re-run: **71 passed** across all 6 files (H-1 18, M0b 5, guards 31, trace 6,
+  decouple 1, new m0c 10); commit = exactly the 4 authorized files (incl. the one-line
+  coordinator-authorized stub kwarg-tolerance fix); gate line verified present at
+  swan_runner.py:839. Trace path retains full matrices (TRACE_ENABLED → parse_energy=True).
+- Cuts now queued for deploy: M0b (dead spectral fields, ~90-484MB/cycle) + M0c cut 1
+  (dead 162× table re-parse, ~160-320MB churn/spot/parse) + M0c cut 2 (unread SPECOUT
+  matrices, ~89MB/spot/parse). ALL UNDEPLOYED pending X5 gate ("run the tests" open).
+- Marine main: ...46f4d1a → 2bf825b (pushed). Next queued work: Z2 brief (anchor fix at
+  the REAL site :1629-1632 + reestablish_spot teardown per Z0 inventory). Awaiting
+  operator: "run the tests" (deploy gate), "go rewire" (register 13 step 2).
