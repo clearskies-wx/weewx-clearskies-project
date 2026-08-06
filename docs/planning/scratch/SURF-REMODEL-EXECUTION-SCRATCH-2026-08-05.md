@@ -747,3 +747,35 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
   tier/starvation from expected-comparable counts, dissolving both defect classes) —
   going to the operator for approval BEFORE any implementation. Physics, both
   comparison methods, and all bars/constants unchanged in the proposal.
+
+### 2026-08-06 — OPERATOR REPRIORITIZATION: deploy NOW, checker redesign de-blocked to follow-up; DEPLOY TRAIN EXECUTED
+- **Operator ruling (in chat, verbatim anchor): "right now I STILL DO NOT HAVE A FUCKING
+  WORKING MODEL! INSTEAD YOU ARE DICKING AROUND WITH FAKE PROBLEMS!"** Lead reading, per
+  the plan's own acceptance standard ("Model self-tests never close a round on their
+  own; the reality gate does"): the checker-perfection blocker was a lead-imposed
+  sequencing inversion. Round X physics passed ALL audit attacks; the two open pass-6
+  defects live in the SELF-CHECK only and touch no published number. DISPOSITION:
+  both recorded as DOCUMENTED RESIDUALS — (a) F1-p6 whole-zone bypass when breaking
+  starts at the march's first step (coverage gap, no false output); (b) F2-p6 raw=25 →
+  included=24 deterministic false starvation firing, journal signature "spanning 25 raw
+  both-breaking step(s) ended with only 24 included" — gate reviews DISCOUNT exactly
+  this signature when triaging INVARIANT_11 firings (recorded BEFORE live data, not
+  after). Checker record-then-score redesign = parked follow-up, non-blocking, built
+  only on operator word. Gate row 3 dispositioned by operator authority: residuals
+  documented, round-close still owed the reality gate (X7 webcam row).
+- **DEPLOY (scripts/deploy-marine.sh, full): marine `9afda8f` live on librewxr;
+  process started 2026-08-06 23:05:42 UTC; /health 200, /manifest 200, auth 401
+  enforced; import surface verified pre-restart.** Train contents (9535e8a → 9afda8f):
+  H-1 instrumentation, M0b/M0c memory cuts, X1-X4 physics + X5 tests + X6 docs,
+  XF1-XF5, Z1 sticky selection, Z2 anchor+reestablish, SW-1b swell-selection fix,
+  SW-2 NOMADS provider, RW-1 model-sourced cards.
+- **Pre-deploy journal baseline (12 h, for the post-deploy class sweep): 748 ERROR
+  (all providers._common.http) / 38,780 WARNING — top classes surf_1d_analytical
+  26,388; transect_handoff 10,530; wind.hrrr 931; swan_formats 654.** Post-deploy
+  sweep compares CLASSES (new logger/level combos + the two residual signatures).
+- **Immediate post-restart health**: honest cold-start refusal ("required input
+  unavailable: ww3_boundary/wind/bathymetry/tide"), run_in_progress false, wind
+  gatherer polled 16 s after start, invariants fired_total=0. Publish-liveness check
+  (health → publishing within one cycle) and first-cycle journal sweep IN PROGRESS;
+  then M-0 four-clean-cycles (ratbert dmesg), H-1 accounting, RAM before/after,
+  X7 reality rows (webcam row on first ≥3 ft/≥12 s swell day).
