@@ -2133,9 +2133,9 @@ API-MANUAL §17 `SpectralWaveComponent`).
 
 Absence of a partition slot in real output is signalled by an exact `HsPT0k ≈ 0`, not the
 documented `-9`/`-999` exception value (SWAN's own `HSPMIN = 0.05` m partition floor gives this a
-wide, safe margin). See `docs/reference/swan-commands-extract.md` for column names, the measured
-absence signal, and the exception-value sentinel (checked belt-and-braces, but never the sole
-signal relied on — real output has never emitted it).
+wide, safe margin). See "Measured deviations of the deployed SWAN binary (41.51AB) from the
+manual" below for column names, the measured absence signal, and the exception-value sentinel
+(checked belt-and-braces, but never the sole signal relied on — real output has never emitted it).
 
 **L3-disabled spots** get the same treatment against L2, bounded by L2's 100 m resolution: ~3
 distinct cells across a 320 m spot. That is the honest ceiling and is better than one — but it is
@@ -2220,6 +2220,99 @@ breakwater/jetty/seawall/groin as of this correction.
 - Swell (Tp ≥ 10s): cfjon = 0.038 (default)
 - Windsea (Tp < 10s): cfjon = 0.067
 - Friction is always enabled in production — frictionless propagation was a development default only.
+
+#### §14.15 Measured deviations of the deployed SWAN binary (41.51AB) from the manual
+
+Findings from testing the actual installed binary against real output, where the manual is
+silent, ambiguous, or (on one point) contradicted by what the binary emits. This section is the
+authorized home for this material — `docs/reference/swan-commands-extract.md` is frozen to
+manual-only content (operator ruling 2026-08-06) and must not carry any of it.
+
+**PT* column count: the manual states "at most 10 partitions"; the deployed 41.51AB binary
+emits 6 columns per keyword, not 10.** Measured 2026-07-25 against a real production
+`TABLE_1.txt` (HB Pier L3, 1273 data rows, run 10:14Z): the real header carries `HsPT01…HsPT06`,
+`TpPT01…TpPT06`, `DrPT01…DrPT06`, `DsPT01…DsPT06`. A row emitted with `TIME XP YP HSIGN HSWELL
+TM01 DIR DEPTH QB DISSURF DSPR PTHSIGN PTRTP PTDIR PTDSPR` has 35 columns, not the 51 that "10
+columns per keyword" predicts. Any output-size or column-offset estimate derived from the
+manual's "at most 10" figure is wrong for this binary — use 6.
+
+**Per-quantity exception value: `PTDIR` uses `-999`; every other PT* quantity uses `-9`.** The
+manual does not document per-quantity exception-value defaults for PT* at all. Verified in the
+SWAN source (`swanmain.ftn:2649+`, `OVEXCV` dispatched on `IVTYPE`: 100→-9, 110→-9, 120→-9,
+**130→-999**, 140→-9, 150→-9, 160→-9). A parser assuming one uniform sentinel across PT* columns
+will misread `PTDIR` points. `QUANTITY PTDIR excv=-9.` may normalise this — unverified, not to
+be relied on without testing.
+
+**Absent partition slots at a wet point carry `0.00000`, not the exception value — not even
+`PTDIR`'s `-999`.** Checked every PT column of all 1273 rows above: zero occurrences of `-9` or
+`-999` anywhere, and 25,288 exactly-zero entries. The exception value applies only where the
+variable is genuinely undefined (dry/masked); an unused partition slot at a wet point is
+legitimately zero energy. **Consequence:** a parser that skips a slot only on the sentinel value
+emits phantom partitions. A version of `services/swan_spectral.py`'s
+`parse_table_pt_partitions()` did exactly this (`if hs is None: continue`, reached only via
+`_is_pt_exception`), which reported 6 partitions per row — 5 of them height 0, period 0,
+direction 0 — where SWAN actually found 1. **Fixed in `12f9ddc`** (T4B.2, operator-approved
+2026-07-25, deployed to librewxr): `parse_table_pt_partitions()` now treats `HsPT0k ≈ 0`
+(tolerance `0.0005`, well below SWAN's own `HSPMIN = 0.05` m partition floor) as the PRIMARY
+absence signal for a slot. The documented `-9`/`-999` exception-value check (`_is_pt_exception`)
+is still applied too, belt-and-braces, for a SWAN build/config that might emit it — but real
+output never has, so it is never the only signal relied on.
+
+**Observed partition counts** (rows with Hs > 0.05, n = 1254, same measurement): 1 partition in
+95.2% of rows, 2 in 4.6%, 3 in 0.2%; slots 4–6 never populated in this dataset. Energy closure
+`sqrt(Σ PTHs²)/Hsig` = 1.0161 mean (range 1.0007–1.0254).
+
+**You cannot request an individual partition index.** The command syntax offers only the
+aggregate keywords (`PTHSIGN`, `PTRTP`, etc.), which expand to the full column block; there is no
+`PT02HS`-style per-partition quantity name. The 41.51AB binary rejects an attempt at one with
+`"Invalid partitioning output specification. Use PTHSIGN instead."`
+
+**Sizing:** TABLE with PT* quantities is what `run_1d_analytical()` (which takes scalar `hs`,
+`tp`, `direction` per partition) actually consumes — it supplies bulk per-partition parameters
+without writing and re-partitioning full 2D spectra. Measured 2026-07-25 at HB: `TABLE_1.txt`
+204 KB vs `SPEC_1.txt` 7.4 MB for the same 18 stations × 73 timesteps.
+
+**`INIT HOTSTART` keyword-less form is accepted identically to the manual's form.**
+`swan_formats.py:1207` emits `INIT HOTSTART 'hotstart.dat'` (no `SINGLE`/`MULTIPLE` keyword).
+Tested directly against the 41.51AB binary: both the keyword-less form and the manual's
+`INIT HOTSTART SINGLE 'hotstart.dat'` parse identically and produce identical results — this
+build accepts the legacy keyword-less form.
+
+**Hotstart failure root cause is a timestamp/scheduling mismatch, not command syntax (measured
+2026-07-25).** `HOTFILE` writes the wave field at the END of the forecast window; a run that
+restarts an overlapping window from its BEGINNING asks SWAN to rewind, which it cannot do.
+Evidence from an L1 hotfile written by a 10:23Z cycle (`20260728.000000` recorded as the file's
+date/time) against the next cycle's `COMPUTE NONST 20260725.060000 10 MIN 20260728.000000` (a
+start 66 hours before the hotfile's state) reproduced SWAN's own PRINT errors: `"start time
+[tbegc] before current time"` then `"start time [tbegc] greater or equal end time [tendc]"` (SWAN
+clamps the start to the hotfile's time, which then equals the end). **Two separate defects
+preceded and enabled this finding, and are already fixed in code:** the hotfile was never loaded
+at all (save used `level1`/`level2`/`level3_<idx>` naming, load used `outer`/`inner` — fixed in
+`a1fa14f`), so SWAN never got the chance to reject a mismatched hotstart before this finding
+surfaced it. **Making hotstart usable under the current overlapping-window run scheduling needs
+an architectural decision (write the hotfile at the next cycle's start time, or chain windows
+forward instead of overlapping, or drop hotstart) — not a code fix, and not decided here.**
+
+**Proven WLEVEL emission pattern** (`swan_formats.py` lines 812-818, `idla=3` convention):
+```
+INPGRID WLEVEL REG {x_sw} {y_sw} 0. {mxc} {myc} {dx} {dy} NONSTAT {t_start} {dt} HR {t_end}
+READINP WLEV 1. 'WLEVEL.txt' 3 0 FREE
+```
+Stationary (quick update, single timestep):
+```
+INPGRID WLEVEL REG {x_sw} {y_sw} 0. {mxc} {myc} {dx} {dy}
+READINP WLEV 1. 'WLEVEL.txt' 3 0 FREE
+```
+`idla=3` (left-to-right, bottom-to-top) matches SWAN's south-to-north internal convention, so
+`WLEVEL.txt` is written south-to-north, west-to-east — row 1 southernmost.
+
+**BOUNDNEST1/NESTOUT filename collision — root cause of the 2026-07-19 forecast failure
+(SWAN-FIXES-PLAN Bug 1).** In a run using both BOUNDNEST1 (reads parent boundary data) and
+NESTOUT (writes child boundary data), the two commands must reference different filenames — if
+they share one, NESTOUT overwrites the parent data BOUNDNEST1 is still reading mid-run, producing
+corrupt output and zero wave energy in the child. The runner's `level{n}/nest_out.dat` →
+`level{n+1}/nest_in.dat` copy-between-subdirs convention (§14.15 above) exists specifically so
+the filenames never collide within one working directory.
 
 #### §14.15 Amendment: geography-aware study-area geometry (target — Marine Geometry-Model Plan G0–G6; ADR-093 Amendment 5 + ADR-100)
 

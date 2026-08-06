@@ -165,9 +165,12 @@ weewx host or weather-dev.
 
 ### SWAN documentation is committed to this repo — NEVER download it
 
-The SWAN user manual is at **`docs/reference/swan-user-manual.pdf`** (v41.45). A curated command
-extract (CURVE / TABLE / SPECOUT / OBSTACLE / HOTSTART / INPGRID / DIFFRACTION / NUMERIC, with
-measured corrections against real output) is at **`docs/reference/swan-commands-extract.md`**.
+The SWAN user manual is at **`docs/reference/swan-user-manual.pdf`** (v41.51). A frozen pure
+manual extract (CURVE / TABLE / SPECOUT / OBSTACLE / HOTSTART / INPGRID / DIFFRACTION / NUMERIC —
+command syntax lookup only, no project usage or measured corrections; operator ruling 2026-08-06,
+may not be amended without direct authorization) is at **`docs/reference/swan-commands-extract.md`**.
+Project SWAN usage and measured deviations of the deployed binary from the manual live in
+`docs/manuals/PROVIDER-MANUAL.md` §14.15, not in the extract.
 
 - To read manual text, extract it **locally**: `pdftotext -layout docs/reference/swan-user-manual.pdf <out.txt>` then grep. `pdftotext` is available in this environment.
 - **Do NOT `WebFetch` / download the SWAN manual, `swanmodel.sourceforge.io`, or any SWAN official

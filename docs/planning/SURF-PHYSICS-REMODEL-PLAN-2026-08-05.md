@@ -285,7 +285,7 @@ operator screenshot check; segment-length scale agreement ≤1%).
 | `docs/decisions/ADR-103-spectral-boundary.md` (NEW) | Y | Three-tier boundary design, conservation contract, degraded-mode flag. |
 | `docs/ARCHITECTURE.md` | Y, X, Z | Marine data-flow: WW3 spectral boundary tiers (Y); breaking model description → statistical Q_b + roller, cap removed (X); transect-selection + stickiness, fine-grid anchor (Z). |
 | `docs/manuals/PROVIDER-MANUAL.md` | Y | `ww3_spectrum` products, tiers, staleness/fallback semantics, `boundary_degraded` health flag. |
-| `docs/reference/swan-commands-extract.md` | Y | The boundary command actually emitted per level, before/after. |
+| ~~`docs/reference/swan-commands-extract.md`~~ | Y | [REMOVED per operator ruling 2026-08-06: file is a frozen pure manual extract, not a governed manual; the live boundary command is documented in ARCHITECTURE.md/PROVIDER-MANUAL.] |
 | `docs/manuals/API-MANUAL.md` | X, Z | §17–18: break-point semantics (Q_b-based onset, one point per bar), whitewater/impact-zone derivation from roller (X); `transectIndex` display contract + stickiness note (Z). |
 | `docs/manuals/DASHBOARD-MANUAL.md` | Z (+ catch-up NOW) | **Catch-up debt from tonight's shipped display fixes (dry-beach 50 ft cap, caption line removed, still-water/waterline text labels removed, foam zones removed, negative x-ticks) — task DOC-0, lands with this plan's first commit**; then Z: transect label + heat-map imagery registration (data-frame-authoritative rule, control-point transform). |
 | `docs/manuals/DESIGN-MANUAL.md` | Z (+ catch-up NOW) | Same catch-up (beach-profile card anatomy); Z: transect label pattern. |
