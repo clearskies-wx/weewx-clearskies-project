@@ -80,8 +80,9 @@ holds the same rulings in summary form.)
   as the real fix. Both are built and running; the four-clean-cycles proof (task M-0) is what
   remains.**
 
-- **D-2 — the order of the work.** Fix stability first (M-0), then add alarms to the places
-  where the model silently gives up (H-1), then fix the breaking-wave physics (Round X), then
+- **D-2 — the order of the work.** Fix stability first (M-0), then add warning log lines at
+  the places where the model silently gives up (H-1), then fix the breaking-wave physics
+  (Round X), then
   fix which part of the beach the site shows (Round Z). Reason: there's no point polishing
   physics on a service that's crashing, and the webcam comparison only proves anything once
   hours aren't being silently corrupted. **Chosen: yes, that order.**
@@ -92,9 +93,10 @@ holds the same rulings in summary form.)
   operator's July 26 ruling; the ask here was only to confirm it still stands. **Chosen:
   confirmed. It stands.**
 
-- **D-4 — approving the alarm work.** Wiring alarms into the silent-failure spots (H-1) was
-  new work not in the original plan, so it needed an explicit yes before being built.
-  **Chosen: approved as written.**
+- **D-4 — approving the logging work.** Writing warning lines into the log at the
+  silent-failure spots (H-1) — they are log entries, not alarms (operator correction
+  2026-08-06) — was new work not in the original plan, so it needed an explicit yes before
+  being built. **Chosen: approved as written.**
 
 - **D-5 — a second, look-alike height cap.** The code has two similar-looking caps on wave
   height. Round X deletes one of them (the one proven to cause wrong results). The other does
@@ -110,9 +112,11 @@ holds the same rulings in summary form.)
 - **D-7 — what to call the chosen beach line on the site.** The old plan wanted a technical
   label for the measurement line the site displays; the operator had already ruled (Aug 2)
   that site visitors won't understand jargon like that. Options were: no label at all, or a
-  plain-language one such as "Surf shown at the sandbar, about 260 ft south of the pier" —
-  explicitly never "Line N of 162". **Chosen: the plain-language label, with the exact
-  wording brought to the operator for approval at the Round Z gate.**
+  plain-language one such as "Surf shown at the sandbar, about 260 ft south of the pier".
+  **RE-RULED 2026-08-06: NO label at all.** The operator killed the label entirely — site
+  visitors don't care where on the beach the measurement comes from. The selection fix
+  ships invisibly, and the Z-gate wording-approval step is dropped. (Supersedes the
+  original "plain-language label" choice.)
 
 ## Task M-0 — service stability (FIRST; per D-1 ruling)
 
@@ -503,9 +507,11 @@ sections that were later struck):**
    than substituting something worse — no backup tiers (D-3); the silent-failure alarm work is
    approved as written (D-4); a second, unrelated wave-height cap stays untouched in Round X
    (D-5); one more file joins Round X's allowed-files list because that's where the work
-   actually lives (D-6); the beach-line label on the site will use plain language, with the
-   exact wording approved at the Round Z gate (D-7). Anything the operator says in chat later
-   overrides this register and gets recorded here.
+   actually lives (D-6); the beach line the site shows gets NO label at all — the operator
+   re-ruled 2026-08-06 that visitors don't care where on the beach the measurement comes
+   from, so the selection fix ships invisibly and no wording approval is needed at the
+   Round Z gate (D-7, re-ruled — originally a plain-language label). Anything the operator
+   says in chat later overrides this register and gets recorded here.
 
 9. **"Figure out why the swells are still wrong" (operator order, with Surfline and
    surf-forecast screenshots).** Two complaints: our published swells don't match what
