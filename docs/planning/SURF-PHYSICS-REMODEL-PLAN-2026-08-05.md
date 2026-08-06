@@ -121,6 +121,51 @@ across 4 consecutive healthy cycles every bulk-fallback hour is accounted for by
 Adversarial brief: "Prove an hour can still collapse to bulk-fallback without the new flag firing;
 force each exit path independently."
 
+## Task SW-1 — swell fidelity + score-card swell text (operator order 2026-08-06, in chat, with screenshots)
+
+**Operator mandate (verbatim anchors):** "figure out why you are still not getting the swell
+correct … their swells and our swells do not match up, yet they both pull from the same source
+that we do to begin with" · "your text surf forecast on the surf score card is wrong, as it is
+not selecting the correct swell at all and it touting the wind swell at 4 seconds."
+
+**Reference numbers pinned at order time (hour ≈ 2026-08-06 03:00–06:00Z / Wed Aug 5 evening
+PDT, Huntington), transcribed from the operator's screenshots BEFORE examining our own output
+(rules/verification.md — pick the comparison before looking):**
+- Surfline (LOTUS + Smart Cam): swells **1.2 ft @ 12 s S 185° · 1.1 ft @ 9 s S 178° ·
+  1.1 ft @ 6 s W 271°**; observed surf **2–3 ft (thigh to waist)**.
+- surf-forecast.com (Wed 8–11 PM cols): Swell 1 **1.5 ft @ 14 s SW**; Swell 2 **0.5–1 ft @
+  11–12 s SSW** (one col 1 ft @ 4 s W); Swell 3 **0.5 ft @ 9 s S**; wind waves 1–1.5 ft @ 5 s W.
+- Our chain, YQ-1's clean-cycle measurement (2026-08-05T22:00Z): handoff partitions
+  **groundswell 0.48 m (1.6 ft) @ 13.4 s + wind_swell 0.22 m (0.7 ft) @ 5.8 s** — TWO
+  partitions where both externals resolve THREE swell trains including a distinct ~9 s
+  mid-period swell.
+
+**SW-1a (read-only investigation):** why don't our published swells match? Compare, for
+matching valid hours: (i) our published deep-water-reference partitions (`multiSwell`, L2 @
+the 15 m contour) vs the pinned externals; (ii) the RAW gfswave station spectra our L1
+boundary actually ingested that cycle (46222/46253/46256 .spec files / their parsed forms) —
+does the ~9 s train exist in our INPUT? If yes, find where it dies (L1→L2 nesting, the DWR
+SPECOUT extraction, or SWAN watershed partitioning at the DWR point — the one leg YQ-1
+explicitly never instrumented is L1→L2→L3 nesting, §Q3(b)); if no, the loss is upstream
+(station selection / spectral ingest). Also compare direction: our groundswell direction vs
+S 178–185°. Deliverable: scratch fact table, file:line + raw numbers, no code changes.
+**SW-1b (defect-site pin):** locate the surf score card's text-forecast swell-selection code
+(repo/file/line), state the rule it implements today, and why it selects the 4–6 s wind swell.
+Note adjacency: EYEBALL-FIX-PLAN S-5 (dominant-partition direction, ruled 2026-08-05,
+scheduled in X's window) — SW-1b's fix likely rides the same window; do not duplicate S-5.
+**SW-1b scope extension (operator, 2026-08-06, follow-up in chat):** the SAME wrong-swell
+selection appears on the CURRENT swell conditions display, and the operator states this "WAS
+CORRECTED ONCE BUT HAS APPARENTLY REGRESSED." SW-1b must therefore also: (i) cover the
+current-conditions swell display's selection path, (ii) find the PRIOR fix in git history
+(likely candidates: the spectral_dwr/spectral channel separation `83f0205`, or a
+dominant-partition selection fix), and (iii) identify which commit regressed it (prime
+suspect window: the Round S surf-scorer rebuild `2ef8191..bdf4db8`, 2026-08-05). A regression
+of a previously-fixed behavior also means a MISSING GUARD — SW-1b names the test that should
+have pinned the fix and did not.
+**Disposition:** findings return to the operator with proposed fix scope and which round
+carries each fix. No fix ships from SW-1 itself. SW-1a's answer may adjust Round X's premise
+set (X consumes the boundary/DWR chain it describes) — surfaced before X dispatch if so.
+
 ## ROUND X — Breaking-energy remodel (statistical breaking, one-sided decay, roller, cap deleted)
 
 ### X-DESIGN (final unless the operator overrules at the X gate)
@@ -405,3 +450,12 @@ premises):**
    OUT of X scope (explicit non-goal); D-6 `endpoints/beach_profile.py` on the X allowlist;
    D-7 plain-language label, exact wording operator-approved at the Z gate. Any chat override
    supersedes and is recorded here.
+
+9. **SW-1 added (operator order 2026-08-06, in chat, with Surfline + surf-forecast
+   screenshots):** "figure out why you are still not getting the swell correct" (published
+   swells don't match Surfline/surf-forecast for the same hour despite the shared NOAA WW3
+   source) + "your text surf forecast on the surf score card … is touting the wind swell at 4
+   seconds" (wrong swell selected). Task SW-1 (above) carries both: SW-1a/SW-1b read-only
+   investigations run immediately alongside M-0/H-1; fixes are scheduled on findings and
+   return to the operator first. Reference numbers pinned in the task section before our own
+   output was examined.
