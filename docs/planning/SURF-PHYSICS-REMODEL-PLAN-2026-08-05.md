@@ -591,14 +591,14 @@ sections that were later struck):**
       REGRESSION and reducing it is in-scope M-0 work: find what is being held that
       doesn't need holding, and stop holding it. M0b (dead spectral fields) was the
       first cut; the hunt continues (MEM-3) until the service fits with wide margin.
-    - **(b) Say "run the tests" to unlock shipping.** Plainly: the memory fix, the swell
-      fix, and the NOAA-files rewrite are all finished — but NONE of it can go to the
-      server yet. Our deploy tool ships everything at once, and "everything" now includes
-      the new wave-breaking math. The plan's own rule (which you approved) says new math
-      does not go live until its checking tests — tests with known right answers — are
-      written and pass. Those tests don't exist yet because you ordered testing paused.
-      One phrase from you — "run the tests" — and they get written and run; when they
-      pass, everything ships.
+    - **(b) RULED 2026-08-06 (operator): "yes, do both, and then finish everything in
+      the plan."** The checking tests (X5) are authorized and dispatched; when they pass
+      and the Round X gate closes, everything ships. The card rewiring (item 13) is
+      authorized to build. Full completion of the plan's remaining rounds (Z2 onward,
+      gates, deploys) is authorized — open items surface only if NEW architectural
+      territory appears. The one standing recommendation not explicitly overruled —
+      item (d), the wave model does NOT sit idle waiting on NOAA — stands as
+      recommended.
     - **(c) RESOLVED 2026-08-06 — the operator was right: NOAA's GRIB files carry all
       the swells.** Live check at Huntington (lead, against NOAA's own file): swells of
       12.4 s, 14.2 s, AND 9.2 s all present, plus the wind chop, all separate. The
