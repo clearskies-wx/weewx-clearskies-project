@@ -659,6 +659,17 @@ sections that were later struck):**
       this can be several consecutive shoreward points, not literally one) — the 1%
       accuracy bar itself is untouched. Without this the alarm would cry wolf every
       cycle on healthy runs.
+    - **(g) Whitewater self-check scoping, part 2 (2026-08-06, audit-remediation F2):**
+      the rebuilt energy-balance self-check (which now cross-checks two independent
+      numerical methods so a wrong coefficient actually trips it — audit finding F2)
+      compares the two methods ONLY on steps where breaking state is the same at both
+      ends of the step. At the exact step where breaking switches on or off, the
+      driving term jumps discontinuously and any two honest methods disagree there by
+      construction — comparing at those regime-boundary steps would cry wolf on
+      perfectly healthy physics, exactly like the water's-edge case in (f). One step
+      per breaking zone is excluded; every interior step remains checked, and a wrong
+      coefficient still trips the alarm on all of them (demonstrated by the dev with a
+      deliberately-wrong coefficient before shipping). The 1% bar is untouched.
 
 13. **ONE source of offshore truth (operator, 2026-08-06, in chat — RULED, supersedes the
     two-feed arrangement).** Operator's words: "EVERYTHING WE NEED IS IN OUR GOD DAMNED
