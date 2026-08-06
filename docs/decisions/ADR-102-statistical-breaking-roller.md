@@ -153,15 +153,30 @@ the previous `Hs <= 0.707 × Hs_break` criterion (`_classify_zones`, `surf_1d_an
 and `_classify_zones_per_break`, `:1561-1691`, both gain an optional `er` parameter; `None` — any
 caller not yet passing it — preserves the legacy 0.707×Hs criterion unchanged). Wired through
 `endpoints/beach_profile.py` (`:731`, `tr.combined_roller_energy_profile` passed as `er=` to both
-`_classify_zones` calls). `reform_trough` is unaffected either way.
+`_classify_zones` calls). `reform_trough`'s START point moves with this change (correction
+2026-08-06, audit finding F3): `reform_trough` derives from `impact_end_idx`, which the E_r
+criterion legitimately relocates relative to the legacy 0.707×Hs criterion (an ~80 m shift was
+reproduced on a synthetic fixture) — an intended consequence of the approved extent change, not
+a defect. The original claim here ("unaffected either way") was false and is corrected.
 
 **Closure invariant — INVARIANT_11 (fire-only, `services/invariants.py:119`,
-`"11:roller_closure_within_one_percent"`):** at every march step, the balance
-`flux_lost (= D_br·ds) = roller_delta (= ΔΦ) + turbulent_loss (= D_r·ds)` is checked against
-itself; the worst (max) per-step relative residual across a march must be `<= 0.01` (1%) — the
-"losing track of energy" alarm the operator's conservation question demands. Wired at both
-production sites: `_ddd_breaking_march` (`:955-962`, per-partition march) and
-`apply_ddd_saturation` (`:1180-1187`, combined-profile march).
+`"11:roller_closure_within_one_percent"`) — REDESIGNED 2026-08-06 (audit finding F2; marine
+`20c2711`):** the original per-step self-check described in this ADR's first version was proven
+tautological by the round's blind audit (it re-derived its answer from its own defining algebra;
+a wrong β_D could never trip it). The shipped form is a PER-ZONE AGGREGATE two-method
+cross-check (`_roller_zone_aggregate_closure_ratio`): within each breaking zone, the
+production forward-Euler energy budget is compared against an independently-accumulated
+semi-implicit trapezoidal budget (the same reference scheme the X-K3 KAT uses); residual
+normalized by total dissipated energy; worst alarm-eligible zone must be `<= 0.01` (1%).
+Scoping (decision-register 11(f)/(g)/(h) + participation floor, all measured-justified):
+water's-edge floored steps excluded; the single regime-transition step at each zone's entry
+AND exit excluded (both-endpoint discontinuity); stiffness-dominated steps excluded
+(`k·ds >= 0.5` as phase speed dies); zones under 25 checked steps are logged per-zone but
+cannot drive the alarm (short aggregates read >1% on healthy physics — measured). Detection
+power demonstrated before shipping: doubled β_D reads 11.8% vs 0.081% clean (~145×).
+Known limitations recorded: near-terminal roller values are locally imprecise by construction
+(stiff regime — harmless, E_r is draining to zero there); short bump-shaped zones (<25 steps)
+are monitored but not alarm-eligible. Wired at both production sites (post-loop, per march).
 
 **Floored-step scoping (decision-register item 11(f), a lead ruling under delegated authority):**
 `D_r = g·β_D·E_r/c` diverges as the floored phase speed `c → 0` at the numerical depth floor
@@ -170,20 +185,27 @@ step is excluded from the closure-invariant accounting when *either* endpoint's 
 speed is at or below its numerical floor: `depth_at_floor = d[i] <= eps or d[i-1] <= eps`,
 `speed_at_floor = c[i] <= eps or c[i-1] <= eps` (`_ddd_breaking_march`, `:942-948`;
 `apply_ddd_saturation`, `:1172-1178`, identical logic). **The 1% threshold itself is untouched by
-this exclusion** — only the single artificial grid point at the water's edge where the approved
-formula divides by a vanishing speed is skipped, so the alarm does not cry wolf every cycle on
-healthy runs.
+this exclusion** — steps whose endpoints sit at the numerical depth/speed floor near the water's
+edge are skipped (wording corrected 2026-08-06 per audit F4: this can be several consecutive
+shoreward points, not literally one), so the alarm does not cry wolf every cycle on healthy runs.
 
 **X-D4. The W1b cap is deleted; INVARIANT_12 replaces it.**
 
 The `min(marched, hs_total[i])` clamp that used to sit at the end of `apply_ddd_saturation`'s
-breaking branch is removed (marine `2bb1cd1`). With X-D2's one-sided dissipation, the Q_b_eff-
-weighted relaxation can only *remove* energy relative to the raw RSS-combined input —
-`marched > hs_total[i]` is now mathematically impossible rather than something a clamp needs to
-enforce. **INVARIANT_12** (fire-only, `services/invariants.py:131`,
-`"12:ddd_march_no_gain_over_raw_input"`) observes, in production, that `marched <= raw + 1 mm`
-everywhere along the march (`no_gain_worst_excess_m` bookkeeping, `apply_ddd_saturation:1089-1150`,
-checked `:1188-1195`) — a property PROVEN by the physics rather than enforced by a clamp. This
+breaking branch is removed (marine `2bb1cd1`). **CORRECTION 2026-08-06 (audit finding F1; marine
+`20c2711`):** this ADR's original claim — that with one-sided dissipation `marched > hs_total[i]`
+is "mathematically impossible" — was DISPROVEN by the round's blind audit: once the state machine
+enters BREAKING it stops reading the raw input, so a mid-breaking downward step in raw (e.g. a
+structure-affected transect where an obstacle absorbs energy) left the marched value up to
+~600 mm above raw. The shipped remedy: the BREAKING branch bounds the PUBLISHED value by the raw
+input at each step (`marched = min(marched, hs_total[i])` post-relaxation, pre-publish) — the
+design's own stated no-gain property enforced where the input itself drops, while the internal
+relaxation trajectory and the roller's dissipation source remain uncapped (X-D3 contract
+preserved). This differs from the deleted W1b cap in scope and role: the old cap silently
+masked two-sided relaxation defects; the new bound never engages except when the input's own
+energy ceiling falls below the decaying trajectory. **INVARIANT_12** (fire-only,
+`services/invariants.py:131`, `"12:ddd_march_no_gain_over_raw_input"`) still observes
+`marched <= raw + 1 mm` in production as the independent alarm on the same property. This
 closes DQ-W3. `_ddd_breaking_march` (the per-partition march) has no raw-input reference to compare
 against and does not carry INVARIANT_12 — only `apply_ddd_saturation` does, by construction (the
 only function with both a raw and a marched value in hand).
