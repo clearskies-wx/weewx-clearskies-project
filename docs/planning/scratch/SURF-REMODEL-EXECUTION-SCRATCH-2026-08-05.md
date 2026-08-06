@@ -548,3 +548,27 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
 - Remaining: X-AUDIT (in flight, deploy gate) → deploy train → live gates → Z3/Z3b build
   (fork-gated)/Z5 docs/Z6 audit/Z7 gate. Operator forks open: non-surf locations;
   Z-D4 path (i)/(ii)/(iii).
+
+### 2026-08-06 — X GATE ROW 3: blind audit REPORTED 2 HIGH / 1 MED / 1 LOW — deploy HELD; XF remediation dispatched
+- **Audit verdicts**: claims 1 (Q_b solve), 5 (cap deletion literal), 6 (reform floor),
+  7 (constants), legacy-path — COULD NOT DISPROVE (attack list on record). Claims 2, 3,
+  4(part) — DISPROVEN with reproductions.
+- **F1 HIGH (accepted, fix ruled)**: apply_ddd_saturation ignores raw during BREAKING →
+  mid-breaking raw drop leaves marched 603mm above raw (repro: monotonic depths, raw
+  1.3→0.05 @ idx164). Violates X-D4's own stated ≤raw+1mm property. Ruled: code-vs-own-
+  contract defect; fix = in-march min(marched_i, raw_i) during non-passthrough states
+  (binds only when raw drops below the decaying trajectory — production case:
+  structure-affected transects). NOT the old W1b post-hoc cap.
+- **F2 HIGH (accepted, fix ruled)**: INVARIANT_11 closure = algebraic tautology (20k
+  fuzz + derivation; can't catch wrong β_D or swapped terms; gate Row 2 vacuous).
+  Ruled: second, trapezoid-discretized accumulation in-loop; residual = mismatch between
+  discretizations (same equation, second arithmetic = methodology); threshold/exclusion
+  unchanged; dev must demonstrate wrong-β detection.
+- **F3 MED (accepted as intended behavior + false docstring)**: er-criterion legitimately
+  moves impact_end, which reform_trough derives from (80m shift live in served
+  reformTrough). Behavior = approved-design consequence, stays; docstring corrected;
+  webcam reality-gate row will visually validate extents anyway.
+- **F4 LOW**: register 11(f) wording corrected ("single grid point" → floored-step
+  scoping, possibly several points).
+- XF-dev dispatched (surf_1d_analytical + invariants + 1 regression-test file; KAT
+  conflict = STOP). RE-AUDIT of remediations required before deploy (gate rule).

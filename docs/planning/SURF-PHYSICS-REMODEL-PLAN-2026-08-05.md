@@ -654,9 +654,11 @@ sections that were later struck):**
       *(Covered by ruling 12 below — the service decides what it serves; stands unless
       specifically overruled.)*
     - **(f) Whitewater self-check scoping (Round X):** the energy-balance self-check
-      skips the single artificial grid point at the water's edge where the approved
-      formula divides by a vanishing speed — the 1% accuracy bar itself is untouched.
-      Without this the alarm would cry wolf every cycle on healthy runs.
+      skips any march step whose endpoints sit at the numerical depth or wave-speed
+      floor near the water's edge (wording corrected 2026-08-06 per audit finding F4 —
+      this can be several consecutive shoreward points, not literally one) — the 1%
+      accuracy bar itself is untouched. Without this the alarm would cry wolf every
+      cycle on healthy runs.
 
 13. **ONE source of offshore truth (operator, 2026-08-06, in chat — RULED, supersedes the
     two-feed arrangement).** Operator's words: "EVERYTHING WE NEED IS IN OUR GOD DAMNED
