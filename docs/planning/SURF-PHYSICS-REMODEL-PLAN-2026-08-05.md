@@ -662,21 +662,21 @@ sections that were later struck):**
     - **(g) Whitewater self-check scoping, part 2 (2026-08-06, audit-remediation F2):**
       the rebuilt energy-balance self-check (which now cross-checks two independent
       numerical methods so a wrong coefficient actually trips it — audit finding F2)
-      compares the two methods ONLY on steps where breaking state is the same at both
-      ends of the step AND the breaking-dissipation forcing has settled (updated
-      2026-08-06, third F2 stop: the switch-on jump is followed by a decaying transient
-      over the next few steps as the dissipation relaxes toward its running value, and
-      any two honest methods disagree through that whole settling tail, not just at the
-      single transition step). The criterion is ratio-based — a step is excluded while
-      the forcing's relative step-to-step change exceeds a fixed round fraction — so it
-      adapts to grid spacing and wave period instead of hardcoding a step count, and it
-      naturally covers the transition step itself. The dev picks the round fraction that
-      cleanly separates (excluded steps = the visible transient tail; included worst
-      comfortably under half the 1% bar), reports the measured margin AND the fraction
-      of breaking-zone steps still checked (sanity: the large majority), and STOPS if
-      no round value separates. A wrong coefficient must still trip the alarm decisively
-      on the checked steps (demonstrated with a deliberately-wrong coefficient before
-      shipping). The 1% bar is untouched.
+      compares the two methods PER BREAKING ZONE IN AGGREGATE, not step-by-step
+      (final form, 2026-08-06, after a fourth measured stop). History, recorded
+      honestly: the per-step comparison failed four ways in sequence — the switch-on
+      step (excluded), its multi-step settling tail (a ratio-based exclusion was tried
+      and WITHDRAWN: measured relative forcing change falls under 10% one step after
+      onset while the residual stays over 1% for several more, so the ratio tracks
+      nothing useful), and the stiff shoreline tail (excluded, (h)). The offline
+      known-answer test had already proven the AGGREGATE form of the same two-method
+      comparison agrees within 1% on these exact fixtures — so the production check
+      now uses that proven form: both methods' energy budgets are accumulated across
+      each breaking zone (skipping only the water's-edge floor (f), the stiff terminal
+      (h), and the single switch-on step), and the alarm compares the totals. One
+      diluted transient step cannot fake a wrong coefficient, and a wrong coefficient
+      shifts EVERY step so the aggregate trips decisively (demonstrated with a
+      deliberately-wrong coefficient before shipping). The 1% bar is untouched.
     - **(h) Whitewater self-check scoping, part 3 (2026-08-06, second F2 stop):** in the
       last few steps before the shoreline the whitewater drain term grows without bound
       as wave speed dies (a "stiff" equation, in numerical-methods terms), so the
