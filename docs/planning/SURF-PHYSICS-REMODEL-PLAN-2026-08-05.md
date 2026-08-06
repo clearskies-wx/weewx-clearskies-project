@@ -583,12 +583,14 @@ sections that were later struck):**
     standing lead-call now lives HERE, updated as they open and close).**
 
     **OPEN QUESTIONS — nothing ships on these without your word:**
-    - **(a) Memory unblock for the crashing container (work-stopper for M-0/H-1):** the
-      6 GB container cannot hold the service (~3.1 GB mid-cycle), the radar program
-      (~2 GB), and the model's RAM-disk scratch files at once. The dead-weight code fix
-      is done (M0b) but can't deploy yet — see (b). Quick options needing your word:
-      raise the container's memory cap, and/or evict/cap the radar program, and/or move
-      the model's scratch files to real disk.
+    - **(a) RULED 2026-08-06 (operator): NO infrastructure change.** "It was always
+      working fine before... That is not my problem that is your problem. It is apparent
+      you are holding information that does not have to be held in memory... There is no
+      reason you should be even anywhere NEAR the 6GB cap even with the radar piece."
+      The cap stays, the radar stays; the marine service's memory footprint is a
+      REGRESSION and reducing it is in-scope M-0 work: find what is being held that
+      doesn't need holding, and stop holding it. M0b (dead spectral fields) was the
+      first cut; the hunt continues (MEM-3) until the service fits with wide margin.
     - **(b) X5 go-ahead (the deploy bottleneck for EVERYTHING):** the deploy script ships
       the whole main branch, and main now carries the new Round X physics, which the plan
       bars from deploying without its known-answer tests (X5) and gate (X7). You ordered
