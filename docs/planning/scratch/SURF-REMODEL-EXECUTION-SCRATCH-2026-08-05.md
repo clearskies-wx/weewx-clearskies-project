@@ -268,3 +268,24 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
 - Proposed rule additions NOT yet written (awaiting operator word): (1) plan claims carry
   file:line at a named commit verified at drafting; (2) coordinator reads (not greps)
   ARCHITECTURE's relevant section at dispatch.
+
+### 2026-08-06 ~05:40Z — operator order: code first, testing backed off; three agents in flight
+- **Operator order**: "back off testing and get the shit coded" → X5 (KAT/test round) DEFERRED;
+  still required before X's DEPLOY gate per plan (sequence now: all code first, X5 last
+  before deploy). Interpreted as GO for SW-1b (restores previously-approved behavior).
+- **SW-1b re-scoped to MARINE repo (dev caught lead's brief error, good stop)**: surf_scorer.py
+  moved api→marine in Marine Service Separation (api commit 9df764c deleted it); the defect
+  (`score_surf()`/`_select_reference_point()` ref_point bulk TM01/MWD) lives at
+  marine `enrichment/surf_scorer.py` + `endpoints/surf.py`. Authorized: marine @ 2bb1cd1,
+  allowlist surf_scorer.py + surf.py (if threading requires) + one pinning-test file;
+  Round X files + swan.py explicitly out of scope. api repo's marine_enrichment.py = pure
+  template fill, nothing to restore there. "sw1b-selection-regression" agent name = stale
+  pre-compact residue, ruled not a real teammate.
+- **SW-2 dispatched in parallel** (api repo @ 62ee7b2 now free): NOMADS gfswave GRIB2 via
+  filter_gfswave.pl + eccodes; ERDDAP deleted outright; ruling-10 wait-and-poll (NO older-
+  cycle step-back; poll constant ~10 min gate-reviewed); LEAD RULING flagged to operator:
+  cold-start bootstrap = fetch newest PUBLISHED cycle (nothing substituted; steady-state
+  rules apply after). Call-site except narrowing (trap 3), level-aware grib keying (trap 2),
+  minimal targeted tests only.
+- **Z0 fact-pin agent in flight** (read-only, marine repo): selection/anchoring/teardown pins
+  → Z code dispatches from its output.
