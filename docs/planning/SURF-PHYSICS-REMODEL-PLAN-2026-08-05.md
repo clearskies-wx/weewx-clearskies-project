@@ -1,9 +1,10 @@
 # SURF PHYSICS REMODEL PLAN — 2026-08-05, REWRITTEN 2026-08-06
 
-**STATUS: DRAFT — AWAITING OPERATOR APPROVAL OF THIS REWRITE. The 2026-08-05 approval is VOID**
-(operator, 2026-08-06, in chat: the original's Round Y premise was proven fatally stale and the
-operator placed the whole plan in doubt). This file was REWRITTEN IN PLACE on operator order
-("ONE PLAN! ONE PLAN ONLY!") — there is no other plan document. Every factual claim below either
+**STATUS: APPROVED — operator, 2026-08-06, in chat ("ok approved"), superseding the voided
+2026-08-05 approval of the pre-rewrite text.** D-1 through D-7 are adopted as the lead
+recommendations stated in each item (per the same approval; the operator may override any D-item
+in chat at any time — an override lands in the decision register). This file was REWRITTEN IN
+PLACE on operator order ("ONE PLAN! ONE PLAN ONLY!") — there is no other plan document. Every factual claim below either
 survived independent re-verification against the code at marine `d74c578` and live librewxr data,
 or is marked as an open DECIDE item. Audit evidence (per-claim verdicts, commands attached):
 `scratch/Y0-FACT-PIN-2026-08-05.md`, `scratch/YQ-1-ENERGY-DEFICIT-2026-08-05.md`,
@@ -398,4 +399,9 @@ premises):**
    amended without direct operator authorization; may never contain non-manual language; project
    SWAN usage lives only in the authorized manuals (executed: `caf49e8`).
 
-**Awaiting ruling: D-1 through D-7 above.** Each joins this register when ruled.
+8. **D-1..D-7 ruled (operator approval 2026-08-06, "ok approved"): the lead recommendations in
+   each DECIDE item are adopted as written** — D-1 = (a) now + (b) as the ruled fix; D-2 order
+   M-0 → H-1 → X → Z; D-3 refuse stands, no tiers; D-4 H-1 approved as scoped; D-5 second cap
+   OUT of X scope (explicit non-goal); D-6 `endpoints/beach_profile.py` on the X allowlist;
+   D-7 plain-language label, exact wording operator-approved at the Z gate. Any chat override
+   supersedes and is recorded here.
