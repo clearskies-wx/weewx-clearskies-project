@@ -572,3 +572,17 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
   scoping, possibly several points).
 - XF-dev dispatched (surf_1d_analytical + invariants + 1 regression-test file; KAT
   conflict = STOP). RE-AUDIT of remediations required before deploy (gate rule).
+
+### 2026-08-06 — XF ACCEPTED (20c2711, pushed); ADR-102 corrected; RE-AUDIT dispatched
+- **XF ACCEPTED**: 3 files exactly; lead re-run **51 passed** (45 controls unmodified incl.
+  the originally-failing no-growth control now green UNMODIFIED + 6 new remediation tests).
+  F1: published-value bound in BREAKING branch (min(marched, raw) post-relax; roller D_br
+  still uncapped — X3 contract intact). F2 final: per-zone aggregate two-method cross-check
+  (11(f)+11(g) entry/exit transition steps+11(h) kds≥0.5+25-step participation floor);
+  clean 0.028-0.081%, wrong-β 11.8% (~145×), coverage 85-95%. Known limitations recorded
+  (short bump zones logged-not-alarmed; near-terminal imprecision). F2 took FIVE
+  stop-and-report rounds — every mechanism change ruled by lead, all numbers in register.
+- **ADR-102 corrected** (meta): F3 reform_trough consequence, F2 redesign section, F1
+  impossibility-claim correction + bound description, F4 wording. Doc-code sync intact.
+- **RE-AUDIT dispatched**: x-audit re-verifies F1/F2 against its own reproductions + fresh
+  adversarial pass on the new aggregate check. Deploy train fires on its clean verdict.
