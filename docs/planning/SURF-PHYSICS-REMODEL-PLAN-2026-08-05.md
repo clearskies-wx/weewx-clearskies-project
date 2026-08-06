@@ -188,6 +188,27 @@ have pinned the fix and did not.
 carries each fix. No fix ships from SW-1 itself. SW-1a's answer may adjust Round X's premise
 set (X consumes the boundary/DWR chain it describes) — surfaced before X dispatch if so.
 
+## Task SW-2 — forecast-card wave data from NOAA's raw files (operator ruling, register item 10)
+
+*(Added to the plan 2026-08-06 when the operator ruled it in chat; the full ruling text lives
+in decision-register item 10. This section exists so the task is findable in the task list,
+not only inside the register.)*
+
+**What it is, plainly:** the provider that fills the marine forecast cards was found reading a
+third-party convenience feed (University of Hawaii's ERDDAP republication) that carries only
+blended summary numbers. The operator ruled: wave-forecast data comes from NOAA's own raw
+wave-model files (GRIB format, from NOAA's NOMADS server), parsed by us, including NOAA's
+separate swell-1/2/3 breakdown; the third-party feed is deleted outright; no fallback sources
+ever; when NOAA's newest run isn't posted yet, wait and check back — never reprocess an older
+run (the forecast already on the site stays up while waiting).
+
+**Status: CODE COMPLETE 2026-08-06** — marine repo commit `b924c90` (provider rewritten to
+NOMADS GRIB2, ERDDAP deleted, swell-1/2/3 fields added, wait-and-poll cycle discipline,
+refuse-on-failure at the endpoints; 14 targeted tests; PROVIDER-MANUAL §14.3 updated in the
+same window). Deploys with the post-gate deploy train. Follow-ups tracked in the execution
+scratch: dashboard rendering of the new swell-2/3 fields; a missing-value sentinel fix in the
+shared GRIB helper for other callers.
+
 ## ROUND X — Breaking-energy remodel (statistical breaking, one-sided decay, roller, cap deleted)
 
 ### X-DESIGN (final unless the operator overrules at the X gate)
