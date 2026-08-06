@@ -289,3 +289,28 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
   minimal targeted tests only.
 - **Z0 fact-pin agent in flight** (read-only, marine repo): selection/anchoring/teardown pins
   → Z code dispatches from its output.
+
+### 2026-08-06 ~06:05Z — M-0 GATE RESET: OOM kill at 05:00:43Z — WORK-STOPPER surfaced
+
+- **Kill evidence**: guest journal 05:00:43Z "killed by the OOM killer"; systemd: marine
+  consumed 3h23min CPU, **3.5G memory peak, 2.8G swap peak** (the 03:21:56Z process — cycle 1
+  + start of cycle 2). Host dmesg (ratbert, ~04:59Z UTC): CONSTRAINT_MEMCG,
+  oom_memcg=/lxc.payload.librewxr, victim task=weewx-clearskie **anon-rss:2671208kB (2.67G)**;
+  the FAULTING allocation came from a docker cpuset (radar container) — radar allocated,
+  container hit the 6G cap, kernel killed marine as biggest task. Service auto-restarted
+  05:00:48Z (restart counter 1), now healthy at 935M.
+- **Why D-1b didn't prevent it (D-1b still correct/working)**: startup load is fixed (fresh
+  process ~200-935M vs 1.4G before; cache file 17M). But steady-state arithmetic still
+  exceeds the 6G container cap: marine mid-cycle working set ~2.7-3.5G + **/run tmpfs 3.5G
+  (RAM-charged; ~2.5G of it = the surfaced-but-unauthorized hotstart duplication)** + radar
+  docker ~2G. Swap absorbed cycle 1 (2.8G swap peak); cycle 2 + radar allocation tipped it.
+- **Verdict**: M-0's 4-consecutive-clean-cycles criterion is NOT reliably reachable by
+  pre-authorized changes alone. Remaining levers all need operator word: (1) hotstart tmpfs
+  duplication fix (~2.5G, marine code); (2) move SWAN work dir off tmpfs to disk (config/
+  lifecycle change, trigger 5/7); (3) raise container cap (infra); (4) radar cohabitation
+  (outside project). LEAD REC: (1), optionally +(2). Gate clock resets; cycles continue
+  meanwhile (service healthy, kills counted from process start 05:00:48Z if/when a fix is
+  ruled).
+- Per the two-named-excuses rule: NOT proceeding on any of these without explicit operator
+  approval — surfaced with evidence instead. Coding tracks (SW-1b, SW-2 read-phase, Z0)
+  unaffected and running.
