@@ -619,3 +619,43 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
   duplicate WARNINGs possible in consecutive-exclusion runs (log-volume, not masking).
 - Marine main: ...cd28fe2 → be5583a (pushed). Audit pass 4 (final) IN FLIGHT → gate row 3
   verdict → deploy train.
+
+### 2026-08-06 — AUDIT PASS 4 REPORTED (1 HIGH); XF4 dispatched+ACCEPTED (2549011, pushed); session died on API error mid-close; resumed
+- **Pass 4 closeout (x-audit, at be5583a)**: reference-side sweep VERIFIED fixed (fires
+  0.05–1.0, no collapse). **NEW HIGH**: the XF3 fix RELOCATED the window-collapse hole to
+  the PRODUCTION constant — `_ROLLER_BETA_D` ≥0.20 collapses every comparison window
+  (0 comparisons, fired_total=0) while corrupting real published E_r; worst possible
+  placement. Also: the ≥25-raw-step collapse WARNING was bare logging, NOT in the
+  invariant registry (journal-only visibility — doesn't move /health or gate row 2).
+  E_r 57%-vs-82% FULLY RECONCILED: different fixtures (auditor ds≈1.5075 via
+  linspace(300,0,200) → 82.0%; dev ds=1.0 via linspace(199,0,200) → 57.2%); same formula,
+  both honest; the shipped docstring's "auditor's own fixture" attribution was wrong.
+  Verdict: cannot close row 3 — root cause = one coefficient doing two jobs (physics
+  measured + measurement eligibility); recommends a window criterion co-varying with
+  NEITHER beta. Duplicate-WARNING quirk confirmed log-volume-only.
+- **XF4 dispatched + delivered (2549011)**: (1) window-only third constant
+  `_ROLLER_KDS_WINDOW_BETA_NOMINAL = 0.10` (:804) — window expression (:1114) reads ONLY
+  it; three-named-site cross-referenced comments (legit physics change = 3-site edit,
+  register-2-gated). (2) Starvation → alarm: aggregate returns
+  (worst_ratio, short_zone_alarm, comparison_starved); INVARIANT_11 fires on starvation
+  (:1485-1495) — no silent path: big edits either diverge (trips) or starve the
+  measurement (trips). Dedup via zone_open/window_closed split — one WARNING per physical
+  zone, final raw-step count (dev's first attempt broke starvation detection; caught by
+  its own test, fixed pre-commit). (3) E_r docstring rewritten: both constructions cited
+  with correct attribution + exact ds; "could not reproduce" claim removed.
+- **XF4 ACCEPTED (this session, resuming after the prior session died 10:30Z on an API
+  connection error just after pushing 2549011)**: lead re-run from fresh shell
+  **66 passed in 0.46s** (same 10-file sweep) at 2549011; `git show --name-only` = exactly
+  the 3 allowlist files; spot-open verified :804/:1114/:1485-1495 as above. Dev sweep
+  numbers on record: production-side 0.20/0.50/1.0 → worst_ratio 0.118/0.146/0.149 all
+  fired; reference-side unchanged from XF3 (0.15–1.0 all fired); baseline 0.0008 not
+  fired; three-site consistent edit does not fire (stated residual).
+- **Dev process flag, recorded**: four re-audits in one day on the same ~80-line function;
+  dev suggests a deliberate design pass over further incremental patching if a fifth
+  finding appears. Noted for the pass-5 verdict.
+- **Audit pass 5 (final verification) DISPATCHED** (fresh blind auditor — prior x-audit
+  agent unreachable across the session boundary): verify at 2549011 that NO silent path
+  remains — one-site sweeps on EACH of the three constants (production, reference, window
+  nominal) must trip INVARIANT_11 via divergence OR starvation; starvation reaches the
+  registry (not bare logging); one WARNING per physical zone; E_r attribution accurate.
+  Clean verdict closes gate row 3 → deploy train.
