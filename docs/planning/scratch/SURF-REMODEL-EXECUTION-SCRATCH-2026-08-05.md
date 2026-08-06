@@ -604,3 +604,18 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
 - **Audit third pass dispatched** (narrow): re-run both masking attacks vs cd28fe2, verify F5,
   reconcile divergence figure, verdict on gate row 3. Marine main: ...20c2711 → 93096c1 →
   cd28fe2 (pushed).
+
+### 2026-08-06 — XF3 ACCEPTED (be5583a, pushed); audit FOURTH (final) pass dispatched
+- **XF3 ACCEPTED**: 3 allowlist files; lead re-run **61 passed**. Role split: k·ds window
+  reads production _ROLLER_BETA_D (semantically correct — 11(h) describes production's
+  integrator); reference constant physics-only. Reference-side one-site sweep now fires
+  across 0.15-1.0 (worst_ratio 0.08-0.15; crossover 0.10-0.15); production-side still
+  fires; two-site consistent edit = stated residual (register-2-gated). No-silent-zones:
+  per-zone line always emitted (comparison=SKIPPED at zero included) + WARNING on ≥25-raw-
+  step collapse. E_r comment now states exact formula/index/counterfactual; 57.2% vs
+  auditor 82% traced to 5× differing Er_ref (105.29 vs 22.45) — constructions differ from
+  descriptions somewhere; fourth pass reconciles once, no further iteration (both figures
+  documented). Known minor quirk flagged: _finalize_zone fires per-excluded-step →
+  duplicate WARNINGs possible in consecutive-exclusion runs (log-volume, not masking).
+- Marine main: ...cd28fe2 → be5583a (pushed). Audit pass 4 (final) IN FLIGHT → gate row 3
+  verdict → deploy train.
