@@ -688,6 +688,16 @@ sections that were later struck):**
       an order of magnitude each way; the re-audit's demonstrated hiding spot (a
       screaming 99.8% divergence in a 2-step zone, invisible under the old floor) now
       alarms.
+      **Third-pass fix (2026-08-06):** the audit's third pass proved the first version of
+      the dual-constant fix was ASYMMETRIC — the reference copy of the coefficient was
+      also (wrongly) used to decide where the comparison windows close, so a large edit
+      to the reference copy alone collapsed the windows and read as a perfect score with
+      no comparison ever made. Fixed by giving each constant exactly one job: the window
+      placement follows the PRODUCTION constant (correct anyway — the window describes
+      the production integrator's own stiffness), the reference constant is physics-only,
+      and every zone now logs its line even when fully excluded, so "no comparison
+      happened" can never masquerade as "clean". After the fix a large one-site edit to
+      EITHER copy trips the alarm (audit-verified across the sweep).
       **Participation floor (2026-08-06, closing addendum):** a zone's aggregate drives
       the alarm only when it spans at least 25 checked steps — an aggregate over fewer
       steps, squeezed between its two transient ends, cannot statistically resolve a 1%
