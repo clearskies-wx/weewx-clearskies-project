@@ -381,3 +381,22 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
 - Marine main now: 2bb1cd1 → 8bb268a (sw1b) → 181a221 (m0b), all pushed. Deploy still
   gated: X5 KATs + X7 required before ANY deploy (main carries unvetted X physics; deploy
   script ships main HEAD only). Operator word on X5 still open.
+
+### 2026-08-06 ~09:50Z — SW-2 ACCEPTED (b924c90, pushed); PROVIDER-MANUAL §14.3 landed
+- **SW-2 ACCEPTED**: commit `b924c90` = 8 files, all within ruled scope (4 source incl.
+  responses.py per field-scheme ruling, 3 test files, 1 real NOMADS GRIB fixture). Lead
+  re-run in .venv-round4: **14 passed**. ERDDAP: 7 grep hits all historical prose, zero
+  live code path. Dev's fail-pre-change check on the refusal tests (stash → 2 failed →
+  pop → pass) on record. Live-verified surprises: typeOfLevel=surface reports level=1
+  (keying gates on orderedSequenceData, not level==0); gfswave missingValue=9999 real.
+- **Doc-code sync landed** (meta repo): PROVIDER-MANUAL §14.3 replaced with the NOMADS/
+  GRIB text (dev-drafted, lead-applied); §14.3a stale "NOMADS, not ERDDAP" contrast
+  clause updated to product-level contrast.
+- **NEW FOLLOW-UPS (backlog, not actioned)**: (1) grib_processor.py generic
+  extract_nearest_value/bilinear_interpolate hardcode 9.999e20 missing-value sentinel —
+  WRONG for gfswave's 9999; risk for other/future callers of the generic helpers (SW-2's
+  own module self-guards). Candidate small fix task. (2) Dashboard does not yet render
+  swell2*/swell3* fields (additive, populated, invisible) — dashboard-repo task.
+- Marine main: 2bb1cd1 → 8bb268a → 181a221 → b924c90, all pushed. Deploy still gated on
+  X5+X7 (operator word open). Next in marine repo: Z1 (brief from Z0 fact-pin + plan
+  Round Z section).
