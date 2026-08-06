@@ -513,3 +513,24 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
   consumer notes).
 - Remaining in flight: X5 (gate tests), Z2 (anchor + reestablish). Then X7 gate → deploy
   train → M-0/H-1 live gates → Z tail (Z3/Z3b/Z4/Z5/Z6/Z7).
+
+### 2026-08-06 — Z2 + X5 ACCEPTED (a001d57, c49ca47+24ef58e — all pushed); X gate rows 1-2 done
+- **Z2 ACCEPTED**: exactly 4 files, +1093/0; lead re-run 12 passed (their 6 + 2 control
+  files); fine-preferred anchor write verified in code at :2031+ with the ordering
+  rationale in-comment; consumer table on record (L2/L3/study-area unchanged by ordering
+  necessity; profile extraction + L4 now FINE-preferred — ruling-6 pre-authorized).
+  reestablish_spot: full inventory implemented (PROFILE-hash via documented bbox-containment
+  proxy; _clear_stale_swan_run_state not spot-scoped — flagged; rebuild via real
+  run_grid_sizing_chain, F1 cold-start self-arms). Live numbers (2.822→≤0.5m, 15m median)
+  = Z7 gate rows. PARKED finding: `_perpendicular_bearing` vs `shoreline_normal_bearing`
+  fallback resolve OPPOSITE conventions for a N-S segment (pre-existing, latent-bug
+  candidate). Z5 docs still open (Z2 correctly didn't cover).
+- **X5 ACCEPTED**: lead re-run **103 passed** across the full 15-file sweep. X-K1..K4 +
+  state-machine units landed; every Table 2 disposition executed and justified; X-K2
+  fail-pre-change transcript on record (pre-change: 1 break @36.84m; post: bar break
+  @79.74m + shorebreak @28.26m + reform dip); honest non-falsifiable-pin declarations
+  (X-K1 dead-code-revival; 2 X-K4 sub-tests true under old physics too) per
+  verification.md. w5 deleted 2 cap-pinning tests (X-D4-named). c49ca47 commit MESSAGE
+  mislabeled (content verified correct; noted in 24ef58e).
+- X gate rows 1 (scope) + 2 (guards/KATs re-run) COMPLETE. Row 3 blind adversarial audit
+  DISPATCHED. Rows 5-6 (deploy discipline + reality) follow the audit.
