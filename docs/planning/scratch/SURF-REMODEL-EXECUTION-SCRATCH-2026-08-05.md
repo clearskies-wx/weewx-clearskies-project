@@ -499,3 +499,17 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
 - X5 fixture delivered by lead (real transect-55, 261 pts, live-pulled read-only,
   LMSL/hat_m metadata included) at tests/fixtures/transect55_profile_huntington.json —
   X5 stages it. In flight: X5, Z2, RW-0.
+
+### 2026-08-06 — RW-1 ACCEPTED (marine ce411f2 + meta docs be3759a, both pushed)
+- Surf-spot marine cards now source ALL wave fields from the model's own cached DWR
+  watershed partitions (same data the surf page's multiSwell already reads) via new
+  services/model_wave_source.py; bulk fields via imported production
+  _bulk_params_from_components (no second formula). Wind-sea selected by is_wind_sea
+  flag, never by position (SW-1b error class avoided — lead-verified in code :121-122).
+  Non-surf locations untouched (fork open, register 11). wavewatch.py NOT deleted
+  (gated on fork). source string honest per branch ("swan-model+ndbc+nws_marine").
+  Lead re-run: 9/9 (7 new + refusal control). Doc-code sync landed same window
+  (API-MANUAL field table incl. previously-undocumented swell2/3 rows; PROVIDER-MANUAL
+  consumer notes).
+- Remaining in flight: X5 (gate tests), Z2 (anchor + reestablish). Then X7 gate → deploy
+  train → M-0/H-1 live gates → Z tail (Z3/Z3b/Z4/Z5/Z6/Z7).
