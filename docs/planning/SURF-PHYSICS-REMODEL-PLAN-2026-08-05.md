@@ -8,6 +8,14 @@ plan still stops and surfaces. Nothing else waits on the operator except the QC/
 (Process note, on record: an execution false-start before approval occurred earlier on
 2026-08-05 — two agents dispatched and stopped on operator order; no files or commits resulted.)
 
+**[SUPERSEDED IN DOUBT — 2026-08-06.** Premise audits found Round Y's root cause (#2) fatally
+stale: its named collapse site was deleted 2026-07-26, ten days before drafting, contradicting
+ARCHITECTURE.md. The operator has placed this plan's approval in doubt. Execution is HALTED.
+The corrected plan is `SURF-PHYSICS-REMODEL-PLAN-REV2-DRAFT-2026-08-06.md` (DRAFT, awaiting
+operator approval). Verified/stale verdicts per claim: `scratch/Y0-FACT-PIN-2026-08-05.md`,
+`scratch/YQ-1-ENERGY-DEFICIT-2026-08-05.md`, `scratch/X0-FACT-PIN-2026-08-05.md`,
+`scratch/Z-PREMISE-AUDIT-2026-08-06.md`.**]
+
 **Operator mandate (2026-08-05, in chat, verbatim anchors):** "yes you need to remodel the energy
 correctly" · "It is not showing breaks where breaks are occurring… nature is right, you are not…
 it is most definitely a physics issue" · "make sure we are picking a transect that has identified
