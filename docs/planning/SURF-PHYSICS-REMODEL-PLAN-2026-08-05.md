@@ -415,65 +415,93 @@ above plus rows 4–6; a round that skips a row is not closed):**
 
 ## Decision register
 
-**Carried verbatim from the 2026-08-05 approval (operator rulings, independent of the struck
-premises):**
-1. **Z-D1 = option (a)** (quality-scored sticky selection) as the DEFAULT, **plus a next-phase
-   operator override**: a per-spot "sampling marker" the operator can pin at a specific location
-   (e.g., HB: expert surfers' spot ~100 yards south of the pier) that overrides the algorithm and
-   forces the displayed/sample transect. NOT built in this plan — first item of the next phase;
-   Z-D1's implementation must not preclude it (selection function takes an optional override
-   index so the marker becomes a config lookup later).
-2. **Constants approved as shipped defaults** (Q_B_VISIBLE 0.05, Q_B_CESSATION 0.02, β_D 0.10,
-   stickiness 20%, anchor accept 15 m / 0.5 m). Tuning later only with gate evidence.
-3. **Ankle-deep reform block approved** — no wave re-formation in depth < 15 cm (folded into
-   X-D1 cessation/re-break semantics; closes DQ-W1).
-4. **configobj approved** as a declared dev/test dependency — **DONE** (`d74c578`).
-5. Round W's separate webcam sign-off item is dissolved into Round X's webcam gate (Row 1) —
-   one visual standard, checked once, there.
-6. **Spot lifecycle ruling: NO grid "adjustments." Redefining a surf spot = DELETE the old spot
-   and RE-ESTABLISH it fresh** — all persisted artifacts destroyed (per the EXPANDED teardown
-   list in Z-D2), then rebuilt from configuration as if newly created. Rationale (operator):
-   "There has just been too many instances where something OLD is carried over." Z2 implements
-   `reestablish_spot(spot_id)` and it becomes THE mechanism for every future spot-geometry
-   change. Grid extents after re-establishment are whatever the corrected inputs produce — no
-   tolerance gate, but the before/after grid diff is pasted in the gate record.
-   OPERATIONS-MANUAL documents the lifecycle; ARCHITECTURE.md states the rule.
+Written in plain English by operator order (2026-08-06). Technical names appear only in
+parentheses so each ruling can be traced to the code and tasks it governs.
+
+**From the 2026-08-05 approval (these rulings stand on their own, independent of the plan
+sections that were later struck):**
+
+1. **Which stretch of beach the site shows.** The site will automatically pick the measurement
+   line (out of the 162 lines we compute across the beach) that has the best real surf on it,
+   and it will stick with its pick instead of jumping around hour to hour. Separately, in a
+   FUTURE phase, the operator gets a way to pin the display to one chosen place on the beach
+   (for example, the well-known surfers' peak about 100 yards south of the Huntington pier),
+   which overrides the automatic pick. That pin is NOT built in this plan — but today's code
+   must be written so it can be added later without rework (the picker accepts an optional
+   "use this line instead" input; task Z-D1).
+
+2. **The tuning numbers are approved as shipped.** The thresholds this plan introduces — when
+   breaking waves become "visible" (5% of waves breaking), when breaking "stops" (2%), how fast
+   whitewater fades (0.10), how much better a new beach line must be before the display
+   switches to it (20%), and the shoreline-position accuracy targets (within 15 m; water
+   shallower than 0.5 m at the shoreline) — ship at exactly these values. They may be tuned
+   later only with before/after evidence at a gate, never casually.
+
+3. **No fake waves in ankle-deep water.** Once a wave has broken and died out, the model may
+   never "re-form" it in water shallower than 15 centimeters — that thin water is wash on the
+   sand, not surf, and drawing new waves there was wrong. (Folded into Round X's breaking
+   rules.)
+
+4. **A small developer tool was approved and installed.** (The `configobj` library, used only
+   for tests — done, commit `d74c578`.)
+
+5. **One webcam check, not two.** The older plan had its own "compare against the webcam"
+   sign-off; that is merged into Round X's webcam gate so the visual standard is checked once,
+   in one place.
+
+6. **Redefining a surf spot means starting it over, never patching it.** When a spot's
+   geometry changes, every saved file that belongs to it is deleted and the spot is rebuilt
+   from its configuration exactly as if it were brand new. No partial updates, no reused grid
+   files. Operator's reason, quoted: "There has just been too many instances where something
+   OLD is carried over." Round Z builds this teardown-and-rebuild routine
+   (`reestablish_spot`), and it becomes the only way spot geometry ever changes from now on.
+   Whatever grid sizes the rebuilt inputs produce are accepted as-is, but the before/after
+   comparison is pasted into the gate record for review.
 
 **Added 2026-08-06 (operator, in chat):**
-7. `docs/reference/swan-commands-extract.md` is FROZEN as a pure SWAN-manual extract — may not be
-   amended without direct operator authorization; may never contain non-manual language; project
-   SWAN usage lives only in the authorized manuals (executed: `caf49e8`).
 
-8. **D-1..D-7 ruled (operator approval 2026-08-06, "ok approved"): the lead recommendations in
-   each DECIDE item are adopted as written** — D-1 = (a) now + (b) as the ruled fix; D-2 order
-   M-0 → H-1 → X → Z; D-3 refuse stands, no tiers; D-4 H-1 approved as scoped; D-5 second cap
-   OUT of X scope (explicit non-goal); D-6 `endpoints/beach_profile.py` on the X allowlist;
-   D-7 plain-language label, exact wording operator-approved at the Z gate. Any chat override
-   supersedes and is recorded here.
+7. **The SWAN manual extract is frozen.** The file holding copied-out pages of the official
+   wave-model manual (`docs/reference/swan-commands-extract.md`) is a pure reference copy. It
+   may not be edited without the operator's direct say-so, and nothing about OUR use of the
+   model may ever be written into it — our usage lives in the project manuals. (Executed,
+   commit `caf49e8`.)
 
-10. **WW3 source ruling (operator, 2026-08-06, in chat): "WW3 data should be coming to us in
-    grib files that we have to parse. They should not be coming from erddap" + "WW3 SHOULD
-    NEVER EVER FALLBACK TO CRAP SOURCES … GET RID OF THESE FUCKING FALLBACKS."** Findings that
-    triggered it: `providers/marine/wavewatch.py` (the WW3 marine-forecast DISPLAY provider)
-    was switched wholesale to PacIOOS ERDDAP `ww3_global` (pae-paha.pacioos.hawaii.edu,
-    gridded bulk parameters, no spectrum, GFS-forced third-party re-host) during an earlier
-    "NOAA ERDDAP unreachable" divergence — the module's own docstring records the switch. The
-    SWAN boundary chain is NOT affected (verified live 2026-08-06: NOMADS
-    `gfswave.<station>.spec` full 50×36 2-D spectra, passthrough, no synthesis). **Task SW-2:
-    rewrite wavewatch.py to fetch NOAA gfswave GRIB2 from NOMADS and parse locally (eccodes/
-    grib_processor pattern already in-repo for HRRR/GFS wind), including NOAA's native swell
-    partition fields (swell 1/2/3 + wind wave); ERDDAP path deleted, no substitute source, on
-    failure the provider refuses (no-silent-fallback).** The boundary's SAME-PRODUCT
-    previous-cycle retry (NOMADS gfswave, ≤3 cycles) is retained unless the operator
-    explicitly orders otherwise (lead recommendation: keep — it is NOAA's own product, not a
-    source substitution; killing it = refusal for the 3–5 h after every NOAA cycle time).
-    Deploy slots into the post-M-0 sequence (embargo respected).
+8. **All seven open decisions were approved as recommended ("ok approved").** In plain terms:
+   fix the crashing service first by moving the oversized cache file aside immediately AND
+   building the real fix that keeps the file small (D-1); do the work in the order stability →
+   silent-failure alarms → breaking physics → display/selection (D-2, the order M-0 → H-1 →
+   X → Z); when the offshore wave data isn't good enough, the service refuses to run rather
+   than substituting something worse — no backup tiers (D-3); the silent-failure alarm work is
+   approved as written (D-4); a second, unrelated wave-height cap stays untouched in Round X
+   (D-5); one more file joins Round X's allowed-files list because that's where the work
+   actually lives (D-6); the beach-line label on the site will use plain language, with the
+   exact wording approved at the Round Z gate (D-7). Anything the operator says in chat later
+   overrides this register and gets recorded here.
 
-9. **SW-1 added (operator order 2026-08-06, in chat, with Surfline + surf-forecast
-   screenshots):** "figure out why you are still not getting the swell correct" (published
-   swells don't match Surfline/surf-forecast for the same hour despite the shared NOAA WW3
-   source) + "your text surf forecast on the surf score card … is touting the wind swell at 4
-   seconds" (wrong swell selected). Task SW-1 (above) carries both: SW-1a/SW-1b read-only
-   investigations run immediately alongside M-0/H-1; fixes are scheduled on findings and
-   return to the operator first. Reference numbers pinned in the task section before our own
-   output was examined.
+9. **"Figure out why the swells are still wrong" (operator order, with Surfline and
+   surf-forecast screenshots).** Two complaints: our published swells don't match what
+   Surfline and surf-forecast show for the same hour, and the surf score card's text (plus,
+   per a follow-up, the current-conditions display) headlines the wrong swell — the short
+   choppy wind swell instead of the real groundswell. Task SW-1 investigates both immediately;
+   any fix comes back to the operator for approval before it ships. The comparison numbers
+   from the screenshots were written down BEFORE our own output was examined, so the test
+   can't be bent to match.
+
+10. **Wave-forecast data comes from NOAA's raw files that we parse ourselves — never from
+    third-party convenience feeds.** Operator's words: "WW3 data should be coming to us in
+    grib files that we have to parse. They should not be coming from erddap" and "WW3 SHOULD
+    NEVER EVER FALLBACK TO CRAP SOURCES." What triggered it: the provider that fills the
+    marine forecast display cards was found to be reading a University-of-Hawaii convenience
+    feed (PacIOOS ERDDAP) that serves only summary numbers — no wave spectrum — because
+    NOAA's own convenience feed had once been unreachable and the code was pointed elsewhere
+    instead of at the raw files. The wave model's own input was checked and is NOT affected —
+    it reads NOAA's full raw station spectra directly (verified live 2026-08-06). Task SW-2
+    rewrites the display provider to download NOAA's raw wave-model files (GRIB format, from
+    NOAA's NOMADS server) and parse them in-house — including NOAA's separate swell-1/2/3
+    breakdown, so the display finally shows multiple swells. The third-party feed is deleted
+    outright; if NOAA's files can't be fetched, the provider says so and serves nothing,
+    rather than quietly using something worse. One nuance held for the operator's explicit
+    word: when NOAA hasn't PUBLISHED the newest 6-hour batch yet, the code currently reuses
+    NOAA's own previous batch (same source, just a few hours older). Recommendation is to
+    keep that; killing it means the service refuses for the 3–5 hours after every NOAA cycle
+    time. Say "kill the cycle retry" and it dies too.

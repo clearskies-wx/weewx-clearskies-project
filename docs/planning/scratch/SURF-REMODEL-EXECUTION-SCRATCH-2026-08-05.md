@@ -86,7 +86,99 @@ restarting the radar container and raising the cap are both outside-project or i
 | 03:30–04:10 Aug 6 | **H-1 BUILD COMPLETE.** Dev `5ca8fcc` (4 exits instrumented [plan said 3, code has 4], per-hour aggregate WARNING, bulk-fallback state registry + /health reasons floor-at-degraded, distinct `ww3_boundary_refused` slug); one design gap surfaced by dev (spot_id absent in surf_1d_pipeline) → lead ruling option (b) (count rides PipelineResult, state write at swan.py precompute site; brief amended in place); test-author caught a REAL defect pre-deploy (total collapse + no bulk substitute → `_degraded_result()` dropped the count to 0 — the exact worst case) → fix `e221a06`; tests `27bb9b3` (18 tests; forced-collapse test carries the behavioral fail-pre-change transcript). ADR-103 authored fresh `d34330f` (file never existed — plan's "REWRITE" premise corrected) + INDEX row; kd-tolerance doc-drift finding fixed lead-direct `9b6bd64`. All pushed. Test-author bonus finding for the gate: exit 2 (`breaking_zone_exhausted`) structurally unreachable via genuine data (BD-1/BD-2 share array+threshold) — narrows mechanism B to exits 1/3/4. H-1 deploy embargoed until M-0 closes. | H-1 built |
 | 04:10 Aug 6 | **SW-1a VERDICT (lead spot-verified the buoy leg independently): the ~9 s swell train NEVER ENTERS OUR INPUT.** gfswave.global.0p16 station spectra = one unimodal 12.7 s/185° peak, all stations, all target hours (raw BOUND_*.txt parsed); NDBC 46253 hardware resolves a distinct 9.09 s secondary peak (local min at 9.9 s then +63% rise — lead re-pulled and confirmed); Surfline LOTUS + surf-forecast carry it. Nothing downstream loses it. Fix = data-source change (trigger 7 + touches the operator's WWIII-grid mandate) → OPERATOR OPTIONS SURFACED: (a) accept+document, (b) investigate finer WW3 regional product (lead rec), (c) buoy-blend (not rec). Direction delta (+15.6° vs Surfline) assessed as plausible refraction (deep-water vs 15 m reference), not a defect. Evidence: scratch/SW-1A-SWELL-CHAIN-2026-08-06.md. | Awaiting operator ruling |
 
+| 04:15–04:25 Aug 6 | **Operator orders executed:** (1) SW-1b findings reported (regression = `_effective_swell` deleted 2026-07-18 `ea47ed6`+`66c9634` w/ its tests; both cards read bulk TM01/MWD; fix scope proposed, awaiting go). (2) **WW3 source ruling → register item 10 + task SW-2:** wavewatch.py display provider found on PacIOOS ERDDAP (`aa077d4` "point at reachable ERDDAP origin" — born on ERDDAP at T1.3, never converted, ported as-is `4c206a9`; NOT a regression of the 3-day boundary work, which is verified intact live). SW-2 = NOMADS gfswave GRIB2 rewrite incl. native swell partitions; ERDDAP deleted; refuse-on-failure; fact-pin dispatched. Boundary same-product cycle retry retained pending explicit operator word. (3) X12 ACCEPTED (bce8997, lead-verified: controls 17/17, exactly 1 expected fallout failure w1_kat marker-index, cap intact, constants exact); X3 dispatched (roller per X-D3 + lead calls: combined-profile E_r published, zones' er param optional, reform_trough untouched, closure ratio field for X4). | SW-2 + X3 in flight |
+| 04:20 Aug 6 | **M-0 gate cycle 1 running SLOW (~55+ min vs 26 min cold cycle), NOT stalled:** L1/L2/L3 converged by 03:38; L4 prep (162-transect generation logged 03:38:09) + heavy GIL contention with dashboard-poll on-demand recomputes (same 04:00Z timestep recomputed every ~50 s — pre-existing inefficiency, PARKED as a finding; not D-1b-related, trim fields unread by that path). No kills; RSS 1.8 GB. Cycle-overrun degraded at 60 min is transient-by-design. Watch continues; >80 min or silent journal ⇒ stall investigation. | Watching |
+
+## ═══ CONTINUATION CHECKPOINT — written 2026-08-06 ~04:30 UTC at operator compact order ═══
+
+**Read this section FIRST on resume. State of every track, exact next actions.**
+
+### Repo state (all pushed except noted)
+- Marine repo `repos/weewx-clearskies-marine`: HEAD `bce8997` (X12) — PUSHED through `27bb9b3`;
+  `bce8997` NOT YET PUSHED (local only). Commits since plan start: `9535e8a` (D-1b cache trim,
+  DEPLOYED), `5ca8fcc` (H-1 instrumentation), `e221a06` (H-1 counter fix), `27bb9b3` (H-1
+  tests, 18), `bce8997` (X12 Q_b state machine — ACCEPTED by lead, controls 17/17, exactly 1
+  expected fallout failure = w1_kat marker-index).
+- Meta repo: pushed through `9b6bd64`; UNCOMMITTED right now: plan decision-register plain-
+  English rewrite (operator order), this scratch update, SW-2-FACT-PIN doc (committed in the
+  checkpoint commit that carries this text).
+- **x3-dev agent (roller, X-D3) is MID-FLIGHT in the marine repo** — will commit
+  `feat(x3): ...` touching surf_1d_analytical.py + surf_1d_pipeline.py + endpoints/
+  beach_profile.py. Its scope-ack was confirmed. If resuming and it's dead with no commit:
+  re-dispatch from briefs/X-DISPATCH-PACKET-2026-08-06.md §X3 + the lead calls recorded in the
+  04:15 log row above.
+
+### Deployed state (librewxr)
+- Running commit `9535e8a`, process started 03:21:56Z. Cache trimmed (17.2 MB, freqs_hz=0).
+- Preserved artifacts (do NOT delete): `/home/ubuntu/forecast_cache.json.oom-m0-aside-20260806`
+  (109 MB) and `/home/ubuntu/forecast_cache.json.pre-d1b-trim-20260806` (233 MB).
+- **M-0 gate: cycle counting since 03:21:56Z. Criterion: 4 consecutive OOM-free cycle
+  completions** (`full SWAN cycle complete` or `stationary fill complete` journal lines; skips
+  don't count) + zero `killed by the OOM killer` + /health ok + journal sweep vs baseline
+  (scratchpad file m0-journal-baseline-classes.txt — regenerate from journal since 01:02 if
+  lost; the top pre-existing classes: runaway W1b WARNINGs, L-handoff-outside-grid, PT*
+  bulk-fallback, HRRR Lambert, provider 4xx). Cycle 1 (started 03:22:57Z) was SLOW (~60 min,
+  GIL contention w/ dashboard request storm) but alive at checkpoint, 0 kills. Watch command:
+  `ssh -F .local/ssh/config librewxr "sudo journalctl -u weewx-clearskies-marine --since '2026-08-06 03:21:56' --no-pager | grep -cE 'cycle complete|fill complete'"` and same with
+  `grep -c 'killed by the OOM killer'`. **After M-0 closes: deploy sequence is H-1 first, then
+  X (after X gate), SW-2 with/after X per one-change-per-deploy.**
+
+### Task states
+- **M-0**: D-1a+D-1b DONE+deployed. Gate = cycle watch (above) + close record w/ raw output.
+- **H-1**: BUILD COMPLETE (code+tests+ADR-103 `d34330f`). Deploy after M-0 close via
+  scripts/deploy-marine.sh; then live checks (clean-cycle: no bulk_fallback reason in /health;
+  H-1 WARNINGs only on collapsed hours) + six-row gate incl. blind adversarial audit (brief in
+  plan; auditor must NOT see dev tests/commits). Gate extras on record: 4 exits not 3; exit 2
+  (breaking_zone_exhausted) structurally unreachable via genuine data (test-author proof, in
+  test file module docstring); threshold = max(8, ceil(0.25·n)).
+- **Round X**: X12 DONE+accepted (`bce8997`). X3 IN FLIGHT (see above). Then X4 (delete W1b cap
+  `min(marched, float(hs_total[i]))` — grep-single-occurrence in surf_1d_analytical.py — + wire
+  INVARIANT_11 roller-closure-1% reading `roller_closure_worst_ratio` field X3 exposes +
+  INVARIANT_12 no-gain marched ≤ raw+1mm, per packet). Then X5 test-author (X-K1..K4 KATs +
+  dispositions of every file in X0 Table 2 — note X12 fallout was LIGHTER than X0 predicted:
+  only w1_kat failed; w2/w4/w5/w8 passed unmodified — X5 must re-derive/justify each anyway).
+  Then X6 docs (ADR-102 + ARCHITECTURE + API-MANUAL §17-18). Then X7 six-row gate + deploy +
+  reality gate (webcam row on first ≥3ft/≥12s day). S-5 (dominant-partition direction,
+  EYEBALL-FIX plan) + SW-1b fix ride X's window WHEN OPERATOR APPROVES SW-1b scope.
+- **SW-1a** DONE: 9s train absent from NOAA gfswave station-spectra input (buoy hardware has
+  it; lead re-verified). AWAITING OPERATOR RULING: (a) accept+document / (b) investigate finer
+  NOAA WW3 regional product (lead rec) / (c) buoy-blend (not rec).
+- **SW-1b** DONE: both cards read bulk TM01/MWD (never multiSwell); prior fix
+  `_effective_swell()` (API repo `5be33fc`) deleted 2026-07-18 (`ea47ed6`+`66c9634`) WITH its
+  tests. AWAITING OPERATOR GO on fix scope: dominant-partition semantics for published
+  period/direction/text + unify tie-breaks + add missing guard; rides X window. Caveat to
+  verify at fix time: live hour showed multiSwell ranking a 1.83m "wind swell" above
+  groundswell — numbers matching nothing else; possible second wrinkle.
+- **SW-2** (operator ruling, register item 10): fact-pin DONE
+  (scratch/SW-2-FACT-PIN-2026-08-06.md). Key design inputs: product
+  `gfs.YYYYMMDD/CC/wave/gridded/gfswave.tCCz.global.0p16.fXXX.grib2` hourly f000-f120 +
+  3-hourly to f159; `filter_gfswave.pl` bbox/var subsetting works (2 live test downloads
+  parsed w/ repo eccodes); EXACTLY 3 swell partitions in .idx; **trap 1: NOMADS names
+  (HTSGW/WVHGT/SWELL) ≠ eccodes shortNames (swh/shww/shts) — table in fact-pin; trap 2:
+  grib_processor.py keys by shortName only → would silently drop 2 of 3 swell partitions —
+  needs level-aware keying; trap 3: all 3 wavewatch call sites in endpoints/marine.py catch
+  bare Exception and degrade silently — operator's refuse-on-failure requires changing call-
+  site except shape too (RFC9457 handler exists at errors.py:74-118 but never reached)**.
+  Cycle pattern to mirror: GFS wind's (6h lag, snap to {0,6,12,18}, step-back, 
+  ProviderUnavailableError). GL: wavewatch is ocean-only today; GLWU gridded GRIB exists
+  (one-file-all-hours). NEXT ACTION: lead writes SW-2 dev brief from fact-pin (allowlist:
+  wavewatch.py rewrite + endpoints/marine.py except-shape + grib_processor level-aware fix OR
+  local parse helper; tests; docs PROVIDER-MANUAL). Deploy post-M-0 sequence.
+- **Round Z**: not started. Seed Z0 from scratch/Z-PREMISE-AUDIT-2026-08-06.md (expanded
+  teardown list). D-7 label wording at Z gate.
+- **Operator rulings OPEN**: SW-1a (a/b/c); SW-1b go; boundary same-product cycle-retry
+  keep/kill (lead rec keep); tmpfs hotstart duplication (~2.5 GB RAM on /run tmpfs, MEM-1 —
+  fix not pre-authorized).
+
+### Standing constraints (unchanged, from plan + kickoff)
+Sonnet agents only for delegated work; never full pytest; every brief carries git/arch/stale
+blocks verbatim; deploys only via scripts/deploy-marine.sh; one functional change per deploy;
+six-row gate per round incl. blind adversarial audit; swan-commands-extract.md FROZEN;
+journalctl on librewxr needs sudo; port 8780 TLS (`curl -sk`); binary 41.51AB; plain English
+to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-06, keep it so).
+
 ## Parking lot
+- **NEW (2026-08-06): request-path on-demand recompute storm** — dashboard polls re-run the full 162-transect 1D pipeline for the SAME timestep every ~50 s when a field (e.g. wind) is unavailable in cache; no request-side memoization of the recompute result. CPU-starves the runner (GIL). Pre-existing; surfaced during M-0 cycle-1 watch. Candidate follow-up task after M-0/H-1.
 
 - `repos/weewx-clearskies-swan-swelltrack` local checkout confusion risk: legacy repo shares
   "SWAN" naming with live marine repo. reference/clearskies-dev.md repo tables still list the
