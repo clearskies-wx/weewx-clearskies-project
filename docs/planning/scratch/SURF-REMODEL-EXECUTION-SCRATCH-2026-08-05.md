@@ -366,3 +366,18 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
   test_swan_handoff_guards.py:583 ruled option (b) — scoped discriminator swap authorized;
   dev finalizing single fix(m0b) commit.
 - SW-2 GO fires at m0b's landing commit (HEAD pin = that commit).
+
+### 2026-08-06 ~09:10Z — M0b ACCEPTED (181a221, pushed); SW-2 GO fired
+- **M0b ACCEPTED**: commit `181a221` = exactly swan_runner.py + guards-test discriminator
+  swap (authorized) + new 5-test file; tree clean; lead re-run **63 passed** across all four
+  files. Dead-field removal at all 3 attachment sites (L3/L4 selector :1062-1071; L2 DWR
+  baseline :3603-3609; L2 DWR per-cell :3711-3718 — pre-edit lines at 2bb1cd1); zero-reader
+  re-verify independent (parser/TRACE/ww3-dataclass/scalar-energy hits all disambiguated).
+  Discriminator swap falsifiability verified (handoff_depth_m 3.8501 st.17 vs 2.4162 st.18).
+  Expected effect: ~90-484 MB/cycle dead weight gone from the hourly carrier rebuild.
+  Live RSS reduction unverifiable until deploy (blocked on X5 gate knot).
+- **SW-2 GO sent**: HEAD pin 181a221; design frozen per ack + rulings. Marine repo queue
+  after SW-2: Z1 (from Z0 fact-pin) — brief to be written during SW-2's window.
+- Marine main now: 2bb1cd1 → 8bb268a (sw1b) → 181a221 (m0b), all pushed. Deploy still
+  gated: X5 KATs + X7 required before ANY deploy (main carries unvetted X physics; deploy
+  script ships main HEAD only). Operator word on X5 still open.
