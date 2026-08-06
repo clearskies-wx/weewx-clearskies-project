@@ -1273,6 +1273,11 @@ No auth required. Response fields: `status`, `version`, `last_run`, `spots`, `ru
 
 **`reasons`** — list of short machine-readable strings explaining a non-`ok` status. Empty when `ok`.
 
+**H-1 reasons (SURF-PHYSICS-REMODEL-PLAN-2026-08-05, 2026-08-06) — floor status at `degraded`:**
+
+- `bulk_fallback: {spot_id}@{time_iso} {count}/{n_transects} transects` (≤3 flagged hours, one reason each) or `bulk_fallback: {N} hour(s) flagged, worst {spot_id}@{time_iso} {count}/{n_transects} transects` (>3 flagged hours, one summary reason) — a SWAN-cycle hour where the 1-D surf pipeline bulk-fell-back (synthesized a single bulk partition instead of a transect's own measured spectral data) for a number of transects at or above the H-1 threshold (`max(8, 25% of n_transects)`). What to check: journal-grep `H-1 handoff-collapse` around the same `time_iso` for the per-transect silent-exit causes (`no_hs_proxy`, `breaking_zone_exhausted`, `no_station_selected`, `no_curve_match`) that produced the collapse. This is a diagnostic flag on the underlying handoff-collapse mechanism (task H-1 item 4, a separate later fix) — it does not itself indicate a data-input problem.
+- `no-publish: ww3_boundary_refused D-3 refusal — {detail}` — the WW3 boundary-station selection explicitly refused this cycle (D-3: fewer than 2 qualifying stations, or one side with zero) rather than substituting a degraded boundary. Distinct from `no-publish: ww3_boundary_failed` (a network/parse failure reaching WW3 at all). What to check: PROVIDER-MANUAL.md §14.3b's live station-count findings for this spot's L1 extent — a persistent refusal usually means the configured spot(s) don't admit a spatially varying boundary at the current L1 size (see "Refusal, never degradation" there).
+
 **`inputs`** — per-input freshness, one entry per required input: `{"available": bool, "age_s": int | null}`. An input never recorded (no fetch attempt observed yet this process) reports `{"available": false, "age_s": null}`.
 
 **`invariants`** — `{"fired_total": int, "last_fired_at": str | null, "last_fired_names": [str]}` from `services/invariants.py` (B2), scoped to `since=last_run`.
