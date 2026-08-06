@@ -166,9 +166,55 @@ restarting the radar container and raising the cap are both outside-project or i
   local parse helper; tests; docs PROVIDER-MANUAL). Deploy post-M-0 sequence.
 - **Round Z**: not started. Seed Z0 from scratch/Z-PREMISE-AUDIT-2026-08-06.md (expanded
   teardown list). D-7 label wording at Z gate.
-- **Operator rulings OPEN**: SW-1a (a/b/c); SW-1b go; boundary same-product cycle-retry
-  keep/kill (lead rec keep); tmpfs hotstart duplication (~2.5 GB RAM on /run tmpfs, MEM-1 —
-  fix not pre-authorized).
+- **Operator rulings OPEN**: SW-1a (a/b/c); SW-1b go; whether SWAN boundary must ALSO
+  wait-and-poll like SW-2 now does (ruling 10 update 2026-08-06 — cards ruled, boundary
+  question open, lead rec no); tmpfs hotstart duplication (~2.5 GB RAM on /run tmpfs,
+  MEM-1 — fix not pre-authorized); X3 closure-scoping lead ruling reported (operator may
+  override).
+
+### 2026-08-06 ~04:45Z — post-compact resume: X3 ACCEPTED; register ruling 10 landed; X4 dispatch
+
+- **X3 ACCEPTED** (commit `9b6a669`, pushed). Acceptance evidence (lead's own runs, fresh
+  shell): `git show --name-only` = exactly the 3 allowlist files (surf_1d_analytical.py,
+  surf_1d_pipeline.py, beach_profile.py); controls `pytest test_ddd_breaking_w3_constants
+  test_ddd_breaking_w6_detection_from_state test_break_detection_z2 -q` → **17 passed**;
+  fallout `test_break_aware_handoff_domain test_ddd_breaking_w1_kat test_ddd_breaking_w2_bar_trough
+  test_ddd_breaking_w5_saturation -q --tb=line` → **8 failed, 14 passed**, every failure
+  `TypeError: ... missing 1 required positional argument: 'T'` (w1_kat 3, w5_saturation 5 —
+  both files in X0 Table 2 superseded bucket). Dev's delta note accepted: implemented X-D3's
+  roller balance verbatim (no leading 2 in D_r), dead `_roller_model` untouched.
+- **X3 finding 1 (T signature break) → routed to X5**: 7 of the 8 fallout failures are
+  signature breaks (missing new required `T` param at direct call sites), NOT the semantic
+  drift X0 predicted; X5 must add a period argument at every call site in those two files
+  AND re-derive expected numbers. `T` required-with-no-default upheld per rules/coding.md §1
+  (no silent default physics inputs).
+- **X3 finding 2 (closure ratio ~0.34 at shoreline) → LEAD RULING (methodology)**: the
+  worst-step closure residual legitimately blows up at the last step before the eps-floored
+  depth (0.01 m) because X-D3's own `D_r = g·β_D·E_r/c` diverges as c→0 — a floor artifact,
+  not march dishonesty. RULING: `roller_closure_worst_ratio` accounting EXCLUDES any step
+  where either endpoint's depth is at/below the numerical depth floor or the phase speed is
+  at its floored minimum; the 1% invariant threshold itself is UNTOUCHED. This is scoping
+  what the QC measurement covers, not changing physics or the plan's threshold. X4-dev
+  implements; reported to operator (can override). X4 must re-run the synthetic bar/trough
+  sanity and report the SCOPED worst-ratio — if still >1% away from floored steps, STOP
+  (no tuning).
+- **Register ruling 10 UPDATE (operator, in chat)**: old-batch reuse DEAD for forecast
+  cards — wait-and-poll for NOAA publication ("We operate on NOAA's timeline, not our
+  timeline"). Binding SW-2 design: on refresh, if newest expected cycle unpublished →
+  do NOT process older cycle; poll until published; previously processed forecast stays
+  served. NEW OPEN QUESTION posed to operator: whether SWAN boundary download (which
+  always uses newest PUBLISHED run via the step-back at swan.py:2738-2743 /
+  `select_boundary_stations_with_cycle_fallback`) must also wait — lead rec NO (it already
+  lives on NOAA's timeline; waiting = no surf forecasts ~60% of hours). Register item 10
+  updated in plan; item 1 got a how-it-sticks sentence (20% hysteresis); item 2 rewritten
+  as record-not-question; register header now states it is a RECORD (operator misread it
+  as a questionnaire — items 3/4/7 reactions).
+- **M-0 watch (re-established post-compact)**: 0 OOM kills since 03:21:56Z; cycle 1 still
+  running at 04:35Z (~73 min, slow per GIL-contention diagnosis), service alive and logging.
+- **X4 dispatched** (Sonnet, marine repo @ 9b6a669): W1b cap deletion + INVARIANT_11
+  (closure 1%, with the scoping ruling above) + INVARIANT_12 (no-gain ≤ raw + 1 mm);
+  allowlist services/surf_1d_analytical.py + services/invariants.py, STOP if wiring needs
+  a third file.
 
 ### Standing constraints (unchanged, from plan + kickoff)
 Sonnet agents only for delegated work; never full pytest; every brief carries git/arch/stale

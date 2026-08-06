@@ -418,24 +418,35 @@ above plus rows 4–6; a round that skips a row is not closed):**
 Written in plain English by operator order (2026-08-06). Technical names appear only in
 parentheses so each ruling can be traced to the code and tasks it governs.
 
+**This register is the permanent RECORD of rulings already made** — it exists so decisions
+don't get lost between sessions and compactions. Nothing in it is a new question for the
+operator unless explicitly marked **OPEN QUESTION**.
+
 **From the 2026-08-05 approval (these rulings stand on their own, independent of the plan
 sections that were later struck):**
 
 1. **Which stretch of beach the site shows.** The site will automatically pick the measurement
    line (out of the 162 lines we compute across the beach) that has the best real surf on it,
-   and it will stick with its pick instead of jumping around hour to hour. Separately, in a
+   and it will stick with its pick instead of jumping around hour to hour. **How it sticks
+   (added 2026-08-06, answering the operator's question):** once a line is picked, the
+   display keeps it unless another line's surf becomes at least 20% better (the switching
+   threshold in item 2). Small hour-to-hour differences never move the pick — it changes
+   only when the beach genuinely shifts, and the exact stick-with-it mechanics are what
+   Round Z builds and demonstrates at its gate. Separately, in a
    FUTURE phase, the operator gets a way to pin the display to one chosen place on the beach
    (for example, the well-known surfers' peak about 100 yards south of the Huntington pier),
    which overrides the automatic pick. That pin is NOT built in this plan — but today's code
    must be written so it can be added later without rework (the picker accepts an optional
    "use this line instead" input; task Z-D1).
 
-2. **The tuning numbers are approved as shipped.** The thresholds this plan introduces — when
-   breaking waves become "visible" (5% of waves breaking), when breaking "stops" (2%), how fast
-   whitewater fades (0.10), how much better a new beach line must be before the display
-   switches to it (20%), and the shoreline-position accuracy targets (within 15 m; water
-   shallower than 0.5 m at the shoreline) — ship at exactly these values. They may be tuned
-   later only with before/after evidence at a gate, never casually.
+2. **The tuning numbers are approved as shipped (a record, not a question).** This entry
+   simply writes down the exact dial settings the plan ships with, so any later drift is
+   visible against this list: breaking waves count as "visible" when 5% of waves are
+   breaking; breaking counts as "stopped" at 2%; whitewater fades at rate 0.10; a new beach
+   line must be 20% better before the display switches to it; and the shoreline position
+   must land within 15 m, in water shallower than 0.5 m. These ship at exactly these
+   values. Changing any of them later requires before/after evidence at a gate, never a
+   casual edit.
 
 3. **No fake waves in ankle-deep water.** Once a wave has broken and died out, the model may
    never "re-form" it in water shallower than 15 centimeters — that thin water is wash on the
@@ -500,8 +511,24 @@ sections that were later struck):**
     NOAA's NOMADS server) and parse them in-house — including NOAA's separate swell-1/2/3
     breakdown, so the display finally shows multiple swells. The third-party feed is deleted
     outright; if NOAA's files can't be fetched, the provider says so and serves nothing,
-    rather than quietly using something worse. One nuance held for the operator's explicit
-    word: when NOAA hasn't PUBLISHED the newest 6-hour batch yet, the code currently reuses
-    NOAA's own previous batch (same source, just a few hours older). Recommendation is to
-    keep that; killing it means the service refuses for the 3–5 hours after every NOAA cycle
-    time. Say "kill the cycle retry" and it dies too.
+    rather than quietly using something worse.
+
+    **Ruled 2026-08-06 (operator): the old-batch reuse is DEAD for the forecast cards.**
+    When NOAA's newest batch isn't published yet, the provider does NOT process the older
+    batch — it waits and checks back until the new batch appears, then processes that.
+    Operator's words: "it should wait to do the processing until it has been published,
+    which means waiting and checking back. We operate on NOAA's timeline, not our
+    timeline. Why would we use the old data, when the new data may then come out 10
+    minutes later?" The forecast already on the site (built from the last batch that WAS
+    published and processed) simply stays up while we wait — waiting never blanks the
+    display. This is binding SW-2 design.
+
+    **OPEN QUESTION (one word needed):** does this also change the wave model's own
+    boundary download? Today that download always uses NOAA's newest PUBLISHED run — it
+    never skips a newer published run, and the hourly rerun picks each new run up as soon
+    as NOAA posts it (the "retry older cycles" code is only how it finds the newest one
+    NOAA has actually posted). Making it "wait" instead would pause new surf forecasts for
+    the 3.5–5 hours after every NOAA run time — that's how long NOAA takes to post, so
+    roughly 60% of all hours — with nothing newer existing to wait for. Recommendation:
+    the boundary stays as-is, because it already lives on NOAA's timeline. Say "boundary
+    waits too" to override.
