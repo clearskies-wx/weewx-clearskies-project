@@ -171,9 +171,15 @@ normalized by total dissipated energy; worst alarm-eligible zone must be `<= 0.0
 Scoping (decision-register 11(f)/(g)/(h) + participation floor, all measured-justified):
 water's-edge floored steps excluded; the single regime-transition step at each zone's entry
 AND exit excluded (both-endpoint discontinuity); stiffness-dominated steps excluded
-(`k·ds >= 0.5` as phase speed dies); zones under 25 checked steps are logged per-zone but
-cannot drive the alarm (short aggregates read >1% on healthy physics — measured). Detection
-power demonstrated before shipping: doubled β_D reads 11.8% vs 0.081% clean (~145×).
+(`k·ds >= 0.5` as phase speed dies); TWO-TIER alarm bar (re-audit hardening, marine `93096c1`):
+zones with >= 25 checked steps alarm at 1%; shorter zones alarm at their own coarser 10% bar
+(healthy short zones measured <= 1.5%, wrong-coefficient ~100% — an order of magnitude clear
+each way; closes the re-audit's demonstrated short-zone hiding spot). The reference side also
+declares its OWN copy of the fade coefficient (`_ROLLER_BETA_D_REFERENCE = 0.10`) so a careless
+one-site edit to either constant trips the alarm; deliberate physics changes are a two-site
+edit gated by register ruling 2 (closes the re-audit's shared-constant masking). Detection
+power demonstrated before shipping: doubled β_D reads 11.8% vs 0.081% clean (~145×), and a
+one-site-edit test pins the dual-constant behavior.
 Known limitations recorded: near-terminal roller values are locally imprecise by construction
 (stiff regime — harmless, E_r is draining to zero there); short bump-shaped zones (<25 steps)
 are monitored but not alarm-eligible. Wired at both production sites (post-loop, per march).
@@ -203,10 +209,16 @@ design's own stated no-gain property enforced where the input itself drops, whil
 relaxation trajectory and the roller's dissipation source remain uncapped (X-D3 contract
 preserved). This differs from the deleted W1b cap in scope and role: the old cap silently
 masked two-sided relaxation defects; the new bound never engages except when the input's own
-energy ceiling falls below the decaying trajectory. **INVARIANT_12** (fire-only,
-`services/invariants.py:131`, `"12:ddd_march_no_gain_over_raw_input"`) still observes
-`marched <= raw + 1 mm` in production as the independent alarm on the same property. This
-closes DQ-W3. `_ddd_breaking_march` (the per-partition march) has no raw-input reference to compare
+energy ceiling falls below the decaying trajectory. Downstream consequence, stated plainly:
+once the bound engages, subsequent steps' trajectory (and therefore roller dissipation) follows
+the bounded height — intended physics (track the actual reduced wave); measured ~57% relative
+E_r divergence at the shoreline vs a never-bounded counterfactual on the audit repro (the
+original audit measured ~82% with a different normalization — reconciliation noted, both
+figures say "substantial and intended"). **INVARIANT_12 is RETIRED** (re-audit finding F5,
+register 11(i), marine `93096c1`): the enforced bound made the observer structurally unable to
+fire — a decorative alarm. In its place, a WARNING-class log records each march where the bound
+engaged (count + worst pre-bound excess) — expected on structure-crossing transects, never
+gated to zero. This closes DQ-W3. `_ddd_breaking_march` (the per-partition march) has no raw-input reference to compare
 against and does not carry INVARIANT_12 — only `apply_ddd_saturation` does, by construction (the
 only function with both a raw and a marched value in hand).
 
@@ -276,7 +288,8 @@ file:line citations above):
 Reality-gate (X7, pre-stated in the plan, **NOT YET RUN as of this document**):
 
 - [ ] Row 1 — webcam vs. published break agreement on the first ≥3 ft / ≥12 s groundswell day.
-- [ ] Row 2 — zero firings of INVARIANT_11/12 across 4 consecutive cycles.
+- [ ] Row 2 — zero firings of INVARIANT_11 across 4 consecutive cycles (INVARIANT_12 retired
+  per register 11(i); F1 bound-engagement WARNING counts reported without a pass/fail bar).
 - [ ] Row 3 — publish-liveness + journal sweep.
 
 Checked at: this document's own drafting (2026-08-06), against marine repo HEAD (`2bb1cd1` and
