@@ -485,3 +485,17 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
 - Marine main: ...46f4d1a → 2bf825b (pushed). Next queued work: Z2 brief (anchor fix at
   the REAL site :1629-1632 + reestablish_spot teardown per Z0 inventory). Awaiting
   operator: "run the tests" (deploy gate), "go rewire" (register 13 step 2).
+
+### 2026-08-06 — X6 ACCEPTED (meta 341bc2f + marine a4e538f, both pushed)
+- ADR-102 (statistical breaking + roller) authored, Accepted status with explicit
+  "X7 reality gate not yet run" caveat; INDEX row; ARCHITECTURE one-sentence delta;
+  API-MANUAL §17/§18 4 surgical edits. Marine: stale W1b-cap comment rewritten
+  (comment-only, 1 file). Lead spot-open verified the closure floor-scoping doc claim
+  against surf_1d_analytical.py:936-948 — exact match (eps 0.01, either-endpoint,
+  threshold unchanged); invariant registry names verified.
+- X6 bonus finding (fixed in-scope per doc-code-sync): API-MANUAL §18's "Round Z
+  hysteresis" paragraph described the legacy onset_indices=None branch not used by
+  production since Round W — corrected in the same row.
+- X5 fixture delivered by lead (real transect-55, 261 pts, live-pulled read-only,
+  LMSL/hat_m metadata included) at tests/fixtures/transect55_profile_huntington.json —
+  X5 stages it. In flight: X5, Z2, RW-0.
