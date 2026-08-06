@@ -330,3 +330,22 @@ to operator — DECISION REGISTER NOW IN PLAIN ENGLISH (operator order 2026-08-0
   (3) cold-start bounded lookback (3 cycles) confirmed as the bootstrap ruling's
   implementation; (4) cadence preserved (72h/3-hourly/25 steps); level-aware keying design +
   except-shape approved. GO + HEAD pin flashes when SW-1b lands (one dev per repo).
+
+### 2026-08-06 ~07:20Z — librewxr saturated; fresh evidence REVISES the memory picture
+- Container pinned at 100.0% (lxc list 5.59GiB/6G); direct SSH fails at banner exchange
+  (starvation, not crash); lxc-exec diagnostic (slow but returned): free = 5698/5722M used,
+  0 free, 23M available. Top consumers RIGHT NOW: **marine service anon RSS 3.11G (87% CPU —
+  actively computing, not hung)**, radar python 1.81G, tmpfs shared 681M, buff/cache 706M.
+- **REVISION vs earlier framing**: at this moment tmpfs holds only ~0.7G (df saw 3.5G earlier
+  mid-SWAN — it fluctuates with run files); the DOMINANT steady consumer is the marine
+  service's own in-cycle working set (3.1G now, 3.5G peak per systemd). Marine ~3.1-3.5G +
+  radar ~1.8-2G ≈ 5-5.5G before ANY tmpfs — the hotstart-dedup fix alone (earlier lead rec)
+  is likely INSUFFICIENT to make 4-clean-cycles reliable. Historical budget (clearskies-dev)
+  expected ~519M compute — 6× over.
+- Revised options put to operator: quick unblocks = raise cap (infra) and/or evict/cap radar;
+  durable = find why the cycle holds 3.1G anon (new MEM-2 investigation) + tmpfs fixes as
+  secondary. MEM-2 dispatched read-only/local (no server load): size the per-cycle in-memory
+  structures (162 transects × timesteps × spectra/profiles), find what's held alive
+  cycle-long vs released, name the top 3 holders with file:line.
+- No new kill since 05:00:43Z. No state-changing action taken on the server (nothing
+  pre-authorized).
