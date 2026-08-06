@@ -677,6 +677,17 @@ sections that were later struck):**
       diluted transient step cannot fake a wrong coefficient, and a wrong coefficient
       shifts EVERY step so the aggregate trips decisively (demonstrated with a
       deliberately-wrong coefficient before shipping). The 1% bar is untouched.
+      **Re-audit hardening (2026-08-06, after the re-audit MASKED the check two ways):**
+      (1) the reference side now declares its OWN copy of the whitewater-fade constant
+      (0.10) instead of reading the production constant — a careless edit to either copy
+      alone now trips the alarm loudly; changing the physics deliberately requires
+      editing both declarations, which is exactly the two-site friction the "never a
+      casual edit" rule wants. (2) Short zones (under 25 checked steps) get their own
+      coarser alarm bar at 10% instead of being alarm-exempt — measured: healthy short
+      zones read ≤1.5%, a genuinely wrong coefficient reads ~100%, so 10% separates by
+      an order of magnitude each way; the re-audit's demonstrated hiding spot (a
+      screaming 99.8% divergence in a 2-step zone, invisible under the old floor) now
+      alarms.
       **Participation floor (2026-08-06, closing addendum):** a zone's aggregate drives
       the alarm only when it spans at least 25 checked steps — an aggregate over fewer
       steps, squeezed between its two transient ends, cannot statistically resolve a 1%
@@ -719,6 +730,22 @@ sections that were later struck):**
     cannot disagree with the model. One fork is open for the operator: what non-surf
     marine locations (boating/fishing points the model doesn't cover) should show — see
     item 11's open question.]**
+
+    - **(i) The no-gain watchdog retired, replaced by engagement telemetry (2026-08-06,
+      re-audit finding F5):** once the F1 fix ENFORCES "published waves never exceed
+      their incoming energy" structurally, the old watchdog that merely OBSERVED that
+      property can never fire again — a decorative alarm, the same disease the audit
+      found in the closure check. Disposition: the watchdog (INVARIANT_12) is removed
+      from the alarm registry; in its place a plain log WARNING records each time the
+      bound actually engages (count and worst magnitude per run) — genuinely useful
+      telemetry ("how often is a pier/jetty absorbing energy mid-profile"), and
+      EXPECTED to appear on structure-crossing beach lines, so it is NOT gated to
+      zero. Consequence, stated plainly: the Round X reality-gate row that read "zero
+      firings of both new self-checks across 4 cycles" now reads "zero firings of the
+      closure self-check (INVARIANT_11); bound-engagement warning counts REPORTED in
+      the gate record without a pass/fail bar this round." This is a structural
+      consequence of an audit-driven fix, recorded before any live numbers exist —
+      not a tolerance loosened after seeing data.
 
 12. **The display layer is source-blind; the marine service/API owns the data (operator,
     2026-08-06, in chat).** Operator's words: "The forecast cards should not care or have
