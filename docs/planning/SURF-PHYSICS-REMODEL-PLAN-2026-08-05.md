@@ -451,6 +451,24 @@ premises):**
    D-7 plain-language label, exact wording operator-approved at the Z gate. Any chat override
    supersedes and is recorded here.
 
+10. **WW3 source ruling (operator, 2026-08-06, in chat): "WW3 data should be coming to us in
+    grib files that we have to parse. They should not be coming from erddap" + "WW3 SHOULD
+    NEVER EVER FALLBACK TO CRAP SOURCES … GET RID OF THESE FUCKING FALLBACKS."** Findings that
+    triggered it: `providers/marine/wavewatch.py` (the WW3 marine-forecast DISPLAY provider)
+    was switched wholesale to PacIOOS ERDDAP `ww3_global` (pae-paha.pacioos.hawaii.edu,
+    gridded bulk parameters, no spectrum, GFS-forced third-party re-host) during an earlier
+    "NOAA ERDDAP unreachable" divergence — the module's own docstring records the switch. The
+    SWAN boundary chain is NOT affected (verified live 2026-08-06: NOMADS
+    `gfswave.<station>.spec` full 50×36 2-D spectra, passthrough, no synthesis). **Task SW-2:
+    rewrite wavewatch.py to fetch NOAA gfswave GRIB2 from NOMADS and parse locally (eccodes/
+    grib_processor pattern already in-repo for HRRR/GFS wind), including NOAA's native swell
+    partition fields (swell 1/2/3 + wind wave); ERDDAP path deleted, no substitute source, on
+    failure the provider refuses (no-silent-fallback).** The boundary's SAME-PRODUCT
+    previous-cycle retry (NOMADS gfswave, ≤3 cycles) is retained unless the operator
+    explicitly orders otherwise (lead recommendation: keep — it is NOAA's own product, not a
+    source substitution; killing it = refusal for the 3–5 h after every NOAA cycle time).
+    Deploy slots into the post-M-0 sequence (embargo respected).
+
 9. **SW-1 added (operator order 2026-08-06, in chat, with Surfline + surf-forecast
    screenshots):** "figure out why you are still not getting the swell correct" (published
    swells don't match Surfline/surf-forecast for the same hour despite the shared NOAA WW3
