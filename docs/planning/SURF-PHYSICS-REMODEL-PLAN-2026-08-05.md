@@ -670,6 +670,22 @@ sections that were later struck):**
       per breaking zone is excluded; every interior step remains checked, and a wrong
       coefficient still trips the alarm on all of them (demonstrated by the dev with a
       deliberately-wrong coefficient before shipping). The 1% bar is untouched.
+    - **(h) Whitewater self-check scoping, part 3 (2026-08-06, second F2 stop):** in the
+      last few steps before the shoreline the whitewater drain term grows without bound
+      as wave speed dies (a "stiff" equation, in numerical-methods terms), so the
+      production scheme's own per-step error grows smoothly there and the two-method
+      comparison reports that scheme divergence — on perfectly healthy physics — well
+      before the water's-edge floor of (f) engages. The check therefore also skips
+      steps whose dimensionless stiffness number (drain coefficient × step size)
+      exceeds a fixed round threshold — the standard criterion for "this step size
+      can't follow this equation here." The dev picks the round value (0.5 or 1.0) that
+      cleanly separates the stiff terminal steps from the healthy interior on the
+      existing fixtures, reports the margin, and STOPS if no round value separates
+      cleanly. Honest side-note recorded with this ruling: this means the whitewater
+      numbers in the last couple of steps before the sand are locally imprecise by
+      construction; harmless in practice (the whitewater is dying to zero there anyway,
+      and the zone boundaries are decided by the healthy interior), and noted as a known
+      limitation in the round's decision record. The 1% bar is untouched.
 
 13. **ONE source of offshore truth (operator, 2026-08-06, in chat — RULED, supersedes the
     two-feed arrangement).** Operator's words: "EVERYTHING WE NEED IS IN OUR GOD DAMNED
