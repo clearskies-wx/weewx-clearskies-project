@@ -2029,20 +2029,22 @@ If datum matching cannot be confirmed — for example, if a DEM's `vertical_datu
 
 #### MarineForecastPoint
 
-Single timestep from WaveWatch III wave forecast, optionally enriched with OFS water temperature.
+Single timestep of a marine location's wave forecast, optionally enriched with OFS water temperature. **Source depends on the location (RW-1, register ruling 13, 2026-08-06):** surf-spot locations (`location.id in marine_config.surf_spots`) get every wave field below from the wave model's own computed swell breakdown (`services/model_wave_source.py`, reading the SWAN last-good cache's watershed partitions); all other locations get WaveWatch III's forecast, unchanged.
 
 | Field | Type | Unit group | Nullable | Description |
 |---|---|---|---|---|
 | `time` | str | — | No | Forecast valid time (UTC ISO-8601) |
-| `waveHeight` | float | `group_wave_height` | Yes | Significant wave height |
-| `wavePeriod` | float | `group_wave_period` | Yes | Peak wave period |
-| `waveDirection` | float | — | Yes | Peak wave direction (degrees true north) |
+| `waveHeight` | float | `group_wave_height` | Yes | Significant wave height. Surf spots: combined/total Hs across every partition (RSS-combine) at this timestep. |
+| `wavePeriod` | float | `group_wave_period` | Yes | Peak wave period. Surf spots: the largest partition's period (SWAN's own TPEAK convention). |
+| `waveDirection` | float | — | Yes | Peak wave direction (degrees true north). Surf spots: the largest partition's direction. |
 | `windSpeed` | float | `group_ocean_speed` | Yes | 10m wind speed |
 | `windDirection` | float | — | Yes | Wind direction |
-| `swellHeight` | float | `group_wave_height` | Yes | Primary swell height |
+| `swellHeight` | float | `group_wave_height` | Yes | Primary swell height. Surf spots: the largest partition whose `is_wind_sea` flag is False — never the wind-sea partition, whatever its height. |
 | `swellPeriod` | float | `group_wave_period` | Yes | Primary swell period |
 | `swellDirection` | float | — | Yes | Primary swell direction |
-| `windWaveHeight` | float | `group_wave_height` | Yes | Wind wave height |
+| `swell2Height` / `swell2Period` / `swell2Direction` | float | `group_wave_height` / `group_wave_period` / — | Yes | Second-largest non-wind-sea partition. Surf spots only — no other current source populates these. |
+| `swell3Height` / `swell3Period` / `swell3Direction` | float | `group_wave_height` / `group_wave_period` / — | Yes | Third-largest non-wind-sea partition. Surf spots only. |
+| `windWaveHeight` | float | `group_wave_height` | Yes | Wind wave height. Surf spots: the single partition whose `is_wind_sea` flag is True (SWAN watershed partition 1 in the raw TABLE output, before the descending-height re-sort — see `watershed_partitions_to_component_format()`, PROVIDER-MANUAL §14.15). `null` if this timestep has no wind-sea partition. |
 | `windWavePeriod` | float | `group_wave_period` | Yes | Wind wave period |
 | `windWaveDirection` | float | — | Yes | Wind wave direction (degrees true north) |
 | `waterTemp` | float | `group_temperature` | Yes | Sea surface water temperature from OFS model forecast time series. Populated by `ocean_data_resolver.resolve_forecast()` → `ofs.fetch_forecast()`. Null when OFS is not configured for the location, the location is on land, or all OFS cycles are unavailable. Source: `ofs.py` `fetch_forecast()`, PROVIDER-MANUAL §14.10. |
@@ -2202,7 +2204,7 @@ Summary snapshot for one marine location (used by the marine landing page locati
 
 | Card field | Primary source | Fallback | Unit conversion |
 |---|---|---|---|
-| `waveHeight` | WaveWatch III first forecast point (offshore, deep-water, 50 km resolution) | NDBC buoy Hs (already-fetched observation) → null. Suppressed (null) for harbor-classified locations. Surf forecasts use SWAN via the dedicated surf endpoint, not this card. | meter → operator `group_wave_height` |
+| `waveHeight` | **Surf-spot locations** (`location.id in marine_config.surf_spots`): the wave model's own computed swell breakdown, via `services/model_wave_source.py` reading the same SWAN last-good cache the surf endpoint uses (RW-1, register ruling 13 "ONE source of offshore truth", 2026-08-06) — combined/total Hs from that timestep's watershed partitions, never WaveWatch III. **All other locations:** WaveWatch III first forecast point (offshore, deep-water, 50 km resolution), unchanged. | NDBC buoy Hs (already-fetched observation) → null. Suppressed (null) for harbor-classified locations. A surf-spot location with no cached SWAN data yet (cold start) goes straight to this fallback — WaveWatch III is never used as a substitute for a surf spot. | meter → operator `group_wave_height` |
 | `windSpeed` | Station hardware via weewx archive (when `is_station_served()` returns True) | Configured forecast provider `fetch_current_conditions(lat, lon)` | Provider handles conversion |
 | `windDirection` | Same as windSpeed | Same as windSpeed | degrees (no conversion) |
 | `airTemp` | Same as windSpeed | Same as windSpeed | Provider handles conversion |
@@ -2922,7 +2924,7 @@ When no marine locations are configured (no `[marine]` section in `api.conf`), n
 | `observation.airTemp` | Station hardware | `marine_weather_cache` | °C internal |
 | `observation.pressure` | Station hardware | `marine_weather_cache` | hPa internal |
 | `observation.visibility` | `marine_weather_cache` | null | km internal |
-| `observation.waveHeight` | WaveWatch III first forecast point (offshore, deep-water) | NDBC buoy Hs (already-fetched observation) → null | Meters internal. Surf forecasts use SWAN via the dedicated surf endpoint, not this field. Null for harbor locations. |
+| `observation.waveHeight` | **Surf-spot locations:** the wave model's own computed swell breakdown via `services/model_wave_source.py` (RW-1, register ruling 13, 2026-08-06), never WaveWatch III. **All other locations:** WaveWatch III first forecast point (offshore, deep-water), unchanged. | NDBC buoy Hs (already-fetched observation) → null | Meters internal. Null for harbor locations. |
 | `observation.waterTemp` | `ocean_data_resolver.resolve()` (OFS → MUR SST → RTOFS) | NDBC buoy | °C internal |
 | `observation.weatherCode` | `marine_weather_cache` | null | WMO code integer |
 | `observation.isDay` | `marine_weather_cache` | null | boolean |
