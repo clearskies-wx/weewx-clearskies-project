@@ -37,22 +37,33 @@ early-exit among … candidate `continue` points"); count noted for the gate rec
   the BD precedent at :895-898 — aggregate, never per-(transect,hour).)
 
 ### 2. Health flag — authoritative counter at the PIPELINE site
+**[AMENDED 2026-08-06 during dispatch — dev found `spot_id` never reaches surf_1d_pipeline.py;
+the original `record_health_flag` param design is DROPPED. Lead ruling, option (b):]**
 - `services/surf_1d_pipeline.py` `_run_pipeline_per_transect()` (:1513-1597): count the
-  `if not parts:` bulk-fallback branch (:1577) per call (one call = one timestep). This is the
-  authoritative bulk-fallback ground truth — it catches BOTH mechanism (A) (entry present,
-  `components=[]`) and mechanism (B) (entry absent) collapses.
-- New module design constants (top of surf_1d_pipeline.py, near existing constants; documented
-  as DESIGN CONSTANTS reviewed at the H-1 gate, NOT admin config):
-  `_H1_BULK_FALLBACK_MIN_COUNT = 8`, `_H1_BULK_FALLBACK_MIN_FRACTION = 0.25`.
-  Flag fires when `fallback_count >= max(_H1_BULK_FALLBACK_MIN_COUNT,
-  ceil(_H1_BULK_FALLBACK_MIN_FRACTION * n_transects))`.
+  `if not parts:` bulk-fallback branch (:1577) per call (one call = one timestep) — needs no
+  spot_id. This is the authoritative bulk-fallback ground truth — it catches BOTH mechanism (A)
+  (entry present, `components=[]`) and mechanism (B) (entry absent) collapses.
+- The count + transect total ride back on the EXISTING internal result object `run_pipeline()`
+  builds (PipelineResult or equivalent): new dataclass fields with defaults
+  `bulk_fallback_count: int = 0` (+ `bulk_fallback_transect_total: int = 0` only if no usable
+  transect-total field already exists). **HARD CONSTRAINT: these fields must NOT enter any
+  serialized/persisted payload** — `_pipeline_result_to_dict`, the swelltrack trimmed codec,
+  and every cache/wire shape stay untouched (trigger-7 edge; internal result-object fields are
+  fine per the plan's own X-D5 precedent).
+- New module design constants (top of surf_1d_pipeline.py; DESIGN CONSTANTS reviewed at the
+  H-1 gate, NOT admin config): `_H1_BULK_FALLBACK_MIN_COUNT = 8`,
+  `_H1_BULK_FALLBACK_MIN_FRACTION = 0.25`, plus pure helper
+  `bulk_fallback_flag_threshold(n_transects) -> int` returning
+  `max(MIN_COUNT, ceil(MIN_FRACTION * n_transects))`.
   Rationale for gate review: observed collapse events are 154–162/162 (95–100%); healthy hours
   are 0–2; 25%-with-floor-8 has wide margin both directions and stays meaningful at the
   32-transect beach_profile spot config (flag at 8).
-- Recording is gated to the PRECOMPUTE path only (new keyword-only param
-  `record_health_flag: bool = False`, set True only at the SWAN-cycle precompute call sites in
-  `providers/nearshore/swan.py` — locate via the `_precompute_swelltrack_for_spot` chain).
-  Request-time on-demand pipeline runs must NOT write cycle state.
+- The state write happens in `providers/nearshore/swan.py` inside
+  `_precompute_swelltrack_for_spot()`'s per-timestep loop (which has spot_id, time_iso, and the
+  returned result): `if result.bulk_fallback_count >= bulk_fallback_flag_threshold(total):
+  state.record_bulk_fallback_hour(...)`. That loop runs ONLY on SWAN-cycle precompute (full run
+  + quick-update), so on-demand endpoint requests never write cycle state — the gating the
+  dropped param existed for is achieved by call-site placement.
 
 ### 3. State registry — `state.py`
 New registry, rebuild-per-cycle shape (same pattern as `_l3_viability_failures` :166/:213-240):
@@ -83,8 +94,9 @@ re-raise. The generic handler stays as-is. Import `BoundaryNotViableError` from
 
 ### Tests (test-author, separate commit, same round)
 - Forced-collapse: `_run_pipeline_per_transect` fed a timestep where every transect has empty
-  parts (with `record_health_flag=True`) → registry entry present, count == n_transects;
-  below-threshold case → no entry.
+  parts → result object's `bulk_fallback_count == n_transects`; threshold helper KAT
+  (`bulk_fallback_flag_threshold`: n=162→41, n=32→8, n=8→8, n=0→8); plus a swan.py-level test
+  (or direct state call) proving count ≥ threshold → registry entry present, below → absent.
 - Four exit-path tests on `_select_l3_handoff_position_and_spectrum` — force each exit
   independently (fixtures per cause), assert `exit_causes_out` records the right slug and the
   entry is absent from the return. (These mirror the H-1 adversarial brief.)
