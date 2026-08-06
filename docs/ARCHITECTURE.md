@@ -561,6 +561,8 @@ Wizard steps are defined by `wizard/routes.py` and `templates/wizard/step_*.html
 | `/admin/marine/coverage` | POST | HTMX: data coverage panel for a location's coordinates (T3.6) |
 | `/admin/marine/test-connectivity` | POST | HTMX: NDBC/CO-OPS/NWS zone status for a location |
 | `/admin/marine/bathymetry` | POST | HTMX: re-run bathymetry download for a surf location |
+| `/admin/surf-scoring` | GET | Surf score weights form (Round S, ADR-101) |
+| `/admin/surf-scoring` | POST | Validate + save top-level `[surf_scoring]` via `/setup/apply` |
 
 **Provider data source:** Provider sections (forecast, alerts, aqi, earthquakes, radar) read their current values from the API's `/setup/current-config` endpoint (on the weewx host), not from the local `api.conf`. This ensures the admin always shows the authoritative config. Falls back to the local `api.conf` if the API is unreachable. The radar section includes LibreWxR-specific fields (endpoint mode, self-hosted URL, geographic bounds) when LibreWxR is the configured provider.
 
