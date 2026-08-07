@@ -125,6 +125,77 @@ cycles** (ratbert `dmesg` clean for the marine cgroup — raw output pasted); po
 sweep (pre/post ERROR/WARNING class counts). No other task's deploy or reality gate may run
 before M-0 closes.
 
+## Task M-0d — precomputed profile store (operator ruling 2026-08-07; eliminates on-demand beach profile and heat map assembly)
+
+**Operator mandate (2026-08-07, in chat):** "after we run the model, there is no reason we should
+be re-assembling outputs like the beach profile or heat map on demand... these only need to be
+developed once per model run for each area, and then stored for recall. Plus no user is going to
+wait 30 seconds for it to assemble, nor should they. This was bad design."
+
+**Root cause:** `GET /surf/{id}/profile` (beach profile chart, `transect_index=best`) and
+`GET /surf/{id}/profile?transect_index=all` (heat map) always run the full 162-transect 1D
+pipeline on demand — even when the same pipeline already ran during the SWAN cycle's precompute
+phase. The precomputed swelltrack cache deliberately drops the heavy arrays (the M-0/D-1b memory
+fix), so the profile endpoint cannot read them from cache and must recompute. With Round X physics
+(Q_b Brent solve + roller march + invariant checking per transect), this on-demand computation
+exceeds the 45-second API proxy timeout. Both the beach profile chart and the surf height heat map
+fail to load.
+
+**Design (operator-approved 2026-08-07):**
+
+1. **Precompute and store, not recompute.** During the existing `_precompute_swelltrack_for_spot()`
+   loop, after computing each timestep's PipelineResult: write the UNTRIMMED per-transect data
+   (hs_total_profile, distances, depths, combined_roller_energy_profile, per_partition break
+   results) to a per-spot SQLite database — one row per timestep, all 162 transects per row. The
+   trimmed swelltrack cache is written as before (unchanged). The full PipelineResult is freed
+   after both writes. Memory stays flat per `rules/coding.md` §12.2.
+
+2. **Storage format:** SQLite per spot (`rules/coding.md` §12.1 — random-access by timestep,
+   single file, atomic writes, no monolithic load). Location:
+   `/var/run/weewx-clearskies/swan/profile_store/{spot_id}.db`. Table:
+   `precomputed_profiles(timestep TEXT PRIMARY KEY, data BLOB)` where `data` is the serialized
+   untrimmed TransectResult set for all 162 transects at that timestep. Estimated size: ~10 MB per
+   timestep × 72 timesteps = ~720 MB on disk per spot. In memory: ONE timestep loaded at a time
+   (~10 MB).
+
+3. **Endpoint change:** `beach_profile.py` checks the SQLite store for the closest timestep
+   first. If data exists, reads the stored TransectResult arrays and runs only the cheap rendering
+   code (`_build_transect_profile` — zone classification, wave shapes, jacking factors: array
+   lookups, no pipeline). If no stored data exists (cold start, stale DB), falls back to on-demand
+   pipeline computation. Response shape is identical — no data-contract change.
+
+4. **Lifecycle:** each SWAN cycle (full run and quick-update) overwrites all rows for the spot
+   (DELETE + INSERT inside a transaction). `reestablish_spot()` teardown deletes the DB file.
+
+**Files (allowlist):**
+- `weewx_clearskies_marine/providers/nearshore/swan.py` — write to SQLite after pipeline, in the
+  existing `_precompute_swelltrack_for_spot()` loop.
+- `weewx_clearskies_marine/endpoints/beach_profile.py` — read from SQLite instead of running
+  on-demand pipeline; fall back to on-demand on cache miss.
+- `weewx_clearskies_marine/services/swelltrack_cache.py` — serialization/deserialization for the
+  untrimmed TransectResult arrays (the trimmed codec already exists; this adds a parallel
+  full-resolution codec).
+- `weewx_clearskies_marine/tools/reestablish_spot.py` — add profile_store DB to teardown list.
+- Tests: `tests/test_m0d_profile_store.py` (new) — precompute writes, endpoint reads, cold-start
+  fallback, reestablish teardown.
+
+**Accept criteria:**
+- Beach profile endpoint responds in <2 seconds (was >45s) after a completed SWAN cycle.
+- Heat map endpoint (`transect_index=all`) responds in <5 seconds (was >45s).
+- Response is byte-identical to the on-demand computation for the same timestep (KAT: run both
+  paths on the same inputs, diff the JSON).
+- Memory: the precompute loop's peak RSS does not increase by more than 20 MB over the
+  pre-M-0d baseline (measured: the stored data is written to disk and freed each iteration).
+- Cold-start path: on first request after service restart with no SQLite DB, falls back to
+  on-demand computation (modelStatus: "unavailable" until first SWAN cycle completes is also
+  acceptable — surface to operator at gate).
+- `reestablish_spot()` deletes the profile_store DB file.
+
+**Adversarial brief:** "Prove the stored profile diverges from a live on-demand computation for
+the same timestep — run both paths, diff every field. Prove memory grows across the precompute
+loop's timestep iterations (§12.2 violation). Prove a stale profile from a previous SWAN cycle
+survives into the current cycle's served data. Prove `reestablish_spot()` leaves the DB behind."
+
 ## Task H-1 — handoff-collapse instrumentation and fix (per D-3/D-4; before X's reality gate)
 
 1. Each of the three silent exit points in `swan_runner.py:908-1011` gets a WARNING naming the
@@ -403,12 +474,12 @@ screenshot check; segment-length scale agreement ≤1%).
 |---|---|---|---|
 | `docs/decisions/ADR-102-statistical-breaking-roller.md` (NEW) | X | The X-DESIGN verbatim: Q_b relation, constants (γ 0.73, Γ 0.40, K 0.15, Q_B_VISIBLE 0.05, Q_B_CESSATION 0.02, β_D 0.10), one-sidedness, roller balance, cap deletion, closure invariants, worked X-K2 example. Status Accepted on operator gate pass. | Open |
 | `docs/decisions/ADR-103-spectral-boundary.md` | H-1 | REWRITTEN from the original plan's version: documents the boundary design that ACTUALLY exists (multi-station BOUNDSPEC, station selection, refuse-don't-degrade per D-3) — NOT the struck three-tier design. | Open |
-| `docs/ARCHITECTURE.md` | H-1, X, Z | H-1: handoff-collapse instrumentation + health flag; X: breaking model → statistical Q_b + roller, cap removed; Z: transect selection + stickiness, fine-grid anchor, `reestablish_spot` lifecycle rule. | Open |
-| `docs/manuals/PROVIDER-MANUAL.md` | H-1 | Bulk-fallback semantics, new WARNING classes, health flag meaning. | Open |
-| `docs/manuals/API-MANUAL.md` | X, Z | §17–18: break-point semantics (Q_b-based onset, one point per bar), whitewater/impact-zone derivation from roller (X); `transectIndex` display contract + stickiness note (Z). | Open |
+| `docs/ARCHITECTURE.md` | H-1, X, Z, M-0d | H-1: handoff-collapse instrumentation + health flag; X: breaking model → statistical Q_b + roller, cap removed; Z: transect selection + stickiness, fine-grid anchor, `reestablish_spot` lifecycle rule; M-0d: precomputed profile store (SQLite per spot, beach profile + heat map served from store not recomputed). | Open |
+| `docs/manuals/PROVIDER-MANUAL.md` | H-1, M-0d | Bulk-fallback semantics, new WARNING classes, health flag meaning (H-1); precomputed profile store lifecycle, SQLite schema, write-during-precompute / read-at-endpoint pattern (M-0d). | Open |
+| `docs/manuals/API-MANUAL.md` | X, Z, M-0d | §17–18: break-point semantics (Q_b-based onset, one point per bar), whitewater/impact-zone derivation from roller (X); `transectIndex` display contract + stickiness note (Z); M-0d: profile endpoint now precomputed (response shape unchanged; latency <2s best / <5s all, was >45s). | Open |
 | `docs/manuals/DASHBOARD-MANUAL.md` | Z | Label per D-7 + heat-map imagery registration (data-frame-authoritative rule, control-point transform). | Open (catch-up DOC-0 **DONE** `e5a94e1`) |
 | `docs/manuals/DESIGN-MANUAL.md` | Z | Label pattern per D-7. | Open (catch-up **DONE** `e5a94e1`) |
-| `docs/manuals/OPERATIONS-MANUAL.md` | M-0, H-1 | M-0: cache lifecycle per D-1(b); H-1: new health reasons, invariant names and what firing means. | Open |
+| `docs/manuals/OPERATIONS-MANUAL.md` | M-0, H-1, M-0d | M-0: cache lifecycle per D-1(b); H-1: new health reasons, invariant names and what firing means; M-0d: new persisted file (`/var/run/weewx-clearskies/swan/profile_store/{spot_id}.db`), lifecycle (overwritten each SWAN cycle, deleted by `reestablish_spot()`). | Open |
 | Operator Manual + `help.admin.surf_scoring.*` | — | **DONE** (DOC-1: stack `940047f`, meta `86b9d4e`). | Done |
 | ~~`docs/reference/swan-commands-extract.md`~~ | — | Row struck: file FROZEN as pure manual extract (operator ruling 2026-08-06, `caf49e8`); never carries project usage. | Struck |
 | `docs/planning/EYEBALL-FIX-PLAN-2026-08-04.md` | X window | STATUS points here for all physics work; S-5 code change (dominant-partition direction, ruled 2026-08-05) scheduled in X's window (small, marine repo unfrozen). | Open |
@@ -822,3 +893,24 @@ sections that were later struck):**
     never embed source knowledge or timing logic. (SW-2 as shipped conforms: no dashboard
     code was touched; the served forecast cadence is unchanged; the 10-minute
     publication-poll is internal to the service.)
+
+14. **Beach profile and heat map are precomputed, not assembled on demand (operator,
+    2026-08-07, in chat).** Operator's words: "after we run the model, there is no reason
+    we should be re-assembling outputs like the beach profile or heat map on demand... these
+    only need to be developed once per model run for each area, and then stored for recall.
+    Plus no user is going to wait 30 seconds for it to assemble, nor should they. This was
+    bad design." The profile endpoint's per-request full-pipeline recomputation is eliminated.
+    The precompute SWAN cycle writes untrimmed per-transect pipeline output to a per-spot
+    SQLite store; the endpoint reads from the store and runs only cheap rendering (zone
+    classification, wave shapes — array lookups, not the pipeline). Response shape unchanged.
+    New persisted file: `/var/run/weewx-clearskies/swan/profile_store/{spot_id}.db`.
+    Memory management rules codified in `rules/coding.md` §12 (same session). Task M-0d.
+
+15. **Memory management rules are codified and auditor-enforced (operator, 2026-08-07).**
+    Eight guidance-flavored rules in `rules/coding.md` §12, covering storage-format choice
+    (§12.1), per-iteration memory flatness (§12.2), explicit freeing at high-water-mark
+    points (§12.3), log-volume-as-memory (§12.4), numpy-over-lists (§12.5), `__slots__` at
+    scale (§12.6), tracemalloc observability (§12.7), and streaming for large inputs (§12.8).
+    The adversarial auditor agent (`clearskies-auditor.md`) now reads §12 and includes memory
+    discipline as a standing audit category — including in adversarial reviews where OOM paths
+    are actively hunted.

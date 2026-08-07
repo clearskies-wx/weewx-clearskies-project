@@ -678,3 +678,80 @@ Before modifying code in any Clear Skies repo, read the governing manual for tha
 - UI visual code (design tokens, components, styling) → read `docs/manuals/DESIGN-MANUAL.md` (already in §9)
 
 Manual rules are prescriptive. If the code doesn't match the manual, the code is wrong unless the manual is explicitly marked as pending implementation. When a code change affects manual rules, update the manual in the same commit (see CLAUDE.md doc-code sync rule).
+
+## 12. Memory management — keep the footprint honest
+
+This project runs scientific models on a memory-constrained host (6 GB LXC container) alongside
+other services. Memory discipline is not optional — an OOM kill takes down the whole service, not
+just the computation that overflowed.
+
+These are not absolute mandates. They are the questions you must ask before writing code that
+touches data of non-trivial size. The right answer depends on the specific case — but the question
+must be asked, and the choice must be justified in a code comment when it departs from the
+preferred direction.
+
+**Why (2026-08-07):** the marine service grew to 2.9 GB during a SWAN cycle and was OOM-killed,
+taking down the beach profile and surf height map for the site. The 1D analytical model is trivial
+math — the memory came from holding full-resolution intermediate results across loop iterations,
+monolithic JSON cache loads, and unbounded log volume from invariant firings. Every rule below
+traces to a specific class of waste found in that investigation.
+
+### 12.1 — Choose the right storage format for the access pattern
+
+If data is written whole but read by key (spot ID, timestep, location), a random-access format
+(SQLite, per-key files) is almost always better than a single monolithic file (one big JSON, one
+big pickle). JSON and pickle must be deserialized entirely to read one field. SQLite and per-key
+files let you load only what the current request needs. When choosing a persistence format, state
+the access pattern in the code comment and justify the choice.
+
+### 12.2 — Hold only what the current computation needs
+
+When processing items in a loop (timesteps, transects, grid points), the memory footprint after
+each iteration should be approximately constant — not growing with the iteration count. After each
+iteration's results are serialized or persisted, the source objects (full-resolution arrays,
+intermediate dataclass instances) should not survive into the next iteration. If you need to
+accumulate across iterations, accumulate the trimmed/serialized form, not the full working set.
+
+### 12.3 — Free heavy objects explicitly at high-water-mark points
+
+CPython's refcount GC handles most cleanup automatically, but numpy array views, logging
+tracebacks, and exception context chains can hold references the programmer didn't intend. At
+identified high-water-mark points (end of a per-timestep pipeline call, end of a per-spot batch),
+explicitly `del` the heavy objects. Call `gc.collect()` only when profiling has shown it helps —
+not as a blanket habit.
+
+### 12.4 — Log volume is memory
+
+Each log call captures a call frame. An invariant or warning that fires once per transect per
+timestep can produce thousands of log calls per cycle. On a memory-constrained host, this is a
+memory problem, not just a log-noise problem. When a condition can fire many times in a tight
+loop, log the first occurrence with full detail and a summary count at the end — not one full
+message per firing.
+
+### 12.5 — Prefer numpy arrays over Python lists for large numeric sequences
+
+A Python list of 2000 floats costs ~64 KB (each float is a 28-byte object plus an 8-byte
+pointer). A numpy float64 array of 2000 elements costs ~16 KB (contiguous, no per-element
+overhead). For profile data, depth arrays, wave height arrays, and similar numeric sequences,
+numpy is the default — Python lists are for small, mixed-type, or structural data.
+
+### 12.6 — Use `__slots__` on dataclasses instantiated at scale
+
+A class instantiated thousands of times per cycle (one per transect per timestep) carries a
+`__dict__` on every instance (~200 bytes each). `@dataclass(slots=True)` eliminates this. Apply
+it when the instance count × dict overhead is material (rule of thumb: more than ~1000 instances
+in a single cycle).
+
+### 12.7 — Make memory observable
+
+Any function that processes a loop of large or variable cardinality should be instrumentable with
+`tracemalloc` snapshots — logging peak resident memory at the end of the loop, controllable by a
+config flag or log level. This is how the next memory problem gets caught in development instead
+of by an OOM kill in production.
+
+### 12.8 — Stream or chunk when the input size is unbounded or large
+
+When reading files, network responses, or database result sets whose size is not bounded by
+design, prefer streaming (line-by-line, chunk-by-chunk, cursor-based) over materializing the full
+content. When the format requires full materialization (JSON, pickle), that is a signal to
+evaluate whether the format is right for the access pattern (see 12.1).

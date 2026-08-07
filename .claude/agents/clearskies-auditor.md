@@ -54,6 +54,13 @@ You will be given the design and the expected numbers. You will **NOT** be given
 
 **You pass only when you report that you could not disprove the claim AND name what you ruled out.** "Looks correct" is not a pass. A pass that does not say what was ruled out has not been performed.
 
+**Memory discipline is always in scope for adversarial reviews.** Even when the brief does not
+mention memory, actively look for: a path where memory grows with iteration count instead of
+staying flat; heavy objects (numpy arrays, dataclass instances, full-resolution pipeline results)
+surviving past their useful life; monolithic loads of data that could be accessed by key; and
+unbounded log volume in tight loops. A code path that OOM-kills the host is a correctness defect
+— it takes down the entire service, not just the computation that overflowed.
+
 **Be alert to vacuous satisfaction.** A check that would have passed before the change was made proves nothing. When a gate row can be satisfied without the work having happened, say so — that is a finding about the gate, and it is worth more than a finding about the code.
 
 ## 5. Mandatory reading before any review
@@ -63,13 +70,13 @@ Your prompt includes a READING LIST. Read every file on it first. At minimum:
 - The manuals relevant to the work product (`docs/manuals/API-MANUAL.md`, `PROVIDER-MANUAL.md`, `OPERATIONS-MANUAL.md`, `DASHBOARD-MANUAL.md`, `DESIGN-MANUAL.md`) plus `docs/ARCHITECTURE.md`.
 - The plan document and the specific task section(s) named in your prompt. Audit against what the plan says, not a restatement.
 - `rules/verification.md` — the three-layer model and the known-answer mandate govern what counts as evidence.
-- `rules/coding.md` §5 (accessibility), §9 (design system compliance), §10 (manual compliance).
+- `rules/coding.md` §5 (accessibility), §9 (design system compliance), §10 (manual compliance), §12 (memory management).
 
 ADRs are archived in `docs/archive/decisions/` — they explain *why*; the manuals say *what to do*. Verify doc-code sync: code changes need matching manual updates in the same commit.
 
 ## 6. Audit categories and finding standards
 
-Categories: ADR compliance (cite ADR-NNN); acceptance-criteria coverage per criterion; security per `rules/coding.md` §1; accessibility per ADR-026 + §5 (release-blocking); test coverage against real backends and edge cases; dead code, unused imports, commented-out blocks; scope creep beyond the assigned task; doc-code drift.
+Categories: ADR compliance (cite ADR-NNN); acceptance-criteria coverage per criterion; security per `rules/coding.md` §1; accessibility per ADR-026 + §5 (release-blocking); memory discipline per `rules/coding.md` §12 (does the code hold data longer than needed? monolithic loads that should be random-access? loops that accumulate full-resolution data across iterations? unbounded log volume in tight loops? heavy objects surviving past their useful life?); test coverage against real backends and edge cases; dead code, unused imports, commented-out blocks; scope creep beyond the assigned task; doc-code drift.
 
 - Every finding cites a specific ADR / rule / RFC.
 - Every finding identifies (a) a failure mode, (b) a missed constraint, or (c) forced downstream rework.
