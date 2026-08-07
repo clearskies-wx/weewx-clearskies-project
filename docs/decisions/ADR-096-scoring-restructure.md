@@ -35,7 +35,7 @@ Five changes to the surf scoring system:
 
 **Decision 1: Three weighted factors.** Restructure from 4 factors (height 35%, period 35%, wind 20%, swell dominance 10%) to 3 factors (height 35%, period 35%, organization 30%). Organization is a composite sub-score: wind effect 50% (15% effective), swell dominance 25% (7.5%), directional spread 15% (4.5%), cross-swell interference 10% (3%).
 
-**Decision 2: All scoring from SWAN.** NDBC spectral data removed from the scoring pipeline. `_effective_swell()` no longer overrides SWAN values. The scorer uses SWAN height/period/direction directly. NDBC spectral data retained in the surf response as reference data — not passed to `score_surf()`.
+**Decision 2: All scoring from SWAN.** NDBC spectral data removed from the scoring pipeline. `_effective_swell()` no longer overrides SWAN values. The scorer uses SWAN height/period/direction directly. NDBC spectral data retained in the surf response as reference data — not passed to `score_surf()`. **Superseded by Amendment 2 (2026-08-07): NDBC is no longer fetched by the surf endpoint at all — see Amendment 2.**
 
 **Decision 3: All penalty/bonus factors surfaced.** Beach alignment (existing), directional exposure (was hidden), and time of day (was hidden) appear in the scoring breakdown as signed integers. `total = height + period + organization + beachAlignment + directionalExposure + timeOfDay`.
 
@@ -67,7 +67,7 @@ Five changes to the surf scoring system:
 - [ ] `windSource` returns `"hrrr"` or `"gfs"` (not `"hrrr_trushore"` or `"gfs_trushore"`)
 - [ ] `grep -ri trushore` returns zero hits in active code, config, and governing docs
 - [ ] Dashboard displays "Model: SWAN" (not "SWAN+TruShore")
-- [ ] NDBC fetch and `spectralComponents` response field retained as reference data
+- [ ] ~~NDBC fetch and `spectralComponents` response field retained as reference data~~ — **superseded by Amendment 2 (2026-08-07), criterion no longer applies:** NDBC fetch removed from the surf endpoint entirely; `spectralComponents` is now sourced from SWAN's own `multiSwell` (first timestep), not NDBC.
 - [ ] `multiSwell` populated from SWAN SPECOUT, not NDBC
 
 ## Implementation guidance
@@ -97,6 +97,16 @@ Per SURF-ZONE-MODEL-BRIEF and SURF-1D-IMPLEMENTATION-PLAN:
 - **Jacking factor → wave quality sub-factor.** High jacking (>1.5×) indicates steep bars with hollow waves — bonus for experienced surfers. Added after validation (Phase 8).
 
 **Face height input — amended.** `breakingFaceHeight` now comes from H1/10 (1.27× Hs) applied at the 1D model's break point, not full K-G at ~10m. Scoring thresholds (`_WAVE_HEIGHT_RANGES_FT`) must be validated against the new face height values before deployment.
+
+### Amendment 2 (2026-08-07): NDBC removed from surf endpoint; dominant swell selected by energy
+
+Two operator rulings, 2026-08-07 (in chat):
+
+**NDBC removal.** "everything coming from the same source, from our model and not a buoy." The NDBC buoy fetch (`providers/buoy/ndbc.py` call in `endpoints/surf.py`) is removed from the surf endpoint entirely — not merely excluded from scoring as Decision 2 above specified. `spectralComponents` in the surf response is now populated from the SWAN model's own `multiSwell` (deep-water reference decomposition), taken from the first forecast timestep that has one — the same source every other spectral/swell field on the surf card already used. `source` changes from `"swan+ndbc+coops+nws_srf"` to `"swan+coops+nws_srf"`. This supersedes Decision 2's "NDBC spectral data retained in the surf response as reference data" and the corresponding acceptance criterion above. Marine `8e17e84`.
+
+**Dominant swell selection — physics fix.** "This is not a design decision, this is a physics decision." Every place the surf endpoint or scorer picks the "dominant" partition out of a spot's multiSwell list now ranks by **total partition energy**, proxied as `Hs² · Tp` — proportional to deep-water wave power (`P ∝ Hs²·Cg`, `Cg ∝ Tp` in deep water) — instead of raw partition height or the partition's `energy` field (which is peak spectral *density*, m²/Hz, not integrated energy, and incorrectly ranks short-period wind swell above a longer-period swell carrying more total energy). This matches the NDBC standard (waveobs.shtml): "If more than one swell is present, this is the period of the swell containing the maximum energy." New helper `_partition_energy(c)` in `surf_scorer.py` implements the `Hs²·Tp` proxy; six call sites were updated to use it: `_total_energy()`, `_swell_dominance()`, `_dominant_partition()` (Power scoring), `_effective_swell()` (display period/direction feeding `conditionsText`), `_cross_swell_score()` (interference detection), and `endpoints/surf.py`'s dominant-partition selection for the `swellHeight` display field. `score_surf()` itself still receives the bulk `wave_period`/`wave_direction` for Size scoring — unchanged; only the display/organization-adjacent selections above changed. Marine `8e17e84`, tests 55/55 passing.
+
+See API-MANUAL.md (spectralComponents, `source`, and dominant-swell-selection sections) for the wire-facing documentation of both changes.
 
 ## References
 
