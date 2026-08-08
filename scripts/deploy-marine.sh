@@ -40,13 +40,21 @@
 # CLAUDE.md "Filesystem permissions on containers" forbids and which would
 # break the old services mid-transition. Match the host's existing user.
 #
-# ReadWritePaths must cover THREE directories, not one. The shipped unit
+# ReadWritePaths must cover FOUR directories, not one. The shipped unit
 # lists only /etc/weewx-clearskies/marine, which was correct for the Phase 4
 # scaffold (TLS cert + marine.conf) but not after Phase 5 moved the SWAN code
 # in. Under ProtectSystem=strict the service also needs:
-#   /etc/weewx-clearskies      — swan_bathymetry_L*.json, swan_grid_sizing.json,
-#                                spot_profiles/, great_lakes/, operator_bathymetry/
-#   /var/run/weewx-clearskies  — SWAN work dirs, hotstart files, forecast_cache.json
+#   /etc/weewx-clearskies          — swan_bathymetry_L*.json, swan_grid_sizing.json,
+#                                    spot_profiles/, great_lakes/, operator_bathymetry/
+#   /var/run/weewx-clearskies      — shared parent; the API's loop.sock lives here.
+#                                    SWAN no longer writes under it (see next line) —
+#                                    kept ONLY for the loop socket (SURF-REMEDIATION-
+#                                    PLAN-2026-08-08 Phase R4).
+#   /var/lib/weewx-clearskies/swan — SWAN work dirs, hotstart files, forecast_cache.json.
+#                                    Real disk, not tmpfs. Moved off /var/run/weewx-
+#                                    clearskies/swan (RAM-backed) in Phase R4: cgroup
+#                                    memory accounting was charging the tmpfs pages to
+#                                    the service (measured 5.1G memory peak vs a 6G cap).
 # Without them every SWAN cycle fails on a read-only filesystem error.
 #
 # ITS OWN VENV, not the API repo's. deploy-compute.sh installs into the API
@@ -238,15 +246,19 @@ RestartSec=5
 NoNewPrivileges=true
 ProtectSystem=strict
 PrivateTmp=true
-# THREE paths, not one. TLS cert + marine.conf live in ${CONF_DIR}; the SWAN
+# FOUR paths, not one. TLS cert + marine.conf live in ${CONF_DIR}; the SWAN
 # pipeline moved in at Phase 5 also writes bathymetry caches, grid sizing and
-# spot profiles under /etc/weewx-clearskies, and its work dirs, hotstart files
-# and forecast cache under /var/run/weewx-clearskies. Under
-# ProtectSystem=strict, omitting either makes every SWAN cycle fail on a
-# read-only filesystem.
+# spot profiles under /etc/weewx-clearskies. /var/run/weewx-clearskies is kept
+# ONLY for the API's loop.sock -- SWAN no longer writes there (Phase R4). SWAN
+# work dirs, hotstart files and forecast cache now live on real disk under
+# /var/lib/weewx-clearskies/swan (SURF-REMEDIATION-PLAN-2026-08-08 Phase R4:
+# /var/run was tmpfs, and cgroup memory accounting charged those pages to the
+# service). Under ProtectSystem=strict, omitting any of these makes every SWAN
+# cycle fail on a read-only filesystem.
 ReadWritePaths=${CONF_DIR}
 ReadWritePaths=/etc/weewx-clearskies
 ReadWritePaths=/var/run/weewx-clearskies
+ReadWritePaths=/var/lib/weewx-clearskies/swan
 # The B1 DEBUG trace (services/trace.py) writes
 # /var/log/weewx-clearskies/marine-trace-{YYYYMMDD}.jsonl when
 # CLEARSKIES_MARINE_DEBUG_TRACE is set. /var is read-only under
@@ -264,6 +276,40 @@ run_root "install -o root -g root -m 0644 /tmp/${SERVICE}.service /etc/systemd/s
 run_root "systemctl daemon-reload"
 run_root "systemctl enable ${SERVICE}"
 echo "[svc] unit installed and enabled"
+
+# --- Bootstrap: /var/lib/weewx-clearskies/swan (Phase R4) ---
+# /var/lib/weewx-clearskies exists root-owned on librewxr already (14 GB of
+# unrelated root content) -- this creates ONLY the swan/ subdirectory, owned
+# by ubuntu, without touching or re-owning anything else under the parent
+# (lead ruling, SURF-REMEDIATION-PLAN-2026-08-08 Phase R4.1(e); CLAUDE.md
+# bans chown on existing content). Idempotent: install -d no-ops if the
+# directory already exists with the right owner/mode.
+echo "--- bootstrap: /var/lib/weewx-clearskies/swan ---"
+run_root "install -d -o ubuntu -g ubuntu -m 0750 /var/lib/weewx-clearskies/swan"
+echo "[bootstrap] /var/lib/weewx-clearskies/swan ready"
+
+# --- Migrate: SWAN working-tree state, /var/run -> /var/lib (Phase R4) ---
+# Runs once, idempotent: only copies when the OLD (tmpfs) forecast cache
+# exists AND the NEW root does not have it yet. Copy, not move -- the old
+# tree is left in place; the lead deletes it manually after the first
+# verified post-move cycle (not scripted here, per Phase R4.3 design). This
+# avoids the D-1a forecast-gap lesson: moving the cache aside cost a
+# forecast gap; copying does not.
+echo "--- migrate: SWAN state /var/run -> /var/lib (Phase R4, one-time) ---"
+OLD_SWAN_ROOT=/var/run/weewx-clearskies/swan
+NEW_SWAN_ROOT=/var/lib/weewx-clearskies/swan
+if $SSH_CMD librewxr "sudo -u ubuntu test -f ${OLD_SWAN_ROOT}/forecast_cache.json" 2>/dev/null \
+   && ! $SSH_CMD librewxr "sudo -u ubuntu test -f ${NEW_SWAN_ROOT}/forecast_cache.json" 2>/dev/null; then
+    echo "[migrate] old SWAN state found, new root empty -- copying (preserving mtimes)"
+    run_ubuntu "cp -a ${OLD_SWAN_ROOT}/forecast_cache.json ${NEW_SWAN_ROOT}/ 2>/dev/null || true"
+    run_ubuntu "cp -a ${OLD_SWAN_ROOT}/wind_timeline.json ${NEW_SWAN_ROOT}/ 2>/dev/null || true"
+    run_ubuntu "cp -a ${OLD_SWAN_ROOT}/incoming.json ${NEW_SWAN_ROOT}/ 2>/dev/null || true"
+    run_ubuntu "cp -a ${OLD_SWAN_ROOT}/profile_store ${NEW_SWAN_ROOT}/ 2>/dev/null || true"
+    run_ubuntu "cp -a ${OLD_SWAN_ROOT}/level*_hotstart_*.dat ${NEW_SWAN_ROOT}/ 2>/dev/null || true"
+    echo "[migrate] copy complete -- old tree left in place at ${OLD_SWAN_ROOT}; delete manually after first verified post-move cycle"
+else
+    echo "[migrate] nothing to do (old state absent, or new root already populated)"
+fi
 
 # --- Step 6: restart + verify ---
 if [ "$no_restart" = "1" ]; then

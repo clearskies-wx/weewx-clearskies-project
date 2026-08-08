@@ -97,10 +97,21 @@ mkdir -p /etc/weewx-clearskies
 chown clearskies:clearskies /etc/weewx-clearskies
 chmod 750 /etc/weewx-clearskies
 
-# Runtime directory for the Unix domain socket
+# Runtime directory for the Unix domain socket (API <-> weewx loop relay
+# only -- the marine service's SWAN working tree does NOT live here, see
+# below; SURF-REMEDIATION-PLAN-2026-08-08 Phase R4)
 mkdir -p /var/run/weewx-clearskies
 chown clearskies:weewx /var/run/weewx-clearskies
 chmod 770 /var/run/weewx-clearskies
+
+# SWAN working directory (marine service only, real disk -- not tmpfs).
+# Historical: before 2026-08-08 this lived under /var/run/weewx-clearskies/
+# swan/ (RAM-backed tmpfs); moved to real disk in Phase R4 because cgroup
+# memory accounting was charging those tmpfs pages to the service (measured
+# 5.1G memory peak against a 6G container cap). Create ONLY this subdirectory
+# -- /var/lib/weewx-clearskies may already exist, owned by root, with
+# unrelated content; do not chown the parent.
+install -d -o clearskies -g clearskies -m 0750 /var/lib/weewx-clearskies/swan
 
 # Web root owned by Caddy (Caddy must already be installed)
 mkdir -p /var/www/clearskies
@@ -1008,7 +1019,7 @@ After every SWAN run, a convergence health check runs. If it fails, the run's ho
 When a SWAN run fails the convergence health check:
 - ERROR log emitted with level, check type, and numeric metrics (greppable pattern: `SWAN convergence FAILED`)
 - No retry attempted
-- Failed working directory (`/var/run/weewx-clearskies/swan/level{N}/`) preserved untouched for debugging — contains INPUT, PRINT, TABLE, and hotstart files from the failed run
+- Failed working directory (`/var/lib/weewx-clearskies/swan/level{N}/`; historical: `/var/run/weewx-clearskies/swan/level{N}/`, RAM-backed tmpfs, corrected 2026-08-08 Phase R4) preserved untouched for debugging — contains INPUT, PRINT, TABLE, and hotstart files from the failed run
 - Hotstart NOT saved — prevents NaN propagation to next cycle
 - Forecast cache NOT updated — API serves the previous good run with its true timestamp (staleness visible on the card)
 - The failed workdir is overwritten only by the next scheduled SWAN cycle
@@ -1016,7 +1027,7 @@ When a SWAN run fails the convergence health check:
 **Mode: `convergence_retry = true` (production, enable after verified stable)**
 
 When a SWAN run fails:
-- Evidence quarantined to `/var/run/weewx-clearskies/swan/failed/{cycle}_{level}/` (retains last 5 quarantines, older pruned)
+- Evidence quarantined to `/var/lib/weewx-clearskies/swan/failed/{cycle}_{level}/` (historical: `/var/run/weewx-clearskies/swan/failed/{cycle}_{level}/`, RAM-backed tmpfs, corrected 2026-08-08 Phase R4; retains last 5 quarantines, older pruned)
 - Degradation ladder fires, one rung per retry:
   - Rung 1: Rerun with DIFFRACTION smoothing doubled (smnum ×2)
   - Rung 2: Rerun with DIFFRACTION removed for this cycle only
@@ -1039,8 +1050,10 @@ When a SWAN run fails:
 If a diverged run's hotstart was saved (before this gate was implemented), manually delete it:
 
 ```bash
-rm -f /var/run/weewx-clearskies/swan/level3_0_hotstart.dat
+rm -f /var/lib/weewx-clearskies/swan/level3_0_hotstart.dat
 ```
+
+(Historical: before 2026-08-08 this file lived under `/var/run/weewx-clearskies/swan/`, a RAM-backed tmpfs — corrected 2026-08-08 Phase R4.)
 
 The next full run will cold-start (first 3-6 hours show reduced accuracy, then the hotstart chain recovers).
 
@@ -1050,7 +1063,7 @@ Stationary quick updates (hourly) never save hotstart files. Only full nonstatio
 
 #### Forecast cache lifecycle (M-0/D-1b, 2026-08-06)
 
-`forecast_cache.json` (`/var/run/weewx-clearskies/swan/forecast_cache.json`) persists each spot's forecast payload — `forecast`, `spectral`, `spectral_dwr`, `transect`, `swelltrack`, and related keys — across marine-service restarts, so `fetch()` can serve immediately without waiting for the next full SWAN run. A full run replaces the file wholesale; the hourly quick update merges only the spots it touched, leaving others untouched.
+`forecast_cache.json` (`/var/lib/weewx-clearskies/swan/forecast_cache.json`; historical: `/var/run/weewx-clearskies/swan/forecast_cache.json`, RAM-backed tmpfs, corrected 2026-08-08 Phase R4) persists each spot's forecast payload — `forecast`, `spectral`, `spectral_dwr`, `transect`, `swelltrack`, and related keys — across marine-service restarts, so `fetch()` can serve immediately without waiting for the next full SWAN run. A full run replaces the file wholesale; the hourly quick update merges only the spots it touched, leaving others untouched.
 
 **M-0 remediation (OOM kill-loop, production outage 2026-08-05/06):** the per-transect handoff carrier form introduced late July grew the cached `spectral` key to 5,508 per-transect 2-D spectra per spot per full run — 95.5% of a measured 223 MB file, none of it read by any live consumer (M0-D1B fact-pin: every reader of a cached `spectral` entry touches only `components`, `handoff_depth_m`, `handoff_source_level`, and `clamped` — never the `freqs_hz`/`dirs_deg`/`energy` 2-D arrays). `providers/nearshore/swan.py`'s `_trim_spectral_for_cache()` now drops those three fields from every `spectral` entry — at the entry's own top level and inside every `handoff_by_transect` value — before it reaches the cache or the disk file. This bounds both the 7-day in-memory last-good cache and the persisted file; nothing downstream changes, since nothing downstream read the dropped fields.
 
