@@ -702,10 +702,36 @@ outside this round's allowlist. Deletion is a follow-up round's task, not a defe
 against this design was in progress at the time this amendment was written. No run, convergence, or
 reality-gate result is claimed here.
 
+### Amendment 8 (2026-08-08): L1 boundary rebuild pointer — ADR-104
+
+**Status: Accepted.** Operator rulings D1–D13, `docs/planning/briefs/L1-ISLAND-BOUNDARY-RELOCATION-BRIEF-2026-08-08.md`
+§8, recorded in full at **ADR-104** ("Island-aware L1 sizing and partition-reconstruction WW3 boundary").
+This amendment is a pointer only — it does not restate ADR-104's decision content, per this project's
+ADR-correction convention (the decision lives in one place).
+
+**What this decision touches in ADR-093's scope, and its deployment status:**
+- **L1's WW3 boundary changes from real per-station `.spec` spectra to gridded-WW3-partition
+  reconstruction** — the "Level 1's WW3 boundary is a real, spatially varying multi-station spectrum"
+  description above (Context/Consequences, and the SWAN model inputs paragraph of ARCHITECTURE.md) is
+  superseded by ADR-104 **(ruled 2026-08-08; lands with Phase B of L1-BOUNDARY-REBUILD-PLAN)**. Until Phase
+  B lands, the per-station `.spec` boundary described above stays live exactly as written.
+- **L1's offshore extent** (Amendment 3's `shelf + 10 km` inheritance, and ADR-100's fetch-fan horizon this
+  ADR consumes) becomes island-aware — decoupled horizon, far-edge enclosure, 100 km cap, near-lee clamp —
+  **(ruled 2026-08-08; lands with Phase G of L1-BOUNDARY-REBUILD-PLAN)**. See ADR-100's own amendment note
+  for the geometry-subsystem side of this same change.
+- **Wind/current/water-level input hardening** (silent-fallback-to-abort conversions, RTOFS/STOFS adoption)
+  is a SWAN-inputs change, not a boundary-mechanism change, but is recorded here because it is a
+  co-requisite of extending L1 — **(ruled 2026-08-08; lands with Phases W/S of L1-BOUNDARY-REBUILD-PLAN)**.
+
+No SWAN command syntax changes by this amendment beyond what ADR-104's own SWAN-syntax prescriptions
+specify (the `BOUNDSPEC ... VARIABLE FILE` grammar itself is unchanged; only the file-generation source and
+the domain the boundary sits on change). The handoff model, the 1-D surf model, and every physics formula
+this ADR governs are unaffected.
+
 ## References
 
 - Supersedes: ADR-084 (NWPS as primary nearshore source with supplementation)
-- Related: ADR-094 (HRRR forecast wind source for surf scoring); ADR-100 (geography-aware study-area geometry — the OSM coastline + fetch-fan subsystem Amendment 5's AD-1/AD-3/AD-4/AD-5 consume)
+- Related: ADR-094 (HRRR forecast wind source for surf scoring); ADR-100 (geography-aware study-area geometry — the OSM coastline + fetch-fan subsystem Amendment 5's AD-1/AD-3/AD-4/AD-5 consume); ADR-104 (island-aware L1 sizing and partition-reconstruction WW3 boundary — Amendment 8)
 - Plan (Amendment 5): `docs/archive/MARINE-GEOMETRY-MODEL-PLAN.md` (architecture decisions AD-1..AD-8; approval of the plan IS the acceptance of Amendment 5 and ADR-100)
 - Research: `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md`, `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md`, `docs/planning/briefs/1D-MODEL-BENCHMARK-BRIEF.md`
 - Plan: `docs/archive/SWAN-TRUSHORE-PLAN.md`, `docs/archive/SURF-1D-IMPLEMENTATION-PLAN.md`, `docs/archive/SURF-MODEL-FIX-PLAN.md`

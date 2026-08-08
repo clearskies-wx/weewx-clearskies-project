@@ -172,10 +172,32 @@ near-zero there.
 - [ ] Stage 1 freezes L1 before Stage 2 facing; the OSM-heading vs isobath-heading self-check flags a divergent
   synthetic pair and passes an aligned one.
 
+## Amendment (2026-08-08): L1 boundary rebuild pointer — ADR-104
+
+**Status: Accepted.** Operator rulings D1–D13,
+`docs/planning/briefs/L1-ISLAND-BOUNDARY-RELOCATION-BRIEF-2026-08-08.md` §8, recorded in full at **ADR-104**
+("Island-aware L1 sizing and partition-reconstruction WW3 boundary"). Pointer only — decision content is not
+restated here.
+
+**What this decision touches in ADR-100's scope, and its deployment status:** the fetch fan's **ocean
+horizon** (pinned here as `find_shelf_distance(centroid) + 10 km`, fallback 40 km) is decoupled from shelf
+distance entirely — a ray that used to terminate at ~20 km at a shelf-narrow coast now marches to a fixed
+100 km cap, so a ray toward a genuinely offshore island (Catalina at HB) can reach and classify it
+`wrap_candidate` instead of `directly_open` **(ruled 2026-08-08; lands with Phase G of
+L1-BOUNDARY-REBUILD-PLAN)**. The **enclosure distance** for a wrap-candidate ray (consumed downstream by
+`swan_domain.py`, not computed in this module) also changes — from the full horizon to
+`open_water_resume_km + 10 km`, capped, with a near-lee clamp for un-enclosable islands — the same tag
+applies; see ADR-104 for the full mechanism (D1/D2/D11) and ADR-093 Amendment 8 for the ADR-093-side pointer.
+The fan's **ray-casting mechanism itself** (72 rays, wrap-candidate/truly-blocked/directly-open
+classification, the `open_water_resume_km` measurement `RayResult` already needs to make this work) is
+unchanged — only the pinned horizon and enclosure-distance VALUES move. Until Phase G lands, the horizon and
+enclosure arithmetic described in "Pinned parameters" above stay live exactly as written.
+
 ## References
 
 - Related: ADR-093 (SWAN nearshore model) Amendment 5 (the model-derivation changes that consume this
-  subsystem — AD-1/AD-3/AD-4/AD-5/AD-8); ADR-098 (datum match-at-source, which the Stage-2 bathymetry relies on)
+  subsystem — AD-1/AD-3/AD-4/AD-5/AD-8); ADR-098 (datum match-at-source, which the Stage-2 bathymetry relies on);
+  ADR-104 (island-aware L1 sizing and partition-reconstruction WW3 boundary — Amendment above)
 - Plan: `docs/archive/MARINE-GEOMETRY-MODEL-PLAN.md` (architecture decisions AD-2/AD-6/AD-7; Phases G0/G6;
   approval of the plan IS the acceptance of this ADR)
 - Brief: `docs/planning/briefs/STUDY-AREA-GEOMETRY-BRIEF.md` (Fable-reviewed x2, 24 findings incorporated)

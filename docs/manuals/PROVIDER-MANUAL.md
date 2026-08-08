@@ -1340,7 +1340,15 @@ CO-OPS Data API returns JSON. Base URL: `https://api.tidesandcurrents.noaa.gov/a
 
 **RW-1 (register ruling 13, "ONE source of offshore truth", 2026-08-06): this provider is no longer called for surf-spot locations.** `endpoints/marine.py`'s 3 card call sites now branch on `location.id in marine_config.surf_spots` — a surf-spot location's wave fields come from `services/model_wave_source.py` (the wave model's own SWAN watershed partitions, §14.15) instead, with no fallback to this module even when the model has no cached data yet. This module still serves every non-surf marine location, and still feeds the L1 SWAN boundary (a different code path — see §14.3a).
 
-### §14.3a WW3 station spectral boundary fetch (T8.10b)
+### §14.3a WW3 station spectral boundary fetch (T8.10b) — superseded-pending-deletion **(ruled 2026-08-08; lands with Phase B of L1-BOUNDARY-REBUILD-PLAN)**
+
+**This section documents the station-fetch path LIVE TODAY.** Per ADR-104 (D3/D4), the L1 WW3 boundary is
+being replaced by per-L1-cell reconstruction from gridded WW3 partition fields — see "§14.3a Amendment:
+partition-reconstruction boundary (target — Phase B)" below for the target design. Until Phase B lands, every
+statement in this section is current production behavior. When Phase B ships: `services/ww3_station_selection.py`,
+`services/ww3_station_catalogue.py`, and `data/ww3_station_catalogue.json` are deleted outright, and the
+station-fetch half of this module (everything below except the Appendix-D 2-D spectrum WRITER, which is
+extracted and reused by the reconstruction path) is removed.
 
 **Module identity:** `services/ww3_spectrum.py` (marine repo), `PROVIDER_ID = "ww3_spectrum"`, `DOMAIN = "marine"`. **Not a dispatch-registered provider module** — same placement rationale as `services/bathymetry_resolver.py`: it fetches remote data over HTTP but feeds a model boundary condition (the SWAN L1 spectral boundary, T8.10c) rather than a canonical `MarineForecastPoint` field. It is a separate module from `providers/marine/wavewatch.py` (§14.3 above) — both read NOAA NOMADS since SW-2 (2026-08-06), but they fetch different NOAA products (this one: full 2-D per-station directional spectrum `.spec` files for the SWAN boundary; §14.3: gridded GRIB2 bulk/partition fields for the forecast cards) with different return shapes.
 
@@ -1361,7 +1369,10 @@ Per-station files only — **never** the tarballs (`spec_tar.gz` 1.72 GB, `ibp_t
 
 **Error handling:** `ProviderHTTPClient` exceptions (`QuotaExhausted`, `KeyInvalid`, `TransientNetworkError`, `ProviderProtocolError`) propagate unwrapped from `fetch_station_spectrum()` — a 404 (cycle not yet published) surfaces as `ProviderProtocolError` with `status_code=404` for the caller to branch on.
 
-### §14.3b WW3 station selection + spatially varying SWAN L1 boundary (T8.10c round 2; marine-repo half of T8.10f)
+### §14.3b WW3 station selection + spatially varying SWAN L1 boundary (T8.10c round 2; marine-repo half of T8.10f) — superseded-pending-deletion **(ruled 2026-08-08; lands with Phase B of L1-BOUNDARY-REBUILD-PLAN)**
+
+**This section documents the station-selection mechanism LIVE TODAY** — see the Amendment below §14.3b for
+the target reconstruction design that replaces it in Phase B.
 
 **Module identity:** `services/ww3_station_selection.py`, plus `services/swan_formats.py`'s `ww3_boundary_files_and_command()`. Not a dispatch-registered provider module — same rationale as §14.3a.
 
@@ -1397,6 +1408,66 @@ Per-station files only — **never** the tarballs (`spec_tar.gz` 1.72 GB, `ibp_t
 **Aggregate handoff-collapse WARNING (H-1, per-hour, plan item 1).** `swan_runner.py`'s `_select_l3_handoff_position_and_spectrum()` gains an optional `exit_causes_out: dict[str, str] | None = None` out-param (time_iso → cause-slug); pure observation, the four silent `continue` exits keep their existing control flow exactly. The four causes: `no_hs_proxy` (no Hs proxy this hour), `breaking_zone_exhausted` (`HandoffBreakingError`), `no_station_selected` (no viable band station), `no_curve_match` (no nearest CURVE station). The caller loop (same function's caller in `swan_runner.py`) accumulates these per spot into one `H-1 handoff-collapse: spot %r @ %s — %d/%d transect(s) have no per-transect handoff entry this hour (silent-exit causes: %s)` WARNING per AFFECTED HOUR — never per transect — covering the union of carrier times and silent-exit times, so an hour where every transect silently exits (never entering the carrier at all) still gets its WARNING.
 
 **Configuration-time viability (marine-repo half of T8.10f — partial).** `services/grid_sizing_chain.py`'s `run_grid_sizing_chain()` (runs on `POST /config`, "same shape as the existing L3 cluster viability test") calls the same selection logic once per config push and logs the result loudly (ERROR with the full rejection list on failure, INFO with selected stations on success) — but this chain "never raises past its own boundary" (it is a `BackgroundTasks` job with no synchronous HTTP response to attach a rejection message to), so it cannot synchronously refuse the operator's config push the way the plan's "fail at configuration time and tell the operator" language describes. **The operator-facing message (station id/distance/depth surfaced at setup) is cross-repo** (marine → API → config UI) and is dispatched separately to `clearskies-api-dev` + the config-UI owner — this section's contribution is limited to making the real check run and log early, and to the runtime path's own per-cycle raise (above), which is the actual per-cycle enforcement that never silently degrades.
+
+#### §14.3a/b Amendment: partition-reconstruction boundary (target — Phase B of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D3/D4)
+
+**Status: target — not yet implemented.** This subsection documents the B1/B2 design verbatim from
+`docs/planning/L1-BOUNDARY-REBUILD-PLAN-2026-08-08.md`. Until Phase B lands, §14.3a/§14.3b above describe
+the live mechanism.
+
+**B1 — gridded partition-field fetcher (new module `services/ww3_partition_fields.py`).** Fetches, per
+forecast step, the corridor bbox = L1 bbox + one native WW3 cell pad, fields `WVHGT`/`WVPER`/`WVDIR`,
+`SWELL`/`SWPER`/`SWDIR` sequences 1–3, and `HTSGW` (validation only). Ocean product: NOMADS `filter_gfswave.pl`,
+`gfswave.tCCz.global.0p16`, f000–f072 3-hourly (the same CGI family §14.3 already uses). Great Lakes: NOMADS
+`glwu` filter if present, else `.idx` byte-range subset of `glwu.grlc_2p5km` — both named, pinned after one
+live check (a bounded decision). Product routing by L1-centre region (`classify_region`, the same rule the
+station path used). Reuses `providers/_common/http.py`'s client/rate limiter, `grib_processor.py`'s eccodes
+backend, and the existing ≥9998 missing-value guard (PROVIDER-MANUAL §14.3 conventions). Any missing
+field/step raises (`BoundaryNotViableError`, retained as the exception type, new message) — never a partial
+fetch.
+
+**B2 — reconstruction module (new module `services/boundary_reconstruction.py`).**
+- **Boundary points:** every L1 boundary cell along the two offshore sides (sides resolved from
+  `open_water_bearing` via the existing `_offshore_sides` logic, which moves into this module when the
+  station module is deleted). Spacing = L1 `dx` = 1 km (D4).
+- **Parameter sampling per point per partition:** bilinear over the 4 surrounding WW3 cells, using WET cells
+  only with renormalized weights; 0 of 4 wet → nearest wet cell within 2 cells; none → raise. Directions
+  interpolate as unit vectors. A partition missing (9999 sentinel) at contributing cells → that partition
+  contributes zero energy at that point (partitions legitimately die out spatially); ALL partitions zero
+  while interpolated `HTSGW > 0.1 m` → raise (inconsistent source).
+- **Spectrum per point:** `E(f,θ) = Σ_p (Hs_p²/16) · S_p(f) · D_p(θ)`, emitted on the CGRID spectral axes (34
+  log-spaced freqs 0.03–1.0 Hz, 72 directions) so SWAN never interpolates the boundary spectrum itself.
+  Wind-sea train: JONSWAP `γ = 3.3`, `Tp = r × WVPER` (`r` measured-then-pinned, bounds [1.10, 1.35], vs 3
+  live `.spec` cycles), spread cos²ˢ `s = 7` (σθ ≈ 30°). Swell trains: Gaussian `σf = 0.015 Hz` centred at
+  `1/SWPER` (narrow-band: mean ≈ peak), spread cos²ˢ `s = 28` (σθ ≈ 15°). Each `S_p(f)`/`D_p(θ)` normalized to
+  unit integral on the discrete grid BEFORE scaling by `Hs_p²/16`, so the bin-sum identity is exact by
+  construction.
+- **Runtime guard:** per point, `|4√m0 − √(ΣHs_p²)| ≤ 5%` (the discretization identity) → raise on breach. No
+  runtime guard against `HTSGW` (a 4th WW3 partition legitimately makes the partition sum < HTSGW) — that
+  comparison is a known-answer test (KAT) only.
+- **Time:** nonstationary files, one file per boundary point carrying all timesteps (ocean 3-hourly; GLWU
+  hourly).
+
+**B3 — emission** reworks `ww3_boundary_files_and_command()` (`services/swan_formats.py`) in place, same
+public name: `BOUNDSPEC SIDE <s> CCW VARIABLE FILE <len_1> 'B_<side>_<i>.txt' 1 ...` per offshore side,
+`[len]` in UTM METRES (L1 is `COORDINATES CARTESIAN`/UTM since F1-proj) from the side's CCW begin corner —
+strictly ascending, one point per L1 boundary cell at `len_i = i × dx` (cell-corner grid points, not
+cell-centres). CCW begin corners: S begins SW (grows east), W begins NW (grows south), E begins SE (grows
+north), N begins NE (grows west). `BOUNDSPEC ... PAR`, `BOUND SHAPE`, `BOUNDNEST2/3` are never emitted;
+`BOUNDNEST1 NEST 'nest_in.dat' CLOSED` (the L1→L2/inner mechanism) is untouched. Full SWAN syntax
+prescriptions and manual line citations: `docs/planning/L1-BOUNDARY-REBUILD-PLAN-2026-08-08.md` "SWAN SYNTAX
+PRESCRIPTIONS".
+
+**B4 — retirement of the station path.** `services/ww3_station_selection.py`,
+`services/ww3_station_catalogue.py`, `data/ww3_station_catalogue.json` are deleted; the station-fetch half of
+`services/ww3_spectrum.py` is deleted after the writer extraction (the parser stays if `swan_spectral.py`
+tests still use it — verified at implementation). `services/grid_sizing_chain.py`'s config-time viability
+check replaces the station check with a partition-fetch smoke test (one live cycle, corridor bbox, all
+fields present, every boundary point maps to wet cells) — same loud config-push refusal role.
+
+**Measured-then-pinned constants (bounds, not values — see ADR-104):** `r` (wind-sea mean→peak period ratio)
+bounds `[1.10, 1.35]`, measured vs 3 live `.spec` cycles; the GLWU fetch method (NOMADS filter vs `.idx`
+byte-range) pinned after one live check. Out-of-bounds measurement → STOP and surface, never picked.
 
 ### §14.4 NWS marine zone text forecasts
 
@@ -1699,6 +1770,46 @@ The response's `osm_type` field carries the raw OSM tag value (e.g. `groyne`, `d
 - Grid cache key: `ofs:grid:{model}`, TTL 86400s (grid topology is static).
 - Constants: `_RESULT_CACHE_TTL = 1800`, `_GRID_CACHE_TTL = 86400`, `_MAX_CYCLE_FALLBACKS = 3`, `_DATASET_TIMEOUT = 20` seconds.
 
+### §14.10a RTOFS surface-current provider for SWAN forcing (target — Phase S of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D9) **(ruled 2026-08-08; lands with Phase S of L1-BOUNDARY-REBUILD-PLAN)**
+
+**Status: target — not yet implemented.** This section documents the S1 design verbatim from the plan. RTOFS
+is already a Clear Skies data source in a different role — `providers/ocean/erddap_ocean.py` serves
+`rtofs_3d` ("Temp column + currents + salinity, 8 km global, 41 levels, 8-day forecast") as the deep fallback
+in the water-temperature chain (§14.12). This section describes RTOFS's NEW role as a SWAN current-forcing
+input, a distinct gridded-U/V fetch path from that existing point/column ERDDAP query.
+
+**Module identity (target):** new `providers/ocean/rtofs_currents.py`.
+
+**Selection rule (containment, not centroid):** `providers/ocean/ofs.py`'s `find_ofs_model` gains
+`find_current_source(l1_bbox)` — an OFS model qualifies only if its `OFS_DOMAINS` box CONTAINS the entire L1
+bbox (not merely overlaps it); the highest-resolution qualifier wins; none qualifying → `"RTOFS"`. This
+mirrors the display-side resolver's existing tier order and answers the D7 coverage-matrix gaps (open-coast
+East Coast, Gulf open coast, Alaska, Hawaii, territories) with the one NOAA operational source that has real
+ocean-circulation currents (wind-driven + Gulf Stream + eddies) everywhere in the service area.
+
+**Product:** NOMADS `rtofs_glo` 2-D surface (`2ds`) prognostic files, 3-hourly u/v, via grib filter (primary)
+or ERDDAP griddap (alternate) — pinned after one live shape check (bounded decision, per ADR-104's
+measured-then-pinned constants). Output shape is identical to `fetch_surface_currents` (list of
+`{time, u_grid, v_grid}` at SWAN grid dims), so `_write_current_txt` (`services/swan_runner.py`) is
+untouched. Selection logged once per cycle at INFO (provenance, not flagging).
+
+**Tidal-current compositing (operator directive 2026-08-08 — the service area, not the test case, is the
+design target).** RTOFS is non-tidal (circulation only). STOFS-2D (§14.13a below) publishes the complementary
+tidal/surge velocity. In RTOFS regions the served current field is the SUM per cell per timestep:
+`u = u_RTOFS + u_STOFS`, `v = v_RTOFS + v_STOFS`. No double-counting by construction — RTOFS contains zero
+tidal signal, STOFS zero circulation. STOFS velocity is depth-averaged; the tidal component is barotropic
+(near-uniform over depth in shelf water), so depth-averaged ≈ surface for exactly the component STOFS
+supplies — stated here, not hidden. STOFS velocity arrives via §14.13a's fetcher (the same STOFS files carry
+u/v; one fetch serves both WLEVEL and the tidal-velocity composite). Time matching: same nearest-within-2h
+rule as `_write_current_txt`; a timestep where either component is missing → `CurrentCoverageError` — no
+partial composite, since half a current is a fabricated current. **OFS regions never composite** — regional
+OFS models are already tidal-inclusive natively; adding STOFS there would double-count. A KAT pins that the
+composite applies to the RTOFS branch only.
+
+**Non-tidal caveat.** RTOFS-Global's own currents carry no tidal signal — verify this claim against NOAA's
+RTOFS documentation at implementation time before relying on it (D9 verify item, carried from the D5
+addendum).
+
 ### §14.11 ERDDAP ocean data (ADR-091)
 
 **Module identity:** `providers/ocean/erddap_ocean.py`, `PROVIDER_ID = "erddap_ocean"`, `DOMAIN = "ocean"`.
@@ -1766,6 +1877,17 @@ Each tier is independently wrapped in try/except — failure at one tier does no
 - `mode="observed"` currently returns `coverage_tier="unavailable"` (no on-premises sensor support implemented yet).
 - All returned values in raw units: °C, m/s, PSU, meters. Unit conversion happens at the endpoint layer.
 
+**RTOFS's second role (target — Phase S of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D9) `(ruled 2026-08-08; lands with Phase S of L1-BOUNDARY-REBUILD-PLAN)`.**
+RTOFS already appears in this resolver's fallback chain as `providers/ocean/erddap_ocean.py`'s `rtofs_3d`
+column/point query — the deep fallback for water temperature and, incidentally, general ocean currents at a
+point. §14.10a documents a SEPARATE, new role: RTOFS as a gridded SWAN current-forcing INPUT, fetched via a
+distinct NOMADS/ERDDAP gridded-U/V path (`providers/ocean/rtofs_currents.py`), selected by domain containment
+rather than by this resolver's fallback-chain order, and composited with STOFS tidal velocity in RTOFS
+regions. The two roles read the same underlying NOAA model but through different fetch paths for different
+consumers (this resolver serves point/column queries for the water-temperature/ocean-data endpoints; the
+SWAN current-forcing path serves a gridded U/V field to `_write_current_txt`) — they are not merged and do
+not share a cache.
+
 ### §14.13 Water level compositor (ADR-091)
 
 **Not a provider module.** Service-layer component (`services/water_level_compositor.py`) that combines CO-OPS harmonic predictions with the OFS non-tidal residual to produce a composite total water level forecast. See API-MANUAL §16 `CompositeWaterLevel` for the output model. Full algorithm and pseudocode in `docs/planning/briefs/TIDE-ACCURACY-BRIEF.md` §"Implementation Design" → "Compositor algorithm". Bias correction rationale and OFS accuracy data in §"Research Questions — Answered" Q1/Q3/Q4. Cache warmer integration in §"Cache warmer integration". STOFS-2D-Global comparison (why it's not needed separately) in §"What STOFS-2D-Global Offers".
@@ -1795,11 +1917,50 @@ Each tier is independently wrapped in try/except — failure at one tier does no
 - Surge threshold constants: `_SURGE_THRESHOLDS_FT = {"minor": 0.15, "moderate": 0.5, "major": 1.0}`.
 - Unit conversion via `weewx_clearskies_api.units.conversion.convert()`.
 
+### §14.13a STOFS-2D-Global water-level provider + WLEVEL chain (target — Phase S of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D10) **(ruled 2026-08-08; lands with Phase S of L1-BOUNDARY-REBUILD-PLAN)**
+
+**Status: target — not yet implemented.** This section documents the S2 design verbatim from the plan.
+Replaces the single-CO-OPS-station uniform WLEVEL stamp (§14.13's compositor, and `swan.py`/`swan_runner.py`'s
+existing tide fetch site) with a spatially-varying grid at every SWAN level.
+
+**Module identity (target):** new `providers/ocean/stofs_wlevel.py`.
+
+**Product:** STOFS-2D-Global (`stofs_2d_glo`), NOAA's Surge and Tide Operational Forecast System (formerly
+ESTOFS), 4 cycles/day, forecast to 180 h; the regional GRIB2 grid covering the domain (CONUS West grid for
+Huntington Beach; Hawaii/Pacific grid for Hawaii — exact product filenames pinned from the NCO inventory at
+implementation). Per-timestep water-level grid sampled to SWAN grid dims at each level.
+
+**Dual extraction.** The fetcher extracts BOTH the water-level field and the velocity (u/v) field from the
+same files — one fetch serves WLEVEL (all regions) and §14.10a's RTOFS-region tidal-velocity composite. This
+is not a second fetch path; it is the one STOFS fetch feeding two consumers.
+
+**Datum.** STOFS ≈ LMSL. **Cutover gate:** before STOFS becomes primary, 24 h of STOFS values at the
+tide-station cell are compared against CO-OPS predictions; `|mean bias| ≤ 0.15 m` passes. A breach means
+CO-OPS stays primary and the round STOPs and surfaces — never a silent proceed on an unverified bias.
+
+**WLEVEL chain (decided):** STOFS → CO-OPS-uniform (fallback selection logged loudly at fetch, the same
+pattern the bathymetry chain already uses) → refuse (`tide_fetch_failed`). The "~30 km uniform tide"
+in-code justification comment (§6 row 5 of the brief) is deleted with the uniform-primary path it justified —
+not kept as stale commentary.
+
+**Field-based writer.** `services/swan_runner.py`'s `_write_wlevel_txt` generalizes from the L3 profile writer
+(spatially-varying already, single-purpose) to a field-based writer serving all levels — command grammar
+(`INPGRID/READINP WLEVEL ... NONSTAT`) is pinned unchanged; only the VALUES in `WLEVEL.txt` change.
+
 ### §14.14 HRRR wind provider (ADR-093, ADR-094)
 
 **Module identity:** `providers/wind/hrrr.py`, `PROVIDER_ID = "hrrr"`, `DOMAIN = "wind"`.
 
 **CAPABILITY:** `geographic_coverage = "us"`, `auth_required = []`. `supplied_canonical_fields` includes U-component and V-component of wind at 10m above ground level, earth-relative.
+
+**Region-aware wind sourcing (target — Phase W of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D8) `(ruled 2026-08-08; lands with Phase W of L1-BOUNDARY-REBUILD-PLAN)`.**
+Wind source is selected per region at setup: HRRR CONUS product for CONUS (this module, unchanged); **HRRR-AK**
+for Alaska (dormant per D12's territory descope, not implemented); **GFS alone** (§14.16) wherever no HRRR
+product exists — Hawaii, PR/USVI, other territories. This module's `dir=/hrrr.{date}/conus` hardcode
+(`providers/wind/hrrr.py:598`) is CONUS-only by construction; a Hawaii/no-HRRR region needs a GFS-only mode
+for the 0–72 h wind blend (`swan_runner.py:2690-2807`), reusing the existing 48–72 h GFS 3-hourly→hourly
+interpolation leg for the full 0–72 h range instead of only the tail. C-77 (all-inputs-required) stays
+intact in a GFS-only region: GFS is the required input there; nothing is silently dropped or substituted.
 
 **Availability:** Part of the marine service, not the API. Invoked by the marine service's SWAN runner (`services/swan_runner.py`), not by the API cache warmer. The marine service fires HRRR warm at startup and on the extended cycle schedule (4×/day at 00/06/12/18Z) when the marine service's `[nearshore]` pip extra is installed.
 

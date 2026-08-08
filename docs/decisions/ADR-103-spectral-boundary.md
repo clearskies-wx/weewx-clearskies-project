@@ -245,7 +245,9 @@ do — it is not an open implementation task.
 
 ## References
 
-- Related ADRs: ADR-093 (SWAN nearshore model), ADR-095 (SWAN model corrections)
+- Related ADRs: ADR-093 (SWAN nearshore model), ADR-095 (SWAN model corrections), ADR-104 (island-aware L1
+  sizing and partition-reconstruction WW3 boundary — supersedes this ADR's mechanism for L1 when Phase B
+  lands, see "Amendment 2026-08-08" above)
 - Concerns / rulings: C-76, C-94, C-99, C-104 (`docs/archive/MARINE-SEP-CONCERNS.md`)
 - `docs/manuals/PROVIDER-MANUAL.md` §14.3a (WW3 station spectral fetch), §14.3b (station
   selection + spatially varying boundary, distinct refusal naming, bulk-fallback health flag)
@@ -282,3 +284,26 @@ documents the shipped multi-station design exclusively. The three-tier design is
 is not planned, and must not be inferred as a future direction from its mention here — it is
 recorded only so a reader who finds the phrase "three-tier" in an old plan commit does not conclude
 it was ever built.
+
+## Amendment 2026-08-08 — superseded for L1 by ADR-104, pending Phase B
+
+**Status: Accepted.** Operator rulings D1–D13,
+`docs/planning/briefs/L1-ISLAND-BOUNDARY-RELOCATION-BRIEF-2026-08-08.md` §8 (specifically D3/D4), recorded in
+full at **ADR-104** ("Island-aware L1 sizing and partition-reconstruction WW3 boundary"). Pointer only —
+decision content is not restated here.
+
+**What changes, and when.** The multi-station real-spectrum boundary this ADR documents — station selection
+against L1's own extent, one real 2-D `.spec` file per qualifying station, `BOUNDSPEC SIDE ... VARIABLE FILE`
+— is **superseded when Phase B of L1-BOUNDARY-REBUILD-PLAN lands (ruled 2026-08-08; lands with Phase B of
+L1-BOUNDARY-REBUILD-PLAN)**, replaced by per-L1-cell 2-D spectra reconstructed from gridded WW3 partition
+fields (ocean `gfswave.global.0p16`, Great Lakes `glwu.grlc_2p5km`), spacing = L1's own cell size (1 km).
+This ADR's own refuse-don't-degrade posture (never a synthesized single-point or "degraded" boundary) is
+preserved by the ADR-104 design, which raises on missing fields/steps/wet-cell coverage rather than
+substituting. **The station path documented throughout this ADR is live TODAY and stays live until Phase B
+lands** — this note does not itself change any code or behavior. `services/ww3_station_selection.py`,
+`services/ww3_station_catalogue.py`, `data/ww3_station_catalogue.json`, and the station-fetch half of
+`services/ww3_spectrum.py` are deleted only when Phase B/B4 ships; the Appendix-D 2-D spectrum WRITER this
+ADR's "Real 2-D spectrum writer" paragraph describes is extracted and kept, reused by the reconstruction path.
+`_KD_AGREEMENT_SHORTFALL_TOLERANCE` (C-104, still provisional as of this note) becomes moot for L1 once Phase
+B lands, since station depth/agreement filtering no longer applies to the L1 boundary — it is not otherwise
+affected by this amendment.

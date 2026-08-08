@@ -817,6 +817,28 @@ Marine locations are configured in the `[marine]` section of `api.conf`. This se
 
 **Surf score weights (Round S, ADR-101 / plan S-SPEC-1, 2026-08-05 — marine service config):** the marine service reads an optional `[surf_scoring]` section with five positive floats — `weight_size`, `weight_shape`, `weight_conditions`, `weight_power`, `weight_consistency` — the exponents of the surf score's weighted geometric mean, one set for the whole system (never per spot), flowing through the existing admin → API → marine `/config` path. Defaults (0.25/0.25/0.20/0.20/0.10) live in code; an absent section means defaults. Weights normalize by their sum at computation time, so any positive values are valid; a zero, negative, or malformed value logs a warning and falls back to that key's default (scoring never crashes on config). The admin UI ("Surf Scoring Weights" section: five fields, live effective-% display, reset-to-defaults, reject ≤ 0; help keys `help.admin.surf_scoring.*`) is Round S leg 4.
 
+**L1 offshore extent override (target — Phase G plumbing / Phase A admin UI of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D1) `(ruled 2026-08-08; lands with Phase G of L1-BOUNDARY-REBUILD-PLAN for the config key, Phase A for the admin field)`.**
+New optional key `[swan] l1_offshore_extent_km` (float, marine service config). When present and > 0, the
+autosized offshore extent (base + island enclosures + near-lee clamp, ADR-104) is REPLACED by the operator
+value, clamped to the `L1_MAX_EXTENT_KM = 100.0` cap; lateral sizing and landward margin are unchanged; wrap
+enclosure points are suppressed (the operator owns the extent when set). Absent or 0 = autosize (the default
+behavior). Negative/NaN/greater-than-cap values are rejected at config-push with a refusal naming the cap.
+Until Phase G lands, no such key exists and L1's offshore extent is always autosized from the shelf-anchored
+horizon described above.
+
+**Admin marine-sources panel + override field (target — Phase A of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D5/D1) `(ruled 2026-08-08; lands with Phase A of L1-BOUNDARY-REBUILD-PLAN)`.**
+A read-only "Marine Sources" admin section renders one row per required input (bathymetry, wind, WW3
+boundary, currents, water level, datum path): `{input, source, coverage: ok|refused, reason?}`, sourced from
+the config-push chain's own per-input source/coverage report (the chain already decides every source at
+setup — this section only surfaces the decision, no new decision logic). A refusal row carries the exact
+refusal string the chain already raises — no separate wording is invented for the admin display. Alongside
+the sources table, one numeric field writes `l1_offshore_extent_km` (validation mirrors the config-key rule
+above: blank = autosize; a value over the cap is rejected with the cap named in the error). Help content keys
+`help.admin.marine_sources.*` land in the same round as the admin section (CLAUDE.md doc-sync table); Operator
+Manual (`repos/weewx-clearskies-stack/docs/OPERATOR-MANUAL.md`) coverage is that repo's own Phase A doc-sync
+task, not this document's. Until Phase A lands, no admin marine-sources panel exists and the override field
+is config-file-only (Phase G).
+
 **Config schema:**
 
 ```ini
