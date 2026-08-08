@@ -486,7 +486,100 @@ operator's. Nothing here is built until that call and the architectural sign-off
 
 ---
 
-## 8. Sources
+## 9. Directional sector optimization for L2/L3/L4 (added 2026-08-07)
+
+**Problem.** SWAN allocates spectral arrays proportional to `grid_cells × directions × frequencies`.
+All four grid levels currently use `CIRCLE 72` (full 360° at 5° resolution). On a memory-constrained
+host (5.7 GB LXC container), L2's spectral arrays alone consume ~740 MB. When a radar container
+(~3.2 GB resident) is also running, the SWAN cycle OOM-kills during L2 execution.
+
+**Observation.** Nearshore grids (L2/L3/L4) do not need the full 360°. Swell arrives from the open
+ocean — a limited directional sector. Directions facing into the coast carry near-zero energy
+(no significant reflectors besides structures, and reflection is handled by OBSTACLE). The SWAN User
+Manual §2.6.3 (line 807–808) explicitly names this: "This may be convenient (less computer time
+and/or memory space), for example, when waves travel towards a coast within a limited sector of 180°."
+
+**Measured test case (2026-08-07, Huntington Beach).** Using the actual `geography.py`
+`cast_fetch_fan()` ray-tracing against real OSM coastline data (81 LineStrings), firing from each
+grid's perimeter points (4 corners + 4 edge midpoints for bbox grids; 4 corners for rotated L4):
+
+| Grid | Perimeter union | Blocked | Memory reduction | Bins 72 → |
+|------|----------------|---------|-----------------|-----------|
+| L2 (6,150 cells) | 220° | 140° | **39%** (~290 MB) | 72 → 44 |
+| L3 (2,445 cells) | 215° | 145° | **40%** (~48 MB) | 72 → 43 |
+| L4 (8,619 cells) | 205° | 155° | **43%** (~130 MB) | 72 → 41 |
+| Beach centroid (existing fan, for comparison) | 185° | 175° | — | — |
+
+Combined savings: **~468 MB** — sufficient for coexistence with the radar container.
+
+**Key finding: the perimeter-union is wider than the beach's own view.** L2's 220° sector is 35°
+wider than the 185° seen from the beach, because L2's offshore corners can see around headlands
+that block the beach's view. This validates the operator's direction (2026-08-07) that the ray fan
+must fire from the grid's boundary perimeter, not from the beach centroid — using the beach fan
+would clip diagonal waves entering through the corners.
+
+### 9.1 Design
+
+**SWAN command change:** replace `CIRCLE 72 0.03 1.0 34` with
+`SECTOR <dir1> <dir2> 72 0.03 1.0 34` on L2/L3/L4, where `<dir1>` and `<dir2>` define the open-
+water sector boundaries. L1 stays `CIRCLE` (shelf-scale, swell from any direction). The `72` in
+SECTOR is the number of directional bins within the sector — SWAN distributes them evenly, so fewer
+degrees = coarser resolution per bin unless the bin count is also reduced. To preserve the 5°
+resolution, set the bin count to `sector_span / 5`.
+
+**Computation (setup-time, once per spot/grid — not runtime):**
+
+1. At config-push time, after `compute_domains()` produces the L2/L3/L4 bounding boxes, compute 8
+   perimeter points per grid (4 corners + 4 edge midpoints; for rotated L4, use the 4 actual corners
+   + 4 edge midpoints of the rotated rectangle).
+2. For each perimeter point, call `cast_fetch_fan()` with the same coastline geometry and land-size
+   thresholds the existing L1-aiming fan uses — `directly_open` and `wrap_candidate` rays are
+   "open," `truly_blocked` are "blocked."
+3. Take the **union** of open-water bearings across all perimeter points. This is the minimum
+   sector that carries energy into the grid from any boundary point.
+4. **Pad by 15°** on each end for refraction spread and wind-sea from oblique wind directions.
+5. Store the sector boundaries in the grid-sizing cache alongside the bbox/resolution.
+6. `build_swan_input()` emits `SECTOR` when the computed sector is < 330° (a threshold below which
+   the savings are material); otherwise stays on `CIRCLE` (near-360° sectors save nothing and add
+   code complexity).
+
+**Multi-spot grids (L1 and L2).** L1 and L2 are shared across all spots in a deployment. L1 stays
+`CIRCLE` regardless. For L2, the sector computation fires from **L2's own perimeter** (which
+already encloses all spots and all child grids). The open-water union from L2's 8 perimeter points
+is the correct sector for L2 — it does not depend on how many spots are inside it, because it
+measures what directions can deliver energy across L2's boundary, not what any individual spot sees.
+L3/L4 are per-cluster and already cluster-scoped. **No change to grid sizing, nesting, or the
+NESTOUT/BOUNDNEST1 chain.** The sector is a spectral-resolution parameter on the CGRID command
+only; everything else (grid geometry, nesting I/O, handoff selection) is unchanged.
+
+**L4 and diffraction.** L4 runs DIFFRACTION for pier/structure effects. Diffraction can redirect
+energy into directions outside the incoming sector. However, the SECTOR command only limits which
+directions SWAN propagates — diffracted energy that wraps around a structure into a "blocked"
+direction would be lost. For L4, pad the sector by an additional 30° (total 45° per side) to
+accommodate diffraction spreading, or keep L4 on CIRCLE if the padded sector exceeds 330°. The
+test case shows L4's unpadded sector is 205°; with 45° padding on each side = 295° — still a 18%
+reduction (72 → 59 bins). Decision: operator.
+
+**Performance.** The ray-tracing from 8 perimeter points takes ~2 minutes in the current pure-Python
+implementation. Optimization paths (not blocking this task, but noted for follow-up): Shapely
+`STRtree` spatial index for coastline geometry lookups (10-100× speedup); NumPy-vectorized ray-step
+generation; GPU acceleration via RAPIDS cuSpatial or Numba CUDA for large-scale multi-spot
+deployments. For a setup-time computation that runs once per config push, 2 minutes is acceptable
+as-is.
+
+### 9.2 What this does NOT change
+
+- L1: stays `CIRCLE 72` (full 360°) — shelf-scale, swell from any direction
+- Grid geometry (bbox, resolution, nesting): unchanged
+- NESTOUT/BOUNDNEST1 spectral boundary handoff: unchanged (SWAN interpolates spectra between
+  different directional grids at nesting boundaries — SWAN User Manual §2.4)
+- Handoff selection (first-match L4→L3→L2): unchanged
+- SwellTrack/SurfBeat: unchanged (they consume the handoff spectrum, not the directional grid)
+- Spectral frequency resolution: unchanged (34 bins, 0.03–1.0 Hz)
+
+---
+
+## 10. Sources (renumbered from §8)
 
 **Internal — ADRs/rules:** ADR-093 (+Amdt 1–4) `docs/decisions/ADR-093-swan-trushore-nearshore-model.md`;
 ADR-095, ADR-097, ADR-098; `rules/clearskies-process.md:272,284,288,290-300`. SWAN User Manual (in-project

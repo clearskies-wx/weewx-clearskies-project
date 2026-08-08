@@ -468,16 +468,412 @@ audit, Z7 deploy + reality gate (gate rows: displayed transect is a bar-transect
 day; anchor numbers pasted; pier in imagery lies under pier-adjacent transects — operator
 screenshot check; segment-length scale agreement ≤1%).
 
+## ROUND WC — Wind-chop suppression (ST6 on L1; post-SWAN partition gate)
+
+**Operator mandate (2026-08-07, in chat, with webcam screenshot):** the beach profile card shows
+a 4.3s wind chop as the outermost breaker at 98.6 m — the cam shows zero chop, only clean
+groundswell lines. "That windswell is CHOP! It is not making it to shore... YOU WOULD FUCKING
+SEE IT ON THE VIDEO FEED!" Research brief:
+`docs/planning/briefs/SWAN-WHITECAPPING-WIND-CHOP-BRIEF-2026-08-07.md` (full diagnosis, literature
+review, five options evaluated with citations).
+
+**Root cause (verified 2026-08-07):** SWAN's `GEN3 WESTHUYSEN` physics package uses
+saturation-based whitecapping (Alves & Banner 2003 / Van der Westhuysen 2007) with no negative
+wind input (`NEGATINP` absent). The 4.3s chop enters via WW3 boundary spectra (measured: 0.112 m
+Hs at station 46222, f=0.233 Hz) and is amplified 3.3× by SWAN's wind-input source terms between
+the L1 boundary and the L2 deep-water reference, reaching 0.37 m at 15 m depth, then 1.24 m at the
+L4 handoff (10.7 m). The chop's spectral saturation B(k) falls below the threshold Br=1.75E-3, so
+the saturation-based whitecapping reduces to a weak residual that cannot kill it. The Yan (1987)
+wind input has no effective adverse-wind term. No published literature supports tuning the WST Cds
+parameter to fix this — Lei et al. (2023) showed WST's default Cds already OVER-dissipates overall
+and the optimal range is 14–22% of default.
+
+### WC-DESIGN
+
+**WC-D1. ST6 physics on Level 1 only.** Replace the `GEN3 WESTHUYSEN` physics block with
+`GEN3 ST6` + `SSWELL ZIEGER` + `NEGATINP` on the L1 grid ONLY. Levels 2, 3, and 4 remain on
+`GEN3 WESTHUYSEN` unchanged.
+
+The code change is in `build_swan_input()` (`swan_formats.py:1783-1796`). Today the `_physics`
+list is identical for all grid levels. The change: `build_swan_input()` gains a new parameter
+`swan_level: str` (values `"L1"`, `"L2"`, `"L3"`, `"L4"`; default `"L2"` — preserves existing
+behavior for all current call sites until explicitly changed). When `swan_level == "L1"`, the
+physics block emits:
+
+```
+GEN3 ST6 4.7E-7 6.6E-6 4.0 4.0 UP HWANG VECTAU U10PROXY 28.0 AGROW
+SSWELL ZIEGER 0.00025
+NEGATINP 0.04
+BREAKING CONSTANT 1.0 0.73
+FRICTION JON 0.038
+TRIAD
+```
+
+For all other `swan_level` values, the physics block is byte-identical to today:
+
+```
+GEN3 WESTHUYSEN
+BREAKING CONSTANT 1.0 0.73
+FRICTION JON 0.038
+TRIAD
+```
+
+**Parameter provenance:**
+- `GEN3 ST6 4.7E-7 6.6E-6 4.0 4.0 UP HWANG VECTAU U10PROXY 28.0 AGROW` — SWAN manual §4.5.4
+  first recommended calibration example (Rogers et al., 2012). Day & Dietrich (2022) independently
+  confirmed this calibration produces the lowest RMSE.
+- `SSWELL ZIEGER 0.00025` — SWAN manual §4.5.4 example; required companion for `NEGATINP`.
+- `NEGATINP 0.04` — SWAN manual §4.5.4 recommended value; Zieger et al. (2015) eq. 11.
+  rdcoef=0.04 means for a spectral bin opposed to the wind direction, the negative wind-input
+  magnitude is 4% of the corresponding aligned-direction bin's positive input.
+
+**Caller wiring.** `_write_input_files()` in `swan_runner.py` (`:4457`) threads the new
+`swan_level` parameter through to `build_swan_input()`. There are **5** `_write_input_files()`
+call sites inside `SWANRunner.run_3level()` (`swan_runner.py:3029`), NOT in
+`_run_all_spots_locked()` (which lives in `providers/nearshore/swan.py`, not `swan_runner.py`):
+
+| Call site | Line | `grid_level` | `swan_level` to pass |
+|-----------|------|-------------|---------------------|
+| L1 | `:3133` | `"outer"` | `"L1"` |
+| L2 | `:3222` | `"outer"` | `"L2"` |
+| L3 (no L4) | `:3957` | `"inner"` | `"L3"` |
+| L3 (with L4) | `:4019` | `"outer"` | `"L3"` |
+| L4 | `:4166` | `"inner"` | `"L4"` |
+
+Note: `swan_level` is independent of `grid_level` — L2 is `grid_level="outer"` when it nests L3,
+but is always `swan_level="L2"`. The two parameters serve different purposes (`grid_level` controls
+nesting I/O; `swan_level` controls physics selection).
+
+**Why mixed-physics nesting is safe.** Each SWAN grid level is a separate execution with its own
+INPUT file. BOUNDNEST1 passes a spectral boundary condition — physics-agnostic. The inner grid
+applies its own physics to whatever spectrum it receives. This is the same mechanism used in
+WW3→SWAN nesting (different models entirely); SWAN→SWAN with different GEN3 packages is a simpler
+case. (Ref: SWAN manual §4.5.3 BOUNDNEST1; standard operational practice in ADCIRC+SWAN, WW3+SWAN
+coupled systems.)
+
+**Compute cost.** L1 has 1,065 grid cells (5.8% of the 18,502 total across L1–L4; measured
+librewxr 2026-08-07). A 60% compute increase (CDIP report) on 5.8% of total cells = **~3–4% total
+compute increase.**
+
+**WC-D2. Minimum surfable period floor — 5 seconds (hard cutoff in SwellTrack).**
+
+**CRITICAL: the live production path is `_run_pipeline_per_transect()` (`surf_1d_pipeline.py:1823`),
+NOT the shared-partitions body of `run_pipeline()`.** In production, `partitions_by_transect` is
+always populated by the SWAN precompute loop (`providers/nearshore/swan.py:2463-2523`), so
+`run_pipeline()` takes the early return at `:2860` to `_run_pipeline_per_transect()`. The
+shared-partitions path (`:2991`) is a legacy/fallback that production never reaches. **The floor
+must be inserted in BOTH paths** — the per-transect loop at `:2035` (production) and the shared
+loop at `:2991` (fallback/tests) — so it works regardless of which path runs.
+
+New named constant (module-level, `surf_1d_pipeline.py`):
+
+```python
+#: Minimum peak period (s) for a swell partition to enter the 1D surf model.
+#: Sub-5s energy is wind chop — not surfable at any break type, any coast, any
+#: conditions. The surf forecasting community consensus (Surfology, Mundo Surf,
+#: GetFoamie, Bali Surfing Camp — see brief §7.1) places the surfability floor
+#: at 5–6s; Great Lakes surfing (the most fetch-limited surfable environment)
+#: runs on 5–6s wind swell, never 4s. This constant gates SwellTrack ONLY —
+#: SWAN processes all frequencies (correct physics requires the full spectrum),
+#: and the surf scorer still sees all partitions (chop degrades conditions via
+#: a separate upstream channel — spectral_dwr, not the pipeline partition list).
+#: DESIGN CONSTANT — reviewed at the WC gate, not admin config.
+_MIN_SURFABLE_PERIOD_S = 5.0
+```
+
+**Insertion in `_run_pipeline_per_transect()` (production path, `:2035`):**
+
+The per-transect function iterates transects in an outer loop, then partitions in an inner loop
+(`for p_idx, partition in enumerate(parts):` at `:2035`). The floor goes inside this inner loop,
+BEFORE the `run_1d_analytical()` call at `:2048`:
+
+```python
+# WC-D2: hard 5s surfability floor — sub-5s partitions do not enter the 1D model
+tp_p = partition["period"]
+if tp_p < _MIN_SURFABLE_PERIOD_S:
+    logger.info(
+        "WC-D2: skipping partition %d (Tp=%.1fs < %.1fs floor, transect %d) — "
+        "non-surfable wind chop, not passed to SwellTrack",
+        p_idx, tp_p, _MIN_SURFABLE_PERIOD_S, t_idx,
+    )
+    p_results.append(None)
+    continue
+```
+
+Note: in `_run_pipeline_per_transect()`, the per-partition results list is `p_results` (not
+`transect_run_results`), and the correct `continue` target is the inner (partition) loop —
+appending `None` to `p_results` preserves the `p_results[p_idx]` indexing the downstream RSS
+combination expects (one entry per partition, `None` for skipped).
+
+**Insertion in `run_pipeline()` (fallback/test path, `:2991`):**
+
+Same logic, same constant, but the loop variable is `transect_run_results` and the structure
+is partition-outer, transect-inner. The floor goes BEFORE the transect loop, skipping the
+entire partition:
+
+```python
+# WC-D2: hard 5s surfability floor (fallback path — see _run_pipeline_per_transect for production)
+if tp_p < _MIN_SURFABLE_PERIOD_S:
+    logger.info(
+        "WC-D2: skipping partition %d (Tp=%.1fs < %.1fs floor) — "
+        "non-surfable wind chop, not passed to SwellTrack",
+        p_idx, tp_p, _MIN_SURFABLE_PERIOD_S,
+    )
+    analytical_results.append([None] * n_transects)
+    continue
+```
+
+Note the fix for audit finding 3b: `[None] * n_transects` (one None per transect), NOT a single
+`None`. The downstream code indexes `analytical_results[p_idx][t_idx]` and requires exactly
+`n_transects` entries per partition.
+
+This is unconditional — no wind-direction check needed. A 4s wave is chop regardless of whether
+the wind is onshore or offshore. It never produces a rideable wave, never produces a break point,
+never appears on the beach profile card. Zero compute cost. The partition still exists in the
+spectral data and still feeds the surf scorer's conditions factor (via the `spectral_dwr` channel,
+which is a separate upstream path that `run_pipeline()` never touches).
+
+The F4/F5 wind-sea growth machinery still operates on wind-sea partitions that PASS the 5s floor
+(e.g., a 6s wind swell on the Great Lakes). Growth is unchanged for qualifying partitions. The
+F5 wind-sea SYNTHESIS (`:2893-2949` in the shared path) could theoretically synthesize a sub-5s
+partition from a very short local fetch — but `compute_wind_sea_growth()` produces periods from
+the Young & Verhagen (1996) depth-limited growth curve, and at any realistic nearshore fetch/depth
+the synthesized Tp is ≥ 5s; a sub-5s synthesis is physically unreachable and would be caught by
+the floor if it ever occurred.
+
+**WC-D3. Surf height as a range (min–max of qualifying partition face heights).**
+
+**Corrected premise (audit finding 5):** `breakingFaceHeight` is currently NOT the RSS-combined
+`_combine_partition_faces_11_3()` value directly — since BD-7 (2026-08-01, ADR-093 Amendment 7) it
+is `main_zone_face_height_m` (the BD-7 main-break-zone cross-transect headline) when > 0, else
+`best_peak_face_height_m` (`endpoints/surf.py:1250-1258`). `_combine_partition_faces_11_3()` is an
+intermediate per-transect step feeding the BD-7 cross-transect selection, with TWO call sites
+(`:2174` in `_run_pipeline_per_transect`, `:3220` in `run_pipeline`). **What WC-D3 changes is
+the MEANING of the headline face height** — from a BD-7 cross-transect statistic (which itself
+used the per-transect RSS combination as its input) to a min–max range of qualifying per-partition
+face heights.
+
+**Field naming (audit finding 5):** `surfHeightMin`/`surfHeightMax` already exist on
+`SurfZoneForecast` (the NWS SRF product, `providers/marine/nws_srf.py:924-925`,
+`models/responses.py:367-368`, unit-conversion entries already in
+`marine_response_conversion.py:194-195`). These live inside the `zoneForecast` sub-object — a
+DIFFERENT data source (NWS text bulletin, not SwellTrack). To avoid semantic collision, the new
+fields use **different names**: `modelSurfHeightMin` and `modelSurfHeightMax` (clearly tagged as
+model-derived, distinct from the NWS text-bulletin `surfHeightMin`/`surfHeightMax`).
+
+**Replacement:** the surf endpoint gains two new fields at the per-forecast-entry level:
+- `modelSurfHeightMin` (float, `group_wave_height`, nullable) = smallest face height among
+  qualifying (Tp ≥ 5s) partition break points on the representative transect.
+- `modelSurfHeightMax` (float, `group_wave_height`, nullable) = largest face height among the
+  same set.
+- When only ONE qualifying partition breaks: min == max.
+- When ZERO qualifying partitions break: both null (flat / no surf).
+- The existing `breakingFaceHeight` field is **kept for backward compatibility** and
+  re-defined as `modelSurfHeightMax`. Its value changes from the BD-7 main-zone headline to the
+  max qualifying per-partition face height; this is a semantic change on an existing field,
+  documented in API-MANUAL §17. `_combine_partition_faces_11_3()` is NOT deleted — it continues
+  to serve as an internal per-transect combination step for the BD-7 main-zone selection; what
+  changes is what the HEADLINE reads from the winning transect.
+
+This matches the reporting convention used by Surfline ("2–3 ft"), surf-forecast.com, and every
+consumer surf forecast. The beach profile card already shows per-partition face heights at each
+break — no change needed there.
+
+### WC known-answer tests
+
+- **WC-K1 (L1 INPUT file correctness):** build a Level 1 INPUT file with `swan_level="L1"` and
+  verify it contains the ST6 GEN3 line, SSWELL ZIEGER, and NEGATINP 0.04. Build the same with
+  `swan_level="L2"` (or default) and verify it contains `GEN3 WESTHUYSEN` and does NOT contain
+  ST6, SSWELL, or NEGATINP. Both must parse without error (SWAN's own syntax validation, if
+  available, or a regex-based structural check).
+- **WC-K2 (5s floor unit test):** fixture with three partitions: 4.3s wind swell, 6.0s wind swell,
+  13.1s groundswell. After `run_pipeline()`: the 4.3s partition has NO break points (skipped by
+  the 5s floor); the 6.0s partition IS processed and produces break points normally; the 13.1s
+  groundswell IS processed normally. Verify the INFO log line fires for the 4.3s partition naming
+  the period and the floor constant.
+- **WC-K3 (surf height range):** fixture with two qualifying partitions breaking at face heights
+  1.3m and 2.5m. Verify `modelSurfHeightMin == 1.3m`, `modelSurfHeightMax == 2.5m`,
+  `breakingFaceHeight == 2.5m` (max, not the BD-7 RSS-combined intermediate). Fixture with ONE
+  qualifying partition: verify min == max. Fixture with ZERO qualifying partitions: verify both
+  null. Also verify: the existing NWS `zoneForecast.surfHeightMin`/`surfHeightMax` fields are
+  unchanged (no collision).
+- **WC-K4 (non-regression):** the existing Round X KATs (X-K1 through X-K4) must pass unchanged —
+  WC-D2's floor fires only on sub-5s partitions, so swell-only fixtures are byte-identical.
+- **WC-K5 (scorer still sees chop):** fixture with a 4.3s wind chop partition. Verify the surf
+  scorer's conditions factor receives the partition (it is NOT filtered by the 5s floor). The
+  scorer's input partition list includes the 4.3s entry; only the SwellTrack call is skipped.
+
+### WC tasks
+
+| # | Task | Owner | Accept criteria |
+|---|---|---|---|
+| WC0 | Fact-pin: verify `build_swan_input()` call sites in `swan_runner.py` for each level; pin line numbers at HEAD; verify `grid_level` vs the new `swan_level` parameter don't collide; pin `_combine_partition_faces_11_3()` call sites and the `breakingFaceHeight` wire path in `surf_1d_pipeline.py` + `endpoints/surf.py` | Lead | File:line table, verified at HEAD |
+| WC1 | Implement WC-D1 (ST6 on L1): add `swan_level` parameter to `build_swan_input()`, conditional physics block, wire callers | Sonnet dev | WC-K1 passes; L1 INPUT contains ST6 + NEGATINP; L2/L3/L4 INPUT unchanged |
+| WC2 | Implement WC-D2 (5s floor): add `_MIN_SURFABLE_PERIOD_S = 5.0` constant and the conditional skip in `run_pipeline()` per-partition loop; verify scorer still receives all partitions | Sonnet dev | WC-K2 passes; WC-K5 passes |
+| WC3 | Implement WC-D3 (surf height range): add `surfHeightMin`/`surfHeightMax` fields to `PipelineResult` and the surf endpoint response; redefine `breakingFaceHeight` as max-of-qualifying; retire `_combine_partition_faces_11_3()` as the source for the headline face height | Sonnet dev | WC-K3 passes |
+| WC4 | Tests: WC-K1 through WC-K5 + the F4/F5 wind-sea growth tests still pass (non-regression) | Sonnet test-author | Fail-pre-change transcripts for WC-K1/K2/K3 |
+| WC5 | Docs: ARCHITECTURE.md (L1 physics = ST6, 5s floor, height range), PROVIDER-MANUAL.md (SWAN physics per level, floor semantics), API-MANUAL.md §17 (surfHeightMin/Max fields, breakingFaceHeight redefinition) | Sonnet docs | Doc-sync checklist green |
+| WC6 | **WC-QC gate** then deploy + reality gate | Lead | All gate rows pass, raw output pasted |
+
+**Files (allowlist — exhaustive, corrected per audit findings 2/3a/5/9):**
+- `weewx_clearskies_marine/services/swan_formats.py` — `build_swan_input()` (`:1250`): add
+  `swan_level` parameter, conditional `_physics` block (`:1783-1796`).
+- `weewx_clearskies_marine/services/swan_runner.py` — `_write_input_files()` (`:4457`): thread
+  `swan_level` through to `build_swan_input()`. All 5 call sites in `run_3level()` (`:3133` L1,
+  `:3222` L2, `:3957` L3-no-L4, `:4019` L3-with-L4, `:4166` L4) pass their respective level
+  strings.
+- `weewx_clearskies_marine/services/surf_1d_pipeline.py` — **TWO insertion sites for WC-D2:**
+  (1) `_run_pipeline_per_transect()` (`:1823`, production path) inner per-partition loop at
+  `:2035`; (2) `run_pipeline()` (`:2354`, fallback path) per-partition loop at `:2991`. Both
+  get the 5s floor. New `_MIN_SURFABLE_PERIOD_S` module-level constant. WC-D3:
+  `modelSurfHeightMin`/`modelSurfHeightMax` computation on `PipelineResult`; the existing
+  `_combine_partition_faces_11_3()` (call sites `:2174` and `:3220`) is NOT deleted — it remains
+  an internal per-transect step; what changes is what the headline reads from the winning
+  transect.
+- `weewx_clearskies_marine/endpoints/surf.py` — wire `modelSurfHeightMin`/`modelSurfHeightMax`
+  into the per-entry response (`:1420`); redefine `breakingFaceHeight` as max-of-qualifying
+  (`:1250-1258`, the BD-7 block).
+- `weewx_clearskies_marine/models/responses.py` — add `modelSurfHeightMin`/`modelSurfHeightMax`
+  to the response model. NOTE: `surfHeightMin`/`surfHeightMax` already exist on
+  `SurfZoneForecast` (`:367-368`) for the NWS SRF product — do NOT reuse those names.
+- `weewx_clearskies_api/services/marine_response_conversion.py` — add unit-conversion entries
+  for `modelSurfHeightMin`/`modelSurfHeightMax` (`group_wave_height`). NOTE:
+  `surfHeightMin`/`surfHeightMax` entries already exist (`:194-195`) for the NWS product — the
+  new entries are ADDITIONAL, not replacements.
+- Tests: `tests/test_wc_l1_st6_physics.py` (new — WC-K1), `tests/test_wc_period_floor.py`
+  (new — WC-K2, WC-K5), `tests/test_wc_height_range.py` (new — WC-K3).
+
+### WC reality gate (pre-stated)
+
+| Row | Check | Evidence required |
+|---|---|---|
+| 1 | **Chop eliminated from profile** | On a day with clean groundswell: the beach profile card shows NO break point from any partition with Tp < 5s. The INFO log line "WC-D2: skipping partition ... non-surfable wind chop" fires for the sub-5s partition. Compare against webcam screenshot — no phantom chop break. |
+| 2 | **Groundswell preserved** | Same day: the 13s and 19s groundswell partitions at the L2 deep-water reference (15 m) are within 10% of a WESTHUYSEN-only baseline run for the same cycle. Raw numbers pasted. |
+| 3 | **5s+ wind swell passes** | Fixture or real-data example with a 6s wind swell partition: it IS passed to SwellTrack (not blocked by the 5s floor) and produces break points normally. |
+| 4 | **Scorer unaffected (structural, not empirical)** | The scorer reads from `spectral_dwr` (deep-water reference channel), a separate upstream path that `run_pipeline()` never touches. Verification: confirm the scorer's `spectral_components` argument at its call site in `endpoints/surf.py` is sourced from the `spectral_dwr` channel, not from `run_pipeline()`'s partition list. A code-path trace, not a runtime check — the gate is structural, not empirical (audit finding 4: a runtime check would pass regardless of implementation correctness). |
+| 5 | **Height range correct** | The surf endpoint's `modelSurfHeightMin` and `modelSurfHeightMax` match the smallest and largest qualifying (Tp ≥ 5s) per-partition face heights on the representative transect. `breakingFaceHeight` equals `modelSurfHeightMax`. Raw numbers pasted beside per-partition breakdown. Also: existing `zoneForecast.surfHeightMin`/`surfHeightMax` (NWS SRF product) is unchanged. |
+| 6 | **L1 compute increase** | Measured wall-clock time for L1 SWAN execution (pre vs post, same forecast cycle): increase ≤ 80% on L1 alone, and total cycle time increase ≤ 10%. Raw times pasted. |
+| 7 | **Non-regression** | All existing Round X and Round Z KATs pass unchanged on the deployed code. Test output pasted. |
+| 8 | Deploy discipline | Deploy script only; running commit + process start-time recorded; post-deploy journal sweep (pre/post ERROR/WARNING class counts pasted). |
+
+**Adversarial brief (WC-QC row 3):** "Prove real groundswell is being attenuated by the L1 ST6
+switch — compare the L2 deep-water reference spectrum with and without the change for the same
+cycle; any swell-band Hs reduction > 10% is a finding. Prove the partition gate fires on a day
+with onshore wind (false suppression). Prove the L1 INPUT file can emit WESTHUYSEN instead of ST6
+(parameter-threading bug). Prove a wind-sea partition with offshore wind still produces a break
+point (gate bypass)."
+
+### WC ordering
+
+Round WC has NO dependencies on Round X or Round Z — it operates on SWAN's physics (L1 INPUT
+file) and the pipeline's partition-selection logic, both of which are independent of the breaking
+model (X) and the transect selection (Z). WC can execute in parallel with X and Z, or before/after
+either. The only prerequisite is M-0 (service stability) — the same prerequisite every other round
+has.
+
+## Task UI-1 — Alert banner truncated location text (operator report 2026-08-07)
+
+**Problem:** The alert banner header truncates long "areas affected" text with an ellipsis (e.g.,
+"Point Piedras Blancas to Point Sal westward out to 10 NM; East Santa Barbara Channel from Pt.
+Conception to Pt. Mugu CA including Santa Cruz Island;..."). When the user expands the banner, the
+extended body shows the alert description but does NOT repeat the full areas-affected text — the
+user never sees the complete location information.
+
+**Fix:** When the expanded banner body is rendered, prepend the FULL areas-affected text (the
+`areaDesc` or equivalent NWS field) above the alert description text. This ensures the complete
+location information is always visible when the banner is expanded, regardless of how long it is
+or how much was truncated in the collapsed header.
+
+**Scope:** Dashboard repo only — the alert card/banner component. This is a display fix; no API
+or data-model change.
+
+**Files:** The alert banner component in the dashboard repo (exact file TBD at dispatch — likely
+in `src/components/alerts/` or equivalent).
+
+**Accept:** Expanded banner body shows the full areas-affected text before the description text.
+No truncation in the expanded view. Collapsed header truncation is unchanged (it's a space
+constraint — fine).
+
+## Task DS-1 — Directional sector optimization for L2/L3/L4 (operator ruling 2026-08-07)
+
+**Operator mandate (2026-08-07, in chat):** SWAN's L2 grid OOM-killed the marine service when
+coexisting with the radar container (~3.2 GB) on the 5.7 GB host. SWAN allocates spectral arrays
+proportional to `grid_cells × directions × frequencies` and all levels use full 360° (72 directional
+bins). Nearshore grids (L2/L3/L4) do not receive swell from directions facing into the coast. The
+SWAN manual §2.6.3 explicitly names directional limiting as a memory/compute optimization for
+coastal applications.
+
+**Measured test case (2026-08-07, Huntington Beach):** using the actual `geography.py`
+`cast_fetch_fan()` ray-tracing from each grid's perimeter points (4 corners + 4 edge midpoints)
+against real OSM coastline data:
+
+| Grid | Open sector (union) | Memory reduction | Current → Sector bins |
+|------|-------------------|-----------------|----------------------|
+| L1 | 360° (unchanged) | 0% | 72 → 72 |
+| L2 (6,150 cells) | 220° | **39%** (~290 MB) | 72 → 44 |
+| L3 (2,445 cells) | 215° | **40%** (~48 MB) | 72 → 43 |
+| L4 (8,619 cells) | 205° | **43%** (~130 MB) | 72 → 41 |
+
+Combined: ~468 MB saved — sufficient for radar coexistence.
+
+**Design:** Research brief §9 of `docs/planning/briefs/STUDY-AREA-GEOMETRY-BRIEF.md` (added
+2026-08-07). Key points:
+
+1. **Setup-time computation (once per config push, not runtime).** After `compute_domains()`
+   produces L2/L3/L4 bounding boxes, compute 8 perimeter points per grid. For each, call
+   `cast_fetch_fan()` with the same coastline geometry and land-size thresholds the L1-aiming fan
+   uses. The union of open-water bearings across all 8 points, padded by 15° per side, is the
+   SECTOR range. Stored in the grid-sizing cache.
+
+2. **L1 stays CIRCLE (360°) always.** Shelf-scale, swell from any direction.
+
+3. **Multi-spot safety.** L2 is shared across all spots. The sector computation fires from L2's own
+   perimeter (which already encloses all spots and child grids). The open-water union from L2's
+   boundary is independent of how many spots are inside — it measures what directions can deliver
+   energy across L2's boundary. No change to grid sizing, nesting, or BOUNDNEST1.
+
+4. **L4 diffraction padding.** L4 runs DIFFRACTION; diffracted energy wraps into directions outside
+   the incoming sector. L4 gets an additional 30° padding (45° total per side), or stays CIRCLE if
+   the padded sector exceeds 330°.
+
+5. **CGRID command change only.** `CIRCLE` → `SECTOR` on the CGRID line in `build_swan_input()`.
+   Bin count set to `sector_span / 5` to preserve 5° resolution. Everything else (grid geometry,
+   nesting I/O, handoff, SwellTrack, SurfBeat) is unchanged.
+
+6. **Ray-tracing performance.** Current pure-Python implementation takes ~2 minutes for 8 perimeter
+   points. Optimization follow-ups: Shapely STRtree spatial index (10-100× CPU speedup); NumPy
+   vectorized ray generation; GPU acceleration (RAPIDS cuSpatial / Numba CUDA) for multi-spot
+   deployments. Acceptable as-is for setup-time.
+
+**Files (allowlist):**
+- `weewx_clearskies_marine/services/swan_formats.py` — `build_swan_input()`: emit SECTOR when the
+  sizing cache carries a sector range; fall back to CIRCLE when absent (backward compat).
+- `weewx_clearskies_marine/services/grid_sizing_chain.py` — compute sector per grid, store in
+  `swan_grid_sizing.json`.
+- `weewx_clearskies_marine/services/geography.py` — no change (existing `cast_fetch_fan()` is
+  reused; origin points are the caller's responsibility).
+- Tests: `tests/test_ds1_directional_sector.py` (new).
+
+**Accept criteria:**
+- L2/L3/L4 INPUT files contain `SECTOR` with the computed range (not `CIRCLE`).
+- L1 INPUT file still contains `CIRCLE`.
+- Grid sizing cache carries `sector_start_deg`/`sector_end_deg`/`sector_bins` per level.
+- Existing grid geometry (bbox, resolution) is byte-identical before and after.
+- SWAN convergence gate passes on all levels with SECTOR.
+- Peak RSS during a SWAN cycle is reduced by ≥ 300 MB compared to the CIRCLE baseline.
+
+**Prerequisite:** Round WC (L1 ST6 physics change, which also modified `build_swan_input()`).
+
 ## DOCUMENTATION — exact deltas (each ships in its task's code commit; none deferred)
 
 | Doc | Task | Delta | Status |
 |---|---|---|---|
 | `docs/decisions/ADR-102-statistical-breaking-roller.md` (NEW) | X | The X-DESIGN verbatim: Q_b relation, constants (γ 0.73, Γ 0.40, K 0.15, Q_B_VISIBLE 0.05, Q_B_CESSATION 0.02, β_D 0.10), one-sidedness, roller balance, cap deletion, closure invariants, worked X-K2 example. Status Accepted on operator gate pass. | Open |
 | `docs/decisions/ADR-103-spectral-boundary.md` | H-1 | REWRITTEN from the original plan's version: documents the boundary design that ACTUALLY exists (multi-station BOUNDSPEC, station selection, refuse-don't-degrade per D-3) — NOT the struck three-tier design. | Open |
-| `docs/ARCHITECTURE.md` | H-1, X, Z, M-0d | H-1: handoff-collapse instrumentation + health flag; X: breaking model → statistical Q_b + roller, cap removed; Z: transect selection + stickiness, fine-grid anchor, `reestablish_spot` lifecycle rule; M-0d: precomputed profile store (SQLite per spot, beach profile + heat map served from store not recomputed). | Open |
-| `docs/manuals/PROVIDER-MANUAL.md` | H-1, M-0d | Bulk-fallback semantics, new WARNING classes, health flag meaning (H-1); precomputed profile store lifecycle, SQLite schema, write-during-precompute / read-at-endpoint pattern (M-0d). | Open |
+| `docs/ARCHITECTURE.md` | H-1, X, Z, WC, M-0d | H-1: handoff-collapse instrumentation + health flag; X: breaking model → statistical Q_b + roller, cap removed; Z: transect selection + stickiness, fine-grid anchor, `reestablish_spot` lifecycle rule; WC: L1 physics = GEN3 ST6 + NEGATINP + SSWELL ZIEGER (L2/L3/L4 unchanged WESTHUYSEN), post-SWAN wind-sea partition gate; M-0d: precomputed profile store (SQLite per spot, beach profile + heat map served from store not recomputed). | Open |
+| `docs/manuals/PROVIDER-MANUAL.md` | H-1, WC, M-0d | Bulk-fallback semantics, new WARNING classes, health flag meaning (H-1); SWAN physics per grid level (L1=ST6, L2-L4=WESTHUYSEN), wind-sea partition gate semantics and log format (WC); precomputed profile store lifecycle, SQLite schema, write-during-precompute / read-at-endpoint pattern (M-0d). | Open |
 | `docs/manuals/API-MANUAL.md` | X, Z, M-0d | §17–18: break-point semantics (Q_b-based onset, one point per bar), whitewater/impact-zone derivation from roller (X); `transectIndex` display contract + stickiness note (Z); M-0d: profile endpoint now precomputed (response shape unchanged; latency <2s best / <5s all, was >45s). | Open |
-| `docs/manuals/DASHBOARD-MANUAL.md` | Z | Label per D-7 + heat-map imagery registration (data-frame-authoritative rule, control-point transform). | Open (catch-up DOC-0 **DONE** `e5a94e1`) |
+| `docs/manuals/DASHBOARD-MANUAL.md` | Z, UI-1 | Label per D-7 + heat-map imagery registration (data-frame-authoritative rule, control-point transform) (Z); alert banner expanded-body areas-affected text (UI-1). | Open (catch-up DOC-0 **DONE** `e5a94e1`) |
 | `docs/manuals/DESIGN-MANUAL.md` | Z | Label pattern per D-7. | Open (catch-up **DONE** `e5a94e1`) |
 | `docs/manuals/OPERATIONS-MANUAL.md` | M-0, H-1, M-0d | M-0: cache lifecycle per D-1(b); H-1: new health reasons, invariant names and what firing means; M-0d: new persisted file (`/var/run/weewx-clearskies/swan/profile_store/{spot_id}.db`), lifecycle (overwritten each SWAN cycle, deleted by `reestablish_spot()`). | Open |
 | Operator Manual + `help.admin.surf_scoring.*` | — | **DONE** (DOC-1: stack `940047f`, meta `86b9d4e`). | Done |
@@ -509,6 +905,12 @@ above plus rows 4–6; a round that skips a row is not closed):**
   knife-edge crests, the 15 cm floor boundary); prove Q_b wrong against your own independent
   solve; prove a second bar can still be swallowed; prove the deleted cap was hiding something
   that now publishes garbage; prove the roller books energy twice or never."
+- **WC-QC:** "Prove real groundswell is being attenuated by the L1 ST6 switch — compare the L2
+  deep-water reference spectrum with and without the change for the same cycle; any swell-band
+  Hs reduction > 10% is a finding. Prove the partition gate fires on a day with onshore wind
+  (false suppression). Prove the L1 INPUT file can emit WESTHUYSEN instead of ST6
+  (parameter-threading bug). Prove a wind-sea partition with offshore wind still produces a break
+  point (gate bypass)."
 - **Z-QC:** "Prove something OLD survives `reestablish_spot()` — enumerate every file the marine
   service can persist for a spot, re-establish, then find ANY artifact with a pre-teardown
   timestamp (operator ruling 6 is the claim under attack; the expanded teardown list is the
@@ -905,6 +1307,25 @@ sections that were later struck):**
     classification, wave shapes — array lookups, not the pipeline). Response shape unchanged.
     New persisted file: `/var/run/weewx-clearskies/swan/profile_store/{spot_id}.db`.
     Memory management rules codified in `rules/coding.md` §12 (same session). Task M-0d.
+
+16. **Wind chop suppression via L1-only ST6 + post-SWAN partition gate (operator,
+    2026-08-07, in chat, with webcam screenshot and research papers).** Operator's words:
+    "That windswell is CHOP! It is not making it to shore... YOU WOULD FUCKING SEE IT ON
+    THE VIDEO FEED!" SWAN's `GEN3 WESTHUYSEN` package lets 4.3s wind chop survive from the
+    WW3 boundary to shore because its saturation-based whitecapping (Alves & Banner 2003)
+    drops to a weak residual when the chop's spectral saturation falls below the threshold
+    Br, and the Yan (1987) wind input has no effective negative wind-input term. Switching
+    ALL levels to ST6 was rejected on compute cost (60% increase — "We cannot afford a 60
+    percent increase. That is blocking."). Approved fix: ST6 + NEGATINP + SSWELL ZIEGER on
+    L1 ONLY (1,065 cells, 5.8% of total — ~3-4% compute increase); L2/L3/L4 unchanged.
+    Complemented by a post-SWAN conditional gate that suppresses the wind-sea partition when
+    the onshore wind component is ≤ 0 (offshore/cross-shore conditions). Research brief:
+    `docs/planning/briefs/SWAN-WHITECAPPING-WIND-CHOP-BRIEF-2026-08-07.md`. Round WC.
+
+17. **Alert banner truncated location text (operator, 2026-08-07, with screenshot).**
+    The alert banner header truncates long NWS areas-affected text; when expanded, the
+    body does NOT repeat the full location — the user never sees the complete area. Fix:
+    the expanded body prepends the full areas-affected text above the description. Task UI-1.
 
 15. **Memory management rules are codified and auditor-enforced (operator, 2026-08-07).**
     Eight guidance-flavored rules in `rules/coding.md` §12, covering storage-format choice
