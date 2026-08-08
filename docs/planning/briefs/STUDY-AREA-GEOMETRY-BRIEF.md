@@ -486,7 +486,7 @@ operator's. Nothing here is built until that call and the architectural sign-off
 
 ---
 
-## 9. Directional sector optimization for L2/L3/L4 (added 2026-08-07)
+## 9. ~~Directional sector optimization for L2/L3/L4~~ (added 2026-08-07, REJECTED — see end of section)
 
 **Problem.** SWAN allocates spectral arrays proportional to `grid_cells × directions × frequencies`.
 All four grid levels currently use `CIRCLE 72` (full 360° at 5° resolution). On a memory-constrained
@@ -576,6 +576,25 @@ as-is.
 - Handoff selection (first-match L4→L3→L2): unchanged
 - SwellTrack/SurfBeat: unchanged (they consume the handoff spectrum, not the directional grid)
 - Spectral frequency resolution: unchanged (34 bins, 0.03–1.0 Hz)
+
+---
+
+### 9.3 REJECTION (Fable adversarial review, 2026-08-07)
+
+**Disproved on four independent grounds from the SWAN manual:**
+
+1. **GEN3 quadruplets require 30° padding per side** (manual L1510-1519), not 15° — erodes L2
+   savings from 39% to ≤22%.
+2. **SECTOR silently disables OBSTACLE reflection** (manual L3753: "Reflections will be computed
+   only if CIRCLE is activated") — any grid with structures must stay CIRCLE, eliminating L4.
+3. **Hotstart files require identical spectral grids** (manual L2806-2807) — changing bin count
+   without clearing hotstarts corrupts warm-start.
+4. **No output-equivalence acceptance criterion** — a wrong sector passes all six accept rows
+   while producing zero wave energy.
+
+With compliant 30° padding and L4 forced to CIRCLE, combined savings drop to ~184 MB —
+insufficient for the radar coexistence problem (~2 GB shortfall). **The memory solution is host
+memory, not directional limiting.** This section retained as the documented investigation record.
 
 ---
 

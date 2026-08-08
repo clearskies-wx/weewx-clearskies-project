@@ -794,9 +794,20 @@ in `src/components/alerts/` or equivalent).
 No truncation in the expanded view. Collapsed header truncation is unchanged (it's a space
 constraint — fine).
 
-## Task DS-1 — Directional sector optimization for L2/L3/L4 (operator ruling 2026-08-07)
+## ~~Task DS-1 — Directional sector optimization for L2/L3/L4~~ (REJECTED 2026-08-07)
 
-**Operator mandate (2026-08-07, in chat):** SWAN's L2 grid OOM-killed the marine service when
+**Status: REJECTED** — Fable adversarial review (2026-08-07) disproved the design on four
+independent grounds from the SWAN manual itself: (1) GEN3 quadruplets require 30° padding per
+side (not 15°), eroding L2 savings from 39% to ≤22%; (2) SECTOR silently disables OBSTACLE
+reflection (manual L3753: "Reflections will be computed only if CIRCLE is activated"), so any
+grid with structures must stay CIRCLE; (3) hotstart files require identical spectral grids,
+which the design didn't account for; (4) no output-equivalence acceptance criterion. With
+compliant padding and L4 forced to CIRCLE, combined savings drop to ~184 MB — insufficient
+to solve the radar coexistence problem (needs ~2 GB). The memory solution is host memory,
+not directional limiting. Research brief §9 in STUDY-AREA-GEOMETRY-BRIEF.md retained as the
+documented investigation record.
+
+**Original mandate (2026-08-07, in chat):** SWAN's L2 grid OOM-killed the marine service when
 coexisting with the radar container (~3.2 GB) on the 5.7 GB host. SWAN allocates spectral arrays
 proportional to `grid_cells × directions × frequencies` and all levels use full 360° (72 directional
 bins). Nearshore grids (L2/L3/L4) do not receive swell from directions facing into the coast. The
