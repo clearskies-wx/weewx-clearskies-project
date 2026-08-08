@@ -189,6 +189,8 @@ Moved 2026-07-27 (task A3). "Audit rules" and "Round-close verification gate" no
 
 **Why (2026-07-25):** During the L3/1D boundary discussion the lead wrote sentences like "N sets how far seaward of the break the handoff sits — but only at L3-enabled spots, because there the handoff **is** L3's shoreward edge." Every term had been defined earlier, but four of them landed in one sentence and the meaning did not come through. The user had to ask "what does N govern?" to get a plain answer. Defined-but-dense is still unreadable.
 
+**Mechanism before metaphor.** When explaining a technical behavior, state the concrete mechanism first — the loop, the file, the list, the number, in ordinary nouns — and only then the consequence. Shorthand the reader must decode ("warms the planet", "double resolution", "roads nobody drives") is not an explanation; each round of it forces the user to interrogate the metaphor instead of learning the fact. If the user pushes back confused, the fix is to strip abstraction down to the mechanism — never to add a new metaphor on top. **Why (2026-08-08):** the LibreWXR memory audit took six increasingly angry rounds to land the one-sentence fact "a loop enumerates world-grid positions written before BBOX support existed, finds no data, and renders blank tiles" because every explanation led with effects and imagery instead of that sentence.
+
 **One decision thread per reply.** Don't interleave multiple topics. Note side-topics briefly at the end.
 
 **Audit decision completeness before claiming a phase done.** Walk through the surface checklist: data model, database, API contract, external integrations, operational, UI/UX, quality bars, deployment, cross-cutting.
