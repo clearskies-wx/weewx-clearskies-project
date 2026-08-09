@@ -593,8 +593,9 @@ cycle, payload + file inventory archived in session scratchpad):**
   at the config push** — 08:26:41Z "structure unreachable by ~229 m … L3 disabled for this
   cluster; handoff falls back to L2 at ~15 m". The chain then wrote the COARSE L3 nest
   (52×47, contains L4 ≥200 m clearance) and live cycles run L3[0] 51×46 + L4 — the exact
-  pre-G L3 dims, so the operative nest chain appears unchanged; whether this same guard also
-  fired at the last pre-G config push is being checked from the journal → Q6.
+  pre-G L3 dims, so the operative nest chain appears unchanged. **PRE-EXISTENCE CONFIRMED:
+  the identical guard fired at the last pre-G config push, 2026-08-03 06:12:32Z ("unreachable
+  by ~235 m") — not a Phase-G effect; belongs to the tracked smart-L3 disposition item.**
 Config push on librewxr → new L1. (1) Sizing trace: box vs S1 estimate recorded; Catalina
 inside the domain (land-masked by ETOPO), boundary seaward of it; (2) bathymetry chain: ETOPO
 covers, C-90 coverage rows pass, cold start observed (G7); (3) full cycle "Normal end of
@@ -1030,11 +1031,13 @@ takes 36 minutes (hard limit 45).
    change it (that would be new design work, not in the current plan).
 3. **An internal safety check fired during setup** ("L3 viability: structure unreachable
    by ~229 m — L3 disabled"). Same check class as the 2026-07-31 incident, which is why I
-   stopped to surface it. HOWEVER: the system then fell back to the coarser inner-grid
-   layout it was already using before this deploy (identical dimensions, 51×46), the pier
-   grid still nests inside it, and live runs are normal. I'm verifying from the logs
-   whether this same check also fired at the previous config push (i.e. pre-existing, not
-   caused by G). If it turns out G caused it, that's a real regression to chase.
+   stopped to surface it. **RESOLVED as pre-existing (journal evidence, 2026-08-09):** the
+   identical line fired at the last pre-G config push on 2026-08-03 06:12:32Z
+   ("unreachable by ~235 m") — Phase G did not cause it, and today's number is marginally
+   BETTER (229 vs 235 m). The system falls back to the same coarse inner-grid layout it
+   was already running (identical 51×46 dims), the pier grid still nests, runs normal.
+   This is the already-tracked "smart-L3 disposition" open item (rules/coordinator.md
+   §4b's example), not a Phase-G finding. Item 3 needs no ruling; items 1 and 2 still do.
 
 **Options:** (a) accept the deviations, close G-Accept, proceed to Phase S (my
 recommendation — every pre-declared reality check passed and the shadow physics is
