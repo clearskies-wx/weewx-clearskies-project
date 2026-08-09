@@ -811,6 +811,24 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
   so that is not a bad thing"; buoy reality gate had already improved on every
   pre-declared quantity) and wall-clock +3m17s vs the matched station cycle. B-Accept
   CLOSED; Phase B complete end-to-end (deployed `5cc28e8`).
+- **2026-08-09 — G8 row-(e) deviation (lead-approved):** the plan's "box ≈ brief §4 S1
+  within ±15% per axis" is not honestly claimable from a single-spot synthetic RayResult
+  fixture (S1's E/N edges come from multiple real spots + lateral margins). Test-author
+  surfaced it rather than overclaiming; the full-box ±15% check MOVES to G-Accept row 1
+  (live sizing trace vs S1). The KATs assert what the plan names concretely: Catalina
+  W-edge enclosure, SCI clamp to max-achievable, W/S edge match (which DID land on S1's
+  values). Deviation stated in the test-file docstring.
+- **2026-08-09 — Marine repo pre-existing test failures TRACKED (parking lot):** 3
+  failures present at `70d442f` (pre-Phase-G) and unchanged since, reproduced
+  independently by dev and lead: `tests/services/test_double_break_transect55_kat.py::
+  TestDoubleBreakOnRealTransect55::test_wave_reforms_between_the_two_breaks`;
+  `tests/services/test_wind_gatherer.py::TestColdStartReconcile::
+  test_loads_store_then_polls_and_persists` (lastPollAt None);
+  `tests/services/test_wind_timeline_store.py::TestDiskPersistence::
+  test_save_then_load_round_trips_timeline_and_incoming`. Plus one flaky
+  environment-timing test seen once during W6 checks: `tests/test_h4_chunked_json.py::
+  test_after_chunked_encode_passes_the_threshold` (heartbeat max_gap 0.162s vs 0.15s).
+  None caused by W6/G work; need their own triage round.
 - **2026-08-09 — G1 stale-test ruling (lead):** `test_geography.py::
   test_resolve_regime_horizon_km_ocean_fallback_and_margin` pins the pre-G1
   shelf-driven ocean horizon (superseded by P1). Dev STOPped per the stale-test block;
