@@ -16,8 +16,10 @@ Auditor: `clearskies-auditor` at Gate S (blind).
    code under test).
 3. The dev's shipped code at the HEAD the lead names: `providers/ocean/
    rtofs_currents.py`, `providers/ocean/stofs_wlevel.py`, `providers/ocean/ofs.py`
-   (`find_current_source`), the two swan.py fetch sites, `_write_wlevel_txt`,
-   `services/vertical_datum.py`.
+   (`find_current_source`), the two swan.py fetch sites, the wlevel wiring into the
+   EXISTING `_write_wlevel_grid_txt` (:2329 — NOT `_write_wlevel_txt`, which is the
+   uniform stamp; lead correction 2026-08-09), `services/vertical_datum.py`,
+   `providers/tides/coops.py` (additive `datums` product, S3).
 4. Existing test conventions: `tests/` flat layout; fixture precedent
    `tests/fixtures/providers/` (wavewatch, hrrr).
 
