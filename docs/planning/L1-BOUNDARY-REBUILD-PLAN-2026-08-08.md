@@ -700,7 +700,7 @@ cycle at INFO (provenance, not flagging). Missing timestep on the selected sourc
 `CurrentCoverageError` (no cross-rung mixing within a cycle — same per-cycle selection
 rule as the WLEVEL chain).
 
-### S2 — STOFS water-level provider + WLEVEL chain  🔶 CODE DONE 2026-08-09 session 5 (marine `5d9d88b`, acceptance gate lead-passed — see decision log; water-level ONLY per the P7 amendment; S4b KATs + Gate S wlevel rows + deploy AFTER G9)
+### S2 — STOFS water-level provider + WLEVEL chain  ⬜ REOPENED 2026-08-09 session 5 — first landing (`5d9d88b`) REVERTED after an OOM crash loop in production (see decision log): the fetcher held 73 full-region grids as nested Python lists (~7 GB). Re-land constraints (binding): subset to L1 bbox+pad AT EXTRACTION; compact array storage (numpy float32-class); memory KAT on production-shaped bbox; accept gains a fetch-path peak-memory row. Bias gate already PASSED (−0.044 m) and carries forward. S4b's 3 S2-test commits reverted with it; S3 + its tests retained.
 **Files (new):** `providers/ocean/stofs_wlevel.py`. **Files (modified):**
 `providers/nearshore/swan.py` (:3021-3080 tide fetch site → chain), `services/swan_runner.py`
 (`_write_wlevel_txt` spatially-varying path generalized from the L3 profile writer to a
@@ -904,6 +904,31 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 ## Decision log
 
+- **2026-08-09 (session 5) — DEPLOY `3065289` FAILED IN THE FIELD: OOM CRASH LOOP →
+  ROLLED BACK same session (S2 reverted, G9+S3 retained; marine `439aa7c` deployed
+  19:51:35Z).** Service OOM-killed 3× post-deploy (18:04: 5.1 GB peak / 2.2 GB swap;
+  19:39: 5.1 GB / 2.8 GB swap after 1h36m CPU; 19:44: 4.7 GB after only 2m55s CPU —
+  crash loop, host swapping under the radar container). The first kill also killed the
+  UNFINISHED sizing chain, so the G9 box never persisted — every restart loaded the old
+  93×132 cache. **ROOT CAUSE (attributed, code-verified): S2's `stofs_wlevel.py` holds
+  each hourly STOFS field as the FULL CONUS-west regional grid (2145×1377 ≈ 2.95 M
+  points) stored as NESTED PYTHON FLOAT LISTS (:345 `values: list[list[float]]`) —
+  ~100+ MB/grid as objects; the runtime call fetches forecast_hours=72 → 73 grids ≈
+  7 GB. Never subsets to the L1 bbox.** Why nothing upstream caught it: the 32 KATs use
+  tiny synthetic grids (correctness, not scale); the lead's bias-gate run fetched 25
+  grids on DILBERT (ample RAM); the acceptance gate has no resource-scale row — BLIND
+  SPOT now named. **Rollback surgery:** reverted `5d9d88b` (S2 production) + its 3
+  dependent test commits (`e9ef833`/`6c89be9`/`04997b3`); KEPT G9 (config-time,
+  memory-neutral, operator-priority), S3 `9cbb915` (Hawaii-gated, inert at HB) + its 2
+  test commits. Suite green post-revert: 225 pass / same 3 tracked fails. **S2 RETURNS
+  TO OPEN with a mandatory re-land design constraint: subset the extracted field to the
+  L1 bbox + pad AT EXTRACTION and store as numpy float32 (or equivalent compact form);
+  the re-land round adds a memory KAT (assert bytes-scale of the returned fields for a
+  production-shaped bbox) and the accept adds an RSS/peak-memory row for the fetch
+  path. Bias-gate result (−0.044 m PASS) remains valid evidence for the eventual
+  cutover.** The two-change deploy deviation recorded below made attribution take
+  minutes not hours (disjoint journal signatures) but still put two changes at risk in
+  one deploy — the §7.1 rule stands vindicated.
 - **2026-08-09 (session 5) — G9+S2+S3 DEPLOYED (marine `3065289`, proc 17:46:16Z) after
   test-g9 gate (5 KATs incl. lead-required east-facing pin; 223/3 lead-reproduced;
   falsifiability: pre-G9 revert 3-fail + positional-unpack mutation fail + floor-raise
