@@ -315,7 +315,22 @@ fetch-time assert fires on undersized bbox; (c) current timestep gap → raise; 
 mismatch → raise; (e) regression: full existing suite on librewxr, 0 new failures vs baseline
 (record baseline commit + counts in the round record).
 
-### W6 — Read the HRRR wind-grid rotation properly (operator-ruled 2026-08-09, Q3) ✅ **CODE `70d442f` lead-verified (12 KATs, falsifiability 9/12 reproduced); accept = post-deploy journal + matched-cycle diff, see decision log**
+### W6 — Read the HRRR wind-grid rotation properly (operator-ruled 2026-08-09, Q3) ✅ **CLOSED — code `70d442f` lead-verified (12 KATs, falsifiability 9/12 reproduced); DEPLOYED proc 05:23:23Z; W6-Accept PASSED 2026-08-09 06:15Z**
+**W6-Accept record (lead, all numbers from fresh commands):** (1) Lambert WARNING: **188
+occurrences** in the pre-deploy window (03:12–05:23Z) → **0** since deploy — gone. (2)
+Matched-cycle wind diff: the live post-deploy run consumed HRRR t04z — the same cycle as
+the committed fixture at the identical live bbox; computed rotation field on it:
+**mean −12.74°** (min −13.18, max −12.31, spread 0.87° across the box) vs predicted
+−12.75°; pre-fix was identically 0° (no-op). Served matched-valid-hour diff (03:17Z run
+vs 05:27Z run, 6 common hours): break height −1%…−8%, at-break direction within ~2°
+except one dominant-partition switch at 00Z. Deep-water catalog at 06Z: groundswell
+UNCHANGED (0.551→0.556 m, 18.2 s, 200.0° — swell boundary untouched, as designed);
+wind swell re-aimed 269.7°→275.2° (+5.5°, the rotation propagating through SWAN). (3)
+Journal sweep: zero new WARNING/ERROR classes (all present pre-deploy; INV-11 the known
+health reason). (4) Reality gate (pre-declared ±25% Hs): combined deep Hs
+√(0.67²+0.556²)=**0.87 m vs 46222 0.8 m (+9%) / 46253 0.9 m (−3%)**; period 18.2 s vs
+buoy DPD 17 s; buoy MWD noisy (46253 swung 184°→157° in 30 min), groundswell 200°
+recorded against it without a pass/fail claim. Cycle wall-clock 05:23→06:00:56 ≈ 37.5 m.
 **Operator ruling (chat):** "Yes we want that fixed so we are reading it properly and not
 estimating based upon wobble we are causing because it is not reading properly."
 **Files:** `providers/wind/hrrr.py` (the Lambert-parameter extraction that currently
