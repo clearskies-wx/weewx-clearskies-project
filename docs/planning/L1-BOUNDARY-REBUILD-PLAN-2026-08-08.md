@@ -981,6 +981,21 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 ## Decision log
 
+- **2026-08-09 (session 5) — GREAT LAKES ARCHITECTURE RULED (operator, in chat,
+  after the depth-envelope research redo):** (1) **NO lake L1 — the GLWU boundary
+  feeds an L2-class grid directly** ("Yes no lake l1, boundary feeds l2"). (2)
+  **Boundary product chosen by ACCURACY**, pinned at implementation by live
+  comparison (500 m vs 2.5 km at boundary depth; blend if the fine product's 48 h
+  limit binds against the 72 h window). (3) **L2 outer edge on lakes = 30 m contour
+  OR the lake's deepest locally-attainable water, whichever comes first** — resolves
+  the Erie no-30 m-contour blocker; L2's role confirmed necessary on all lakes
+  (boundary ingestion + surf-spot-scale bathymetry + water level down to the 15 m
+  handoff — beyond GLWU's product resolution and proof floor). These supersede the
+  G9-GL cap question entirely: the lake answer is not a cap, it is no L1 at all.
+  Implementation is a future operator-ordered round (coding freeze stands); the
+  research record's dependency list (briefs/G9-GL-RESEARCH-REDO-2026-08-09.md Q4) is
+  the work-list; ARCHITECTURE/ADR doc-sync rides the implementing round per the
+  "tags come off at the implementing deploy" convention.
 - **2026-08-09 (session 5) — OPERATOR REVOKED the C3 accept (screenshot review) +
   REJECTED the G9-GL research writeup; NO-CODING instruction issued.** C3: the
   remediated heatmap is wrong at the foundation — ortho misplaced (transects start
@@ -1357,15 +1372,28 @@ the same snapshot-size limit you already ruled against on the ocean.
    Erie cannot be configured AT ALL, whatever we decide about L1. The L2 outer-edge
    rule needs a lake variant regardless.
 
-**The three decisions this puts in front of you:**
-- **D-GL-1:** Adopt "no lake L1 — boundary feeds an L2-class grid" as the lake
-  architecture? (The evidence supports it; the dependency list makes it a real but
-  bounded change.)
-- **D-GL-2:** Which boundary product on lakes — 2.5 km to 72 h, ~500 m to 48 h, or a
-  blend (fine near-term, coarse far-term)?
-- **D-GL-3:** The lake variant of L2's outer edge — e.g. "the 30 m contour or the
-  deepest water the lake locally offers, whichever comes first"? (Needed for Erie no
-  matter what.)
+**RULINGS (operator, 2026-08-09, in chat):**
+- **D-GL-1 RULED: "Yes no lake l1, boundary feeds l2."** No L1 grid on Great Lakes
+  sites; the reconstructed GLWU boundary feeds an L2-class grid directly. (The
+  dependency list in the research record is the implementation work-list; execution
+  awaits the operator lifting the coding freeze.)
+- **D-GL-2 RULED: "whichever boundary product that is ACCURATE"** — accuracy governs
+  the product choice, not convenience. Implementation pins it by a live accuracy
+  comparison at the lake boundary depth (the ~400–500 m product vs the 2.5 km
+  product where they overlap; if the fine product wins and its 48 h limit binds, a
+  fine-near/coarse-far blend covers the 72 h window) — lead determines WITH EVIDENCE
+  at implementation, not by assumption.
+- **D-GL-3 RULED via the operator's follow-up question ("is there the possibility
+  that L2 MAY NOT be needed in all lakes, Erie being a perfect example?") and the
+  lead's evidence-based answer, operator-accepted framing:** L2's ROLE remains
+  necessary on every lake (only an L2-class grid can ingest the boundary and resolve
+  surf-spot-scale bathymetry, water level, and per-transect variation down to the
+  ~15 m handoff — GLWU's product cannot, even on Erie: ≥400 m cells, no water-level/
+  seiche effects, proof floor ~20 m). What shallow lakes change is WHERE L2 starts:
+  its outer edge becomes **"the 30 m contour OR the deepest water the lake locally
+  offers, whichever comes first"** (Erie: ~20–22 m — coinciding with GLWU's proven
+  floor; same principle as D-GL-1: our modeling starts where the boundary source's
+  proof ends). On Erie this makes L2 smaller, not larger.
 
 **The question:** how big should our outermost wave grid be at a Great Lakes site?
 
