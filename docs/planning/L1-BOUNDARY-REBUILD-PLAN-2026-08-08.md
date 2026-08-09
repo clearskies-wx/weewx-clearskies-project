@@ -688,7 +688,7 @@ cycle at INFO (provenance, not flagging). Missing timestep on the selected sourc
 `CurrentCoverageError` (no cross-rung mixing within a cycle — same per-cycle selection
 rule as the WLEVEL chain).
 
-### S2 — STOFS water-level provider + WLEVEL chain  🔄 IN FLIGHT 2026-08-09 session 4 (dev-phase-s coding; scope-ack confirmed with 6 lead rulings — see decision log + session handoff; water-level ONLY per the P7 amendment; deploy ships AFTER G9)
+### S2 — STOFS water-level provider + WLEVEL chain  🔶 CODE DONE 2026-08-09 session 5 (marine `5d9d88b`, acceptance gate lead-passed — see decision log; water-level ONLY per the P7 amendment; S4b KATs + Gate S wlevel rows + deploy AFTER G9)
 **Files (new):** `providers/ocean/stofs_wlevel.py`. **Files (modified):**
 `providers/nearshore/swan.py` (:3021-3080 tide fetch site → chain), `services/swan_runner.py`
 (`_write_wlevel_txt` spatially-varying path generalized from the L3 profile writer to a
@@ -705,7 +705,7 @@ surface. Chain (decided): STOFS → CO-OPS-uniform (fallback selection logged lo
 bathymetry-chain pattern) → refuse (`tide_fetch_failed`). The "~30 km uniform tide"
 justification comment is deleted with the uniform-primary path.
 
-### S3 — Hawaii/VDatum-less datum branch  🔄 IN FLIGHT 2026-08-09 session 4 (same dev-phase-s round as S2; coops.py allowlisted for additive `datums` product via the CO-OPS Metadata API — lead rulings 2026-08-09; P12 DEM entries incl. the 5 optional PR DEMs approved hand-authored with catalogue citations)
+### S3 — Hawaii/VDatum-less datum branch  🔶 CODE DONE 2026-08-09 session 5 (marine `9cbb915`, acceptance gate lead-passed; coops.py additive `fetch_datums` via Metadata API; **P12 found ALREADY SATISFIED** — all 9 DEM entries present since the original port `f2494bb`, no edit needed)
 **Files:** `services/vertical_datum.py`, `data/ncei_regional_dem_index.json` (P12 refresh).
 **Design (decided):** when the domain has no VDatum separation-grid coverage AND every
 bathymetry source in play is tidal-referenced (MHW/MSL/MLLW): convert via tidal-datum offsets
@@ -813,7 +813,7 @@ component (name resolved at scope-ack from the dashboard repo), `docs/contracts/
 list on the same refresh; screenshot-case arithmetic verified against the live payload;
 API-MANUAL + openapi doc-sync same round.
 
-### C2 — Beach Profile card: draw ONLY the dominant swell's wave train  🔶 CODE DONE session 2 (dashboard `7cfd475`, lead-verified in git 2026-08-09); Accept (live, weather-test) + Gate C pending
+### C2 — Beach Profile card: draw ONLY the dominant swell's wave train  🔶 CODE DONE session 2 (dashboard `7cfd475`); **ACCEPT (live, weather-test) PASSED 2026-08-09 session 5** — see decision log (all breakPoints partition 0, card matches 199°/16.7 s same hour, one coherent train in screenshot); Gate C pending (with C1)
 **Operator instruction (2026-08-08):** the profile's water-surface rendering must draw the
 dominant swell only, not all swells interleaved (screenshot: overlapping trains).
 **Files:** `BeachProfileChart.tsx` (wave-surface generation region ONLY — the :585-594
@@ -827,7 +827,7 @@ draw. DASHBOARD-MANUAL doc-sync same round.
 **Accept (live):** profile shows one coherent train matching the headline swell; no
 interleaved secondary crests; matched against the card's dominant direction on the same hour.
 
-### C3 — Surf-height heatmap: ortho alignment, buffer, y-axis, structure-overlay removal  🔶 CODE DONE session 2 (dashboard `e8be970`, lead-verified in git 2026-08-09); Accept (live, weather-test) + Gate C pending
+### C3 — Surf-height heatmap: ortho alignment, buffer, y-axis, structure-overlay removal  🔶 CODE DONE session 2 (dashboard `e8be970`); **Accept measured 2026-08-09 session 5: rotation + overlay-removal + bundle rows PASS; buffer (32.9/57.0 m ≠ 50 m) and y-tick rows (suppressed at 162-row density) FAILED → remediation round in flight** — see decision log; Accept re-measures after the fix deploys; Gate C pending (with C1)
 **Operator instruction (2026-08-08):** (a) the orthophotography must be ALIGNED with the
 transect bearing (the heatmap's beach frame), not true north — "so that way IT MATCHES";
 (b) 50 m of orthophotography buffering around the heatmap extent so the user can get their
@@ -892,6 +892,41 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 ## Decision log
 
+- **2026-08-09 (session 5) — S2/S3 CODE ROUND CLOSED (re-dispatch): marine `5d9d88b`
+  (S2) + `9cbb915` (S3), acceptance gate PASSED lead-independently** — pytest
+  `tests/test_island_autosizing.py tests/services/` = 210 pass / 3 tracked pre-existing
+  fail reproduced at `9cbb915`; allowlist diff exact (S2: swan.py/stofs_wlevel.py/
+  swan_runner.py; S3: coops.py/vertical_datum.py); spot-checks: zero velocity code in
+  the STOFS fetcher (ruling 1), WLEVEL chain semantics verbatim (per-cycle, loud
+  fallback, `tide_fetch_failed` terminal, C-77 preserved), S3 offset sign independently
+  re-derived (z_LMSL = z_MHW + 0.188 m at 1612340 ✓). Session-4's agent died without
+  committing; round re-ran from `eecfabc`. **PROCESS DEVIATION recorded: the dev agent
+  skipped the mandatory scope-ack and coded straight through** — output survived the
+  full acceptance gate, but the skip is a brief-compliance failure (agent-definition
+  hygiene item). **Dev findings accepted as implementation detail:** STOFS regional
+  GRIB2 has a 4-byte length-prefix wrapper (no `GRIB` at byte 0); [0,360) native
+  longitudes normalized; last-gridpoint eccodes keys absent (hrrr.py-pattern fallback);
+  **P12 was already satisfied** — all 9 DEM entries existed since the original port
+  (`f2494bb`), no index edit made (P12 row closes as pre-satisfied).
+- **2026-08-09 (session 5) — C2 ACCEPT PASS (live, weather-test at dashboard
+  `e8be970`):** served breakPoints (n=3) all carry `partitionInfo.partitionIndex: 0`
+  (16.659 s / 199.4° groundswell); card dominant 199° SSW / 16.7 s matches on the same
+  hour; screenshot shows one coherent train (secondary crest = same partition's inner
+  break, distances 320/140/5.5 ft all partition 0); non-breaking partitions 1/2 have
+  all break fields null. Evidence: `curl -sk .../api/v1/surf/huntington-city-beach-pier/profile`
+  + Playwright captures in session-5 scratchpad.
+- **2026-08-09 (session 5) — C3 accept measurement found TWO defects vs C3's own
+  decided design → remediation round dispatched (dashboard repo):** (1) ortho buffer
+  is 32.9 m horizontal / 57.0 m vertical, not 50 m — `HeatMapCard.tsx:797-803` sizes
+  buffer px against a hardcoded 300 m-radius assumption instead of the chart's real
+  scale (measured 0.577 px/ft from the card's own x-ticks; drawn frame ≈395 m wide);
+  (2) y-axis tick labels wholly suppressed at HB density — 162 rows → rowH 8.0 px fails
+  the `rowH >= 12` all-or-nothing test at :1290; fix = every-Nth density-aware labels.
+  PASSING C3 rows: ortho rotation into beach frame (50.967°, pier aligns), structure
+  overlay fully absent, bundle baseline recorded (entry `index-DHd8dsLK.js` 200.93 KB
+  gzip / marine chunk 41.23 KB gzip vs 203.00/41.73 prior). Anomaly recorded (not
+  characterized): scattered full-saturation streak rows + white gap band near southern
+  transects in the live heatmap — parking lot pending model-side look.
 - **2026-08-09 (session 4) — P7 LADDER AMENDMENT APPROVED (operator, in chat: "ok
   fine").** Register row P7 amended in place; S1 design rewritten to the ladder; S4a
   composite KATs respecified as ladder-selection KATs. S1 dispatches after G9 (repo
