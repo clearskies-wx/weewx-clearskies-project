@@ -827,7 +827,7 @@ draw. DASHBOARD-MANUAL doc-sync same round.
 **Accept (live):** profile shows one coherent train matching the headline swell; no
 interleaved secondary crests; matched against the card's dominant direction on the same hour.
 
-### C3 — Surf-height heatmap: ortho alignment, buffer, y-axis, structure-overlay removal  🔶 CODE DONE session 2 (dashboard `e8be970`); **Accept measured 2026-08-09 session 5: rotation + overlay-removal + bundle rows PASS; buffer (32.9/57.0 m ≠ 50 m) and y-tick rows (suppressed at 162-row density) FAILED → remediation round in flight** — see decision log; Accept re-measures after the fix deploys; Gate C pending (with C1)
+### C3 — Surf-height heatmap: ortho alignment, buffer, y-axis, structure-overlay removal  🔶 CODE DONE session 2 (dashboard `e8be970`); **ACCEPT (live, weather-test) PASSED 2026-08-09 session 5 after remediation `8fff329`** — rotation (50.967°, pier aligns) ✓; X buffer re-measured **49.99 m/side** (was 32.9 — fixed to `distToX`'s own slope; vertical ruled NOT a defect, no physical y scale, see decision log) ✓; y-axis 82 row labels (every 2nd + last of 162) + "Transect" title ✓; structure overlay absent ✓; bundle baseline entry 200.93 KB / marine 41.23 KB gzip ✓. Independent vitest on weather-dev: 46/46 at `8fff329`. Gate C pending (with C1) — see decision log; Accept re-measures after the fix deploys; Gate C pending (with C1)
 **Operator instruction (2026-08-08):** (a) the orthophotography must be ALIGNED with the
 transect bearing (the heatmap's beach frame), not true north — "so that way IT MATCHES";
 (b) 50 m of orthophotography buffering around the heatmap extent so the user can get their
@@ -892,6 +892,15 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 ## Decision log
 
+- **2026-08-09 (session 5) — C3 REMEDIATION LANDED + ACCEPT PASSED (dashboard
+  `8fff329`, meta doc-sync `fc33363`, deployed weather-dev).** X buffer live-measured
+  49.99 m/side post-fix (94.678 px at 1.89395 px/m from the card's own x-ticks); 82
+  y-row labels (every 2nd + last, 162 rows) + title; Y buffer intentionally unchanged
+  (option-(a) ruling); vitest 46/46 lead-reproduced ON weather-dev; allowlist diffs
+  exact both repos. Process note: the dev round ran vitest/tsc/build locally on DILBERT
+  per the LEAD's own brief — that contradicted reference/clearskies-dev.md "no node
+  toolchains on DILBERT"; the acceptance-gate re-run was done on weather-dev, and
+  future dashboard briefs point verification at weather-dev.
 - **2026-08-09 (session 5) — S2/S3 CODE ROUND CLOSED (re-dispatch): marine `5d9d88b`
   (S2) + `9cbb915` (S3), acceptance gate PASSED lead-independently** — pytest
   `tests/test_island_autosizing.py tests/services/` = 210 pass / 3 tracked pre-existing
@@ -916,12 +925,18 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
   all break fields null. Evidence: `curl -sk .../api/v1/surf/huntington-city-beach-pier/profile`
   + Playwright captures in session-5 scratchpad.
 - **2026-08-09 (session 5) — C3 accept measurement found TWO defects vs C3's own
-  decided design → remediation round dispatched (dashboard repo):** (1) ortho buffer
-  is 32.9 m horizontal / 57.0 m vertical, not 50 m — `HeatMapCard.tsx:797-803` sizes
-  buffer px against a hardcoded 300 m-radius assumption instead of the chart's real
-  scale (measured 0.577 px/ft from the card's own x-ticks; drawn frame ≈395 m wide);
-  (2) y-axis tick labels wholly suppressed at HB density — 162 rows → rowH 8.0 px fails
-  the `rowH >= 12` all-or-nothing test at :1290; fix = every-Nth density-aware labels.
+  decided design → remediation round dispatched (dashboard repo):** (1) HORIZONTAL
+  ortho buffer is 32.9 m, not 50 m — `HeatMapCard.tsx:797-803` sizes buffer px against
+  a hardcoded 300 m-radius assumption instead of the chart's real x scale (measured
+  0.577 px/ft from the card's own x-ticks; drawn frame ≈395 m wide). **Lead ruling at
+  the dev's scope-ack finding (2026-08-09): the VERTICAL buffer is NOT a defect** — the
+  y axis has no physical alongshore scale anywhere in the component (footprint model,
+  per the component's own :192-202 comment); the initial "57.0 m vertical" figure was a
+  measurement-frame artifact (x ruler applied to a non-physical axis). Fix = X only,
+  derived from the `distToX` slope; Y stays on the footprint-model computation with a
+  guard comment. (2) y-axis tick labels wholly suppressed at HB density — 162 rows →
+  rowH 8.0 px fails the `rowH >= 12` all-or-nothing test at :1290; fix = every-Nth
+  density-aware labels.
   PASSING C3 rows: ortho rotation into beach frame (50.967°, pier aligns), structure
   overlay fully absent, bundle baseline recorded (entry `index-DHd8dsLK.js` 200.93 KB
   gzip / marine chunk 41.23 KB gzip vs 203.00/41.73 prior). Anomaly recorded (not
