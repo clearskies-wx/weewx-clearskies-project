@@ -1267,10 +1267,52 @@ harmless on this machine, and the alternative trades speed for a limit that no l
 matches the grid you approved.
 
 
-## G9-GL — UPDATED 2026-08-09: operator REJECTED the keep-uncapped recommendation and
-## ORDERED RESEARCH ("you need to do the research in terms of how we should properly
-## set the L1 grid based upon that body of water"). Coordinator research in progress —
-## findings + options return here for ruling. Original question below for the record.
+## G9-GL — RESEARCH COMPLETE 2026-08-09 (operator-ordered). Findings + options below;
+## awaiting operator ruling.
+
+**What the research found (plain English; full evidence trail in the research record,
+decision log entry of this date):**
+
+1. **The wave model's own manual draws the line at 100 km.** SWAN's user manual says
+   directly: for domains under ~100 km, hourly-snapshot ("stationary") computation is
+   recommended; bigger than that, you must use the time-stepping mode we rejected for
+   compute cost. No exception for lakes. (Manual line 5715. This is almost certainly
+   where your 100 km ocean number originally comes from.)
+2. **Lake waves make big boxes WORSE, not better.** Lake waves are short-period, and
+   short-period waves travel SLOWER — a typical 5-second lake sea takes ~7 hours to
+   cross a 100 km box, versus ~2.4 hours for ocean swell. And building a full sea
+   across a 200 km fetch takes the wind ~14 steady hours — real weather rarely holds
+   that long, so a whole-lake snapshot assumes a sea state the wind never had time to
+   build. Both errors are the same CLASS you rejected in the ocean case, only larger.
+3. **NOAA already solved the whole-lake problem for us.** Their Great Lakes wave model
+   (GLWU) runs the proper time-stepping physics over each entire lake at 2.5 km,
+   refining to 250 m at the coast — and our system ALREADY consumes it as the L1
+   boundary input for lakes. NOAA's own operational pattern for nearshore forecasting
+   is exactly "small local SWAN grid fed by the big lake model at its edges" — nobody
+   anywhere runs whole-lake stationary SWAN.
+4. **Our current lake design contradicts itself.** One part of our architecture says
+   the lake far-field comes from the GLWU boundary; another says size the box from the
+   full wind fetch (which on the upper lakes means a 210 km box). The research shows
+   the fetch-sized box would break the 45-minute cycle budget (~75 min just for L1),
+   the 400 MB memory budget (~1.5 GB), and the machine itself on Superior/Michigan.
+5. **The numbers-that-fit line:** with everything else measured today, the cycle
+   budget supports an L1 up to roughly 115 km per side; the 400 MB memory budget up to
+   roughly 105 km per side.
+
+**Options for your ruling:**
+- **(a) One rule everywhere: the 100 km per-axis cap applies to lakes too.** The
+  fetch fan still aims the box and sizes it on small lakes (where fetch+10 stays
+  under the cap); on big lakes the box caps at 100 km and GLWU's boundary carries the
+  rest of the lake — the same division of labor NOAA uses operationally.
+- **(b) Lakes get a deliberately SMALLER box** (e.g., ~50–60 km around the site),
+  leaning harder on GLWU's boundary — cheapest and fastest, at the cost of less room
+  for the local wind to add growth inside our own grid.
+- **(c) Keep the current fetch-sized uncapped box.** The research found no support
+  for this: it fails the manual's own stationarity line, the physics, and every
+  compute budget on the upper lakes.
+
+## G9-GL history — operator REJECTED the earlier keep-uncapped recommendation and
+## ORDERED this research. Original question below for the record.
 
 ## G9-GL (original) — Does the 100 km grid-size limit also apply to Great Lakes sites?
 
