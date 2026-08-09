@@ -593,7 +593,36 @@ G-Accept row set re-run); L1 wall-clock recorded (expect ~11 min at ~9,400 cells
 operator ruling), ARCHITECTURE.md L1 sizing bullet, PROVIDER-MANUAL §14.15 addition
 (99-file cap measured-not-enforced on 41.51AB — from G-Accept row 4).
 
-### G-Accept (live — the relocation deploy)  🔶 **RUN 2026-08-09 (session 4) — deployed `eecfabc` (proc 08:22:05Z), new L1 (93×132) live and publishing; 4 rows PASS; Q6 RULED (cap binds the BOX → task G9). G-Accept CLOSES when the G9 redeploy re-runs the sizing/reality/journal rows on the capped (~91×100) box. Outstanding evidence: SWAN peak RSS (monitor was armed session 4; capture on any full cycle).**
+### G-Accept (live — the relocation deploy)  🔶 **G9 re-run RECORDED 2026-08-09 session 5 (rollback deploy `439aa7c`, capped box live): sizing/boundary/reality/journal rows PASS; wall-clock recorded (cold-start caveat); RSS 335 MB vs 300 MB budget = BREACH → held OPEN on operator question G9-RSS (recommendation: raise budget). Closes on that ruling.**
+**G9 re-run record (session 5, all lead-collected):**
+- **Sizing: PASS.** Persisted box lat 33.1797..34.0806 / lon −118.7598..−117.7725 —
+  N-S 100.0 km EXACTLY at cap (S edge pulled, predicted ≈33.18 ✓), E-W 91.3 km
+  unchanged, N + W coast/lateral edges byte-identical to the uncapped box. SCI (tip
+  33.03) fully outside; Catalina (S shore ≈33.30) retained inside. Chain complete:
+  L1 9,393 cells (93×101), runner L1 91×100 meshes (known points-vs-meshes logging
+  offset, same as L2 76×83→75×82).
+- **G7 guard: PASS.** 20:52:38-39Z stale hotstarts + run dirs + geometry markers
+  cleared; 20:54:58Z "forced full SWAN run — geometry-changing config push" bypassed
+  the cycle-unchanged gate. (First chain attempt 19:53Z aborted cleanly on a transient
+  WW3 rate-limiter collision with the in-flight cycle — caches left in place by
+  design; re-push after cycle end succeeded.)
+- **Boundary adaptation: PASS.** 194 points (S=93, W=101), 25 timesteps, zero Phase-B
+  code change (was 225 points on the oversized box).
+- **Reality gate (pre-declared quantities, same as session 4): PASS.** Combined deep
+  Hs 0.64 m vs 46222 0.8 m @21:26Z (−20%) / 46253 0.9 m (−23%) — inside ±25%, ≈
+  session-4's −20.5%. W-NW wind swell 0.35 m @259° (shadow retained; session 4:
+  0.336 m @264°). Dominant S groundswell 17.4 s @201° vs buoy DPD 15 s MWD 160–180°.
+- **Wall-clock: cold-start 48m40s** (20:54:58→21:43:38, hotstarts cleared — over the
+  45-min budget with the cold-start caveat; steady-state measured at V3's 5-cycle
+  window on normal cycles).
+- **RSS: 343,272 KB = 335 MB peak (10 s sampling, whole run) vs 300 MB threshold —
+  BREACH +12% → operator question G9-RSS** (host has ~1.7 GB free; run completed and
+  published normally).
+- **Journal sweep: PASS.** No new ERROR/WARNING classes. The high-volume "L4 handoff
+  ... clamped to nearest interior station" WARNING is PRE-EXISTING at scale (5,670
+  hits in today's 10:00–17:40 pre-deploy window; 141,102 hits Aug 8→9 morning —
+  `journalctl` grep counts) — the tracked small-surf L4 target-depth class, not a
+  deploy effect.
 **Record (all numbers lead-collected from fresh commands; baseline = the 07:23:14Z pre-deploy
 cycle, payload + file inventory archived in session scratchpad):**
 - **Sizing (row 1): PART PASS / PART BREACH.** New L1 bbox lon −118.7598..−117.7725, lat
@@ -1163,6 +1192,34 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 ---
 
 # ❓ OPEN OPERATOR QUESTIONS — maintained by the coordinator; newest at top
+
+## G9-RSS — The wave model's memory use measured 335 MB against your 300 MB budget. Accept, or act?
+
+**Context (plain English):** Your performance budget for the wave-model program says its
+memory use during a run should stay at or under 300 MB. We had never actually measured
+it until today (it was the one outstanding number from the grid-relocation acceptance).
+Today's measurement, taken on the FIRST run of the new capped grid — which was also a
+"cold start" doing extra work because the grid had just changed — came in at **335 MB
+peak, 35 MB (12%) over budget**. The machine it runs on had no trouble: about 1.7 GB is
+free for this work, so 335 MB is comfortable in practice. The run itself completed
+normally and published. For scale: the budget number was originally an estimate written
+before the grid grew to its current size; the grid the budget imagined was about half
+as many cells as what we now run.
+
+**Also for the record:** that same first run took 48m40s against the 45-minute cycle
+budget — but a cold start always runs long (it rebuilds everything from scratch instead
+of continuing from saved state). The steady-state timing on the new grid gets measured
+across the next several normal cycles (the plan's V3 row); I'll report it there.
+
+**The question for you:** (a) accept 335 MB and raise the budget line to, say, 400 MB
+(it fits the machine with room to spare), or (b) hold the 300 MB line, which would mean
+a follow-up task to shrink the model's memory (fewer threads, or splitting the run) at
+some speed cost?
+
+**My recommendation:** (a) — raise the budget to 400 MB. The number is real but
+harmless on this machine, and the alternative trades speed for a limit that no longer
+matches the grid you approved.
+
 
 ## G9-GL — Does the 100 km grid-size limit also apply to Great Lakes sites?
 
