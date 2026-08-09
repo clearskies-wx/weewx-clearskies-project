@@ -483,7 +483,7 @@ paragraph rewritten) landed same round; pytest baseline recorded.
 **Owner:** `clearskies-api-dev` (Sonnet). **Tests:** `clearskies-test-author`. **QC:**
 `clearskies-auditor` at Gate G.
 
-### G1 — Horizon decoupled + cap constant  ⬜
+### G1 — Horizon decoupled + cap constant  ✅ (marine `036a2ec`)
 **Files:** `services/geography.py` (:114-115, :170-190).
 **Design (decided):** `L1_MAX_EXTENT_KM = 100.0` module constant in `geography.py` (single
 source; `swan_domain.py` imports it). Ocean path of `resolve_regime_horizon_km()` returns the
@@ -493,7 +493,7 @@ fallback and the Great Lakes fetch path). Great Lakes horizon stays 200 km (its 
 lake sizing is fetch-based and unchanged). Overpass bbox scales with the horizon by existing
 code (`_bbox_from_horizon`) — config-time cost only; note in the round record.
 
-### G2 — Ray march records where open water resumes  ⬜
+### G2 — Ray march records where open water resumes  ✅ (marine `036a2ec`)
 **Files:** `services/geography.py` (`RayResult` :135-150, `_classify_ray` :296-351).
 **Design (decided):** `RayResult` gains `open_water_resume_km: float | None` — for
 `wrap_candidate`, the distance of the FIRST water step of the qualifying ≥5 km run (the march
@@ -501,7 +501,7 @@ already walks it; record `distance_km − (run_count−1)·_RAY_STEP_KM` at qual
 for other classifications. Pure addition; existing consumers unaffected (dataclass field
 append, no positional construction survives — verify in scope-ack).
 
-### G3 — Enclosure to the island's far edge; beyond-cap islands are NOT enclosed  ⬜
+### G3 — Enclosure to the island's far edge; beyond-cap islands are NOT enclosed  ✅ (marine `3f98613`)
 **Files:** `services/swan_domain.py` (`_compute_level1` :1168-1187 wrap block).
 **Design (decided):** per wrap ray, enclosure distance = `resume + 10.0` km. If
 `resume + 10.0 > L1_MAX_EXTENT_KM` → the ray is treated as un-enclosable (NO enclosure point
@@ -509,7 +509,7 @@ append, no positional construction survives — verify in scope-ack).
 Otherwise the enclosure point sits at that distance along the ray bearing (replaces today's
 point-at-full-horizon). Every extent computation clamps to the cap.
 
-### G4 — Near-lee clamp (D11, ruled closed — constants σθ=15°, k=1)  ⬜
+### G4 — Near-lee clamp (D11, ruled closed — constants σθ=15°, k=1)  ✅ (marine `3f98613`; angular-extent lead ruling in decision log + ADR-104 D11 note)
 **Files:** `services/swan_domain.py` (same function; new private helper
 `_near_lee_max_extents(rays, base_offshore_km)`).
 **Design (decided):** un-enclosable blocker set = {wrap rays with `resume+10 > cap`} ∪
@@ -523,7 +523,7 @@ the min/max envelope. Enclosure requirements from OTHER islands are not reduced 
 where geometry conflicts, the envelope that results IS the answer (best-achievable, silent,
 per D11 — no reporting apparatus; sizing trace keeps ordinary numbers only).
 
-### G5 — Operator override key (marine side)  ⬜
+### G5 — Operator override key (marine side)  ✅ (marine `3f98613` swan_domain half + `e207d79` config/plumbing)
 **Files:** `config/marine_config.py` (new key `[swan] l1_offshore_extent_km`, optional
 float), `services/grid_sizing_chain.py`, `services/swan_domain.py`.
 **Design (decided):** when present and > 0: the autosized offshore extent (base + enclosures
@@ -532,19 +532,19 @@ landward margin unchanged; wrap enclosure points suppressed (the operator owns t
 Absent/0 = autosize. Admin UI exposure is Phase A (this task is config plumbing + validation:
 negative/NaN/> cap → config-push refusal naming the cap).
 
-### G6 — UTM-zone span validation  ⬜
+### G6 — UTM-zone span validation  ✅ (marine `e207d79`)
 **Files:** `services/grid_sizing_chain.py`.
 **Design (decided):** at config push, after L1 sizing: the L1 bbox's longitudes must lie
 within ±3.5° of the locked UTM zone's central meridian → else loud config-push refusal naming
 the span and the cap. (Zone 11 handles all of SoCal incl. San Clemente; this guard exists for
 arbitrary future coasts, not HB.)
 
-### G7 — Cold-start guard verification (no code)  ⬜
+### G7 — Cold-start guard verification (no code)  🔶 code-read half DONE (lead: `_domain_geometry_signature` includes L1 bbox+resolution, grid_sizing_chain.py:309-331); live observation lands at G-Accept
 Verify (read-only) the F1 geometry-compare guard treats the L1 bbox change as
 cold-start + forced full run. Evidence: the guard's compare includes L1 bbox (it does per
 ARCHITECTURE:115 — confirm at HEAD) + one live observation at G-Accept.
 
-### G8 — Tests (test-author)  ⬜
+### G8 — Tests (test-author)  ✅ (marine `eecfabc`, 12 KATs; falsifiability 8 FAIL pre-G / row-(c) anchor + row-(d) declared non-falsifiable; row-(e) deviation lead-approved, see decision log)
 KATs (`tests/test_island_autosizing.py`): synthetic coastline fixtures — (a) island at
 50 km, 8 km wide → wrap; enclosure at `resume+10`; (b) island at 95 km → un-enclosable →
 near-lee clamp computed per G4's exact arithmetic (hand-computed expected extents); (c) plain
@@ -554,7 +554,7 @@ horizon 200, sizing unchanged; (e) Huntington OSM fixture → Catalina enclosed
 brief §4 S1 within ±15% per axis; (f) override set → exact operator extent, enclosures
 suppressed; (g) zone-span refusal. Baseline suite: 0 new failures.
 
-### G-Accept (live — the relocation deploy)  ⬜
+### G-Accept (live — the relocation deploy)  ⬜ NEXT — all code+gate prerequisites met; was held for the 2026-08-09 librewxr incident (RESOLVED, see decision log); marine `eecfabc` pushed? NO (push at deploy)
 Config push on librewxr → new L1. (1) Sizing trace: box vs S1 estimate recorded; Catalina
 inside the domain (land-masked by ETOPO), boundary seaward of it; (2) bathymetry chain: ETOPO
 covers, C-90 coverage rows pass, cold start observed (G7); (3) full cycle "Normal end of
