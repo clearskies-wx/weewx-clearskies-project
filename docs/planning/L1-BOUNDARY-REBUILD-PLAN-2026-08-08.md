@@ -1110,6 +1110,31 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 # ❓ OPEN OPERATOR QUESTIONS — maintained by the coordinator; newest at top
 
+## G9-GL — Does the 100 km grid-size limit also apply to Great Lakes sites?
+
+**Context (plain English):** You ruled that the outermost wave grid (L1) may never be
+bigger than 100 km on a side, because the model solves each hour as a snapshot and a
+bigger box takes waves longer to cross than the snapshot can honestly represent. That
+ruling came from the Huntington Beach (ocean) situation, and task G9 now enforces it
+for ocean sites. While building G9 we found the plan is silent about lakes: the Great
+Lakes design sizes the grid from how far wind can blow across the lake ("fetch"), plus
+10 km — on the biggest lakes that can exceed 100 km, and an existing test pins that
+lake formula as deliberately uncapped. Lake waves are also physically different: they
+are grown by the wind INSIDE the grid rather than arriving from a distant boundary, so
+the "waves take hours to cross the box" concern applies differently there.
+
+**What I did (lead ruling, 2026-08-09):** G9's cap is applied to OCEAN sites only for
+now; the Great Lakes sizing is left exactly as designed and tested. Nothing live
+depends on the lake answer — no Great Lakes site is deployed.
+
+**The question for you:** should the 100 km limit also apply to Great Lakes grids
+(shrinking the grid on the biggest lakes), or should lakes keep their own
+fetch-plus-10 km sizing without the cap?
+
+**My recommendation:** keep lakes uncapped (the current state) until a Great Lakes
+site actually exists, then revisit with that site's real numbers in front of us.
+
+
 *(Operator request 2026-08-09: questions live HERE so they don't get lost in agent
 chatter. Each is self-contained: context, options, recommendation. Answered items move to
 the decision log.)*
