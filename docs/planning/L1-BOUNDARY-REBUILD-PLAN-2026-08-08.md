@@ -884,6 +884,15 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 ## Decision log
 
+- **2026-08-09 (session 4) — Q5 CLOSED (route lead-ruled per operator delegation in
+  chat; research completed).** RTOFS route pinned = direct NOMADS netCDF (only live
+  route). Research: STOFS-2D-Global carries NO velocity in any product (GRIB2 + netCDF
+  inspected + NOAA description page); STOFS-3D-Atlantic carries TOTAL-current velocity
+  (3-D baroclinic; East/Gulf/PR); PacIOOS ROMS Hawaii is tidal-inclusive (TPXO elevation
+  + velocity forcing, 4 km/3-hourly/7-day, ERDDAP/THREDDS). P7 composite is dead as
+  ruled (its premise field does not exist); replacement source ladder (OFS → STOFS-3D-Atl
+  → PacIOOS ROMS → RTOFS-alone loud fallback) drafted in the Q5 closure block — register
+  amendment awaiting operator sign-off before S1 dispatch.
 - **2026-08-09 (session 4) — Q6 RULED IN PART (operator, in chat): the 100 km value is a
   cap on the L1 BOX SIZE ITSELF, not on per-ray scan reach — the per-ray reading that
   shipped in G1/G3/G4 misencoded D1/D2's intent. Nonstationary L1 (option b3) REJECTED:
@@ -1043,9 +1052,19 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 chatter. Each is self-contained: context, options, recommendation. Answered items move to
 the decision log.)*
 
-## Q6 — The relocated grid is live and healthier than before, but it came out much
-## bigger than estimated, its south edge crosses San Clemente Island, and an internal
-## safety check fired. Keep it, or roll back?
+## ~~Q6 — relocated grid oversized / SCI crossing / L3 guard~~ ANSWERED 2026-08-09
+(operator, in chat): **the 100 km cap binds the BOX SIZE ITSELF, not the per-ray reach —
+the shipped per-ray reading misencoded D1/D2; nonstationary L1 (b3) REJECTED
+("compute unwieldy. We cannot do that").** Enacted as task G9 (box-envelope clamp,
+designed in Phase G above; dispatches when the S2/S3 round closes). Expected capped box
+~91×100 km: Catalina stays enclosed, SCI falls back outside the grid (item 2 dissolves),
+stationary hourly solves defensible again. Item 3 (L3 guard) was resolved pre-existing
+(fired 2026-08-03 pre-G). G-Accept closes after the G9 redeploy re-runs its rows.
+Moved to decision log. Original question kept below for the record.
+
+## Q6 (original text, for the record) — The relocated grid is live and healthier than
+## before, but it came out much bigger than estimated, its south edge crosses San
+## Clemente Island, and an internal safety check fired. Keep it, or roll back?
 
 **Context, plain English:** The island-aware grid (Phase G) deployed today and has been
 publishing all day. Everything the change was supposed to do, it did: Catalina is now
@@ -1112,9 +1131,40 @@ physically-complete fix if you want the full 100 km fan to stay. The SCI-crossin
 question (item 2) largely dissolves under (b1) — a tighter south edge stops short of
 SCI entirely.
 
-## Q5 — Which internet address do we download the RTOFS ocean-current data from?
-## (UPDATED 2026-08-09 session 4: a second S1 problem — the STOFS files we planned to
-## take tidal-current velocity from don't carry velocity at all)
+## ~~Q5 — RTOFS route + STOFS velocity~~ CLOSED 2026-08-09 (operator, in chat:
+## "That is supposed to be your research, DO IT" — route research delegated to lead;
+## research completed same session, full findings in the decision log)
+
+**Lead ruling (route, delegated):** RTOFS is fetched via **direct NOMADS netCDF**
+(`pub/data/nccf/com/rtofs/prod/rtofs.YYYYMMDD/rtofs_glo_2ds_n{NNN}_prog.nc`, ~155 MB/file,
+3-hourly, xarray/netCDF4) — the only live route; both plan-named candidates are dead on
+NOAA's side (no filter_rtofs.pl CGI; OPeNDAP retired NOMADS-wide).
+
+**Research findings (all live-verified or from NOAA's own product description):**
+1. **STOFS-2D-Global publishes NO velocity in ANY product** — regional GRIB2 (3 fields:
+   water level, surge, one unknown; eccodes-inspected), global netCDF fields files
+   (`zeta` + mesh topology only; header-inspected), and NOAA's NOMADS STOFS description
+   page confirms: 2D-Global variables are water levels only. P7's composite premise
+   (tide-only velocity from the same files as WLEVEL) is dead — no such field exists.
+2. **STOFS-3D-Atlantic DOES publish velocity** ("horizontal water velocity … surface,
+   bottom, specific depths, or depth-averaged", per NOAA's description) — but it is a
+   full 3-D baroclinic model (temperature/salinity/currents), so its velocity is the
+   TOTAL current (circulation + tide + surge). In its domain (US East Coast + Gulf of
+   Mexico + Puerto Rico) you USE it like an OFS — never sum it with RTOFS (double-count).
+3. **Hawaii: PacIOOS ROMS Main Hawaiian Islands** — operational daily, 4 km, 3-hourly,
+   7-day horizon, TPXO tidal elevation AND velocity forcing (tidal-inclusive total
+   current), data-assimilating, served via ERDDAP/THREDDS. Covers Hawaii the way an OFS
+   would.
+
+**Consequence — P7 amendment for operator sign-off (one word; a register row changes so
+the hard block applies):** the RTOFS+STOFS composite is REPLACED by a source ladder of
+tidal-inclusive models, RTOFS demoted to last-rung non-tidal fallback:
+`regional OFS (containment) → STOFS-3D-Atl (East/Gulf/PR) → PacIOOS ROMS (Hawaii) →
+RTOFS alone (loudly logged non-tidal)`. Every service-area region (D7/D12: CONUS + Great
+Lakes + Hawaii) is covered by a tidal-inclusive source; the RTOFS rung should almost
+never serve. No summing anywhere — every ladder source is already tide-complete, which
+is simpler and safer than the composite it replaces. S1's design section gets rewritten
+to this ladder on sign-off; S4a's composite KATs become ladder-selection KATs.
 
 **New evidence (dev-phase-s scope-ack, live file inspection today):** the STOFS regional
 forecast files (`stofs_2d_glo.t00z.conus.west.f000.grib2`) contain exactly three data
