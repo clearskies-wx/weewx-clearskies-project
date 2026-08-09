@@ -444,7 +444,7 @@ in the scope-ack; each listed in the closeout per the stale-test rule).
 - (3) Headline matched-hour (00Z): breakingFaceHeight 1.4649→1.1639 m = **−20.5%, BREACHES ≤15%** → Q4. Reality check (pre-declared): combined DWR Hs 1.008 m vs 46253 0.9 m (+12% ✓) / 46222 0.8 m (+26% marginal); period 18.4 s vs DPD 17 s ✓; swell dir 199° vs MWD 164–209° spread — the pre-plan 35–40° gap is GONE. Every quantity moved TOWARD the buoys vs W-Accept's "before" (0.62 m, −31%/−22%).
 - (4) Wall-clock: 30m11s vs matched station run 26m54s = **+3m17s, grazes ≤+3min** → Q4 (vs the plan's other stated baseline "~37min incl. fetches" it is −7m30s).
 - (5) Boundary volume: 66 files, 12,484,979 B total (station path: 4 files, 36.1 MB) — SMALLER. WIND.txt md5 differs from baseline solely by the shifted computation window (leading values byte-identical; explained, wind path untouched by B). Journal sweep: zero NEW classes (INV-11 + L4-handoff-selection classes present in baseline window too). Publish-liveness ✓ (lastRunTime 03:17:19Z, /surf 200).
-**Deploy stands (healthy, last-good never lost); formal close waits on Q4.** Parking lot: SWAN caps one command at 99 file names (manual :1223) — 66 today, Phase G growth could approach it.
+**✅ CLOSED 2026-08-09 — Q4 ruled: operator accepted both deviations ("the height change matches surfline and surf-forecast, so that is not a bad thing" — external corroboration on top of the buoy agreement).** Parking lot: SWAN caps one command at 99 file names (manual :1223) — 66 today, Phase G growth could approach it.
 Deploy alone. Matched cycle vs the last station-boundary cycle: (1) "Normal end of run", zero
 boundary warnings; (2) boundary Hs sampled at the 4 old station positions within ±10% of the
 same-cycle `.spec` m0 at those stations (the old boundary is the reference for the SAME
@@ -791,6 +791,11 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 ## Decision log
 
+- **2026-08-09 — Q4 ruled (operator, in chat): B-Accept's two criterion deviations
+  accepted** — headline −20.5% ("the height change matches surfline and surf-forecast,
+  so that is not a bad thing"; buoy reality gate had already improved on every
+  pre-declared quantity) and wall-clock +3m17s vs the matched station cycle. B-Accept
+  CLOSED; Phase B complete end-to-end (deployed `5cc28e8`).
 - **2026-08-09 — W6 created (operator, in chat, Q3): fix the HRRR Lambert-parameter
   extraction so wind rotation reads the file's own projection metadata** instead of the
   bounds-derived approximation ("not estimating based upon wobble we are causing because
@@ -825,7 +830,10 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 chatter. Each is self-contained: context, options, recommendation. Answered items move to
 the decision log.)*
 
-## Q4 — Accept the new boundary's headline change? (2 accept-criteria breached, 2026-08-09)
+## ~~Q4 — Accept the new boundary's headline change?~~ ANSWERED 2026-08-09 (operator:
+"the height change matches surfline and surf-forecast, so that is not a bad thing") →
+**both deviations accepted, B-Accept CLOSED.** Moved to decision log. Original question
+kept below for the record.
 
 **Context, plain English:** The new wave-boundary system is deployed and running. When we
 compared the new forecast against the old one for the same hour, the headline surf height
