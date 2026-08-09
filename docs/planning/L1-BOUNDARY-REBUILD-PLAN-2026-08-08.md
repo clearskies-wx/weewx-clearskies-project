@@ -278,7 +278,7 @@ in the round (git diff shows docs only).
 **Owner:** `clearskies-api-dev` (Sonnet). **Tests:** `clearskies-test-author`. **QC:**
 `clearskies-auditor` at Gate W. All code in `repos/weewx-clearskies-marine/`.
 
-### W1 — Wind bbox derived from the L1 domain  ⬜
+### W1 — Wind bbox derived from the L1 domain  ✅ (marine `f7c2b04` W1–W4 combined; live bbox verified in journal at W-Accept)
 **Files:** `config/marine_config.py` (`_HRRR_MARGIN_DEG`, `hrrr_bbox` at :1036, :1112-1117),
 `service.py` (:335-341, :422), `services/wind_gatherer.py` (`_bbox_for_locations`, :468-480),
 `providers/nearshore/swan.py` (`outer_bbox` use, :2666, :2691, :2726).
@@ -288,7 +288,7 @@ HRRR 3 km ≪). All four call sites route through it. No sizing cache → the ex
 `no_grid_sizing_cache` abort (no new path). The spot ±1.0° arithmetic is deleted at all three
 duplication sites. `outer_bbox` keeps its name; its VALUE becomes domain-derived.
 
-### W2 — Kill the calm-fill: out-of-coverage wind aborts  ⬜
+### W2 — Kill the calm-fill: out-of-coverage wind aborts  ✅ (marine `f7c2b04`)
 **Files:** `services/swan_formats.py` (:386-388 NaN→`0.0000`), `providers/nearshore/swan.py`
 (catch + no-publish), `state.py` (slug registry).
 **Design (decided):** `hrrr_to_swan_wind()` raises new `WindCoverageError` (message: offending
@@ -296,20 +296,20 @@ cell count, first offending lat/lon, wind-grid bounds vs CGRID bounds). Runner c
 no-publish slug **`wind_coverage_failed`** (14th instrumented exit; extends H1's registry —
 doc-sync API-MANUAL §19.7 in the same round). The NaN branch is deleted, not conditioned.
 
-### W3 — Fetch-time wind coverage assert (fail fast)  ⬜
+### W3 — Fetch-time wind coverage assert (fail fast)  ✅ (marine `f7c2b04`; criterion corrected to require-L1-exactly in `95abc74` after live firing — see GATE EVENT in session handoff + Gate W record)
 **Files:** `providers/nearshore/swan.py` (post-fetch, before SWAN input build).
 **Design (decided):** after wind fetch/stitch, compare the blended field's bounds vs the L1
 bbox (+ pad). Shortfall → same `WindCoverageError`/slug BEFORE any SWAN work. This makes W2's
 runtime raise a defense-in-depth backstop, not the primary detector.
 
-### W4 — Current zero-fills become aborts  ⬜
+### W4 — Current zero-fills become aborts  ✅ (marine `f7c2b04`)
 **Files:** `services/swan_runner.py` (`_write_current_txt`, :2407-2459).
 **Design (decided):** unmatched timestep (no OFS entry within 2 h) or U/V grid shape short of
 `(myc+1)×(mxc+1)` → raise `CurrentCoverageError` → existing `currents_fetch_failed` slug. The
 `_ZERO_BLOCK` and row/col `0.0000` padding are deleted. (OFS 3-hourly × wind hourly ⇒ nearest
 within 1.5 h always exists when the fetch succeeded — the raise fires only on genuine holes.)
 
-### W5 — Tests (test-author)  ⬜
+### W5 — Tests (test-author)  ✅ (test commits `35f98f6`/`9cb1b43` + F1 remediation fixtures `6ab1df0`/`84f4757`; final 139 tests pass lead-reproduced — see Gate W record)
 KATs: (a) wind grid one cell smaller than CGRID → `WindCoverageError` naming the count; (b)
 fetch-time assert fires on undersized bbox; (c) current timestep gap → raise; (d) shape
 mismatch → raise; (e) regression: full existing suite on librewxr, 0 new failures vs baseline
