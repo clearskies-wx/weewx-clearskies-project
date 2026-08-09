@@ -6,11 +6,16 @@ current as of the 2026-08-09 checkpoint) and
 `docs/planning/briefs/L1-ISLAND-BOUNDARY-RELOCATION-BRIEF-2026-08-08.md` (authority).**
 
 ## ⏭ RESUME HERE — exact next actions (2026-08-09 checkpoint)
-1. **Collect B5's checkpoint closeout** (test-phase-b was told to commit partial state
-   and report done-vs-remaining; its commit(s) sit on marine main after `5ebc1fa`).
-   Finish any NOT-YET-WRITTEN KATs/repairs via a fresh test-author round using
-   `briefs/L1-PHASE-B-TEST-BRIEF-2026-08-09.md` + the 35-frequency correction + the
-   B5 scope-ack triage (recorded in the plan's B5 line and below).
+1. **Finish B5** (partial commit `c217d8f`, PUSHED). DONE: test_boundary_reconstruction.py
+   (22 tests — K1/K2/K3/K4/K5/K7, with in-file falsifiability controls for K1+K5); 2
+   authorized deletions (ledger in commit body); 5 station-mock repairs (42 tests green);
+   3 more files verified no-change-needed. **REMAINING (fresh test-author round, brief
+   `L1-PHASE-B-TEST-BRIEF-2026-08-09.md`):** (a) tests/test_partition_fields.py — K6
+   (GLWU hourly cadence + 2.5 km corridor, independent arithmetic) + the migrated
+   aggregated-cycle-fallback-WARNING idiom vs `fetch_partition_corridor_with_cycle_fallback()`
+   + optional shared-http-client-reuse KAT; (b) live mutation-and-revert falsifiability
+   demos for K1/K2/K5 (Gate B row 1 needs them — the auditor can perform them itself if
+   the test round doesn't).
 2. **Gate B blind audit** — brief READY at `briefs/L1-GATE-B-AUDIT-BRIEF-2026-08-09.md`
    (already includes the 35-frequency correction + commit list; append B5's commit ids).
 3. **B-Accept deploy** — deploy-marine.sh FROM META ROOT, between cycles (check journal
