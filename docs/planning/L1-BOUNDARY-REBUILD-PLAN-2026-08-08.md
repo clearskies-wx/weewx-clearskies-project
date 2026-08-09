@@ -5,8 +5,8 @@
 | | |
 |---|---|
 | **Live on librewxr** | marine `462b38f` (proc 22:04:28Z): capped 93×101 L1 box (G9) + STOFS water level (S2 re-land, memory-safe) + S3 Hawaii datum branch (inert at HB) |
-| **Phases DONE** | DOC, W, B, **G (CLOSED — RSS budget raised to 400 MB by operator, G-Accept closed)**, S2/S3/S4b code, C2+C3 accepts |
-| **In progress** | S2 live-accept evidence (cycle watch); Great Lakes L1-sizing RESEARCH (operator-ordered); then Gate S (wlevel half) → S1+S4a (currents ladder, NO RTOFS) → A → C1+Gate C → V |
+| **Phases DONE** | DOC, W, B, **G (CLOSED — RSS budget raised to 400 MB by operator, G-Accept closed)**, S2/S3/S4b code, C2 accept |
+| **In progress** | S2 live-accept evidence (cycle watch); **C3 ACCEPT REVOKED by operator (ortho misplaced, no beach, y-axis must be DISTANCE, buffer void) — reopened, NO fix coding until operator directs**; GL research rewritten, awaiting ruling; then Gate S (wlevel half) → S1+S4a (currents ladder, NO RTOFS) → A → C1+Gate C → V |
 | **Today's incident** | First G9+S2 deploy OOM-crash-looped (S2 held ~7 GB of grids) → rolled back same session → S2 re-landed memory-safe + redeployed. Full record: decision log. |
 | **WAITING ON OPERATOR** | G9-GL ruling — after the ordered research returns options (in progress) |
 | **Today's operator rulings applied** | RTOFS-alone fallback REMOVED (exhausted = refuse); box cap binds the BOX (G9, deployed); RSS budget 300→400 MB; GL sizing research ordered (recommendation rejected) |
@@ -888,7 +888,26 @@ draw. DASHBOARD-MANUAL doc-sync same round.
 **Accept (live):** profile shows one coherent train matching the headline swell; no
 interleaved secondary crests; matched against the card's dominant direction on the same hour.
 
-### C3 — Surf-height heatmap: ortho alignment, buffer, y-axis, structure-overlay removal  🔶 CODE DONE session 2 (dashboard `e8be970`); **ACCEPT (live, weather-test) PASSED 2026-08-09 session 5 after remediation `8fff329`** — rotation (50.967°, pier aligns) ✓; X buffer re-measured **49.99 m/side** (was 32.9 — fixed to `distToX`'s own slope; vertical ruled NOT a defect, no physical y scale, see decision log) ✓; y-axis 82 row labels (every 2nd + last of 162) + "Transect" title ✓; structure overlay absent ✓; bundle baseline entry 200.93 KB / marine 41.23 KB gzip ✓. Independent vitest on weather-dev: 46/46 at `8fff329`. Gate C pending (with C1) — see decision log; Accept re-measures after the fix deploys; Gate C pending (with C1)
+### C3 — Surf-height heatmap: ortho alignment, buffer, y-axis, structure-overlay removal  ⛔ **ACCEPT REVOKED BY OPERATOR 2026-08-09 (screenshot review): "unacceptable"** — the session-5 remediation (`8fff329`) and my PASS ruling are both overturned; task REOPENED. **Operator's defects (the new requirement list, binding):**
+1. **No beach visible / ortho in the WRONG PLACE** — the transects start SOUTH of the
+   pier but the imagery is displaced; the underlying orthophotography and the heat map
+   are NOT correctly co-registered at scale. The vertical chart dimension must be
+   PHYSICALLY GEOREFERENCED (real ground coordinates), not the internal
+   "footprint-model" approximation the component uses today.
+2. **Y-axis must show DISTANCE** (alongshore, same unit family as the x-axis) — NOT
+   transect indices. "No one gives a shit about" row numbers. (Supersedes both my
+   index-label ruling and the earlier "no physical y scale" ruling — the transects
+   ARE physically spaced; the component must use their real coordinates.)
+3. **Real buffering around the study area** — the buffer must be measured against a
+   CORRECT frame; the 49.99 m measurement was against the broken internal frame and
+   is void.
+**Coordinator failure recorded:** my acceptance verified the chart against its own
+internal geometry (DOM px-to-scale arithmetic) and one eyeballed landmark, never
+against ground truth — the exact "validate against the model's own output" anti-
+pattern from rules/verification.md. Structure-overlay removal (defect d) remains the
+only accepted row. NO fix round dispatched — operator instruction 2026-08-09: "NO
+FUCKING CODING. FIX THE GOD DAMNED PLANS" — redesign/dispatch awaits operator
+direction at Gate C planning. — see decision log; Accept re-measures after the fix deploys; Gate C pending (with C1)
 **Operator instruction (2026-08-08):** (a) the orthophotography must be ALIGNED with the
 transect bearing (the heatmap's beach frame), not true north — "so that way IT MATCHES";
 (b) 50 m of orthophotography buffering around the heatmap extent so the user can get their
@@ -954,6 +973,19 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 ## Decision log
 
+- **2026-08-09 (session 5) — OPERATOR REVOKED the C3 accept (screenshot review) +
+  REJECTED the G9-GL research writeup; NO-CODING instruction issued.** C3: the
+  remediated heatmap is wrong at the foundation — ortho misplaced (transects start
+  south of the pier; no beach in frame), scale/co-registration broken, y-axis must be
+  alongshore DISTANCE (not transect indices), buffer measurement void because the
+  frame it was measured in is wrong. My PASS ruling is overturned; the coordinator's
+  verification anti-pattern (validated the chart against its own internal geometry,
+  not the ground) is recorded in the reopened C3 section. GL research: rewritten as a
+  plain progressive argument (question → snapshot limit → lakes tighten it → NOAA
+  already computes the lake → our design contradicts itself → options); original
+  data-dump preserved in briefs/G9-GL-RESEARCH-2026-08-09.md. Per the operator's
+  explicit instruction, NO fix round was dispatched for C3 — plan corrections only;
+  redesign awaits operator direction.
 - **2026-08-09 (session 5) — OPERATOR RULINGS on G9-RSS + G9-GL:** (1) "G9, raise to
   400" → SWAN peak-RSS budget 300→400 MB; the measured 335 MB is in budget; **G-ACCEPT
   CLOSED, PHASE G CLOSED** (V3 row updated to 400). (2) G9-GL keep-uncapped
@@ -1267,49 +1299,59 @@ harmless on this machine, and the alternative trades speed for a limit that no l
 matches the grid you approved.
 
 
-## G9-GL — RESEARCH COMPLETE 2026-08-09 (operator-ordered). Findings + options below;
-## awaiting operator ruling.
+## G9-GL — RESEARCH COMPLETE 2026-08-09 (operator-ordered; rewritten same day after
+## the operator rejected the first writeup as "technobabble without any logical
+## progression"). Awaiting operator ruling.
 
-**What the research found (plain English; full evidence trail in the research record,
-decision log entry of this date):**
+**The question:** how big should our outermost wave grid be at a Great Lakes site?
 
-1. **The wave model's own manual draws the line at 100 km.** SWAN's user manual says
-   directly: for domains under ~100 km, hourly-snapshot ("stationary") computation is
-   recommended; bigger than that, you must use the time-stepping mode we rejected for
-   compute cost. No exception for lakes. (Manual line 5715. This is almost certainly
-   where your 100 km ocean number originally comes from.)
-2. **Lake waves make big boxes WORSE, not better.** Lake waves are short-period, and
-   short-period waves travel SLOWER — a typical 5-second lake sea takes ~7 hours to
-   cross a 100 km box, versus ~2.4 hours for ocean swell. And building a full sea
-   across a 200 km fetch takes the wind ~14 steady hours — real weather rarely holds
-   that long, so a whole-lake snapshot assumes a sea state the wind never had time to
-   build. Both errors are the same CLASS you rejected in the ocean case, only larger.
-3. **NOAA already solved the whole-lake problem for us.** Their Great Lakes wave model
-   (GLWU) runs the proper time-stepping physics over each entire lake at 2.5 km,
-   refining to 250 m at the coast — and our system ALREADY consumes it as the L1
-   boundary input for lakes. NOAA's own operational pattern for nearshore forecasting
-   is exactly "small local SWAN grid fed by the big lake model at its edges" — nobody
-   anywhere runs whole-lake stationary SWAN.
-4. **Our current lake design contradicts itself.** One part of our architecture says
-   the lake far-field comes from the GLWU boundary; another says size the box from the
-   full wind fetch (which on the upper lakes means a 210 km box). The research shows
-   the fetch-sized box would break the 45-minute cycle budget (~75 min just for L1),
-   the 400 MB memory budget (~1.5 GB), and the machine itself on Superior/Michigan.
-5. **The numbers-that-fit line:** with everything else measured today, the cycle
-   budget supports an L1 up to roughly 115 km per side; the 400 MB memory budget up to
-   roughly 105 km per side.
+**The argument, start to finish:**
 
-**Options for your ruling:**
-- **(a) One rule everywhere: the 100 km per-axis cap applies to lakes too.** The
-  fetch fan still aims the box and sizes it on small lakes (where fetch+10 stays
-  under the cap); on big lakes the box caps at 100 km and GLWU's boundary carries the
-  rest of the lake — the same division of labor NOAA uses operationally.
-- **(b) Lakes get a deliberately SMALLER box** (e.g., ~50–60 km around the site),
-  leaning harder on GLWU's boundary — cheapest and fastest, at the cost of less room
-  for the local wind to add growth inside our own grid.
-- **(c) Keep the current fetch-sized uncapped box.** The research found no support
-  for this: it fails the manual's own stationarity line, the physics, and every
-  compute budget on the upper lakes.
+Our system computes each forecast hour as a frozen snapshot. A snapshot is only
+honest if the waves inside the box don't need longer than about an hour to react to
+what's happening at its edges — which means the box has to be small. The wave model's
+own manual states the limit outright: snapshot mode is for domains under about
+100 km; anything bigger needs the time-stepping mode you already rejected as too
+expensive to run. There is no lake exception in the manual. That number is where your
+ocean cap came from, and it applies here for the same reason.
+
+Lakes don't relax that limit — they tighten it. Lake waves are short-period, and
+short-period waves travel slower, so they need MORE time to cross the same box, not
+less: a typical 5-second lake sea needs about 7 hours to cross 100 km, versus about
+2.4 hours for long ocean swell. On top of that, a whole-lake snapshot claims the wind
+has fully built the sea across the entire lake — which takes roughly 14 hours of
+steady wind on a 200 km fetch, and real weather almost never holds that long. So a
+whole-lake snapshot is wrong twice: it moves waves instantly that should take hours,
+and it shows a fully-developed sea the wind never had time to raise. This is the same
+error you rejected at Huntington Beach, in a larger dose.
+
+So who should compute the whole lake? NOAA already does. Their Great Lakes wave model
+runs the correct time-stepping physics across each entire lake, every hour, at 2.5 km
+resolution sharpening to 250 m near the coast — and our system already pulls its
+output in as the edge condition for our grid. This is also how NOAA themselves do
+nearshore forecasting: a small local grid, fed at its edges by the big lake model.
+Nobody, operationally or in research, runs a whole lake in snapshot mode.
+
+Our current lake design ignores all of this: it sizes the box from the full wind
+fetch, which on the upper lakes means a ~210 km box — over the manual's limit, wrong
+on both physics counts above, and beyond our budgets (about 75 minutes and 1.5 GB for
+the grid alone, against your 45-minute and 400 MB limits). It also contradicts our
+own architecture, which already says the far field comes from NOAA's model at the
+boundary. The design was written before that boundary existed and was never
+reconciled with it.
+
+**Conclusion the evidence supports:** the box size question for lakes is not "how far
+does the wind blow" — it's "how much local water do we need around the site," because
+the lake-scale work arrives through the boundary either way.
+
+**Your options:**
+- **(a) Same 100 km cap as the ocean.** One rule everywhere; small lakes still size
+  naturally below it; big lakes cap and let NOAA's model carry the rest. Matches the
+  manual's limit and NOAA's own operational pattern.
+- **(b) A deliberately smaller lake box (~50–60 km).** Cheaper and faster; leans
+  harder on NOAA's boundary; less room for local wind to add waves inside our grid.
+- **(c) Keep the current fetch-sized box.** The evidence supports nothing about it —
+  it fails the manual's limit, the physics, and every budget on the upper lakes.
 
 ## G9-GL history — operator REJECTED the earlier keep-uncapped recommendation and
 ## ORDERED this research. Original question below for the record.
