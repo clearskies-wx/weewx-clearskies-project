@@ -1307,9 +1307,15 @@ harmless on this machine, and the alternative trades speed for a limit that no l
 matches the grid you approved.
 
 
-## G9-GL — RESEARCH COMPLETE 2026-08-09 (operator-ordered; rewritten same day after
-## the operator rejected the first writeup as "technobabble without any logical
-## progression"). Awaiting operator ruling.
+## G9-GL — RESEARCH BEING REDONE 2026-08-09 (operator: the box-size framing was the
+## WRONG QUESTION — "lazy assed research focused on the wrong questions completely").
+## The reframe (operator's, binding): the ocean L1 is big only because deep-water WW3
+## can't see nearshore islands; GLWU resolves the lakes at 2.5 km→250 m, so a big lake
+## L1 may be pure duplication. The redo establishes DEPTH-VALIDITY ENVELOPES on both
+## sides — what depths GLWU operates correctly in (as we once established WW3 needs
+## deep water) and what depths OUR L1/L2/L3/L4 each serve — then answers where OUR
+## lake grid should START (possibly no L1 at all; boundary feeding L2 directly).
+## The options below are SUPERSEDED pending the redo's findings.
 
 **The question:** how big should our outermost wave grid be at a Great Lakes site?
 
