@@ -811,6 +811,14 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
   so that is not a bad thing"; buoy reality gate had already improved on every
   pre-declared quantity) and wall-clock +3m17s vs the matched station cycle. B-Accept
   CLOSED; Phase B complete end-to-end (deployed `5cc28e8`).
+- **2026-08-09 — G4 `angular_extent_rad` lead-ruled (same-document ambiguity; operator
+  may override before G-Accept deploy):** neither G4 nor ADR-104 D11 defines the
+  cluster's angular extent. Ruled: `(bearing_max − bearing_min) + one 5° ray step`, in
+  radians — each blocked ray represents its own 5° sector (the same semantics G4's own
+  clustering rule uses, "gap ≤ 2 ray steps = 10°"); contiguous N-ray cluster ⇒ N×5°;
+  single ray ⇒ 5°, never zero (a zero-width island would get NO clamp, contradicting
+  D11's stated purpose); internal 1–2-step gaps are spanned. Dev-surfaced STOP,
+  dev continued G3/G5/G6 while waiting — correct protocol.
 - **2026-08-09 — W6 CODE COMPLETE (marine `70d442f`, lead-verified) + W-Accept item 1
   root-cause REFRAMED.** Empirical diagnosis from a real captured NOMADS GRIB2 fixture:
   the eccodes key was misspelled (`LovInDegrees` vs correct `LoVInDegrees`), and the
