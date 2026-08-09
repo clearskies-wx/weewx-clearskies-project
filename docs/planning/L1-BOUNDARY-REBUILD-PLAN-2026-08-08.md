@@ -716,7 +716,7 @@ pattern: the Great Lakes LWD/IGLD85 branch. Index refresh: add Maui + Big Island
 entries (and PR, low priority) from the NCEI catalogue via the index's existing generation
 path (verify the generator script exists; if hand-authored, entries cite the catalogue URL).
 
-### S4 — Tests (test-author)  ⬜ (S4a rows (a)/(f) RESPECIFIED 2026-08-09 to ladder-selection/no-mixing KATs per the P7 amendment; S4b dispatches after the S2/S3 dev round lands, S4a with S1)
+### S4 — Tests (test-author)  🔶 S4b DONE 2026-08-09 session 5 (marine `e9ef833..c5e9383`, 32 KATs in 5 new files, gate lead-passed: 242 pass / 3 tracked pre-existing lead-reproduced; 2 live mutation falsifiability transcripts (byte0-magic, per-timestep-skip); count discrepancy in the agent's first report resolved = duplicate collection artifact, both sides reconciled to 242 independently). S4a (ladder KATs) dispatches with S1
 (a) selection-ladder KAT (respecified 2026-08-09, P7 amendment): containment-covered
 bbox → that OFS; East-Coast/Gulf bbox outside all OFS → STOFS-3D-Atl; Hawaii bbox →
 PacIOOS ROMS; open-Pacific bbox outside all → RTOFS with the loud non-tidal log line
