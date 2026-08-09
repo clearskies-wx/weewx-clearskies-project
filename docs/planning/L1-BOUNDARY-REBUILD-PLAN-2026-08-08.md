@@ -1039,15 +1039,52 @@ takes 36 minutes (hard limit 45).
    This is the already-tracked "smart-L3 disposition" open item (rules/coordinator.md
    §4b's example), not a Phase-G finding. Item 3 needs no ruling; items 1 and 2 still do.
 
-**Options:** (a) accept the deviations, close G-Accept, proceed to Phase S (my
-recommendation — every pre-declared reality check passed and the shadow physics is
-visibly working; the size cost is real but inside budget); (b) keep it running but have
-me investigate pulling the south extent in (design change → would need a plan amendment);
-(c) roll back to the pre-G grid.
-**RECOMMENDATION: (a)**, with the SCI-crossing and N-S-size facts recorded as accepted
-deviations, and the L3-guard question resolved by the journal check either way.
+**4. (ADDED after operator challenge, 2026-08-09): the stationarity problem — the
+operator is right.** L1 runs one STATIONARY solve per forecast hour (live INPUT:
+`COMPUTE STAT` hourly; verified). A stationary solve assumes waves equilibrate across
+the whole grid instantly each hour. Crossing times on the new 131 km grid: 18 s swell
+~2.6 h, 15 s ~3.1 h, 5 s wind sea ~9.3 h — versus under ~1 h for swell on the old 37 km
+grid. So on the big grid, swell arrival timing can smear by hours and far-corner wind
+sea arrives instantly. Island SHADOWING (geometric) is unaffected; TIMING and wind-sea
+evolution are now physically suspect. The 100 km rule did hold — it caps each scan
+ray's reach from the spot (per-direction radius), and Gate G proved it binds; nothing
+capped the resulting BOX dimension, and the fan's southern rays plus up-coast margin
+legitimately envelope out to 131 km N-S. The gap is in the ruled design, not the
+implementation.
+
+**Options:** (a) accept the grid as-is (rejected by the lead after finding 4 — the
+stationary-solve physics doesn't support 131 km); (b) keep running for now and pull the
+grid's reach back in — sub-options, each architectural (trigger 3), operator picks:
+  (b1) add an envelope cap: the resulting box may not exceed X km per axis (X yours to
+       set; Catalina enclosure needs ~80-90 km west; the south reach can be much less);
+  (b2) lower the 100 km per-ray scan cap (simpler; trades fetch coverage in ALL
+       directions, not just south);
+  (b3) switch L1 to true time-stepping (nonstationary) computes — fixes the physics at
+       any grid size and keeps full island coverage, but changes solver mode, cost, and
+       behavior; needs its own designed round;
+(c) roll back to the pre-G grid (loses the island shadowing that is demonstrably
+working).
+**RECOMMENDATION (revised): (b)** — and within it, (b1) is the smallest change that
+keeps Catalina enclosed while restoring a defensible stationary-solve size; (b3) is the
+physically-complete fix if you want the full 100 km fan to stay. The SCI-crossing
+question (item 2) largely dissolves under (b1) — a tighter south edge stops short of
+SCI entirely.
 
 ## Q5 — Which internet address do we download the RTOFS ocean-current data from?
+## (UPDATED 2026-08-09 session 4: a second S1 problem — the STOFS files we planned to
+## take tidal-current velocity from don't carry velocity at all)
+
+**New evidence (dev-phase-s scope-ack, live file inspection today):** the STOFS regional
+forecast files (`stofs_2d_glo.t00z.conus.west.f000.grib2`) contain exactly three data
+fields — water level, storm surge, and one unidentifiable field — and **no water-velocity
+fields**. The plan's S1 design (P7) assumed the same files that give us water level would
+also give us the tidal current to add on top of RTOFS. That assumption is dead as written.
+Velocity may exist in OTHER STOFS output products (not yet investigated). So S1 now has
+two open problems: the RTOFS download route (original Q5 below) AND where its tidal
+velocity component comes from. S2 (water level) is unaffected and proceeding.
+**Recommendation update:** when you rule on Q5, also authorize a bounded read-only
+investigation of the STOFS product family for a velocity output; if none exists, the P7
+composite design needs an operator decision (it is a registered architectural row).
 
 **Context, plain English:** Phase S adds a new data source — RTOFS, the Navy-style
 global ocean model NOAA runs — to supply ocean currents in regions where no regional
