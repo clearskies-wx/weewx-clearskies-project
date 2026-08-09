@@ -554,7 +554,19 @@ horizon 200, sizing unchanged; (e) Huntington OSM fixture → Catalina enclosed
 brief §4 S1 within ±15% per axis; (f) override set → exact operator extent, enclosures
 suppressed; (g) zone-span refusal. Baseline suite: 0 new failures.
 
-### G9 — Box-size cap (operator ruling 2026-08-09: the 100 km cap binds the BOX, not the ray)  ⬜ dispatches when the S2/S3 round closes
+### G9 — Box-size cap (operator ruling 2026-08-09: the 100 km cap binds the BOX, not the ray)  🔶 DEV DONE 2026-08-09 session 5 (marine `353c34e` + `91b6e2d`; test round in flight; deploy next)
+**Session-5 record:** clamp landed per design; lead gate caught a REAL defect in the first
+commit — `_offshore_sides()`'s closeness-RANKED pair was unpacked positionally as
+(lat-side, lon-side), correct at HB only by coincidence (264°→('W','S')) and wrong for
+east-facing coasts (100°→('E','S') would have pulled the COAST-side W edge — the edge
+the ruling forbids moving). Fixed by cardinal-membership mapping (`91b6e2d`), lead
+re-verified live across 7 bearings. Great Lakes regime EXEMPTED from the clamp by lead
+ruling (plan-contradiction resolution — §G9 literal text vs the GL fetch+10 uncapped
+design row (d) pins; all §G9 examples/KATs/accept are ocean) — the GL half is an OPEN
+OPERATOR QUESTION (§OPEN OPERATOR QUESTIONS, G9-GL). Baseline 218/3 unchanged both
+commits, lead-reproduced. No existing fixture reaches the cap → clamp coverage comes
+from the test round (KATs h/i + lead-required east-facing case + floor refusal + GL
+non-clamp pin).
 **Files:** `services/swan_domain.py` (`_compute_level1`, after the min/max envelope),
 `services/geography.py` (L1_MAX_EXTENT_KM docstring — semantics now "max L1 box span per
 axis"), `tests/test_island_autosizing.py` (KAT updates authorized same-commit per the
