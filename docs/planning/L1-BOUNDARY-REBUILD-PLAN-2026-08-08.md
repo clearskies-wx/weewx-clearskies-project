@@ -438,7 +438,13 @@ K7 missing-field raise. **Deleted test files (the ONLY ones):** the station-sele
 (`tests/` files pinning `ww3_station_selection` / catalogue behavior — enumerate exhaustively
 in the scope-ack; each listed in the closeout per the stale-test rule).
 
-### B-Accept (live, CURRENT extent — the comparability deploy)  ⬜ **NOT RUN — B NOT DEPLOYED** (librewxr still runs `95abc74`, the station boundary). Baseline banked for the comparison: the 18z station-boundary cycle's `level1/` dir holds BOUND_W_46222/46253/46256 + BOUND_S_46223 (the "same water" reference for the ±10% station-position check); W-Accept's reality-gate row (model 0.62 m vs buoys 0.8/0.9 m) is the external "before."
+### B-Accept (live, CURRENT extent — the comparability deploy)  🔶 **RUN 2026-08-09, 3 rows PASS / 2 criterion breaches surfaced (Q4)** — deployed `5cc28e8` 03:12:56Z after a GATE EVENT on the first attempt (03:07Z: `no-publish swan_fatal` — the 43-point BOUNDSPEC command was 1085 chars on one line; `build_swan_input`'s 180-char guard correctly refused; last-good preserved. Fix same round, lead-direct: `&`-continuation wrapping per manual :1219-1220/B.4 + continuation-aware E8 reuse reader + 2 KATs that fail pre-fix; marine `5cc28e8`). Matched 00Z cycle rerun 03:17:19→03:47:30Z:
+- (1) norm_end "Normal end of run v1" ✓. "Differences in wave height at the boundary" WARNING class is PRE-EXISTING (station baseline PRINT: 14 over 4 points = 3.5/point; new: 56 over 66 points = 0.85/point — per-point rate improved; the row's "zero boundary warnings" was never met by the station baseline either — recorded deviation).
+- (2) Station-position ±10%: **PASS all 4** (independent parse of preserved station BOUND_* vs nearest new B_* file, first common timestep 18z: 46223 −0.7% @1.1 km; 46222 −9.3% @13.1 km (station lies outside L1 — farthest match, noted); 46253 −4.0% @0.14 km; 46256 −3.3% @2.0 km).
+- (3) Headline matched-hour (00Z): breakingFaceHeight 1.4649→1.1639 m = **−20.5%, BREACHES ≤15%** → Q4. Reality check (pre-declared): combined DWR Hs 1.008 m vs 46253 0.9 m (+12% ✓) / 46222 0.8 m (+26% marginal); period 18.4 s vs DPD 17 s ✓; swell dir 199° vs MWD 164–209° spread — the pre-plan 35–40° gap is GONE. Every quantity moved TOWARD the buoys vs W-Accept's "before" (0.62 m, −31%/−22%).
+- (4) Wall-clock: 30m11s vs matched station run 26m54s = **+3m17s, grazes ≤+3min** → Q4 (vs the plan's other stated baseline "~37min incl. fetches" it is −7m30s).
+- (5) Boundary volume: 66 files, 12,484,979 B total (station path: 4 files, 36.1 MB) — SMALLER. WIND.txt md5 differs from baseline solely by the shifted computation window (leading values byte-identical; explained, wind path untouched by B). Journal sweep: zero NEW classes (INV-11 + L4-handoff-selection classes present in baseline window too). Publish-liveness ✓ (lastRunTime 03:17:19Z, /surf 200).
+**Deploy stands (healthy, last-good never lost); formal close waits on Q4.** Parking lot: SWAN caps one command at 99 file names (manual :1223) — 66 today, Phase G growth could approach it.
 Deploy alone. Matched cycle vs the last station-boundary cycle: (1) "Normal end of run", zero
 boundary warnings; (2) boundary Hs sampled at the 4 old station positions within ±10% of the
 same-cycle `.spec` m0 at those stations (the old boundary is the reference for the SAME
@@ -818,6 +824,32 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 *(Operator request 2026-08-09: questions live HERE so they don't get lost in agent
 chatter. Each is self-contained: context, options, recommendation. Answered items move to
 the decision log.)*
+
+## Q4 — Accept the new boundary's headline change? (2 accept-criteria breached, 2026-08-09)
+
+**Context, plain English:** The new wave-boundary system is deployed and running. When we
+compared the new forecast against the old one for the same hour, the headline surf height
+dropped 20.5% (from about 4.8 ft faces to about 3.8 ft) — the plan allowed at most a 15%
+change. The full model run also took 3 minutes 17 seconds longer than the old one — the
+plan allowed 3 minutes.
+
+**Why the height change is probably GOOD news:** we checked the new numbers against the
+two real ocean buoys near Huntington. The old system read the offshore waves 22–31% too
+LOW and pointed the swell 35–40 degrees in the wrong direction. The new system reads wave
+height within 12% of the nearer buoy, gets the wave period right, and the direction error
+is gone. The 20.5% headline drop is the old, wrong boundary being replaced by a more
+accurate one — which is the entire purpose of this plan. The 15% guardrail was written
+assuming the old and new boundaries would describe similar water; the comparison itself
+proved the old one was off.
+
+**The extra 3 minutes:** the new system downloads 25 forecast files per run instead of 4
+larger ones, inside the timed window. Total run: 30 minutes (the plan's hard budget in
+Phase V is 45).
+
+**Options:** (a) accept both deviations as measured-and-explained, close B-Accept, move
+on to the wind-rotation fix (W6); (b) roll back to the old boundary and rethink.
+**RECOMMENDATION: (a).** Every reality-check quantity improved; the service is healthy;
+nothing was lost (the fallback protections all worked during the one failed attempt).
 
 ## ~~Q1 — Pin the `r` constant~~ ANSWERED 2026-08-09 ("Q1: ok") → **r = 1.0 pinned**,
 marine commit `5ebc1fa`. Moved to decision log.
