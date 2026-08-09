@@ -554,7 +554,47 @@ horizon 200, sizing unchanged; (e) Huntington OSM fixture → Catalina enclosed
 brief §4 S1 within ±15% per axis; (f) override set → exact operator extent, enclosures
 suppressed; (g) zone-span refusal. Baseline suite: 0 new failures.
 
-### G-Accept (live — the relocation deploy)  ⬜ NEXT — all code+gate prerequisites met; was held for the 2026-08-09 librewxr incident (RESOLVED, see decision log); marine `eecfabc` pushed? NO (push at deploy)
+### G-Accept (live — the relocation deploy)  🔶 **RUN 2026-08-09 (session 4) — deployed `eecfabc` (proc 08:22:05Z), config re-pushed 08:23:13Z, new L1 live and publishing since; 4 rows PASS, 2 deviations + 1 fired guard surfaced as Q6 (operator ruling needed to close)**
+**Record (all numbers lead-collected from fresh commands; baseline = the 07:23:14Z pre-deploy
+cycle, payload + file inventory archived in session scratchpad):**
+- **Sizing (row 1): PART PASS / PART BREACH.** New L1 bbox lon −118.7598..−117.7725, lat
+  32.8994..34.0806 = 93×132 cells (12,276; was 37×27=1,064). E-W 91.4 km vs brief S1 ~90 km
+  (+1.6% ✓, W edge −118.76 ≈ S1's −118.75); **N-S 131.3 km vs S1 ~57 km (+130% — BREACHES
+  ±15%/axis → Q6).** Catalina fully inside, boundary W edge seaward of it ✓. **S edge (32.90)
+  crosses San Clemente Island's footprint** (SCI ~32.80–33.03) — the D11 envelope outcome;
+  ~5–8 boundary points sit over SCI land; the B2 wet-cell ladder mapped them (smoke test
+  PASSED, 225 points) → Q6.
+- **G7 cold start (row 2): PASS.** 08:56:33Z: "grid geometry changed on this config push
+  (L1, L2) — clearing persisted SWAN run state … an immediate full run is now signalled";
+  stale hotstarts removed; subsequent runs on 91×131 live grid.
+- **Full cycle (row 3): PASS.** 13:04 extended cycle: L1 91×131 @1 km "Normal end of run v1"
+  + STOP; L1 wall-clock 13:08:33→13:22:57 = 14m24s (vs brief est ~4.3 min at ~5,100 cells —
+  scales with the 2.4× cell count); full cycle 13:04:23→13:40:19 = **35m56s < 45 min hard ✓**;
+  publish live (lastRunTime 13:08:25Z, /surf 200). Peak SWAN RSS measurement armed for the
+  next run (monitor); STOP threshold 300 MB not yet confirmed either way.
+- **Boundary adaptation / 99-file cap (row 4): PASS with a measured deviation.** 225 points
+  (S=93 files, W=132 files), zero Phase-B code change (decoupling proof ✓).
+  **The W-side BOUNDSPEC carries 132 file names in ONE command — the manual's :1223 99-file
+  cap did NOT bite on the deployed 41.51AB binary** (multiple Normal-end runs) → record in
+  PROVIDER-MANUAL §14.15 measured deviations at doc-sync. Boundary volume 44.9 MB
+  (66 files/12.7 MB pre-G; station era 36.1 MB). L1 PRINT boundary WARNING 35/225 points =
+  0.16/pt (B-Accept: 0.85/pt) — improved.
+- **Reality gate (row 5, quantities pre-declared): PASS.** Combined deep Hs 0.636 m vs
+  46222 0.8 m (−20.5% ✓ within ±25%) / 46253 0.8 m @15:26Z (−20.5% ✓; the 14:56Z 0.9 m
+  reading would be −29%). **W-NW shadow window: wind swell 0.65 m @275° → 0.336 m @264°
+  (energy −73%) — the pre-declared DROP, islands now modeled ✓;** S groundswell survives
+  0.552→0.534 m and gains a second 19.3 s / 179° train. Matched-hour headline +8%…+29.5%
+  (mean ≈ +15%) — CHANGE was expected; faces RISE because the shadowed wind swell no longer
+  steals dominance (period at the 14–16Z hours 10.9→16.7 s: groundswell stays dominant).
+- **Journal sweep (row 6): PASS.** No new WARNING/ERROR classes: transect SUBSTITUTION class
+  = 326 hits in the PRE-deploy window (pre-existing, = the tracked L4-handoff target-depth
+  class); HRRR Lambert WARNING still absent ✓; INV-11 the only health reason.
+- **FIRED GUARD (gate event, rules/coordinator.md §7.3): L3 smart-sizing viability FAILED
+  at the config push** — 08:26:41Z "structure unreachable by ~229 m … L3 disabled for this
+  cluster; handoff falls back to L2 at ~15 m". The chain then wrote the COARSE L3 nest
+  (52×47, contains L4 ≥200 m clearance) and live cycles run L3[0] 51×46 + L4 — the exact
+  pre-G L3 dims, so the operative nest chain appears unchanged; whether this same guard also
+  fired at the last pre-G config push is being checked from the journal → Q6.
 Config push on librewxr → new L1. (1) Sizing trace: box vs S1 estimate recorded; Catalina
 inside the domain (land-masked by ETOPO), boundary seaward of it; (2) bathymetry chain: ETOPO
 covers, C-90 coverage rows pass, cold start observed (G7); (3) full cycle "Normal end of
@@ -959,6 +999,50 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 *(Operator request 2026-08-09: questions live HERE so they don't get lost in agent
 chatter. Each is self-contained: context, options, recommendation. Answered items move to
 the decision log.)*
+
+## Q6 — The relocated grid is live and healthier than before, but it came out much
+## bigger than estimated, its south edge crosses San Clemente Island, and an internal
+## safety check fired. Keep it, or roll back?
+
+**Context, plain English:** The island-aware grid (Phase G) deployed today and has been
+publishing all day. Everything the change was supposed to do, it did: Catalina is now
+inside the model, the west boundary sits seaward of it, and the westerly wind-chop that
+Catalina should block dropped by three-quarters while the southerly groundswell came
+through untouched. The forecast now agrees with both nearby buoys within the tolerance we
+declared in advance (we read about 20% below them; the allowance was 25%). The full run
+takes 36 minutes (hard limit 45).
+
+**The three things that need your ruling:**
+
+1. **The grid is much bigger north-south than the brief estimated** — 131 km instead of
+   ~57 km (the east-west size landed within 2% of the estimate). This is the ruled sizing
+   arithmetic doing what it says: the 100 km open-water scan fan, pointed southwest,
+   reaches far to the south, and nothing in the ruled design pulls the south edge back in.
+   The brief's sketch underestimated that. Cost: the outer grid's compute time went from
+   ~2 to ~14 minutes; total cycle 36 min (was 30 pre-G, budget 45). Memory check on the
+   next run is armed; 300 MB is the stop line.
+2. **The south edge happens to slice through San Clemente Island.** The plan's own rule
+   (D11) says: where island geometry conflicts, the resulting envelope IS the answer, no
+   flagging. The ~5–8 boundary points that fall on SCI land were fed from the nearest wet
+   ocean data (the designed fallback); SWAN masks the land itself. It works, but "the
+   boundary line crosses an island" is exactly the picture G3 said enclosure must avoid —
+   I want your explicit OK that the envelope outcome is acceptable here, or a ruling to
+   change it (that would be new design work, not in the current plan).
+3. **An internal safety check fired during setup** ("L3 viability: structure unreachable
+   by ~229 m — L3 disabled"). Same check class as the 2026-07-31 incident, which is why I
+   stopped to surface it. HOWEVER: the system then fell back to the coarser inner-grid
+   layout it was already using before this deploy (identical dimensions, 51×46), the pier
+   grid still nests inside it, and live runs are normal. I'm verifying from the logs
+   whether this same check also fired at the previous config push (i.e. pre-existing, not
+   caused by G). If it turns out G caused it, that's a real regression to chase.
+
+**Options:** (a) accept the deviations, close G-Accept, proceed to Phase S (my
+recommendation — every pre-declared reality check passed and the shadow physics is
+visibly working; the size cost is real but inside budget); (b) keep it running but have
+me investigate pulling the south extent in (design change → would need a plan amendment);
+(c) roll back to the pre-G grid.
+**RECOMMENDATION: (a)**, with the SCI-crossing and N-S-size facts recorded as accepted
+deviations, and the L3-guard question resolved by the journal check either way.
 
 ## Q5 — Which internet address do we download the RTOFS ocean-current data from?
 
