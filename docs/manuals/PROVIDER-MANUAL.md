@@ -1340,15 +1340,16 @@ CO-OPS Data API returns JSON. Base URL: `https://api.tidesandcurrents.noaa.gov/a
 
 **RW-1 (register ruling 13, "ONE source of offshore truth", 2026-08-06): this provider is no longer called for surf-spot locations.** `endpoints/marine.py`'s 3 card call sites now branch on `location.id in marine_config.surf_spots` — a surf-spot location's wave fields come from `services/model_wave_source.py` (the wave model's own SWAN watershed partitions, §14.15) instead, with no fallback to this module even when the model has no cached data yet. This module still serves every non-surf marine location, and still feeds the L1 SWAN boundary (a different code path — see §14.3a).
 
-### §14.3a WW3 station spectral boundary fetch (T8.10b) — superseded-pending-deletion **(ruled 2026-08-08; lands with Phase B of L1-BOUNDARY-REBUILD-PLAN)**
+### §14.3a WW3 station spectral boundary fetch (T8.10b) — SUPERSEDED, deleted 2026-08-09 (Phase B, ADR-104 D3/D4)
 
-**This section documents the station-fetch path LIVE TODAY.** Per ADR-104 (D3/D4), the L1 WW3 boundary is
-being replaced by per-L1-cell reconstruction from gridded WW3 partition fields — see "§14.3a Amendment:
-partition-reconstruction boundary (target — Phase B)" below for the target design. Until Phase B lands, every
-statement in this section is current production behavior. When Phase B ships: `services/ww3_station_selection.py`,
-`services/ww3_station_catalogue.py`, and `data/ww3_station_catalogue.json` are deleted outright, and the
-station-fetch half of this module (everything below except the Appendix-D 2-D spectrum WRITER, which is
-extracted and reused by the reconstruction path) is removed.
+**HISTORICAL REFERENCE ONLY — this mechanism is deleted.** Per ADR-104 (D3/D4), the L1 WW3 boundary is now
+reconstructed per-L1-cell from gridded WW3 partition fields — see "§14.3a/b Amendment: partition-reconstruction
+boundary" below for the live design. `services/ww3_station_selection.py`, `services/ww3_station_catalogue.py`,
+and `data/ww3_station_catalogue.json` are deleted outright; `services/ww3_spectrum.py` is reduced to a
+docstring-only stub (the station fetch/parse code below is gone — the Appendix-D 2-D spectrum WRITER this
+module's docstring referenced never actually lived here; it lived in `services/swan_formats.py` and was
+extracted/replaced by `write_swan_2d_spectrum_file()` there, B2/B3). Everything below this line documents the
+pre-Phase-B mechanism as it ran in production, kept for the historical record.
 
 **Module identity:** `services/ww3_spectrum.py` (marine repo), `PROVIDER_ID = "ww3_spectrum"`, `DOMAIN = "marine"`. **Not a dispatch-registered provider module** — same placement rationale as `services/bathymetry_resolver.py`: it fetches remote data over HTTP but feeds a model boundary condition (the SWAN L1 spectral boundary, T8.10c) rather than a canonical `MarineForecastPoint` field. It is a separate module from `providers/marine/wavewatch.py` (§14.3 above) — both read NOAA NOMADS since SW-2 (2026-08-06), but they fetch different NOAA products (this one: full 2-D per-station directional spectrum `.spec` files for the SWAN boundary; §14.3: gridded GRIB2 bulk/partition fields for the forecast cards) with different return shapes.
 
@@ -1369,10 +1370,10 @@ Per-station files only — **never** the tarballs (`spec_tar.gz` 1.72 GB, `ibp_t
 
 **Error handling:** `ProviderHTTPClient` exceptions (`QuotaExhausted`, `KeyInvalid`, `TransientNetworkError`, `ProviderProtocolError`) propagate unwrapped from `fetch_station_spectrum()` — a 404 (cycle not yet published) surfaces as `ProviderProtocolError` with `status_code=404` for the caller to branch on.
 
-### §14.3b WW3 station selection + spatially varying SWAN L1 boundary (T8.10c round 2; marine-repo half of T8.10f) — superseded-pending-deletion **(ruled 2026-08-08; lands with Phase B of L1-BOUNDARY-REBUILD-PLAN)**
+### §14.3b WW3 station selection + spatially varying SWAN L1 boundary (T8.10c round 2; marine-repo half of T8.10f) — SUPERSEDED, deleted 2026-08-09 (Phase B, ADR-104 D3/D4)
 
-**This section documents the station-selection mechanism LIVE TODAY** — see the Amendment below §14.3b for
-the target reconstruction design that replaces it in Phase B.
+**HISTORICAL REFERENCE ONLY — this mechanism is deleted** (`services/ww3_station_selection.py` removed
+outright). See the Amendment below for the live per-L1-cell reconstruction design that replaced it in Phase B.
 
 **Module identity:** `services/ww3_station_selection.py`, plus `services/swan_formats.py`'s `ww3_boundary_files_and_command()`. Not a dispatch-registered provider module — same rationale as §14.3a.
 
@@ -1409,24 +1410,27 @@ the target reconstruction design that replaces it in Phase B.
 
 **Configuration-time viability (marine-repo half of T8.10f — partial).** `services/grid_sizing_chain.py`'s `run_grid_sizing_chain()` (runs on `POST /config`, "same shape as the existing L3 cluster viability test") calls the same selection logic once per config push and logs the result loudly (ERROR with the full rejection list on failure, INFO with selected stations on success) — but this chain "never raises past its own boundary" (it is a `BackgroundTasks` job with no synchronous HTTP response to attach a rejection message to), so it cannot synchronously refuse the operator's config push the way the plan's "fail at configuration time and tell the operator" language describes. **The operator-facing message (station id/distance/depth surfaced at setup) is cross-repo** (marine → API → config UI) and is dispatched separately to `clearskies-api-dev` + the config-UI owner — this section's contribution is limited to making the real check run and log early, and to the runtime path's own per-cycle raise (above), which is the actual per-cycle enforcement that never silently degrades.
 
-#### §14.3a/b Amendment: partition-reconstruction boundary (target — Phase B of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D3/D4)
+#### §14.3a/b Amendment: partition-reconstruction boundary (IMPLEMENTED 2026-08-09, Phase B of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D3/D4)
 
-**Status: target — not yet implemented.** This subsection documents the B1/B2 design verbatim from
-`docs/planning/L1-BOUNDARY-REBUILD-PLAN-2026-08-08.md`. Until Phase B lands, §14.3a/§14.3b above describe
-the live mechanism.
+**Status: LIVE.** §14.3a/§14.3b above are historical reference only (deleted mechanism); this subsection
+describes the current production boundary path.
 
-**B1 — gridded partition-field fetcher (new module `services/ww3_partition_fields.py`).** Fetches, per
+**B1 — gridded partition-field fetcher (`services/ww3_partition_fields.py`).** Fetches, per
 forecast step, the corridor bbox = L1 bbox + one native WW3 cell pad, fields `WVHGT`/`WVPER`/`WVDIR`,
 `SWELL`/`SWPER`/`SWDIR` sequences 1–3, and `HTSGW` (validation only). Ocean product: NOMADS `filter_gfswave.pl`,
-`gfswave.tCCz.global.0p16`, f000–f072 3-hourly (the same CGI family §14.3 already uses). Great Lakes: NOMADS
-`glwu` filter if present, else `.idx` byte-range subset of `glwu.grlc_2p5km` — both named, pinned after one
-live check (a bounded decision). Product routing by L1-centre region (`classify_region`, the same rule the
-station path used). Reuses `providers/_common/http.py`'s client/rate limiter, `grib_processor.py`'s eccodes
-backend, and the existing ≥9998 missing-value guard (PROVIDER-MANUAL §14.3 conventions). Any missing
-field/step raises (`BoundaryNotViableError`, retained as the exception type, new message) — never a partial
-fetch.
+`gfswave.tCCz.global.0p16`, f000–f072 3-hourly (the same CGI family §14.3 already uses), one file per forecast
+hour. Great Lakes: NOMADS `filter_glwu.pl` (pinned over the `.idx` byte-range alternative after a live check
+2026-08-08/09 — the filter CGI needs no new byte-range-parsing code and mirrors the ocean product's own
+mechanism), one file per cycle bundling many hourly steps (live-verified ≥150 hourly steps per cycle),
+extracted per-hour via `grib_processor.read_grib_fields(target_step=hour)`. Product routing by L1-centre region
+(`classify_region`, the same rule the station path used). Reuses `providers/_common/http.py`'s client/rate
+limiter, `grib_processor.py`'s eccodes backend, and the existing ≥9998 missing-value guard (PROVIDER-MANUAL
+§14.3 conventions). Any missing field in a successfully-downloaded file raises (`BoundaryNotViableError`,
+retained as the exception type, new message) — never a partial fetch; a not-yet-published cycle is a distinct,
+retryable condition (`fetch_partition_corridor_with_cycle_fallback()`, the bounded cycle-fallback idiom carried
+over from the deleted station path).
 
-**B2 — reconstruction module (new module `services/boundary_reconstruction.py`).**
+**B2 — reconstruction module (`services/boundary_reconstruction.py`).**
 - **Boundary points:** every L1 boundary cell along the two offshore sides (sides resolved from
   `open_water_bearing` via the existing `_offshore_sides` logic, which moves into this module when the
   station module is deleted). Spacing = L1 `dx` = 1 km (D4).
@@ -1435,8 +1439,10 @@ fetch.
   interpolate as unit vectors. A partition missing (9999 sentinel) at contributing cells → that partition
   contributes zero energy at that point (partitions legitimately die out spatially); ALL partitions zero
   while interpolated `HTSGW > 0.1 m` → raise (inconsistent source).
-- **Spectrum per point:** `E(f,θ) = Σ_p (Hs_p²/16) · S_p(f) · D_p(θ)`, emitted on the CGRID spectral axes (34
-  log-spaced freqs 0.03–1.0 Hz, 72 directions) so SWAN never interpolates the boundary spectrum itself.
+- **Spectrum per point:** `E(f,θ) = Σ_p (Hs_p²/16) · S_p(f) · D_p(θ)`, emitted on the CGRID spectral axes (**35**
+  log-spaced freqs 0.03–1.0 Hz — `CIRCLE … 34` is msc, and the frequency count is msc+1 (SWAN manual :1532/:3719;
+  live-verified against the deployed binary's own SPECOUT `AFREQ / 35`, 2026-08-09) — 72 directions) so SWAN never
+  interpolates the boundary spectrum itself.
   Wind-sea train: JONSWAP `γ = 3.3`, `Tp = r × WVPER` (`r` measured-then-pinned, bounds [1.10, 1.35], vs 3
   live `.spec` cycles), spread cos²ˢ `s = 7` (σθ ≈ 30°). Swell trains: Gaussian `σf = 0.015 Hz` centred at
   `1/SWPER` (narrow-band: mean ≈ peak), spread cos²ˢ `s = 28` (σθ ≈ 15°). Each `S_p(f)`/`D_p(θ)` normalized to
@@ -1459,15 +1465,25 @@ prescriptions and manual line citations: `docs/planning/L1-BOUNDARY-REBUILD-PLAN
 PRESCRIPTIONS".
 
 **B4 — retirement of the station path.** `services/ww3_station_selection.py`,
-`services/ww3_station_catalogue.py`, `data/ww3_station_catalogue.json` are deleted; the station-fetch half of
-`services/ww3_spectrum.py` is deleted after the writer extraction (the parser stays if `swan_spectral.py`
-tests still use it — verified at implementation). `services/grid_sizing_chain.py`'s config-time viability
-check replaces the station check with a partition-fetch smoke test (one live cycle, corridor bbox, all
-fields present, every boundary point maps to wet cells) — same loud config-push refusal role.
+`services/ww3_station_catalogue.py`, `data/ww3_station_catalogue.json` are deleted outright. `services/ww3_spectrum.py`
+is reduced to a docstring-only stub (verified: `swan_spectral.py`'s own `parse_specout_file()` — the
+"SPECOUT-mirror parser" — is a DIFFERENT function in a DIFFERENT module, never lived in `ww3_spectrum.py`, and
+is untouched) — no importable symbol remains; the module's WW3 `.spec` direction-convention research is kept
+in its docstring for the historical record. `services/grid_sizing_chain.py`'s config-time viability
+check (`_validate_ww3_boundary_viability()`) replaces the two-stage station check with a single
+partition-reconstruction smoke test — one live cycle, corridor bbox, every boundary point's spectrum actually
+built via `boundary_reconstruction.reconstruct_boundary()` — same loud config-push refusal role, verified live
+2026-08-09 against both a passing Huntington-scale extent (43 points, 25 timesteps each) and a deliberately
+land-locked domain (ERROR logged naming the extent, function returns without raising further).
 
-**Measured-then-pinned constants (bounds, not values — see ADR-104):** `r` (wind-sea mean→peak period ratio)
-bounds `[1.10, 1.35]`, measured vs 3 live `.spec` cycles; the GLWU fetch method (NOMADS filter vs `.idx`
-byte-range) pinned after one live check. Out-of-bounds measurement → STOP and surface, never picked.
+**Measured-then-pinned constants (see ADR-104):** the GLWU fetch method pinned (NOMADS `filter_glwu.pl`, see
+B1 above). `r` (wind-sea mean→peak period ratio, bounds `[1.10, 1.35]`) — one-shot measurement 2026-08-09
+against station 46222 (live NOMADS, 2 of 3 attempted cycles yielded a usable wind-sea pair) produced
+r=1.0136 and r=1.0559, BOTH below the [1.10, 1.35] floor; the direction-convention cross-check passed cleanly
+(2.4–2.5° agreement, no flip needed for the GRIB2 path, confirming it matches `providers/marine/wavewatch.py`'s
+handling). Per ADR-104 ("out of bounds → STOP and surface, never pick"), this was surfaced rather than picked;
+`WIND_SEA_TP_MEAN_TO_PEAK_RATIO_R` in `boundary_reconstruction.py` carries an explicitly-marked NOT-YET-PINNED
+placeholder (1.20) pending the operator's ruling on the bound — update this doc when the real value lands.
 
 ### §14.4 NWS marine zone text forecasts
 
