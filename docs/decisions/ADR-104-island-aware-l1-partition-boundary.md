@@ -160,6 +160,10 @@ boundary point spacing = L1 `dx` (1 km); wind bbox pad `0.3°`; STOFS cutover bi
 Two constants are **measured then pinned** — the method is decided here, the value is measured at
 implementation, within a bound:
 - B2's `r` (wind-sea mean→peak period ratio): bounds `[1.10, 1.35]`, measured vs 3 live `.spec` cycles.
+  **Amendment 2026-08-09 (operator ruling, plan decision log):** the measurement came in below the floor
+  (1.0136/1.0559); the operator ruled the gridded `WVPER` field behaves as (near-)peak period and pinned
+  **`r = 1.0`** (no mean→peak inflation; marine commit `5ebc1fa`). The bound above is superseded for this
+  constant; the out-of-bounds → STOP-and-surface protocol was followed and is unchanged for future constants.
 - S1's RTOFS endpoint choice: NOMADS grib primary, ERDDAP griddap alternate, pinned after one live shape
   check.
 

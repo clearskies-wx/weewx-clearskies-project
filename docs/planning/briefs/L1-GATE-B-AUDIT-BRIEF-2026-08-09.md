@@ -21,7 +21,7 @@ passes against pre-B code.
 3. LOCAL SWAN manual `docs/reference/swan-user-manual.txt` (cites in the plan). NEVER
    download SWAN docs.
 4. Marine repo commits `95abc74..HEAD` (B1 10c8d70, B2 f81e520, B3 dcfd84a, B4 f190fcd,
-   plus the B5 test commit(s) after them). Meta doc-sync `b22e80f`.
+   r-pin 5ebc1fa, B5 tests c217d8f + e1c315e + 11b5768). Meta doc-sync `b22e80f`.
 5. `.venv-round4` for running tests/mutations (ephemeral only, revert everything,
    clean tree after).
 

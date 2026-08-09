@@ -133,7 +133,7 @@ current as of the 2026-08-09 checkpoint) and
   lastRunTime 23:40:26Z, h0 face 1.089 unchanged); loud retry loop, no publish. This IS
   the forced-drill evidence, end-to-end, unsynthesized.
 
-## ⛔ OPEN OPERATOR DECISION — B2's `r` constant measured OUT OF BOUNDS (2026-08-09)
+## ~~OPEN OPERATOR DECISION — B2's `r` constant~~ RESOLVED 2026-08-09: operator accepted the recommendation ("Q1: ok"), **r = 1.0 pinned, marine `5ebc1fa`**. B-Accept unblocked. Historical record below.
 Plan: `r` (wind-sea mean→peak period ratio, `Tp = r × WVPER`) measured-then-pinned,
 bounds [1.10, 1.35], "out-of-bounds → STOP and surface, do not pick."
 **Measured (station 46222 vs co-located gfswave cell, live):** 00Z r=1.0136, 06Z r=1.0559

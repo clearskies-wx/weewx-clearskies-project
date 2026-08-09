@@ -1443,8 +1443,8 @@ over from the deleted station path).
   log-spaced freqs 0.03–1.0 Hz — `CIRCLE … 34` is msc, and the frequency count is msc+1 (SWAN manual :1532/:3719;
   live-verified against the deployed binary's own SPECOUT `AFREQ / 35`, 2026-08-09) — 72 directions) so SWAN never
   interpolates the boundary spectrum itself.
-  Wind-sea train: JONSWAP `γ = 3.3`, `Tp = r × WVPER` (`r` measured-then-pinned, bounds [1.10, 1.35], vs 3
-  live `.spec` cycles), spread cos²ˢ `s = 7` (σθ ≈ 30°). Swell trains: Gaussian `σf = 0.015 Hz` centred at
+  Wind-sea train: JONSWAP `γ = 3.3`, `Tp = r × WVPER` (`r = 1.0`, operator-ruled 2026-08-09 — see the
+  measured-then-pinned constants paragraph below), spread cos²ˢ `s = 7` (σθ ≈ 30°). Swell trains: Gaussian `σf = 0.015 Hz` centred at
   `1/SWPER` (narrow-band: mean ≈ peak), spread cos²ˢ `s = 28` (σθ ≈ 15°). Each `S_p(f)`/`D_p(θ)` normalized to
   unit integral on the discrete grid BEFORE scaling by `Hs_p²/16`, so the bin-sum identity is exact by
   construction.
@@ -1477,13 +1477,15 @@ built via `boundary_reconstruction.reconstruct_boundary()` — same loud config-
 land-locked domain (ERROR logged naming the extent, function returns without raising further).
 
 **Measured-then-pinned constants (see ADR-104):** the GLWU fetch method pinned (NOMADS `filter_glwu.pl`, see
-B1 above). `r` (wind-sea mean→peak period ratio, bounds `[1.10, 1.35]`) — one-shot measurement 2026-08-09
+B1 above). `r` (wind-sea mean→peak period ratio) — **pinned `r = 1.0`, operator-ruled 2026-08-09, marine
+commit `5ebc1fa`** (`WIND_SEA_TP_MEAN_TO_PEAK_RATIO_R = 1.0` in `boundary_reconstruction.py`). History: the
+plan's original bounds were `[1.10, 1.35]` on a mean→peak premise; the one-shot measurement 2026-08-09
 against station 46222 (live NOMADS, 2 of 3 attempted cycles yielded a usable wind-sea pair) produced
-r=1.0136 and r=1.0559, BOTH below the [1.10, 1.35] floor; the direction-convention cross-check passed cleanly
-(2.4–2.5° agreement, no flip needed for the GRIB2 path, confirming it matches `providers/marine/wavewatch.py`'s
-handling). Per ADR-104 ("out of bounds → STOP and surface, never pick"), this was surfaced rather than picked;
-`WIND_SEA_TP_MEAN_TO_PEAK_RATIO_R` in `boundary_reconstruction.py` carries an explicitly-marked NOT-YET-PINNED
-placeholder (1.20) pending the operator's ruling on the bound — update this doc when the real value lands.
+r=1.0136 and r=1.0559, BOTH below that floor. Per ADR-104 ("out of bounds → STOP and surface, never pick")
+the result was surfaced; the operator ruled the gridded `WVPER` field behaves as (near-)peak period, so no
+mean→peak inflation is applied and the bound is superseded for this constant (plan decision log 2026-08-09).
+The direction-convention cross-check passed cleanly (2.4–2.5° agreement, no flip needed for the GRIB2 path,
+confirming it matches `providers/marine/wavewatch.py`'s handling).
 
 ### §14.4 NWS marine zone text forecasts
 
