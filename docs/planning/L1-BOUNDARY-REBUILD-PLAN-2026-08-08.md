@@ -821,12 +821,36 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
   so that is not a bad thing"; buoy reality gate had already improved on every
   pre-declared quantity) and wall-clock +3m17s vs the matched station cycle. B-Accept
   CLOSED; Phase B complete end-to-end (deployed `5cc28e8`).
-- **2026-08-09 — INCIDENT: librewxr host down ~06:46Z (investigation open, G-Accept +
-  Phase S code HELD).** Signature: instant simultaneous TCP death (SSH + 8780 + CheckMK
-  agent, "no route to host" from LAN) with ICMP alive; CheckMK metrics flat to the last
-  datapoint 06:45Z (RAM 1.88 GB of 11.2 GiB, CPU 8%, no ramp — resource exhaustion
-  RULED OUT); uptime 25 d. NOT deploy-correlated: W6 deployed 05:23Z, clean full cycle
-  ended 06:00:56Z, box healthy 06:15Z; nothing deployed after. Two read-only code
+- **2026-08-09 — INCIDENT RESOLVED ~07:18Z: librewxr DHCP lease expiry.** ROOT CAUSE:
+  unattended-upgrades restarted systemd-networkd on Aug 1 06:47Z (openssl upgrade); the
+  restarted daemon wedged silently (zero journal entries for 8 days, no T1/T2 renewals);
+  the lease (LIFETIME=1w1d, acquired Aug 1 06:47) expired Aug 9 06:47Z — the death
+  minute — dropping eth0's IPv4. librewxr is an LXD CONTAINER (not a physical host —
+  coordinator error cost diagnostic time); fix = `systemctl restart systemd-networkd`
+  in-container via ratbert lxc exec → 192.168.7.22 + default route restored, SSH OK,
+  CheckMK agent OK, marine service recovered (had refused loudly + preserved last-good,
+  by design). Coordinator errors recorded: stale memory-pressure bias; misread Windows
+  ping (router "unreachable" replies counted as received → false "ICMP alive"); raw-IPv4
+  diagnostics instead of FQDNs (rule added to CLAUDE.md); premature "flapping" claim
+  from a wall-clock arithmetic error. FOLLOW-UPS (parked): (1) monitor DHCP lease age /
+  networkd log-liveness to catch a deaf networkd before expiry; (2) per-minute failing
+  `check_mk_agent` docker-exec spam in container journal; (3) SWAN stdin FD leak (below).
+  **Historical record of the investigation as it unfolded:** TOTAL network death — no ARP,
+  no ICMP, no TCP. The coordinator's earlier "ICMP alive" claim was a misread: Windows
+  `ping` counts the ROUTER's "Destination host unreachable" replies (from 192.168.2.254)
+  as received packets, so "0% loss" was the gateway talking, never the box (operator
+  caught it: "ping is not responding either"). tracert confirms: dies at the gateway,
+  host unresolvable at L2. **Operator RESTARTED the box and it did NOT return to the
+  network** → persistent across reboot → candidates now: not booting at all (power/
+  disk/kernel), NIC/driver failure, cable/switch port. Physical console is the next
+  diagnostic. CheckMK metrics flat to the last datapoint 06:45Z (RAM 1.88 GB of
+  11.2 GiB, CPU 8%, no ramp — resource exhaustion RULED OUT); uptime 25 d at death,
+  no reboot before it. NOT deploy-correlated: W6 deployed 05:23Z, clean full cycle
+  ended 06:00:56Z, box healthy 06:15Z; nothing deployed after. **Both code-review
+  hypothesis rankings below were briefed with the false ICMP-alive premise — the
+  docker-iptables-wedge hypothesis loses its signature fit and is DOWNGRADED
+  accordingly; the code-level findings (marine cleared; FD leak; unbounded build
+  cache; hourly rebuild cron existence) stand as facts.** Two read-only code
   investigations complete: (1) marine code CLEARED — no mechanism for cross-process TCP
   death; W6 diff verified parse-time-only with finally-closed handles; retry loops
   bounded (≤1 attempt/5 min/input). (2) LibreWXR repo: LEAD HYPOTHESIS = hourly

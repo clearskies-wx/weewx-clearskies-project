@@ -39,6 +39,12 @@ These apply regardless of domain.
 ### Operating posture
 
 - **NEVER assume state — verify first.** Check current state before running any command.
+- **FQDNs, never raw IPs.** All host reachability checks, service queries, and diagnostics
+  use FQDNs (`librewxr.shaneburkhardt.com`, `weewx.shaneburkhardt.com`, …), never raw IPv4
+  addresses. This network is dual-stack — raw-IPv4 checks give a false picture of host
+  state. (Why 2026-08-09: during the librewxr DHCP-lease outage, IPv4-only pings/curls
+  conflated "IPv4 address lost" with "host dead," while the container's IPv6 was alive the
+  whole time; operator called out the violation.)
 - **If a solution fails twice, STOP.** Report the failure and ask for clarification. Do not repeatedly attempt the same fix.
 - **NO LOOPS.** Do not repeatedly attempt the same fix or command hoping for a different result.
 - **When you don't know, search the web.** Don't guess at procedures from training data. Search official docs and reputable community sources before running anything destructive or unfamiliar.
