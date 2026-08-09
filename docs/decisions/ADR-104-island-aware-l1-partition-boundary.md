@@ -138,6 +138,16 @@ future case:** missing data → refuse loudly with the reason (D5); constrained 
 answer, silently (D11). The two are never conflated. The sizing trace keeps its ordinary engineering record
 (bearings, achieved km) for debugging — nothing more.
 
+> **Implementation note (lead ruling 2026-08-09, Phase G; operator may override before the G-Accept
+> deploy):** D11 as ruled did not define an un-enclosable cluster's angular extent for the chord width
+> `W = mean(first_land) × angular_extent_rad`. Ruled: `angular_extent_rad = radians((bearing_max −
+> bearing_min) + one 5° ray step)` over the cluster's blocked rays — each ray represents its own 5° fan
+> sector (the same semantics the clustering gap test "≤ 2 ray steps" uses), so a contiguous N-ray cluster
+> subtends N×5° and a single blocked ray subtends 5°, never zero (a zero-width island would receive no
+> clamp at all, contradicting this ruling's purpose). Implemented in
+> `services/swan_domain.py::_near_lee_max_extents()` (marine `3f98613`), KAT-pinned with hand-derived
+> literals (`tests/test_island_autosizing.py`).
+
 **D12 — Service area amended.** CONUS + Great Lakes + Hawaii; Alaska and the territories descoped. The
 descope is reversible — the D7 coverage matrix retains the AK/PR-USVI/Guam-AS columns as the re-entry
 record; any future re-entry reopens exactly those gap cells. Hawaii is the one hard remaining problem

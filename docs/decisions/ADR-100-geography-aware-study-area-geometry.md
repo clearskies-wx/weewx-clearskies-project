@@ -190,8 +190,15 @@ L1-BOUNDARY-REBUILD-PLAN)**. The **enclosure distance** for a wrap-candidate ray
 applies; see ADR-104 for the full mechanism (D1/D2/D11) and ADR-093 Amendment 8 for the ADR-093-side pointer.
 The fan's **ray-casting mechanism itself** (72 rays, wrap-candidate/truly-blocked/directly-open
 classification, the `open_water_resume_km` measurement `RayResult` already needs to make this work) is
-unchanged — only the pinned horizon and enclosure-distance VALUES move. Until Phase G lands, the horizon and
-enclosure arithmetic described in "Pinned parameters" above stay live exactly as written.
+unchanged — only the pinned horizon and enclosure-distance VALUES move. **Phase G code LANDED 2026-08-09**
+(marine `036a2ec`..`e207d79`, KATs `eecfabc`): `L1_MAX_EXTENT_KM = 100.0` in `services/geography.py`
+(single source), ocean horizon returns it unconditionally, `RayResult.open_water_resume_km` recorded at
+wrap qualification, enclosure at `resume + 10 km` (capped; > cap ⇒ no enclosure point, near-lee clamp),
+`[swan] l1_offshore_extent_km` operator override, UTM-zone ±3.5° span guard. One formula gap lead-ruled
+2026-08-09 (operator may override pre-G-Accept): a near-lee cluster's `angular_extent_rad` =
+(outermost-bearing span + one 5° ray step) — each ray represents its own sector; a single blocked ray is
+never zero-width. Deployment happens at G-Accept; until that deploy the RUNNING service still uses the
+pre-G sizing.
 
 ## References
 
