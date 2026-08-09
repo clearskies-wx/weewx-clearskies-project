@@ -29,8 +29,11 @@ P7). Anything beyond those rows' text → STOP and surface.
    (:3068-3103, the site S2's chain replaces) and the currents fetch site (:3157-3178,
    the site S1's selector routes; C-77 abort semantics live here — read the
    surrounding no-publish machinery).
-6. `weewx_clearskies_marine/services/swan_runner.py` — `_write_wlevel_txt` (:2285-2376,
-   the L3-profile spatially-varying path S2 generalizes), `_write_current_txt`
+6. `weewx_clearskies_marine/services/swan_runner.py` — `_write_wlevel_txt` (:2285-2326 —
+   NOTE, lead-verified 2026-08-09: this is the spatially-UNIFORM tide stamp, NOT a
+   spatially-varying path) AND `_write_wlevel_grid_txt` (:2329-2352 — the EXISTING
+   spatially-varying grid writer, takes `grids[timestep][j][i]`; **S2 = feed STOFS fields
+   to THIS existing function — wiring, not generalization**), `_write_current_txt`
    (:2378-, post-W4 abort semantics you must not weaken).
 7. `weewx_clearskies_marine/services/vertical_datum.py` — whole module (S3's branch
    lands here; the Great Lakes LWD/IGLD85 branch is the precedent pattern).
@@ -53,9 +56,12 @@ files).
 **Modify:** `providers/ocean/ofs.py` (add `find_current_source(l1_bbox)` per S1 —
 containment, not centre-in-box; do not alter `find_ofs_model`'s existing behavior for
 its other callers), `providers/nearshore/swan.py` (the two fetch sites only),
-`services/swan_runner.py` (`_write_wlevel_txt` generalization only),
-`services/vertical_datum.py` (S3 branch), `data/ncei_regional_dem_index.json` (P12
-entries).
+`services/swan_runner.py` (S2 wiring ONLY: route the all-levels wlevel path through the
+EXISTING `_write_wlevel_grid_txt`; do not rewrite either writer),
+`services/vertical_datum.py` (S3 branch), `providers/tides/coops.py` (S3 — ADDITIVE
+`datums` product support ONLY; the existing predictions/water_level/water_temperature
+paths are untouched; lead ruling 2026-08-09, no datums support exists today),
+`data/ncei_regional_dem_index.json` (P12 entries).
 **Do NOT touch:** wind path (hrrr.py, wind_gatherer), `swan_formats.py`,
 `boundary_reconstruction.py`, `ww3_partition_fields.py`, geography/swan_domain/
 grid_sizing_chain (Phase G's files), `_write_current_txt`'s W4 abort semantics, any
@@ -64,10 +70,14 @@ grib filter (eccodes already present) or ERDDAP (existing client); if you conclu
 new dependency is required → STOP and surface.
 
 ## DESIGN (decided — plan §PHASE S tasks S1–S3, verbatim; hard edges restated)
-1. **Bounded decisions you MAY pin empirically (named in the plan):** RTOFS access
-   route (grib filter primary vs ERDDAP alternate) after ONE live shape check; STOFS
-   regional product filenames from the NCO inventory. Record the pinned choice + the
-   check's raw evidence in your closeout. These are the ONLY open choices.
+1. **Bounded decisions:** the RTOFS access route is NO LONGER yours to pin — both
+   plan-named candidates (NOMADS grib filter; ERDDAP griddap) were verified DEAD on
+   NOAA's side 2026-08-09 (scope-ack evidence, preserved in the session handoff); the
+   route is an open operator question (plan §OPEN OPERATOR QUESTIONS) and the lead
+   states the ruled route at dispatch — do not begin S1 without it. STOFS regional
+   product filenames remain yours to pin from the NCO inventory (region tokens
+   live-verified plain `conus`/`hawaii`, 4 cycles/day). Record pinned choices + raw
+   evidence in your closeout.
 2. **Compositing (P7, operator directive):** RTOFS branch ONLY: `u = u_RTOFS +
    u_STOFS`, `v = v_RTOFS + v_STOFS` per cell per timestep; missing either component
    at a timestep → `CurrentCoverageError` (no partial composite). OFS regions NEVER

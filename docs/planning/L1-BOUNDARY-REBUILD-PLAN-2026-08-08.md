@@ -816,7 +816,17 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 ## Decision log
 
-- **2026-08-09 — Q4 ruled (operator, in chat): B-Accept's two criterion deviations
+- **2026-08-09 (session 4) — Two lead rulings from the Phase-S scope-ack findings, both
+  code-verified by the lead before ruling:** (1) `providers/tides/coops.py` ADDED to the
+  S allowlist for S3, additive `datums` product only (no datums support exists today —
+  verified: `_DEFAULT_PRODUCTS` = predictions/water_level/water_temperature; P9 already
+  authorizes the datums-product conversion, so the file addition is implementation of a
+  registered change, not a new architectural grant). (2) S dev brief corrected:
+  `_write_wlevel_txt` (:2285) is the spatially-UNIFORM stamp; the spatially-varying
+  writer ALREADY EXISTS as `_write_wlevel_grid_txt` (:2329-2352) — S2 is wiring STOFS
+  fields into the existing grid writer, not generalizing the uniform one. Third finding
+  (RTOFS route, both plan candidates dead) surfaced as Q5 — out-of-bounds per the plan's
+  own named-constants rule, not lead-ruled. (operator, in chat): B-Accept's two criterion deviations
   accepted** — headline −20.5% ("the height change matches surfline and surf-forecast,
   so that is not a bad thing"; buoy reality gate had already improved on every
   pre-declared quantity) and wall-clock +3m17s vs the matched station cycle. B-Accept
@@ -949,6 +959,39 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 *(Operator request 2026-08-09: questions live HERE so they don't get lost in agent
 chatter. Each is self-contained: context, options, recommendation. Answered items move to
 the decision log.)*
+
+## Q5 — Which internet address do we download the RTOFS ocean-current data from?
+
+**Context, plain English:** Phase S adds a new data source — RTOFS, the Navy-style
+global ocean model NOAA runs — to supply ocean currents in regions where no regional
+model covers us. The plan named two ways to download it and said "try one, pick
+whichever works." The problem: when the agent checked on 2026-08-09, **both** of the
+plan's named download routes turned out to no longer exist on NOAA's side (one was a
+download-helper page that was never set up for RTOFS; the other was a data service NOAA
+retired across the board this year). The plan also says that when a measured answer
+falls outside the bounds it wrote down, I must stop and ask rather than pick.
+
+**The one route that DOES work (live-verified):** downloading the model's raw output
+files directly from NOAA's NOMADS server (the same server, and the same file family, our
+existing regional-current code already uses). Each file is about 155 MB and covers one
+3-hour step; we would read just our small corner of it with the netCDF tools already in
+the project. No new software dependencies.
+
+**Options:** (a) approve the direct-download route just described — the only live one
+found; (b) have me investigate further for other routes (e.g. subsetting servers that
+would cut download size, but none NOAA-operated were found alive for RTOFS); (c) drop
+RTOFS (this would leave open-Atlantic/Hawaii regions with no background current —
+against the ruled design D9).
+**RECOMMENDATION: (a).** It is the plan's own intent ("whichever works after one live
+check"); the file size is larger than ideal but bounded (25 files per run window,
+fetched once per cycle, same cadence as everything else). A separate finding — the
+provider manual's table describing the retired service — gets fixed in the Phase S
+doc-sync either way.
+
+**Phase S sequencing while this is open:** S1 (currents) cannot dispatch without the
+ruling. S2/S3 (water level, Hawaii datum) don't depend on it. The phase's two deploys
+were already ordered currents-first; if this question is still open when the marine repo
+frees up after G-Accept, I will dispatch S2+S3 work first and slot S1 in when ruled.
 
 ## ~~Q4 — Accept the new boundary's headline change?~~ ANSWERED 2026-08-09 (operator:
 "the height change matches surfline and surf-forecast, so that is not a bad thing") →
