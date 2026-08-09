@@ -1,5 +1,16 @@
 # L1 Boundary Rebuild Plan — island-aware sizing + partition-reconstruction boundary (2026-08-08)
 
+## 📍 CURRENT STATE — updated every working session (last: Sun 2026-08-09 ~3:50 PM PDT / 22:50Z, session 5)
+
+| | |
+|---|---|
+| **Live on librewxr** | marine `462b38f` (proc 22:04:28Z): capped 93×101 L1 box (G9) + STOFS water level (S2 re-land, memory-safe) + S3 Hawaii datum branch (inert at HB) |
+| **Phases DONE** | DOC, W, B, G (code+deploy; accept pending one ruling), S2/S3/S4b code, C2+C3 accepts |
+| **In progress** | S2 live-accept evidence (cycle watch); then Gate S (wlevel half) → S1+S4a (currents ladder, NO RTOFS) → A → C1+Gate C → V |
+| **Today's incident** | First G9+S2 deploy OOM-crash-looped (S2 held ~7 GB of grids) → rolled back same session → S2 re-landed memory-safe + redeployed. Full record: decision log. |
+| **WAITING ON OPERATOR** | G9-RSS (memory 335 MB vs 300 MB budget — G-Accept closes on this) and G9-GL (100 km cap for Great Lakes?) — §OPEN OPERATOR QUESTIONS at bottom |
+| **Today's operator rulings applied** | RTOFS-alone fallback REMOVED (ladder exhausted = refuse); box cap binds the BOX (G9, deployed) |
+
 **Created:** 2026-08-08 (operator-directed, in chat: "granular tasks, all design done now and not
 left for agents, qc gates, agent assignments").
 **Status:** ACTIVE — execution begins on operator go (see "Relationship to other live plans").
