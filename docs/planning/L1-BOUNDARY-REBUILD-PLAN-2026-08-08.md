@@ -565,7 +565,7 @@ horizon 200, sizing unchanged; (e) Huntington OSM fixture → Catalina enclosed
 brief §4 S1 within ±15% per axis; (f) override set → exact operator extent, enclosures
 suppressed; (g) zone-span refusal. Baseline suite: 0 new failures.
 
-### G9 — Box-size cap (operator ruling 2026-08-09: the 100 km cap binds the BOX, not the ray)  🔶 DEV DONE 2026-08-09 session 5 (marine `353c34e` + `91b6e2d`; test round in flight; deploy next)
+### G9 — Box-size cap (operator ruling 2026-08-09: the 100 km cap binds the BOX, not the ray)  ✅ DONE + DEPLOYED + LIVE-VERIFIED 2026-08-09 session 5 (code `353c34e`+`91b6e2d`, 5 KATs `3065289`, live via `439aa7c`; capped 93×101 box publishing, all re-run accept rows PASS — G-Accept record below; only the G9-RSS operator ruling outstanding)
 **Session-5 record:** clamp landed per design; lead gate caught a REAL defect in the first
 commit — `_offshore_sides()`'s closeness-RANKED pair was unpacked positionally as
 (lat-side, lon-side), correct at HB only by coincidence (264°→('W','S')) and wrong for
@@ -713,7 +713,7 @@ separately (PRIME DIRECTIVE 3). **Order REVERSED + G9 interleaved (2026-08-09 se
 S2/S3 code round → G9 code+deploy (operator-ruled box cap, outranks) → S2+S4b deploy →
 S1+S4a (ladder) deploy.**
 
-### S1 — Current-source ladder (REWRITTEN 2026-08-09, P7 amended + operator-approved; was RTOFS+composite)  ⬜ dispatches AFTER G9 (repo queue: S2/S3 → G9 → S1+S4a)
+### S1 — Current-source ladder (RE-AMENDED 2026-08-09: RTOFS rung REMOVED by operator, exhausted=refuse)  ⬜ NEXT IN QUEUE — G9 is deployed; dispatches after the S2 accept rows + Gate S wlevel half close
 **Files (new — RE-AMENDED 2026-08-09, RTOFS removed):** STOFS-3D-Atl velocity fetcher +
 PacIOOS ROMS fetcher modules only; `providers/ocean/rtofs_currents.py` is NOT created.
 **Files (modified):**
@@ -747,7 +747,7 @@ cycle at INFO (provenance, not flagging). Missing timestep on the selected sourc
 `CurrentCoverageError` (no cross-rung mixing within a cycle — same per-cycle selection
 rule as the WLEVEL chain).
 
-### S2 — STOFS water-level provider + WLEVEL chain  ⬜ REOPENED 2026-08-09 session 5 — first landing (`5d9d88b`) REVERTED after an OOM crash loop in production (see decision log): the fetcher held 73 full-region grids as nested Python lists (~7 GB). Re-land constraints (binding): subset to L1 bbox+pad AT EXTRACTION; compact array storage (numpy float32-class); memory KAT on production-shaped bbox; accept gains a fetch-path peak-memory row. Bias gate already PASSED (−0.044 m) and carries forward. S4b's 3 S2-test commits reverted with it; S3 + its tests retained.
+### S2 — STOFS water-level provider + WLEVEL chain  ✅ CODE LIVE 2026-08-09 session 5 (re-land `462b38f`, deployed 3:04 PM PDT single-change) — first landing `5d9d88b` was REVERTED same day after an OOM crash loop (fetcher held 73 full-region grids as Python lists ≈7 GB; decision log has the incident); re-land is memory-safe (subset-at-extraction + float32, ~0.5 MB retained, memory KAT mutation-proven), gate lead-passed 249/3, bias gate PASSED −0.044 m ≤ 0.15 m (pre-cutover, station 9410660). Remaining for full close: live wlevel accept rows (watch running) + Gate S wlevel half.
 **Files (new):** `providers/ocean/stofs_wlevel.py`. **Files (modified):**
 `providers/nearshore/swan.py` (:3021-3080 tide fetch site → chain), `services/swan_runner.py`
 (`_write_wlevel_txt` spatially-varying path generalized from the L3 profile writer to a
@@ -764,7 +764,7 @@ surface. Chain (decided): STOFS → CO-OPS-uniform (fallback selection logged lo
 bathymetry-chain pattern) → refuse (`tide_fetch_failed`). The "~30 km uniform tide"
 justification comment is deleted with the uniform-primary path.
 
-### S3 — Hawaii/VDatum-less datum branch  🔶 CODE DONE 2026-08-09 session 5 (marine `9cbb915`, acceptance gate lead-passed; coops.py additive `fetch_datums` via Metadata API; **P12 found ALREADY SATISFIED** — all 9 DEM entries present since the original port `f2494bb`, no edit needed)
+### S3 — Hawaii/VDatum-less datum branch  ✅ CODE DONE + DEPLOYED 2026-08-09 session 5 (marine `9cbb915`, gate lead-passed; live since the `462b38f` deploy, inert at HB by design — activates only on a Hawaii deployment; coops.py additive `fetch_datums` via Metadata API; **P12 found ALREADY SATISFIED** — all 9 DEM entries present since the original port `f2494bb`, no edit needed)
 **Files:** `services/vertical_datum.py`, `data/ncei_regional_dem_index.json` (P12 refresh).
 **Design (decided):** when the domain has no VDatum separation-grid coverage AND every
 bathymetry source in play is tidal-referenced (MHW/MSL/MLLW): convert via tidal-datum offsets
@@ -789,7 +789,7 @@ composite KATs):** no summing on any rung (mutation: sum two sources → KAT fai
 missing timestep on the selected source → raise, never a silent switch mid-cycle;
 (g) baselines 0-delta.
 
-### S-Accept (live)  ⬜ (deploy order reversed 2026-08-09 — wlevel rows run first, currents rows after S1)
+### S-Accept (live)  🔶 IN PROGRESS 2026-08-09 session 5 — wlevel half underway: bias gate PASSED −0.044 m (pre-cutover, 25 pairs vs station 9410660); S2 live on `462b38f`; cycle watch collecting the remaining wlevel rows (STOFS INFO line, service memory, publish, matched-hour delta). Currents rows run after S1.
 Currents deploy: HB continues on WCOFS (selection INFO line proves the ladder ran); ladder
 rungs smoke-verified from librewxr (STOFS-3D-Atl velocity fetch+parse on a Jersey-shore test
 bbox; PacIOOS ROMS on an Oahu bbox; an uncovered open-ocean bbox → refusal message named —
