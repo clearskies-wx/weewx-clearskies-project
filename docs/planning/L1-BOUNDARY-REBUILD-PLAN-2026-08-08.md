@@ -904,6 +904,23 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 ## Decision log
 
+- **2026-08-09 (session 5) — G9+S2+S3 DEPLOYED (marine `3065289`, proc 17:46:16Z) after
+  test-g9 gate (5 KATs incl. lead-required east-facing pin; 223/3 lead-reproduced;
+  falsifiability: pre-G9 revert 3-fail + positional-unpack mutation fail + floor-raise
+  mutation fail, transcripts in closeout) and the S2 CUTOVER BIAS GATE, lead-run
+  PRE-deploy per plan S2: 25 matched hourly pairs STOFS vs CO-OPS 9410660 (MSL),
+  MEAN BIAS −0.044 m ≤ 0.15 m → PASS (stdev 0.167 m = tidal phase, criterion is mean;
+  command+script in session-5 scratchpad `bias_gate_s2.py`).** **MEASURED DEVIATION
+  from deploy-discipline §7.1 (one functional change per deploy): this deploy carries
+  TWO functional changes (G9 clamp + S2 wlevel cutover; S3 inert at HB) — forced by the
+  session-4 repo queue stacking S2/S3 beneath G9 on main while deploys pull HEAD. Each
+  change was independently pre-verified (G9: KATs+gate; S2: 32 KATs + bias gate) and
+  their journal signatures are disjoint (sizing-trace lines vs STOFS wlevel INFO lines)
+  for attribution.** First sizing trace on the clamped code: **L1 sized 93×101 cells**
+  (was 93×132) — N-S pulled to the 100 km cap, E-W unchanged; geography resolved
+  regime=semi_enclosed, open-water bearing 220.3°, horizon 100 km. Full accept rows
+  (bbox coords, cold-start guard, cycle, reality, journal sweep, RSS) recorded below
+  when the post-clamp cycle completes.
 - **2026-08-09 (session 5) — C3 REMEDIATION LANDED + ACCEPT PASSED (dashboard
   `8fff329`, meta doc-sync `fc33363`, deployed weather-dev).** X buffer live-measured
   49.99 m/side post-fix (94.678 px at 1.89395 px/m from the card's own x-ticks); 82
