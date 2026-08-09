@@ -142,8 +142,15 @@ publishes no velocity in any product** (water levels only). Replacement: a conta
 tidal-inclusive sources — regional OFS → STOFS-3D-Atlantic total-current velocity (US East/Gulf/PR; 3-D
 baroclinic, so its velocity already carries circulation+tide+surge and is used ALONE) → PacIOOS ROMS Main
 Hawaiian Islands (Hawaii; TPXO tidal elevation+velocity forcing, 4 km/3-hourly, ERDDAP/THREDDS) →
-RTOFS-Global alone (non-tidal, loudly logged, last resort; direct NOMADS netCDF route — the plan-named grib
-filter and ERDDAP routes are both retired on NOAA's side). No summing on any rung; per-cycle source
+~~RTOFS-Global alone (non-tidal, loudly logged, last resort)~~. **Amendment 2026-08-09 (operator, in
+chat, same day): the RTOFS-alone rung is REMOVED — "The fallback is not a fallback... it is missing
+information... garbage data." Ladder exhausted → REFUSE (`CurrentCoverageError` →
+`currents_fetch_failed`-class no-publish naming the uncovered bbox). Non-tidal-only currents are missing
+required input; a site no tidal-inclusive source contains does not run. The three remaining rungs blanket
+the D12 service area (West Coast + Great Lakes: regional OFS; East/Gulf/PR: OFS + STOFS-3D-Atl; Hawaii:
+PacIOOS ROMS), so the refusal is a coverage-hole tripwire surfacing at setup time, not an expected runtime
+path. No RTOFS module is created; the direct-NOMADS route research is retained in PROVIDER-MANUAL §14.10a
+as historical record.** No summing on any rung; per-cycle source
 selection, never per-timestep. See PROVIDER-MANUAL §14.10a (rewritten) and plan Q5 closure block.
 
 **D10 — Water level: STOFS adopted.** STOFS-2D-Global becomes the spatially-varying WLEVEL source at all

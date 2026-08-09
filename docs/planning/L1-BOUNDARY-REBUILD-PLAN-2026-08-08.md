@@ -84,7 +84,7 @@ surfaces to exist; V closes the whole plan.
 | P4 | L1 boundary data contract: per-station `.spec` spectra REPLACED by per-L1-cell spectra reconstructed from gridded WW3 partition fields (ocean gfswave 0p16 + GLWU 2.5 km), spacing = L1 cell (1 km) | 2, 4 | D3, D4 |
 | P5 | DELETE `services/ww3_station_selection.py`, `services/ww3_station_catalogue.py`, `data/ww3_station_catalogue.json`, and the station-fetch half of `services/ww3_spectrum.py` (the Appendix-D spectrum writer is extracted and kept) | 2 | D3 |
 | P6 | Wind fetch bbox derived from the L1 domain (replaces spot ±1.0°); wind/current out-of-coverage silent fills replaced by cycle-abort raises; new no-publish slug `wind_coverage_failed` | 4, 5 | D5, D6 |
-| P7 | **AMENDED 2026-08-09 (operator "ok fine" on the lead-researched ladder; original composite premise dead — STOFS-2D publishes no velocity):** new providers RTOFS surface currents + STOFS-3D-Atl velocity + PacIOOS ROMS Hawaii; current-source selection = tidal-inclusive ladder by domain containment: regional OFS → STOFS-3D-Atl (East/Gulf/PR) → PacIOOS ROMS (Hawaii) → RTOFS alone (non-tidal last resort, loudly logged). NO summing anywhere — every ladder source is tide-complete. RTOFS route = direct NOMADS netCDF. | 2, 4, 7 | D9 + operator 2026-08-09 |
+| P7 | **RE-AMENDED 2026-08-09 (operator, in chat: RTOFS fallback REMOVED — "The fallback is not a fallback... it is fucking missing information... garbage data"):** new providers STOFS-3D-Atl velocity + PacIOOS ROMS Hawaii (NO RTOFS module at all); current-source selection = tidal-inclusive ladder by domain containment: regional OFS → STOFS-3D-Atl (East/Gulf/PR) → PacIOOS ROMS (Hawaii) → **ladder exhausted = REFUSE** (`currents_fetch_failed`-class no-publish naming the uncovered bbox; a site no tidal-inclusive source contains cannot run — missing required input, never a degraded run). NO summing anywhere — every ladder source is tide-complete. | 2, 4, 7 | D9 + operator 2026-08-09 (×2) |
 | P8 | New provider: STOFS-2D-Global water level; WLEVEL source chain = STOFS → CO-OPS-uniform (loud) → refuse; spatially-varying WLEVEL grid at all levels | 2, 4, 7 | D10 |
 | P9 | Datum branch: tidal-offset conversion (CO-OPS `datums` product) for VDatum-less tidal-referenced regions (Hawaii); NAVD88 source there → refuse | 1, 2 | D13 |
 | P10 | Setup-time per-input source/coverage report surfaced through config chain → admin | 4, 7 | D5 |
@@ -703,10 +703,13 @@ S2/S3 code round → G9 code+deploy (operator-ruled box cap, outranks) → S2+S4
 S1+S4a (ladder) deploy.**
 
 ### S1 — Current-source ladder (REWRITTEN 2026-08-09, P7 amended + operator-approved; was RTOFS+composite)  ⬜ dispatches AFTER G9 (repo queue: S2/S3 → G9 → S1+S4a)
-**Files (new):** `providers/ocean/rtofs_currents.py`. **Files (modified):**
+**Files (new — RE-AMENDED 2026-08-09, RTOFS removed):** STOFS-3D-Atl velocity fetcher +
+PacIOOS ROMS fetcher modules only; `providers/ocean/rtofs_currents.py` is NOT created.
+**Files (modified):**
 `providers/ocean/ofs.py` (`find_ofs_model` gains `find_current_source(l1_bbox)`:
 an OFS qualifies only if its `OFS_DOMAINS` box CONTAINS the L1 bbox — containment, not
-centre-in-box; highest-resolution qualifier wins; none → `"RTOFS"`), `providers/nearshore/swan.py`
+centre-in-box; highest-resolution qualifier wins; none → next rung; ladder exhausted →
+raise), `providers/nearshore/swan.py`
 (:3086-3140 fetch site routes through the selector; C-77 abort semantics unchanged).
 **Design (decided — REWRITTEN 2026-08-09 per the P7 ladder amendment, operator-approved;
 the original composite design below it is superseded):** current source = first ladder rung
@@ -719,9 +722,13 @@ whose domain CONTAINS the L1 bbox:
    implementation with one live shape check).
 3. **PacIOOS ROMS Main Hawaiian Islands** (Hawaii) — 4 km, 3-hourly, 7-day, TPXO tidal
    elevation+velocity forcing; via ERDDAP/THREDDS (existing client idioms).
-4. **RTOFS alone** (anywhere the above don't contain) — NON-TIDAL, logged loudly as such
-   at selection time (`current source RTOFS: non-tidal circulation only`). Route = direct
-   NOMADS netCDF `rtofs_glo_2ds_n{NNN}_prog.nc`, 3-hourly u/v, xarray/netCDF4 (Q5 ruling).
+4. **Ladder exhausted → REFUSE (operator re-ruling 2026-08-09, replaces the RTOFS-alone
+   rung):** no tidal-inclusive source contains the L1 bbox → `CurrentCoverageError` at
+   selection time → the existing C-77 no-publish machinery fires
+   (`currents_fetch_failed` class) with a message naming the bbox and the three rungs
+   that declined. A run with non-tidal-only currents is a run on missing required
+   input — refused, never published. `providers/ocean/rtofs_currents.py` is NOT
+   created; no RTOFS code anywhere in S1.
 **NO summing anywhere** — every rung is already tide-complete except the last, which
 serves alone. Output shape identical to `fetch_surface_currents` (list of {time, u_grid,
 v_grid} at SWAN grid dims) so `_write_current_txt` is untouched. Selection logged once per
@@ -758,12 +765,13 @@ entries (and PR, low priority) from the NCEI catalogue via the index's existing 
 path (verify the generator script exists; if hand-authored, entries cite the catalogue URL).
 
 ### S4 — Tests (test-author)  🔶 S4b DONE 2026-08-09 session 5 (marine `e9ef833..c5e9383`, 32 KATs in 5 new files, gate lead-passed: 242 pass / 3 tracked pre-existing lead-reproduced; 2 live mutation falsifiability transcripts (byte0-magic, per-timestep-skip); count discrepancy in the agent's first report resolved = duplicate collection artifact, both sides reconciled to 242 independently). S4a (ladder KATs) dispatches with S1
-(a) selection-ladder KAT (respecified 2026-08-09, P7 amendment): containment-covered
+(a) selection-ladder KAT (re-respecified 2026-08-09, RTOFS removed): containment-covered
 bbox → that OFS; East-Coast/Gulf bbox outside all OFS → STOFS-3D-Atl; Hawaii bbox →
-PacIOOS ROMS; open-Pacific bbox outside all → RTOFS with the loud non-tidal log line
-(assert the log); a bbox whose CENTRE is in a domain but extent is not → next rung
-(containment, not centre — Gate S row); (b) RTOFS fetch parse KAT from a recorded netCDF
-fixture (direct-NOMADS route); (c) STOFS grid → WLEVEL.txt shape KAT; (d) chain fallback
+PacIOOS ROMS; a bbox NO rung contains → `CurrentCoverageError` raised with the bbox and
+declined rungs in the message (assert the refusal, assert NO publish path is reached);
+a bbox whose CENTRE is in a domain but extent is not → next rung
+(containment, not centre — Gate S row); (b) ~~RTOFS fetch parse KAT~~ DELETED with the
+RTOFS rung (operator re-ruling 2026-08-09); (c) STOFS grid → WLEVEL.txt shape KAT; (d) chain fallback
 order + loud log + refuse; (e) Hawaii datum KAT (Oahu fixture, synthetic station datums,
 MHW→LMSL arithmetic exact; NAVD88 source → raise); (f) **no-mixing KATs (replace the
 composite KATs):** no summing on any rung (mutation: sum two sources → KAT fails);
@@ -773,7 +781,8 @@ missing timestep on the selected source → raise, never a silent switch mid-cyc
 ### S-Accept (live)  ⬜ (deploy order reversed 2026-08-09 — wlevel rows run first, currents rows after S1)
 Currents deploy: HB continues on WCOFS (selection INFO line proves the ladder ran); ladder
 rungs smoke-verified from librewxr (STOFS-3D-Atl velocity fetch+parse on a Jersey-shore test
-bbox; PacIOOS ROMS on an Oahu bbox; RTOFS direct-netCDF parse — config-time style, nothing
+bbox; PacIOOS ROMS on an Oahu bbox; an uncovered open-ocean bbox → refusal message named —
+config-time style, nothing
 published). WLEVEL deploy: bias gate result recorded; post-cutover cycle
 publishes with STOFS WLEVEL; matched-hour headline delta recorded (expected ≪ 0.1 m effect);
 baseline diffs both deploys.
@@ -933,6 +942,19 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 ## Decision log
 
+- **2026-08-09 (session 5) — OPERATOR RE-RULING: RTOFS-alone rung REMOVED from the S1
+  currents ladder** ("Remove RTOFS as a fallback. STOP THIS FALLBACK SHIT! ... It is
+  fucking missing information that is needed... so it is garbage data!"). Ladder
+  exhausted now REFUSES (`CurrentCoverageError` → `currents_fetch_failed`-class
+  no-publish naming the uncovered bbox) instead of running on non-tidal-only currents.
+  Operator follow-up question answered: the three remaining rungs blanket the D12
+  service area, so refusal is a coverage-hole tripwire (surfaced at setup via the
+  Phase-A report), not an expected path — nothing supported today or planned gets
+  refused. Doc-sync same session: P7 register row re-amended, S1 files+design rung 4
+  rewritten, S4a rows (a)/(b) re-respecified (RTOFS parse KAT deleted; refusal KAT
+  added), S-Accept smoke row, PROVIDER-MANUAL §14.10a rung 4 + RTOFS product para
+  marked historical, ARCHITECTURE input-chain bullet, ADR-104 D9 amendment. No RTOFS
+  module will exist; Q5's route research retained as historical record only.
 - **2026-08-09 (session 5) — DEPLOY `3065289` FAILED IN THE FIELD: OOM CRASH LOOP →
   ROLLED BACK same session (S2 reverted, G9+S3 retained; marine `439aa7c` deployed
   19:51:35Z).** Service OOM-killed 3× post-deploy (18:04: 5.1 GB peak / 2.2 GB swap;

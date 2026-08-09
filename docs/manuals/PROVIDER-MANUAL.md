@@ -1810,10 +1810,16 @@ rung whose domain CONTAINS the entire L1 bbox (containment, never centre-in-box)
 3. **PacIOOS ROMS Main Hawaiian Islands** (Hawaii) — 4 km, 3-hourly, 7-day, TPXO tidal elevation+velocity
    forcing, data-assimilating; via ERDDAP/THREDDS (the `pacioos` server §14.11 already lists, dataset
    `roms_hiig` family).
-4. **RTOFS-Global alone** — NON-TIDAL circulation only, logged loudly as such at selection; last resort
-   for any bbox the above don't contain (should essentially never serve inside the D7/D12 service area).
+4. **Ladder exhausted → REFUSE (operator re-ruling 2026-08-09 — the RTOFS-alone rung is REMOVED:
+   "the fallback is not a fallback... it is missing information... garbage data").** A bbox no
+   tidal-inclusive rung contains raises `CurrentCoverageError` at selection → C-77 no-publish
+   (`currents_fetch_failed` class), message naming the bbox and the declined rungs. Non-tidal-only
+   currents are missing required input, never a degraded run. No RTOFS module exists. Inside the
+   D7/D12 service area the three rungs blanket every supported region, so the refusal is a
+   coverage-hole tripwire (surfaces at setup/config time via the Phase-A source report), not an
+   expected runtime path.
 
-**NO summing on any rung** — every rung above RTOFS is already tide-complete; summing anything with
+**NO summing on any rung** — every rung is tide-complete; summing anything with
 STOFS-3D or an OFS would double-count circulation. Missing timestep on the selected source →
 `CurrentCoverageError`; source selection is per-cycle, never per-timestep (no cross-rung mixing mid-run).
 
@@ -1823,7 +1829,8 @@ netCDF fields files carry `zeta` + mesh topology only (header-inspected), and NO
 description page lists water levels as 2D-Global's only variables. The tide-only velocity field the
 composite assumed does not exist operationally.
 
-**Product (RTOFS rung; Q5 lead ruling 2026-08-09, operator-delegated):** direct NOMADS netCDF
+**Product (~~RTOFS rung~~ HISTORICAL — rung removed by the 2026-08-09 operator re-ruling above; the
+route research is kept for the record only):** direct NOMADS netCDF
 `pub/data/nccf/com/rtofs/prod/rtofs.YYYYMMDD/rtofs_glo_2ds_n{NNN}_prog.nc` (~155 MB/file, 3-hourly u/v,
 xarray/netCDF4) — the ONLY live route: NOMADS has no `filter_rtofs.pl` CGI and retired OPeNDAP
 server-side subsetting NOMADS-wide; §14.11's coastwatch ERDDAP rtofs datasets are gone from the live
