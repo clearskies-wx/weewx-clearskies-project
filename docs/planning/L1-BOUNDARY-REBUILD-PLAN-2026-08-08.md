@@ -5,11 +5,11 @@
 | | |
 |---|---|
 | **Live on librewxr** | marine `462b38f` (proc 22:04:28Z): capped 93×101 L1 box (G9) + STOFS water level (S2 re-land, memory-safe) + S3 Hawaii datum branch (inert at HB) |
-| **Phases DONE** | DOC, W, B, G (code+deploy; accept pending one ruling), S2/S3/S4b code, C2+C3 accepts |
-| **In progress** | S2 live-accept evidence (cycle watch); then Gate S (wlevel half) → S1+S4a (currents ladder, NO RTOFS) → A → C1+Gate C → V |
+| **Phases DONE** | DOC, W, B, **G (CLOSED — RSS budget raised to 400 MB by operator, G-Accept closed)**, S2/S3/S4b code, C2+C3 accepts |
+| **In progress** | S2 live-accept evidence (cycle watch); Great Lakes L1-sizing RESEARCH (operator-ordered); then Gate S (wlevel half) → S1+S4a (currents ladder, NO RTOFS) → A → C1+Gate C → V |
 | **Today's incident** | First G9+S2 deploy OOM-crash-looped (S2 held ~7 GB of grids) → rolled back same session → S2 re-landed memory-safe + redeployed. Full record: decision log. |
-| **WAITING ON OPERATOR** | G9-RSS (memory 335 MB vs 300 MB budget — G-Accept closes on this) and G9-GL (100 km cap for Great Lakes?) — §OPEN OPERATOR QUESTIONS at bottom |
-| **Today's operator rulings applied** | RTOFS-alone fallback REMOVED (ladder exhausted = refuse); box cap binds the BOX (G9, deployed) |
+| **WAITING ON OPERATOR** | G9-GL ruling — after the ordered research returns options (in progress) |
+| **Today's operator rulings applied** | RTOFS-alone fallback REMOVED (exhausted = refuse); box cap binds the BOX (G9, deployed); RSS budget 300→400 MB; GL sizing research ordered (recommendation rejected) |
 
 **Created:** 2026-08-08 (operator-directed, in chat: "granular tasks, all design done now and not
 left for agents, qc gates, agent assignments").
@@ -604,7 +604,7 @@ G-Accept row set re-run); L1 wall-clock recorded (expect ~11 min at ~9,400 cells
 operator ruling), ARCHITECTURE.md L1 sizing bullet, PROVIDER-MANUAL §14.15 addition
 (99-file cap measured-not-enforced on 41.51AB — from G-Accept row 4).
 
-### G-Accept (live — the relocation deploy)  🔶 **G9 re-run RECORDED 2026-08-09 session 5 (rollback deploy `439aa7c`, capped box live): sizing/boundary/reality/journal rows PASS; wall-clock recorded (cold-start caveat); RSS 335 MB vs 300 MB budget = BREACH → held OPEN on operator question G9-RSS (recommendation: raise budget). Closes on that ruling.**
+### G-Accept (live — the relocation deploy)  ✅ **CLOSED 2026-08-09 (operator ruling: RSS budget raised to 400 MB — measured 335 MB is in budget). All rows PASS on the capped box; record below.**
 **G9 re-run record (session 5, all lead-collected):**
 - **Sizing: PASS.** Persisted box lat 33.1797..34.0806 / lon −118.7598..−117.7725 —
   N-S 100.0 km EXACTLY at cap (S edge pulled, predicted ≈33.18 ✓), E-W 91.3 km
@@ -933,8 +933,9 @@ rules/verification.md §"Validate against reality".
   Clemente) — records how WW3's partially-healed shadow performs at the new boundary
   (measurement evidence; D11 means no further action regardless, unless the operator reopens).  ⬜
 - **V3 — Performance budget:** full cycle ≤ 45 min hard / target ≤ 40; SWAN peak RSS
-  ≤ 300 MB at `omp_num_threads=6`; boundary file volume + SWAN read time within B-Accept's
-  recorded envelope across 5 consecutive cycles.  ⬜
+  ≤ **400 MB** (raised from 300 by operator ruling 2026-08-09 after the first live
+  measurement, 335 MB on the capped box) at `omp_num_threads=6`; boundary file volume +
+  SWAN read time within B-Accept's recorded envelope across 5 consecutive cycles.  ⬜
 - **V4 — Blind auditor walk** of Gates W/B/G/S/A evidence (the Gate H 8/8 pattern): every row
   re-verified by the auditor's own command or prior adversarial artifact — zero rows on
   implementer/coordinator word.  ⬜
@@ -953,6 +954,15 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 ## Decision log
 
+- **2026-08-09 (session 5) — OPERATOR RULINGS on G9-RSS + G9-GL:** (1) "G9, raise to
+  400" → SWAN peak-RSS budget 300→400 MB; the measured 335 MB is in budget; **G-ACCEPT
+  CLOSED, PHASE G CLOSED** (V3 row updated to 400). (2) G9-GL keep-uncapped
+  recommendation REJECTED — operator ordered proper research into how L1 should be
+  sized for a lake body ("do the research in terms of how we should properly set the
+  L1 grid based upon that body of water"). Research dispatched (lead-scoped: enclosed-
+  basin stationarity, fetch-limited seas, GLWU boundary role, whole-lake vs subdomain,
+  per-lake dimensions vs crossing time); findings + options return to §G9-GL for
+  ruling.
 - **2026-08-09 (session 5) — OPERATOR RE-RULING: RTOFS-alone rung REMOVED from the S1
   currents ladder** ("Remove RTOFS as a fallback. STOP THIS FALLBACK SHIT! ... It is
   fucking missing information that is needed... so it is garbage data!"). Ladder
@@ -1226,7 +1236,10 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 # ❓ OPEN OPERATOR QUESTIONS — maintained by the coordinator; newest at top
 
-## G9-RSS — The wave model's memory use measured 335 MB against your 300 MB budget. Accept, or act?
+## ~~G9-RSS~~ ANSWERED 2026-08-09 (operator: "G9, raise to 400") → budget raised to
+## 400 MB; measured 335 MB is within budget; G-ACCEPT CLOSED. V3 row updated.
+
+## G9-RSS (original text, for the record) — The wave model's memory use measured 335 MB against your 300 MB budget. Accept, or act?
 
 **Context (plain English):** Your performance budget for the wave-model program says its
 memory use during a run should stay at or under 300 MB. We had never actually measured
@@ -1254,7 +1267,12 @@ harmless on this machine, and the alternative trades speed for a limit that no l
 matches the grid you approved.
 
 
-## G9-GL — Does the 100 km grid-size limit also apply to Great Lakes sites?
+## G9-GL — UPDATED 2026-08-09: operator REJECTED the keep-uncapped recommendation and
+## ORDERED RESEARCH ("you need to do the research in terms of how we should properly
+## set the L1 grid based upon that body of water"). Coordinator research in progress —
+## findings + options return here for ruling. Original question below for the record.
+
+## G9-GL (original) — Does the 100 km grid-size limit also apply to Great Lakes sites?
 
 **Context (plain English):** You ruled that the outermost wave grid (L1) may never be
 bigger than 100 km on a side, because the model solves each hour as a snapshot and a
