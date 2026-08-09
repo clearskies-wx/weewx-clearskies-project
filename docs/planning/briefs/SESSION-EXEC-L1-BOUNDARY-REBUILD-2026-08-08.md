@@ -97,8 +97,8 @@ capped box; (5) A, C1+Gate C, V.
 | W | ✅ CLOSED incl. W6 (session 3) | See plan records. |
 | B | ✅ COMPLETE (session 2) | Deployed `5cc28e8`. |
 | G | **G9 DEPLOYED session 5 — capped 93×101 box LIVE, all re-run rows PASS; G-Accept closes on operator question G9-RSS** | See plan G9 + G-Accept records. |
-| G9 | **DESIGNED (plan §G9) — dispatch after S2/S3 round closes** | Operator ruling: envelope clamp ≤100 km/axis, offshore edges pull in, coast side fixed; nonstationary REJECTED. |
-| S | **S2+S3 IN FLIGHT at checkpoint (dev-phase-s coding, 6 rulings issued, no commits yet); S1 REWRITTEN to ladder (P7 amended, approved); S4a respecified** | Deploy order: (S2+S4b after G9), S1+S4a last. Q5 closed: RTOFS = direct NOMADS netCDF. |
+| G9 | ✅ CODE+TESTS+DEPLOY session 5 (`353c34e`/`91b6e2d`/`3065289` KATs; live via rollback deploy `439aa7c`) | Membership-mapping defect caught at lead gate + fixed; GL regime exempt (open question G9-GL). |
+| S | **S2 LIVE (re-land `462b38f` after OOM rollback — see plan incident entry); S3 code done+deployed (inert at HB); S4b KATs in; S1+S4a NEXT (ladder, NO RTOFS — exhausted=refuse per operator re-ruling)** | Gate S (wlevel half) after S2 accept rows. |
 | A | not started | |
 | C | C2/C3 code done (session 2); C1 + Gate C dispatchable (R5 closed) | |
 | V | not started | V3 note: 5-cycle wall-clock window starts AFTER G9 lands (current box is temporary). |
