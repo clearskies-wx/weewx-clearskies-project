@@ -1938,9 +1938,23 @@ not share a cache.
 - Surge threshold constants: `_SURGE_THRESHOLDS_FT = {"minor": 0.15, "moderate": 0.5, "major": 1.0}`.
 - Unit conversion via `weewx_clearskies_api.units.conversion.convert()`.
 
-### §14.13a STOFS-2D-Global water-level provider + WLEVEL chain (target — Phase S of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D10) **(ruled 2026-08-08; lands with Phase S of L1-BOUNDARY-REBUILD-PLAN)**
+### §14.13a STOFS-2D-Global water-level provider + WLEVEL chain (Phase S of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D10)
 
-**Status: target — not yet implemented.** This section documents the S2 design verbatim from the plan.
+**Status: LIVE (2026-08-09, marine `462b38f` — the RE-LAND).** The first landing
+(`5d9d88b`) was reverted the same day after an OOM crash loop: the fetcher retained
+each hourly field as the full conus.west grid (2145×1377) in nested Python float
+lists, ~7 GB across the 73-hour fetch (plan decision log, session 5). The re-land adds
+two binding memory-safety properties that are now part of this section's contract:
+**(1) subset-at-extraction** — the eccodes/pygrib decode is sliced to the requested
+bbox + a 2-cell pad, computed from the message's own grid coordinates, before
+retention (full-grid buffers are transient, released per message); **(2) compact
+storage** — retained values are numpy `float32` arrays (~0.5 MB total for an L1-shaped
+bbox × 73 hours, vs ~7 GB in the reverted design). A memory KAT
+(`TestMemorySafeExtraction`) pins both. Implementation notes discovered live: STOFS
+regional GRIB2 files carry a 4-byte length prefix (no `GRIB` at byte 0); native
+longitudes are [0,360), normalized on extraction; last-gridpoint eccodes keys are
+absent (coordinate-array fallback). The section below documents the S2 design as
+ruled.
 Replaces the single-CO-OPS-station uniform WLEVEL stamp (§14.13's compositor, and `swan.py`/`swan_runner.py`'s
 existing tide fetch site) with a spatially-varying grid at every SWAN level.
 
