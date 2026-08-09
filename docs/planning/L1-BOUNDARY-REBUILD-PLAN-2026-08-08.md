@@ -554,6 +554,33 @@ horizon 200, sizing unchanged; (e) Huntington OSM fixture → Catalina enclosed
 brief §4 S1 within ±15% per axis; (f) override set → exact operator extent, enclosures
 suppressed; (g) zone-span refusal. Baseline suite: 0 new failures.
 
+### G9 — Box-size cap (operator ruling 2026-08-09: the 100 km cap binds the BOX, not the ray)  ⬜ dispatches when the S2/S3 round closes
+**Files:** `services/swan_domain.py` (`_compute_level1`, after the min/max envelope),
+`services/geography.py` (L1_MAX_EXTENT_KM docstring — semantics now "max L1 box span per
+axis"), `tests/test_island_autosizing.py` (KAT updates authorized same-commit per the
+stale-test rule — this task's ruling supersedes the pinned box literals).
+**Design (decided):** after the full envelope (base + enclosures + near-lee + margins) is
+computed, enforce per-axis: `span_axis ≤ L1_MAX_EXTENT_KM`. If exceeded, pull in ONLY the
+offshore edge of that axis (the edge on the open-water side per the existing
+`_offshore_sides` semantics); the coast-side edge — spots bbox + landward margin + lateral
+margins — never moves and is the floor the pull-in cannot cross (if the floor itself
+exceeds the cap → loud config-push refusal naming both numbers; cannot happen at HB).
+G3's per-ray un-enclosable prefilter stays as-is (it feeds candidates); the box clamp is
+the final authority. Enclosure/wrap points left outside the clamped box are simply cut
+(D11 best-achievable, silent). Override key (G5) semantics unchanged; override value >
+cap still refused.
+**KATs:** (h) synthetic fan whose envelope exceeds the cap N-S → S edge pulled to exactly
+span=100 km, other three edges byte-identical; (i) HB/Catalina fixture → Catalina
+enclosure points remain inside the capped box, SCI outside; existing (e) literals updated
+to the capped box. Falsifiability: (h)/(i) fail against pre-G9 code.
+**Accept (live):** config re-push → sizing trace box ≤100 km per axis, S edge north of
+SCI (~33.18), Catalina inside with boundary seaward; boundary file count drops
+accordingly (~91+100 points); full cycle + matched-hour + buoy reality re-check (the
+G-Accept row set re-run); L1 wall-clock recorded (expect ~11 min at ~9,400 cells).
+**Doc-sync same round:** ADR-104 D1/D2 amendment note (cap semantics corrected by
+operator ruling), ARCHITECTURE.md L1 sizing bullet, PROVIDER-MANUAL §14.15 addition
+(99-file cap measured-not-enforced on 41.51AB — from G-Accept row 4).
+
 ### G-Accept (live — the relocation deploy)  🔶 **RUN 2026-08-09 (session 4) — deployed `eecfabc` (proc 08:22:05Z), config re-pushed 08:23:13Z, new L1 live and publishing since; 4 rows PASS, 2 deviations + 1 fired guard surfaced as Q6 (operator ruling needed to close)**
 **Record (all numbers lead-collected from fresh commands; baseline = the 07:23:14Z pre-deploy
 cycle, payload + file inventory archived in session scratchpad):**
@@ -857,6 +884,21 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 ## Decision log
 
+- **2026-08-09 (session 4) — Q6 RULED IN PART (operator, in chat): the 100 km value is a
+  cap on the L1 BOX SIZE ITSELF, not on per-ray scan reach — the per-ray reading that
+  shipped in G1/G3/G4 misencoded D1/D2's intent. Nonstationary L1 (option b3) REJECTED:
+  "Changing to non-stationary will make the compute unwieldy. We cannot do that."**
+  Consequence: new task G9 (below) — enforce the cap on the box envelope per axis;
+  coast-side edges never move; offshore edges pull in. On current geometry this yields
+  ~91×100 km, S edge ≈ 33.18 (≈ the brief's S1 sketch), Catalina stays enclosed
+  (S shore ≈ 33.30), SCI drops fully outside the grid (Q6 item 2 dissolves). Stationary
+  hourly solves become defensible again (≤100 km crossing ≈ 2.4 h for 15 s swell at the
+  diagonal worst case vs 3.1 h+ today; the operator owns this trade at 100). G9
+  dispatches AFTER the in-flight S2/S3 round closes (one round per repo); the current
+  oversized grid keeps publishing in the interim (reality gates pass; the known cost is
+  hours-scale timing smear, accepted for the interim by the lead under this ruling's
+  urgency ordering — operator may order an interim override shrink instead via the G5
+  key, at the cost of losing Catalina enclosure until G9).
 - **2026-08-09 (session 4) — Two lead rulings from the Phase-S scope-ack findings, both
   code-verified by the lead before ruling:** (1) `providers/tides/coops.py` ADDED to the
   S allowlist for S3, additive `datums` product only (no datums support exists today —
