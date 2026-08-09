@@ -811,6 +811,13 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
   so that is not a bad thing"; buoy reality gate had already improved on every
   pre-declared quantity) and wall-clock +3m17s vs the matched station cycle. B-Accept
   CLOSED; Phase B complete end-to-end (deployed `5cc28e8`).
+- **2026-08-09 — G1 stale-test ruling (lead):** `test_geography.py::
+  test_resolve_regime_horizon_km_ocean_fallback_and_margin` pins the pre-G1
+  shelf-driven ocean horizon (superseded by P1). Dev STOPped per the stale-test block;
+  ruled: update that one test in the SAME commit as G1 to pin the new behavior (ocean
+  horizon = L1_MAX_EXTENT_KM = 100.0 unconditionally, no shelf dependence; unrelated
+  assertions preserved) — evidence-hygiene rule, same-commit. Deletion and
+  leave-it-red both rejected.
 - **2026-08-09 — G4 `angular_extent_rad` lead-ruled (same-document ambiguity; operator
   may override before G-Accept deploy):** neither G4 nor ADR-104 D11 defines the
   cluster's angular extent. Ruled: `(bearing_max − bearing_min) + one 5° ray step`, in
