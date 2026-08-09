@@ -84,7 +84,13 @@ hourly stationary solves cannot physically support a 131 km span (15 s swell cro
 supposed to be a cap on the box size itself." Switching L1 to nonstationary computes was REJECTED in the
 same ruling ("compute unwieldy"). Enacted by plan task G9: a final envelope clamp pulls in only the
 offshore edge of any axis exceeding the cap; coast-side edges never move; the per-ray logic remains as the
-candidate-generating pre-filter.
+candidate-generating pre-filter. **Implementation note (2026-08-09, deployed marine `3065289`):** the
+per-axis offshore side resolves from `_offshore_sides()` by cardinal MEMBERSHIP — the function returns a
+closeness-ranked pair, not an axis-ordered one (`91b6e2d` fixed a positional unpacking that was correct at
+HB only by coincidence and would have moved the coast edge on east-facing coasts). **Great Lakes regime is
+EXEMPT from the box clamp** (lead ruling, plan-contradiction resolution: the GL fetch+10 sizing is
+deliberately uncapped by design and pinned by test; whether this cap should extend to lakes is an open
+operator question — L1-BOUNDARY-REBUILD-PLAN §OPEN OPERATOR QUESTIONS, G9-GL).
 
 **D3 — Boundary data contract: per-partition reconstruction, no hybrid.** The L1 offshore boundary is built
 by reconstructing a full 2-D spectrum at every boundary point from NOAA's gridded WW3 partition fields
