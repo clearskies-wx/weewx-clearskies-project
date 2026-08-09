@@ -905,9 +905,14 @@ interleaved secondary crests; matched against the card's dominant direction on t
 internal geometry (DOM px-to-scale arithmetic) and one eyeballed landmark, never
 against ground truth — the exact "validate against the model's own output" anti-
 pattern from rules/verification.md. Structure-overlay removal (defect d) remains the
-only accepted row. NO fix round dispatched — operator instruction 2026-08-09: "NO
-FUCKING CODING. FIX THE GOD DAMNED PLANS" — redesign/dispatch awaits operator
-direction at Gate C planning. — see decision log; Accept re-measures after the fix deploys; Gate C pending (with C1)
+only accepted row. **The operator's direction was ALREADY COMPLETE (2026-08-08
+instruction + 2026-08-09 screenshot review) — clarified 2026-08-09: execution, not
+direction, was what failed. Fix round dispatched same day under the standing
+direction, with the redesign requirement: ONE physically-correct ground→chart
+transform (real transect coordinates) shared by the heatmap, the axes, and the
+imagery — and acceptance verified against GROUND TRUTH (known pier coordinates vs
+rendered position; beach in frame; y-axis in real alongshore distance; 50 m buffer
+measured as ground distance), never against the chart's own arithmetic again.** — see decision log; Accept re-measures after the fix deploys; Gate C pending (with C1)
 **Operator instruction (2026-08-08):** (a) the orthophotography must be ALIGNED with the
 transect bearing (the heatmap's beach frame), not true north — "so that way IT MATCHES";
 (b) 50 m of orthophotography buffering around the heatmap extent so the user can get their
