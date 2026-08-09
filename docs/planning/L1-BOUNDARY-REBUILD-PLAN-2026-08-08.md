@@ -1307,15 +1307,65 @@ harmless on this machine, and the alternative trades speed for a limit that no l
 matches the grid you approved.
 
 
-## G9-GL — RESEARCH BEING REDONE 2026-08-09 (operator: the box-size framing was the
-## WRONG QUESTION — "lazy assed research focused on the wrong questions completely").
-## The reframe (operator's, binding): the ocean L1 is big only because deep-water WW3
-## can't see nearshore islands; GLWU resolves the lakes at 2.5 km→250 m, so a big lake
-## L1 may be pure duplication. The redo establishes DEPTH-VALIDITY ENVELOPES on both
-## sides — what depths GLWU operates correctly in (as we once established WW3 needs
-## deep water) and what depths OUR L1/L2/L3/L4 each serve — then answers where OUR
-## lake grid should START (possibly no L1 at all; boundary feeding L2 directly).
-## The options below are SUPERSEDED pending the redo's findings.
+## G9-GL — REDO COMPLETE 2026-08-09 (operator reframe: depth-validity envelopes, not
+## box size). Full cited evidence: briefs/G9-GL-RESEARCH-REDO-2026-08-09.md. Awaiting
+## operator rulings on the three decisions at the end.
+
+**The question:** where should our own wave grid START on a Great Lakes site?
+
+**The argument:**
+
+On the ocean, our outermost grid starts far offshore for one reason: NOAA's global
+wave model runs at ~16 km, treats islands as smears, and is only trustworthy in deep
+water — our old design even had a written test for "deep enough to trust it" (water
+deeper than about 0.78 × wave-period², i.e. ~176 m for a 15-second swell). Everything
+inside that line is OUR job, which is why the ocean L1 is big: it exists to compute
+Catalina's shadow because the global model can't.
+
+NOAA's lake model (GLWU) is a different machine. It runs shallow-water physics the
+global model doesn't (depth-driven wave breaking, bottom friction), on a mesh that
+sharpens to 250 m at the coast — it already computes each lake's geometry, islands
+and all. Its proven trust line, from every buoy it has ever been verified against, is
+about **20 m of water depth** — nothing shallower has ever been checked, and it does
+not model water-level or current effects, which matter most in shallow water. So:
+trustworthy to roughly the 20 m contour, never into the surf zone.
+
+Now our side. Our L2 grid's outer edge sits at the **30 m contour** — measured, per
+site. Our surf handoff is at ~15 m, and the actual breaking is the 1-D model's job.
+So the water GLWU is proven in (20 m and deeper) OVERLAPS where L2 begins (30 m).
+**The evidence therefore supports your hypothesis: on a lake, the boundary feed can
+plausibly start our chain at an L2-class grid, and a lake L1 adds nothing** — it
+would recompute, at 1 km, a lake NOAA already computed at up to 250 m, while breaking
+the same snapshot-size limit you already ruled against on the ocean.
+
+**Four hard facts that shape the execution, found in this research:**
+1. **The download problem.** What NOMADS actually serves us is NOT the 250 m mesh:
+   it's a 2.5 km grid (reaching 149 hours ahead) or a ~400–500 m grid that only
+   reaches **48 hours** — and our system builds a 72-hour forecast. Finer boundary or
+   full forecast length: pick one, or blend the two products.
+2. **The resolution jump.** Feeding a 100 m grid from a 2.5 km product is a 25× jump
+   (the wave manual advises ~2–3×; our ocean setup already runs 16× and tames it by
+   interpolating wave parameters in our own code before reconstruction — same
+   mitigation applies, but it should be said out loud).
+3. **The plumbing assumes L1 exists.** Wind-fetch box, current-source selection,
+   sizing chain, cold-start guard, health reporting — a dozen code points take L1 as
+   given (all listed with file:line in the research record). "Start at L2" is a real
+   architectural change with a known, bounded dependency list — not a config tweak.
+4. **Lake Erie breaks the L2 rule all by itself.** Most of Erie never reaches 30 m of
+   depth (the central basin flattens at ~20–22 m), and our sizing code treats
+   "no 30 m contour within 60 km" as a fatal error — as coded today, most of Lake
+   Erie cannot be configured AT ALL, whatever we decide about L1. The L2 outer-edge
+   rule needs a lake variant regardless.
+
+**The three decisions this puts in front of you:**
+- **D-GL-1:** Adopt "no lake L1 — boundary feeds an L2-class grid" as the lake
+  architecture? (The evidence supports it; the dependency list makes it a real but
+  bounded change.)
+- **D-GL-2:** Which boundary product on lakes — 2.5 km to 72 h, ~500 m to 48 h, or a
+  blend (fine near-term, coarse far-term)?
+- **D-GL-3:** The lake variant of L2's outer edge — e.g. "the 30 m contour or the
+  deepest water the lake locally offers, whichever comes first"? (Needed for Erie no
+  matter what.)
 
 **The question:** how big should our outermost wave grid be at a Great Lakes site?
 
