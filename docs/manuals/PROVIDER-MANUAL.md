@@ -1798,35 +1798,38 @@ input, a distinct gridded-U/V fetch path from that existing point/column ERDDAP 
 
 **Module identity (target):** new `providers/ocean/rtofs_currents.py`.
 
-**Selection rule (containment, not centroid):** `providers/ocean/ofs.py`'s `find_ofs_model` gains
-`find_current_source(l1_bbox)` — an OFS model qualifies only if its `OFS_DOMAINS` box CONTAINS the entire L1
-bbox (not merely overlaps it); the highest-resolution qualifier wins; none qualifying → `"RTOFS"`. This
-mirrors the display-side resolver's existing tier order and answers the D7 coverage-matrix gaps (open-coast
-East Coast, Gulf open coast, Alaska, Hawaii, territories) with the one NOAA operational source that has real
-ocean-circulation currents (wind-driven + Gulf Stream + eddies) everywhere in the service area.
+**Selection rule (P7 as amended 2026-08-09, operator-approved — a containment LADDER of
+tidal-inclusive sources; the original RTOFS+STOFS composite below is VOID):**
+`providers/ocean/ofs.py`'s `find_ofs_model` gains `find_current_source(l1_bbox)` returning the first
+rung whose domain CONTAINS the entire L1 bbox (containment, never centre-in-box):
 
-**Product:** NOMADS `rtofs_glo` 2-D surface (`2ds`) prognostic files, 3-hourly u/v, via grib filter (primary)
-or ERDDAP griddap (alternate) — pinned after one live shape check (bounded decision, per ADR-104's
-measured-then-pinned constants). Output shape is identical to `fetch_surface_currents` (list of
+1. **Regional OFS** (`OFS_DOMAINS` containment; highest-resolution qualifier wins) — tidal-inclusive natively.
+2. **STOFS-3D-Atlantic** (US East Coast + Gulf of Mexico + Puerto Rico) — 3-D baroclinic SCHISM;
+   its horizontal water velocity is the TOTAL current (circulation + tide + surge), used directly.
+   Velocity netCDF output pinned from the NCO inventory at implementation (one live shape check).
+3. **PacIOOS ROMS Main Hawaiian Islands** (Hawaii) — 4 km, 3-hourly, 7-day, TPXO tidal elevation+velocity
+   forcing, data-assimilating; via ERDDAP/THREDDS (the `pacioos` server §14.11 already lists, dataset
+   `roms_hiig` family).
+4. **RTOFS-Global alone** — NON-TIDAL circulation only, logged loudly as such at selection; last resort
+   for any bbox the above don't contain (should essentially never serve inside the D7/D12 service area).
+
+**NO summing on any rung** — every rung above RTOFS is already tide-complete; summing anything with
+STOFS-3D or an OFS would double-count circulation. Missing timestep on the selected source →
+`CurrentCoverageError`; source selection is per-cycle, never per-timestep (no cross-rung mixing mid-run).
+
+**Why the composite died (evidence, 2026-08-09):** STOFS-2D-Global publishes NO velocity in ANY product —
+regional GRIB2 carries exactly water level + surge (+1 unknown field; eccodes-inspected live), the global
+netCDF fields files carry `zeta` + mesh topology only (header-inspected), and NOAA's own NOMADS STOFS
+description page lists water levels as 2D-Global's only variables. The tide-only velocity field the
+composite assumed does not exist operationally.
+
+**Product (RTOFS rung; Q5 lead ruling 2026-08-09, operator-delegated):** direct NOMADS netCDF
+`pub/data/nccf/com/rtofs/prod/rtofs.YYYYMMDD/rtofs_glo_2ds_n{NNN}_prog.nc` (~155 MB/file, 3-hourly u/v,
+xarray/netCDF4) — the ONLY live route: NOMADS has no `filter_rtofs.pl` CGI and retired OPeNDAP
+server-side subsetting NOMADS-wide; §14.11's coastwatch ERDDAP rtofs datasets are gone from the live
+server (stale rows flagged below). Output shape identical to `fetch_surface_currents` (list of
 `{time, u_grid, v_grid}` at SWAN grid dims), so `_write_current_txt` (`services/swan_runner.py`) is
 untouched. Selection logged once per cycle at INFO (provenance, not flagging).
-
-**Tidal-current compositing (operator directive 2026-08-08 — the service area, not the test case, is the
-design target).** RTOFS is non-tidal (circulation only). STOFS-2D (§14.13a below) publishes the complementary
-tidal/surge velocity. In RTOFS regions the served current field is the SUM per cell per timestep:
-`u = u_RTOFS + u_STOFS`, `v = v_RTOFS + v_STOFS`. No double-counting by construction — RTOFS contains zero
-tidal signal, STOFS zero circulation. STOFS velocity is depth-averaged; the tidal component is barotropic
-(near-uniform over depth in shelf water), so depth-averaged ≈ surface for exactly the component STOFS
-supplies — stated here, not hidden. STOFS velocity arrives via §14.13a's fetcher (the same STOFS files carry
-u/v; one fetch serves both WLEVEL and the tidal-velocity composite). Time matching: same nearest-within-2h
-rule as `_write_current_txt`; a timestep where either component is missing → `CurrentCoverageError` — no
-partial composite, since half a current is a fabricated current. **OFS regions never composite** — regional
-OFS models are already tidal-inclusive natively; adding STOFS there would double-count. A KAT pins that the
-composite applies to the RTOFS branch only.
-
-**Non-tidal caveat.** RTOFS-Global's own currents carry no tidal signal — verify this claim against NOAA's
-RTOFS documentation at implementation time before relying on it (D9 verify item, carried from the D5
-addendum).
 
 ### §14.11 ERDDAP ocean data (ADR-091)
 
@@ -1839,8 +1842,8 @@ addendum).
 | Dataset key | Server | Dataset ID | Content | Depth | Lon convention |
 |---|---|---|---|---|---|
 | `mur_sst` | coastwatch.pfeg.noaa.gov | `jplMURSST41` | Surface temp only (1km, global, daily) | Surface | -180/+180 |
-| `rtofs_3d` | coastwatch.pfeg.noaa.gov | `ncepRtofsG3DForeDaily` | Temp column + currents + salinity (8km, global, 41 levels, 8-day forecast) | 41 levels | 0–360 |
-| `rtofs_2d` | coastwatch.pfeg.noaa.gov | `ncepRtofsG2DFore3hrlyProg` | Surface SST (8km, global, 3-hourly) | Surface | 0–360 |
+| `rtofs_3d` | coastwatch.pfeg.noaa.gov | `ncepRtofsG3DForeDaily` **⚠ STALE — dataset gone from the live server (verified 2026-08-09, Phase-S scope-ack); water-temp chain's deep fallback silently unavailable; needs its own fix round** | Temp column + currents + salinity (8km, global, 41 levels, 8-day forecast) | 41 levels | 0–360 |
+| `rtofs_2d` | coastwatch.pfeg.noaa.gov | `ncepRtofsG2DFore3hrlyProg` **⚠ STALE — same, gone from the live server** | Surface SST (8km, global, 3-hourly) | Surface | 0–360 |
 | `pacioos` | pae-paha.pacioos.hawaii.edu | `roms_hiig` | Full column (4km, Hawaii/Pacific, 36 levels) | 36 levels | -180/+180 |
 | `caricoos` | dm3.caricoos.org | `FVCOM_Historical_3D_StructuredGrid` | Full column (800m, PR/USVI, 11 levels) | 11 levels | -180/+180 |
 
@@ -1899,9 +1902,9 @@ Each tier is independently wrapped in try/except — failure at one tier does no
 RTOFS already appears in this resolver's fallback chain as `providers/ocean/erddap_ocean.py`'s `rtofs_3d`
 column/point query — the deep fallback for water temperature and, incidentally, general ocean currents at a
 point. §14.10a documents a SEPARATE, new role: RTOFS as a gridded SWAN current-forcing INPUT, fetched via a
-distinct NOMADS/ERDDAP gridded-U/V path (`providers/ocean/rtofs_currents.py`), selected by domain containment
-rather than by this resolver's fallback-chain order, and composited with STOFS tidal velocity in RTOFS
-regions. The two roles read the same underlying NOAA model but through different fetch paths for different
+distinct direct-NOMADS-netCDF gridded-U/V path (`providers/ocean/rtofs_currents.py`), selected as the LAST
+rung of the §14.10a containment ladder (P7 as amended 2026-08-09 — no compositing; RTOFS serves alone,
+loudly non-tidal). The two roles read the same underlying NOAA model but through different fetch paths for different
 consumers (this resolver serves point/column queries for the water-temperature/ocean-data endpoints; the
 SWAN current-forcing path serves a gridded U/V field to `_write_current_txt`) — they are not merged and do
 not share a cache.
@@ -1944,13 +1947,17 @@ existing tide fetch site) with a spatially-varying grid at every SWAN level.
 **Module identity (target):** new `providers/ocean/stofs_wlevel.py`.
 
 **Product:** STOFS-2D-Global (`stofs_2d_glo`), NOAA's Surge and Tide Operational Forecast System (formerly
-ESTOFS), 4 cycles/day, forecast to 180 h; the regional GRIB2 grid covering the domain (CONUS West grid for
-Huntington Beach; Hawaii/Pacific grid for Hawaii — exact product filenames pinned from the NCO inventory at
-implementation). Per-timestep water-level grid sampled to SWAN grid dims at each level.
+ESTOFS), 4 cycles/day live-verified, forecast to 180 h; the regional GRIB2 grid covering the domain. Region
+tokens live-verified 2026-08-09: two-part for CONUS — **`conus.west`** (Huntington Beach), `conus.east` —
+plus `hawaii`, `alaska`, `guam`, `puertori`, `northpacific`; pattern
+`stofs_2d_glo.t{00,06,12,18}z.{region}.f{000..180}.grib2`. The GRIB2 carries the combined water level
+(`elevhtml`, "Ocean Surface Elevation Relative to Geoid") plus a surge-only field; the water-level field is
+what S2 consumes. Per-timestep water-level grid sampled to SWAN grid dims at each level.
 
-**Dual extraction.** The fetcher extracts BOTH the water-level field and the velocity (u/v) field from the
-same files — one fetch serves WLEVEL (all regions) and §14.10a's RTOFS-region tidal-velocity composite. This
-is not a second fetch path; it is the one STOFS fetch feeding two consumers.
+**~~Dual extraction~~ VOID (2026-08-09, P7 ladder amendment).** The original design had this fetcher also
+extract velocity for §14.10a's composite. **STOFS-2D-Global publishes no velocity in any product**
+(GRIB2 + netCDF inspected live; NOAA's NOMADS STOFS description confirms water levels only). This fetcher
+extracts the WATER-LEVEL field only; SWAN current forcing comes from §14.10a's amended source ladder.
 
 **Datum.** STOFS ≈ LMSL. **Cutover gate:** before STOFS becomes primary, 24 h of STOFS values at the
 tide-station cell are compared against CO-OPS predictions; `|mean bias| ≤ 0.15 m` passes. A breach means
@@ -1961,9 +1968,13 @@ pattern the bathymetry chain already uses) → refuse (`tide_fetch_failed`). The
 in-code justification comment (§6 row 5 of the brief) is deleted with the uniform-primary path it justified —
 not kept as stale commentary.
 
-**Field-based writer.** `services/swan_runner.py`'s `_write_wlevel_txt` generalizes from the L3 profile writer
-(spatially-varying already, single-purpose) to a field-based writer serving all levels — command grammar
-(`INPGRID/READINP WLEVEL ... NONSTAT`) is pinned unchanged; only the VALUES in `WLEVEL.txt` change.
+**Field-based writer (corrected 2026-08-09, lead code-read).** The spatially-varying writer ALREADY EXISTS:
+`services/swan_runner.py::_write_wlevel_grid_txt` (:2329, takes `grids[timestep][j][i]`); `_write_wlevel_txt`
+(:2285) is the spatially-UNIFORM stamp being retired from primary duty. S2 is WIRING — the all-levels wlevel
+path routes STOFS per-timestep grids into the existing grid writer; neither writer is rewritten. Command
+grammar (`INPGRID/READINP WLEVEL ... NONSTAT`) is pinned unchanged; only the VALUES in `WLEVEL.txt` change.
+Source selection is per-cycle: a timestep gap within STOFS data = STOFS fetch failure for the whole cycle →
+loud CO-OPS-uniform fallback; never mixed sources within one run.
 
 ### §14.14 HRRR wind provider (ADR-093, ADR-094)
 
@@ -2410,6 +2421,15 @@ Findings from testing the actual installed binary against real output, where the
 silent, ambiguous, or (on one point) contradicted by what the binary emits. This section is the
 authorized home for this material — `docs/reference/swan-commands-extract.md` is frozen to
 manual-only content (operator ruling 2026-08-06) and must not carry any of it.
+
+**BOUNDSPEC file-name count: the manual caps one command at 99 file names (:1223); the
+deployed 41.51AB binary accepted 132.** Measured 2026-08-09 at the Phase-G relocation deploy
+(marine `eecfabc`): the W-side `BOUNDSPEC SIDE W CCW VARIABLE FILE` command carried 132 boundary
+files (`&`-continuation-wrapped), the S side 93, and multiple full L1 runs ended with
+`Normal end of run v1` and only the pre-existing boundary-difference WARNING class (35 hits over
+225 points = 0.16/point, an improvement on B-Accept's 0.85/point). The 99-name cap did not bite.
+Do not rely on exceeding it by design forever — treat >99 as measured-tolerated, not
+manual-guaranteed; the G9 box cap brings the counts back near ~100+93 regardless.
 
 **PT* column count: the manual states "at most 10 partitions"; the deployed 41.51AB binary
 emits 6 columns per keyword, not 10.** Measured 2026-07-25 against a real production

@@ -84,7 +84,7 @@ surfaces to exist; V closes the whole plan.
 | P4 | L1 boundary data contract: per-station `.spec` spectra REPLACED by per-L1-cell spectra reconstructed from gridded WW3 partition fields (ocean gfswave 0p16 + GLWU 2.5 km), spacing = L1 cell (1 km) | 2, 4 | D3, D4 |
 | P5 | DELETE `services/ww3_station_selection.py`, `services/ww3_station_catalogue.py`, `data/ww3_station_catalogue.json`, and the station-fetch half of `services/ww3_spectrum.py` (the Appendix-D spectrum writer is extracted and kept) | 2 | D3 |
 | P6 | Wind fetch bbox derived from the L1 domain (replaces spot ±1.0°); wind/current out-of-coverage silent fills replaced by cycle-abort raises; new no-publish slug `wind_coverage_failed` | 4, 5 | D5, D6 |
-| P7 | New provider: RTOFS surface currents; current-source selection rule = OFS-if-domain-contained else **RTOFS + STOFS-velocity composite** (RTOFS is non-tidal; STOFS's tidal/surge velocity is summed in so every service-area region gets the COMPLETE current — designing for the service area, not the test case; operator directive 2026-08-08) | 2, 4, 7 | D9 + operator directive |
+| P7 | **AMENDED 2026-08-09 (operator "ok fine" on the lead-researched ladder; original composite premise dead — STOFS-2D publishes no velocity):** new providers RTOFS surface currents + STOFS-3D-Atl velocity + PacIOOS ROMS Hawaii; current-source selection = tidal-inclusive ladder by domain containment: regional OFS → STOFS-3D-Atl (East/Gulf/PR) → PacIOOS ROMS (Hawaii) → RTOFS alone (non-tidal last resort, loudly logged). NO summing anywhere — every ladder source is tide-complete. RTOFS route = direct NOMADS netCDF. | 2, 4, 7 | D9 + operator 2026-08-09 |
 | P8 | New provider: STOFS-2D-Global water level; WLEVEL source chain = STOFS → CO-OPS-uniform (loud) → refuse; spatially-varying WLEVEL grid at all levels | 2, 4, 7 | D10 |
 | P9 | Datum branch: tidal-offset conversion (CO-OPS `datums` product) for VDatum-less tidal-referenced regions (Hawaii); NAVD88 source there → refuse | 1, 2 | D13 |
 | P10 | Setup-time per-input source/coverage report surfaced through config chain → admin | 4, 7 | D5 |
@@ -665,25 +665,26 @@ separately (PRIME DIRECTIVE 3).
 an OFS qualifies only if its `OFS_DOMAINS` box CONTAINS the L1 bbox — containment, not
 centre-in-box; highest-resolution qualifier wins; none → `"RTOFS"`), `providers/nearshore/swan.py`
 (:3086-3140 fetch site routes through the selector; C-77 abort semantics unchanged).
-**Design (decided):** RTOFS product = NOMADS `rtofs_glo` 2-D surface (`2ds`) prognostic
-files, 3-hourly u/v, via grib filter (primary) or ERDDAP griddap (alternate) — pinned after
-one live shape check (bounded decision, register). Output shape identical to
-`fetch_surface_currents` (list of {time, u_grid, v_grid} at SWAN grid dims) so
-`_write_current_txt` is untouched. Selection logged once per cycle at INFO (provenance, not
-flagging).
-**Tidal-current compositing (operator directive 2026-08-08 — the service area, not the test
-case, is the design target):** RTOFS is non-tidal (circulation only); STOFS-2D publishes the
-complementary tidal/surge velocity. In RTOFS regions the served current field is the SUM per
-cell per timestep: `u = u_RTOFS + u_STOFS`, `v = v_RTOFS + v_STOFS`. No double-counting by
-construction — RTOFS contains zero tidal signal and STOFS zero circulation. STOFS velocity is
-depth-averaged; the tidal component is barotropic (near-uniform over depth in shelf water), so
-depth-averaged ≈ surface for exactly the component STOFS supplies — stated in the manual
-section, not hidden. STOFS velocity arrives via S2's fetcher (same files carry u/v; one fetch
-serves both WLEVEL and the tidal velocity). Time matching: same nearest-within-2h rule as
-`_write_current_txt`; a timestep where either component is missing → `CurrentCoverageError`
-(no partial composite — half a current is a fabricated current). OFS regions are untouched
-(regional OFS models are tidal-inclusive natively; adding STOFS there WOULD double-count —
-the composite applies to the RTOFS branch only, and a KAT pins that).
+**Design (decided — REWRITTEN 2026-08-09 per the P7 ladder amendment, operator-approved;
+the original composite design below it is superseded):** current source = first ladder rung
+whose domain CONTAINS the L1 bbox:
+1. **Regional OFS** (existing `OFS_DOMAINS` containment; highest-resolution qualifier wins) —
+   tidal-inclusive natively.
+2. **STOFS-3D-Atlantic** (US East Coast + Gulf of Mexico + Puerto Rico) — 3-D baroclinic
+   SCHISM; horizontal water velocity = TOTAL current (circulation+tide+surge). Fetch the
+   velocity output (netCDF fields; exact file pinned from the NCO inventory at
+   implementation with one live shape check).
+3. **PacIOOS ROMS Main Hawaiian Islands** (Hawaii) — 4 km, 3-hourly, 7-day, TPXO tidal
+   elevation+velocity forcing; via ERDDAP/THREDDS (existing client idioms).
+4. **RTOFS alone** (anywhere the above don't contain) — NON-TIDAL, logged loudly as such
+   at selection time (`current source RTOFS: non-tidal circulation only`). Route = direct
+   NOMADS netCDF `rtofs_glo_2ds_n{NNN}_prog.nc`, 3-hourly u/v, xarray/netCDF4 (Q5 ruling).
+**NO summing anywhere** — every rung is already tide-complete except the last, which
+serves alone. Output shape identical to `fetch_surface_currents` (list of {time, u_grid,
+v_grid} at SWAN grid dims) so `_write_current_txt` is untouched. Selection logged once per
+cycle at INFO (provenance, not flagging). Missing timestep on the selected source →
+`CurrentCoverageError` (no cross-rung mixing within a cycle — same per-cycle selection
+rule as the WLEVEL chain).
 
 ### S2 — STOFS water-level provider + WLEVEL chain  ⬜
 **Files (new):** `providers/ocean/stofs_wlevel.py`. **Files (modified):**
@@ -714,13 +715,17 @@ entries (and PR, low priority) from the NCEI catalogue via the index's existing 
 path (verify the generator script exists; if hand-authored, entries cite the catalogue URL).
 
 ### S4 — Tests (test-author)  ⬜
-(a) selection KAT: containment-covered bbox → that OFS; open-Atlantic bbox → RTOFS+STOFS
-composite; lake bbox → the lake OFS; (b) RTOFS fetch parse KAT from a recorded fixture;
-(c) STOFS grid → WLEVEL.txt shape KAT; (d) chain fallback order + loud log + refuse;
-(e) Hawaii datum KAT (Oahu fixture, synthetic station datums, MHW→LMSL arithmetic exact;
-NAVD88 source → raise); (f) **composite KATs:** synthetic RTOFS + STOFS fields → summed
-u/v exact per cell; missing either component at a timestep → raise; OFS branch never
-composites (mutation: add STOFS to an OFS fixture → KAT fails); (g) baselines 0-delta.
+(a) selection-ladder KAT (respecified 2026-08-09, P7 amendment): containment-covered
+bbox → that OFS; East-Coast/Gulf bbox outside all OFS → STOFS-3D-Atl; Hawaii bbox →
+PacIOOS ROMS; open-Pacific bbox outside all → RTOFS with the loud non-tidal log line
+(assert the log); a bbox whose CENTRE is in a domain but extent is not → next rung
+(containment, not centre — Gate S row); (b) RTOFS fetch parse KAT from a recorded netCDF
+fixture (direct-NOMADS route); (c) STOFS grid → WLEVEL.txt shape KAT; (d) chain fallback
+order + loud log + refuse; (e) Hawaii datum KAT (Oahu fixture, synthetic station datums,
+MHW→LMSL arithmetic exact; NAVD88 source → raise); (f) **no-mixing KATs (replace the
+composite KATs):** no summing on any rung (mutation: sum two sources → KAT fails);
+missing timestep on the selected source → raise, never a silent switch mid-cycle;
+(g) baselines 0-delta.
 
 ### S-Accept (live)  ⬜
 Currents deploy: HB continues on WCOFS (selection INFO line proves the rule ran); RTOFS
@@ -884,6 +889,10 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 ## Decision log
 
+- **2026-08-09 (session 4) — P7 LADDER AMENDMENT APPROVED (operator, in chat: "ok
+  fine").** Register row P7 amended in place; S1 design rewritten to the ladder; S4a
+  composite KATs respecified as ladder-selection KATs. S1 dispatches after G9 (repo
+  order: S2/S3 → G9 → S1+S4).
 - **2026-08-09 (session 4) — Q5 CLOSED (route lead-ruled per operator delegation in
   chat; research completed).** RTOFS route pinned = direct NOMADS netCDF (only live
   route). Research: STOFS-2D-Global carries NO velocity in any product (GRIB2 + netCDF

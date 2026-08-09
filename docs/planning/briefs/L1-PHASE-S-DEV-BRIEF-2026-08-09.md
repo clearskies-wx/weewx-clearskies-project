@@ -78,10 +78,12 @@ new dependency is required → STOP and surface.
    product filenames remain yours to pin from the NCO inventory (region tokens
    live-verified plain `conus`/`hawaii`, 4 cycles/day). Record pinned choices + raw
    evidence in your closeout.
-2. **Compositing (P7, operator directive):** RTOFS branch ONLY: `u = u_RTOFS +
-   u_STOFS`, `v = v_RTOFS + v_STOFS` per cell per timestep; missing either component
-   at a timestep → `CurrentCoverageError` (no partial composite). OFS regions NEVER
-   composite (they are tidal-inclusive natively — adding STOFS would double-count).
+2. **~~Compositing~~ VOID (2026-08-09, P7 amended, operator-approved):** STOFS-2D
+   publishes NO velocity in any product (live-verified). S1 is now a containment
+   LADDER: regional OFS → STOFS-3D-Atl (East/Gulf/PR, total current, used alone) →
+   PacIOOS ROMS (Hawaii) → RTOFS alone (non-tidal, loud log; direct NOMADS netCDF).
+   NO summing on any rung; per-cycle selection. Read the plan's rewritten S1 design +
+   PROVIDER-MANUAL §14.10a before S1 work; S4a KATs respecified to ladder selection.
 3. **WLEVEL chain (P8):** STOFS primary → CO-OPS-uniform fallback (loud log, bathy-
    chain pattern) → refuse `tide_fetch_failed`. The "~30 km uniform tide" justification
    comment is deleted WITH the uniform-primary path. The cutover bias gate (24 h STOFS

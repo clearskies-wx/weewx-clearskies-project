@@ -76,6 +76,16 @@ enclosed, the autosizer must detect it and avoid placing the boundary in that is
 **D2 — 100 km hard cap.** `L1_MAX_EXTENT_KM = 100.0`. An island that cannot be enclosed within the cap is not
 enclosed; its shadow is a recorded residual, mitigated by D11's near-lee avoidance, never silently clipped.
 
+**Amendment 2026-08-09 (operator ruling, in chat; plan Q6/G9):** the cap binds the **L1 BOX SIZE per
+axis**, not each scan ray's reach from the spot. The Phase-G implementation shipped the per-ray reading and
+produced a 91×131 km live box — no single ray exceeded 100 km, but the envelope of the fan did, and L1's
+hourly stationary solves cannot physically support a 131 km span (15 s swell crossing time ~3.1 h vs the
+1 h forcing step). Operator: "The 100km is not supposed to be a cap on the length of the ray, it is
+supposed to be a cap on the box size itself." Switching L1 to nonstationary computes was REJECTED in the
+same ruling ("compute unwieldy"). Enacted by plan task G9: a final envelope clamp pulls in only the
+offshore edge of any axis exceeding the cap; coast-side edges never move; the per-ray logic remains as the
+candidate-generating pre-filter.
+
 **D3 — Boundary data contract: per-partition reconstruction, no hybrid.** The L1 offshore boundary is built
 by reconstructing a full 2-D spectrum at every boundary point from NOAA's gridded WW3 partition fields
 (ocean `gfswave.global.0p16`, Great Lakes `glwu.grlc_2p5km`) — per-partition bulk parameters (wind sea
@@ -118,6 +128,17 @@ timestep is `u = u_RTOFS + u_STOFS`, `v = v_RTOFS + v_STOFS` — no double-count
 RTOFS carries zero tidal signal and STOFS zero circulation. A timestep where either component is missing
 raises rather than compositing a partial current. OFS regions never composite (OFS models are already
 tidal-inclusive).
+
+**Amendment 2026-08-09 (operator "ok fine" on the lead-researched replacement; plan register P7 amended,
+decision log):** the composite is VOID — its premise field does not exist. Live inspection (regional GRIB2
+via eccodes, global netCDF headers) and NOAA's own NOMADS STOFS description confirm **STOFS-2D-Global
+publishes no velocity in any product** (water levels only). Replacement: a containment LADDER of
+tidal-inclusive sources — regional OFS → STOFS-3D-Atlantic total-current velocity (US East/Gulf/PR; 3-D
+baroclinic, so its velocity already carries circulation+tide+surge and is used ALONE) → PacIOOS ROMS Main
+Hawaiian Islands (Hawaii; TPXO tidal elevation+velocity forcing, 4 km/3-hourly, ERDDAP/THREDDS) →
+RTOFS-Global alone (non-tidal, loudly logged, last resort; direct NOMADS netCDF route — the plan-named grib
+filter and ERDDAP routes are both retired on NOAA's side). No summing on any rung; per-cycle source
+selection, never per-timestep. See PROVIDER-MANUAL §14.10a (rewritten) and plan Q5 closure block.
 
 **D10 — Water level: STOFS adopted.** STOFS-2D-Global becomes the spatially-varying WLEVEL source at all
 levels, replacing the single-CO-OPS-station uniform stamp. Chain: STOFS → CO-OPS-uniform (loud fallback,
