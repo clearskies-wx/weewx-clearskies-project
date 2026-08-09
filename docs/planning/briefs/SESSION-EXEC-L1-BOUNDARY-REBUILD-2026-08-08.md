@@ -5,14 +5,26 @@
 closure blocks are current as of the session-4 checkpoint) and
 `docs/planning/briefs/L1-ISLAND-BOUNDARY-RELOCATION-BRIEF-2026-08-08.md` (authority).**
 
-## ⏭ RESUME HERE — exact next actions (2026-08-09 SESSION-4 CHECKPOINT, ~16:45Z)
+## ⏭ RESUME HERE — exact next actions (2026-08-09 SESSION-5 STATE, ~22:45Z)
 
-**Phase G DEPLOYED and live (marine `eecfabc`, proc 08:22:05Z; new L1 93×132 publishing
-all day, reality gates PASS). Operator ruled the box came out oversized (Q6): the 100 km
-cap binds the BOX per axis, not the scan ray — task G9 (box-envelope clamp, FULLY
-DESIGNED in the plan) fixes it. dev-phase-s agent was COMMISSIONED AND CODING S2+S3 at
-checkpoint (scope-ack confirmed, all 6 findings ruled — see below; NO commits yet at
-checkpoint: repo still `eecfabc` clean). Repo queue: S2/S3 close → G9 → S1+S4.**
+**Session-5 outcomes (full evidence in the plan's decision log + section records):**
+S2/S3 re-run and closed (`5d9d88b`/`9cbb915`); S4b closed (32 KATs); G9 coded+tested+
+DEPLOYED — capped 93×101 box LIVE and verified (S edge 33.18, SCI out, Catalina in,
+reality gate PASS); **INCIDENT: first G9+S2 deploy OOM-crash-looped (S2 fetcher held
+73 full-region grids as Python lists ≈7 GB) → rolled back same session; S2 RE-LANDED
+memory-safe (`462b38f`, subset+float32, ~0.5 MB retained) and deployed single-change
+22:04:28Z; bias gate PASS −0.044 m.** C2+C3 accepts PASSED (C3 after a same-session
+remediation, dashboard `8fff329` deployed). Marine + dashboard repos pushed; meta repo
+pushed this session. **OPERATOR RULINGS session 5: RTOFS-alone rung REMOVED from the
+S1 ladder (exhausted = REFUSE, never non-tidal-only currents); pending questions
+G9-RSS (335 vs 300 MB budget) + G9-GL (lakes cap) in the plan's OPEN OPERATOR
+QUESTIONS.**
+
+**Next actions:** (0) S2 accept evidence (bg watch was on the 22:04+ cycle: STOFS INFO
+line, service RSS, publish) → record wlevel accept rows; (1) Gate S blind audit
+(wlevel half); (2) S1+S4a currents-ladder round (NO RTOFS — refusal rung per the
+re-ruling); (3) G-Accept closes on the G9-RSS ruling; (4) V3 5-cycle wall-clock on the
+capped box; (5) A, C1+Gate C, V.
 
 0. **Pre-flight:** `git -C repos/weewx-clearskies-marine log --oneline -8` — look for
    "S2:"/"S3:" commits (the dev-phase-s agent may have finished after checkpoint; its
@@ -84,7 +96,7 @@ checkpoint: repo still `eecfabc` clean). Repo queue: S2/S3 close → G9 → S1+S
 | DOC | ✅ CLOSED (session 1) | ADR-104; blind audit 7/7. |
 | W | ✅ CLOSED incl. W6 (session 3) | See plan records. |
 | B | ✅ COMPLETE (session 2) | Deployed `5cc28e8`. |
-| G | **DEPLOYED session 4 (`eecfabc` live 08:22:05Z) — G-Accept 4 rows PASS, closes after G9** | New L1 93×132 publishing; Q6 ruled: cap binds BOX per axis → G9 (designed, queued behind S2/S3). L3-viability guard that fired at config push = PRE-EXISTING (identical line 2026-08-03 pre-G, ~235 m vs ~229 m — smart-L3 open item, not a G regression). 99-file BOUNDSPEC cap NOT enforced by 41.51AB (132 files ran; §14.15 measured deviation recorded). Reality gate PASS: combined deep Hs 0.636 m vs 46222/46253 0.8 m (−20.5%, inside ±25%); W-NW wind swell 0.65→0.34 m @275°→264° (shadow works); matched-hour headline +8…+29.5% (period-dominance shift, explained). Cycle 35m56s; L1 14m24s. RSS never measured — capture at G9 accept. |
+| G | **G9 DEPLOYED session 5 — capped 93×101 box LIVE, all re-run rows PASS; G-Accept closes on operator question G9-RSS** | See plan G9 + G-Accept records. |
 | G9 | **DESIGNED (plan §G9) — dispatch after S2/S3 round closes** | Operator ruling: envelope clamp ≤100 km/axis, offshore edges pull in, coast side fixed; nonstationary REJECTED. |
 | S | **S2+S3 IN FLIGHT at checkpoint (dev-phase-s coding, 6 rulings issued, no commits yet); S1 REWRITTEN to ladder (P7 amended, approved); S4a respecified** | Deploy order: (S2+S4b after G9), S1+S4a last. Q5 closed: RTOFS = direct NOMADS netCDF. |
 | A | not started | |
