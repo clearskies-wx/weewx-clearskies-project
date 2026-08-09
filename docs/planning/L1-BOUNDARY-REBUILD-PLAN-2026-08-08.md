@@ -453,7 +453,7 @@ K7 missing-field raise. **Deleted test files (the ONLY ones):** the station-sele
 (`tests/` files pinning `ww3_station_selection` / catalogue behavior — enumerate exhaustively
 in the scope-ack; each listed in the closeout per the stale-test rule).
 
-### B-Accept (live, CURRENT extent — the comparability deploy)  🔶 **RUN 2026-08-09, 3 rows PASS / 2 criterion breaches surfaced (Q4)** — deployed `5cc28e8` 03:12:56Z after a GATE EVENT on the first attempt (03:07Z: `no-publish swan_fatal` — the 43-point BOUNDSPEC command was 1085 chars on one line; `build_swan_input`'s 180-char guard correctly refused; last-good preserved. Fix same round, lead-direct: `&`-continuation wrapping per manual :1219-1220/B.4 + continuation-aware E8 reuse reader + 2 KATs that fail pre-fix; marine `5cc28e8`). Matched 00Z cycle rerun 03:17:19→03:47:30Z:
+### B-Accept (live, CURRENT extent — the comparability deploy)  ✅ **CLOSED 2026-08-09 (Q4 ruled, both deviations operator-accepted — see closure line below). RUN 2026-08-09, 3 rows PASS / 2 criterion breaches surfaced (Q4)** — deployed `5cc28e8` 03:12:56Z after a GATE EVENT on the first attempt (03:07Z: `no-publish swan_fatal` — the 43-point BOUNDSPEC command was 1085 chars on one line; `build_swan_input`'s 180-char guard correctly refused; last-good preserved. Fix same round, lead-direct: `&`-continuation wrapping per manual :1219-1220/B.4 + continuation-aware E8 reuse reader + 2 KATs that fail pre-fix; marine `5cc28e8`). Matched 00Z cycle rerun 03:17:19→03:47:30Z:
 - (1) norm_end "Normal end of run v1" ✓. "Differences in wave height at the boundary" WARNING class is PRE-EXISTING (station baseline PRINT: 14 over 4 points = 3.5/point; new: 56 over 66 points = 0.85/point — per-point rate improved; the row's "zero boundary warnings" was never met by the station baseline either — recorded deviation).
 - (2) Station-position ±10%: **PASS all 4** (independent parse of preserved station BOUND_* vs nearest new B_* file, first common timestep 18z: 46223 −0.7% @1.1 km; 46222 −9.3% @13.1 km (station lies outside L1 — farthest match, noted); 46253 −4.0% @0.14 km; 46256 −3.3% @2.0 km).
 - (3) Headline matched-hour (00Z): breakingFaceHeight 1.4649→1.1639 m = **−20.5%, BREACHES ≤15%** → Q4. Reality check (pre-declared): combined DWR Hs 1.008 m vs 46253 0.9 m (+12% ✓) / 46222 0.8 m (+26% marginal); period 18.4 s vs DPD 17 s ✓; swell dir 199° vs MWD 164–209° spread — the pre-plan 35–40° gap is GONE. Every quantity moved TOWARD the buoys vs W-Accept's "before" (0.62 m, −31%/−22%).
@@ -539,7 +539,7 @@ within ±3.5° of the locked UTM zone's central meridian → else loud config-pu
 the span and the cap. (Zone 11 handles all of SoCal incl. San Clemente; this guard exists for
 arbitrary future coasts, not HB.)
 
-### G7 — Cold-start guard verification (no code)  🔶 code-read half DONE (lead: `_domain_geometry_signature` includes L1 bbox+resolution, grid_sizing_chain.py:309-331); live observation lands at G-Accept
+### G7 — Cold-start guard verification (no code)  ✅ (code-read half session 3: `_domain_geometry_signature` includes L1 bbox+resolution, grid_sizing_chain.py:309-331; LIVE half observed at G-Accept 2026-08-09 08:56:33Z — guard detected the L1/L2 change, cleared all persisted SWAN state + hotstarts with the correct ruling citation, signalled an immediate forced full run)
 Verify (read-only) the F1 geometry-compare guard treats the L1 bbox change as
 cold-start + forced full run. Evidence: the guard's compare includes L1 bbox (it does per
 ARCHITECTURE:115 — confirm at HEAD) + one live observation at G-Accept.
@@ -581,7 +581,7 @@ G-Accept row set re-run); L1 wall-clock recorded (expect ~11 min at ~9,400 cells
 operator ruling), ARCHITECTURE.md L1 sizing bullet, PROVIDER-MANUAL §14.15 addition
 (99-file cap measured-not-enforced on 41.51AB — from G-Accept row 4).
 
-### G-Accept (live — the relocation deploy)  🔶 **RUN 2026-08-09 (session 4) — deployed `eecfabc` (proc 08:22:05Z), config re-pushed 08:23:13Z, new L1 live and publishing since; 4 rows PASS, 2 deviations + 1 fired guard surfaced as Q6 (operator ruling needed to close)**
+### G-Accept (live — the relocation deploy)  🔶 **RUN 2026-08-09 (session 4) — deployed `eecfabc` (proc 08:22:05Z), new L1 (93×132) live and publishing; 4 rows PASS; Q6 RULED (cap binds the BOX → task G9). G-Accept CLOSES when the G9 redeploy re-runs the sizing/reality/journal rows on the capped (~91×100) box. Outstanding evidence: SWAN peak RSS (monitor was armed session 4; capture on any full cycle).**
 **Record (all numbers lead-collected from fresh commands; baseline = the 07:23:14Z pre-deploy
 cycle, payload + file inventory archived in session scratchpad):**
 - **Sizing (row 1): PART PASS / PART BREACH.** New L1 bbox lon −118.7598..−117.7725, lat
@@ -656,10 +656,12 @@ note) landed; baselines.
 ## PHASE S — Sources: RTOFS currents, STOFS water level, Hawaii datum *(D9/D10/D13)*
 
 **Owner:** `clearskies-api-dev` (Sonnet). **Tests:** `clearskies-test-author`. **QC:**
-`clearskies-auditor` at Gate S. Two deploys: S1+S4a (currents) and S2+S4b (wlevel) ship
-separately (PRIME DIRECTIVE 3).
+`clearskies-auditor` at Gate S. Two deploys: S2+S4b (wlevel) and S1+S4a (currents) ship
+separately (PRIME DIRECTIVE 3). **Order REVERSED + G9 interleaved (2026-08-09 session 4):
+S2/S3 code round → G9 code+deploy (operator-ruled box cap, outranks) → S2+S4b deploy →
+S1+S4a (ladder) deploy.**
 
-### S1 — RTOFS surface-current provider + OFS-contains-domain selection  ⬜
+### S1 — Current-source ladder (REWRITTEN 2026-08-09, P7 amended + operator-approved; was RTOFS+composite)  ⬜ dispatches AFTER G9 (repo queue: S2/S3 → G9 → S1+S4a)
 **Files (new):** `providers/ocean/rtofs_currents.py`. **Files (modified):**
 `providers/ocean/ofs.py` (`find_ofs_model` gains `find_current_source(l1_bbox)`:
 an OFS qualifies only if its `OFS_DOMAINS` box CONTAINS the L1 bbox — containment, not
@@ -686,7 +688,7 @@ cycle at INFO (provenance, not flagging). Missing timestep on the selected sourc
 `CurrentCoverageError` (no cross-rung mixing within a cycle — same per-cycle selection
 rule as the WLEVEL chain).
 
-### S2 — STOFS water-level provider + WLEVEL chain  ⬜
+### S2 — STOFS water-level provider + WLEVEL chain  🔄 IN FLIGHT 2026-08-09 session 4 (dev-phase-s coding; scope-ack confirmed with 6 lead rulings — see decision log + session handoff; water-level ONLY per the P7 amendment; deploy ships AFTER G9)
 **Files (new):** `providers/ocean/stofs_wlevel.py`. **Files (modified):**
 `providers/nearshore/swan.py` (:3021-3080 tide fetch site → chain), `services/swan_runner.py`
 (`_write_wlevel_txt` spatially-varying path generalized from the L3 profile writer to a
@@ -703,7 +705,7 @@ surface. Chain (decided): STOFS → CO-OPS-uniform (fallback selection logged lo
 bathymetry-chain pattern) → refuse (`tide_fetch_failed`). The "~30 km uniform tide"
 justification comment is deleted with the uniform-primary path.
 
-### S3 — Hawaii/VDatum-less datum branch  ⬜
+### S3 — Hawaii/VDatum-less datum branch  🔄 IN FLIGHT 2026-08-09 session 4 (same dev-phase-s round as S2; coops.py allowlisted for additive `datums` product via the CO-OPS Metadata API — lead rulings 2026-08-09; P12 DEM entries incl. the 5 optional PR DEMs approved hand-authored with catalogue citations)
 **Files:** `services/vertical_datum.py`, `data/ncei_regional_dem_index.json` (P12 refresh).
 **Design (decided):** when the domain has no VDatum separation-grid coverage AND every
 bathymetry source in play is tidal-referenced (MHW/MSL/MLLW): convert via tidal-datum offsets
@@ -714,7 +716,7 @@ pattern: the Great Lakes LWD/IGLD85 branch. Index refresh: add Maui + Big Island
 entries (and PR, low priority) from the NCEI catalogue via the index's existing generation
 path (verify the generator script exists; if hand-authored, entries cite the catalogue URL).
 
-### S4 — Tests (test-author)  ⬜
+### S4 — Tests (test-author)  ⬜ (S4a rows (a)/(f) RESPECIFIED 2026-08-09 to ladder-selection/no-mixing KATs per the P7 amendment; S4b dispatches after the S2/S3 dev round lands, S4a with S1)
 (a) selection-ladder KAT (respecified 2026-08-09, P7 amendment): containment-covered
 bbox → that OFS; East-Coast/Gulf bbox outside all OFS → STOFS-3D-Atl; Hawaii bbox →
 PacIOOS ROMS; open-Pacific bbox outside all → RTOFS with the loud non-tidal log line
@@ -727,10 +729,11 @@ composite KATs):** no summing on any rung (mutation: sum two sources → KAT fai
 missing timestep on the selected source → raise, never a silent switch mid-cycle;
 (g) baselines 0-delta.
 
-### S-Accept (live)  ⬜
-Currents deploy: HB continues on WCOFS (selection INFO line proves the rule ran); RTOFS
-smoke-verified from librewxr against a Jersey-shore test bbox (fetch + parse once, config-time
-style, nothing published). WLEVEL deploy: bias gate result recorded; post-cutover cycle
+### S-Accept (live)  ⬜ (deploy order reversed 2026-08-09 — wlevel rows run first, currents rows after S1)
+Currents deploy: HB continues on WCOFS (selection INFO line proves the ladder ran); ladder
+rungs smoke-verified from librewxr (STOFS-3D-Atl velocity fetch+parse on a Jersey-shore test
+bbox; PacIOOS ROMS on an Oahu bbox; RTOFS direct-netCDF parse — config-time style, nothing
+published). WLEVEL deploy: bias gate result recorded; post-cutover cycle
 publishes with STOFS WLEVEL; matched-hour headline delta recorded (expected ≪ 0.1 m effect);
 baseline diffs both deploys.
 
@@ -810,7 +813,7 @@ component (name resolved at scope-ack from the dashboard repo), `docs/contracts/
 list on the same refresh; screenshot-case arithmetic verified against the live payload;
 API-MANUAL + openapi doc-sync same round.
 
-### C2 — Beach Profile card: draw ONLY the dominant swell's wave train  ⬜
+### C2 — Beach Profile card: draw ONLY the dominant swell's wave train  🔶 CODE DONE session 2 (dashboard `7cfd475`, lead-verified in git 2026-08-09); Accept (live, weather-test) + Gate C pending
 **Operator instruction (2026-08-08):** the profile's water-surface rendering must draw the
 dominant swell only, not all swells interleaved (screenshot: overlapping trains).
 **Files:** `BeachProfileChart.tsx` (wave-surface generation region ONLY — the :585-594
@@ -824,7 +827,7 @@ draw. DASHBOARD-MANUAL doc-sync same round.
 **Accept (live):** profile shows one coherent train matching the headline swell; no
 interleaved secondary crests; matched against the card's dominant direction on the same hour.
 
-### C3 — Surf-height heatmap: ortho alignment, buffer, y-axis, structure-overlay removal  ⬜
+### C3 — Surf-height heatmap: ortho alignment, buffer, y-axis, structure-overlay removal  🔶 CODE DONE session 2 (dashboard `e8be970`, lead-verified in git 2026-08-09); Accept (live, weather-test) + Gate C pending
 **Operator instruction (2026-08-08):** (a) the orthophotography must be ALIGNED with the
 transect bearing (the heatmap's beach frame), not true north — "so that way IT MATCHES";
 (b) 50 m of orthophotography buffering around the heatmap extent so the user can get their
