@@ -821,6 +821,30 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
   so that is not a bad thing"; buoy reality gate had already improved on every
   pre-declared quantity) and wall-clock +3m17s vs the matched station cycle. B-Accept
   CLOSED; Phase B complete end-to-end (deployed `5cc28e8`).
+- **2026-08-09 — INCIDENT: librewxr host down ~06:46Z (investigation open, G-Accept +
+  Phase S code HELD).** Signature: instant simultaneous TCP death (SSH + 8780 + CheckMK
+  agent, "no route to host" from LAN) with ICMP alive; CheckMK metrics flat to the last
+  datapoint 06:45Z (RAM 1.88 GB of 11.2 GiB, CPU 8%, no ramp — resource exhaustion
+  RULED OUT); uptime 25 d. NOT deploy-correlated: W6 deployed 05:23Z, clean full cycle
+  ended 06:00:56Z, box healthy 06:15Z; nothing deployed after. Two read-only code
+  investigations complete: (1) marine code CLEARED — no mechanism for cross-process TCP
+  death; W6 diff verified parse-time-only with finally-closed handles; retry loops
+  bounded (≤1 attempt/5 min/input). (2) LibreWXR repo: LEAD HYPOTHESIS = hourly
+  `scripts/auto-update.sh` cron (`docker compose up -d --build`; heavy no-cache build
+  could run ~46 min from an 06:00Z fire, landing dockerd's iptables/NAT rewrite at the
+  06:46Z death minute — the classic ICMP-alive/TCP-dead netfilter wedge class); 43 GB /
+  95-active BuildKit cache (no pruning anywhere in repo) corroborates repeated in-place
+  rebuilds. DECISIVE PENDING FACT: whether `.auto-update-enabled` or
+  `LIBREWXR_AUTO_UPDATE=1` is set on the host — unset collapses the hypothesis toward a
+  kernel/driver event. Post-reboot checklist: sentinel/env → update log 06:00-06:46Z →
+  docker events + docker journal (prev boot) → kern.log netfilter/NIC → rule out
+  EMFILE/conntrack-full.
+- **2026-08-09 — DEFECT FOUND (parking lot, unrelated to incident): SWAN subprocess
+  stdin FD leak** — `services/swan_runner.py:5474` `_spawn_swan()` and
+  `services/surfbeat_runner.py:531` pass `input_file.open("r")` to `subprocess.run`
+  without ever closing it (any path). ~20-30 FDs/day leaked in the marine process.
+  Slow, self-confined, cannot explain the incident; needs a small fix round (with-block
+  or explicit close in finally).
 - **2026-08-09 — G8 row-(e) deviation (lead-approved):** the plan's "box ≈ brief §4 S1
   within ±15% per axis" is not honestly claimable from a single-spot synthetic RayResult
   fixture (S1's E/N edges come from multiple real spots + lateral margins). Test-author
