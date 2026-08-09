@@ -5,31 +5,29 @@
 current as of the 2026-08-09 checkpoint) and
 `docs/planning/briefs/L1-ISLAND-BOUNDARY-RELOCATION-BRIEF-2026-08-08.md` (authority).**
 
-## ⏭ RESUME HERE — exact next actions (2026-08-09 checkpoint)
-1. **Finish B5** (partial commit `c217d8f`, PUSHED). DONE: test_boundary_reconstruction.py
-   (22 tests — K1/K2/K3/K4/K5/K7, with in-file falsifiability controls for K1+K5); 2
-   authorized deletions (ledger in commit body); 5 station-mock repairs (42 tests green);
-   3 more files verified no-change-needed. **REMAINING (fresh test-author round, brief
-   `L1-PHASE-B-TEST-BRIEF-2026-08-09.md`):** (a) tests/test_partition_fields.py — K6
-   (GLWU hourly cadence + 2.5 km corridor, independent arithmetic) + the migrated
-   aggregated-cycle-fallback-WARNING idiom vs `fetch_partition_corridor_with_cycle_fallback()`
-   + optional shared-http-client-reuse KAT; (b) live mutation-and-revert falsifiability
-   demos for K1/K2/K5 (Gate B row 1 needs them — the auditor can perform them itself if
-   the test round doesn't).
-2. **Gate B blind audit** — brief READY at `briefs/L1-GATE-B-AUDIT-BRIEF-2026-08-09.md`
-   (already includes the 35-frequency correction + commit list; append B5's commit ids).
-3. **B-Accept deploy** — deploy-marine.sh FROM META ROOT, between cycles (check journal
-   "SWAN: starting" vs "full SWAN cycle complete"; pgrep -x swan). Protocol per plan
-   B-Accept: matched cycle vs the banked station-boundary baseline (level1/BOUND_* files
-   on librewxr from the 18z run + W-Accept's reality-gate numbers), boundary Hs at the 4
-   old station positions ±10% vs same-cycle .spec m0, headline delta ≤15% recorded,
-   wall-clock ≤ +3 min vs ~37 min, boundary file count/bytes/read-time measured.
-   CAPTURE THE SERVED PAYLOAD BEFORE DEPLOYING (R5's lesson).
-4. **W6** (operator-ruled): fix HRRR Lambert-parameter extraction — task spec in plan
-   Phase W. Dispatch AFTER Gate B closes (one round at a time in the marine repo).
-   dev brief pattern: `briefs/L1-PHASE-W-DEV-BRIEF-2026-08-08.md` mandatory blocks.
-5. Then Phase G (briefs not yet written; G sites pre-verified below), then S, A,
-   C1+Gate C, V per plan order.
+## ⏭ RESUME HERE — exact next actions (2026-08-09 SESSION-2 CHECKPOINT, ~04:15Z)
+
+**PHASE B IS COMPLETE END-TO-END** (B1–B5 ✅, Gate B PASSED, B-Accept CLOSED with Q4
+operator-ruled, deployed `5cc28e8` live and healthy). Full evidence in the plan's Gate B
++ B-Accept records — do not re-derive.
+
+1. **W6 — DISPATCH FIRST** (HRRR Lambert-parameter extraction fix, operator-ruled Q3).
+   Brief READY + COMMITTED: `briefs/L1-PHASE-W6-DEV-BRIEF-2026-08-09.md` (reading list,
+   scope, 6 design points, STOP condition, lead hypotheses: eccodes key-case
+   `"LovInDegrees"` vs correct `"LoVInDegrees"` at hrrr.py:383 + single try/except
+   zeroing all three params — verify empirically vs a recorded fixture, don't code from
+   the hypothesis). A dev-w6 agent was dispatched at session end and STOPPED before any
+   code (session cutover); marine repo verified clean at `5cc28e8` after the stop.
+   Dispatch prompt pattern: brief pointer + the three mandatory blocks verbatim +
+   scope-ack gate (same as this session's dispatches).
+2. **W6 accept:** WARNING gone from journal post-deploy + one matched-cycle before/after
+   wind diff. NOTE: wind diff will NOT be byte-identical (metadata-driven rotation
+   replaces the bbox-derived approximation — that's the point); record the delta.
+3. Then **Phase G** (briefs NOT yet written; G1–G8 sites pre-verified below, still valid
+   at `5cc28e8`). Parking-lot item for G: SWAN caps one command at 99 file names
+   (manual :1223); boundary has 66 files today, G's larger grid could approach it —
+   check point count at G-Accept.
+4. Then S, A, C1+Gate C, V per plan order.
 
 ## Operator authorizations in force (this session, 2026-08-08 chat)
 - "As coordinator, you have permission to push/deploy as needed."
@@ -46,7 +44,7 @@ current as of the 2026-08-09 checkpoint) and
 | R5 close (SURF-REMEDIATION dependency) | **DEPLOYED, accept pending** | Pushed + deployed 2026-08-08 23:35:16Z (deploy-marine.sh verify: running a399eb6, health 200). Awaiting first post-deploy full cycle (00Z HRRR, ~01:07Z) → run R5-Accept checks from SURF-REMEDIATION plan Phase R5 (partitionIndex uniformity, single outer break, ≤6 markers, INV-13→0, headline unchanged). Watcher armed. |
 | DOC | **CLOSED — Gate DOC PASSED** | Meta `9dc1fe3` (11 files, docs-only). Blind audit 7/7 rows, 0 findings. ADR shipped as **ADR-104**. Plan checkboxes updated. NOT yet pushed. |
 | W | **CLOSED — Gate W PASSED, deployed `95abc74` (proc 00:41:16Z), W-Accept recorded in plan** | Commits: marine f7c2b04/35f98f6/9cb1b43/6ab1df0/84f4757/95abc74 (all pushed+deployed); meta 96070c2/5870b45. Byte-identity deviation root-caused (rotation approximation depends on fetch bbox — inherent to P6; headline −5.3% on wind-sea day). Real drill banked. Reality gate: model 0.62 m vs buoys 0.8/0.9 m, dir gap ~35–40° = pre-plan boundary defect, the V1/V2 "before" measurement. |
-| B | B1–B4 ✅ (marine 10c8d70/f81e520/dcfd84a/f190fcd + r-pin 5ebc1fa; doc-sync meta b22e80f); B5 IN FLIGHT (checkpoint-committed); Gate B + B-Accept PENDING | **B NOT DEPLOYED** — librewxr runs 95abc74 (station boundary). Gate B audit brief ready. |
+| B | **✅ COMPLETE 2026-08-09 (session 2).** B1–B5 (B5: c217d8f + e1c315e + 11b5768, 33 tests). Gate B PASSED (blind audit 7/8 own-evidence + lead closed the SPECOUT row; F1 r-doc drift remediated meta 474a55a; F2 LOW noted). B-Accept CLOSED (Q4 operator-ruled: headline −20.5% accepted — matches Surfline/surf-forecast; wall-clock +3m17s accepted). GATE EVENT mid-accept: first cycle aborted no-publish swan_fatal (BOUNDSPEC 1085 chars > SWAN 180-char line limit) → lead-direct fix `5cc28e8` (&-continuation wrap + continuation-aware E8 reuse reader + 2 KATs failing pre-fix). | **DEPLOYED `5cc28e8`** (proc 03:12:56Z), matched-00Z accept cycle 03:17→03:47 clean, publishing. Station-position check PASS all 4 (±10%); reality gate improved on every quantity (combined Hs 1.01 m vs buoys 0.8/0.9; period 18.4 vs 17 s; dir gap gone). |
 | G | not started (sites pre-verified, see below) | |
 | S | not started | two deploys: S1+S4a currents, S2+S4b wlevel |
 | A | not started | |
@@ -189,15 +187,21 @@ the matched-cycle comparison).
 - Also: open questions live in the plan's OPEN OPERATOR QUESTIONS section, plain English
   → rules/coordinator.md §5 updated.
 
-## Repo/deploy state at checkpoint (2026-08-09)
+## Repo/deploy state at checkpoint (2026-08-09 session 2, ~04:15Z)
 | Repo | HEAD (local) | Pushed? | Deployed? |
 |---|---|---|---|
-| marine | `5ebc1fa` + any B5 checkpoint commit(s) | pushing at checkpoint | librewxr runs **`95abc74`** (W phase). B NOT deployed. |
+| marine | `5cc28e8` | YES | librewxr runs **`5cc28e8`** (Phase B live, proc 03:12:56Z) |
 | dashboard | `e8be970` | YES | weather-dev serves it (C2/C3 live on weather-test; visual accept pending at Gate C) |
-| meta | checkpoint commit (see git log) | pushing at checkpoint | n/a |
-- Marine service healthy at checkpoint; known noise: INV-11 (operator item, SURF-REM
-  plan), NDBC QuotaExhausted, HRRR Lambert WARNING (goes away with W6).
-- Agents at checkpoint: test-phase-b wrapping (B5 partial commit); all others closed.
+| meta | session-2 checkpoint commit (git log) | YES | n/a |
+- Marine service healthy; known noise: INV-11 (operator item, SURF-REM plan), NDBC
+  QuotaExhausted, HRRR Lambert WARNING (goes away with W6), L4-handoff-selection
+  target-depth INFO/WARN class (pre-existing, in station baseline too).
+- Pre-deploy baseline artifacts preserved on librewxr `/tmp/b-accept-baseline-00z/`
+  (station BOUND_*, WIND.txt, surf_pre_deploy.json) + `/tmp/surf_pre.json`,
+  `/tmp/surf_post.json`, `/tmp/b_accept.py` (the independent station-position
+  comparison script). /tmp is volatile — durable numbers are in the plan records.
+- Agents at checkpoint: ALL CLOSED (test-phase-b2 closed; audit-gate-b closed; dev-w6
+  stopped pre-code at cutover — W6 not started).
 
 ## Decision log (this session)
 - 2026-08-08: Execution session started. Rules loaded (agents/verification/coordinator/
