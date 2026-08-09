@@ -789,7 +789,14 @@ composite KATs):** no summing on any rung (mutation: sum two sources → KAT fai
 missing timestep on the selected source → raise, never a silent switch mid-cycle;
 (g) baselines 0-delta.
 
-### S-Accept (live)  🔶 IN PROGRESS 2026-08-09 session 5 — wlevel half underway: bias gate PASSED −0.044 m (pre-cutover, 25 pairs vs station 9410660); S2 live on `462b38f`; cycle watch collecting the remaining wlevel rows (STOFS INFO line, service memory, publish, matched-hour delta). Currents rows run after S1.
+### S-Accept (live)  🔶 IN PROGRESS 2026-08-09 session 6 — wlevel evidence rows COLLECTED + independently re-verified session 6; ONE open item blocks the wlevel close: cycle-RSS attribution (below). Currents rows run after S1.
+**Wlevel evidence (collected session 5 on the 22:11–23:03Z live cycle, re-verified session 6 from the journal + on-disk files):**
+- **STOFS primary, live:** journal 22:09:03Z `STOFS-2D-Global: region=conus.west cycle=2026-08-09/12z -> 73 hourly water-level grid(s), forecast_hours=0..72 complete` followed by `spatially-varying WLEVEL primary (P8 chain)`. Provenance: `journalctl -u weewx-clearskies-marine --since '2026-08-09 22:08' --until '2026-08-09 22:12'`.
+- **Cycle-selection fallback exercised correctly within STOFS:** t18z files 404'd (not yet published), fetcher fell back to the t12z cycle (all 200s) — this is latest-available-cycle selection inside the STOFS rung, NOT the CO-OPS fallback; primary held.
+- **WLEVEL.txt spatially-varying on ALL FOUR grids, 67 timesteps each** (re-verified session 6: line counts 6767 / 5561 / 3149 / 11390 = 67 × per-grid point-rows exactly; L1/L2/L3_0/L4_0). Provenance: `wc -l /var/lib/weewx-clearskies/swan/level*/WLEVEL.txt` (sudo).
+- **Cycle published normally, no OOM:** `full SWAN cycle complete` 23:03:25Z; /health degraded only by INV-11.
+- **Bias gate PASS −0.044 m** (≤ 0.15 m, 25 pairs vs CO-OPS 9410660, pre-cutover, session 5) — carries forward, do NOT re-run.
+- **OPEN ITEM (blocks wlevel close): cycle-RSS attribution.** Service idle RSS ~1.35–1.43 GB; process VmHWM after the one post-deploy cycle = **3,404,336 kB (~3.25 GiB)** — the true cycle peak exceeds session 5's spot-sampled ~2,973 MB. READ-ONLY stage-attribution running session 6 (10 s RSS sampler `/tmp/rss_watch_s6.csv` on librewxr through the next live cycle, correlated against journal stage lines). S2's fetch path retaining more than ~one decoded message beyond its ~0.5 MB design retention = defect → fix round; pre-existing cycle behavior = park with evidence and close the accept.
 Currents deploy: HB continues on WCOFS (selection INFO line proves the ladder ran); ladder
 rungs smoke-verified from librewxr (STOFS-3D-Atl velocity fetch+parse on a Jersey-shore test
 bbox; PacIOOS ROMS on an Oahu bbox; an uncovered open-ocean bbox → refusal message named —
