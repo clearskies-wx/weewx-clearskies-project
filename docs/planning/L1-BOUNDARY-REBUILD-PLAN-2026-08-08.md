@@ -315,7 +315,7 @@ fetch-time assert fires on undersized bbox; (c) current timestep gap → raise; 
 mismatch → raise; (e) regression: full existing suite on librewxr, 0 new failures vs baseline
 (record baseline commit + counts in the round record).
 
-### W6 — Read the HRRR wind-grid rotation properly (operator-ruled 2026-08-09, Q3) ⬜
+### W6 — Read the HRRR wind-grid rotation properly (operator-ruled 2026-08-09, Q3) ✅ **CODE `70d442f` lead-verified (12 KATs, falsifiability 9/12 reproduced); accept = post-deploy journal + matched-cycle diff, see decision log**
 **Operator ruling (chat):** "Yes we want that fixed so we are reading it properly and not
 estimating based upon wobble we are causing because it is not reading properly."
 **Files:** `providers/wind/hrrr.py` (the Lambert-parameter extraction that currently
@@ -796,6 +796,20 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
   so that is not a bad thing"; buoy reality gate had already improved on every
   pre-declared quantity) and wall-clock +3m17s vs the matched station cycle. B-Accept
   CLOSED; Phase B complete end-to-end (deployed `5cc28e8`).
+- **2026-08-09 — W6 CODE COMPLETE (marine `70d442f`, lead-verified) + W-Accept item 1
+  root-cause REFRAMED.** Empirical diagnosis from a real captured NOMADS GRIB2 fixture:
+  the eccodes key was misspelled (`LovInDegrees` vs correct `LoVInDegrees`), and the
+  single combined try/except zeroed all three Lambert parameters on every fetch. Because
+  per-point longitudes (`lons_2d`) are read OUTSIDE that try/except, the pre-fix rotation
+  was NOT the lon_first/lon_last approximation the old WARNING text claimed — it was a
+  no-op (`latin1=latin2=0 → n=0 → alpha=0`): **winds were never earth-rotated at all.**
+  W-Accept item 1's "bbox-dependent approximation wobble" attribution is superseded; the
+  byte-diff observed there was NOMADS-side resubsetting between bboxes, not rotation
+  wobble. Post-deploy expectation (predicted, not tuned): wind direction shifts ≈ −12.75°
+  at the L1 domain-center longitude (alpha = sin(38.5°)·(242.02°−262.5°)). Fix: three
+  independent metadata reads (both eccodes + pygrib backends), corrected log text,
+  approximation branch kept as last resort now logging at ERROR. 12 KATs, 9/12 fail
+  pre-change (falsifiability independently reproduced by lead: `9 failed, 3 passed`).
 - **2026-08-09 — W6 created (operator, in chat, Q3): fix the HRRR Lambert-parameter
   extraction so wind rotation reads the file's own projection metadata** instead of the
   bounds-derived approximation ("not estimating based upon wobble we are causing because
