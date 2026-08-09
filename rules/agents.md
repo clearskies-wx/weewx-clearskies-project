@@ -79,6 +79,8 @@ SSH to containers is for READ-ONLY operations: running tests, reading logs, chec
 
 **Why (2026-07-14):** Full pytest suite runs for minutes and produces thousands of lines of output that flood agent context. Targeted tests verify the same thing in seconds.
 
+**This binds plan text too (operator, 2026-08-09).** When a plan's accept/baseline row says "full existing suite" or "regression baseline," satisfy it with the tests matching the round's changed files plus the affected directory (`tests/services/` for a services change) — never a repo-wide `pytest`. A plan row is not authorization to run the whole suite; the changed-code scope defines the test scope. ("Run the directory, not only the files an agent named" still applies within that scope — the directory containing the changed code's tests, not every directory.)
+
 **Deploy scripts (use these, not manual commands):**
 - `scripts/deploy-api.sh` — API changes → weewx container (pull + restart + wait + verify)
 - `scripts/redeploy-weather-dev.sh` — Dashboard/config changes → weather-dev (pull + restart + build + publish)

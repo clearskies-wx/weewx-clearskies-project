@@ -32,6 +32,13 @@ Measured against `clearskies-dashboard` build artifacts on Now / Forecast / Char
 
 Initial JS bundle: target **≤ 200 KB gzipped** for the Now-page route. Monitored in CI via `vite-bundle-visualizer` (or equivalent). Going over flags a review — charting and i18n bundles can grow legitimately; we want awareness, not a hard fail.
 
+> **Amendment 2026-08-09 (operator ruling, in chat):** reaffirmed as a **guideline, not a
+> hard rule** — "we need to be mindful to ensure pages are as efficient as possible, but it
+> should not be a hard rule." Context: the dashboard now code-splits per route, so the
+> single-bundle number this ADR was written against no longer exists; the tracked measure
+> is now per-chunk gzip sizes (entry chunk + lazy route chunks), recorded at round close
+> for awareness. No gate fails on the number alone.
+
 ### API latency targets (p95)
 
 | Endpoint class | p95 target |

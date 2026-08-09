@@ -111,6 +111,15 @@ Halt the affected work and bring it to the operator when any of these appear:
 **While surfacing, keep working the unblocked items.** Do not idle waiting for an answer, and never
 proceed under an assumption on an architectural question.
 
+**Surface questions in the plan document, not only in chat (operator, 2026-08-09).** Every open
+operator question is appended to a dedicated "OPEN OPERATOR QUESTIONS" section at the BOTTOM of the
+active plan — self-contained (context, options, recommendation), newest at top, answered items moved
+to the decision log. Chat mentions get lost in agent traffic; the plan section is where the operator
+reads them. **Written in PLAIN ENGLISH — the operator bounced two questions the same day for
+jargon ("i understand those words form sentences, but i have no idea what your entire question
+means").** No internal shorthand (bbox, chunk, gzip, byte-identity) without a plain sentence first;
+if the question can't survive being read cold by someone who wasn't in the session, rewrite it.
+
 ## 6. Operator spot-check protocol
 
 **This file is written by the entity it governs and cannot enforce itself.** A coordinator that

@@ -420,7 +420,12 @@ Track the pass/skip/fail count at each round close to detect regressions.
 
 ## Dashboard bundle baselines
 
-Track gzipped JS bundle size at each round close against ADR-033's 200 KB target.
+Track gzipped JS bundle size at each round close against ADR-033's 200 KB target —
+**a guideline for awareness, not a hard gate (operator ruling 2026-08-09; ADR-033
+amendment)**. The repo now code-splits per route: record per-chunk sizes (entry chunk +
+changed route chunks), not one bundle number. Rows below the split (pre-2026-08) measured
+the old single bundle. First post-split measure (2026-08-09): entry `index-*.js`
+203.00 KB gzip, marine route chunk 41.73 KB gzip.
 
 | Round | Commit | Gzipped JS | % of budget |
 |---|---|---|---|
