@@ -565,8 +565,18 @@ or cycle > 45 min → STOP and surface); (4) boundary point count grew, reconstr
 record the delta and the W-NW-swell sanity direction (shadowed window energy should DROP);
 (6) baseline diff table.
 
-### ⛔ QC GATE G — `clearskies-auditor`, adversarial
-Rows: G4 arithmetic re-derived independently by the auditor from D11's formula (not from the
+### ⛔ QC GATE G — `clearskies-auditor`, adversarial — **PASSED 2026-08-09, 0 findings**
+(Blind audit at `eecfabc`, 8 rows, all with pasted live evidence: R1 G4 arithmetic
+re-derived from D11+implementation-note alone — 79.5300/47.2263 km match KAT literals and
+code on both fixture shapes; R2 grep = single legitimate find_shelf_distance use (BASE
+extent, swan_domain :1270), zero shelf→horizon coupling; R3 cap mutation (100→30) broke
+4/12 KATs at 3+ distinct call sites, reverted, tree clean (lead re-verified clean at
+`eecfabc`); R4 override chain traced parse→validate→plumb→replace/clamp/suppress, no gap;
+R5 zone-span guard order + locked-zone + meridian arithmetic verified; R6 KAT literals from
+from-scratch reimplementations + true cross-commit pin `_PRE_G_L1` at 70d442f; R7 doc-sync
+landed; R8 exactly the 3 tracked pre-existing failures. Auditor named ruled-out failure
+modes; row-(e) full S1 box comparison correctly identified as deferred to G-Accept.)
+Rows as specified: G4 arithmetic re-derived independently by the auditor from D11's formula (not from the
 implementation); fixture (e) box vs brief S1 checked by the auditor's own numbers; no
 surviving `horizon` derivation from shelf distance (grep); override end-to-end (set → sized →
 suppressed enclosures) demonstrated; cap enforced at every extent site (mutation: cap=30 →
