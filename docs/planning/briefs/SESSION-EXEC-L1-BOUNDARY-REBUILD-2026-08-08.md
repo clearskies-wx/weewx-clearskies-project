@@ -1,172 +1,199 @@
 # SESSION SCRATCH / HANDOFF — L1-BOUNDARY-REBUILD-PLAN execution (2026-08-08 → 09)
 
 **Read FIRST when resuming, with `docs/planning/L1-BOUNDARY-REBUILD-PLAN-2026-08-08.md`
-(the plan — ALL phase checkboxes, gate records, G9 design, decision log, and the Q5/Q6
-closure blocks are current as of the session-4 checkpoint) and
+(the plan — the 📍 CURRENT STATE table at its top, all phase markers, gate records,
+decision log, and the G9-GL ruling block are current as of session-5 close) and
 `docs/planning/briefs/L1-ISLAND-BOUNDARY-RELOCATION-BRIEF-2026-08-08.md` (authority).**
 
-## ⏭ RESUME HERE — exact next actions (2026-08-09 SESSION-5 STATE, ~22:45Z)
+## ⏭ RESUME HERE — session 6 (written Sun 2026-08-09 ~5:15 PM PDT, session-5 close)
 
-**Session-5 outcomes (full evidence in the plan's decision log + section records):**
-S2/S3 re-run and closed (`5d9d88b`/`9cbb915`); S4b closed (32 KATs); G9 coded+tested+
-DEPLOYED — capped 93×101 box LIVE and verified (S edge 33.18, SCI out, Catalina in,
-reality gate PASS); **INCIDENT: first G9+S2 deploy OOM-crash-looped (S2 fetcher held
-73 full-region grids as Python lists ≈7 GB) → rolled back same session; S2 RE-LANDED
-memory-safe (`462b38f`, subset+float32, ~0.5 MB retained) and deployed single-change
-22:04:28Z; bias gate PASS −0.044 m.** C2+C3 accepts PASSED (C3 after a same-session
-remediation, dashboard `8fff329` deployed). Marine + dashboard repos pushed; meta repo
-pushed this session. **OPERATOR RULINGS session 5: RTOFS-alone rung REMOVED from the
-S1 ladder (exhausted = REFUSE, never non-tidal-only currents); pending questions
-G9-RSS (335 vs 300 MB budget) + G9-GL (lakes cap) in the plan's OPEN OPERATOR
-QUESTIONS.**
+**Operator's closing instruction: "get the REST OF THE PLAN DONE."** That is the
+session-6 mandate — execute every remaining item below, in order, under the standing
+authorizations. The session-5 C3 coding freeze converts to EXECUTE-AS-RECORDED: the
+operator's direction for C3 is complete and in the plan; build exactly that.
 
-**Next actions:** (0) S2 accept evidence (bg watch was on the 22:04+ cycle: STOFS INFO
-line, service RSS, publish) → record wlevel accept rows; (1) Gate S blind audit
-(wlevel half); (2) S1+S4a currents-ladder round (NO RTOFS — refusal rung per the
-re-ruling); (3) G-Accept closes on the G9-RSS ruling; (4) V3 5-cycle wall-clock on the
-capped box; (5) A, C1+Gate C, V.
+**Remaining work, in dispatch order (all briefs/designs already exist — do not
+redesign):**
 
-0. **Pre-flight:** `git -C repos/weewx-clearskies-marine log --oneline -8` — look for
-   "S2:"/"S3:" commits (the dev-phase-s agent may have finished after checkpoint; its
-   closeout may be in the dead session's transcript — if commits exist but no closeout
-   was QC'd, treat them as UNVERIFIED claims and run the acceptance gate from scratch:
-   independent pytest, allowlist diff, spot-check). Marine service health via
+0. **Pre-flight:** marine repo HEAD must be `462b38f` clean; dashboard `8fff329`
+   clean; meta pushed through session-5 close. Health:
    `ssh -F .local/ssh/config librewxr "curl -sk https://127.0.0.1:8780/health"` —
-   expect status degraded ONLY by INV-11. FQDNs always.
-1. **Close out / re-dispatch S2+S3.** If the agent died before finishing: re-dispatch
-   `clearskies-api-dev` with the CORRECTED brief `briefs/L1-PHASE-S-DEV-BRIEF-2026-08-09.md`
-   (S2+S3 ONLY; S1 is now a rewritten ladder design — see plan S1) + the six rulings in
-   "S2/S3 rulings issued" below (they bind; re-state them in the dispatch). Then S4b
-   test-author (wlevel/datum KATs), auditor at Gate S per plan. **S2+S4b deploy ships
-   AFTER G9** (one functional change per deploy; G9 outranks — operator-ruled physics).
-2. **G9 — box-size cap (operator ruling, urgent).** Full design + KAT spec + doc-sync
-   list = plan §G9. Dispatch dev (swan_domain.py envelope clamp) + test (KATs h/i +
-   row-(e) literal updates authorized same-commit). Then push + deploy + config re-push
-   → sizing trace must show ≤100 km/axis (~91×100, S edge ≈33.18, north of SCI 33.03tip;
-   Catalina S shore ≈33.30 stays inside). Re-run the G-Accept rows on the capped box
-   (matched-hour + buoys + journal sweep + wall-clock; capture SWAN peak RSS — the one
-   number never measured, threshold 300 MB, `ps -C swan -o rss=` sampled during L1).
-   G-Accept then CLOSES (record in plan).
-3. **S1 + S4a (currents ladder).** S1 design REWRITTEN in plan (P7 amended, operator
-   "ok fine"): containment ladder OFS → STOFS-3D-Atl (East/Gulf/PR, total current,
-   fetch its velocity netCDF — exact file pinned at implementation with one live shape
-   check) → PacIOOS ROMS Hawaii (`roms_hiig` family, ERDDAP server already in §14.11)
-   → RTOFS alone (direct NOMADS netCDF `rtofs_glo_2ds_n{NNN}_prog.nc`, non-tidal, loud
-   log). NO summing anywhere; per-cycle selection. S4a KATs respecified (plan S4 row a/f).
-4. Then **A, C1+Gate C, V** per plan order (R5 is closed — C1 is dispatchable).
+   status degraded ONLY by INV-11. FQDNs always. All session-5 agents/monitors are
+   dead — nothing is in flight.
+1. **Close the S2 accept (no coding — evidence + one investigation).** Evidence
+   already collected session 5 (record it in the plan's S-Accept block): STOFS ran as
+   PRIMARY on the live cycle — journal 22:09:03Z "73 hourly water-level grid(s)...
+   spatially-varying WLEVEL primary (P8 chain)", WLEVEL.txt written spatially-varying
+   on ALL FOUR grids (91×100 / 75×82 / 51×46 / 49×169, 67 timesteps each), cycle
+   published normally, no OOM. **OPEN ITEM blocking the accept row: the service
+   process peaked ~2,973 MB during that cycle** (vs ~1.35 GB idle measured later).
+   READ-ONLY investigation first: is the ~1.6 GB cycle delta attributable to S2's
+   fetch path (it should be ~0.5 MB retained + transient decode) or pre-existing
+   cycle behavior? Compare: sample service RSS through one full cycle while grepping
+   which stage the peak lands in; check whether the pre-S2 deploys showed the same
+   (no baseline exists — the honest method is stage-attribution on the live cycle).
+   If S2's path holds full-grid buffers longer than one message decode, that is a
+   defect → fix round (subset earlier / free sooner). If pre-existing, park it with
+   evidence and close the accept.
+2. **Gate S blind audit — wlevel half** (`clearskies-auditor`, adversarial, per plan
+   §Gate S rows minus the currents rows): containment/bias-gate numbers recomputed
+   from raw fetches, no-silent-fallback greps, mutation drill on a cut STOFS URL,
+   Hawaii NAVD88 refusal, §14.13a doc-sync landed. Auditor sees design + expected
+   numbers ONLY (never implementer work product).
+3. **S1 + S4a — currents ladder round** (marine repo; briefs exist: plan §S1 as
+   RE-AMENDED + §S4 rows a/c-g as re-respecified). HARD EDGES: NO RTOFS anywhere —
+   ladder = regional OFS (containment) → STOFS-3D-Atl (East/Gulf/PR; velocity netCDF
+   pinned from NCO inventory with one live shape check) → PacIOOS ROMS Hawaii
+   (`roms_hiig`, ERDDAP) → **exhausted = REFUSE** (`CurrentCoverageError` →
+   `currents_fetch_failed`, message names bbox + declined rungs). No summing;
+   per-cycle selection; output shape identical to `fetch_surface_currents` so
+   `_write_current_txt` is untouched. Scope-ack MANDATORY and ENFORCED (a session-5
+   dev skipped it — do not let that repeat). Then S1+S4a single-change deploy +
+   S-Accept currents rows (HB stays on WCOFS — selection INFO line; smoke the other
+   rungs config-time from librewxr incl. the refusal on an uncovered bbox).
+4. **V3 evidence collection (can start immediately, parallel):** 5 consecutive
+   NORMAL cycles on the capped box — wall-clock ≤45 min hard/≤40 target, SWAN peak
+   RSS ≤ **400 MB** (operator raised from 300, session 5), boundary volume + read
+   time in B-Accept envelope. Watcher hygiene: absolute `-F` ssh-config path
+   (a session-5 monitor died silently on a relative path), test pattern first,
+   bounded timeout.
+5. **Phase A** (A1 marine `/config` source report; A2 admin panel + L1-override
+   field + help keys) per plan §A1/§A2; Gate A.
+6. **Phase C remainder:** C1 (server aggregates + card; plan §C1 design is decided —
+   eligibility rule, min/max heights, energy-weighted period, additive fields only)
+   — its server half is marine-repo `endpoints/surf.py`, so it queues behind S1's
+   round on that repo. **C3 REDO per the recorded requirements** (plan §C3, binding):
+   ONE physically-correct ground→chart transform from the transects' REAL
+   coordinates driving heatmap rows, BOTH axes (y in alongshore DISTANCE, not
+   indices), imagery placement, and the 50 m ground-distance buffer; acceptance
+   verified against GROUND TRUTH (pier's real coordinates project onto its rendered
+   pixels; transect 0 south of the pier; beach in frame; a known ground distance —
+   the pier's ~500 m — measures true on both scales). Never validate the chart
+   against its own arithmetic. If the dashboard payload lacks real per-transect
+   coordinates, STOP and surface (API gap). Then Gate C (both cards, screenshots in
+   gate record).
+7. **Phase V close:** V1/V2 (swell-event reality rows — need matching weather; may
+   remain open), V3 (from item 4), V4 blind auditor walk of all gate evidence. Plan
+   closes when V1–V4 recorded.
 
-## S2/S3 rulings issued (session 4, binding on the round — QC against these)
-1. STOFS fetcher = WATER-LEVEL ONLY (`elevhtml` field); no velocity code, no stubs;
-   docstring notes velocity is S1's question. (STOFS-2D has NO velocity — proven.)
-2. Region tokens: `conus.west` (HB) / `hawaii` (HI);
-   `stofs_2d_glo.t{00,06,12,18}z.{region}.f{NNN}.grib2`.
-3. CO-OPS `datums` product lives on the Metadata API (`/mdapi/.../stations/{id}/datums.json`)
-   — datagetter returns "no longer available" (put that error text in a comment).
-   Additive product in coops.py; offset = datums[target]−datums[source] (station-local zero).
-4. DEM entries hand-authored WITH catalogue URLs: Maui lahaina_13 + Big Island
-   hilo/kawaihae/keauhou_13 + the 5 PR DEMs (arecibo/fajardo/guayama/mayaguez/ponce).
-5. S3 branch: catch existing DatumConversionError, gate on REGION_HAWAII + tidal source
-   datum, fall to CO-OPS-datums offsets; NAVD88/geodetic re-raises. Offsets fetched ONCE
-   at config push, CACHED (no per-cycle datums calls).
-6. Time matching nearest-within-2h; source selection PER-CYCLE — any STOFS timestep gap
-   = whole-cycle STOFS failure → loud CO-OPS-uniform fallback; refuse only if both fail.
+**NOT part of this plan's remaining work:** the Great Lakes implementation. The GL
+rulings are RECORDED (plan §G9-GL + decision log: D-GL-1 no lake L1, boundary feeds
+L2; D-GL-2 boundary product chosen by ACCURACY, pinned by live comparison at
+implementation; D-GL-3 L2 outer edge = 30 m contour OR deepest-locally-available).
+Implementation is a separate future operator-ordered round; the work-list is
+`briefs/G9-GL-RESEARCH-REDO-2026-08-09.md` §Q4's dependency list.
 
-## Operator authorizations + prohibitions in force
-- "As coordinator, you have permission to push/deploy as needed." (exercised: G-Accept
-  deploy session 4)
-- "Architectural changes called for within the plan are pre-approved" (register P1–P15
-  incl. amended P7; outside it → STOP and ask). G9 + P7 ladder are operator-ruled.
+## Session-5 outcomes (evidence in the plan's decision log + section records)
+- S2/S3 code round re-run from scratch and closed (`5d9d88b`/`9cbb915`); S4b closed
+  (32 KATs, `e9ef833..c5e9383`).
+- G9 coded (`353c34e` + membership-fix `91b6e2d`), tested
+  (5 KATs `3065289` incl. east-facing pin), deployed; **the lead gate caught a real
+  defect** (positional `_offshore_sides` unpacking — would have moved the coast edge
+  on east-facing coasts).
+- **INCIDENT:** first deploy (`3065289`, G9+S2 two-change) OOM-crash-looped — S2's
+  fetcher held 73 full-region grids as nested Python lists (~7 GB). Rolled back same
+  session (`439aa7c`, surgical: S2 + its 3 test commits only). **S2 re-landed
+  memory-safe** (`462b38f`: subset-at-extraction + float32, ~0.5 MB retained, memory
+  KAT mutation-proven) and deployed single-change. Bias gate PASS −0.044 m (25 pairs
+  vs CO-OPS 9410660) — carries forward, do NOT re-run.
+- **G9 verified live on the capped box:** 93×101 cells / 9,393; lat 33.1797..34.0806
+  (N-S = 100.0 km exactly at cap; S edge north of SCI 33.03; Catalina 33.30 inside);
+  lon −118.7598..−117.7725 (E-W 91.3 km unchanged); boundary 194 points (S=93,
+  W=101); G7 guard cleared state + forced full run; reality gate PASS (combined deep
+  Hs 0.64 m vs buoys 0.8/0.9 = −20/−23% inside ±25%; shadow retained 0.35 m @259°);
+  journal sweep clean (the high-volume L4-clamp WARNING proven PRE-EXISTING: 5,670
+  hits in the pre-deploy window). Cold-start cycle 48m40s (cold caveat; steady-state
+  = V3's job). SWAN peak RSS measured for the first time: 335 MB.
+- **Phase G CLOSED** (operator raised the RSS budget to 400 MB; V3 row updated).
+- C2 accept PASSED (partition-0-only train, card-consistent). **C3 accept REVOKED by
+  operator screenshot review** (ortho misplaced/no beach; y-axis must be DISTANCE;
+  buffer void) — two prior rounds fixed symptoms inside a broken frame; requirements +
+  ground-truth acceptance now recorded in plan §C3; the one surviving row is
+  overlay-removal.
+- **Operator rulings session 5:** RTOFS-alone rung REMOVED from the S1 ladder
+  (exhausted = REFUSE — "missing information... garbage data"); RSS budget 300→400;
+  GL architecture ruled (D-GL-1/2/3 above) after a research redo on the operator's
+  depth-envelope reframe (first research rejected as wrong-question).
+- Repos: marine pushed through `462b38f`; dashboard through `8fff329` (deployed to
+  weather-dev); meta pushed through session close.
+
+## Authorizations + prohibitions in force
+- "As coordinator, you have permission to push/deploy as needed." (exercised
+  repeatedly session 5). **Push the meta repo at EVERY checkpoint** — batching it to
+  session end made progress invisible to the operator (session-5 failure).
+- "Architectural changes called for within the plan are pre-approved" (register
+  P1–P15 as amended; outside it → STOP and ask). The GL rulings + RTOFS removal +
+  C3 redesign are operator-ruled.
 - "Work through the entire plan and only stop if there are architectural issues not
-  foreseen in the plan."
-- **Q5-class questions (data-source routes/mechanics) are the COORDINATOR'S research, not
-  operator questions** (operator, 2026-08-09, emphatic: "That is supposed to be your
-  research, DO IT"). Only true register/trigger items go to the operator.
-- ⛔ ROUTER ACCESS: PERMISSION DENIED (standing). FQDNs, never raw IPv4 (CLAUDE.md).
-- Standing: no AskUserQuestion; plain-English reports; scratch files maintained; no full
-  pytest suite ever.
-- **Process burn from session 4 (do not repeat):** a background watcher with a
-  `--since` window that started AFTER the target log line + no fallback timeout idled
-  the session ~7 h. Every watcher: test the pattern against an existing line first, AND
-  give every wait a bounded timeout that re-checks regardless.
+  foreseen in the plan." + the closing mandate above.
+- Q5-class data-source research is the COORDINATOR'S job, not an operator question.
+- ⛔ ROUTER ACCESS: PERMISSION DENIED (standing). FQDNs, never raw IPv4.
+- Standing: no AskUserQuestion; plain English (define every term); NO full pytest
+  suite ever; scratch files maintained.
+- **NEVER present an unverified diagnosis to the operator as fact** — session 5's
+  worst moment was explaining invisible progress with an unchecked guess ("not
+  pushed") when the operator reads LOCAL files. Ask what they're looking at.
+- **Operator-facing times in PDT** (server logs are UTC — convert; "tonight" at
+  3 PM local reads as a bot that doesn't know what time it is).
+- **No "fallbacks" that substitute missing physics for real data** (the RTOFS
+  lesson): a source that lacks required content is not a fallback, it is garbage
+  data — refuse loudly instead. Generalize this instinct.
+- **Status markers update at the moment state changes** — plan section headings,
+  the 📍 CURRENT STATE table, and this file must never disagree (operator caught
+  hours-stale headings twice in session 5).
 
-## Phase status
-
-| Phase | Status | Notes |
-|---|---|---|
-| DOC | ✅ CLOSED (session 1) | ADR-104; blind audit 7/7. |
-| W | ✅ CLOSED incl. W6 (session 3) | See plan records. |
-| B | ✅ COMPLETE (session 2) | Deployed `5cc28e8`. |
-| G | **G9 DEPLOYED session 5 — capped 93×101 box LIVE, all re-run rows PASS; G-Accept closes on operator question G9-RSS** | See plan G9 + G-Accept records. |
-| G9 | ✅ CODE+TESTS+DEPLOY session 5 (`353c34e`/`91b6e2d`/`3065289` KATs; live via rollback deploy `439aa7c`) | Membership-mapping defect caught at lead gate + fixed; GL regime exempt (open question G9-GL). |
-| S | **S2 LIVE (re-land `462b38f` after OOM rollback — see plan incident entry); S3 code done+deployed (inert at HB); S4b KATs in; S1+S4a NEXT (ladder, NO RTOFS — exhausted=refuse per operator re-ruling)** | Gate S (wlevel half) after S2 accept rows. |
-| A | not started | |
-| C | C2/C3 code done (session 2); C1 + Gate C dispatchable (R5 closed) | |
-| V | not started | V3 note: 5-cycle wall-clock window starts AFTER G9 lands (current box is temporary). |
-
-## Session-4 G-Accept / live facts
-- librewxr runs marine `eecfabc` (proc 08:22:05Z), new L1 LIVE: bbox lon
-  −118.7598..−117.7725 / lat 32.8994..34.0806 (93×132 @1 km, 12,276 cells), L2 76×83
-  (sized; runner logs 75×82), L3 51×46 coarse-nest fallback (smart-L3 viability failed
-  ~229 m — PRE-EXISTING class), L4 51×169. Boundary 225 points (S=93, W=132 files),
-  44.9 MB. G7 cold-start guard fired correctly 08:56:33Z (state cleared, forced full run).
-- Pre-deploy baseline archived in session-4 scratchpad (surf payload JSON + boundary
-  inventory + WIND md5 `4c6ad285…`); post payload likewise (`g_accept_baseline_surf.json`
-  / `g_accept_post_surf.json`) — scratchpad is session-scoped, so numbers that matter
-  are IN the plan's G-Accept record; re-fetch fresh payloads rather than hunting files.
-- Config push mechanic (needed for G9): re-push the persisted config verbatim —
-  `sudo cat /etc/weewx-clearskies/marine/marine.conf | curl -sk -X POST -H "Authorization:
-  Bearer $TOKEN" -H 'Content-Type: application/json' --data-binary @- https://127.0.0.1:8780/config`
-  (token: `sudo sed -n 's/^MARINE_SERVICE_SECRET=//p' /etc/weewx-clearskies/marine/secrets.env`).
-  Sizing chain runs in background ~3 min; look for "Marine grid sizing chain: L1 sized".
-- Deploy: `scripts/deploy-marine.sh` FROM META REPO ROOT (prints commit + proc start).
-- Known journal noise: INV-11 (only /health reason), NDBC QuotaExhausted, L4-handoff
-  target-depth class = the compute_spot_transect SUBSTITUTION warnings (326/cycle,
-  pre-existing), check_mk docker-exec spam. HRRR Lambert WARNING still GONE (W6) —
-  reappearance = regression.
-- Full-cycle wall-clock: 35m56s on the oversized box (13:04:23→13:40:19); pre-G 30m11s;
-  expect ~32-33m after G9.
-- Tracked pre-existing marine test failures unchanged (3 + 1 flaky; see plan decision log
-  2026-08-09 entry). Baseline: tests/test_island_autosizing.py + tests/services/ =
-  210 pass / 3 fail at eecfabc.
-
-## Doc-sync state (session 4 — COMMITTED, meta `c767794` + earlier)
-ADR-104: D2 amendment (box-cap ruling) + D9 amendment (ladder). PROVIDER-MANUAL:
-§14.10a rewritten (ladder + direct-NOMADS route + composite-death evidence), §14.13a
-(no-velocity, conus.west tokens, grid-writer wiring correction), §14.15 (+99-file-cap
-measured deviation), §14.11 (2 coastwatch rtofs rows flagged STALE — **side-finding:
-water-temp chain's rtofs_3d deep fallback is silently dead; needs its own fix round**,
-parking lot). ARCHITECTURE.md: input-chain bullet (ladder) + L1-sizing bullet (cap
-semantics, "lands with G9" tag). Tags come off at the implementing deploys (G9 / S1).
-**Meta repo is NOT pushed this session — push at operator instruction or next natural
-push point; marine IS pushed through `eecfabc`.**
+## Live facts (verified at session-5 close)
+- librewxr: marine `462b38f` (proc 22:04:28Z), capped L1 live and publishing; STOFS
+  wlevel primary; S3 present-but-inert (Hawaii-gated). Idle service RSS ~1.35 GB;
+  cycle peak ~2.97 GB observed once (OPEN question, item 1 above).
+- Budgets: cycle ≤45 min hard; SWAN peak RSS ≤400 MB (`omp_num_threads=6` is an
+  operator ruling — do not touch).
+- Marine pytest baseline at `462b38f`: selection `tests/test_island_autosizing.py
+  tests/services/ tests/test_coops_fetch_datums.py tests/test_stofs_wlevel_provider.py
+  tests/test_swan_wlevel_chain_fallback.py` = **249 pass / 3 tracked pre-existing
+  fail** (double-listing tests/services files inflates counts — dedupe: never list a
+  file AND its parent dir). The 3: test_double_break_transect55_kat wave_reforms,
+  test_wind_gatherer cold-start reconcile, test_wind_timeline_store round-trip.
+- Dashboard vitest (HeatMapCard) 46/46 at `8fff329` — will churn in the C3 redo
+  (stale-test rule: the footprint-model tests get REPLACED in the same commit).
+- Config re-push mechanic + deploy script: unchanged (see plan G-Accept record;
+  `scripts/deploy-marine.sh` from meta root; sizing chain ~3 min background — do NOT
+  re-push config while a cycle is mid-WW3-fetch: the chain's smoke test shares the
+  NOMADS rate limiter and aborts cleanly but wastes a cycle wait; session-5 hit
+  this — wait for `run_in_progress:false` first).
+- Known journal noise (unchanged): INV-11 only /health reason; NDBC QuotaExhausted;
+  L4-clamp/SUBSTITUTION classes pre-existing; check_mk spam; HRRR Lambert WARNING
+  gone (reappearance = regression).
 
 ## Parking lot (carried)
+- **Service cycle-RSS ~3 GB attribution** (item 1 above — blocks S2 accept row).
+- Heatmap streak rows + white gap band near southern transects (recorded at C3
+  evidence; may be model-side, look after C3 redo).
+- coastwatch ERDDAP rtofs datasets gone → water-temp chain deep fallback silently
+  dead (§14.11 flag) — own fix round.
 - Dashboard bundle per-chunk methodology ruling (open); BeachProfileCardBody D6 2
-  pre-existing fails; orphaned `shadowedTransect` i18n key; openapi-v1.yaml SurfForecast
+  pre-existing fails; orphaned `shadowedTransect` i18n key; openapi SurfForecast
   drift (own doc-sync round).
-- **NEW: coastwatch ERDDAP rtofs datasets gone → water-temperature chain deep fallback
-  (erddap_ocean rtofs_3d) silently unavailable — needs its own fix round** (flagged in
-  §14.11).
-- Incident follow-ups 1–3 (DHCP/networkd monitoring; check_mk spam; SWAN stdin FD leak
-  swan_runner.py:5474 + surfbeat_runner.py:531).
-- 3 pre-existing marine test failures + 1 flaky.
-- Smart-L3 viability failing at HB (~229-235 m short, falls back to coarse nest) — the
-  known smart-L3 disposition item; surfaced again at G-Accept, unchanged by G.
+- Incident follow-ups 1–3 (DHCP/networkd monitoring; check_mk spam; SWAN stdin FD
+  leak swan_runner.py:5474 + surfbeat_runner.py:531).
+- 3 pre-existing marine test failures + 1 flaky; smart-L3 viability at HB (~229 m
+  short, coarse-nest fallback) — known disposition item.
 
-## Agents at checkpoint
-- **dev-phase-s: ALIVE AND CODING S2+S3 at checkpoint** (scope-ack confirmed 6 rulings,
-  no commits yet). A new session cannot reach the old session's agent — check the repo
-  for its commits; if incomplete, re-dispatch fresh (corrected brief + the 6 rulings).
-- All others dead/closed (dev-w6, dev-phase-g, test-g8, audit-gate-g, inv-*).
-- Session-4 monitors (RSS watcher, sizing watcher) die with the session — re-arm at G9.
+## Agents at session-5 close
+All dead (dev-phase-s, test-s4b, dev-g9, test-g9, dev-s2-reland, dev-c3-fix,
+dev-c3-geo [recalled before any code], c23-evidence, research-gl-*). All monitors
+dead. Nothing in flight; repos clean at the HEADs above.
 
-## Decision log (session 4) — full text in the PLAN's decision log
-- G-Accept run: 4 rows PASS; L3-guard pre-existence proven; 99-file cap measured-tolerated.
-- Q6 ruled: cap binds BOX (per-ray reading was a misencoding); b3 nonstationary rejected;
-  G9 created + designed.
-- Q5 closed (delegated): RTOFS = direct NOMADS netCDF; STOFS-2D-no-velocity proven;
-  P7 composite → ladder (operator "ok fine"); S1/S4 rewritten; full doc-sync committed.
-- Phase-S scope-ack findings: coops.py allowlisted (additive datums via Metadata API);
-  S2 = wiring into existing `_write_wlevel_grid_txt`; 6 dispatch rulings issued.
-- Process: session idled ~7 h on a mis-windowed watcher (--since after the line, no
-  timeout) — watcher hygiene rule added above.
+## Process lessons this session (already applied above, listed for the record)
+1. Two-change deploys: the OOM incident vindicated one-change-per-deploy —
+   attribution was fast ONLY because the changes' journal signatures were disjoint.
+2. Resource-scale blind spot: KATs on tiny fixtures + a big-RAM workstation bias
+   gate cannot see a 7 GB production footprint — production-shaped memory KATs are
+   now mandatory for data fetchers (S2 re-land has the pattern).
+3. Acceptance must compare against GROUND TRUTH, not the artifact's own arithmetic
+   (C3 revocation; rules/verification.md "validate against reality" applies to UI
+   geometry too).
+4. Watchers: absolute paths, validated patterns, bounded timeouts (one silent
+   monitor + one 8-test-count confusion this session).
+5. Scope-ack is not optional — one dev skipped it and only the acceptance gate
+   caught the risk after the fact; enforce before any code.
