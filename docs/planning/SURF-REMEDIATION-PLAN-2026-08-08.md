@@ -164,6 +164,11 @@ raw payload excerpt pasted beside the per-partition list. Dashboard range ("X–
 
 ## PHASE R1b — Min/max redefined: true extremes of the good surf, pooled across swells (operator-ruled 2026-08-08)
 
+**✅ AMENDED SEMANTICS IMPLEMENTED + LIVE 2026-08-09 PM** (marine `e12facc`, deployed; live
+min/max tightened to 1.08–1.14 m from the pre-fix 0.34–1.28 m; stale test re-pinned
+same-commit with fail-pre-change transcript; record in L1-BOUNDARY-REBUILD-PLAN
+§EXECUTION RECORD).
+
 **⚠ R1b-D1 AMENDED 2026-08-09 PM (operator, in chat, verbatim anchors: "It was NEVER supposed
 to be every transect — ONLY the TOP transects"; "I don't want the limp-ass bottom of the
 barrel, why the fuck would we measure that"; "get the documentation right"):** the min/max
@@ -677,6 +682,15 @@ and replacement is an operator decision with a designed successor — never a mi
 ---
 
 ## PHASE R3 — Fixed beach-profile scale *(operator-ruled, third request)*
+
+**✅ R3 DONE + DEPLOYED 2026-08-09 PM** (priority-reset round; full record in
+L1-BOUNDARY-REBUILD-PLAN §EXECUTION RECORD): R3.1 marine `5ffd50e` (config keys + metadata
+`displayWindowM:150`/`displayLandwardM:30`, live-verified); R3.2 dashboard `fe00d23`+`21c3aca`
+(selectTier + tier tables DELETED, fixed [+150, −30] m domain, HB-preset fallback;
+fixed-domain KAT fails against the old tier logic — transcript in commit). Screenshot accept:
+axis reads 492 → −95 ft. The REVERSED label ruling shipped alongside (dashboard `e454b2e` —
+every break labeled). Gate R3 (auditor adversarial pass) NOT yet run — deferred with the rest
+of the QC queue per the operator's same-evening priority reset.
 
 **Owner:** `clearskies-dashboard-dev` (Sonnet) + `clearskies-api-dev` (one metadata field).
 **QC:** `clearskies-auditor` at Gate R3. **Pre-approved architectural scope (trigger 4/7):**

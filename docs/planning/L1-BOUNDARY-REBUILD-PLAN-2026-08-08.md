@@ -4,11 +4,12 @@
 
 | | |
 |---|---|
-| **Live on librewxr** | marine `462b38f` (proc 3:04 PM PDT): capped 93×101 L1 box (G9) + STOFS water level primary (S2 re-land, memory-safe) + S3 Hawaii datum branch (inert at HB) |
-| **Phases DONE** | DOC, W, B, **G (CLOSED)**, S2/S3/S4b code, C2 accept. GL architecture RULED (no lake L1; boundary→L2; accuracy-governed product; L2 edge = 30 m-or-deepest) — implementation is a future round, outside this plan |
-| **Remaining (session-6 mandate: finish the plan)** | S2 accept close (one open item: cycle-RSS attribution) → Gate S wlevel → S1+S4a (NO RTOFS, exhausted=refuse) → V3 5-cycle window → A → C1 + C3 redo (ground-truth transform, requirements recorded) + Gate C → V |
+| **Live on librewxr** | marine `bdaf956` (proc 6:50 PM PDT 08-09): capped L1 box (G9) + STOFS wlevel primary (S2) + S3 Hawaii branch (inert) + **R1b top-tail min/max + W0 adaptive σf (swell-loss fix) + R3.1 window metadata + C3O per-transect origins + C1 aggregate fields** |
+| **Live on weather-dev** | dashboard `9700aae` (deployed ~7:05 PM PDT 08-09): fixed 492→−95 ft profile axis + all-breaks-labeled + C1 range card + C3 heatmap ground→chart transform (pier ground-truth PASS) |
+| **Phases DONE** | DOC, W, B, **G (CLOSED)**, S2/S3/S4b code, **S2 accept wlevel rows CLOSED** (cycle-RSS attributed pre-existing), C2 accept, **C1 DONE (server+card, live-verified)**, **C3 REDO DONE (origins+transform, ground-truth accept PASS)**, V2 evidence collected. GL architecture RULED — implementation outside this plan |
+| **Remaining** | Gate S wlevel (blind audit; brief drafted) → S1+S4a currents ladder (briefs drafted, NO RTOFS, exhausted=refuse) → S-Accept currents rows → Phase A (A1/A2, briefs drafted) → Gate A → **Gate C (C1+C2+C3 rows — all code/accepts done, gate not yet run)** → V1 (needs W-NW swell weather) + V3 (5-cycle window, collecting) + V4 blind walk → plan close |
 | **Session-5 incident** | First G9+S2 deploy OOM-crash-looped (~7 GB fetcher) → rolled back → S2 re-landed memory-safe + redeployed same day. Full record: decision log. |
-| **WAITING ON OPERATOR** | Nothing pending. **PRIORITY-RESET ROUND BUILT + DEPLOYED 2026-08-09 PM (~7:20 PM PDT):** marine `bdaf956` live (R1b top-tail, R3.1 metadata 150/30, C3O origins+alongshoreM, C1 fields, W0 adaptive σf; R2 found already live `fdf7afc`); dashboard `9700aae` live on weather-dev (fixed 492→−95 ft axis ✓ screenshot, 3 breaks labeled ✓, C1 range card ✓, heatmap ground→chart transform with pier position matching its served ~285 m alongshore ✓ screenshot). **First post-deploy cycle (01:56–02:47Z) VERIFIED: R1b top-tail live (min/max 1.08–1.14 m tight band vs pre-fix 0.34–1.28 m); W0 live (rebuilt boundary spectrum decomposes to TWO distinct S trains 0.54 m@13.2 s/193° + 0.46 m@12.3 s/182° — WW3's separate trains preserved; served train histogram improved {2:20,3:27,4:14,5:6}→{3:27,4:17,5:17,6:6}, zero 2-train hours); post-deploy journal sweep clean (only pre-existing INV-11 + L4-clamp classes). Honest residual: at nowcast hours SWAN's own propagation physics still blends the two nearly-same-direction S trains by the 15 m point — input-side fabrication is fixed; further separation would need the pinned spectral grid (CIRCLE 72 0.03 1.0 34) revisited, which is OUT of this plan.** Gate S / S1 / Phase A / V-close still DEFERRED per the reset. |
+| **WAITING ON OPERATOR** | Nothing — full execution record of the 2026-08-09 PM priority-reset round is in §"EXECUTION RECORD — 2026-08-09 PM priority-reset round" below. The deferred queue (Gate S wlevel → S1+S4a → A → Gate C → V) resumes next session unless redirected |
 | **Session-5 operator rulings applied** | RTOFS fallback REMOVED; RSS budget 300→400; C3 accept revoked + redo requirements set; GL D-GL-1/2/3 |
 
 **Created:** 2026-08-08 (operator-directed, in chat: "granular tasks, all design done now and not
@@ -105,6 +106,36 @@ surfaces to exist; V closes the whole plan.
 | P14 | Beach-profile chart draws the DOMINANT swell's wave train only (display; consumes R5's dominant-partition serving) | — (display) | operator, 2026-08-08 chat (beach-profile instruction) |
 | P15 | Surf-height heatmap: ortho imagery rotated to the transect/beach frame, 50 m ortho buffer, y-axis labels, structure-affected-area overlay REMOVED (display-only; structure physics stays in SWAN L4) | — (display) | operator, 2026-08-08 chat (heatmap instruction) |
 | P16 | All-transects profile response: additive per-row `originLat`/`originLon`/`alongshoreM` (each transect's real origin + alongshore position), sourced from the pipeline's existing `transect_origins` — no new computation, serving only | 4 | operator, 2026-08-09 PM chat (C3-COORDS ruling) |
+
+## EXECUTION RECORD — 2026-08-09 PM priority-reset round (operator-ordered, in chat; folded into THIS plan — the separate execution scratch file is retired)
+
+The operator's 2026-08-09 evening review of three live cards ordered: build the ruled fixes
+NOW, defer the QC/test queue. Every task, its status, commit, and verification:
+
+| Task | What | Status | Commits | Verification (all lead-reproduced) |
+|---|---|---|---|---|
+| Swell-loss diagnosis | WW3 served 4 partitions, we served 2 — locate the loss | ✅ DONE | (read-only) | WW3 f007 point dump: 14.7 s/191° + 11.7 s/186° S trains in input; σf=0.015 Gaussians 0.0175 Hz apart sum saddle-free (arithmetic + 18Z directional-separation cross-check) |
+| W0 σf fix | Adaptive narrowing `min(0.015, max(0.005, Δf/3))` within 45° affinity (pinned-constant amendment above) | ✅ DONE + LIVE | marine `bdaf956` | Rebuilt boundary file decomposes to TWO S trains (0.54 m@13.2 s/193° + 0.46 m@12.3 s/182°); served train histogram {2:20,3:27,4:14,5:6}→{3:27,4:17,5:17,6:6}, zero 2-train hours. Residual (recorded): SWAN's own propagation still blends near-same-direction trains at nowcast hours — spectral-grid revisit is OUT of plan |
+| R1b amendment (SURF-REMEDIATION) | min/max = +0.75σ TOP TAIL only; docs corrected | ✅ DONE + LIVE | marine `e12facc` | Live min/max 1.08–1.14 m tight band (pre-fix 0.34–1.28 m); stale test re-pinned same-commit w/ fail-pre-change transcript |
+| R2 cessation (SURF-REMEDIATION) | Q_b-only cessation | ✅ ALREADY LIVE (found) | `fdf7afc`/`b3f8092` (earlier session) | Lead-verified at HEAD; plan marker corrected. Chained-impact-zone physics question left open for operator |
+| R3.1 window metadata (SURF-REMEDIATION D-R2) | 150/30 m keys + `/profile` metadata | ✅ DONE + LIVE | marine `5ffd50e` | Live: `displayWindowM:150, displayLandwardM:30` |
+| C3O origins (P16) | Per-row `originLat`/`originLon`/`alongshoreM` | ✅ DONE + LIVE | marine `223182e` | Live: 162 rows, row 0 = journal-logged transect-0 coords exactly, alongshore 0→1,608 m |
+| C1 server (P13) | Aggregate fields, eligibility, Hs² period | ✅ DONE + LIVE | marine `921ac21` | Live fields serving; worked-example arithmetic pins 15.1 s |
+| R3.2 fixed axis (SURF-REMEDIATION D-R2) | selectTier DELETED; fixed [+150, −30] m | ✅ DONE + LIVE | dashboard `fe00d23`+`21c3aca` | Screenshot: axis 492→−95 ft; fixed-domain KAT fails pre-change |
+| All breaks labeled | Dominant-only annotation filter DELETED | ✅ DONE + LIVE | dashboard `e454b2e` | Screenshot: 3.9 ft/2.4 ft/1.4 ft all labeled |
+| C1 card | Range + combined period, dumb renderer | ✅ DONE + LIVE | dashboard `f6416dc` | Screenshot: 1.1–1.8 ft, 1.5–3.4 ft, 13.0 s, 3-train table |
+| C3 transform redo | ONE ground→chart transform; y-axis DISTANCE; ortho co-registered; 50 m ground buffer | ✅ DONE + LIVE, **ground-truth accept PASS** | dashboard `b523626`+`9700aae` | Screenshot: y-axis in ft distance; pier renders at its served ~285 m alongshore position; beach in frame; ground-truth vitest block independent of component math |
+| Deploys | One marine (`deploy-marine.sh`, proc 01:50:01Z) + one dashboard (`redeploy-weather-dev.sh`) | ✅ | — | Post-deploy journal sweep clean (only pre-existing INV-11 + L4-clamp); first post-deploy cycle 01:56–02:47Z published normally |
+| Tests | Marine 270 pass/3 tracked pre-existing (lead-reproduced, names matched); dashboard 92/92 on weather-dev (lead-reproduced) + tsc clean + build | ✅ | — | Baselines recorded; bundle entry 203.00 KB gzip, marine chunk 43.06 KB |
+
+**Also closed this session (pre-reset):** S2 accept wlevel rows (cycle-RSS attributed pre-existing,
+§S-Accept); V2 evidence (§Phase V); C3-COORDS answered (P16). **Parking lot additions:** 2
+pre-existing stale foam-count tests in `BeachProfileCardBody.test.tsx` (pre-date round, fail at
+`8fff329` — test-author round); openapi has NO BeachProfile schema at all (pre-existing drift,
+flagged by dev); chained-impact physics question (above); nowcast S-train blending vs pinned
+spectral grid (above).
+
+---
 
 Named constants fixed by this plan (not re-derivable by agents): `L1_MAX_EXTENT_KM = 100.0`,
 enclosure margin `10.0 km` (reuses the existing offshore-margin convention), near-lee
@@ -859,7 +890,7 @@ C2 `clearskies-dashboard-dev`. **Tests:** `clearskies-test-author` (API KATs), d
 vitest. **QC:** `clearskies-auditor` at Gate C. Independent of the model chain; both tasks
 consume R5's dominant-partition serving and therefore wait for its round close.
 
-### C1 — Current Swell Conditions card: range/combination over ELIGIBLE swells  ⬜
+### C1 — Current Swell Conditions card: range/combination over ELIGIBLE swells  ✅ DONE 2026-08-09 PM (server marine `921ac21` + card dashboard `f6416dc`, deployed both hosts, live-verified: 1.1–1.8 ft range / 1.5–3.4 ft face / 13.0 s combined on the card; see §EXECUTION RECORD). Gate C row pending
 **Operator instruction (2026-08-08, verbatim intent):** show the swell height RANGE from
 min/max across swells by type — not just the dominant; min/max breaking face height; and the
 period from the COMBINATION of swells. Wind-swell rule throughout: **a wind swell with period
@@ -940,6 +971,11 @@ transform run from the transects' REAL coordinates. The origins exist server-sid
 → ⛔ BLOCKED on operator ruling §OPEN OPERATOR QUESTIONS "C3-COORDS".**
 **UNBLOCKED 2026-08-09 PM: C3-COORDS answered Option A (P16). Origins round (marine) + transform
 rebuild (dashboard) dispatched under the operator's 2026-08-09 PM priority reset.**
+**✅ REDO DONE + GROUND-TRUTH ACCEPT PASS 2026-08-09 PM (marine `223182e` origins + dashboard
+`b523626` transform, both deployed): y-axis in real alongshore distance, index labels deleted,
+ortho co-registered by the fitted transform, 50 m ground buffer; the pier renders at its served
+~285 m alongshore position (screenshot evidence, §EXECUTION RECORD) — verified against the
+pier's real geometry, never the chart's own arithmetic. Gate C row pending.**
 **Operator instruction (2026-08-08):** (a) the orthophotography must be ALIGNED with the
 transect bearing (the heatmap's beach frame), not true north — "so that way IT MATCHES";
 (b) 50 m of orthophotography buffering around the heatmap extent so the user can get their
