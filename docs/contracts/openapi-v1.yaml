@@ -3494,11 +3494,11 @@ components:
             this timestep (no ~15 m contour locatable for the spot, or no PT* row for the
             point/timestep) — the handoff partitions are never substituted.
           items: { $ref: '#/components/schemas/SpectralWaveComponent' }
-        swellHeightMinFt: { type: number, nullable: true, description: "(ruled 2026-08-08; lands with Phase C of L1-BOUNDARY-REBUILD-PLAN, P13.) Min deep-water swell height across ELIGIBLE swell components (wind swell with period < 5.0s excluded unless none eligible). Additive field; see API-MANUAL.md SurfForecast table." }
-        swellHeightMaxFt: { type: number, nullable: true, description: "(ruled 2026-08-08; lands with Phase C of L1-BOUNDARY-REBUILD-PLAN, P13.) Max deep-water swell height across ELIGIBLE swell components. Additive field; see API-MANUAL.md SurfForecast table." }
-        faceHeightMinFt: { type: number, nullable: true, description: "(ruled 2026-08-08; lands with Phase C of L1-BOUNDARY-REBUILD-PLAN, P13.) Min per-swell breaking face height over ELIGIBLE components at the representative break. Additive field; see API-MANUAL.md SurfForecast table." }
-        faceHeightMaxFt: { type: number, nullable: true, description: "(ruled 2026-08-08; lands with Phase C of L1-BOUNDARY-REBUILD-PLAN, P13.) Max per-swell breaking face height over ELIGIBLE components at the representative break. Additive field; see API-MANUAL.md SurfForecast table." }
-        combinedPeriodS: { type: number, nullable: true, description: "(ruled 2026-08-08; lands with Phase C of L1-BOUNDARY-REBUILD-PLAN, P13.) Energy-weighted mean period (Hs_i^2 weights) over ELIGIBLE components. Additive field; see API-MANUAL.md SurfForecast table." }
+        swellHeightMinFt: { type: number, nullable: true, description: "LIVE 2026-08-09 (L1-BOUNDARY-REBUILD-PLAN Phase C, P13). Min deep-water swell height (already display-unit feet) across ELIGIBLE swell components (wind swell with period < 5.0s excluded unless none eligible). Additive field; see API-MANUAL.md SurfForecast table." }
+        swellHeightMaxFt: { type: number, nullable: true, description: "LIVE 2026-08-09 (L1-BOUNDARY-REBUILD-PLAN Phase C, P13). Max deep-water swell height (already display-unit feet) across ELIGIBLE swell components. Additive field; see API-MANUAL.md SurfForecast table." }
+        faceHeightMinFt: { type: number, nullable: true, description: "LIVE 2026-08-09 (L1-BOUNDARY-REBUILD-PLAN Phase C, P13). Min per-swell breaking face height (already display-unit feet) over ELIGIBLE components at the representative break. Additive field; see API-MANUAL.md SurfForecast table." }
+        faceHeightMaxFt: { type: number, nullable: true, description: "LIVE 2026-08-09 (L1-BOUNDARY-REBUILD-PLAN Phase C, P13). Max per-swell breaking face height (already display-unit feet) over ELIGIBLE components at the representative break. Additive field; see API-MANUAL.md SurfForecast table." }
+        combinedPeriodS: { type: number, nullable: true, description: "LIVE 2026-08-09 (L1-BOUNDARY-REBUILD-PLAN Phase C, P13). Energy-weighted mean period (Hs_i^2 weights) over ELIGIBLE components. Additive field; see API-MANUAL.md SurfForecast table." }
       required: [time, waveHeightAtBreak, period, direction, qualityStars, qualityLabel, conditionsText, windQuality, swellDominance]
 
     FishingForecast:
