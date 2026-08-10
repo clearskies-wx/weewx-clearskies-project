@@ -1373,7 +1373,14 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 # ❓ OPEN OPERATOR QUESTIONS — maintained by the coordinator; newest at top
 
-## C3-ASPECT (2026-08-09 ~9 PM PDT) — The heat map's shape makes an honest photo overlay impossible. Which shape do you want?
+## ~~C3-ASPECT~~ WITHDRAWN 2026-08-09 ~9:30 PM PDT — the question was built on a FALSE premise
+## (operator: "the card is scaled to show whatever we put in it" — CONFIRMED in code:
+## `chartH = N × rowH`, viewBox height grows with content; only the X axis is a normalized
+## stretch-to-fill constant, HeatMapCard.tsx:665/916). No aspect decision exists. The fix is
+## ONE ground scale (px/m) shared by x, y, and the photo; the card takes the resulting shape.
+## Fix round dispatched immediately under the standing fix order.
+
+## C3-ASPECT (original text, for the record — premise was wrong) — The heat map's shape makes an honest photo overlay impossible. Which shape do you want?
 
 **Context (plain English):** Your surf area is a long thin ribbon of real ground: about
 200 m from the waterline out to the deepest data, but 1,608 m along the beach — one to
