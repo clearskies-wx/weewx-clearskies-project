@@ -426,6 +426,19 @@ class counts — the HRRR-404 noise class is pre-existing, do not count it as ne
 
 ## PHASE R2 — A wave that stops breaking, re-forms, and breaks again *(the double break)*
 
+**✅ R2 CODE FOUND ALREADY LIVE — status marker corrected 2026-08-09 PM (session 6).** The
+priority-reset round's dev agent found, and the lead independently verified, that R2's
+cessation change is already implemented and deployed: commits `fdf7afc` ("R2 — cessation on
+breaking fraction alone; coherent zone output") + `b3f8092` ("R2 audit F1 — aggregate zones
+scoped to the second break"); the AND-term is gone at both sites and
+`test_ddd_breaking_w5_saturation.py` pins Q_b-only. This section was never marked DONE — a
+plan-status staleness, corrected here. **Consequence, recorded honestly: the 2026-08-09
+screenshot's wall-to-wall impact rendering is the model's output WITH the cessation fix**
+(on tonight's shelf/tide the model chains breaks at 100.6 → 47.6 → 2.7 m with a ~1 m reform
+band); the R3 fixed window + all-break labels make it legible, but whether chained impact
+with near-zero reform is physically acceptable on this profile is an open model question
+for the operator if the rendered result still reads wrong after R3 deploys.
+
 **Owner:** `clearskies-api-dev` (Sonnet, marine repo); tests `clearskies-test-author`.
 **QC:** `clearskies-auditor` at Gate R2 (blind — never sees the dev's tests/commits/report).
 **Authorization:** D-R1 ruling (physics criterion change, trigger 1) — plan approval is the
