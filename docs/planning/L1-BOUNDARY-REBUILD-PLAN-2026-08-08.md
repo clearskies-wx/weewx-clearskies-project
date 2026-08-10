@@ -8,7 +8,7 @@
 | **Phases DONE** | DOC, W, B, **G (CLOSED)**, S2/S3/S4b code, C2 accept. GL architecture RULED (no lake L1; boundary→L2; accuracy-governed product; L2 edge = 30 m-or-deepest) — implementation is a future round, outside this plan |
 | **Remaining (session-6 mandate: finish the plan)** | S2 accept close (one open item: cycle-RSS attribution) → Gate S wlevel → S1+S4a (NO RTOFS, exhausted=refuse) → V3 5-cycle window → A → C1 + C3 redo (ground-truth transform, requirements recorded) + Gate C → V |
 | **Session-5 incident** | First G9+S2 deploy OOM-crash-looped (~7 GB fetcher) → rolled back → S2 re-landed memory-safe + redeployed same day. Full record: decision log. |
-| **WAITING ON OPERATOR** | Nothing — all questions ruled; session 6 executes |
+| **WAITING ON OPERATOR** | **C3-COORDS** (§OPEN OPERATOR QUESTIONS): heatmap redo hit its recorded STOP — payload lacks per-transect origin coordinates; additive data-contract change needs a ruling. Everything else executes |
 | **Session-5 operator rulings applied** | RTOFS fallback REMOVED; RSS budget 300→400; C3 accept revoked + redo requirements set; GL D-GL-1/2/3 |
 
 **Created:** 2026-08-08 (operator-directed, in chat: "granular tasks, all design done now and not
@@ -923,6 +923,13 @@ heatmap, the axes, and the imagery — acceptance verified against GROUND TRUTH 
 pier coordinates vs rendered position; beach in frame; y-axis in real alongshore
 distance; 50 m buffer as ground distance), never against the chart's own arithmetic.
 **C3 CODING IS FROZEN until the operator explicitly orders it.** — see decision log; Accept re-measures after the fix deploys; Gate C pending (with C1)
+**SESSION 6 UPDATE (2026-08-09): freeze converted to EXECUTE-AS-RECORDED by the operator's
+closing mandate — but C3 immediately hit its own recorded STOP condition: the all-transects
+profile payload carries NO per-transect origin coordinates (lead-verified live: rows have
+`transectIndex`/`transectBearingDeg`/`transect[]` only), while the requirements demand the
+transform run from the transects' REAL coordinates. The origins exist server-side
+(`transect_handoff.py` `transect_origins`) but are not served. Data-contract addition needed
+→ ⛔ BLOCKED on operator ruling §OPEN OPERATOR QUESTIONS "C3-COORDS".**
 **Operator instruction (2026-08-08):** (a) the orthophotography must be ALIGNED with the
 transect bearing (the heatmap's beach frame), not true north — "so that way IT MATCHES";
 (b) 50 m of orthophotography buffering around the heatmap extent so the user can get their
@@ -1297,6 +1304,37 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 ---
 
 # ❓ OPEN OPERATOR QUESTIONS — maintained by the coordinator; newest at top
+
+## C3-COORDS (2026-08-09 session 6) — The heatmap redo hit its recorded STOP condition: the data the dashboard receives does not include where each shoreline slice actually sits. May I add that missing piece to the data the wave service serves?
+
+**Context (plain English):** Your requirements for the surf-height heatmap redo say the
+chart must be drawn from the REAL map positions of the shoreline slices ("transects" —
+the lines running from the beach out to sea along which the model computes wave height),
+so that the pier lines up with its true place, the y-axis reads in real alongshore
+distance, and the 50 m border is a true ground distance. The plan also says: if the data
+the dashboard receives does not contain those real positions, STOP and report it as a gap
+in the data service rather than fake it. **I checked the live data today, and that gap is
+real:** for each of the 162 shoreline slices, the dashboard receives the slice's compass
+direction and its wave heights — but NOT where the slice starts on the map. Without the
+start points, no correct chart can be drawn; the previous, revoked version invented an
+approximation, which is exactly what you rejected.
+
+**The good news:** the wave service already computes and uses the real start point
+(latitude/longitude) of every slice internally (`transect_origins` in its handoff code).
+Nothing needs to be recomputed — the numbers just need to be included in what the service
+sends out.
+
+**The ask:** adding a field to what the service sends is a change to the data contract
+between services — that is on your approval list, and the heatmap task (P15) was approved
+as display-only, so it does not cover this. **Option A (recommended):** approve an
+additive change — each row of the all-slices profile response gains its slice's start
+latitude/longitude (and, computed from those, its alongshore position in metres). Nothing
+existing changes; existing consumers are unaffected; the heatmap redo then proceeds
+exactly as you specified. **Option B:** leave the contract as-is, and the heatmap redo
+stays blocked (the chart cannot meet your ground-truth acceptance without the real
+positions). **Cost of A:** small — one marine-repo round (serve the origins) + doc-sync,
+then the dashboard round. C3 remains BLOCKED until you rule; all other session-6 work
+continues meanwhile.
 
 ## ~~G9-RSS~~ ANSWERED 2026-08-09 (operator: "G9, raise to 400") → budget raised to
 ## 400 MB; measured 335 MB is within budget; G-ACCEPT CLOSED. V3 row updated.
