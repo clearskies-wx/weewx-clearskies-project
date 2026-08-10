@@ -972,7 +972,17 @@ rules/verification.md §"Validate against reality".
   groundswell faces within ±20% of Surfline's range on the comparable hour.  ⬜
 - **V2 — S swell event:** served vs 46253/46222 observations (the water down-wave of San
   Clemente) — records how WW3's partially-healed shadow performs at the new boundary
-  (measurement evidence; D11 means no further action regardless, unless the operator reopens).  ⬜
+  (measurement evidence; D11 means no further action regardless, unless the operator reopens).
+  ✅ EVIDENCE COLLECTED 2026-08-09 session 6 (live S groundswell). Quantities pre-declared
+  before fetching: dominant S-groundswell partition Hs/Tp/dir, served 00:00Z vs buoy 23:26Z.
+  Served (deep 15 m reference): 0.569 m @ 15.93 s from 197°. NDBC 46253: swell 0.7 m @
+  15.4 s (S; MWD 176°) → Hs −19%, Tp +3%. NDBC 46222: swell 0.5 m @ 15.4 s (S; MWD 171°)
+  → Hs +14%, Tp +3%. Both inside the ±25% envelope; direction delta +21°/+26° vs buoy MWD
+  with the caveat that .spec MWD is the full-spectrum mean (wind sea included), not the
+  swell partition. Combined deep Hs 0.650 m vs WVHT 0.9/0.8 m (−28%/−19%) — consistent
+  with the G-Accept under-bias already on record. Provenance: `curl
+  ndbc.noaa.gov/data/realtime2/{46253,46222}.spec` + `/surf/huntington-city-beach-pier`
+  payload at marine `462b38f`, 2026-08-10 00:30Z.  ✅
 - **V3 — Performance budget:** full cycle ≤ 45 min hard / target ≤ 40; SWAN peak RSS
   ≤ **400 MB** (raised from 300 by operator ruling 2026-08-09 after the first live
   measurement, 335 MB on the capped box) at `omp_num_threads=6`; boundary file volume +
