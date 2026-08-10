@@ -971,11 +971,23 @@ transform run from the transects' REAL coordinates. The origins exist server-sid
 → ⛔ BLOCKED on operator ruling §OPEN OPERATOR QUESTIONS "C3-COORDS".**
 **UNBLOCKED 2026-08-09 PM: C3-COORDS answered Option A (P16). Origins round (marine) + transform
 rebuild (dashboard) dispatched under the operator's 2026-08-09 PM priority reset.**
-**✅ REDO DONE + GROUND-TRUTH ACCEPT PASS 2026-08-09 PM (marine `223182e` origins + dashboard
-`b523626` transform, both deployed): y-axis in real alongshore distance, index labels deleted,
-ortho co-registered by the fitted transform, 50 m ground buffer; the pier renders at its served
-~285 m alongshore position (screenshot evidence, §EXECUTION RECORD) — verified against the
-pier's real geometry, never the chart's own arithmetic. Gate C row pending.**
+**~~REDO DONE + GROUND-TRUTH ACCEPT PASS~~ ⛔ ACCEPT REVOKED (2nd time) 2026-08-09 ~9 PM PDT —
+operator screenshot challenge, coordinator verification error CONFIRMED with config ground
+truth.** The serving half (C3O origins) is CORRECT: transect 0 = the operator's drawn
+`segment_start` EXACTLY (33.65587, −118.003185), which sits ~10 m alongshore of the STORED
+PIER BASE (structure coords start 33.65687, −118.00240) — the field genuinely starts AT the
+pier and runs 1,608 m south, as the operator drew it. The DISPLAY transform is WRONG twice:
+(1) **alongshore placement** — the photo renders the pier crossing ~900 ft down the y-axis
+instead of at ~0–30 ft; my acceptance "pier at ~285 m" validated against the SPOT point
+(33.6534, −118.0039), which is NOT the pier — model-derived reference, the exact
+validate-against-the-model anti-pattern, repeated; (2) **cross-shore scale** — the chart is
+anisotropic (~6.3 px/m cross-shore vs ~0.84 px/m alongshore, ~7.5×); one rotation + uniform
+scale CANNOT co-register a real photo to both axes; the photo evidently matched the
+alongshore scale, so the 567 m pier renders SHORTER than the ~200 m transect strips and the
+photo's beach/downtown fall under chart-x positions that are still surf zone in data scale
+("waves breaking downtown"). The whole pier being visible in-frame is itself the proof of
+error: at true cross-shore scale only ~the first 200 m of pier fits the chart. FIX REQUIRES A
+DESIGN RULING (aspect ratio) — see §OPEN OPERATOR QUESTIONS "C3-ASPECT". Gate C blocked on it.
 **Operator instruction (2026-08-08):** (a) the orthophotography must be ALIGNED with the
 transect bearing (the heatmap's beach frame), not true north — "so that way IT MATCHES";
 (b) 50 m of orthophotography buffering around the heatmap extent so the user can get their
@@ -1360,6 +1372,30 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 ---
 
 # ❓ OPEN OPERATOR QUESTIONS — maintained by the coordinator; newest at top
+
+## C3-ASPECT (2026-08-09 ~9 PM PDT) — The heat map's shape makes an honest photo overlay impossible. Which shape do you want?
+
+**Context (plain English):** Your surf area is a long thin ribbon of real ground: about
+200 m from the waterline out to the deepest data, but 1,608 m along the beach — one to
+eight. Tonight's chart stretches the short (cross-shore) direction about 7.5× so the ribbon
+fills a squarish card. A real aerial photo can be rotated and scaled, but it cannot match
+two different stretch factors at once — so ANY photo under the current squarish chart is
+guaranteed wrong somewhere: tonight it matched the alongshore scale, which made the 567 m
+pier render SHORTER than your 200 m data strips and put surf cells on top of downtown.
+The photo can only be truthful if the chart itself uses the SAME scale in both directions.
+
+**Options:**
+- **A (recommended): rotate the layout — beach runs ACROSS the card, true scale both axes.**
+  Alongshore on the horizontal (1,608 m across the card width), cross-shore vertical
+  (~600 m tall to include the full pier reaching offshore). Looks like your own map view:
+  beach horizontal, pier sticking out into the water, photo at true scale under the data,
+  everything measurable. The wave-height cells become a ~200 m band along the shore edge.
+- **B: keep the current tall stretched chart, remove the photo from under it** (no photo can
+  be honest there), and put a small TRUE-SCALE locator map beside it for orientation.
+- **C: keep the current chart and stretch the photo ~7.5× cross-shore to match** — perfectly
+  co-registered, but buildings/pier visibly smeared; most people find this looks broken.
+
+**Cost:** one dashboard round whichever you pick. C3/Gate C stay blocked until ruled.
 
 ## ~~C3-COORDS~~ ANSWERED 2026-08-09 ~6:15 PM PDT (operator, in chat: "The fact that you cannot figure out
 ## where the transects are in real space and draw a card correctly is a failure on your part —
