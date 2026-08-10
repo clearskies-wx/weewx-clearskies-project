@@ -164,6 +164,19 @@ raw payload excerpt pasted beside the per-partition list. Dashboard range ("X–
 
 ## PHASE R1b — Min/max redefined: true extremes of the good surf, pooled across swells (operator-ruled 2026-08-08)
 
+**⚠ R1b-D1 AMENDED 2026-08-09 PM (operator, in chat, verbatim anchors: "It was NEVER supposed
+to be every transect — ONLY the TOP transects"; "I don't want the limp-ass bottom of the
+barrel, why the fuck would we measure that"; "get the documentation right"):** the min/max
+pool is the +0.75σ UPPER TAIL ONLY — the per-transect faces at/above the zone's qualifying
+threshold `min(zone_mean + 0.75·zone_σ, 5th-highest)` (the same `eff_threshold` the
+BD-7 selection already computes). `modelSurfHeightMin` = min of that TOP set;
+`modelSurfHeightMax` = max of that top set. The prior text below (pool = every qualifying
+partition's face on qualifying transects) let a marginal-but-qualifying swell drag the min
+to "no surf" (live 2026-08-09: served 1.1–4.3 ft) and is SUPERSEDED. Both construction
+sites change; API-MANUAL rows fixed same round. Live expectation after the fix: a tight
+range near the good-surf faces (e.g. ~3.8–4.3 ft on the 2026-08-09 evening ocean), never
+a floor at the smallest swell.
+
 **Operator ruling (in chat, verbatim anchors):** "yes that was wrong... We need to take the
 min/max of the range of 'good surf' regardless of the swell.... which means capturing the
 true min/max... not the means of the top percentage of each swell." Root defect: the WC-D3
@@ -679,8 +692,11 @@ domain clips without distorting the bands.
 `src/api/types.ts` (metadata type), its test file; marine `endpoints/beach_profile.py`
 (metadata block only) + config plumbing for the two keys; API-MANUAL §17 + DASHBOARD-MANUAL
 rows.
-**MUST NOT TOUCH:** the dominant-break annotation filter (`:585-594` — WC-D3 behavior,
-unchanged); zone band rendering; wave-surface sampling; the heat map.
+**MUST NOT TOUCH:** ~~the dominant-break annotation filter (`:585-594` — WC-D3 behavior,
+unchanged)~~ **REVERSED 2026-08-09 PM (operator, in chat: "the fact that you cannot see two
+breaks means you are blind"): EVERY served break point gets its height/type label — the
+dominant-only annotation filter is DELETED in the same round (collision handling kept)**;
+zone band rendering; wave-surface sampling; the heat map.
 **Accept (live):** two screenshots, one high-tide hour and one low-tide hour, both axes
 reading identically (492 ft … −98 ft under D-R2 defaults); no crop of the modeled profile.
 

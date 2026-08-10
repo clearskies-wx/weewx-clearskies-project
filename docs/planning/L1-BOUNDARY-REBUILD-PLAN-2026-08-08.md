@@ -8,7 +8,7 @@
 | **Phases DONE** | DOC, W, B, **G (CLOSED)**, S2/S3/S4b code, C2 accept. GL architecture RULED (no lake L1; boundary→L2; accuracy-governed product; L2 edge = 30 m-or-deepest) — implementation is a future round, outside this plan |
 | **Remaining (session-6 mandate: finish the plan)** | S2 accept close (one open item: cycle-RSS attribution) → Gate S wlevel → S1+S4a (NO RTOFS, exhausted=refuse) → V3 5-cycle window → A → C1 + C3 redo (ground-truth transform, requirements recorded) + Gate C → V |
 | **Session-5 incident** | First G9+S2 deploy OOM-crash-looped (~7 GB fetcher) → rolled back → S2 re-landed memory-safe + redeployed same day. Full record: decision log. |
-| **WAITING ON OPERATOR** | **C3-COORDS** (§OPEN OPERATOR QUESTIONS): heatmap redo hit its recorded STOP — payload lacks per-transect origin coordinates; additive data-contract change needs a ruling. Everything else executes |
+| **WAITING ON OPERATOR** | Nothing — C3-COORDS ANSWERED 2026-08-09 PM (Option A, P16). **PRIORITY RESET (operator 2026-08-09 PM, in chat): build the ruled display/model fixes NOW — R2 + R1b-top-tail + R3 + all-breaks-labeled + C1 + C3 (origins + transform) + swell-loss diagnosis. Gate S / S1 / Phase A / V-close DEFERRED until these land.** |
 | **Session-5 operator rulings applied** | RTOFS fallback REMOVED; RSS budget 300→400; C3 accept revoked + redo requirements set; GL D-GL-1/2/3 |
 
 **Created:** 2026-08-08 (operator-directed, in chat: "granular tasks, all design done now and not
@@ -104,6 +104,7 @@ surfaces to exist; V closes the whole plan.
 | P13 | Surf response gains card-aggregate fields (`swellHeightMinFt/MaxFt`, `faceHeightMinFt/MaxFt` recomputed over eligible swells, `combinedPeriodS`) — additive wire-shape change, eligibility rule server-side | 4 | operator, 2026-08-08 chat (swell-card instruction) |
 | P14 | Beach-profile chart draws the DOMINANT swell's wave train only (display; consumes R5's dominant-partition serving) | — (display) | operator, 2026-08-08 chat (beach-profile instruction) |
 | P15 | Surf-height heatmap: ortho imagery rotated to the transect/beach frame, 50 m ortho buffer, y-axis labels, structure-affected-area overlay REMOVED (display-only; structure physics stays in SWAN L4) | — (display) | operator, 2026-08-08 chat (heatmap instruction) |
+| P16 | All-transects profile response: additive per-row `originLat`/`originLon`/`alongshoreM` (each transect's real origin + alongshore position), sourced from the pipeline's existing `transect_origins` — no new computation, serving only | 4 | operator, 2026-08-09 PM chat (C3-COORDS ruling) |
 
 Named constants fixed by this plan (not re-derivable by agents): `L1_MAX_EXTENT_KM = 100.0`,
 enclosure margin `10.0 km` (reuses the existing offshore-margin convention), near-lee
@@ -930,6 +931,8 @@ profile payload carries NO per-transect origin coordinates (lead-verified live: 
 transform run from the transects' REAL coordinates. The origins exist server-side
 (`transect_handoff.py` `transect_origins`) but are not served. Data-contract addition needed
 → ⛔ BLOCKED on operator ruling §OPEN OPERATOR QUESTIONS "C3-COORDS".**
+**UNBLOCKED 2026-08-09 PM: C3-COORDS answered Option A (P16). Origins round (marine) + transform
+rebuild (dashboard) dispatched under the operator's 2026-08-09 PM priority reset.**
 **Operator instruction (2026-08-08):** (a) the orthophotography must be ALIGNED with the
 transect bearing (the heatmap's beach frame), not true north — "so that way IT MATCHES";
 (b) 50 m of orthophotography buffering around the heatmap extent so the user can get their
@@ -1315,7 +1318,14 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 
 # ❓ OPEN OPERATOR QUESTIONS — maintained by the coordinator; newest at top
 
-## C3-COORDS (2026-08-09 session 6) — The heatmap redo hit its recorded STOP condition: the data the dashboard receives does not include where each shoreline slice actually sits. May I add that missing piece to the data the wave service serves?
+## ~~C3-COORDS~~ ANSWERED 2026-08-09 ~6:15 PM PDT (operator, in chat: "The fact that you cannot figure out
+## where the transects are in real space and draw a card correctly is a failure on your part —
+## figure it out") → **Option A APPROVED**: the marine service serves each transect's real
+## origin (additive `originLat`/`originLon` + `alongshoreM` per row of the all-transects
+## profile response). Registered as P16. C3 UNBLOCKED — heatmap rebuilt on the real
+## ground→chart transform per §C3's recorded requirements.
+
+## C3-COORDS (original text, for the record) — The heatmap redo hit its recorded STOP condition: the data the dashboard receives does not include where each shoreline slice actually sits. May I add that missing piece to the data the wave service serves?
 
 **Context (plain English):** Your requirements for the surf-height heatmap redo say the
 chart must be drawn from the REAL map positions of the shoreline slices ("transects" —
