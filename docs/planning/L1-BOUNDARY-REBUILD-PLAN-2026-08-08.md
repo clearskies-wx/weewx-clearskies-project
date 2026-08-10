@@ -109,7 +109,14 @@ surfaces to exist; V closes the whole plan.
 Named constants fixed by this plan (not re-derivable by agents): `L1_MAX_EXTENT_KM = 100.0`,
 enclosure margin `10.0 km` (reuses the existing offshore-margin convention), near-lee
 `SIGMA_THETA_REF = 15°`, `K_FILL = 1`, swell spread `σθ = 15°` (cos^2s s = 28), wind-sea
-spread `σθ = 30°` (s = 7), swell frequency shape Gaussian `σf = 0.015 Hz`, wind-sea shape
+spread `σθ = 30°` (s = 7), swell frequency shape Gaussian `σf = 0.015 Hz` — **AMENDED 2026-08-09 PM (operator order
+"there was more than two partitions from WW3, you are losing swells — figure it out and fix
+it"; lead diagnosis with WW3 f007 evidence: two S trains 0.0175 Hz apart at ~same direction
+sum to a saddle-free single peak at σf 0.015, so SWAN receives one merged system — the 18Z
+hours survived only on 21° directional separation): σf per train =
+`min(0.015, max(0.005, Δf/3))` where Δf = frequency distance to the nearest other swell
+train within 45° of its direction; isolated trains keep 0.015 exactly (zero change when
+trains are well separated)** —, wind-sea shape
 JONSWAP `γ = 3.3`, boundary point spacing = L1 `dx` (1 km), wind bbox pad `0.3°`, STOFS
 cutover bias gate `≤ 0.15 m`. Two constants are **measured then pinned** (method decided here,
 value measured at implementation, bounded): B2's `r` (wind-sea mean→peak period ratio, bounds
