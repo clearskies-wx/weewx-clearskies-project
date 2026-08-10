@@ -1387,6 +1387,14 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 ## its surveyed footprint; frame = data extent ± 50 m (measured live: −95.1..+126.1 m, so the
 ## pier clips honestly at the offshore edge at true scale); acceptance = independent-math
 ## pixel-distance checks (two origins' separation, strip lengths, imagery px/m = S both axes).**
+## ✅ C3S DONE + DEPLOYED + ACCEPT PASS 2026-08-09 ~10:15 PM PDT: dashboard `529e13d` (+ meta
+## docs `0e46c16`), deployed weather-dev; 51/51 single-S acceptance tests lead-reproduced ON
+## weather-dev; tsc + build clean. Screenshot evidence: pier crosses at the TOP rows (its true
+## position — row 0 ≈ 11 m south of the pier base), runs offshore at true scale and clips
+## honestly at the frame edge; colored cells confined to water; downtown carries zero cells;
+## photo and data share one px/m via tile-snapped-bbox projection through S. Cosmetic
+## parking-lot item: Beach Profile x-axis corner label collision ("-10"/"492" overlap).
+## Gate C (C1+C2+C3 rows) remains the outstanding QC pass.
 
 ## C3-ASPECT (original text, for the record — premise was wrong) — The heat map's shape makes an honest photo overlay impossible. Which shape do you want?
 
