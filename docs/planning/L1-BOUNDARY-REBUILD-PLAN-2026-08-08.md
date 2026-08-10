@@ -1387,7 +1387,19 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 ## its surveyed footprint; frame = data extent ± 50 m (measured live: −95.1..+126.1 m, so the
 ## pier clips honestly at the offshore edge at true scale); acceptance = independent-math
 ## pixel-distance checks (two origins' separation, strip lengths, imagery px/m = S both axes).**
-## ✅ C3S DONE + DEPLOYED + ACCEPT PASS 2026-08-09 ~10:15 PM PDT: dashboard `529e13d` (+ meta
+## ⛔ C3S ACCEPT REJECTED BY OPERATOR ~10:45 PM PDT ("nope") — the PASS below is struck.
+## Operator-named defects on the deployed render: (1) transect cells rendered LARGER —
+## unordered side effect of moving row height from the old fixed 8-px budget to true 10 m
+## pitch (~3× taller on screen); (2) background imagery resolution unacceptable — the tile-
+## count cap in `computeImageryTiles` forces coarse low-zoom tiles at the new framing, then
+## upscales them. Coordinator-proposed fix (NOT dispatched — operator ended the session):
+## widen the cross-shore frame toward the pier tip (zooms out → cells shrink, registration
+## unchanged, more context) + raise tile zoom to match the frame's needed sharpness. A
+## registration doubt also stands unresolved: the colored band's cross-shore placement vs
+## the photo was operator-rejected before the size/resolution complaints; a numeric
+## data-layer-vs-imagery-layer registration check (project one origin through both paths)
+## was started but not completed. NEXT SESSION: run that check FIRST before any further fix.
+## ~~✅ C3S DONE + DEPLOYED + ACCEPT PASS 2026-08-09 ~10:15 PM PDT~~: dashboard `529e13d` (+ meta
 ## docs `0e46c16`), deployed weather-dev; 51/51 single-S acceptance tests lead-reproduced ON
 ## weather-dev; tsc + build clean. Screenshot evidence: pier crosses at the TOP rows (its true
 ## position — row 0 ≈ 11 m south of the pier base), runs offshore at true scale and clips
