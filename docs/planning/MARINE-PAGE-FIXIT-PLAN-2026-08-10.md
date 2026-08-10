@@ -523,7 +523,16 @@ failure mode the wild intermittent was, and that neither reproduces silent gray 
 
 ## PHASE Z — Forecast-hole diagnosis + staleness ruling *(fixit Item 0; PA6: NOT pre-approved)*
 
-### Z1 — Diagnose the mid-window hole (read-only; any time)
+### Z1 — Diagnose the mid-window hole — ✅ DONE 2026-08-10 (read-only; ruling brief delivered)
+Mechanism confirmed from the 18:00Z run's journal + code: the HRRR wind fetcher treats "file
+not posted yet" (404) the same as "reached the end" — it stops early and reports success with
+however many hours it got (23 of 49 that run), and nothing downstream checks the count. The
+HRRR/GFS stitcher then blends the short set, leaving hours 23–48 empty with no warning, and
+the run publishes normally. The existing loud-refusal guard covers total GFS failure but
+never checks HRRR completeness — that is the gap. A fully-built poll-until-complete retry
+module (`wind_gatherer.py`) already exists in the repo but is deliberately dormant (no effect
+on the live path). Full brief with journal/code citations: session scratchpad
+`Z1-RULING-BRIEF.md`; operator ruling row in OPEN OPERATOR QUESTIONS below.
 **Owner:** `clearskies-api-dev` in READ-ONLY mode (or lead-direct).
 Establish from journal + code: why the 19:24Z run published a forecast missing the hours whose
 HRRR extended files 404'd (f34–f48 posting lag), instead of waiting/backfilling/refusing.
@@ -562,4 +571,30 @@ English, self-contained, newest at top. Answered items move to the decision log.
 instruction 2026-08-10: "create a list of questions in the plan for items THAT ARE NOT
 ANSWERABLE BY THE DOCS, if they are answerable by DOCS, do not ask me.")*
 
-*(none yet)*
+### Q1 (2026-08-10, from Z1) — What should the model do when the wind files aren't all posted yet?
+
+**Context, plain English:** our forecast runs need wind data files from the government's
+HRRR weather model. Those files appear on the download server gradually over an hour or two
+after each HRRR cycle. On 2026-08-10 our run started before the later files were posted, the
+fetcher quietly stopped at the last file it found and called that success, and we published
+a forecast with a 26-hour empty stretch in the middle — no warning anywhere. Our own rule
+says a model runs on all its inputs or refuses loudly; today it does neither. (A ready-made
+"keep checking until the files appear" module already exists in the repo but is deliberately
+switched off; wiring it in would be its own decision.)
+
+**Your options (all except D change when/how runs happen, so per the plan's PA6 row each
+needs your sign-off — none is pre-approved):**
+- **A — wait and retry (RECOMMENDED).** When files are missing, keep re-checking for a
+  bounded time (e.g. up to ~90 min) before running; if still missing, refuse loudly instead
+  of publishing a forecast with a hole. Cost: forecasts publish later on affected cycles.
+  Matches the existing "all inputs or loud refusal" principle already enforced for the other
+  wind model. The dormant retry module could be reused (sub-decision: yes/no to wiring it).
+- **B — publish, then backfill.** Publish the partial forecast immediately, then fill the
+  hole on a follow-up run once the files appear. Cost: the hole still exists (and is
+  visible) for a while; more moving parts.
+- **C — fill the hole from the other wind model (GFS).** Architectural: moves the agreed
+  HRRR/GFS boundary. Fastest publish, but blends coarser wind into hours we promised to
+  HRRR.
+- **D — status quo.** Keep publishing with silent holes. Contradicts the loud-refusal rule.
+
+**Recommendation:** A. Full evidence: scratchpad `Z1-RULING-BRIEF.md`.
