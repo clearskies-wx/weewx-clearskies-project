@@ -1378,7 +1378,15 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 ## `chartH = N × rowH`, viewBox height grows with content; only the X axis is a normalized
 ## stretch-to-fill constant, HeatMapCard.tsx:665/916). No aspect decision exists. The fix is
 ## ONE ground scale (px/m) shared by x, y, and the photo; the card takes the resulting shape.
-## Fix round dispatched immediately under the standing fix order.
+## Fix round dispatched immediately under the standing fix order — then ⛔ STOPPED by operator
+## order ("No coding!") at scope-ack, BEFORE any code: agent killed, dashboard repo verified
+## clean at `9700aae`, zero commits, zero uncommitted files. ~~C3 CODING FROZEN~~ **EXECUTION
+## ORDERED by operator 2026-08-09 ~10 PM PDT ("NOW FUCKING FIX IT") — C3S round dispatched:
+## one px/m scale for data + axes + photo; spot marker BANNED as spatial anchor (it is a
+## forecast data pin — operator, restated tonight, previously established); pier anchored by
+## its surveyed footprint; frame = data extent ± 50 m (measured live: −95.1..+126.1 m, so the
+## pier clips honestly at the offshore edge at true scale); acceptance = independent-math
+## pixel-distance checks (two origins' separation, strip lengths, imagery px/m = S both axes).**
 
 ## C3-ASPECT (original text, for the record — premise was wrong) — The heat map's shape makes an honest photo overlay impossible. Which shape do you want?
 
