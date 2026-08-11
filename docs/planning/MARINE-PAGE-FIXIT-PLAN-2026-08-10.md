@@ -703,6 +703,24 @@ partial fetch).
 
 ---
 
+## PHASE T — TIDE COHERENCE (operator-ordered 2026-08-11, REQUIREMENT ruling)
+
+**Operator ruling (chat, 2026-08-11, verbatim intent):** single water-level truth is "not a
+DESIGN CHOICE, that is a FUCKING REQUIREMENT" — the 1-D surf pipeline and the beach-profile
+endpoint MUST use the SAME water level SWAN itself is forced with, per cycle. This ruling
+is the operator authorization for the data-flow change (the tide-trace found the S2
+migration orphaned these consumers at swan.py:3097-3125 → manufactured 0.0 at
+swan.py:2425/2603 and silent 0.0 at beach_profile.py:1147-1165, since 2026-08-09 22:09Z).
+**Design (T1):** the scalar tide for the 1-D pipeline + profile = the SAME STOFS field SWAN
+uses, sampled at the spot per timestep (surge included, SWAN-coherent); the existing
+CO-OPS chain remains the documented FALLBACK (used only when SWAN itself fell back);
+exhaustion → refuse loudly per the codebase's own surf.py "never a substituted 0.0"
+pattern — beach_profile.py's silent 0.0 branch is brought into line (refuse/null, logged);
+the quick-update path reads the same source (no more flip-flop). Stage-2 setup dead code +
+the old eta_shore=0.000 wave-setup diagnostic are OUT of scope (separate tracked finding).
+Evidence base: scratchpad TIDE-TRACE-FINDINGS.md. Tests: KATs pinning nonzero tide
+propagation + the refusal path, same-commit. Deploy only on explicit operator go.
+
 ## Round-close & bookkeeping (every phase)
 
 - Gate record in THIS file (CURRENT STATE table + per-phase ✅ markers with commits, accept
