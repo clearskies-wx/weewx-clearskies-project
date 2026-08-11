@@ -169,10 +169,21 @@ as historical record.** No summing on any rung; per-cycle source
 selection, never per-timestep. See PROVIDER-MANUAL §14.10a (rewritten) and plan Q5 closure block.
 
 **D10 — Water level: STOFS adopted.** STOFS-2D-Global becomes the spatially-varying WLEVEL source at all
-levels, replacing the single-CO-OPS-station uniform stamp. Chain: STOFS → CO-OPS-uniform (loud fallback,
+levels, replacing the single-CO-OPS-station uniform stamp. ~~Chain: STOFS → CO-OPS-uniform (loud fallback,
 logged) → refuse (`tide_fetch_failed`). A cutover bias gate (24 h of STOFS at the tide-station cell vs
 CO-OPS predictions, `|mean bias| ≤ 0.15 m`) must pass before STOFS becomes primary; breach → CO-OPS stays
-primary, STOP and surface.
+primary, STOP and surface.~~
+**AMENDED 2026-08-11 (operator ruling in chat, MARINE-PAGE-FIXIT-PLAN Phase T: "ONE SOURCE. THAT IS
+IT."): the CO-OPS fallback rung is REMOVED from the model water-level path.** Water level = STOFS,
+period, for every run type (full cycles AND the hourly stationary fill, which previously ran
+CO-OPS-uniform forcing) and for every model consumer (SWAN WLEVEL forcing, the 1-D surf pipeline's
+per-timestep tide, the beach-profile serving path — all sample the same STOFS field). STOFS
+unavailable → the run REFUSES loudly (`tide_fetch_failed` no-publish); no fallback, no uniform stamp,
+no substituted value. Context: the original chain's S2 implementation orphaned the non-SWAN consumers
+(silent tide=0.0 from 2026-08-09 22:09Z; see MARINE-PAGE-FIXIT-PLAN Phase T + TIDE-TRACE findings);
+the never-run Gate S bias check is superseded by this removal. CO-OPS remains in use ONLY by
+display/informational consumers outside the model path (tide charts, fishing/beach-safety overlays).
+Landed: marine `53eea82` + `a8a27e2`.
 
 **D11 — Near-lee fallback criterion, CLOSED.** For every blocking island that cannot be enclosed (a
 wrap-candidate whose enclosure would exceed the D2 cap, or a truly-blocked ray beyond the base offshore

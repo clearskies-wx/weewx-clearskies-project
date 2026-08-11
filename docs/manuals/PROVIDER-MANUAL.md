@@ -2032,8 +2032,19 @@ extracts the WATER-LEVEL field only; SWAN current forcing comes from §14.10a's 
 tide-station cell are compared against CO-OPS predictions; `|mean bias| ≤ 0.15 m` passes. A breach means
 CO-OPS stays primary and the round STOPs and surfaces — never a silent proceed on an unverified bias.
 
-**WLEVEL chain (decided):** STOFS → CO-OPS-uniform (fallback selection logged loudly at fetch, the same
-pattern the bathymetry chain already uses) → refuse (`tide_fetch_failed`). The "~30 km uniform tide"
+**WLEVEL chain (AMENDED 2026-08-11 — operator ruling, MARINE-PAGE-FIXIT-PLAN Phase T: "ONE SOURCE.
+THAT IS IT."; supersedes the STOFS → CO-OPS-uniform → refuse chain below):** water level = **STOFS
+only**, for every run type (full cycles AND the hourly stationary fill, previously CO-OPS-uniform) and
+every model consumer — SWAN's WLEVEL forcing, the 1-D surf pipeline's per-timestep tide (sampled from
+the same STOFS field at the coastline anchor via `_precompute_swelltrack_for_spot(stofs_wlevel=...)`),
+and the beach-profile serving path. STOFS unavailable or gapped → the run REFUSES loudly
+(`tide_fetch_failed` no-publish, per-spot, first missing timestep named); there is NO fallback source
+and NO substituted value anywhere in the model path (the shared fetch helper is
+`_fetch_stofs_wlevel_or_refuse()`, one definition, both run paths). CO-OPS tide predictions remain in
+use only by display/informational consumers outside the model (tide charts, fishing/beach-safety
+overlays). Landed: marine `53eea82` + `a8a27e2`; ADR-104 D10 amendment same date. ~~Original chain
+(historical): STOFS → CO-OPS-uniform (fallback selection logged loudly at fetch) → refuse
+(`tide_fetch_failed`).~~ The "~30 km uniform tide"
 in-code justification comment (§6 row 5 of the brief) is deleted with the uniform-primary path it justified —
 not kept as stale commentary.
 
@@ -2043,7 +2054,8 @@ not kept as stale commentary.
 path routes STOFS per-timestep grids into the existing grid writer; neither writer is rewritten. Command
 grammar (`INPGRID/READINP WLEVEL ... NONSTAT`) is pinned unchanged; only the VALUES in `WLEVEL.txt` change.
 Source selection is per-cycle: a timestep gap within STOFS data = STOFS fetch failure for the whole cycle →
-loud CO-OPS-uniform fallback; never mixed sources within one run.
+**REFUSE (`tide_fetch_failed`) — the CO-OPS-uniform fallback was removed 2026-08-11 (ONE SOURCE
+amendment above)**; never mixed sources within one run.
 
 ### §14.14 HRRR wind provider (ADR-093, ADR-094)
 
