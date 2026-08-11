@@ -1,0 +1,158 @@
+---
+status: Proposed
+date: 2026-08-11
+deciders: shane
+supersedes:
+superseded-by:
+---
+
+# ADR-107: Wind provider decoupling + assembly (wind gatherer, single assembled timeline)
+
+**Status: Proposed — DRAFTED by the Z3.5 implementer per the fixit plan's Z3 re-scope note ("lifting
+the design into ADR/PROVIDER-MANUAL as the doc-sync this ruling never got"). Not marked Accepted by
+this draft; awaiting operator acceptance.**
+
+## Context
+
+The design this ADR records was fully approved by the operator in chat on 2026-08-03 (decision item
+9 of `docs/planning/briefs/AUDIT-OPUS-WINDOW-2026-08-03.md`) and written up in full in
+`docs/planning/briefs/WIND-PROVIDER-ARCHITECTURE-DESIGN-2026-08-03.md` ("the design brief") — but the
+approval never became an ADR at the time, so `docs/planning/MARINE-PAGE-FIXIT-PLAN-2026-08-10.md`'s
+Z1 diagnosis and its PA6 pre-approval register both treated the underlying question ("how should the
+marine service gather wind?") as still open, three days after it had already been ruled on twice. The
+plan's Z3 re-scope note (2026-08-10) names this gap explicitly and assigns its closure — lifting the
+design into an ADR — to this round (Z3, migration step 5). This ADR is that lift: it restates the
+approved design as a decision record, with no new ruling of its own. Evidence, full narrative, and
+the five-step migration order are in the design brief; this ADR summarizes the shape and cites it as
+the source of record.
+
+**Operator ruling, verbatim (2026-08-03):** *"You need to decouple the HRRR gathering from the
+runs… This is an external API provider just like any other and needs treated as such. It should have
+its own independent timings, not be tied into the surf system, especially if that information may be
+used by other portions of the marine service. Second, if we have to assemble our information, then
+we need a mechanism to do that. Third… We need to cut back our hourly runs to 12 hours."* Read-back
+confirmed: per-hour freshest-available assembly; 12h fast cycle ("half a day"); full runs trigger on
+extended-cycle-assembled-complete.
+
+**The defect this design closes:** before this design, `_marine_runner_loop()` (service.py) fetched
+HRRR/GFS inline, at run-trigger time, and ran SWAN on whatever hours the fetch happened to return —
+NOAA posts an extended cycle's forecast-hour files over roughly 60-90 minutes, not atomically, and
+nothing checked completeness before accepting a fetch as done. A live journal survey (2026-08-03)
+found every extended-cycle first fetch partial (7-31 of 49 grids). The mid-forecast hole this produced
+is `docs/planning/briefs/V3-F1-WIND-HOLE-INVESTIGATION-2026-08-03.md`'s subject.
+
+## Decision
+
+**1. The wind gatherer** — one new background component inside the existing marine service process:
+an independent `asyncio` task with its own scheduler, started at service startup, never invoked by
+(and never invoking) the SWAN run path. Detects new HRRR cycles (hourly f00-f18 every hour; extended
+f00-f48 at 00/06/12/18Z) and GFS far-window cycles (f048-f072, 3-hourly); fetches incrementally
+("top-up" — only forecast hours not yet held for a cycle), respecting NOMADS pacing; tracks per-cycle
+completeness; maintains the assembled store and emits `hourly_cycle_assembled` /
+`extended_cycle_assembled` events. Considered and rejected: a separate systemd service — it maximizes
+"treated like an external provider" but adds a deployment unit and a second failure domain for a
+gatherer whose consumers all live in the marine process anyway.
+
+**2. The store — ONE assembled wind timeline, updated in place.** *(Revised 2026-08-03 per operator
+review: "we need to be keeping one fully assembled set, why are we keeping individual fragments?" —
+the original per-cycle-fragment design was dropped before build.)* File-backed under the marine
+service's run directory: `wind_timeline.json(.gz)` — one record per forecast hour over the working
+window (now → +72h), each carrying grid data + per-hour provenance; a fresher cycle's hour replaces
+the existing one in place, no fragment retention. `incoming.json` — completeness tracker for the
+cycle currently being assembled only. Read API: `get_wind_series(t0, t1)` (uniform-hourly, refuses
+with a named reason on any gap) and the regime-aware `get_wind_records(t0, t1)` (native-cadence per
+regime, for the run triggers below); `get_status()` for `/health`.
+
+**3. Consumers — all read-only against the store, all switched over across migration steps 2-5:**
+
+| Consumer | Before | After |
+|---|---|---|
+| Full 48h SWAN run | fetched inline at trigger time; ran on partial fetches | triggered BY `extended_cycle_assembled`; reads a complete assembled 0-72h series |
+| Hourly fast cycle | 24h scope; trigger unreachable in production | REAL hourly trigger on `hourly_cycle_assembled`; **12 forecast hours** ("half a day") |
+| Surf-card display wind | request-time fetch + publish-time warming thread | store PRIMARY per hour via `get_present_hours()` (tolerant, never refuses); run-forced `wind_for_display` PERMANENT fallback for hours the store cannot cover — Q3 amendment below |
+| GFS far window | separate fetch, same partial-success defect class | gatherer-owned on the same manifest pattern |
+
+**4. Deletions (migration step 5, no dead code left behind):** `hrrr.py`'s/`gfs.py`'s request-time
+fetch orchestration from consumer paths (the fetch machinery itself is reused by the gatherer, and
+`run_all_spots()`'s/`run_quick_update()`'s own inline-fetch fallbacks stay live for the manual
+trigger and tests); the run loop's inline HRRR/GFS fetch, cycle-cadence classification, and
+cycle-change bookkeeping in their entirety; the H5 publish-time warming thread (removed earlier,
+2026-08-02, confirmed pre-satisfied at this step). The pipeline-persisted `wind_for_display` field
+was originally scoped for deletion here too — **reversed, see "Amendment (Q3 ruling, 2026-08-11)"
+below.**
+
+**5. Migration order** (each step separately deployed + reality-gated): (1) gatherer + store land
+dormant; (2) display wind switches to the store; (3) full run switches to the
+`extended_cycle_assembled` trigger + store reads + a gap-refusal invariant; (4) fast cycle (12h)
+switches on — the first time this path ever ran in production; (5) deletions + this doc-sync.
+
+## Amendment (Q3 ruling, 2026-08-11)
+
+The original step-5 design (Decision §4 above) deleted `wind_for_display` — the pipeline-persisted,
+run-forced spot-pin wind field — treating the Z3.2-shipped fallback as a temporary transition rung
+between the old request-time fetch and a store read expected to eventually cover the whole served
+timeline on its own.
+
+**Production evidence surfaced the mechanism was built wrong, not merely incomplete.** Post-restart
+production monitoring (2026-08-11, `docs/planning/MARINE-PAGE-FIXIT-PLAN-2026-08-10.md` "Z3.5
+STATUS") found the store-primary display-wind read failing on EVERY served request — 16/16 requests
+logged a fallback. Mechanism: the store is self-bounding by design (§2 above) — `age_out()` deletes
+every hour behind wall-clock now, and it holds the +48-72h window only at GFS-native 3-hourly
+cadence — while the surf endpoint's served forecast timeline starts at the run's own cycle start
+(already in the past by the time of any request) and extends past +48h. A whole-timeline,
+refuse-on-gap read against a store that cannot, by construction, hold that whole range can
+essentially never fully succeed. Deleting the fallback as originally scoped would have blanked the
+forecast wind display.
+
+**Operator ruling (2026-08-11, verbatim):** *"Q3 that is fine, I do not understand why that is even a
+question? It is apparent you built the mechanism wrong, and need to fix it."* Classified as a DEFECT
+FIX, not a new design choice (`docs/planning/MARINE-PAGE-FIXIT-PLAN-2026-08-10.md`, "Q3 — ✅
+ANSWERED").
+
+**Corrected, permanent design:** the store is PRIMARY for every hour it actually holds, read via
+`wind_timeline_store.get_present_hours()` — a tolerant sibling of `get_wind_series()` that returns
+whatever hours are present instead of refusing on a gap. `wind_for_display` — unchanged from its
+pre-round build and cache-key handling — permanently serves every hour the store does not cover:
+aged-out past hours, 3-hourly far-window off-slot hours, and any store-absent/cold hour. Both
+sources absent for an hour → null, never a fabricated value. The single WARNING that used to fire per
+request on any partial store coverage is replaced by one WARNING that fires only when the store
+returns zero hours in range while the gatherer is enabled (store dead/cold — genuinely anomalous);
+partial coverage is now the designed steady state, not an anomaly.
+
+**Scope of the amendment:** ONLY `wind_for_display`'s deletion (Decision §4) and the "After" cell for
+surf-card display wind (Decision §3 table) are reversed. Every other migration-step-5 deletion — the
+run loop's inline HRRR/GFS fetch, cycle-cadence classification, and cycle-change bookkeeping; the H5
+warming thread; the full-run and fast-cycle event-driven-only triggers — proceeds exactly as
+originally decided and is unaffected by this amendment. This ADR remains status **Proposed**; this
+amendment does not itself constitute operator acceptance of the ADR as a whole.
+
+## Consequences
+
+- Wind is gathered on its own schedule, independent of SWAN run cadence, satisfying the "own
+  independent timings" ruling.
+- A SWAN run can no longer read a partial fetch — the store's refuse-on-gap contract makes a
+  structurally short forecast unreachable, closing the defect class Z1 diagnosed.
+- The wind gatherer is the sole ROUTINE NOMADS caller for wind as of migration step 5;
+  `hrrr.py`'s/`gfs.py`'s own inline-fetch fallbacks remain reachable only via the manual trigger and
+  tests.
+- `GET /health`'s `inputs.wind` freshness signal moved from the (now-deleted) run-loop inline fetch
+  to the store-driven run functions themselves, recorded immediately after their own store read.
+- The 12h fast-cycle scope is an operator-ruled reduction from the prior 24h inline-fetch scope,
+  authorized by the same 2026-08-03 chat ruling ("cut back our hourly runs to 12 hours").
+
+## Trigger classification (for the record, design brief §6)
+
+Trigger 2 (new component + responsibilities move), 5 (fetch lifecycle moves), 6 (new schedules; run
+triggers change), 7 (new persisted store files). All authorized by the 2026-08-03 operator ruling.
+
+## References
+
+- `docs/planning/briefs/WIND-PROVIDER-ARCHITECTURE-DESIGN-2026-08-03.md` — full design, source of
+  record for every detail summarized above.
+- `docs/planning/briefs/AUDIT-OPUS-WINDOW-2026-08-03.md` — decision item 9, the original operator
+  ruling.
+- `docs/planning/briefs/V3-F1-WIND-HOLE-INVESTIGATION-2026-08-03.md` — the defect this design closes.
+- `docs/planning/MARINE-PAGE-FIXIT-PLAN-2026-08-10.md` — Z3 re-scope note, migration steps 2-5 as
+  tracked tasks.
+- `docs/manuals/PROVIDER-MANUAL.md` §14.14/§14.15 and ARCHITECTURE.md's "Wind gatherer" section —
+  target-state documentation, updated in the same commit as this draft.

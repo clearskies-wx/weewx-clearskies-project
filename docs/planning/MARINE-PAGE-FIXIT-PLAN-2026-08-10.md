@@ -774,6 +774,34 @@ longer needs to carry data-age options.
   successful full run, it is a real health-semantics defect.
 - Wind gatherer store healthy: 53 hours (47 HRRR + 6 GFS), oldest 20:00Z, newest 08-14T12:00Z.
 
+**Z3.5b ROUND + QC GATE Z3.5b RECORD (2026-08-11 ~22:30Z): ✅ GATE PASS, 0 remediations.**
+Round = the Q3-ruling amendment of the held Z3.5 tree: new tolerant store accessor
+`get_present_hours()` (never refuses on gaps); surf.py display read swapped to it
+(store-primary per hour, `wind_for_display` PERMANENT fallback, both-absent → null; single
+WARNING only on zero-hours-while-gatherer-enabled); every wind_for_display deletion reversed
+byte-identical to HEAD (swan.py machinery + 11 test files' stale adaptations, incl.
+`test_h5_pipeline_wind.py` whole-file and a 1-line `test_rw1_cards_from_model.py` fixture
+restore lead-direct); the prior round's service.py legacy-trigger deletions + health
+`inputs.wind` re-sourcing RETAINED. Lead acceptance: independent runs reproduced implementer
+numbers exactly at every step (`2 failed, 99 passed` core set; `3 failed, 169 passed`
+extended — 2 disclosed date-dependent pre-existing + 1 GRIB2-library-missing local-env-only,
+lead-verified `import eccodes`/`pygrib` both fail on DILBERT). Adversarial gate (auditor
+firewalled from implementer report): 7/8 rows clean PASS, row 4 PASS-with-finding; mutation
+drills — reverting the display read to all-or-nothing `get_wind_series` flips 2 real
+endpoint KATs; neutering the accessor flips 6 store-wins tests while fallback tests stay
+green; exact-valid_time matching + no None→0 coercion confirmed; old per-request fallback
+WARNING string absent; out-of-scope files hash-verified untouched. **F1 [MEDIUM] PUSHED BACK
+with primary evidence:** lead diffed HEAD vs `stash@{0}` for test_h5_pipeline_wind.py — 0
+hits for any legacy-inline marker; every changed symbol is wind_for_display content; the
+brief's "preserve category-(b) content in this file" premise was factually empty, whole-file
+restore correct. **F2 [LOW] ACCEPTED as coordinator-process finding:** the pre-round hash
+baseline was captured ~2 min AFTER agent resume, so the agent's first edit (the accessor)
+leaked into it; the real pre-round deletions are independently proven by the pre-dispatch
+diff hunks in the session record. Lesson queued: capture audit baselines BEFORE dispatch.
+Doc batch (meta repo) revised to the hybrid by docs round (incl. one committed stale
+passage found+fixed per doc-code sync); ADR-107 stays Proposed, carries a Q3 Amendment
+section. Ship authorized by operator ("push/deploy after the adversarial audit and fixes").
+
 **Z3.2 SPLICE RULING (coordinator, 2026-08-11):** the design's §3 "Today" column was stale —
 H5 (2026-08-02) had already collapsed the request-time HRRR fetch into a per-cycle resample of
 the run's own blended field, cached as `wind_for_display`. The approved end state ("display
