@@ -720,7 +720,20 @@ ARCHITECTURAL, moves the blend boundary; status quo + visible gap). NO code.
 No data-age badge, no staleness refusal on cards. CLOSED, no implementation. Z1's brief no
 longer needs to carry data-age options.
 
-### Z3 — RE-SCOPED 2026-08-10 (wind-gatherer migration steps 2–5, operator-approved 2026-08-03) — ⬜ NOT STARTED (runs after Gate K closes)
+### Z3 — RE-SCOPED 2026-08-10 (wind-gatherer migration steps 2–5, operator-approved 2026-08-03) — 🟡 STEP 2 IMPLEMENTED 2026-08-11 (marine `9e43e7a` + meta doc-sync `b97f0436`); gate in progress; steps 3–5 queued
+
+**Z3.2 SPLICE RULING (coordinator, 2026-08-11):** the design's §3 "Today" column was stale —
+H5 (2026-08-02) had already collapsed the request-time HRRR fetch into a per-cycle resample of
+the run's own blended field, cached as `wind_for_display`. The approved end state ("display
+wind reads the store") is spliced at surf.py `_resolve_timestep_wind()` as a REQUEST-TIME
+`get_wind_series()` read (store primary) — not at the swan.py precompute, which would keep
+display wind refreshing only when a SWAN run completes, preserving the coupling the 2026-08-03
+operator ruling exists to kill. Transition semantics: run-cached `wind_for_display` is the
+fallback ONLY on store refusal/empty (one WARNING per request, named reason); fallback and the
+swan.py build are deleted in step 5. Wire shape + `windSource` unchanged. Grid shapes verified
+compatible; `_sample_wind_at_point()` reused unmodified. 8 new KATs; 40/40 targeted green;
+2 pre-existing wind-store/gatherer disk-persistence test failures disclosed (stash-verified
+at HEAD, parking lot).
 PA6's withholding is MOOT — operator approval exists (WIND-PROVIDER-ARCHITECTURE-DESIGN-
 2026-08-03.md, FULLY APPROVED, trigger classification §6). Z3 = §5 migration steps 2–5 of
 that design, each its own deployed + reality-gated round, run in the marine chain AFTER
