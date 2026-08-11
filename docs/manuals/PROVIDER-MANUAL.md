@@ -3117,7 +3117,10 @@ documented constant `CONUS_BOUNDS`), `auth_required = []`. Public domain, keyles
 **Upstream is DYNAMIC, not tiled** (live-verified 2026-08-03: `exportTilesAllowed:false`, no
 `tileInfo`): `https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer` —
 tile bytes come from `exportImage` with a Web-Mercator bbox computed from slippy z/x/y
-(`_tile_to_web_mercator_bbox()`), 256×256 PNG. See the USGS dynamic-vs-cached FAQ cited in the
+(`_tile_to_web_mercator_bbox()`), 512×512 PNG (raised from 256 on 2026-08-11, operator-approved:
+at the heat map's typical zoom 17 a 256px raster sampled NAIP at ~1.0 m/px vs the source's ~0.6 m
+native GSD; 512px restores at-native ~0.5 m/px with the same tile count — raster size is in the
+tile cache key, so a size change can never serve stale-size cached tiles). See the USGS dynamic-vs-cached FAQ cited in the
 module docstring. Polite-use `RateLimiter` 5 req/s. Tiles cached via the ADR-017 pluggable cache
 (base64 envelope), TTL `[imagery] tile_cache_ttl_seconds`, default 604 800 s (7 days) — static
 imagery. Cache key spans (z, x, y), TTL-independent.
