@@ -509,6 +509,31 @@ pre-C3S size, photo legibility (operator eyeball invited — this card's accepts
 operator-struck twice), nothing below legends, chevron works, surf forecast card position
 restored above the fold. H0/H1 numeric records in the round log.
 
+**GATE H RECORD (2026-08-11): PASS** — commits `8fdbf4c`/`382ab4f`/`53ebd38`, all rows MET
+by independent auditor verification (H0 mutation drill: dropping the handedness fold fails
+the KAT at 17.8 m; auditor's own falsifiable no-data probe; single-S grep; overlay
+confirmed the shared component, not a fork; 95/95 + 2 disclosed pre-existing failures
+exact; tsc clean). Bundle: entry 203.01 KB gz (neutral), marine chunk 44.49 KB gz (was
+41.73 — +2.76 for modal/fullscreen/smoothing). H2 shipped as bounded SVG-rect bilinear
+subdivision (16x2/row) instead of a literal canvas raster — lead-accepted methodology
+substitution (jsdom testability; bounded cost). Findings: F1 MEDIUM missing H6 report —
+REMEDIATED below; F2 LOW — the plan's "no-data cells stay unpainted" is CONDITIONAL in
+code: a pre-existing break-point-proximity extrapolation still paints a modeled value when
+a no-data cell's row carries breakPoints (predates this round; H2 did remove the worse
+hs=0 fabrication); text corrected at tag-lift, fallback surfaced to operator at H-Accept.
+F3 INFO — fullscreen overlay keeps a second card instance always-mounted (existing
+pattern); performance note parked.
+
+**H6 FLAT-SEGMENT REPORT (F1 remediation; read-only finding, NO fix made):** the flat
+~0.03 m landward segment on the beach-profile chart has two candidate mechanisms, not
+distinguishable from code alone: (a) the CUDEM survey's own native near-shore resolution
+genuinely flattening the profile (a real bathymetry characteristic); or (b) — only when
+the served `beachElevation` field is absent and the chart falls back to `tide −
+depth` — the existing 0.01 m solver-depth clamp producing an artificially flat swash
+segment when consecutive points sit at the floor (real fixture data in the repo shows 3
+consecutive 0.01 m points). Distinguishing requires a live-serving check; any fix would be
+serving-side and is the operator's call, not chartered by this plan.
+
 ### ⛔ QC GATE H — auditor rows
 (1) H0 KAT present, passing, and falsifiable (mutation: perturb the imagery transform → KAT
 fails); (2) single-ground-scale rule intact (DASHBOARD-MANUAL C3S rule vs code — two-ruler
