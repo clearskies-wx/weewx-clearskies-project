@@ -427,6 +427,17 @@ Lead ruling: repairing it is a defect fix against the documented C3S single-grou
 contract (display-only, no trigger) — fix ordered as part of H0 closure, KAT must go green
 at ≤10 m; H1-frame (held on Q2 anyway) and H2 stay blocked until H0 is green; H3/H5/H6
 (registration-independent) proceed.
+**✅ H0 GREEN 2026-08-10 (dashboard `8fdbf4c`):** root cause = alongshore-handedness — one
+north-up→chart rotation can only align both axes for one chirality of (offshore, tangent);
+the other case (cross2D < 0, ~50% of real coastlines incl. this fixture convention) rendered
+the alongshore axis mirrored. Fix: `alongshoreFlipNeeded()`/`foldAlongM()` applied at all
+three alongM→Y sites (row bands, Y ticks, imagery pivot) — data+photo move as one unit;
+rotation formula, S, served data untouched. Post-fix registration delta **0.00006 m**
+(pre-fix 40.9 m; tolerance 10 m). HeatMapCard tests 52/52, SurfingTab 33/33, tsc clean.
+3 stale ground-truth tests updated same-commit, each re-deriving handedness independently.
+Viewer-visible change: a spot's alongshore top/bottom orientation now follows its real
+geometry (may mirror vs pre-fix), matching the photo. H2 + H1-tile-budget now unblocked;
+H1-frame still held on Q2.
 **Files:** `HeatMapCard` test file (new KAT); read-only vs component code.
 **Design (decided):** project ONE ground anchor (the pier-base transect origin served by the
 profile endpoint — `originLat/originLon` of the pier transect) through (a) the data-layer
