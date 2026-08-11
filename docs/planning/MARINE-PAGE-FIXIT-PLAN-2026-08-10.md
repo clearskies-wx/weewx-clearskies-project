@@ -337,6 +337,25 @@ on deployed state must be mirrored into the repo/deploy script same-day.
   SWAN shadows it. Strengthens the ACCEPT recommendation.
 - Tag lift (PROVIDER-MANUAL §14.3a / ARCHITECTURE) held with the same ruling.
 
+**⛔ OPERATOR STRIKE (2026-08-11, chat): B2-ACCEPT REJECTED; ALL WORK FROZEN; RESEARCH
+ROUND ORDERED.** The operator rejected the accept recommendation and the shadow/refraction
+explanations as unresearched: (1) the served list STILL shows one swell — failing the
+fixit log's own Item-1 acceptance ("the served list must show a real ~10 s west train …
+and the SSE train") — the coordinator wrongly recommended accept on boundary-mechanism
+evidence instead of the served outcome; (2) buoys LANDWARD of Catalina measure the 8 s W
+train at 0.7–1.4 ft, killing the island-shadow explanation — in-model extinction is OUR
+defect; (3) S (170°) vs SSW (195–200°) are 5–6 directional bins apart and must NEVER
+merge — the 5° bins exist for this; (4) tide runs at eta_shore=0.000 during a
+flood-advisory high tide (the L1-plan STOFS wlevel chain shipped with Gate S never run;
+the coordinator also read past the 0.000 line during the accept); (5) orthophoto quality
+still unacceptable at operator viewport (source-tile quality, not tile count); (6) heat
+map painted dry-beach padding as surf (display fix written, committed LOCALLY at
+dashboard `1d37593`, NOT pushed/deployed — parked on operator freeze). Two READ-ONLY
+investigation agents dispatched (operator-ordered): WAVE-TRACE (hop-by-hop WW3→L1→L2→DWR→
+partitioner energy/direction audit, SWAN manual as authority) and TIDE-TRACE (eta_shore
+zero: defective step, start date, should-be value). Briefs + findings in session
+scratchpad. NO code/config/deploy work until operator rules on findings.
+
 ### ⛔ QC GATE B2 — `clearskies-auditor`, adversarial, BEFORE lead gate
 Rows: (1) sampling-layer functions GONE (grep — any survivor = FAIL); (2) anti-fabrication KAT
 falsifiable (mutation: reintroduce slot-averaging on a copy → KAT fails); (3) emitted INPUT
