@@ -534,7 +534,21 @@ segment when consecutive points sit at the floor (real fixture data in the repo 
 consecutive 0.01 m points). Distinguishing requires a live-serving check; any fix would be
 serving-side and is the operator's call, not chartered by this plan.
 
-### ⛔ QC GATE H — auditor rows
+**H-ACCEPT EVIDENCE (2026-08-11, deployed to weather-dev at `53ebd38`): OPERATOR EYEBALL
+PENDING.** Screenshots in session scratchpad (h-desktop.png / h-fullscreen.png /
+h-phone.png), captured via Playwright through local Caddy. Observed: aerial photo now SHARP
+(individual cars/pier structure resolvable — the blocky-photo complaint is gone); the
+WHOLE pier visible in the fullscreen frame; color field smoothly blended alongshore (H2);
+nothing below the legends; fullscreen overlay opens/closes ("View chart fullscreen"
+button); surf-score footer gone; phone width stacks cleanly. **One item flagged for the
+operator eyeball:** a solid uniform BLUE block of shoreward cells appears to overlay dry
+sand and part of the back-beach/parking area on the photo's shore side. Candidate benign
+explanation: the 1-D model's landward boundary is HAT (up the beach face), so low-height
+shoreward cells can legitimately extend past the photo's capture-time waterline; candidate
+defect: shoreward cell extent misrendered. The H0 KAT pins pier-anchor registration to
+0.00006 m, so gross misregistration is excluded — but cell EXTENT vs the real waterline is
+exactly the kind of call the operator's eye settles. Formal ≤1.5 m/px measurement rides
+with the held H1-frame term (Q2).
 (1) H0 KAT present, passing, and falsifiable (mutation: perturb the imagery transform → KAT
 fails); (2) single-ground-scale rule intact (DASHBOARD-MANUAL C3S rule vs code — two-ruler
 regression grep); (3) smoothing never paints no-data cells (auditor's own canvas probe);
