@@ -6,7 +6,7 @@
 |---|---|
 | **Live on librewxr** | marine `bdaf956` (L1-BOUNDARY-REBUILD state; crash-loop temp-dir startup defect repaired by operator 2026-08-10; publishing again since ~19:24Z) |
 | **Live on weather-dev** | dashboard `529e13d` (= repo HEAD; the struck C3S render) |
-| **Phases DONE** | none — GO received 2026-08-10, Phase DOC in progress |
+| **Phases DONE** | ✅ **DOC** (meta `7e53927`, 12 files docs-only; Gate DOC PASSED 2026-08-10, adversarial audit 0 findings — rows 1–6 all PASS with evidence; lead independent checks: allowlist diff exact, ADR-106↔PA1–PA5 1:1, 25 m confirmed wording, zero Z2 content). ✅ **Z1** (diagnosis; Q1 answered by 2026-08-03 ruling). Z2 ruled no. |
 | **Remaining** | Phase DOC → B2 → S → K → Z3 (marine chain, strict; Z3 = wind-gatherer migration steps 2–5 per the approved 2026-08-03 design) ; H → M (dashboard chain, may interleave after DOC) |
 | **WAITING ON OPERATOR** | none — Z1 answered by the pre-existing 2026-08-03 ruling (Q1 record below); Z2 ruled no |
 
