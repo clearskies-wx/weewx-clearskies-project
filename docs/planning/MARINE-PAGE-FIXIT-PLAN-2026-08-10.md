@@ -428,12 +428,26 @@ tests fail against pre-change code (falsifiability spot-check); (4) doc-sync tag
 
 ---
 
-## PHASE K — Break markers + crash-band impact zone *(PA3/PA4 — fixit Item 4)* — ⬜ NOT STARTED (dispatches after Gate S closes)
+## PHASE K — Break markers + crash-band impact zone *(PA3/PA4 — fixit Item 4)* — 🟡 K1–K4 ✅ DONE 2026-08-11 (marine `57ee18d`+`daa0b14`+`d75e507`+`9bbc292`); Gate K ⏳ IN PROGRESS; K-Accept pending deploy
+
+**K2 COORDINATOR RULING (a), 2026-08-11:** the plan's literal "maximal contiguous runs where
+Qb_i ≥ qb_breaking_onset" contradicted the plan's own examples (transect-55 two-break KAT +
+"multi-bar ⇒ multiple markers" consequence) — on the real fixture, raw Qb dips to 0.0475 at
+the bar crest, so single-threshold regions delete the bar marker. Ruled per CLAUDE.md's
+same-plan-contradiction clause toward the examples: `qb_breaking_onset` gates region START
+only; continuity uses the existing `Q_B_CESSATION` (0.02, value/march-role untouched) as the
+stay-alive floor, mirroring the march's own onset/cessation asymmetry. Documented in
+`_select_break_markers()` docstring; pinned by the K4 hysteresis-isolation KAT pair; Gate K
+row 4's literal "no Q_B_CESSATION in publication path" amended accordingly (one sanctioned use).
+Round notes: config-plumbing allowlist extension (pipeline call sites + beach_profile kwarg
+threading — coordinator-ruled, enumerated); 1 pre-existing transect-55 reform failure + 4
+pre-existing wind-sea F4/F5 failures disclosed and worktree-verified at `b4dfb40` baseline;
+k-tests skipped scope-ack-wait (2nd occurrence this session, disclosed, retro-approved).
 
 **Owner:** `clearskies-api-dev`. **Tests:** `clearskies-test-author`. **QC:** auditor at Gate
 K. Dispatches after Gate S closes.
 
-### K1 — Config keys + plumbing — ⬜ NOT STARTED
+### K1 — Config keys + plumbing — ✅ DONE 2026-08-11 (`57ee18d`; SurfConfig + real wiring to both pipeline call sites + beach_profile)
 **Files:** `config/marine_config.py`, `services/surf_1d_analytical.py` (constant read sites).
 **Design (decided):** `[surf] qb_breaking_onset` (float, default 0.05, valid (0, 0.5)) and
 `[surf] impact_zone_width_m` (float, default 25.0, valid (5, 200)); out-of-range → loud
@@ -442,7 +456,7 @@ config-push refusal naming the bound. Values flow to the 1-D layer the same way 
 this module, module-level defaults overridden at pipeline construction — implementer follows
 the repo's existing pattern, surfacing if none exists). OPERATIONS-MANUAL doc-sync tag removal.
 
-### K2 — Marker detection decoupled from cessation — ⬜ NOT STARTED
+### K2 — Marker detection decoupled from cessation — ✅ DONE 2026-08-11 (`57ee18d`+`daa0b14` ruling (a); zero march-loop lines touched)
 **Files:** `services/surf_1d_analytical.py` — break-publication region ONLY (`onset_indices`
 mechanics + `_find_break_points()`); the physics march variables (Q_b solve, one-sided
 relaxation, roller reservoir) are OUT of scope.
@@ -457,7 +471,7 @@ append-at-cessation logic no longer feeds publication (cessation stays as intern
 state). Multi-bar profiles ⇒ multiple markers per region even when Q_b never dips — the
 operator-accepted dependency.
 
-### K3 — Zones: fixed crash bands — ⬜ NOT STARTED
+### K3 — Zones: fixed crash bands — ✅ DONE 2026-08-11 (`57ee18d`+`d75e507`; reformTrough always null, wire-locked in beach_profile)
 **Files:** `services/surf_1d_analytical.py` (`_classify_zones` + per-break variant),
 `endpoints/beach_profile.py` (serving shape only — field names/nullability unchanged except
 `reformTrough` now always null).
@@ -469,7 +483,7 @@ most shoreward band, waterlineDistance] (pure geometry, no roller-energy term).
 roller-energy zone scan (`_WHITEWATER_ER_FLOOR_FRACTION` and the next-break clamp) leaves the
 published path entirely. Dashboard `types.ts` comment updated per PA5 (DOC.4 prescription).
 
-### K4 — Tests — ⬜ NOT STARTED
+### K4 — Tests — ✅ DONE 2026-08-11 (`9bbc292`; 16 KATs covering (a)-(g) + ruling-(a) hysteresis pair; lead re-ran 16/16)
 KATs: (a) synthetic two-bar profile whose D-series has two prominent maxima with Q_b never
 dipping below onset between them → TWO markers, TWO bands (fails against pre-K2 code —
 falsifiability demo required); (b) prominence: a 25%-prominence ripple publishes NO marker;
@@ -489,7 +503,7 @@ restore (recorded); (4) journal sweep + baseline diff; (5) INV-11 firing rate re
 before/after (informational — PA4 doesn't charter fixing it, but the number lands in the
 record for the standing SURF-REMEDIATION item).
 
-### QC GATE K — auditor rows — ⬜ NOT STARTED
+### QC GATE K — auditor rows — ⏳ IN PROGRESS 2026-08-11 (adversarial auditor dispatched; rows audited as amended by ruling (a) — see phase header)
 (1) physics-march diff audit: zero changes to Q_b solve/relaxation/roller code paths (the
 frozen physics assertion — any touched line outside the publication/zone regions = FAIL);
 (2) KAT (a) falsifiability reproduced by the auditor (mutation/revert); (3) config keys
