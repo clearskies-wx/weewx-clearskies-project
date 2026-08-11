@@ -220,7 +220,7 @@ live-behavior claim changed where behavior hasn't; (4) ADR-106 covers PA1–PA5 
 
 ---
 
-## PHASE B2 — Boundary: one spectrum per wet WW3 cell, SWAN interpolates *(PA1 — fixit Item 1)* — 🟡 CODE SHIPPED+DEPLOYED (B2.1–B2.3 ✅, Gate B2 ✅ PASS, mechanism proven live); **B2-ACCEPT ⛔ STRUCK/OPEN** — blocked on the L1 wave-corruption fix (served list must show the real trains; CTHETA/CSIGMA experiment running 2026-08-11)
+## PHASE B2 — Boundary: one spectrum per wet WW3 cell, SWAN interpolates *(PA1 — fixit Item 1)* — 🟡 CODE SHIPPED+DEPLOYED (B2.1–B2.3 ✅, Gate B2 ✅ PASS, mechanism proven live); **B2-ACCEPT ⛔ STRUCK/OPEN** — blocked on the L1 wave-corruption fix (served list must show the real trains). Investigation 2026-08-11: **refraction-limiter mechanism REFUTED** by controlled three-way scratch experiment on librewxr (control vs CTHETA 0.9/CSIGMA 0.9 vs Dietrich-2012 tuned 0.5/0.25 — west-swell energy flat 2.4–3.1% at all probes, south bearings locked 192–198° in all three; WAVE-TRACE-FINDINGS.md addendum). New lead candidate: 67× COMPUTE STAT sequencing + STOPC bulk-Hs-only convergence; discriminating NONSTAT scratch experiment authorized + running. Candidate 2 (ST6→WESTHUYSEN package swap) named/held.
 
 **Owner:** `clearskies-api-dev` (Sonnet). **Tests:** `clearskies-test-author`. **QC:**
 `clearskies-auditor` at Gate B2. All code in `repos/weewx-clearskies-marine/`.
