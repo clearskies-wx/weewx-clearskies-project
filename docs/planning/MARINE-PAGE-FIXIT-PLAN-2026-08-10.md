@@ -418,6 +418,15 @@ comment); (6) targeted baselines, zero new failures.
 **QC:** auditor at Gate H. Dispatches after Gate DOC; H0 BLOCKS H1–H4.
 
 ### H0 — Registration known-answer check FIRST (the C3S recorded next-session action)
+**⚠ H0 RESULT 2026-08-10: FAIL — registration defect CONFIRMED.** Pier-base anchor
+projected through the data transform vs the imagery transform disagrees by **40.95 m
+alongshore** (cross-shore exact to <0.001 m; tolerance 10 m). The C3S registration doubt is
+now a measured finding: the defect isolates to the alongshore/tangent basis handling when
+the north-up imagery mosaic is rotated into the chart frame — not scale (S), not pivot.
+Lead ruling: repairing it is a defect fix against the documented C3S single-ground-frame
+contract (display-only, no trigger) — fix ordered as part of H0 closure, KAT must go green
+at ≤10 m; H1-frame (held on Q2 anyway) and H2 stay blocked until H0 is green; H3/H5/H6
+(registration-independent) proceed.
 **Files:** `HeatMapCard` test file (new KAT); read-only vs component code.
 **Design (decided):** project ONE ground anchor (the pier-base transect origin served by the
 profile endpoint — `originLat/originLon` of the pier transect) through (a) the data-layer
