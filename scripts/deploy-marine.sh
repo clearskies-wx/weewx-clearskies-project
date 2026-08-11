@@ -259,6 +259,18 @@ ReadWritePaths=${CONF_DIR}
 ReadWritePaths=/etc/weewx-clearskies
 ReadWritePaths=/var/run/weewx-clearskies
 ReadWritePaths=/var/lib/weewx-clearskies/swan
+# /var/run (= /run) is tmpfs: after a host reboot /run/weewx-clearskies does
+# not exist, and a ReadWritePaths entry naming a missing path fails mount-
+# namespace setup (status=226/NAMESPACE) -> immediate crash loop. This was
+# the 2026-08-10 startup crash-loop root cause (marine fixit Item 0); the
+# operator repaired it live and the 2026-08-11 B2 unit reinstall regressed
+# it because the fix was only on the host, not here. RuntimeDirectory makes
+# systemd CREATE the directory (unit User= ownership, no chown) before
+# namespacing; Preserve=yes stops deletion on service stop (on a host where
+# the API's loop.sock lives here, deleting on marine stop would yank the
+# socket dir out from under the API).
+RuntimeDirectory=weewx-clearskies
+RuntimeDirectoryPreserve=yes
 # The B1 DEBUG trace (services/trace.py) writes
 # /var/log/weewx-clearskies/marine-trace-{YYYYMMDD}.jsonl when
 # CLEARSKIES_MARINE_DEBUG_TRACE is set. /var is read-only under
