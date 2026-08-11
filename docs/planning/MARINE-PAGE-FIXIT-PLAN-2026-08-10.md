@@ -580,6 +580,32 @@ English, self-contained, newest at top. Answered items move to the decision log.
 instruction 2026-08-10: "create a list of questions in the plan for items THAT ARE NOT
 ANSWERABLE BY THE DOCS, if they are answerable by DOCS, do not ask me.")*
 
+### Q2 (2026-08-10, from Phase H dispatch) — The heat map can't know where the pier ends; how should it?
+
+**Context, plain English:** you ruled the heat map should frame enough ground to include the
+whole pier (which also shrinks the colored strips and sharpens the photo). Implementing
+that, we found the dashboard has no way to know how far out the pier reaches: the server
+computes the pier's footprint internally for the wave model, but never sends any of it to
+the browser. The plan's wording assumed it was available; it isn't. Inventing it in the
+browser (hard-coding "567 m" for this one beach) would break the dashboard for any other
+site. Everything else in the heat map round proceeds — only the "how far seaward to frame"
+number is on hold.
+
+**Options (A and C add a field to what the server sends, which is an architectural change
+needing your sign-off):**
+- **A — serve the pier's seaward extent (RECOMMENDED).** One small additive field on the
+  heat-map response (the server already computes the footprint; this just exposes its
+  seaward tip distance). Generic for any spot/structure; the frame formula then works
+  exactly as you ruled.
+- **B — display-only workaround.** Widen the frame by a fixed factor or fixed extra ground
+  (e.g. +400 m seaward). No server change, strips shrink and photo sharpens, and at this
+  beach the pier happens to fit — but the number is arbitrary and spot-blind.
+- **C — per-spot display preset.** A configured "frame this much ground" value per spot
+  (same pattern as the beach-profile display window). More operator control, slightly more
+  plumbing than A.
+
+**Recommendation:** A.
+
 ### Q1 — ✅ ANSWERED (operator 2026-08-10 + pre-existing ruling 2026-08-03) — see decision log entry below; Z3 re-scoped accordingly
 
 **The question was already ruled on 2026-08-03 and the coordinator failed to find it before
