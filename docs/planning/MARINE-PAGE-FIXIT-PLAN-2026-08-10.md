@@ -10,7 +10,8 @@ table → Phase records below → SESSION-STATE.md.**
 |---|---|
 | **Live on librewxr** | RUNNING SERVICE = marine `a396866` **Phase T tide fix DEPLOYED** (restart 2026-08-11 07:29:40Z, health 200, auth enforced; deploy-marine.sh full run). Tide reality-check vs CO-OPS 9410660 pending next model cycle (journal monitor armed). B2 boundary rework also live. |
 | **Live on weather-dev** | dashboard `1d37593` **DEPLOYED** (dry-beach fix pushed + redeployed 2026-08-11; was parked) |
-| **OPERATOR RULINGS 2026-08-11** | (1) T deploy **OK** → done; (2) CTHETA/CSIGMA L1 experiment **OK** → dispatched to wave-trace agent (scratch copy, deck-only change, no production edit — permanent limiter change stays an architectural decision for the operator); (3) push+deploy `1d37593` **OK** → done; (4) new-source investigation **NO** — operator asked instead what source is in use: **USGS NAIP Plus** via API exportImage proxy (live config confirmed provider=naip, proxyMode=api at spot lat/lon); ESRI World Imagery is the non-CONUS fallback only |
+| **OPERATOR RULINGS 2026-08-11** | (1) T deploy **OK** → done; (2) CTHETA/CSIGMA L1 experiment **OK** → dispatched to wave-trace agent (scratch copy, deck-only change, no production edit — permanent limiter change stays an architectural decision for the operator); (3) push+deploy `1d37593` **OK** → done; (4) new-source investigation **NO** — source is **USGS NAIP Plus** via API exportImage proxy; operator pointed out we weren't requesting native resolution — CONFIRMED (measured: 75/99 live tile requests at z17 = 1.0 m/px vs 0.6 m native) → **remedy operator-approved ("fine") and DEPLOYED: tile raster 256→512px (api `e729a97`, deployed to weewx 2026-08-11), now ~0.5 m/px at-native; cache key versioned; live tile verified 512px + visibly sharp** |
+| **Also live on weewx** | api `e729a97` (NAIP 512px raster) deployed 2026-08-11 |
 | **STRUCK/OPEN** | B2-Accept (open until L1 wave corruption fixed — served list must show the real trains); H-Accept (open: dry-beach fix parked + ortho quality) |
 | **Phases DONE** | ✅ **M** (dashboard `eb424fd`+`73d9017` DEPLOYED to weather-dev; Gate M PASS, repro capture clean — see Phase M gate record). ✅ **DOC** (meta `7e53927`, 12 files docs-only; Gate DOC PASSED 2026-08-10, adversarial audit 0 findings — rows 1–6 all PASS with evidence; lead independent checks: allowlist diff exact, ADR-106↔PA1–PA5 1:1, 25 m confirmed wording, zero Z2 content). ✅ **Z1** (diagnosis; Q1 answered by 2026-08-03 ruling). Z2 ruled no. |
 | **Remaining** | Phase DOC → B2 → S → K → Z3 (marine chain, strict; Z3 = wind-gatherer migration steps 2–5 per the approved 2026-08-03 design) ; H → M (dashboard chain, may interleave after DOC) |
@@ -172,7 +173,7 @@ handling + atomic theme remount (M); card range-rendering rebinds (S2).
 
 ---
 
-## PHASE DOC — governing documents to the ruled target state, BEFORE any code
+## PHASE DOC — governing documents to the ruled target state, BEFORE any code — ✅ CLOSED 2026-08-10 (all tasks done; Gate DOC PASS, 0 findings; meta `7e53927`)
 
 **Owner:** `clearskies-docs-author` (Sonnet), content sourced ONLY from the fixit log's ruling
 records and this plan. **QC:** `clearskies-auditor` at Gate DOC. **No implementation phase
@@ -181,7 +182,7 @@ dispatches until Gate DOC passes.**
 **`(ruled 2026-08-10; lands with Phase <X> of MARINE-PAGE-FIXIT-PLAN)`**; the implementing
 phase's doc-sync removes the tag on deploy.
 
-### DOC.1 — New ADR-106 + amendments
+### DOC.1 — New ADR-106 + amendments — ✅ DONE 2026-08-10
 New **ADR-106 — Marine page fixit rulings 2026-08-10** (status: Accepted; records, with the
 fixit log as evidence: the slot-mixing root cause; PA1 per-WW3-cell boundary + SWAN
 interpolation + why the D4 1-km spacing is superseded (station-era fear vs 16-km neighbors);
@@ -190,17 +191,17 @@ marker decoupling + prominence rule; the named constants). Amendment notes in **
 (P4/D4 superseded → pointer to ADR-106) and **ADR-102** (published-marker/zone section
 superseded → pointer; internal Q_b/roller physics unchanged). `docs/decisions/INDEX.md` rows.
 
-### DOC.2 — ARCHITECTURE.md
+### DOC.2 — ARCHITECTURE.md — ✅ DONE 2026-08-10
 Tagged rewrites: the L1-boundary bullet (:120 region — per-WW3-cell files, SWAN interpolates,
 sampling layer deleted); the SWAN-outputs paragraph's break-point/impact-zone sentences (PA4
 definitions); the P13 aggregate-fields sentence (PA2 field set).
 
-### DOC.3 — PROVIDER-MANUAL
+### DOC.3 — PROVIDER-MANUAL — ✅ DONE 2026-08-10
 §14.3a reconstruction spec rewritten to the per-cell design (B2.1/B2.2 content verbatim:
 cell-row selection, endpoint copies, viability floor, constants unchanged table); note that
 the corridor fetch (B1, §14.3) is untouched.
 
-### DOC.4 — API-MANUAL + openapi + DASHBOARD-MANUAL + OPERATIONS-MANUAL + DESIGN-MANUAL
+### DOC.4 — API-MANUAL + openapi + DASHBOARD-MANUAL + OPERATIONS-MANUAL + DESIGN-MANUAL — ✅ DONE 2026-08-10
 API-MANUAL surf-bundle field table + `openapi-v1.yaml`: add `periodMinS/periodMaxS`, remove
 `combinedPeriodS` + `faceHeightMinFt/MaxFt`, breakPoints may carry >1 entry, perBreakZones
 band semantics (PA4), `reformTrough` always null (tagged). DASHBOARD-MANUAL: card 3 bindings
@@ -211,7 +212,7 @@ OPERATIONS-MANUAL: the two new `[surf]` config keys + validation + how to tune t
 DESIGN-MANUAL: marine card table gains the missing Heat Map row (4x2, overlay pattern);
 `types.ts` impact-zone comment text prescribed (PA5).
 
-### ⛔ QC GATE DOC — `clearskies-auditor`, adversarial
+### QC GATE DOC — `clearskies-auditor`, adversarial — ✅ PASS 2026-08-10 (0 findings)
 Rows: (1) every doc statement traceable to a fixit-log ruling or a plan design line (spot-map
 10 random claims; any orphan = FAIL); (2) every target-state section tagged; (3) no
 live-behavior claim changed where behavior hasn't; (4) ADR-106 covers PA1–PA5 completely
@@ -219,12 +220,12 @@ live-behavior claim changed where behavior hasn't; (4) ADR-106 covers PA1–PA5 
 
 ---
 
-## PHASE B2 — Boundary: one spectrum per wet WW3 cell, SWAN interpolates *(PA1 — fixit Item 1)*
+## PHASE B2 — Boundary: one spectrum per wet WW3 cell, SWAN interpolates *(PA1 — fixit Item 1)* — 🟡 CODE SHIPPED+DEPLOYED (B2.1–B2.3 ✅, Gate B2 ✅ PASS, mechanism proven live); **B2-ACCEPT ⛔ STRUCK/OPEN** — blocked on the L1 wave-corruption fix (served list must show the real trains; CTHETA/CSIGMA experiment running 2026-08-11)
 
 **Owner:** `clearskies-api-dev` (Sonnet). **Tests:** `clearskies-test-author`. **QC:**
 `clearskies-auditor` at Gate B2. All code in `repos/weewx-clearskies-marine/`.
 
-### B2.1 — Reconstruction rework: per-cell spectra, sampling layer deleted
+### B2.1 — Reconstruction rework: per-cell spectra, sampling layer deleted — ✅ DONE 2026-08-11 (marine `39504a0`)
 **Files:** `services/boundary_reconstruction.py`; `services/grid_sizing_chain.py` (config-time
 viability check only).
 **Design (decided, complete):**
@@ -251,7 +252,7 @@ viability check only).
 `tests/test_boundary_reconstruction.py tests/test_partition_fields.py` on librewxr (no full
 suite; check no SWAN cycle in progress first).
 
-### B2.2 — Emission: fewer positions, endpoint copies, grammar unchanged
+### B2.2 — Emission: fewer positions, endpoint copies, grammar unchanged — ✅ DONE 2026-08-11 (same round; live: 15 files vs 194)
 **Files:** `services/swan_formats.py` (`ww3_boundary_files_and_command()` only),
 `services/swan_runner.py` (file-writing call site only).
 **Design (decided):** position list = B2.1's per-cell `len`s, strictly ascending, PLUS the two
@@ -259,7 +260,7 @@ endpoint byte-copies (len 0.0 / len side_length, §Named constants). Same file n
 same `&`-wrapping, same one-command-per-side. Expected scale: ~7–10 cells + 2 copies per side
 (≈ 20 files total vs today's 194). The 180-char line guard and continuation reader stay.
 
-### B2.3 — Tests (test-author) — the misalignment case becomes a permanent KAT
+### B2.3 — Tests (test-author) — the misalignment case becomes a permanent KAT — ✅ DONE 2026-08-11 (`3ef48ed`+`d9301cf`; 8 KATs, 13 stale deleted per scope-ack)
 **Files:** `tests/test_boundary_reconstruction.py` (rework), `tests/test_partition_fields.py`
 (untouched unless imports break — B1 fetcher is out of scope).
 KATs (all falsifiable — each demonstrated to fail against the OLD sampling code where
@@ -276,7 +277,7 @@ convention KAT re-pointed at the per-cell path. **Old sampling-layer tests:** up
 deleted ONLY as enumerated in the scope-ack (stale-test protocol; every deletion listed in the
 closeout with its replacement).
 
-### B2-Accept (live, librewxr — deploy alone)
+### B2-Accept (live, librewxr — deploy alone) — ⛔ OPEN (operator-struck 2026-08-11; see strike record below)
 **⚠ GATE EVENT (2026-08-11 02:41Z, deploy restart):** the restart crash-looped
 (status=226/NAMESPACE, `/run/weewx-clearskies` missing) — the deploy reinstalled the
 repo/script unit, which still carried the Item-0 crash-loop defect the operator had
@@ -362,7 +363,7 @@ partitioner energy/direction audit, SWAN manual as authority) and TIDE-TRACE (et
 zero: defective step, start date, should-be value). Briefs + findings in session
 scratchpad. NO code/config/deploy work until operator rules on findings.
 
-### ⛔ QC GATE B2 — `clearskies-auditor`, adversarial, BEFORE lead gate
+### QC GATE B2 — `clearskies-auditor`, adversarial, BEFORE lead gate — ✅ PASS 2026-08-11 (code-level rows; does NOT close B2-Accept above)
 Rows: (1) sampling-layer functions GONE (grep — any survivor = FAIL); (2) anti-fabrication KAT
 falsifiable (mutation: reintroduce slot-averaging on a copy → KAT fails); (3) emitted INPUT
 diff vs pre-phase: only the BOUNDSPEC block and file inventory differ; (4) pinned commands
@@ -374,13 +375,13 @@ failures.
 
 ---
 
-## PHASE S — Swell-conditions card: ruled ranges *(PA2 — fixit Item 2)*
+## PHASE S — Swell-conditions card: ruled ranges *(PA2 — fixit Item 2)* — ⬜ NOT STARTED (dispatching 2026-08-11; brief ready in scratchpad)
 
 **Owner:** `clearskies-api-dev` (S1) + `clearskies-dashboard-dev` (S2). **Tests:**
 `clearskies-test-author` (S3). **QC:** `clearskies-auditor` at Gate S. Dispatches after Gate
 B2 closes (marine repo single-round).
 
-### S1 — Server fields (marine `endpoints/surf.py`, `_compute_eligible_swell_aggregates`)
+### S1 — Server fields (marine `endpoints/surf.py`, `_compute_eligible_swell_aggregates`) — ⬜ NOT STARTED
 **Design (decided):** (a) ADD `periodMinS`/`periodMaxS` = min/max of `period` over the
 ELIGIBLE set (existing eligibility rule — operator ruled the no-qualifier fallback stays
 as-is), rounded 1 decimal; (b) REMOVE `combinedPeriodS` and `faceHeightMinFt`/`faceHeightMaxFt`
@@ -390,7 +391,7 @@ by an import of `_MIN_SURFABLE_PERIOD_S` from `services/surf_1d_pipeline` (share
 verify no import cycle); (d) `swellHeightMinFt/MaxFt` and `modelSurfHeightMin/Max`
 computations untouched.
 
-### S2 — Card rebind (dashboard `SurfingTab.tsx` Card 3)
+### S2 — Card rebind (dashboard `SurfingTab.tsx` Card 3) — ⬜ NOT STARTED
 **Design (decided):** Breaking Face Height range ← `modelSurfHeightMin`/`modelSurfHeightMax`
 (verify served units against API-MANUAL before binding — the fields serve feet today per the
 live capture); Period ← `periodMinS`–`periodMaxS` via the existing `formatMinMaxFt`-style
@@ -398,19 +399,19 @@ collapse rule (single number iff min = max); delete the `combinedPeriodS` and
 `faceHeightMinFt/MaxFt` bindings and the fields from `src/api/types.ts`/openapi mirror.
 Swell Height binding unchanged.
 
-### S3 — Tests
+### S3 — Tests — ⬜ NOT STARTED
 Marine: aggregate KATs updated in the same round — period-range arithmetic on a 3-train
 fixture; fields-absent assertions for the two removals (response must NOT carry them).
 Dashboard: `SurfingTab.test.tsx` C1 block updated to the new bindings (range renders, collapse
 renders, null fallback) — same-commit-as-behavior rule.
 
-### S-Accept (live)
+### S-Accept (live) — ⬜ NOT STARTED
 Served JSON at matched time shows `periodMinS/periodMaxS` and lacks the removed fields;
 screenshot of the card showing Breaking Face Height as the `modelSurfHeight*` range (a real
 range on a multi-transect day) and Period as a range when ≥2 surfable trains differ; cam/buoy
 sanity note recorded.
 
-### ⛔ QC GATE S — auditor rows
+### QC GATE S — auditor rows — ⬜ NOT STARTED
 (1) repo-wide grep: zero surviving references to the removed fields (both repos + openapi);
 (2) shared-constant import verified (no duplicated 5.0 literal in `surf.py`); (3) dashboard
 tests fail against pre-change code (falsifiability spot-check); (4) doc-sync tags removed
@@ -418,12 +419,12 @@ tests fail against pre-change code (falsifiability spot-check); (4) doc-sync tag
 
 ---
 
-## PHASE K — Break markers + crash-band impact zone *(PA3/PA4 — fixit Item 4)*
+## PHASE K — Break markers + crash-band impact zone *(PA3/PA4 — fixit Item 4)* — ⬜ NOT STARTED (dispatches after Gate S closes)
 
 **Owner:** `clearskies-api-dev`. **Tests:** `clearskies-test-author`. **QC:** auditor at Gate
 K. Dispatches after Gate S closes.
 
-### K1 — Config keys + plumbing
+### K1 — Config keys + plumbing — ⬜ NOT STARTED
 **Files:** `config/marine_config.py`, `services/surf_1d_analytical.py` (constant read sites).
 **Design (decided):** `[surf] qb_breaking_onset` (float, default 0.05, valid (0, 0.5)) and
 `[surf] impact_zone_width_m` (float, default 25.0, valid (5, 200)); out-of-range → loud
@@ -432,7 +433,7 @@ config-push refusal naming the bound. Values flow to the 1-D layer the same way 
 this module, module-level defaults overridden at pipeline construction — implementer follows
 the repo's existing pattern, surfacing if none exists). OPERATIONS-MANUAL doc-sync tag removal.
 
-### K2 — Marker detection decoupled from cessation
+### K2 — Marker detection decoupled from cessation — ⬜ NOT STARTED
 **Files:** `services/surf_1d_analytical.py` — break-publication region ONLY (`onset_indices`
 mechanics + `_find_break_points()`); the physics march variables (Q_b solve, one-sided
 relaxation, roller reservoir) are OUT of scope.
@@ -447,7 +448,7 @@ append-at-cessation logic no longer feeds publication (cessation stays as intern
 state). Multi-bar profiles ⇒ multiple markers per region even when Q_b never dips — the
 operator-accepted dependency.
 
-### K3 — Zones: fixed crash bands
+### K3 — Zones: fixed crash bands — ⬜ NOT STARTED
 **Files:** `services/surf_1d_analytical.py` (`_classify_zones` + per-break variant),
 `endpoints/beach_profile.py` (serving shape only — field names/nullability unchanged except
 `reformTrough` now always null).
@@ -459,7 +460,7 @@ most shoreward band, waterlineDistance] (pure geometry, no roller-energy term).
 roller-energy zone scan (`_WHITEWATER_ER_FLOOR_FRACTION` and the next-break clamp) leaves the
 published path entirely. Dashboard `types.ts` comment updated per PA5 (DOC.4 prescription).
 
-### K4 — Tests
+### K4 — Tests — ⬜ NOT STARTED
 KATs: (a) synthetic two-bar profile whose D-series has two prominent maxima with Q_b never
 dipping below onset between them → TWO markers, TWO bands (fails against pre-K2 code —
 falsifiability demo required); (b) prominence: a 25%-prominence ripple publishes NO marker;
@@ -469,7 +470,7 @@ falsifiability demo required); (b) prominence: a 25%-prominence ripple publishes
 (f) `reformTrough` null; (g) out-of-range config → push refusal. Existing zone/marker tests
 updated same-commit per the task specs; every touched test enumerated in scope-ack.
 
-### K-Accept (live)
+### K-Accept (live) — ⬜ NOT STARTED
 Deploy alone. (1) Beach-profile card at matched time: does the inner beach break now carry a
 marker? RECORD against cam observation (pass/fail on "markers correspond to where waves
 visibly crash" — pre-declared, operator invited to eyeball); (2) impact-zone bar(s) are
@@ -479,7 +480,7 @@ restore (recorded); (4) journal sweep + baseline diff; (5) INV-11 firing rate re
 before/after (informational — PA4 doesn't charter fixing it, but the number lands in the
 record for the standing SURF-REMEDIATION item).
 
-### ⛔ QC GATE K — auditor rows
+### QC GATE K — auditor rows — ⬜ NOT STARTED
 (1) physics-march diff audit: zero changes to Q_b solve/relaxation/roller code paths (the
 frozen physics assertion — any touched line outside the publication/zone regions = FAIL);
 (2) KAT (a) falsifiability reproduced by the auditor (mutation/revert); (3) config keys
@@ -489,12 +490,12 @@ comment); (6) targeted baselines, zero new failures.
 
 ---
 
-## PHASE H — Heat map + small display fixes *(fixit Items 5, 3, 4-display)*
+## PHASE H — Heat map + small display fixes *(fixit Items 5, 3, 4-display)* — 🟡 ALL TASKS ✅ SHIPPED+DEPLOYED (Gate H ✅ PASS); **H-ACCEPT ⛔ STRUCK 2026-08-11 → both remediations DEPLOYED 2026-08-11** (dry-beach clip `1d37593` on weather-dev; ortho NAIP raster 256→512px api `e729a97` on weewx — measured z17 requests were 1.0 m/px vs 0.6 m native, now 0.5 m/px) — re-accept awaits operator eyeball
 
 **Owner:** `clearskies-dashboard-dev`. **Tests:** `clearskies-test-author` (H7).
 **QC:** auditor at Gate H. Dispatches after Gate DOC; H0 BLOCKS H1–H4.
 
-### H0 — Registration known-answer check FIRST (the C3S recorded next-session action)
+### H0 — Registration known-answer check FIRST (the C3S recorded next-session action) — ✅ GREEN 2026-08-10 (`8fdbf4c`; 40.9 m defect found+fixed → 0.00006 m; permanent KAT)
 **⚠ H0 RESULT 2026-08-10: FAIL — registration defect CONFIRMED.** Pier-base anchor
 projected through the data transform vs the imagery transform disagrees by **40.95 m
 alongshore** (cross-shore exact to <0.001 m; tolerance 10 m). The C3S registration doubt is
@@ -530,14 +531,14 @@ tile budget 4 → 8. Single-ground-scale rule PRESERVED (one S, both axes — DA
 C3S rule untouched). Accept numbers: background ≤ 1.5 m/px at default card size; row strips
 at or below their pre-C3S on-screen height; H0 KAT green.
 
-### H2 — Radar-style smoothing (display-only)
+### H2 — Radar-style smoothing (display-only) — ✅ DONE 2026-08-11 (`53ebd38`, SVG bilinear subdivision)
 **Files:** `HeatMapCard.tsx`.
 **Design (decided):** the per-cell surf-height color field renders through bilinear
 interpolation between adjacent transect row bands and along each transect (offscreen-canvas
 upsample of the value grid, then colormap) — cells with no data stay unpainted (no invented
 surf beyond the data extent); the served data and the transform are untouched.
 
-### H3 — Nothing below the legends
+### H3 — Nothing below the legends — ✅ DONE 2026-08-11 (`382ab4f`)
 **Files:** `HeatMapCard.tsx` + info-modal content/help keys.
 **Design (decided — operator's words "do not need anything below the legends" govern):** BOTH
 lines below the legends are removed from the card face: the imagery attribution AND the D7s
@@ -545,32 +546,32 @@ smoothing note. Both texts move into the card's info-icon modal; the attribution
 rendered VERBATIM from `imageryConfig.attribution` there (keeps the ESRI ToS case compliant —
 PROVIDER-MANUAL §16.2). Help-key doc-sync per CLAUDE.md.
 
-### H4 — Card 4x2 + fullscreen overlay (RULED)
+### H4 — Card 4x2 + fullscreen overlay (RULED) — ✅ DONE 2026-08-11 (`382ab4f`)
 **Files:** `SurfingTab.tsx` (card wrapper), `HeatMapCard.tsx`.
 **Design (decided):** `footprint="full"` + `rowSpan={2}`; chart area scrolls vertically inside
 the card (`overflow-y: auto`) when the true-scale height exceeds the card; header gains
 `ChartFullscreenButton` opening the existing `ChartFullscreenOverlay` (operator-ruled: overlay
 is fine). DESIGN-MANUAL marine-card table row (DOC.4) tag removed on ship.
 
-### H5 — Surf score footer deletion (fixit Item 3)
+### H5 — Surf score footer deletion (fixit Item 3) — ✅ DONE 2026-08-11 (`382ab4f`)
 **Files:** `SurfingTab.tsx` (:2105-2109 region — verify, don't trust line numbers).
 Delete the footer explainer `<p>` block; i18n key + modal untouched.
 
-### H6 — Beach-profile display smalls (fixit Item 4.6)
+### H6 — Beach-profile display smalls (fixit Item 4.6) — ✅ DONE 2026-08-11 (`382ab4f`; flat-segment report filed below)
 **Files:** `BeachProfileChart.tsx`.
 **Design (decided):** bottom elevation tick label suppressed when its y lands within 12 SVG
 units of the x-axis label row (kills the "-10492" collision at any render width); plus a
 read-only look at the flat 0.03 m landward transect segment — REPORT ONLY (a serving-side
 fix, if needed, is a finding for the operator, not an H6 change).
 
-### H7 — Tests
+### H7 — Tests — ✅ DONE 2026-08-11 (95/95 + 2 disclosed pre-existing; H-ACCEPT-STRUCK KATs added with `1d37593`)
 H0 KAT (permanent); framing/zoom unit tests (given a fixture extent, chosen zoom yields
 ≤ 1.5 m/px); smoothing: no-data cells stay transparent (canvas sample assert); H3: no text
 node renders below the legend row; H4: overlay opens/closes, focus trap (reuse existing
 pattern's tests as template); H5/H6 render asserts. Baseline: full dashboard vitest +
 `tsc -b` + build; bundle sizes recorded per reference/clearskies-dev.md.
 
-### H-Accept (live, weather-dev deploy)
+### H-Accept (live, weather-dev deploy) — ⛔ STRUCK 2026-08-11 → remediations deployed same day (dry-beach + ortho raster); ⏳ RE-ACCEPT PENDING operator eyeball
 Screenshots at default card size + fullscreen overlay + a phone-width viewport: cells vs
 pre-C3S size, photo legibility (operator eyeball invited — this card's accepts have been
 operator-struck twice), nothing below legends, chevron works, surf forecast card position
@@ -666,7 +667,7 @@ key changes with theme. Accept: one browser session (devtools network log) throu
 full→detail navigation and a forced theme flip, recorded in the round log — confirming which
 failure mode the wild intermittent was, and that neither reproduces silent gray post-fix.
 
-### ⛔ QC GATE M — auditor rows
+### QC GATE M — auditor rows — ✅ PASS 2026-08-10 (record above)
 (1) no remaining unkeyed/mixed-key layer state (code walk); (2) banner tests falsifiable;
 (3) repro capture artifact present; (4) DASHBOARD-MANUAL map contract tag removed;
 (5) baselines, zero new failures.
@@ -696,7 +697,7 @@ ARCHITECTURAL, moves the blend boundary; status quo + visible gap). NO code.
 No data-age badge, no staleness refusal on cards. CLOSED, no implementation. Z1's brief no
 longer needs to carry data-age options.
 
-### Z3 — ✅ RE-SCOPED 2026-08-10: execute wind-gatherer migration steps 2–5 (already operator-approved 2026-08-03)
+### Z3 — RE-SCOPED 2026-08-10 (wind-gatherer migration steps 2–5, operator-approved 2026-08-03) — ⬜ NOT STARTED (runs after Gate K closes)
 PA6's withholding is MOOT — operator approval exists (WIND-PROVIDER-ARCHITECTURE-DESIGN-
 2026-08-03.md, FULLY APPROVED, trigger classification §6). Z3 = §5 migration steps 2–5 of
 that design, each its own deployed + reality-gated round, run in the marine chain AFTER
@@ -709,7 +710,7 @@ partial fetch).
 
 ---
 
-## PHASE T — TIDE COHERENCE (operator-ordered 2026-08-11, REQUIREMENT ruling)
+## PHASE T — TIDE COHERENCE (operator-ordered 2026-08-11, REQUIREMENT ruling) — 🟡 IMPLEMENTED ✅ (marine `53eea82`+`a8a27e2`), Gate T ✅ PASS (adversarial, mutation-proven), **DEPLOYED 2026-08-11 07:29:40Z on operator go** — ⏳ accept pending next-cycle tide reality check (journal monitor armed); T2 (tideLevel display cache onto STOFS) ⬜ OPEN, required before phase close
 
 **Operator ruling (chat, 2026-08-11, verbatim intent):** single water-level truth is "not a
 DESIGN CHOICE, that is a FUCKING REQUIREMENT" — the 1-D surf pipeline and the beach-profile
