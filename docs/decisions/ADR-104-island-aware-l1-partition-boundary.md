@@ -108,6 +108,21 @@ vectors), before reconstruction — SWAN is never asked to interpolate between t
 file volume/SWAN read time must be measured at accept; infeasibility is a STOP-and-surface, never a silent
 narrowing of the spacing.
 
+> **SUPERSEDED 2026-08-10 (ADR-106 R1, PA1; `docs/planning/MARINE-PAGE-FIXIT-PLAN-2026-08-10.md`).** This
+> D4 ruling — and P4's per-L1-cell-spacing wire form of the same ruling — is superseded. Live measurement
+> after Phase B deployed (fixit log Item 1) found the deleted-spatial-averaging premise of D4 was itself the
+> root cause of a slot-mixing defect: averaging each WW3 partition slot by NUMBER across the four surrounding
+> cells (the D4-mandated "our own code" interpolation) does not guarantee the same physical wave system, and
+> a live corridor survey proved adjacent cells carry unrelated systems in the same slot number. D4's own
+> justification — spacing at L1's 1 km cell size specifically so SWAN never interpolates between two DISTANT
+> spectra — is superseded because that fear was station-era (stations sat 100+ km apart); adjacent WW3 cells
+> are ~16 km apart, and SWAN's own documented mixture between 16-km-separated neighbors is the wanted
+> behavior, not a risk to avoid. **New ruling (ADR-106 R1, `(ruled 2026-08-10; lands with Phase B2 of
+> MARINE-PAGE-FIXIT-PLAN)`):** the per-L1-cell spatial sampling layer in `services/boundary_reconstruction.py`
+> is deleted; boundary positions become one per wet WW3 cell along each offshore side (plus two endpoint
+> byte-copies), built purely from that cell's own partition values, with SWAN's own spectral interpolation
+> (SWAN manual §2.6.3) filling the space between. See ADR-106 for the full ruling record.
+
 **D5 — Setup-time availability reporting + pull-to-the-grids.** Data-source viability is decided at setup;
 setup must tell the operator when data is not available for the configured location, and why. Runtime keeps
 its loud aborts, but structural absences must be caught at setup, not discovered as an eternal abort loop.

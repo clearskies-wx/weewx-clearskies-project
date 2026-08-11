@@ -1410,12 +1410,17 @@ outright). See the Amendment below for the live per-L1-cell reconstruction desig
 
 **Configuration-time viability (marine-repo half of T8.10f — partial).** `services/grid_sizing_chain.py`'s `run_grid_sizing_chain()` (runs on `POST /config`, "same shape as the existing L3 cluster viability test") calls the same selection logic once per config push and logs the result loudly (ERROR with the full rejection list on failure, INFO with selected stations on success) — but this chain "never raises past its own boundary" (it is a `BackgroundTasks` job with no synchronous HTTP response to attach a rejection message to), so it cannot synchronously refuse the operator's config push the way the plan's "fail at configuration time and tell the operator" language describes. **The operator-facing message (station id/distance/depth surfaced at setup) is cross-repo** (marine → API → config UI) and is dispatched separately to `clearskies-api-dev` + the config-UI owner — this section's contribution is limited to making the real check run and log early, and to the runtime path's own per-cycle raise (above), which is the actual per-cycle enforcement that never silently degrades.
 
-#### §14.3a/b Amendment: partition-reconstruction boundary (IMPLEMENTED 2026-08-09, Phase B of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D3/D4)
+#### §14.3a/b Amendment: partition-reconstruction boundary (IMPLEMENTED 2026-08-09, Phase B of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D3/D4; B2/B3 target-state superseding B2's spacing/sampling, `(ruled 2026-08-10; lands with Phase B2 of MARINE-PAGE-FIXIT-PLAN)`, ADR-106 R1, PA1)
 
-**Status: LIVE.** §14.3a/§14.3b above are historical reference only (deleted mechanism); this subsection
-describes the current production boundary path.
+**Status: LIVE for B1/B4 below (2026-08-09); B2/B3's spacing and per-point sampling are SUPERSEDED — the
+tagged paragraphs below this subsection's original B2/B3 text describe the CURRENT design until Phase B2
+of the fixit plan ships, at which point this subsection's own doc-sync removes the tag.** §14.3a/§14.3b
+originally above (pre-2026-08-09) are historical reference only (deleted mechanism); this subsection
+describes the current production boundary path, then the ruled target state.
 
-**B1 — gridded partition-field fetcher (`services/ww3_partition_fields.py`).** Fetches, per
+**B1 — gridded partition-field fetcher (`services/ww3_partition_fields.py`) — untouched by the fixit plan's
+Phase B2 (ADR-106 R1 changes only B2's per-point sampling and B3's position list, below; the corridor fetch
+itself is out of scope).** Fetches, per
 forecast step, the corridor bbox = L1 bbox + one native WW3 cell pad, fields `WVHGT`/`WVPER`/`WVDIR`,
 `SWELL`/`SWPER`/`SWDIR` sequences 1–3, and `HTSGW` (validation only). Ocean product: NOMADS `filter_gfswave.pl`,
 `gfswave.tCCz.global.0p16`, f000–f072 3-hourly (the same CGI family §14.3 already uses), one file per forecast
@@ -1439,6 +1444,27 @@ over from the deleted station path).
   interpolate as unit vectors. A partition missing (9999 sentinel) at contributing cells → that partition
   contributes zero energy at that point (partitions legitimately die out spatially); ALL partitions zero
   while interpolated `HTSGW > 0.1 m` → raise (inconsistent source).
+
+> **`(ruled 2026-08-10; lands with Phase B2 of MARINE-PAGE-FIXIT-PLAN)` — B2 boundary points/sampling
+> SUPERSEDED (ADR-106 R1, PA1; fixit log Item 1).** Live measurement against the design above found the
+> per-point spatial sampling was the confirmed root cause of a slot-mixing defect: averaging each WW3
+> partition slot by NUMBER across 4 cells does not guarantee the same physical wave system from cell to
+> cell — a live corridor survey found adjacent cells carrying unrelated systems in the same slot (9.8 s
+> west swell @ 277° next to 3.6 s chop @ 259° next to 8.7 s SSE @ 172°), so slot-number averaging both
+> fabricated trains that exist nowhere and annihilated real ones. Operator ruling, verbatim: *"We should
+> not be interpolating and then having SWAN interpolate our interpolation."* **Target state:** the entire
+> spatial parameter-interpolation layer above (`_bilinear_corners`, `_sample_scalar`, `_sample_direction`,
+> `_sample_train`, `_sample_point_partitions`, `_nearest_wet_value`, and the per-point sampling loop) is
+> DELETED. Boundary-point selection becomes **cell selection per offshore side**: for an S/N side (east–west
+> line), the WW3 cell ROW whose centre latitude is nearest the side's latitude; for a W/E side (north–south
+> line), the cell COLUMN nearest the side's longitude. From that row/column, every WET cell (the same ≥9998
+> missing-mask test on HTSGW, unchanged) whose centre projects within `[0, side_length]` onto the side
+> becomes one boundary position at `len` = the UTM projection of the cell centre onto the side. Each
+> position's spectrum is built from that ONE cell's OWN partition values only — wind sea (`WVHGT`/`WVPER`/
+> `WVDIR`, absent = calm, legitimate) + swell slots 1–3 (`SWELL`/`SWPER`/`SWDIR`; a missing slot contributes
+> nothing) — zero spatial math. Viability: fewer than 2 selected wet cells on any side → `BoundaryNotViableError`
+> (existing role, unchanged); `services/grid_sizing_chain.py`'s config-time smoke test updates to the same
+> criterion. Expected scale: ~7–10 cells per side (vs today's ~93–132 points per side at 1 km spacing).
 - **Spectrum per point:** `E(f,θ) = Σ_p (Hs_p²/16) · S_p(f) · D_p(θ)`, emitted on the CGRID spectral axes (**35**
   log-spaced freqs 0.03–1.0 Hz — `CIRCLE … 34` is msc, and the frequency count is msc+1 (SWAN manual :1532/:3719;
   live-verified against the deployed binary's own SPECOUT `AFREQ / 35`, 2026-08-09) — 72 directions) so SWAN never
@@ -1463,6 +1489,28 @@ north), N begins NE (grows west). `BOUNDSPEC ... PAR`, `BOUND SHAPE`, `BOUNDNEST
 `BOUNDNEST1 NEST 'nest_in.dat' CLOSED` (the L1→L2/inner mechanism) is untouched. Full SWAN syntax
 prescriptions and manual line citations: `docs/planning/L1-BOUNDARY-REBUILD-PLAN-2026-08-08.md` "SWAN SYNTAX
 PRESCRIPTIONS".
+
+> **`(ruled 2026-08-10; lands with Phase B2 of MARINE-PAGE-FIXIT-PLAN)` — B3 position list SUPERSEDED
+> (ADR-106 R1, PA1).** Command grammar above is UNCHANGED (`BOUNDSPEC SIDE ... VARIABLE FILE`, same CCW
+> corner map, `&`-continuation wrapping, one command per side). **Target state:** the position list becomes
+> B2's per-cell `len`s (above, superseded paragraph), strictly ascending, PLUS two endpoint byte-copies — the
+> first/last supplied position on each side (`len = 0.0` and `len = side_length`) is a byte-copy of the
+> nearest selected wet cell's spectrum file, guaranteeing full-side coverage independent of SWAN's
+> beyond-endpoint behavior. Same file naming scheme, same `&`-wrapping, same one-command-per-side. Expected
+> scale: ~7–10 cells + 2 copies per side (≈20 files total, down from today's ~194) — retires the SWAN 99-file
+> command-cap parking-lot concern from `docs/planning/L1-BOUNDARY-REBUILD-PLAN-2026-08-08.md`. `BOUNDSPEC ...
+> PAR`, `BOUND SHAPE`, `BOUNDNEST2/3` remain forbidden; `BOUNDNEST1` remains untouched. Manual authority for
+> letting SWAN fill the space between listed positions: *"The wave spectra for grid points on the boundary
+> of the computational grid are calculated by SWAN by the spectral interpolation technique described in
+> Section 2.6.3"* (SWAN manual, `VARIABLE FILE` description) — see the fixit plan's "SWAN SYNTAX
+> PRESCRIPTIONS" section for full citations.
+>
+> **Unchanged by this ruling (both B2 and B3):** all single-cell spectrum-construction math — JONSWAP
+> wind-sea shape (γ=3.3), Gaussian swell shapes (adaptive σf), cos²ˢ directional spreads (s=28 swell / s=7
+> wind-sea), normalization, the bin-sum identity guard (≤5%), the HTSGW-inconsistency guard (0.1 m) — and the
+> timestep structure (one file per position carrying every step of the cycle window). This ruling changes
+> WHERE a spectrum is built (per wet cell, zero spatial averaging), never HOW a single cell's spectrum is
+> built. See ADR-106 R1 for the full ruling record.
 
 **B4 — retirement of the station path.** `services/ww3_station_selection.py`,
 `services/ww3_station_catalogue.py`, `data/ww3_station_catalogue.json` are deleted outright. `services/ww3_spectrum.py`

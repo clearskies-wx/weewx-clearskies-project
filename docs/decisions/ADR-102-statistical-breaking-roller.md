@@ -237,6 +237,27 @@ only function with both a raw and a marched value in hand).
 `surf_1d_pipeline.py:_combine_partition_faces_11_3` is NOT touched by this round (decision-register
 item 8, D-5).
 
+> **SUPERSEDED 2026-08-10, PUBLISHED PATH ONLY (ADR-106 R3/R4, PA3/PA4;
+> `docs/planning/MARINE-PAGE-FIXIT-PLAN-2026-08-10.md`).** Operator review of the beach-profile
+> card (fixit log Item 4) found that this ADR's onset/cessation state machine — a marker only
+> publishes when breaking CEASES — glues a beach's outer break and inner break into one zone
+> whenever the breaking fraction never drops below `Q_B_CESSATION` between them, so a beach break
+> that visibly crashes gets no marker no matter how thresholds are tuned. **New ruling (ADR-106 R3,
+> `(ruled 2026-08-10; lands with Phase K of MARINE-PAGE-FIXIT-PLAN)`):** published break-marker
+> detection DECOUPLES from the cessation machinery — each local dissipation maximum above an
+> operator-adjustable onset threshold (`[surf] qb_breaking_onset`, default 0.05, this ADR's own
+> `Q_B_VISIBLE` value unchanged) publishes its own marker, subject to a 30% prominence rule
+> (`_BREAK_PROMINENCE_FRACTION`), independent of whether Q_b later falls below `Q_B_CESSATION`
+> anywhere in the region. The published impact zone is likewise redefined: the `_WHITEWATER_ER_FLOOR_FRACTION
+> = 0.05` roller-energy-floor criterion this ADR ships (X-D3, immediately above) is REPLACED on the
+> PUBLISHED path by a fixed-width crash band per marker (`[surf] impact_zone_width_m`, default 25.0
+> m, CONFIRMED by operator 2026-08-10), clipped at the waterline; `foamZone` becomes pure geometry
+> (no roller-energy term); `reformTrough` is served null. **`Q_B_CESSATION`, the roller-energy
+> reservoir `E_r`, the one-sided Q_b-weighted dissipation, and INVARIANT_11's closure check are
+> entirely UNCHANGED and remain internal physics state** — only what gets published as a marker and
+> how the published zone's extent is computed change. See ADR-106 for the full ruling record and
+> `docs/manuals/API-MANUAL.md` for the `types.ts`/wire-field doc-delta.
+
 **15 cm reform floor** — see X-D1 above (`_REFORM_FLOOR_DEPTH_M`); listed again here because the
 plan's own doc-delta table names it as a top-level Round X constant alongside the others.
 

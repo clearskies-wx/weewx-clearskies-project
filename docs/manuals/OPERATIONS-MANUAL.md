@@ -826,6 +826,29 @@ behavior). Negative/NaN/greater-than-cap values are rejected at config-push with
 Until Phase G lands, no such key exists and L1's offshore extent is always autosized from the shelf-anchored
 horizon described above.
 
+**Breaking-onset threshold and impact-zone width (target — Phase K of MARINE-PAGE-FIXIT-PLAN, ADR-106 R3, PA3) `(ruled 2026-08-10; lands with Phase K of MARINE-PAGE-FIXIT-PLAN)`.**
+Two new optional keys, marine service config, module-level (not per-location — one value governs
+every configured surf spot):
+
+```ini
+[surf]
+  qb_breaking_onset = 0.05
+  impact_zone_width_m = 25.0
+```
+
+`qb_breaking_onset` (float, valid `(0, 0.5)`, default **0.05**) — the Q_b (breaking-fraction)
+threshold above which a candidate break region exists; today's fixed `Q_B_VISIBLE` constant,
+unchanged value, now operator-tunable so the operator can adjust it against webcam observation
+rather than the model re-deriving it. `impact_zone_width_m` (float, valid `(5, 200)`, default
+**25.0 m** — CONFIRMED by the operator 2026-08-10 at GO, "25m proposed crash-band width is fine")
+— the fixed shoreward distance from each published break marker that defines the impact/crash
+band, clipped at the waterline (swash is never included). Both keys flow from `config/marine_config.py`
+to the 1-D pipeline the same way existing `[surf]`-scope settings do. **Out-of-range values are a
+loud config-push refusal naming the bound** — never a silent clamp. Tuning either key changes the
+published break-marker set and/or the impact-zone band widths on the NEXT SWAN cycle; there is no
+retroactive recompute of already-published forecast hours. Until Phase K lands, no such keys exist
+and both quantities are fixed, non-adjustable constants in `services/surf_1d_analytical.py`.
+
 **Admin marine-sources panel + override field (target — Phase A of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D5/D1) `(ruled 2026-08-08; lands with Phase A of L1-BOUNDARY-REBUILD-PLAN)`.**
 A read-only "Marine Sources" admin section renders one row per required input (bathymetry, wind, WW3
 boundary, currents, water level, datum path): `{input, source, coverage: ok|refused, reason?}`, sourced from

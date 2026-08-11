@@ -93,7 +93,7 @@ surfaces to exist; V closes the whole plan.
 | P1 | Ocean fetch-fan horizon decoupled from shelf distance; fixed 100 km scan cap `L1_MAX_EXTENT_KM` | 1, 3 | D1, D2 |
 | P2 | L1 offshore extent: island enclosure to `open_water_resume + 10 km` (≤ cap); near-lee clamp `W/(2·tan 15°)`, k=1 | 1, 3 | D1, D11 |
 | P3 | New config key `[swan] l1_offshore_extent_km` (operator override, admin-exposed) | 7 | D1 |
-| P4 | L1 boundary data contract: per-station `.spec` spectra REPLACED by per-L1-cell spectra reconstructed from gridded WW3 partition fields (ocean gfswave 0p16 + GLWU 2.5 km), spacing = L1 cell (1 km) | 2, 4 | D3, D4 |
+| P4 | L1 boundary data contract: per-station `.spec` spectra REPLACED by per-L1-cell spectra reconstructed from gridded WW3 partition fields (ocean gfswave 0p16 + GLWU 2.5 km), spacing = L1 cell (1 km) | 2, 4 | D3, D4 — **superseded 2026-08-10 by MARINE-PAGE-FIXIT-PLAN PA1/ADR-106 R1 (the 1-km spacing + per-point spatial averaging is replaced by one spectrum per wet WW3 cell, SWAN interpolates); see that plan's Phase B2** |
 | P5 | DELETE `services/ww3_station_selection.py`, `services/ww3_station_catalogue.py`, `data/ww3_station_catalogue.json`, and the station-fetch half of `services/ww3_spectrum.py` (the Appendix-D spectrum writer is extracted and kept) | 2 | D3 |
 | P6 | Wind fetch bbox derived from the L1 domain (replaces spot ±1.0°); wind/current out-of-coverage silent fills replaced by cycle-abort raises; new no-publish slug `wind_coverage_failed` | 4, 5 | D5, D6 |
 | P7 | **RE-AMENDED 2026-08-09 (operator, in chat: RTOFS fallback REMOVED — "The fallback is not a fallback... it is fucking missing information... garbage data"):** new providers STOFS-3D-Atl velocity + PacIOOS ROMS Hawaii (NO RTOFS module at all); current-source selection = tidal-inclusive ladder by domain containment: regional OFS → STOFS-3D-Atl (East/Gulf/PR) → PacIOOS ROMS (Hawaii) → **ladder exhausted = REFUSE** (`currents_fetch_failed`-class no-publish naming the uncovered bbox; a site no tidal-inclusive source contains cannot run — missing required input, never a degraded run). NO summing anywhere — every ladder source is tide-complete. | 2, 4, 7 | D9 + operator 2026-08-09 (×2) |
@@ -102,7 +102,7 @@ surfaces to exist; V closes the whole plan.
 | P10 | Setup-time per-input source/coverage report surfaced through config chain → admin | 4, 7 | D5 |
 | P11 | Service area = CONUS + Great Lakes + Hawaii (AK/territories descoped, matrix kept) | — | D7, D12 |
 | P12 | DEM index refresh: add Maui + Big Island (+ optionally PR, low priority) entries | 7 | D12/D13 |
-| P13 | Surf response gains card-aggregate fields (`swellHeightMinFt/MaxFt`, `faceHeightMinFt/MaxFt` recomputed over eligible swells, `combinedPeriodS`) — additive wire-shape change, eligibility rule server-side | 4 | operator, 2026-08-08 chat (swell-card instruction) |
+| P13 | Surf response gains card-aggregate fields (`swellHeightMinFt/MaxFt`, `faceHeightMinFt/MaxFt` recomputed over eligible swells, `combinedPeriodS`) — additive wire-shape change, eligibility rule server-side | 4 | operator, 2026-08-08 chat (swell-card instruction) — **field set superseded 2026-08-10 by MARINE-PAGE-FIXIT-PLAN PA2/ADR-106 R2 (`combinedPeriodS` removed, replaced by `periodMinS`/`periodMaxS`; `faceHeightMinFt/MaxFt` removed, Breaking Face Height rebinds to `modelSurfHeightMin/Max`; `swellHeightMinFt/MaxFt` unchanged); see that plan's Phase S** |
 | P14 | Beach-profile chart draws the DOMINANT swell's wave train only (display; consumes R5's dominant-partition serving) | — (display) | operator, 2026-08-08 chat (beach-profile instruction) |
 | P15 | Surf-height heatmap: ortho imagery rotated to the transect/beach frame, 50 m ortho buffer, y-axis labels, structure-affected-area overlay REMOVED (display-only; structure physics stays in SWAN L4) | — (display) | operator, 2026-08-08 chat (heatmap instruction) |
 | P16 | All-transects profile response: additive per-row `originLat`/`originLon`/`alongshoreM` (each transect's real origin + alongshore position), sourced from the pipeline's existing `transect_origins` — no new computation, serving only | 4 | operator, 2026-08-09 PM chat (C3-COORDS ruling) |
@@ -509,7 +509,7 @@ in the scope-ack; each listed in the closeout per the stale-test rule).
 - (3) Headline matched-hour (00Z): breakingFaceHeight 1.4649→1.1639 m = **−20.5%, BREACHES ≤15%** → Q4. Reality check (pre-declared): combined DWR Hs 1.008 m vs 46253 0.9 m (+12% ✓) / 46222 0.8 m (+26% marginal); period 18.4 s vs DPD 17 s ✓; swell dir 199° vs MWD 164–209° spread — the pre-plan 35–40° gap is GONE. Every quantity moved TOWARD the buoys vs W-Accept's "before" (0.62 m, −31%/−22%).
 - (4) Wall-clock: 30m11s vs matched station run 26m54s = **+3m17s, grazes ≤+3min** → Q4 (vs the plan's other stated baseline "~37min incl. fetches" it is −7m30s).
 - (5) Boundary volume: 66 files, 12,484,979 B total (station path: 4 files, 36.1 MB) — SMALLER. WIND.txt md5 differs from baseline solely by the shifted computation window (leading values byte-identical; explained, wind path untouched by B). Journal sweep: zero NEW classes (INV-11 + L4-handoff-selection classes present in baseline window too). Publish-liveness ✓ (lastRunTime 03:17:19Z, /surf 200).
-**✅ CLOSED 2026-08-09 — Q4 ruled: operator accepted both deviations ("the height change matches surfline and surf-forecast, so that is not a bad thing" — external corroboration on top of the buoy agreement).** Parking lot: SWAN caps one command at 99 file names (manual :1223) — 66 today, Phase G growth could approach it.
+**✅ CLOSED 2026-08-09 — Q4 ruled: operator accepted both deviations ("the height change matches surfline and surf-forecast, so that is not a bad thing" — external corroboration on top of the buoy agreement).** Parking lot: SWAN caps one command at 99 file names (manual :1223) — 66 today, Phase G growth could approach it. **Retired 2026-08-10 by MARINE-PAGE-FIXIT-PLAN Phase B2 (PA1/ADR-106 R1):** the per-wet-WW3-cell boundary redesign cuts file count from today's ~194 (measured 225 points, see the G-Accept row below) to ~20 total, ending the concern from the other direction — see that plan's Phase B2 for the design.
 Deploy alone. Matched cycle vs the last station-boundary cycle: (1) "Normal end of run", zero
 boundary warnings; (2) boundary Hs sampled at the 4 old station positions within ±10% of the
 same-cycle `.spec` m0 at those stations (the old boundary is the reference for the SAME
@@ -1397,6 +1397,15 @@ Plan closes when V1–V4 are recorded and the decision log below is complete.
 ## unchanged, more context) + raise tile zoom to match the frame's needed sharpness. A
 ## registration doubt also stands unresolved: the colored band's cross-shore placement vs
 ## the photo was operator-rejected before the size/resolution complaints; a numeric
+## Absorbed 2026-08-10 by MARINE-PAGE-FIXIT-PLAN task H0
+
+The "NEXT SESSION: run that check FIRST" action recorded immediately below (the C3S ACCEPT
+REJECTED note) is absorbed into `docs/planning/MARINE-PAGE-FIXIT-PLAN-2026-08-10.md` task **H0**
+(registration known-answer check, permanent regression KAT, blocks the rest of that plan's Phase
+H). This plan's own Gate C (C1+C2+C3 rows) remains the outstanding QC pass recorded below; H0 is
+where the registration doubt itself gets resolved. See the fixit plan for the design and
+acceptance criteria — not restated here.
+
 ## data-layer-vs-imagery-layer registration check (project one origin through both paths)
 ## was started but not completed. NEXT SESSION: run that check FIRST before any further fix.
 ## ~~✅ C3S DONE + DEPLOYED + ACCEPT PASS 2026-08-09 ~10:15 PM PDT~~: dashboard `529e13d` (+ meta
