@@ -243,7 +243,7 @@ item 8, D-5).
 > publishes when breaking CEASES — glues a beach's outer break and inner break into one zone
 > whenever the breaking fraction never drops below `Q_B_CESSATION` between them, so a beach break
 > that visibly crashes gets no marker no matter how thresholds are tuned. **New ruling (ADR-106 R3,
-> `(ruled 2026-08-10; lands with Phase K of MARINE-PAGE-FIXIT-PLAN)`):** published break-marker
+> ruled 2026-08-10; SHIPPED 2026-08-11 with Phase K of MARINE-PAGE-FIXIT-PLAN, marine `57ee18d`+`daa0b14` — publication-side hysteresis uses `Q_B_CESSATION` as the region stay-alive floor per coordinator ruling (a), see API-MANUAL `breakPoints` row):** published break-marker
 > detection DECOUPLES from the cessation machinery — each local dissipation maximum above an
 > operator-adjustable onset threshold (`[surf] qb_breaking_onset`, default 0.05, this ADR's own
 > `Q_B_VISIBLE` value unchanged) publishes its own marker, subject to a 30% prominence rule

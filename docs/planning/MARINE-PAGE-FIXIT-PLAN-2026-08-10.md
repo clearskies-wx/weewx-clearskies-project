@@ -503,7 +503,7 @@ restore (recorded); (4) journal sweep + baseline diff; (5) INV-11 firing rate re
 before/after (informational — PA4 doesn't charter fixing it, but the number lands in the
 record for the standing SURF-REMEDIATION item).
 
-### QC GATE K — auditor rows — ⏳ IN PROGRESS 2026-08-11 (adversarial auditor dispatched; rows audited as amended by ruling (a) — see phase header)
+### QC GATE K — auditor rows — ✅ PASS 2026-08-11 after remediation (rows 1–4 clean under auditor's own drills: frozen-march diff zero loop-body lines, hysteresis mutation flips the KAT, real-config-path wiring verified, publication-path grep exactly one sanctioned Q_B_CESSATION use). Findings: **F1 HIGH** — undisclosed NEW failure `test_handoff_clamp_depth.py` (fixed-signature stub vs K1 kwargs; introduced `57ee18d`, auditor-traced) → REMEDIATED lead-direct (`**_kwargs` absorb, 8/8); **F2 MEDIUM** — dashboard `types.ts` PA5 comment update never attempted → REMEDIATED lead-direct (impactZone/foamZone/reformTrough JSDoc to K3 semantics, tsc clean). Doc-sync tags lifted at deploy (OPERATIONS-MANUAL, API-MANUAL ×3 incl. ruling-(a) hysteresis amendment, ADR-102). Informational: 2 additional pre-existing failures in `test_landward_boundary_amendment4.py` (auditor-verified at baseline, parking lot).
 (1) physics-march diff audit: zero changes to Q_b solve/relaxation/roller code paths (the
 frozen physics assertion — any touched line outside the publication/zone regions = FAIL);
 (2) KAT (a) falsifiability reproduced by the auditor (mutation/revert); (3) config keys

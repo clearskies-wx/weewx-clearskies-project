@@ -826,7 +826,7 @@ behavior). Negative/NaN/greater-than-cap values are rejected at config-push with
 Until Phase G lands, no such key exists and L1's offshore extent is always autosized from the shelf-anchored
 horizon described above.
 
-**Breaking-onset threshold and impact-zone width (target — Phase K of MARINE-PAGE-FIXIT-PLAN, ADR-106 R3, PA3) `(ruled 2026-08-10; lands with Phase K of MARINE-PAGE-FIXIT-PLAN)`.**
+**Breaking-onset threshold and impact-zone width (LIVE — shipped 2026-08-11, Phase K of MARINE-PAGE-FIXIT-PLAN, marine `57ee18d`, ADR-106 R3, PA3).**
 Two new optional keys, marine service config, module-level (not per-location — one value governs
 every configured surf spot):
 
