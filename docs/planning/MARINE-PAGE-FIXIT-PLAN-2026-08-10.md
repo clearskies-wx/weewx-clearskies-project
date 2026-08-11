@@ -271,6 +271,16 @@ deleted ONLY as enumerated in the scope-ack (stale-test protocol; every deletion
 closeout with its replacement).
 
 ### B2-Accept (live, librewxr — deploy alone)
+**⚠ GATE EVENT (2026-08-11 02:41Z, deploy restart):** the restart crash-looped
+(status=226/NAMESPACE, `/run/weewx-clearskies` missing) — the deploy reinstalled the
+repo/script unit, which still carried the Item-0 crash-loop defect the operator had
+repaired live on 2026-08-10; the live fix was never mirrored into the repo. Remedy:
+runtime dir recreated (~90 s outage, service recovered and immediately began the
+restart-triggered 00Z full run on the NEW boundary code); durable fix landed twice —
+marine `cb6bfb3` (packaging unit) and the meta deploy-script heredoc (the one that
+actually installs) — `RuntimeDirectory=weewx-clearskies` + `Preserve=yes`, so a host
+reboot can never reproduce the Item-0 crash loop again. Lesson queued: operator hotfixes
+on deployed state must be mirrored into the repo/deploy script same-day.
 1. Matched-cycle before/after: run the last pre-deploy cycle's WW3 inputs through the new
    path; **west-side boundary file at the cell nearest (33.33, −118.83) must show a distinct
    ~10 s lobe at ~277°** (the train today's file lacks — fixit log measurement); south-side
