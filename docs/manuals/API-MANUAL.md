@@ -2672,6 +2672,8 @@ For SWAN surf forecasts, the wind source is HRRR (the same model run that drove 
 | `t+1h` through `t+48h` (forecast, HRRR range) | HRRR forecast wind at 3km from SWAN cache | `"hrrr"` |
 | `t+49h` through `t+72h` (forecast, GFS range) | GFS forecast wind at 0.25° from SWAN cache | `"gfs"` |
 
+**Z3.2 (2026-08-10, migration step 2 of WIND-PROVIDER-ARCHITECTURE-DESIGN-2026-08-03 §5):** the table above still describes the wind's ORIGIN model/resolution — that is unchanged. What changed is where the surf endpoint READS it from: PRIMARILY the wind gatherer's assembled store (`services/wind_timeline_store.py`), one gap-free-by-construction read per request; the "from SWAN cache" sourcing above is now a TRANSITION-only fallback (store refusal or not-yet-populated), removed in migration step 5. `windSource` field values are unaffected by this switch (same `"hrrr"`/`"gfs"` labels either way).
+
 The NDBC buoy wind exclusion (HARD RULE) is unchanged — NDBC buoy wind is never used for surf quality scoring regardless of source mode.
 
 #### Wave transform supplements (from ADR-084; REMOVED 2026-07-25, T4A.7)
@@ -2968,7 +2970,7 @@ For instantaneous fields (wave height, period, direction, wind), `endStep` equal
 
 The NWS SRF text product's `waterTemp` field (a manually-entered forecaster value parsed from the SRF text, not modeled or observed data) may serve as a last-resort fallback only — not as the primary source. The SRF water temp is a stale, hand-typed value that does not update with ocean conditions.
 
-**Wind:** For forecast timesteps (`t > 0`), the surf endpoint uses HRRR forecast wind from the SWAN cache (ADR-094). For `t=0` current conditions, the existing precedence applies: station hardware → forecast provider. NOT NDBC buoy wind. See §17 "Wind source for surf quality scoring (ADR-094)" for the full rationale and rules.
+**Wind:** For forecast timesteps (`t > 0`), the surf endpoint's PRIMARY wind source is the wind gatherer's assembled store (`services/wind_timeline_store.py`'s `get_wind_series()`, migration step 2 of WIND-PROVIDER-ARCHITECTURE-DESIGN-2026-08-03 §5, 2026-08-10) — one in-process, gap-free-by-construction read per request, never a request-time fetch. On a store refusal (gap) or not-yet-populated store, it falls back to the run-cached HRRR forecast wind from the SWAN cache (ADR-094) — a TRANSITION-only path, removed in migration step 5. For `t=0` current conditions, the existing precedence applies: station hardware → forecast provider (station/forecast-provider still take precedence over both wind sources). NOT NDBC buoy wind. See §17 "Wind source for surf quality scoring (ADR-094)" for the full rationale and rules.
 
 ### Multi-point surf forecast contract
 
