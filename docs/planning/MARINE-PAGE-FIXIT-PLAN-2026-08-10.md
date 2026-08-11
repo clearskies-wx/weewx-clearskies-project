@@ -7,8 +7,8 @@
 | **Live on librewxr** | marine `bdaf956` (L1-BOUNDARY-REBUILD state; crash-loop temp-dir startup defect repaired by operator 2026-08-10; publishing again since ~19:24Z) |
 | **Live on weather-dev** | dashboard `529e13d` (= repo HEAD; the struck C3S render) |
 | **Phases DONE** | none — GO received 2026-08-10, Phase DOC in progress |
-| **Remaining** | Phase DOC → B2 → S → K (marine chain, strict) ; H → M (dashboard chain, may interleave after DOC) ; Z1 (diagnosis; Z2 RULED, Z3 scope narrows to Z1 outcome only) |
-| **WAITING ON OPERATOR** | Z1 outcome ruling when its brief lands |
+| **Remaining** | Phase DOC → B2 → S → K → Z3 (marine chain, strict; Z3 = wind-gatherer migration steps 2–5 per the approved 2026-08-03 design) ; H → M (dashboard chain, may interleave after DOC) |
+| **WAITING ON OPERATOR** | none — Z1 answered by the pre-existing 2026-08-03 ruling (Q1 record below); Z2 ruled no |
 
 **Operator rulings received 2026-08-10 (in chat, at GO):** (1) **GO** — "Let's execute the
 entirety of the plan"; (2) **crash-band width 25 m CONFIRMED** ("25m proposed crash-band width
@@ -544,7 +544,16 @@ ARCHITECTURAL, moves the blend boundary; status quo + visible gap). NO code.
 No data-age badge, no staleness refusal on cards. CLOSED, no implementation. Z1's brief no
 longer needs to carry data-age options.
 
-### Z3 — Implement per rulings (scoped then; not designed here — PA6 withheld).
+### Z3 — ✅ RE-SCOPED 2026-08-10: execute wind-gatherer migration steps 2–5 (already operator-approved 2026-08-03)
+PA6's withholding is MOOT — operator approval exists (WIND-PROVIDER-ARCHITECTURE-DESIGN-
+2026-08-03.md, FULLY APPROVED, trigger classification §6). Z3 = §5 migration steps 2–5 of
+that design, each its own deployed + reality-gated round, run in the marine chain AFTER
+Gate K closes (single-round-in-flight rule): step 2 display wind → store; step 3 full-run
+trigger on `extended_cycle_assembled` + store reads + gap-refusal invariant; step 4 fast
+cycle 12 h on `hourly_cycle_assembled`; step 5 deletions + doc batch (incl. lifting the
+design into ADR/PROVIDER-MANUAL as the doc-sync this ruling never got). The C-77-class
+completeness gap Z1 found is closed structurally by step 3 (runs can no longer read a
+partial fetch).
 
 ---
 
@@ -571,7 +580,33 @@ English, self-contained, newest at top. Answered items move to the decision log.
 instruction 2026-08-10: "create a list of questions in the plan for items THAT ARE NOT
 ANSWERABLE BY THE DOCS, if they are answerable by DOCS, do not ask me.")*
 
-### Q1 (2026-08-10, from Z1) — What should the model do when the wind files aren't all posted yet?
+### Q1 — ✅ ANSWERED (operator 2026-08-10 + pre-existing ruling 2026-08-03) — see decision log entry below; Z3 re-scoped accordingly
+
+**The question was already ruled on 2026-08-03 and the coordinator failed to find it before
+asking.** The ruling: wind is gathered by an independent background component that keeps ONE
+fully assembled wind set, polling/top-up-fetching until every hour of a cycle is held; model
+runs trigger only on "cycle fully assembled" — never on a partial fetch; the previous
+assembled set provides the immediate fill on cold start / backfill. Recorded, operator-
+approved twice, in: `briefs/AUDIT-OPUS-WINDOW-2026-08-03.md` decision item 9 (operator
+directives verbatim) and `briefs/WIND-PROVIDER-ARCHITECTURE-DESIGN-2026-08-03.md` ("✅ FULLY
+APPROVED 2026-08-03", §2 one-assembled-set store, §5 five-step migration order, §6 trigger
+classification "All authorized by the 2026-08-03 operator ruling"), plus the V3-F1 row in
+MARINE-FORWARD-PLAN.
+
+**Why it still exists (traced 2026-08-10):** only migration step 1 (gatherer + store,
+DORMANT by design) was ever built and deployed (marine `dd301af` + fixes). Steps 2–5 —
+switching the display wind, the full-run trigger, the fast cycle onto the store, then
+deleting the inline-fetch path — were never turned into tracked task rows in any active
+plan. Their only trace is a "HOLD until step-1 gate passes" note in a session-resume brief
+(`briefs/SESSION-RESUME-2026-08-04-POSTCOMPACT.md:84`); when that session closed, the queue
+vanished — the exact "deferred item buried in narrative" failure rules/verification.md
+Step 3 exists to prevent. The approved design also never became ADR/manual target-state, so
+Z1's diagnosis (and this plan's PA6) treated the question as open.
+
+*(Original question text retained below for the record; options A–D are VOID — the 2026-08-03
+architecture, which subsumes A and B, governs.)*
+
+### Q1-void (2026-08-10, from Z1) — original question text (superseded by the above)
 
 **Context, plain English:** our forecast runs need wind data files from the government's
 HRRR weather model. Those files appear on the download server gradually over an hour or two
