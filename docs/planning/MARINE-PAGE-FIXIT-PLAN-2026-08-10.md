@@ -1,6 +1,6 @@
 # Marine Page Fixit Plan — boundary plug-in, ruled card fixes, break/zone redefinition (2026-08-10)
 
-## 📍 CURRENT STATE — updated every working session (last: 2026-08-11 post-resume)
+## 📍 CURRENT STATE — updated every working session (last: 2026-08-11 ~21:15Z, new session)
 
 **RESUME POINTER: session scratchpad `SESSION-STATE.md` holds the full session context
 (agent roster, pending operator decisions, operational traps). Authority order: this
@@ -8,14 +8,14 @@ table → Phase records below → SESSION-STATE.md.**
 
 | | |
 |---|---|
-| **Live on librewxr** | RUNNING SERVICE = marine `a396866` **Phase T tide fix DEPLOYED** (restart 2026-08-11 07:29:40Z, health 200, auth enforced; deploy-marine.sh full run). Tide reality-check vs CO-OPS 9410660 pending next model cycle (journal monitor armed). B2 boundary rework also live. |
+| **Live on librewxr** | RUNNING SERVICE = marine `0ebdd01` (restart 2026-08-11 20:30:26Z — deploy of the two Z3 reality-gate window fixes `c812d94` fast-cycle clamp + `0ebdd01` full-run cycle-anchor; checkout verified at `0ebdd01`, ActiveState=active). Includes all prior: T tide fix, B2 boundary rework, Z3 steps 2–4. **⚠ 2026-08-11 12:31→20:30Z: EVERY run refused (`wind_series_gap`)** — full-run window was wall-clock-anchored (2 refusals: 13:51Z, 19:47Z) and fast-cycle window unclamped (8 hourly refusals 12:31→19:17Z); served forecast stayed on the 10:33Z run's last-good cache the whole window (loud refusal worked; no silent bad publish). Post-fix: **FIRST-EVER production fast cycle PASS 20:36→20:56Z** (see Z3.5 record). |
 | **Live on weather-dev** | dashboard `1d37593` **DEPLOYED** (dry-beach fix pushed + redeployed 2026-08-11; was parked) |
 | **OPERATOR RULINGS 2026-08-11** | (1) T deploy **OK** → done; (2) CTHETA/CSIGMA L1 experiment **OK** → dispatched to wave-trace agent (scratch copy, deck-only change, no production edit — permanent limiter change stays an architectural decision for the operator); (3) push+deploy `1d37593` **OK** → done; (4) new-source investigation **NO** — source is **USGS NAIP Plus** via API exportImage proxy; operator pointed out we weren't requesting native resolution — CONFIRMED (measured: 75/99 live tile requests at z17 = 1.0 m/px vs 0.6 m native) → **remedy operator-approved ("fine") and DEPLOYED: tile raster 256→512px (api `e729a97`, deployed to weewx 2026-08-11), now ~0.5 m/px at-native; cache key versioned; live tile verified 512px + visibly sharp** |
 | **Also live on weewx** | api `e729a97` (NAIP 512px raster) deployed 2026-08-11 |
 | **STRUCK/OPEN** | B2-Accept (open until L1 wave corruption fixed — served list must show the real trains); H-Accept (open: dry-beach fix parked + ortho quality) |
 | **Phases DONE** | ✅ **M** (dashboard `eb424fd`+`73d9017` DEPLOYED to weather-dev; Gate M PASS, repro capture clean — see Phase M gate record). ✅ **DOC** (meta `7e53927`, 12 files docs-only; Gate DOC PASSED 2026-08-10, adversarial audit 0 findings — rows 1–6 all PASS with evidence; lead independent checks: allowlist diff exact, ADR-106↔PA1–PA5 1:1, 25 m confirmed wording, zero Z2 content). ✅ **Z1** (diagnosis; Q1 answered by 2026-08-03 ruling). Z2 ruled no. |
 | **Remaining** | Phase DOC → B2 → S → K → Z3 (marine chain, strict; Z3 = wind-gatherer migration steps 2–5 per the approved 2026-08-03 design) ; H → M (dashboard chain, may interleave after DOC) |
-| **WAITING ON OPERATOR** | none — Z1 answered by the pre-existing 2026-08-03 ruling (Q1 record below); Z2 ruled no |
+| **WAITING ON OPERATOR** | (1) **Q3 ruling** (display-wind store seam — blocks Z3.5's fallback deletion, see OPEN OPERATOR QUESTIONS); (2) S-Accept card eyeball; (3) K-Accept rows 1 (cam eyeball) + 3 (knob drill go); (4) H re-accept eyeball (both remediations deployed); (5) Phase T close acknowledgment; (6) eventual push/deploy go for Z3.5 once gates + Q3 resolve |
 
 **Operator rulings received 2026-08-10 (in chat, at GO):** (1) **GO** — "Let's execute the
 entirety of the plan"; (2) **crash-band width 25 m CONFIRMED** ("25m proposed crash-band width
@@ -729,6 +729,51 @@ longer needs to carry data-age options.
 
 ### Z3 — RE-SCOPED 2026-08-10 (wind-gatherer migration steps 2–5, operator-approved 2026-08-03) — 🟡 STEP 2 ✅ CLOSED 2026-08-11 (`9e43e7a`+`9aba413`, gate PASS after F1 end-to-end-KAT remediation, DEPLOYED `0d46a82` 11:18Z, reality gate PASS: store-sourced wind classification served, zero request-path fetches, no fallback warning; gatherer live, 7 MB timeline actively topping up); **STEP 3 ✅ GATED+DEPLOYED 2026-08-11** (`7aab009`+meta `db4748a3`; two design gaps stopped-and-ruled pre-code: (i) GFS far-window — interpolation STAYS in `_stitch_wind`, only raw-hour source moves to the store via new regime-aware `get_wind_records()` (72 h window intact — the window-shrink and store-relocation readings were both declined as unauthorized triggers); (ii) forced-run immediacy — service loop keeps its 300s signal check invoking the SAME `run_full_swan_cycle_from_store()`, pending-signal handoff so the gatherer's asyncio thread never runs SWAN. Gate: 0 findings, all 4 adversarial drills flipped real KAT failures, double-fire wrinkle traced bounded, `_stitch_wind`/`run_quick_update` provably byte-unchanged. Deployed 11:57Z; reality gate armed — next extended-cycle assembly must fire a store-driven full run consuming 49/49). **STEP 4 ✅ GATED+DEPLOYED 2026-08-11** (`8897c9c`+`ceda60c`+meta `1337f372`, deployed ~12:4xZ): hourly fast cycle gets its REAL `hourly_cycle_assembled` trigger (finding-13's unreachable path made live), 12 h scope (operator "half a day", ONE enforcement site at the runner trim), store-read with cycle-time anchoring, no forced-bypass analog (Q3). Gate: 4/5 rows clean under mutation drills; F1 MEDIUM (cross-fire seam had no negative KAT — code correct, suite blind) remediated lead-direct with a falsifiability-proven KAT (`ceda60c`). Round notes: Z3.3's "zero new failures" claim was FALSE — `test_c8_forced_run_no_op` regression introduced at `7aab009`, missed by grep AND the `-k` sweep, caught by lead cross-check during Z3.4 close; remediated at the new seam (`aec462c`) per false-claim protocol. Reality gates armed: first store-driven full run (next extended assembly) + FIRST-EVER production fast cycle (next hourly assembly). **Step 5 (deletions + doc batch — final code round) dispatching.**
 
+**Z3.5 STATUS (2026-08-11 ~21:15Z session, lead-verified from journal + git + live host — every number below re-derived this session):**
+- **Work product exists, UNCOMMITTED, hold gate intact.** The step-5 agent's deletion round
+  sits in the marine working tree on top of `0ebdd01` (21 files, −1467/+510: service.py
+  legacy-branch deletions, surf.py fallback deletion, swan.py `wind_for_display` build
+  removal, test dispositions). Backups: marine stash@{0} "Z3.5 + reality-gate-fixes,
+  pre-split" + scratchpad `z35-plus-fixes-full.patch` (prior session). Meta repo carries the
+  uncommitted step-5 doc batch (ADR-107 draft + PROVIDER-MANUAL/ARCHITECTURE/INDEX edits).
+  Per the brief's HOLD GATE, nothing commits until BOTH production reality gates pass — and
+  gate B's aftermath now BLOCKS part of the deletion inventory (Q3 below).
+- **Reality-gate day record (pre-fix failures, all on old code, process 386440):** full runs
+  13:51Z (12Z cycle) and 19:47Z (18Z cycle) refused — window `now..now+72h` instead of
+  `cycle..cycle+72h` hit hours the store cannot hold (e.g. "no timeline entry for
+  2026-08-13T13:00"); fast cycles 12:31/13:21/14:32/15:28/16:34/17:30/18:42/19:17Z refused —
+  window start at an already-aged-out hour. Fixes `c812d94`+`0ebdd01` pushed + deployed,
+  restart 20:30:26Z. All refusals were loud no-publishes; last-good cache never overwritten.
+- **Reality gate B (first-ever production fast cycle): PASS 2026-08-11 20:56:00Z.** Evidence
+  (journal, process 484919, running `0ebdd01`): 20:30:31 `hourly_cycle_assembled cycle=19Z`
+  from the gatherer → 20:36:24 "hourly_cycle_assembled trigger firing fast SWAN cycle" →
+  stationary full-nest fill, STOFS-2D-Global WLEVEL "73 hourly grid(s), sole source" (T design
+  live in the fast path) → 20:56:00 "SWAN quick update complete in 1175s — 1 spot(s)" +
+  "Marine runner: fast SWAN cycle complete (store-driven)" + forecast cache persisted 18.6 MB.
+  Post-restart journal sweep: zero new ERROR/WARNING classes (INV-11, DDD-runaway, L4-handoff
+  clamp, roller-closure all pre-existing tracked).
+- **Reality gate A (first store-driven full run): PENDING** — the 18Z extended assembly was
+  consumed (and refused) pre-fix at 19:47Z; next chance = 00Z extended cycle, expected to
+  assemble ~01:47Z 2026-08-12 (12Z assembled 13:50Z, 18Z 19:46Z — ~1h50m pattern). Persistent
+  journal monitor armed (fires on assembly/firing/refusal/completion + service-inactive).
+- **⚠ NEW FINDING (blocks Z3.5 item 2, surfaced as Q3):** the Z3.2 display-wind store read is
+  structurally failing on EVERY request — 16/16 requests post-restart logged "display wind
+  fell back to run-cached field: gap:missing_hour". Mechanism (code-verified at `0ebdd01`):
+  `surf.py` reads `get_wind_series(first_ts, last_ts)` over the ENTIRE served timeline,
+  all-or-nothing; the store's `age_out()` deletes every hour before wall-clock now (design §2
+  "self-bounding") and holds +48–72h at GFS-native 3-hourly cadence — so a range starting at
+  cycle start (past within 1h of any run) and/or crossing +48h ALWAYS refuses. The transition
+  fallback is carrying display wind in production; deleting it (step-5 inventory item 2)
+  would null display wind. Z3.2's reality-gate PASS was measured in the only narrow window
+  where the read can succeed — a gate-design lesson for round-close triage.
+- **Health artifact (recorded, watch at gate A):** `/health` currently `status:"failed",
+  reasons:["required input unavailable: ww3_boundary","required input unavailable:
+  bathymetry"]` while the fast cycle publishes fine — those are full-run inputs no run has
+  fetched since the 20:30Z restart (both full-run attempts refused pre-restart, at the wind
+  step). Expected to clear when gate A's full run fetches them; if it persists past a
+  successful full run, it is a real health-semantics defect.
+- Wind gatherer store healthy: 53 hours (47 HRRR + 6 GFS), oldest 20:00Z, newest 08-14T12:00Z.
+
 **Z3.2 SPLICE RULING (coordinator, 2026-08-11):** the design's §3 "Today" column was stale —
 H5 (2026-08-02) had already collapsed the request-time HRRR fetch into a per-cycle resample of
 the run's own blended field, cached as `wind_for_display`. The approved end state ("display
@@ -813,6 +858,41 @@ awaiting operator go.
 English, self-contained, newest at top. Answered items move to the decision log. Operator
 instruction 2026-08-10: "create a list of questions in the plan for items THAT ARE NOT
 ANSWERABLE BY THE DOCS, if they are answerable by DOCS, do not ask me.")*
+
+### Q3 — Display wind can't actually come from the new wind store for the whole forecast (2026-08-11, blocks the last Z3 round)
+
+**Context, plain English:** you approved a design where the wind shown on the surf page is
+read from the wind-gatherer's assembled store (so it can refresh hourly without waiting for a
+model run), with the old run-cached wind kept only as a temporary safety net, to be deleted in
+the final cleanup round (Z3.5, currently held uncommitted). This session verified the safety
+net is not temporary — it is carrying the page on EVERY request. The store read fails by
+construction, for two reasons the store itself is DESIGNED to have: (1) it throws away hours
+older than the current hour, but the served forecast timeline starts at the model run's start
+hour, which is in the past within an hour of any run; (2) beyond +48 hours it only holds
+every-3rd-hour wind (that is all GFS provides natively), but the read demands every hour or
+refuses entirely. So "read the whole timeline from the store" can essentially never succeed.
+Deleting the safety net as planned would blank the forecast wind display.
+
+**Options (each amends the approved 2026-08-03 design's end state, so each needs your ruling):**
+- **A — make the hybrid permanent (RECOMMENDED).** Store stays primary for the hours it
+  covers (now → +48h); for past hours and the 3-hourly far window, the display permanently
+  uses the wind field the model run itself was forced with (the existing run-cached field).
+  The step-5 deletion list shrinks: the run-cached display field and its fallback stay; the
+  rest of the deletions (dead legacy branches, old fetch orchestration) proceed. Honest
+  provenance, no fabricated values, smallest change.
+- **B — make the store hold what the display needs.** Keep past hours back to the serving
+  run's start instead of deleting them at the current hour, and fill the far window to hourly
+  (the hourly-filling question was already deferred once — it moves interpolation into the
+  store, which you previously declined as a relocation). Bigger change, touches the store's
+  approved "self-bounding" design.
+- **C — give up on store-driven display wind.** Display wind reverts to the run-cached field
+  only (what H5 shipped); the store remains solely the model-forcing source. Simplest, but
+  loses the "wind refreshes hourly between runs" property the 2026-08-03 ruling asked for —
+  and with fast cycles now running hourly (Z3.4 live), a new run refreshes the cache hourly
+  anyway, so the practical loss may be near zero. Worth weighing against A.
+
+**Recommendation:** A, with a note that C is defensible now that hourly fast cycles are real.
+Either way the ADR-107 draft + doc batch (uncommitted) need matching revision before commit.
 
 ### Q2 — ✅ VOID (operator 2026-08-11): the premise was the coordinator's misreading
 
