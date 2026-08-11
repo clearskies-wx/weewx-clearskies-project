@@ -15,7 +15,7 @@ table → Phase records below → SESSION-STATE.md.**
 | **STRUCK/OPEN** | B2-Accept (open until L1 wave corruption fixed — served list must show the real trains); H-Accept (open: dry-beach fix parked + ortho quality) |
 | **Phases DONE** | ✅ **M** (dashboard `eb424fd`+`73d9017` DEPLOYED to weather-dev; Gate M PASS, repro capture clean — see Phase M gate record). ✅ **DOC** (meta `7e53927`, 12 files docs-only; Gate DOC PASSED 2026-08-10, adversarial audit 0 findings — rows 1–6 all PASS with evidence; lead independent checks: allowlist diff exact, ADR-106↔PA1–PA5 1:1, 25 m confirmed wording, zero Z2 content). ✅ **Z1** (diagnosis; Q1 answered by 2026-08-03 ruling). Z2 ruled no. |
 | **Remaining** | Phase DOC → B2 → S → K → Z3 (marine chain, strict; Z3 = wind-gatherer migration steps 2–5 per the approved 2026-08-03 design) ; H → M (dashboard chain, may interleave after DOC) |
-| **WAITING ON OPERATOR** | (1) **Q3 ruling** (display-wind store seam — blocks Z3.5's fallback deletion, see OPEN OPERATOR QUESTIONS); (2) S-Accept card eyeball; (3) K-Accept rows 1 (cam eyeball) + 3 (knob drill go); (4) H re-accept eyeball (both remediations deployed); (5) Phase T close acknowledgment; (6) eventual push/deploy go for Z3.5 once gates + Q3 resolve |
+| **WAITING ON OPERATOR** | (1) S-Accept card eyeball; (2) K-Accept rows 1 (cam eyeball) + 3 (knob drill go); (3) H re-accept eyeball (both remediations deployed); (4) Phase T close acknowledgment; (5) eventual push/deploy go for Z3.5 (amended per Q3 ruling — fix in flight) once reality gate A passes. Q3 RULED 2026-08-11 ("built wrong, fix it" — permanent hybrid, defect-fix classification). |
 
 **Operator rulings received 2026-08-10 (in chat, at GO):** (1) **GO** — "Let's execute the
 entirety of the plan"; (2) **crash-band width 25 m CONFIRMED** ("25m proposed crash-band width
@@ -859,7 +859,18 @@ English, self-contained, newest at top. Answered items move to the decision log.
 instruction 2026-08-10: "create a list of questions in the plan for items THAT ARE NOT
 ANSWERABLE BY THE DOCS, if they are answerable by DOCS, do not ask me.")*
 
-### Q3 — Display wind can't actually come from the new wind store for the whole forecast (2026-08-11, blocks the last Z3 round)
+### Q3 — ✅ ANSWERED (operator 2026-08-11, in chat): "Q3 that is fine, I do not understand why that is even a question? It is apparent you built the mechanism wrong, and need to fix it."
+
+**Ruling recorded:** Option A semantics, classified by the operator as a DEFECT FIX, not a
+design choice — the display read was built wrong (all-or-nothing whole-timeline read against
+a store that by design cannot hold that range). Corrected design: store is PRIMARY for every
+hour it actually holds; the run-forced wind field (`wind_for_display`) permanently serves
+past hours, far-window off-slot hours, and any store-absent hour; both-absent → null.
+The Z3.5 deletion inventory is amended: the `wind_for_display` build + fallback SURVIVE
+(no longer "transition"); the rest of the deletions proceed. ADR-107 draft + doc batch to be
+revised to match before commit. Implementation round Z3.5b dispatched 2026-08-11 ~21:30Z.
+
+### Q3-original (question text as asked, for the record)
 
 **Context, plain English:** you approved a design where the wind shown on the surf page is
 read from the wind-gatherer's assembled store (so it can refresh hourly without waiting for a
