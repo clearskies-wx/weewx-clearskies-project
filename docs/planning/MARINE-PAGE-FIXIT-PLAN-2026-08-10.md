@@ -1,6 +1,6 @@
 # Marine Page Fixit Plan — boundary plug-in, ruled card fixes, break/zone redefinition (2026-08-10)
 
-## 📍 CURRENT STATE — updated every working session (last: 2026-08-11 pre-compaction)
+## 📍 CURRENT STATE — updated every working session (last: 2026-08-11 post-resume)
 
 **RESUME POINTER: session scratchpad `SESSION-STATE.md` holds the full session context
 (agent roster, pending operator decisions, operational traps). Authority order: this
@@ -8,9 +8,9 @@ table → Phase records below → SESSION-STATE.md.**
 
 | | |
 |---|---|
-| **Live on librewxr** | RUNNING SERVICE = pre-T code (started 06:31:18Z); checkout synced to marine `a396866` (B2 boundary rework DEPLOYED+running since 02:42Z; Phase T tide fix ON DISK, awaiting operator restart-deploy go) |
-| **Live on weather-dev** | dashboard `53ebd38` deployed (M + H rounds); `1d37593` (dry-beach fix) LOCAL-ONLY, parked on operator freeze |
-| **OPERATOR DECISIONS PENDING** | (1) Phase T restart-deploy go (±T2 first); (2) CTHETA/CSIGMA L1 experiment go; (3) push+deploy parked `1d37593`; (4) ortho source-quality investigation go |
+| **Live on librewxr** | RUNNING SERVICE = marine `a396866` **Phase T tide fix DEPLOYED** (restart 2026-08-11 07:29:40Z, health 200, auth enforced; deploy-marine.sh full run). Tide reality-check vs CO-OPS 9410660 pending next model cycle (journal monitor armed). B2 boundary rework also live. |
+| **Live on weather-dev** | dashboard `1d37593` **DEPLOYED** (dry-beach fix pushed + redeployed 2026-08-11; was parked) |
+| **OPERATOR RULINGS 2026-08-11** | (1) T deploy **OK** → done; (2) CTHETA/CSIGMA L1 experiment **OK** → dispatched to wave-trace agent (scratch copy, deck-only change, no production edit — permanent limiter change stays an architectural decision for the operator); (3) push+deploy `1d37593` **OK** → done; (4) new-source investigation **NO** — operator asked instead what source is in use: **USGS NAIP Plus** via API exportImage proxy (live config confirmed provider=naip, proxyMode=api at spot lat/lon); ESRI World Imagery is the non-CONUS fallback only |
 | **STRUCK/OPEN** | B2-Accept (open until L1 wave corruption fixed — served list must show the real trains); H-Accept (open: dry-beach fix parked + ortho quality) |
 | **Phases DONE** | ✅ **M** (dashboard `eb424fd`+`73d9017` DEPLOYED to weather-dev; Gate M PASS, repro capture clean — see Phase M gate record). ✅ **DOC** (meta `7e53927`, 12 files docs-only; Gate DOC PASSED 2026-08-10, adversarial audit 0 findings — rows 1–6 all PASS with evidence; lead independent checks: allowlist diff exact, ADR-106↔PA1–PA5 1:1, 25 m confirmed wording, zero Z2 content). ✅ **Z1** (diagnosis; Q1 answered by 2026-08-03 ruling). Z2 ruled no. |
 | **Remaining** | Phase DOC → B2 → S → K → Z3 (marine chain, strict; Z3 = wind-gatherer migration steps 2–5 per the approved 2026-08-03 design) ; H → M (dashboard chain, may interleave after DOC) |
