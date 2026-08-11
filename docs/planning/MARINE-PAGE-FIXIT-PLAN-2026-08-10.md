@@ -327,6 +327,14 @@ on deployed state must be mirrored into the repo/deploy script same-day.
   open a follow-up item to (i) verify the W-band attenuation boundary→DWR is physical
   (SWAN field inspection next cycle) and (ii) re-pin the reality-gate quantity to a
   like-for-like comparison.** Operator ruling awaited; Phase S dispatch HELD until then.
+- **Follow-up (i) EVIDENCE (lead decode of `SPEC_DWR_1.txt`, the 15 m reference's own
+  spectrum):** 13.2 s @ 198° (75%) + **10.7 s @ 198° (9%) — a distinct secondary S train
+  the old smearing had merged away, now resolved** + 16.2 s @ 198° (5%) + 3.8 s @ 282°
+  chop (8%). The boundary's 9.7 s W lobe attenuates crossing to the reference —
+  consistent with Catalina/Palos Verdes shadowing of W energy at this spot, which the
+  deep unsheltered buoys don't feel. The W-band deficit vs buoy totals is
+  geometry-consistent physics, not lost input: the energy enters the domain (row 1) and
+  SWAN shadows it. Strengthens the ACCEPT recommendation.
 - Tag lift (PROVIDER-MANUAL §14.3a / ARCHITECTURE) held with the same ruling.
 
 ### ⛔ QC GATE B2 — `clearskies-auditor`, adversarial, BEFORE lead gate
