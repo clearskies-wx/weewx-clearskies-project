@@ -295,6 +295,40 @@ on deployed state must be mirrored into the repo/deploy script same-day.
    faster — fewer files) and headline face-height delta RECORDED with the cam check.
 5. Journal sweep: zero new ERROR/WARNING classes.
 
+**B2-ACCEPT RECORD (2026-08-11 ~03:45Z; deploy `d9301cf`+unit fix, restart 02:42Z):**
+- **Row 2 run/publish: PASS.** 00Z full cycle on the new code: "SWAN run complete in
+  2515s — 1/1 spot(s) cached" (cold start, no hotstart — baseline 1464 s was hotstarted;
+  true wall-clock delta measures on the next warm cycle). Boundary: side S = 6 wet cells,
+  side W = 5, 25 timesteps each → **15 files** (8 S + 7 W incl. endpoint byte-copies) vs
+  ~194 old; INPUT carries exactly 2 BOUNDSPEC commands, lens ascending from 0.0.
+  (Housekeeping parking-lot: ~181 stale old-design B_*.txt remain on disk, inert — INPUT
+  never references them; cleanup candidate.)
+- **Row 1 lobe check: PASS.** Lead's independent decode of the live W-side files:
+  B_W_0003–0006 carry a distinct **9.7 s lobe at 265–280°** (15–18% of cell energy)
+  alongside the dominant 13.2 s @ 190–195° S groundswell; cells 0000–0002 (whose WW3
+  cells don't carry it) correctly lack it; endpoint copies byte-identical. NO ~7 s ghost
+  at any position. The per-cell fidelity the fix promises, live.
+- **Row 5 journal sweep: PASS.** Error classes during the run: HRRR posting-lag 404s
+  (pre-existing), WCOFS `NetCDF: file not found` (18 hits in prior 3 days —
+  pre-existing), stofs_wlevel 404 (pre-existing). **Zero new classes.**
+- **Row 3 reality gate: FAIL AS PRE-DECLARED, ruling surfaced to operator.** Matched time
+  03:00Z vs buoys 02:56Z. Dominant train: served 0.46 m @ 13.4 s @ 196° vs 46253 swell
+  0.6 m @ 13.3 s S / 46222 0.5 m @ 14.3 s SSE → −8%..−23%, WITHIN ±25%. But TOTAL: served
+  quadrature 0.59 m vs buoy WVHT 0.9/0.8 m → **−34%, outside the pre-declared ±25%**. The
+  entire miss sits in the mid-period W/WSW band (46222 wind-wave 0.7 m @ 8.3 s WSW; we
+  serve only 3.7 s chop there). Context the ruling needs: (a) the boundary NOW carries the
+  9.7 s W energy faithfully (row 1) — the deficit arises between boundary and the 15 m
+  DWR, where Catalina/San Pedro shadowing of W energy is real physics the deep unsheltered
+  buoys don't feel; (b) the OLD code's better-looking totals in this band were partly
+  FABRICATED (the 7.2 s ghost carried invented W energy) — rolling back would restore
+  agreement-by-fabrication, the exact "total right, distribution wrong" failure mode;
+  (c) the ±25% row compared a deep-ocean buoy total against a sheltered 15 m nearshore
+  reference — arguably not like-for-like. **Lead recommendation: ACCEPT B2 (no rollback),
+  open a follow-up item to (i) verify the W-band attenuation boundary→DWR is physical
+  (SWAN field inspection next cycle) and (ii) re-pin the reality-gate quantity to a
+  like-for-like comparison.** Operator ruling awaited; Phase S dispatch HELD until then.
+- Tag lift (PROVIDER-MANUAL §14.3a / ARCHITECTURE) held with the same ruling.
+
 ### ⛔ QC GATE B2 — `clearskies-auditor`, adversarial, BEFORE lead gate
 Rows: (1) sampling-layer functions GONE (grep — any survivor = FAIL); (2) anti-fabrication KAT
 falsifiable (mutation: reintroduce slot-averaging on a copy → KAT fails); (3) emitted INPUT
