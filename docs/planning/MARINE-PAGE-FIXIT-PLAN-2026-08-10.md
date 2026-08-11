@@ -414,7 +414,10 @@ fixture; fields-absent assertions for the two removals (response must NOT carry 
 Dashboard: `SurfingTab.test.tsx` C1 block updated to the new bindings (range renders, collapse
 renders, null fallback) — same-commit-as-behavior rule.
 
-### S-Accept (live) — ⏳ PENDING DEPLOY (dashboard deploying 2026-08-11; marine deploy after T2)
+### S-Accept (live) — ✅ SERVER EVIDENCE PASS 2026-08-11 (operator card-eyeball invited)
+Served JSON (cycle 10:33Z, fetched 11:20Z): `periodMinS 10.2 / periodMaxS 13.4` as a real
+range; `combinedPeriodS` + `faceHeightMinFt/MaxFt` absent from the ENTIRE response;
+`modelSurfHeightMin/Max` present. Dashboard card rebind deployed (`355a83e`).
 Served JSON at matched time shows `periodMinS/periodMaxS` and lacks the removed fields;
 screenshot of the card showing Breaking Face Height as the `modelSurfHeight*` range (a real
 range on a multi-transect day) and Period as a range when ≥2 surfable trains differ; cam/buoy
@@ -493,7 +496,11 @@ falsifiability demo required); (b) prominence: a 25%-prominence ripple publishes
 (f) `reformTrough` null; (g) out-of-range config → push refusal. Existing zone/marker tests
 updated same-commit per the task specs; every touched test enumerated in scope-ack.
 
-### K-Accept (live) — ⬜ NOT STARTED
+### K-Accept (live) — 🟡 SERVED-SHAPE EVIDENCE 2026-08-11 (cam eyeball + knob drill pending)
+First post-K cycle (10:33Z) serves TWO break markers where one glued zone used to be:
+outer ~121.5 m (depth 1.05 m) + inner beach break ~92.4 m (depth 0.39 m) — the fixit
+Item-4 outcome (beach break carries a marker). Rows 1 (cam correspondence, operator
+eyeball) and 3 (live knob drill, needs a cycle per change) remain open.
 Deploy alone. (1) Beach-profile card at matched time: does the inner beach break now carry a
 marker? RECORD against cam observation (pass/fail on "markers correspond to where waves
 visibly crash" — pre-declared, operator invited to eyeball); (2) impact-zone bar(s) are
@@ -720,7 +727,7 @@ ARCHITECTURAL, moves the blend boundary; status quo + visible gap). NO code.
 No data-age badge, no staleness refusal on cards. CLOSED, no implementation. Z1's brief no
 longer needs to carry data-age options.
 
-### Z3 — RE-SCOPED 2026-08-10 (wind-gatherer migration steps 2–5, operator-approved 2026-08-03) — 🟡 STEP 2 IMPLEMENTED 2026-08-11 (marine `9e43e7a` + meta doc-sync `b97f0436`); gate in progress; steps 3–5 queued
+### Z3 — RE-SCOPED 2026-08-10 (wind-gatherer migration steps 2–5, operator-approved 2026-08-03) — 🟡 STEP 2 ✅ CLOSED 2026-08-11 (`9e43e7a`+`9aba413`, gate PASS after F1 end-to-end-KAT remediation, DEPLOYED `0d46a82` 11:18Z, reality gate PASS: store-sourced wind classification served, zero request-path fetches, no fallback warning; gatherer live, 7 MB timeline actively topping up); steps 3–5 queued (step 3 dispatching)
 
 **Z3.2 SPLICE RULING (coordinator, 2026-08-11):** the design's §3 "Today" column was stale —
 H5 (2026-08-02) had already collapsed the request-time HRRR fetch into a per-cycle resample of
@@ -746,7 +753,7 @@ partial fetch).
 
 ---
 
-## PHASE T — TIDE COHERENCE (operator-ordered 2026-08-11, REQUIREMENT ruling) — 🟡 IMPLEMENTED ✅ (marine `53eea82`+`a8a27e2`), Gate T ✅ PASS (adversarial, mutation-proven), **DEPLOYED 2026-08-11 07:29:40Z on operator go** — ⏳ accept pending next-cycle tide reality check (journal monitor armed); T2 (tideLevel display cache onto STOFS) ⬜ OPEN, required before phase close
+## PHASE T — TIDE COHERENCE (operator-ordered 2026-08-11, REQUIREMENT ruling) — 🟡 IMPLEMENTED ✅ (marine `53eea82`+`a8a27e2`), Gate T ✅ PASS (adversarial, mutation-proven), **DEPLOYED 2026-08-11 07:29:40Z on operator go** — **✅ REALITY CHECK PASS 2026-08-11 11:20Z:** served tideLevel 67/67 timesteps nonzero STOFS values (lead independently reproduced the exact values via scratch re-fetch+sample — byte-identical, same source/anchor proven); vs CO-OPS 9410660 observed −1.068 m MSL at 11:12Z, served brackets −1.215→−1.122 (11:00→12:00Z) — correct phase (falling through the morning low), ~0.13 m agreement, NOT zero. ONE-SOURCE verified live (STOFS forces WLEVEL + display; the only CO-OPS fetch is the permitted tide-chart predictions feed). **T2 ✅ SHIPPED** (`0aa0ebf`+`b4dfb40` KAT remediation, adversarial gate PASS after F1/F2 fixes) **+ refusal-logging fix `0d46a82`** (first live cycle's all-null was undiagnosable — silent refusal branch now logs the reason; turned out to be the stale pre-T2 run, but the gap was real). Phase T CLOSE pending operator acknowledgment.
 
 **Operator ruling (chat, 2026-08-11, verbatim intent):** single water-level truth is "not a
 DESIGN CHOICE, that is a FUCKING REQUIREMENT" — the 1-D surf pipeline and the beach-profile
