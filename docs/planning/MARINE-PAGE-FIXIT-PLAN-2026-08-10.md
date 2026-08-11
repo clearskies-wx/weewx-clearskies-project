@@ -711,15 +711,22 @@ endpoint MUST use the SAME water level SWAN itself is forced with, per cycle. Th
 is the operator authorization for the data-flow change (the tide-trace found the S2
 migration orphaned these consumers at swan.py:3097-3125 → manufactured 0.0 at
 swan.py:2425/2603 and silent 0.0 at beach_profile.py:1147-1165, since 2026-08-09 22:09Z).
-**Design (T1):** the scalar tide for the 1-D pipeline + profile = the SAME STOFS field SWAN
-uses, sampled at the spot per timestep (surge included, SWAN-coherent); the existing
-CO-OPS chain remains the documented FALLBACK (used only when SWAN itself fell back);
-exhaustion → refuse loudly per the codebase's own surf.py "never a substituted 0.0"
-pattern — beach_profile.py's silent 0.0 branch is brought into line (refuse/null, logged);
-the quick-update path reads the same source (no more flip-flop). Stage-2 setup dead code +
-the old eta_shore=0.000 wave-setup diagnostic are OUT of scope (separate tracked finding).
-Evidence base: scratchpad TIDE-TRACE-FINDINGS.md. Tests: KATs pinning nonzero tide
-propagation + the refusal path, same-commit. Deploy only on explicit operator go.
+**Design (T1 — FINAL, operator rulings 2026-08-11 in chat, escalating sequence):**
+(1) "that is a REQUIREMENT" — 1-D pipeline + beach profile use the SAME water level SWAN
+is forced with; (2) "NO ONE USES COOP" — quick-update's CO-OPS-primary forcing dies;
+STOFS forces EVERY run type (stationary plumbing change authorized); (3) **"ONE SOURCE.
+THAT IS IT."** — the CO-OPS fallback rung DIES ENTIRELY from the model water-level path.
+Final design: water level = STOFS, sampled at the spot per timestep for the 1-D/profile
+consumers and forcing all SWAN runs; STOFS unavailable → the run REFUSES loudly
+(tide_fetch_failed no-publish; journal + health reason) — no fallback, no uniform stamp,
+no substituted value anywhere. beach_profile.py silent-0.0 branch → refuse/null, logged.
+CO-OPS may persist ONLY for non-model display consumers (tide charts) if any exist —
+model path loses it completely. **Supersedes ADR-104 D10 / P8's CO-OPS fallback rung
+(operator chat override; ADR/manual amendment lands with this phase's doc-sync).**
+Stage-2 setup dead code + the old eta_shore wave-setup diagnostic remain OUT of scope
+(separate tracked finding). Evidence: scratchpad TIDE-TRACE-FINDINGS.md. Tests: KATs for
+nonzero STOFS tide propagation end-to-end (both run types) + refusal KATs (STOFS absent →
+no-publish, nothing runs CO-OPS), same-commit. Deploy only on explicit operator go.
 
 ## Round-close & bookkeeping (every phase)
 
