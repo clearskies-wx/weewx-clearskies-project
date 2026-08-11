@@ -6,7 +6,7 @@
 |---|---|
 | **Live on librewxr** | marine `bdaf956` (L1-BOUNDARY-REBUILD state; crash-loop temp-dir startup defect repaired by operator 2026-08-10; publishing again since ~19:24Z) |
 | **Live on weather-dev** | dashboard `529e13d` (= repo HEAD; the struck C3S render) |
-| **Phases DONE** | ✅ **DOC** (meta `7e53927`, 12 files docs-only; Gate DOC PASSED 2026-08-10, adversarial audit 0 findings — rows 1–6 all PASS with evidence; lead independent checks: allowlist diff exact, ADR-106↔PA1–PA5 1:1, 25 m confirmed wording, zero Z2 content). ✅ **Z1** (diagnosis; Q1 answered by 2026-08-03 ruling). Z2 ruled no. |
+| **Phases DONE** | ✅ **M** (dashboard `eb424fd`+`73d9017` DEPLOYED to weather-dev; Gate M PASS, repro capture clean — see Phase M gate record). ✅ **DOC** (meta `7e53927`, 12 files docs-only; Gate DOC PASSED 2026-08-10, adversarial audit 0 findings — rows 1–6 all PASS with evidence; lead independent checks: allowlist diff exact, ADR-106↔PA1–PA5 1:1, 25 m confirmed wording, zero Z2 content). ✅ **Z1** (diagnosis; Q1 answered by 2026-08-03 ruling). Z2 ruled no. |
 | **Remaining** | Phase DOC → B2 → S → K → Z3 (marine chain, strict; Z3 = wind-gatherer migration steps 2–5 per the approved 2026-08-03 design) ; H → M (dashboard chain, may interleave after DOC) |
 | **WAITING ON OPERATOR** | none — Z1 answered by the pre-existing 2026-08-03 ruling (Q1 record below); Z2 ruled no |
 
@@ -498,7 +498,23 @@ baselines, zero new failures; (7) H6 report filed (flat-segment finding surfaced
 
 ---
 
-## PHASE M — Main map layer reliability *(fixit Item 6)*
+## PHASE M — Main map layer reliability *(fixit Item 6)* — ✅ CLOSED 2026-08-10
+
+**Gate record:** dashboard `eb424fd` (M1+M2+M3) + `73d9017` (Gate M finding F1: clear
+pending retry timer — lead-direct). Gate M adversarial audit: PASS, 1 LOW finding
+(remediated), mutation drill proved test falsifiability (threshold mutation → 3/6 fail;
+handler-removal mutation → 2/6 fail). Verification (lead-independent, weather-dev):
+LocationMap vitest 6/6 + `tsc -b` clean at `73d9017`. Deployed via full
+redeploy-weather-dev (entry chunk 203.01 KB gz — neutral vs 203.00 baseline). Repro
+capture (Playwright on weather-dev, via local Caddy HTTP — public HTTPS terminates at an
+upstream openresty proxy that 403s container-origin requests): marine page 1 leaflet
+container, 36/36 tiles HTTP 200 (base openstreetmap + labels cartocdn), forced dark-theme
+pass 36/36 fresh tile loads, banner correctly absent, zero silent-gray. Caveat recorded:
+the theme flip was exercised via reload (unit tests pin the in-place remount); the wild
+intermittent was not reproducible post-fix — both candidate mechanisms are closed by
+construction. DASHBOARD-MANUAL tag lifted to LIVE (this commit). Parking lot: 2
+pre-existing dashboard vitest failures found by the gate (useRealtimeObservation UV key;
+grid gap-token) — unrelated to M, tracked in P2 below; dashboard "92/92" baseline is stale.
 
 **Owner:** `clearskies-dashboard-dev`. **Tests:** `clearskies-test-author`. **QC:** auditor at
 Gate M. May run parallel to Phase H (different files).
