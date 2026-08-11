@@ -728,6 +728,19 @@ Stage-2 setup dead code + the old eta_shore wave-setup diagnostic remain OUT of 
 nonzero STOFS tide propagation end-to-end (both run types) + refusal KATs (STOFS absent →
 no-publish, nothing runs CO-OPS), same-commit. Deploy only on explicit operator go.
 
+**T IMPLEMENTED (2026-08-11): marine `53eea82` + `a8a27e2`** (agent surfaced the
+architectural triggers once, complied on the coordinator's formal approval statement per
+the 2026-08-05 protocol; both commit messages cite the operator rulings). Windows local
+verification 300 passed / 8 pre-existing (stash-verified). Pushed + librewxr synced
+`a8a27e2` (NO restart — running process still pre-T; an unexplained-but-clean
+administrative service restart occurred 06:31:18Z, systemd stop/start, not a crash —
+possibly operator-issued; the 06Z cycle runs pre-T code). Container test run queued
+behind the in-flight 06Z cycle. **T2 follow-up (required before phase close, flagged by
+implementer): the served `tideLevel` DISPLAY field's own cache path
+(`swelltrack_tide_predictions`/`resolve_ondemand_tide_level()`) is not yet wired to
+STOFS — after deploy it reads null (honest, no longer 0.0) until T2 lands.** Deploy
+awaiting operator go.
+
 ## Round-close & bookkeeping (every phase)
 
 - Gate record in THIS file (CURRENT STATE table + per-phase ✅ markers with commits, accept
