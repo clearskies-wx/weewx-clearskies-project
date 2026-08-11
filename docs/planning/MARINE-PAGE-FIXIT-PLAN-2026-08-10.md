@@ -1,11 +1,17 @@
 # Marine Page Fixit Plan — boundary plug-in, ruled card fixes, break/zone redefinition (2026-08-10)
 
-## 📍 CURRENT STATE — updated every working session (last: created 2026-08-10, pre-dispatch)
+## 📍 CURRENT STATE — updated every working session (last: 2026-08-11 pre-compaction)
+
+**RESUME POINTER: session scratchpad `SESSION-STATE.md` holds the full session context
+(agent roster, pending operator decisions, operational traps). Authority order: this
+table → Phase records below → SESSION-STATE.md.**
 
 | | |
 |---|---|
-| **Live on librewxr** | marine `bdaf956` (L1-BOUNDARY-REBUILD state; crash-loop temp-dir startup defect repaired by operator 2026-08-10; publishing again since ~19:24Z) |
-| **Live on weather-dev** | dashboard `529e13d` (= repo HEAD; the struck C3S render) |
+| **Live on librewxr** | RUNNING SERVICE = pre-T code (started 06:31:18Z); checkout synced to marine `a396866` (B2 boundary rework DEPLOYED+running since 02:42Z; Phase T tide fix ON DISK, awaiting operator restart-deploy go) |
+| **Live on weather-dev** | dashboard `53ebd38` deployed (M + H rounds); `1d37593` (dry-beach fix) LOCAL-ONLY, parked on operator freeze |
+| **OPERATOR DECISIONS PENDING** | (1) Phase T restart-deploy go (±T2 first); (2) CTHETA/CSIGMA L1 experiment go; (3) push+deploy parked `1d37593`; (4) ortho source-quality investigation go |
+| **STRUCK/OPEN** | B2-Accept (open until L1 wave corruption fixed — served list must show the real trains); H-Accept (open: dry-beach fix parked + ortho quality) |
 | **Phases DONE** | ✅ **M** (dashboard `eb424fd`+`73d9017` DEPLOYED to weather-dev; Gate M PASS, repro capture clean — see Phase M gate record). ✅ **DOC** (meta `7e53927`, 12 files docs-only; Gate DOC PASSED 2026-08-10, adversarial audit 0 findings — rows 1–6 all PASS with evidence; lead independent checks: allowlist diff exact, ADR-106↔PA1–PA5 1:1, 25 m confirmed wording, zero Z2 content). ✅ **Z1** (diagnosis; Q1 answered by 2026-08-03 ruling). Z2 ruled no. |
 | **Remaining** | Phase DOC → B2 → S → K → Z3 (marine chain, strict; Z3 = wind-gatherer migration steps 2–5 per the approved 2026-08-03 design) ; H → M (dashboard chain, may interleave after DOC) |
 | **WAITING ON OPERATOR** | none — Z1 answered by the pre-existing 2026-08-03 ruling (Q1 record below); Z2 ruled no |
