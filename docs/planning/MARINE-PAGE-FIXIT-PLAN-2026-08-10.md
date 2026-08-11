@@ -497,7 +497,7 @@ ground→chart transform and (b) the imagery-tile ground→pixel math; assert ag
 ≤ 10 m ground-equivalent. Failure = STOP the phase and surface (the C3S registration doubt
 becomes a finding, not a rework guess). This KAT stays in the suite permanently.
 
-### H1 — Framing + tile budget (cells shrink, photo sharpens — C3S strike remedy)
+### H1 — Framing + tile budget — ✅ RESOLVED 2026-08-11: tile budget SHIPPED; frame term CANCELLED (operator: the whole-pier framing was never asked for — Q2 record above; only correct ortho scale/placement matters, which H0 gates)
 **Files:** `HeatMapCard.tsx` (framing constants + `IMAGERY_MOSAIC_MAX_TILES_PER_SIDE`).
 **Design (decided):** cross-shore frame seaward edge = max(data extent, pier seaward tip's
 cross-shore position) + the existing 50 m buffer (frame includes the whole pier for context);
@@ -707,7 +707,20 @@ English, self-contained, newest at top. Answered items move to the decision log.
 instruction 2026-08-10: "create a list of questions in the plan for items THAT ARE NOT
 ANSWERABLE BY THE DOCS, if they are answerable by DOCS, do not ask me.")*
 
-### Q2 (2026-08-10, from Phase H dispatch) — The heat map can't know where the pier ends; how should it?
+### Q2 — ✅ VOID (operator 2026-08-11): the premise was the coordinator's misreading
+
+Operator, verbatim: "I NEVER STATED that you had to show 'the whole pier.' … YOU DO NOT
+EVEN NEED TO KNOW WHERE THE PIER IS. … you only need to scale and locate the
+orthophotography IN THE RIGHT PLACE. If you did that right, the pier shows up. Does it all
+fit in the card? No, and I never expected it to." Consequences: (1) H1's
+frame-seaward-edge term is CANCELLED — no served pier field, no per-spot preset, no frame
+change; H1 = tile-budget raise only, which is SHIPPED. (2) Phase H has NO held terms
+remaining — correct imagery scale/placement is exactly what H0 now gates permanently
+(registration ≤10 m; measured 0.00006 m). (3) Strip on-screen size is whatever true scale
+dictates in the ruled 4x2+scroll+fullscreen card — judged at the H-Accept eyeball, not by
+a frame rule. Options A/B/C below are DEAD.
+
+### Q2-void (original question text, superseded by the above)
 
 **Context, plain English:** you ruled the heat map should frame enough ground to include the
 whole pier (which also shrinks the colored strips and sharpens the photo). Implementing
