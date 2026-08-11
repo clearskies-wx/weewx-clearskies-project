@@ -375,13 +375,22 @@ failures.
 
 ---
 
-## PHASE S — Swell-conditions card: ruled ranges *(PA2 — fixit Item 2)* — ⬜ NOT STARTED (dispatching 2026-08-11; brief ready in scratchpad)
+## PHASE S — Swell-conditions card: ruled ranges *(PA2 — fixit Item 2)* — 🟡 S1/S2/S3 ✅ DONE 2026-08-11 (marine `9562d28`, dashboard `355a83e`), Gate S ✅ PASS (1 LOW doc finding, remediated lead-direct same day); ⏳ S-ACCEPT pending deploy (dashboard deploying; marine deploy bundled after T2 lands)
+
+**GATE S RECORD (2026-08-11): PASS, all 5 rows,** auditor's own falsifiability runs (marine
+9/9 new KATs fail on pre-change code; dashboard 2/34 period assertions fail pre-change,
+face-height pre-existing-fallback explanation verified); no import cycle; zero live
+retired-field references either repo or either openapi; dynamic heightUnit ruled correct
+against API-MANUAL group_wave_height. F1 [LOW]: DASHBOARD-MANUAL C1 bullet stale +
+Phase-S tag unlifted — REMEDIATED lead-direct (C1 bullet folded to shipped state).
+Round notes: s-dash-dev disclosed 2 pre-ack in-scope edits (kept, logged); pre-existing
+drift finding — retired fields were never present in the dashboard openapi mirror.
 
 **Owner:** `clearskies-api-dev` (S1) + `clearskies-dashboard-dev` (S2). **Tests:**
 `clearskies-test-author` (S3). **QC:** `clearskies-auditor` at Gate S. Dispatches after Gate
 B2 closes (marine repo single-round).
 
-### S1 — Server fields (marine `endpoints/surf.py`, `_compute_eligible_swell_aggregates`) — ⬜ NOT STARTED
+### S1 — Server fields (marine `endpoints/surf.py`, `_compute_eligible_swell_aggregates`) — ✅ DONE 2026-08-11 (marine `9562d28`)
 **Design (decided):** (a) ADD `periodMinS`/`periodMaxS` = min/max of `period` over the
 ELIGIBLE set (existing eligibility rule — operator ruled the no-qualifier fallback stays
 as-is), rounded 1 decimal; (b) REMOVE `combinedPeriodS` and `faceHeightMinFt`/`faceHeightMaxFt`
@@ -391,7 +400,7 @@ by an import of `_MIN_SURFABLE_PERIOD_S` from `services/surf_1d_pipeline` (share
 verify no import cycle); (d) `swellHeightMinFt/MaxFt` and `modelSurfHeightMin/Max`
 computations untouched.
 
-### S2 — Card rebind (dashboard `SurfingTab.tsx` Card 3) — ⬜ NOT STARTED
+### S2 — Card rebind (dashboard `SurfingTab.tsx` Card 3) — ✅ DONE 2026-08-11 (dashboard `355a83e`)
 **Design (decided):** Breaking Face Height range ← `modelSurfHeightMin`/`modelSurfHeightMax`
 (verify served units against API-MANUAL before binding — the fields serve feet today per the
 live capture); Period ← `periodMinS`–`periodMaxS` via the existing `formatMinMaxFt`-style
@@ -399,19 +408,19 @@ collapse rule (single number iff min = max); delete the `combinedPeriodS` and
 `faceHeightMinFt/MaxFt` bindings and the fields from `src/api/types.ts`/openapi mirror.
 Swell Height binding unchanged.
 
-### S3 — Tests — ⬜ NOT STARTED
+### S3 — Tests — ✅ DONE 2026-08-11 (9 marine KATs in `9562d28`; 3 C1 tests rewritten in `355a83e`; falsifiability auditor-reproduced)
 Marine: aggregate KATs updated in the same round — period-range arithmetic on a 3-train
 fixture; fields-absent assertions for the two removals (response must NOT carry them).
 Dashboard: `SurfingTab.test.tsx` C1 block updated to the new bindings (range renders, collapse
 renders, null fallback) — same-commit-as-behavior rule.
 
-### S-Accept (live) — ⬜ NOT STARTED
+### S-Accept (live) — ⏳ PENDING DEPLOY (dashboard deploying 2026-08-11; marine deploy after T2)
 Served JSON at matched time shows `periodMinS/periodMaxS` and lacks the removed fields;
 screenshot of the card showing Breaking Face Height as the `modelSurfHeight*` range (a real
 range on a multi-transect day) and Period as a range when ≥2 surfable trains differ; cam/buoy
 sanity note recorded.
 
-### QC GATE S — auditor rows — ⬜ NOT STARTED
+### QC GATE S — auditor rows — ✅ PASS 2026-08-11 (record at phase header)
 (1) repo-wide grep: zero surviving references to the removed fields (both repos + openapi);
 (2) shared-constant import verified (no duplicated 5.0 literal in `surf.py`); (3) dashboard
 tests fail against pre-change code (falsifiability spot-check); (4) doc-sync tags removed
