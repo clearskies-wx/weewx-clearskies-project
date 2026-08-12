@@ -752,10 +752,22 @@ longer needs to carry data-age options.
   "Marine runner: fast SWAN cycle complete (store-driven)" + forecast cache persisted 18.6 MB.
   Post-restart journal sweep: zero new ERROR/WARNING classes (INV-11, DDD-runaway, L4-handoff
   clamp, roller-closure all pre-existing tracked).
-- **Reality gate A (first store-driven full run): PENDING** — the 18Z extended assembly was
-  consumed (and refused) pre-fix at 19:47Z; next chance = 00Z extended cycle, expected to
-  assemble ~01:47Z 2026-08-12 (12Z assembled 13:50Z, 18Z 19:46Z — ~1h50m pattern). Persistent
-  journal monitor armed (fires on assembly/firing/refusal/completion + service-inactive).
+- **Reality gate A (first store-driven full run): ❌ FAILED 2026-08-12 01:50:43Z — STRUCTURAL,
+  fix round dispatching.** The 00Z extended cycle assembled 01:50:15Z, full run fired
+  01:50:43Z on `1ff5124` and refused: `gap:missing_hour: no timeline entry for
+  2026-08-12T00:00:00Z (requested 00:00..08-15T00:00)`. Root cause (both ends): (near) the
+  cycle-anchored window's first ~2 hours are ALWAYS aged out by assembly time — `age_out()`
+  drops everything before wall-clock now, destroying part of the assembled set the trigger
+  exists to consume (contradicts the 2026-08-03 design's own "ONE fully assembled wind set"
+  promise); (far) the 3-hourly window to cycle+72h can exceed posted GFS coverage at trigger
+  time (the matching GFS cycle posts hours later). The refusal also CONSUMED the pending
+  trigger (no retry ticks in journal) — so the store-driven full run has structurally never
+  been runnable. Same built-wrong defect class as Q3. Old inline path evidently forced from
+  cycle start successfully at ~cycle+2.5h (e.g. 08-11 00Z ran 02:42Z) — read-only
+  investigation (z36-trace) dispatched to pin its exact window semantics before the fix is
+  designed. NOT a publish outage: fast cycles keep passing hourly (19Z/20Z/21Z-era, 01Z
+  02:41:36Z, 02Z 03:36:57Z all store-driven complete), display hybrid serving; cost = the
+  12–72h forecast tail still dates from the 08-11 06Z full run and ages until fixed.
 - **⚠ NEW FINDING (blocks Z3.5 item 2, surfaced as Q3):** the Z3.2 display-wind store read is
   structurally failing on EVERY request — 16/16 requests post-restart logged "display wind
   fell back to run-cached field: gap:missing_hour". Mechanism (code-verified at `0ebdd01`):
