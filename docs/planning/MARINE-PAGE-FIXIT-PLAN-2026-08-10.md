@@ -789,6 +789,37 @@ newer-cycle-overwrite-safe, superseded-without-running logs one INFO; **D4** win
 semantics preserved. All KATs falsifiability-proven vs HEAD `1ff5124`. Pipeline: implement
 → lead acceptance → adversarial gate → deploy (same operator authorization pattern as
 Z3.5b); gate A retries on the next extended assembly post-deploy.
+
+**Z3.6 GATE + SHIP RECORD (2026-08-12): ✅ GATE PASS 8/8 rows (adversarial; every mutation
+drill flipped its KATs, scratch copies hash-restored). Findings: F1 [MEDIUM] pending-signal
+wedge on an already-completed cycle (real TOCTOU between the gatherer's status write and the
+callback, combined with the forced-geometry path) → REMEDIATED (marker check before
+dispatch, CAS-clear without dispatching; KATs falsifiability-proven); F2 [LOW] stale
+"DORMANT" store docstring → fixed. Lead acceptance: independent runs reproduced implementer
+numbers exactly at every step (100 passed / 2 disclosed pre-existing; adjacent net 28/28).
+Committed marine `acdfa0c`, pushed, DEPLOYED 04:58:16Z.**
+
+**⚠ DEPLOY OUTAGE + HOTFIX (2026-08-12 04:58–05:04Z, 6 minutes, surf page empty):** the
+04:58 restart refused the on-disk forecast cache as ">12h stale (saved 08-11T11:16Z)" and
+came up cold; every marine endpoint served no-model-data and the public surf endpoint served
+`forecast: []`. Root cause (new latent defect, exposed because this was the first restart
+>12h after the last successful FULL run): `_update_forecast_cache_on_disk()` (the fast-cycle
+merge persist) deliberately carried the PREVIOUS `saved_at` forward, so 11 fresh fast-cycle
+persists all bore the last full run's stamp — the loader refused a file whose newest content
+was 12 minutes old. The fast cycle also cannot bootstrap an empty cache (skips spots with no
+existing entry), so no self-heal before the next successful full run (~5.5h). Recovery:
+hotfix marine `ed1f26d` (merge persist stamps `saved_at=now`; KAT falsifiability-proven —
+fails with the carried-over stamp) + one-time in-place repair of the live file's false stamp
+to its true content time (04:52:03Z, the file's own mtime; in-place rewrite, ownership
+untouched) + deploy 05:04:30Z → "restored forecast cache from disk (saved 04:52)"; public
+endpoint verified serving 67 timesteps again, lastRunTime 04:41Z. Lesson queued: restart
+recovery had never been exercised across a >12h full-run gap; the staleness stamp semantics
+were only ever tested same-day. Doc-sync: PROVIDER-MANUAL GFS-depth passage, ARCHITECTURE
+gatherer bullet, ADR-107 "Amendment (Z3.6 runnability fixes, 2026-08-12)" (all this commit).
+**Gate A retry pending: 06Z extended assembly ~07:50Z — far edge needs GFS 06Z (~10:32Z)
+because the 00Z GFS batch was fetched pre-deploy at the old 9-file depth; D3 retry carries
+the trigger until it succeeds. First fully-on-time run expected at 12Z (~13:50Z). Monitor
+armed.**
 - **⚠ NEW FINDING (blocks Z3.5 item 2, surfaced as Q3):** the Z3.2 display-wind store read is
   structurally failing on EVERY request — 16/16 requests post-restart logged "display wind
   fell back to run-cached field: gap:missing_hour". Mechanism (code-verified at `0ebdd01`):

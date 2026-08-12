@@ -2940,7 +2940,7 @@ pushed/deployed at the time of this doc-sync pass. No run/convergence/reality-ga
 
 **Schedule:** GFS runs on a 6-hourly schedule (00Z, 06Z, 12Z, 18Z). Availability: ~3.5–4.5 hours after the nominal run hour (GFS takes longer to post than HRRR due to its global domain). Aligned with the SWAN extended HRRR cycle schedule.
 
-**Forecast range:** GFS produces forecasts to 384 hours (16 days) at 3-hour timesteps (f00–f384). For SWAN, only hours 48–72 are fetched (9 grids at 3-hour intervals: f048, f051, f054, f057, f060, f063, f066, f069, f072). The SWAN runner interpolates 3-hourly GFS wind to hourly resolution to match the HRRR cadence.
+**Forecast range:** GFS produces forecasts to 384 hours (16 days) at 3-hour timesteps (f00–f384). For SWAN, the wind gatherer fetches hours 48–84 (13 grids at 3-hour intervals, f048…f084; raised from f048–f072 in Z3.6, 2026-08-12, so the full-run window's far edge — HRRR cycle + 72 h — is always already held even though GFS's own cycle lags the HRRR extended cycle by at least one 6 h cadence step). The old inline manual-trigger path still fetches f048–f072 (gfs.py defaults unchanged). The SWAN runner interpolates 3-hourly GFS wind to hourly resolution to match the HRRR cadence.
 
 **Extracted variables:**
 

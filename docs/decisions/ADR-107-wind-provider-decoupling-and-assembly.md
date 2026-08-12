@@ -46,7 +46,7 @@ is `docs/planning/briefs/V3-F1-WIND-HOLE-INVESTIGATION-2026-08-03.md`'s subject.
 **1. The wind gatherer** — one new background component inside the existing marine service process:
 an independent `asyncio` task with its own scheduler, started at service startup, never invoked by
 (and never invoking) the SWAN run path. Detects new HRRR cycles (hourly f00-f18 every hour; extended
-f00-f48 at 00/06/12/18Z) and GFS far-window cycles (f048-f072, 3-hourly); fetches incrementally
+f00-f48 at 00/06/12/18Z) and GFS far-window cycles (f048-f084, 3-hourly; Z3.6 2026-08-12); fetches incrementally
 ("top-up" — only forecast hours not yet held for a cycle), respecting NOMADS pacing; tracks per-cycle
 completeness; maintains the assembled store and emits `hourly_cycle_assembled` /
 `extended_cycle_assembled` events. Considered and rejected: a separate systemd service — it maximizes
@@ -156,3 +156,29 @@ triggers change), 7 (new persisted store files). All authorized by the 2026-08-0
   tracked tasks.
 - `docs/manuals/PROVIDER-MANUAL.md` §14.14/§14.15 and ARCHITECTURE.md's "Wind gatherer" section —
   target-state documentation, updated in the same commit as this draft.
+
+## Amendment (Z3.6 runnability fixes, 2026-08-12)
+
+The first production trigger of the event-driven full run (00Z cycle, fired 01:50:43Z) refused and
+exposed three build errors that made the designed trigger structurally unsatisfiable; the operator
+ruled them defects ("fix it") and Z3.6 (marine `acdfa0c` + hotfix `ed1f26d`) corrected them:
+
+1. **Store retention floor.** `age_out()` deleted every hour behind wall-clock now — including the
+   assembling extended cycle's own first hours, destroyed 47 minutes before assembly even
+   completed. The floor is now `min(now, the hrrr_extended track's own cycle_time)`; the
+   "self-bounding, no retention policy" wording in §2 is amended accordingly (bound ≈ +8 h worst
+   case, the extended cycle replaces every 6 h).
+2. **GFS fetch depth.** f048–f072 measured from GFS's *own* cycle can never reach the HRRR
+   cycle + 72 h far edge, because GFS structurally lags the HRRR extended cycle by ≥ one 6 h step.
+   The gatherer now fetches f048–f084 (13 grids); `gfs.py` defaults and the inline manual-trigger
+   path are unchanged.
+3. **Trigger retry.** The pending `extended_cycle_assembled` signal was consumed before the run
+   executed, so a refusal swallowed it until the next cycle (≥6 h). It is now peeked, cleared only
+   on success (equality-guarded so a newer mid-run arrival is never lost), retried every runner
+   tick otherwise, and cleared-without-dispatch when its run marker shows the cycle already
+   completed (forced-path race). A pending cycle superseded before running logs one INFO.
+
+Rider (same date): the fast-cycle merge persist carried the last full run's `saved_at` stamp
+forward, so the disk cache's >12 h staleness check refused a file whose newest content was minutes
+old — a service restart during a long full-run outage came up cold (6-minute empty-forecast
+outage, 04:58–05:04Z). The merge persist now stamps `saved_at = now` (`ed1f26d`).
