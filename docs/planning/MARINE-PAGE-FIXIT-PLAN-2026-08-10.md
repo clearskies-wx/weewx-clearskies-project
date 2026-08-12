@@ -768,6 +768,27 @@ longer needs to carry data-age options.
   designed. NOT a publish outage: fast cycles keep passing hourly (19Z/20Z/21Z-era, 01Z
   02:41:36Z, 02Z 03:36:57Z all store-driven complete), display hybrid serving; cost = the
   12–72h forecast tail still dates from the 08-11 06Z full run and ages until fixed.
+
+**Z3.6 ROUND (gate-A fix) — operator-ruled 2026-08-12 in chat ("why the fuck are you not
+asking for more information from that model and saving it so we just use the existing GFS
+that we have when we need to run the model instead of waiting"), dispatched ~04:3xZ.**
+Fact-finding (z36-trace2, full brief in session record) pinned three independent defects,
+each with file:line + journal evidence: (1) `age_out()` deleted the 00Z cycle's own start
+hour at 01:03:30Z — 47 min BEFORE assembly completed — because retention has no floor below
+wall-clock now while the run window is cycle-anchored; (2) GFS fetch depth f048–f072 is
+anchored to GFS's OWN cycle, which structurally lags the HRRR extended cycle ≥6h, so the
+run's far edge (cycle+72h) is unreachable at ANY assembly timing (masked in the journal —
+the near-end error raises first); (3) the pending trigger is consumed unconditionally
+before the run executes; refusal = swallowed, unlike the geometry-forced path's proven
+level-triggered retry. **Design (BRIEF-Z36-DEV.md): D1** age_out floor =
+min(now, `_incoming["hrrr_extended"].cycle_time`) — in-module state, bounded ≈8h extra
+retention; **D2** gatherer-local GFS depth f048→f084 (13 files; `gfs.py` defaults + inline
+path untouched — pinned by KAT); **D3** pending signal cleared only on success,
+newer-cycle-overwrite-safe, superseded-without-running logs one INFO; **D4** window anchor
+(cycle start = dedup key = SWAN t_start = served first timestep) UNCHANGED — historical
+semantics preserved. All KATs falsifiability-proven vs HEAD `1ff5124`. Pipeline: implement
+→ lead acceptance → adversarial gate → deploy (same operator authorization pattern as
+Z3.5b); gate A retries on the next extended assembly post-deploy.
 - **⚠ NEW FINDING (blocks Z3.5 item 2, surfaced as Q3):** the Z3.2 display-wind store read is
   structurally failing on EVERY request — 16/16 requests post-restart logged "display wind
   fell back to run-cached field: gap:missing_hour". Mechanism (code-verified at `0ebdd01`):
