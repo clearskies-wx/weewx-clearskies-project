@@ -182,3 +182,28 @@ Rider (same date): the fast-cycle merge persist carried the last full run's `sav
 forward, so the disk cache's >12 h staleness check refused a file whose newest content was minutes
 old — a service restart during a long full-run outage came up cold (6-minute empty-forecast
 outage, 04:58–05:04Z). The merge persist now stamps `saved_at = now` (`ed1f26d`).
+
+## Amendment (Z3.7 far-window geometry homogenization — option 2, operator ruling 2026-08-12)
+
+Z3.6 made the trigger fire; the run then crashed at the wind stitch on every cycle
+(`IndexError`, `swan_runner.py` `_stitch_wind()`, first hit 10:49:48Z). Root cause: this ADR's
+store keeps ONE record per hour ("best source wins"), and the HRRR-extended and GFS batches for
+the same forecast cycle carry the same `cycle_time` label with HRRR assembling first — so the
+boundary hour (cycle+48 h) is always HRRR-sourced (65×60 grid) and GFS's own f048 copy is always
+discarded. `get_wind_records()`'s original docstring promised the boundary hour "in both regimes"
+reproducing the legacy fetch shape; the one-record-per-hour design cannot honor that promise.
+`_stitch_wind()` interpolates the far-window pair (48 h→51 h) elementwise assuming one geometry,
+and crashed on the 65×60-vs-6×7 mix.
+
+**Operator ruling (in chat, 2026-08-12): option 2** — at store-read time, in the run adapter
+(`run_full_swan_cycle_from_store()` only), any far-window grid whose geometry differs from the
+GFS target geometry is resampled onto the GFS grid using the existing canonical sampler
+(`swan_formats._bilinear_interp()`), with nearest-edge clamping for the GFS box's ≤0.061°
+overhang past the HRRR box. In production this means the h49–50 interpolation anchors on
+HRRR's own hour-48 state (resampled to 6×7) instead of legacy GFS f048 — a deliberate,
+approved change of those two hours' interpolation inputs (smoother handoff: the model is
+HRRR-forced through hour 48). The resampled anchor remains pure scaffolding — never emitted as
+a forced hour. Rejected alternatives: option 1 (store keeps both sources at overlap hours —
+schema change, bit-identical legacy reproduction) and option 3 (GFS wins ≥48 h in the merge —
+moves the same crash into the near window). Store schema, gatherer merge rule, and
+`_stitch_wind()` itself are unchanged.

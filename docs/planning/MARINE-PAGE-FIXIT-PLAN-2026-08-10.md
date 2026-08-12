@@ -822,6 +822,74 @@ gatherer bullet, ADR-107 "Amendment (Z3.6 runnability fixes, 2026-08-12)" (all t
 because the 00Z GFS batch was fetched pre-deploy at the old 9-file depth; D3 retry carries
 the trigger until it succeeds. First fully-on-time run expected at 12Z (~13:50Z). Monitor
 armed.**
+
+**GATE A SECOND FAILURE (2026-08-12, live): ❌ STRUCTURAL — far-window stitch shape
+mismatch. STOP-AND-SURFACED to operator (architectural triggers 4/7); awaiting ruling.**
+Timeline: D2/D3 verifiably WORKED — the GFS 06Z batch assembled ~10:30Z at the new 13-file
+depth, the store window filled, the refusal cleared, and the trigger fired the run. The run
+then CRASHED at the wind-stitch step (`swan_runner.py:2894`, `IndexError`), and has crash-
+looped on D3 retry every ~5–10 min since 10:49Z (06Z cycle, then 12Z cycle identically;
+`no-publish: swan_fatal`, last-good cache preserved every time — site keeps serving
+fast-cycle-refreshed content, but the 72h tail is aging and each retry re-downloads WW3
+boundary + STOFS + tide from NOAA). Root cause (code- and live-data-verified): the store
+keeps ONE record per hour, "fresher cycle wins, equal cycle keeps first writer"
+(`record_hour()`); HRRR-extended and the GFS batch for the same forecast cycle carry the
+SAME `cycle_time` label and HRRR assembles first, so the boundary hour (cycle+48h) is ALWAYS
+HRRR-sourced (65×60 grid) and GFS's own f048 copy is ALWAYS discarded. `_stitch_wind()`
+interpolates the far-window pair (48h→51h) elementwise using the first grid's dimensions —
+HRRR-shaped anchor (65×60) vs GFS-shaped neighbor (6×7) → IndexError, every cycle, forever.
+The `get_wind_records()` docstring explicitly promises "HRRR's last grid at hour 48 AND
+GFS's own f048 both present" — the store cannot honor that promise by construction; the old
+inline-fetch path had both because each provider returned its own file. Verified live:
+timeline hours ≤ cycle+48 all `src=hrrr nj=65 ni=60`, hours > cycle+48 all `src=gfs nj=6
+ni=7` (wind_timeline.json, 19:00Z). Fix options surfaced: (1) RECOMMENDED — store keeps the
+GFS-native record alongside HRRR for overlap hours; far-window reads prefer GFS-native
+(reproduces the legacy stitch inputs exactly; store schema + persisted-file change,
+triggers 4/7); (2) regrid HRRR hour-48 onto the GFS grid at read time (no schema change but
+changes the numbers feeding the 49–50h interpolation — formula-adjacent); (3) flip merge
+precedence so GFS wins ≥48h — REJECTED, poisons the near-window's hour-48 with a GFS-shaped
+grid (same crash, other side).
+
+**OPERATOR RULING (2026-08-12 in chat): OPTION 2** — "we go with option 2." At store-read
+time, in the run adapter only, any far-window grid whose geometry differs from the GFS target
+geometry is resampled onto the GFS grid via the existing canonical sampler
+(`swan_formats._bilinear_interp()`, the same routine that projects wind onto SWAN grids), with
+nearest-edge clamping for the GFS box's ≤0.061° overhang past the HRRR box (exceeds the
+sampler's built-in one-cell tolerance — measured live). h49–50 interpolation now anchors on
+HRRR's own hour-48 state instead of legacy GFS f048 — deliberate, approved (smoother handoff;
+the model is HRRR-forced through hour 48). Store schema, gatherer merge, `_stitch_wind()`
+unchanged. **Z3.7 ROUND DISPATCHED** (~19:45Z): z37-dev (clearskies-api-dev) on brief
+`BRIEF-Z37-DEV.md` (scratchpad); pre-round baseline `z37-preround-hashes.txt` captured BEFORE
+dispatch (Z3.5b F2 lesson applied); marine HEAD `ed1f26d` clean. Scope: swan.py adapter helper
++ far-window construction, wind_timeline_store.py docstring-only, test_z3_full_run_from_store.py
+(4 new KATs incl. falsifiable repro + 1 named production-shaped seed fix), PROVIDER-MANUAL
+passage. New refusal reasons: `far_window_no_gfs_records`, `far_window_resample_failed`.
+ADR-107 "Amendment (Z3.7 …)" appended (coordinator).
+
+**Z3.7 GATE + SHIP RECORD (2026-08-12 ~20:50Z): ✅ GATE PASS 9/9 rows, 0 findings.**
+Dev z37-dev delivered marine `6d0c5ff` (3 files: swan.py helper+construction, store docstring-only,
+tests +394 lines incl. 4 new KATs) + meta `22bd8ee6` (PROVIDER-MANUAL passage). Lead acceptance:
+independent pytest `28 passed in 0.29s` (3 test files); commit stat = allowlist exact; 4 frozen
+files hash-verified untouched; store diff byte-verified docstring-only; clamp/lon-frame/refusal-
+ordering spot-checked in code. Falsifiability: with the fix stashed, the repro-KAT fails with
+`IndexError` at `swan_runner.py:2894` — the exact live defect line. Adversarial gate (z37-gate,
+firewalled from dev report): own affine-field repro with closed-form hand checks at interior AND
+clamped-edge points (exact match); drill A (fix reverted → 4 tests fail incl. the exact
+IndexError); drill B (clamp neutered → 2 tests fail; proves clamp is load-bearing vs the sampler's
+one-cell tolerance); drill C (lat/lon transposed → dev tests AND auditor's own script flip — not
+right-by-accident); refusal drivers (both new reasons return False before any cache write,
+`record_input(wind, True)` unreachable from either); pass-through purity (all-GFS list byte-equal,
+0 resample logs); frame consistency (returned metadata stays 0–360, normalization never leaks);
+tree restored byte-identical (lead re-verified sha256 post-audit). Auditor named its blind spots:
+no real-SWAN execution locally, no real-grid float noise, no concurrency case.
+Dev-found bonus defect in the old h49 test: its seed relied on `record_hour()`'s freshness gate
+silently DISCARDING the boundary-hour write (same cycle_time), leaving the seed accidentally
+homogeneous — the exact non-production-shaped gate blindness that shipped the bug; now seeds
+mixed geometry through the production path. **Restart fact (code+production-verified): the pending
+trigger does NOT survive a restart (in-memory, no cold-start reconcile, no startup re-emit) — the
+deploy drops the crash-looping 18Z trigger; first store-driven full run on Z3.7 code fires at the
+00Z extended assembly ~01:48Z. Deployed ~20:55Z under the round-pipeline authorization; live
+gate-A verdict + reality gate + B2-Accept re-check at ~01:50Z.**
 - **⚠ NEW FINDING (blocks Z3.5 item 2, surfaced as Q3):** the Z3.2 display-wind store read is
   structurally failing on EVERY request — 16/16 requests post-restart logged "display wind
   fell back to run-cached field: gap:missing_hour". Mechanism (code-verified at `0ebdd01`):
