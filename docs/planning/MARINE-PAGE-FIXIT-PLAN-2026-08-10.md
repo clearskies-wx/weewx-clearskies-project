@@ -2,9 +2,11 @@
 
 ## 📍 CURRENT STATE — updated every working session (last: 2026-08-11 ~21:15Z, new session)
 
-**RESUME POINTER: session scratchpad `SESSION-STATE.md` holds the full session context
-(agent roster, pending operator decisions, operational traps). Authority order: this
-table → Phase records below → SESSION-STATE.md.**
+**RESUME POINTER (updated 2026-08-12 ~05:15Z sign-off): the 2026-08-12 session's scratchpad
+`SESSION-STATE.md` (glob `%LOCALAPPDATA%\Temp\claude\c--CODE-weather-belchertown\*\scratchpad\SESSION-STATE.md`,
+newest) holds the MORNING CHECKLIST — gate A verification (did the 06Z/12Z full runs fire),
+retention/health checks, B2-Accept re-check, lessons queue, parking-lot additions, traps.
+Authority order: this table → Phase records below → SESSION-STATE.md.**
 
 | | |
 |---|---|
