@@ -1401,48 +1401,120 @@ large enough to CONTAIN the islands and do the shadowing ourselves with real bat
    All bounded below the current 5° directional bin width. Validation must spot-check
    shadow-edge sensitivity.
 
-**TARGET ARCHITECTURE — THE FIX (operator-ordered 2026-08-13 in chat; that order is the
-trigger-3/6/7 authorization for the elements below. Remaining PARAMETER values — exact extent,
-dt, bathymetry source — get surfaced at each task's dispatch; whether the fix happens is
-decided and is not re-litigated):**
-- L1 extended south/west far enough to contain San Clemente (south edge ~32.8°N or beyond;
-  ~135–170 km N-S), run TRUE NON-STATIONARY on the 6-hourly full-run cadence only.
-- Hourly cycle drops its L1 recompute: L2+ run hourly (stationary as today), reading the
-  time-indexed hour from the full run's non-stationary L1 nest output. What is lost: ONLY
-  hourly fresh-wind response over L1's outer belt (new offshore wind events reach the forecast
-  up to ~6–8 h late); swell evolution/timing is preserved (time-indexed NESTOUT), and WW3-edge
-  staleness is unchanged from today. Mitigation lever: generous L2 extent.
-- Coordinates stay Cartesian at every level, with the direction-skew numbers above documented
-  as a stated, quantified tolerance (operator: acceptable if within tolerance).
-- Bathymetry: L1's source chain must be verified/extended for deep water 100+ km offshore
-  (CRM/GEBCO-class source likely needed — new provider work to be scoped).
-- Islands inside L1 become real obstacles/dry cells with real bathymetry — OUR model does the
-  shadowing instead of inheriting WW3's over-attenuation.
+### A1 DESIGN v1 (2026-08-13, lead-authored; grounded in the LIVE production L1/L2 decks read
+### this date and the LOCAL manual. Agents implement THIS — they do not design.)
 
-**TASK BREAKDOWN (strict order — the fix ships at A1.5, not at A1.1):**
+Live baseline (read from `/var/lib/weewx-clearskies/swan/level{1,2}/INPUT`, 06Z run):
+L1 = `COORDINATES CARTESIAN` (UTM 11N), origin (335934.64, 3672592.58), **92.8 × 98.8 km**,
+`CGRID REG … 91 100 CIRCLE 72 0.03 1.0 34` (~1020×988 m cells; 72 dir × 35 freq), boundary
+`BOUNDSPEC SIDE S + SIDE W CCW VARIABLE FILE`, `GEN3 ST6 … U10PROXY 28.0 AGROW`,
+`NUMERIC STOPC dabs=0.005 drel=0.01 curvat=0.005 npnts=99.5 STAT mxitst=500 alfa=0.01`,
+`NGRID 'inner'` + `NESTOUT 'inner' 'nest_out.dat' OUTPUT <C> 1 HR`, then the hourly
+`COMPUTE STAT` march. **L2 already ingests the nest via `BOUNDNEST1 NEST 'nest_in.dat'
+CLOSED` while itself marching `COMPUTE STAT <t>` through the whole horizon — the time-indexed
+seam mechanism the hourly rewire needs is ALREADY in production.**
 
-- **A1.1 MEASURE (parameters, not permission).** The four-way timing matrix —
-  {quasi-stationary march, true non-stationary} × {current ~95 km L1, big ~170 km L1} — plus a
-  per-level split of the current 51-minute production run. Read-only side runs on librewxr
-  off-cycle, nothing published. Cost structures are NOT comparable a priori (~73 stationary
-  convergence solves vs ~432 cheap propagation steps at 10-min dt) — measurement decides dt,
-  extent margin, and 6-hourly-cadence feasibility, NOT whether the fix happens. Same round
-  answers from the LOCAL manual: can the hourly stationary child read a time-indexed record
-  from the non-stationary parent's nest file (BOUNDNEST1), or does the L1→L2 seam need our
-  proven file-based extraction adapter? Deliverable: the parameter set for A1.3/A1.4.
-- **A1.2 DEEP-WATER BATHYMETRY.** Provider work for the extended L1 (CRM/GEBCO-class source,
-  100+ km offshore; datum consistency per ADR-098). Islands inside the domain (San Clemente,
-  Catalina, ...) become real dry cells/obstacles with real bathymetry — OUR model does the
-  shadowing, not WW3's coarse grid.
-- **A1.3 BIG-L1 TRUE-NON-STATIONARY FULL RUN.** Extend L1 south/west to contain San Clemente
-  (south edge ~32.8°N or beyond, ~135–170 km N-S; exact extent from A1.1); the 6-hourly full
-  run's L1 goes TRUE non-stationary (`COMPUTE NONSTAT`); boundary reconstruction moves to the
-  new perimeter — open-Pacific WW3 cells seaward of the island shadow, where WW3 is verified
-  accurate (0.43–0.45 m ledger row).
-- **A1.4 HOURLY CYCLE REWIRE.** Hourly runs L2+ only (stationary as today), reading the
-  time-indexed hour from the full run's L1 nest output via the A1.1-chosen seam mechanism.
-  Accepted loss: hourly fresh-wind response over L1's outer belt only (~6–8 h late worst case);
-  swell evolution/timing preserved; WW3-edge staleness unchanged. Mitigation lever: generous L2.
+**D1 — Domain.** Extend L1's S and W edges only; N and E unchanged. Geographic targets:
+**SW corner (32.60°N, 119.25°W)** — south of San Clemente's southern tip (~32.80°N) with
+open-Pacific WW3 cells seaward (the verified-accurate zone, ledger 0.43–0.45 m); NE corner
+stays (~34.07°N, ~117.77°W). Result ≈ **138 km E-W × 163 km N-S**, UTM 11N Cartesian as today
+(skew tolerance quantified in the fact base). Cell size stays ~1.0 km → ≈ **138 × 163 meshes
+(~22.5k cells, 2.47× today's 9.1k)**. Spectral resolution unchanged (`CIRCLE 72 0.03 1.0 34`).
+Code: `swan_domain.py` sizing gains an ISLAND-CONTAINMENT union — L1 box = union(spot-derived
+box as today, fixed containment corners `L1_CONTAINMENT_SW = (32.60, -119.25)`); cap
+`L1_MAX_EXTENT_KM` **100 → 175** (geography.py:133). Both constants operator-ordered under this
+amendment; G9's 100 km rationale (stationary validity) is superseded FOR L1 ONLY because L1
+stops being stationary (manual line 5718-5719: <100 km stationary recommended, otherwise
+non-stationary advised). Catalina (already interior) and San Clemente resolve as dry cells
+(~30×8 cells at 1 km) — OUR bathymetry does the shadowing; no OBSTACLE commands at L1.
+
+**D2 — Compute mode (full run L1 ONLY; L2–L4 unchanged).** Keep `MODE NONSTATIONARY`; replace
+the 57–73-solve `COMPUTE STAT` march with the manual's own canonical pattern (lines 5708-5713):
+```
+COMPUTE STAT <C+0>                      ! spin-up: stationary equilibrium = initial state
+COMPUTE NONSTAT <C+0> 10 MIN <C+72h>    ! true time-marching, dt = 10 min
+```
+`NUMERIC` gains `NONSTAT mxitns=1` (manual 5730-5731: ≤10-min dt → 1 iteration/step); the
+STOPC stationary criteria stay for the spin-up solve. **dt = 10 MIN** (manual 5721: at most
+10 minutes advised). Courant (manual 5725-5728, <10 for fastest/dominant): dominant 16 s
+cg≈12.5 m/s → C≈7.5 ✓; 25 s forerunners cg≈19.5 → C≈11.7, marginally over for the rare
+extreme tail — mitigation ladder if A1.1's physics row shows noise: dt = 6 MIN (C≈7.0 for
+25 s, ×1.67 step cost). All L1 inputs (WIND/BOUND/WLEV/CUR) are already time-tagged files —
+non-stationary interpolates them natively, zero input-side changes. `NESTOUT … 1 HR`
+unchanged (same L2 contract, and the 48–72 h tail gains hourly nest records vs today's
+3-hourly solves). L1 hourly hotstart files retired (nothing consumes them once the fast cycle
+drops L1); full-run initial state = the spin-up solve, no hotfile dependency.
+
+**D3 — Boundary.** Per-wet-cell WW3 reconstruction (ADR-106 R1) mechanism UNCHANGED; the
+perimeter moves with the box: S side at 32.60°N (~7–8 gfswave 0p16 wet cells), W side at
+119.25°W (~9 cells). Same source, same time axis, same coverage-window rule (Z3.9a).
+
+**D4 — Bathymetry.** Existing chain unchanged: NCEI regional DEM → **CRM fallback (~90 m)**
+(bathymetry_resolver.py); NOAA CRM's Southern California volume nominally covers the whole big
+box incl. San Clemente and the basin. A1.1 PROBES actual tile coverage/fill at the SW quadrant.
+A GEBCO-class new provider is scoped ONLY if the probe finds a hole. Datum deltas (MSL vs
+NAVD88, <1 m) are noise at basin depths.
+
+**D5 — Hourly (fast) cycle rewire.** Fast cycle runs L2→L3→L4 + SwellTrack/1-D exactly as
+today; **L1 is SKIPPED**. L2's `nest_in.dat` := the ARCHIVED `nest_out.dat` of the most recent
+COMPLETED full run (per-run retained copy `level1/nest_out_<cycle>.dat`, kept ≥24 h; the live
+workdir file is not depended on). L2's deck is byte-unchanged — `BOUNDNEST1 NEST CLOSED` +
+`COMPUTE STAT <t>` already reads the time-tagged record stream mid-file (production behavior
+today; A1.1 runs the one cheap disambiguation: a SINGLE mid-file `COMPUTE STAT` against a
+multi-record nest file). Fresh wind still forces L2–L4 every hour — the accepted loss is
+confined to L1's belt outside L2 (~6–8 h worst-case latency on new offshore wind). NEW health
+surface: `l1NestAge` + hourly-run refusal when the archived nest exceeds
+`L1_NEST_MAX_AGE_H = 9` (one missed full run + margin) — refuse-loudly per standing no-publish
+posture; **constant flagged below as the one open ruling**.
+
+**D6 — Wind store impact.** Gatherer bbox derives from the L1 box (existing derivation) →
+grows ~2.5×; HRRR CONUS + GFS both cover 32.6°N offshore; disk/transfer growth bounded and
+trivial vs. the existing store. No schedule/cadence change, no store schema change.
+
+**D7 — NOT changing (scope fence for every A1 agent):** L2/L3/L4 grids and decks, spectral
+resolution at every level, GEN3 ST6 physics line, SwellTrack/1-D/SurfBeat, the per-wet-cell
+reconstruction algorithm, provider modules other than bbox inputs, API/served contracts, the
+5° directional-resolution question (separate parked experiment).
+
+**D8 — Failure/rollback.** Full-run failure → hourly keeps serving off the last archived nest
+until the D5 age gate refuses (existing refuse-loudly UX). Rollback = git revert of the domain
+constants + runner switch; no data migration; stale hotstart/nest artifacts are inert files.
+
+**D9 — Predicted cost (A1.1 CONFIRMS, does not choose).** Iteration-sweep units on today's
+grid=1: march today ≈ 57–73 solves × I_stat iterations × 1.0; big-L1 non-stat ≈ (I_stat spin-up
++ 432 steps × 1 iter) × 2.47. At I_stat≈15 → ≈ parity with today's L1 wall-clock share; worst
+plausible (well-warmed I_stat≈8) ≈ 2× L1's share. The full run's L1 share is unknown until
+A1.1's per-level split — hence measurement before the cadence call is final. The HOURLY cycle
+gets strictly FASTER (drops its L1 solve entirely).
+
+**TASK BREAKDOWN (strict order — the fix ships at A1.5, not at A1.1; every task implements
+the DESIGN above, verbatim; design deviations are findings to surface, never agent calls):**
+
+- **A1.1 VALIDATE THE DESIGN'S PREDICTIONS (scratch measurement round, librewxr off-cycle,
+  nothing published, production-idle windows only).** Six rows, all specified by the design:
+  (a) per-level wall-clock split of the current production full run (parse existing work-dir
+  PRINT/log timestamps — no new runs); (b) measure I_stat (iterations per stationary solve,
+  distribution across the march) from the live PRINT files; (c) timing run of the D1 big grid
+  under D2 (`COMPUTE NONSTAT`, dt=10 MIN, mxitns=1) — CRM bathy if the (f) probe passes, flat
+  deep extension otherwise (timing-only caveat); parametric boundary proxy acceptable, caveat
+  stated; (d) physics arrival row on the CURRENT extent with REAL decks: march vs non-stat,
+  arrival-time delta of the ≥12 s front at a probe point (quantifies "swell teleports");
+  (e) the D5 seam disambiguation: single mid-file `COMPUTE STAT` against a multi-record nest
+  file — pass/fail with PRINT evidence; (f) CRM coverage/fill probe of the big box SW quadrant
+  (D4). Output: measured numbers beside D9's predictions + the dt confirmation (10 vs 6 MIN
+  per D2's ladder). NOT in scope: choosing extent, seam mechanism, or whether to proceed.
+- **A1.2 BATHYMETRY PER D4.** If A1.1(f) passes: wire the existing chain to the big bbox and
+  verify island dry-cell rendering (San Clemente ~30×8 cells) — small task. If it fails: STOP,
+  surface, and scope the GEBCO-class provider as its own ruled round.
+- **A1.3 BIG-L1 NON-STATIONARY FULL RUN PER D1+D2+D3.** Domain constants
+  (`L1_CONTAINMENT_SW`, cap 175) + union sizing in swan_domain.py; D2 deck emission in
+  swan_formats.py (spin-up `COMPUTE STAT` + `COMPUTE NONSTAT <C> 10 MIN <C+72h>`,
+  `NONSTAT mxitns=1`); boundary perimeter follows the box (D3, mechanism untouched); retire L1
+  hourly hotstarts (D2). Wind-store bbox growth rides the existing derivation (D6).
+- **A1.4 HOURLY CYCLE REWIRE PER D5.** Fast cycle skips L1; per-run nest archive
+  (`nest_out_<cycle>.dat`, ≥24 h retention); L2 fed the archived nest (deck byte-unchanged);
+  `l1NestAge` health surface + `L1_NEST_MAX_AGE_H = 9` refuse gate (constant pending the open
+  ruling below).
 - **A1.5 VALIDATE AGAINST REALITY — gate for everything downstream.** Re-run the 16 s-train
   ledger vs buoy 46253 spectral at matched hours (target: served S-train no longer 30–45% low);
   shadow-edge sensitivity spot-check (the Cartesian ~0.5–0.9° skew tolerance); arrival-timing
@@ -1450,10 +1522,13 @@ decided and is not re-litigated):**
   eyeball accepts until the model is right — B2/S/K/H re-accepts unfreeze only after A1.5
   passes.**
 
-**Open questions attached to this amendment:**
-- Whether the G9 100 km clamp is the proximate cause of today's boundary siting (unresolved by
+**Open ruling for the operator (ONE, non-blocking until A1.4):** when the archived L1 nest
+exceeds `L1_NEST_MAX_AGE_H = 9` (a full run missed its slot), the hourly cycle REFUSES
+(no-publish, loud) per the design default — confirm, or choose serve-stale-with-health-flag.
+
+**Historical notes:**
+- Whether the G9 100 km clamp was the proximate cause of today's boundary siting (unresolved by
   Z3.10; moot once A1.3 lands).
-- Deep-water bathymetry source selection and datum consistency (resolved inside A1.2).
 - Interim posture while A1 is in flight: current siting stays; its ~30–45% long-period SSW bite
   is a STATED KNOWN BIAS of the served forecast (recorded here, 2026-08-13).
 
