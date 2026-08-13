@@ -164,3 +164,19 @@ system's numbers were never captured before being replaced.
 4. **Post-deploy journal sweep.** After every marine deploy, grep the service journal for
    ERROR/WARNING classes that did not exist before the deploy; each new class is a finding to
    surface, not background noise.
+
+## 8. Monitors and baselines (added 2026-08-13, Z3.8/Z3.9)
+
+- **A monitor's filter must match every terminal state, not known-failure signatures plus
+  success.** Silence must be impossible when the watched thing fails a NEW way. The Z3.7 stitch
+  crash looped for 5 hours behind a monitor filtered for the previous failure's signatures; the
+  operator found out by asking. Include the generic classes (`Traceback`, `CRITICAL`,
+  `no-publish`, service-not-active) and subtract known noise explicitly — never enumerate only
+  the failures you expect.
+- **Capture pre-round baseline hashes BEFORE dispatching or resuming any agent.** A baseline
+  captured after dispatch can contain the agent's first edits (Z3.5b F2: the "pre-round" hashes
+  were taken ~2 min after resume and included the accessor edit).
+- **After any outage longer than a cache's staleness window, run a restart-recovery check before
+  closing the incident** — restart semantics are where stale stamps and lost in-memory state hide
+  (the `saved_at` outage and the dropped-trigger class were both restart-only defects invisible
+  in steady state).

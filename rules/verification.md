@@ -224,3 +224,20 @@ You have explicit permission to think critically about your own work and refine 
 ## Prompt faithfulness
 
 Before reporting a task complete, walk the user's original request and confirm every distinct ask has a corresponding deliverable or an explicit deferral communicated to the user. The user should never have to say "but I also asked you to do X." When the task involves multiple items, enumerate them at the start and check them off at the end.
+
+## Real-clock and production-shape rows (added 2026-08-13, Z3.8 audit)
+
+**Any gate on a schedule- or feed-integration change must include at least one row computed
+against the provider's REAL posting clock** — probe the actual publication times (e.g. NOMADS
+`Last-Modified`) and show the worst-case coverage arithmetic, not a fixture's assumption. Every
+one of the five Z3 wind/input bugs (age-out window, GFS depth, trigger loss, STOFS depth+anchor,
+WW3 boundary depth) shipped through gates whose tests used synthetic clocks; the code's own 2h
+STOFS lag assumption was wrong by 4h and nothing ever checked it against the real server.
+
+**Test seeds must be production-shaped.** A fixture that seeds all inputs with the same geometry,
+the same cycle label, or exact-hour offsets cannot catch mixed-geometry, provenance-race, or
+rounding-mode defects — the Z3.7 IndexError shipped because the h49 test's boundary-hour seed was
+accidentally homogeneous (a freshness-gate interaction silently discarded the differing write),
+and the Z3.9 gate found `ceil` vs `floor` indistinguishable under exact-hour fixtures. When a
+gate's mutation drill survives (the mutated code passes every test), that is a FINDING about the
+tests, not a pass.
