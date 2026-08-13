@@ -997,6 +997,28 @@ disclosed); WC-K5 stale pin updated; 5th-implementation sweep clean for surf pat
 acceptance: independent re-run 4 failed/115 passed with the 4 failures VERIFIED pre-existing at
 `338b899` by lead checkout-and-run (not trusted from the dev). Deploy after gate.
 
+**Z3.11 GATE PASSED (2026-08-13 ~07:38Z, z311-gate closeout): 0 findings, all 7 rows PASS.**
+Own four-site numeric driver (fresh numbers, hand-computed `_effective_swell` blend branch,
+exact-5.0s inclusive boundary case incl. eligible-lower-height-beats-ineligible-taller at the
+endpoint); mutation drills — floor unwired at `_effective_swell()` alone and
+`_compute_peel_angle()` alone, plus the classic filtered-list-position-vs-original-index bug —
+each caught by named round tests, tree restored with sha256 proof; every zero-eligible fallback
+byte-wise traced via git diff to pre-existing contracts (None / `_POWER_NEUTRAL` / `default=None`
+/ bulk-fallback line / `(None,None,None)` sentinel — none invented); sub-5s trains proven still
+listed (multiSwell built from UNfiltered `ts_spectral`; dominance-ratio machinery untouched);
+scope exactly the 5 declared files, 4 claimed-untouched files diff-empty vs `338b899`; the 4
+known pre-existing failures byte-identical at both revs; independent 13-file sweep (gate's own
+selection) 4 failed/115 passed. Bonus: gate found two argmax sites NOT in the dev's disclosure
+(`_combine_partition_faces_11_3`, `_select_primary_break_point`) and cleared them itself — their
+input is built downstream of the PRE-EXISTING stricter WC-D2 floor (sub-5s partitions get
+`p_results.append(None)` before break-point computation), so structurally unreachable by sub-5s
+trains. Tree byte-identical to `634775b` (status/diff empty, hashes match baseline).
+**PUSHED 07:40Z (`338b899..634775b`). Deploy deferred to the post-06Z-run gap (~08:45–09:25Z)**
+— Z3.11 is selection/serving-layer only, and the 06Z run (first normal-event-path run on Z3.9
+code, first live currents tail-hold) should be observed WITHOUT a mid-run service restart.
+After deploy: verify served card's dominant flips to the southerly train, sub-5s train still
+listed; then B2 re-accept goes back to the operator.
+
 **Z3.8 AUDIT RESULTS (2026-08-13 ~05:00Z, all three closed out; lead spot-verified every
 load-bearing claim in code/manual/live probes). 14 findings; consolidated below.**
 *Coverage auditor (3 CRITICAL + 1 info):* (V1) STOFS WLEVEL anchored to WALL CLOCK not the run
