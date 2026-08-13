@@ -137,6 +137,7 @@ prior to do any code work as agents depend on the docs").**
 | PA4 | Published break markers DECOUPLED from the breaking-cessation machinery: one marker per distinct crash point (local dissipation maximum, prominence rule, §Named constants); published impact zone REDEFINED as a fixed-width crash band per marker, clipped at the waterline; foam zone becomes pure geometry (last band → waterline); `reformTrough` serves null. Internal physics marches UNTOUCHED. Amends ADR-102's published-output section | 1, 4 | operator 2026-08-10 chat (Item 4 rulings, incl. the marker-decoupling dependency accepted in chat) |
 | PA5 | Beach-profile/impact-zone doc contract: dashboard `types.ts` "50% energy loss" impact-zone description replaced by the PA4 definition (resolves the 5%-vs-50% doc-code drift) | 4 (docs of a contract) | follows from PA4 |
 | PA6 | Item-0 forecast-hole handling: **NOT pre-approved.** Z1 produces a ruling brief; any fix that moves the HRRR/GFS blend boundary, changes cycle scheduling, or adds a wait/retry cadence is architectural and goes to the operator | — | explicitly withheld |
+| PA7 | **AMENDMENT A1 block** (design = §PLAN AMENDMENT A1 → A1 DESIGN v1; added 2026-08-13): (a) L1 domain extension to contain San Clemente — `L1_CONTAINMENT_SW = (32.60, -119.25)`, cap `L1_MAX_EXTENT_KM` 100→175 (supersedes the G9 cap FOR L1 and ADR-104's S/W siting rationale); (b) full-run L1 compute mode: quasi-stationary march → stationary spin-up + `COMPUTE NONSTAT` dt=10 MIN, `mxitns=1` (two-NUMERIC deck per D2); (c) hourly cycle drops L1 — archived-nest seam (`nest_out_<cycle>.dat` ≥24 h), `l1NestAge` health key + `L1_NEST_MAX_AGE_H = 9` refuse gate; (d) boundary perimeter moves with the box (per-wet-cell mechanism UNCHANGED); (e) L1 hourly hotstart files retired; (f) big-box bathymetry datum policy per D4 (KNOWN datum required; CRM/UNKNOWN answer = STOP for operator ruling); (g) wind-store bbox growth via the existing L1-box derivation | 1, 2, 3, 4, 6, 7 | operator 2026-08-13 in chat: "I SAID TO PUT THE FUCKING FIX IN THE PLAN" + "FUCKING DESIGN IT NOW" (fix ordered, lead-designed); QC gates + docs-first/docs-last ordered same date |
 
 Display-only changes (no trigger hit, listed for scope clarity): heatmap framing + tile budget
 8 + smoothing raster + attribution/notes relocation + card 4x2 + fullscreen overlay (H); surf
@@ -1434,9 +1435,13 @@ the 57–73-solve `COMPUTE STAT` march with the manual's own canonical pattern (
 COMPUTE STAT <C+0>                      ! spin-up: stationary equilibrium = initial state
 COMPUTE NONSTAT <C+0> 10 MIN <C+72h>    ! true time-marching, dt = 10 min
 ```
-`NUMERIC` gains `NONSTAT mxitns=1` (manual 5730-5731: ≤10-min dt → 1 iteration/step); the
-STOPC stationary criteria stay for the spin-up solve. **dt = 10 MIN** (manual 5721: at most
-10 minutes advised). Courant (manual 5725-5728, <10 for fastest/dominant): dominant 16 s
+NUMERIC: the manual's grammar makes `STAT [mxitst] [alfa]` and `NONSTAT [mxitns]`
+ALTERNATIVES inside one NUMERIC command (manual 4176-4182), `[alfa]` is "NOT MEANINGFUL FOR
+NONSTATIONARY" (4231), and settings may change between COMPUTE commands (5708-5716) — so the
+deck carries TWO NUMERIC commands: today's STOPC…STAT line before the spin-up solve, then
+`NUMERIC STOPC dabs=0.005 drel=0.01 curvat=0.005 npnts=99.5 NONSTAT mxitns=1` before the
+march (mxitns default is already 1 per 4235 — stated explicitly anyway; manual 5730-5731:
+≤10-min dt → 1 iteration/step). **dt = 10 MIN** (manual 5721: at most 10 minutes advised). Courant (manual 5725-5728, <10 for fastest/dominant): dominant 16 s
 cg≈12.5 m/s → C≈7.5 ✓; 25 s forerunners cg≈19.5 → C≈11.7, marginally over for the rare
 extreme tail — mitigation ladder if A1.1's physics row shows noise: dt = 6 MIN (C≈7.0 for
 25 s, ×1.67 step cost). All L1 inputs (WIND/BOUND/WLEV/CUR) are already time-tagged files —
@@ -1488,6 +1493,13 @@ trivial vs. the existing store. No schedule/cadence change, no store schema chan
 resolution at every level, GEN3 ST6 physics line, SwellTrack/1-D/SurfBeat, the per-wet-cell
 reconstruction algorithm, provider modules other than bbox inputs, API/served contracts, the
 5° directional-resolution question (separate parked experiment).
+**Frozen-core opening (PRIME DIRECTIVE 1 — a task opens ONLY files its list names):** A1 tasks
+name and therefore open, for A1 work only: `services/geography.py` (the cap),
+`services/swan_domain.py` (sizing union), `services/swan_formats.py` (deck emission —
+CGRID/INPGRID numbers + COMPUTE/NUMERIC block), `services/swan_runner.py` (full/fast
+orchestration + nest archive), `state.py` + `endpoints/health.py` (`l1NestAge`). Hotstart
+mechanics open ONLY for the L1-hourly-hotstart retirement. `CIRCLE 72 0.03 1.0 34`,
+`omp_num_threads = 6`, and L2/L3/L4 sizing stay FROZEN.
 
 **D8 — Failure/rollback.** Full-run failure → hourly keeps serving off the last archived nest
 until the D5 age gate refuses (existing refuse-loudly UX). Rollback = git revert of the domain
@@ -1500,9 +1512,21 @@ plausible (well-warmed I_stat≈8) ≈ 2× L1's share. The full run's L1 share i
 A1.1's per-level split — hence measurement before the cadence call is final. The HOURLY cycle
 gets strictly FASTER (drops its L1 solve entirely).
 
-**TASK BREAKDOWN (strict order — the fix ships at A1.5, not at A1.1; every task implements
-the DESIGN above, verbatim; design deviations are findings to surface, never agent calls):**
+**TASK BREAKDOWN (strict order — docs FIRST and docs AGAIN at the end, operator order
+2026-08-13; the fix ships at A1.5; every task implements the DESIGN above, verbatim; design
+deviations are findings to surface, never agent calls):**
 
+- **A1.0 DOCS-FIRST (operator order 2026-08-13: "docs update done first" — same convention as
+  Phase DOC: docs to the TARGET state before any code, agents depend on the docs).** New
+  **ADR-108** (big-L1 true-non-stationary domain: D1 extent + containment constants, D2 compute
+  mode, D5 hourly-L2+ seam + nest archive + age gate, D4 datum policy — Accepted-on-operator-
+  order, cites this amendment); supersession note in **ADR-104** (its island-aware S/W siting
+  rationale is superseded by containment — the boundary no longer dodges the islands, it
+  swallows them); **ARCHITECTURE.md** (SWAN domain section: new extent/cells, compute mode per
+  level, full-vs-hourly data flow incl. archived-nest seam, `l1NestAge` health key, cap 175);
+  **PROVIDER-MANUAL.md** (bathymetry big-box + datum requirements per D4, WW3 boundary
+  perimeter cells, wind-store bbox growth); **OPERATIONS-MANUAL.md** (health surface, refuse
+  gate, force-full-run interplay with the nest age). Gate DOC-A1 (adversarial, see QC GATES).
 - **A1.1 VALIDATE THE DESIGN'S PREDICTIONS (scratch measurement round, librewxr off-cycle,
   nothing published, production-idle windows only).** Six rows, all specified by the design:
   (a) per-level wall-clock split of the current production full run (parse existing work-dir
@@ -1539,6 +1563,26 @@ the DESIGN above, verbatim; design deviations are findings to surface, never age
   sanity (march vs non-stationary on the same case). **Operator ruling 2026-08-13: no further
   eyeball accepts until the model is right — B2/S/K/H re-accepts unfreeze only after A1.5
   passes.**
+- **A1.6 DOCS-FINAL (operator order 2026-08-13: "and then done again at the end").** After
+  A1.5: re-sync every A1.0 document to AS-BUILT (measured cell counts, final dt if the ladder
+  moved it, actual bathy source+datum, seam mechanism as verified, health keys as shipped) +
+  full drift sweep of ADR-108/ARCHITECTURE/manuals vs code. Gate DOC-A1-FINAL (adversarial).
+
+**QC GATES (added per operator order 2026-08-13 — every task gets an ADVERSARIAL
+`clearskies-auditor` gate BEFORE lead acceptance, firewalled from implementer reports per
+rules/verification.md. Every gate that touches a SWAN deck MUST consult the LOCAL manual
+(`docs/reference/swan-user-manual.txt` + `swan-commands-extract.md`) and cite line numbers —
+web-searching SWAN stays forbidden):**
+
+| Gate | Verifies (minimum rows) |
+|------|------------------------|
+| DOC-A1 (after A1.0) | ADR-108 content matches DESIGN D1–D9 verbatim (numbers, constants, datum policy); ADR-104 supersession note present and scoped; ARCHITECTURE/manual passages match the design's numbers; no doc promises anything the design doesn't say |
+| GATE-A1.1 | Scratch confinement (nothing outside /tmp/a11-timing; production untouched — diff mtimes/checksums of production dirs); idle-window discipline from the agent's own logs; EVERY scratch deck line syntax-checked against the manual (COMPUTE NONSTAT time format + `[deltc]` MIN unit :5733-5775; two-NUMERIC alternation :4176-4235; BOUNDSPEC VARIABLE FILE grammar per plan §SWAN SYNTAX PRESCRIPTIONS; **FORBIDDEN list holds even in scratch: no PAR/SHAPE/TPAR/BOUNDNEST2/3**); measurements carry raw PRINT evidence, not summaries |
+| GATE-A1.2 | D4 acceptance: BOTTOM datum KNOWN and named for the whole big box; WLEVEL (STOFS≈LMSL) reconciled to it via the existing ADR-098 mechanism, verified for the new box; cross-level datum statement (L1 vs L2/L3/L4 sources); SCI dry-cell footprint (land where land is); UNKNOWN/CRM-mixed = auto-FAIL pending operator ruling |
+| GATE-A1.3 | **Deck KAT**: emitted big-L1 deck for a known cycle vs a hand-derived expected deck (CGRID/INPGRID origin+mesh numbers from D1's UTM corners; spin-up `COMPUTE STAT` + `COMPUTE NONSTAT <C> 10 MIN <C+72h>`; both NUMERIC commands; NGRID/NESTOUT byte-unchanged); every changed command manual-verified with line cites (incl. BOUNDNEST1 same-coordinate-system :2592, CGRID-before-BOUNDNEST1 :2575-2576); boundary endpoint rule (§SWAN SYNTAX PRESCRIPTIONS row 2) preserved on the NEW side lengths; frozen-core untouched outside the named files (`CIRCLE 72 0.03 1.0 34` byte-identical at every level, `omp_num_threads` untouched, L2/L3/L4 sizing untouched); falsifiable KATs at pre-round HEAD |
+| GATE-A1.4 | Hourly deck byte-identical except nest source; archive retention + TTL proven; `l1NestAge` KATs incl. the refuse boundary (9 h exact); health additive-only (no key renamed/removed); restart survival of the archive pointer; falsifiability transcripts |
+| GATE-A1.5 | Reality-gate rows per PRIME DIRECTIVE 4 with quantities pre-picked BEFORE looking (46253 16 s-train ledger re-run vs served; arrival-timing delta; shadow-edge spot-check); baseline-vs-after diff per PRIME DIRECTIVE 2; publish-liveness |
+| DOC-A1-FINAL (after A1.6) | As-built numbers in every A1.0 doc match code/live decks (read the LIVE deck, not the repo's intent); zero drift findings |
 
 **Open ruling for the operator (ONE, non-blocking until A1.4):** when the archived L1 nest
 exceeds `L1_NEST_MAX_AGE_H = 9` (a full run missed its slot), the hourly cycle REFUSES
