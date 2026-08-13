@@ -912,6 +912,25 @@ honesty, wedge states — the saved_at/pending-trigger class). Briefs:
 BRIEF-Z38-AUDIT-{COVERAGE,SWAN,STATE}.md (scratchpad). Deliverable: one consolidated defect list
 → ONE operator ruling → ONE fix round → ONE deploy.
 
+**✅ GATE A PASSED LIVE (2026-08-13 06:21:39Z) — first successful store-driven full run in the
+project's history.** Z3.9 (marine `8cac6d1`→`338b899`, gate 12/12 + F1/F2 remediation KATs,
+deployed 05:20:29Z): the new cold-start reconcile armed the restart-dropped 00Z cycle at the
+first post-warmup tick (05:25:31Z — after a lead-direct fix for a startup race found in live
+verification: the one-shot reconcile ran 0.4s before the gatherer's store load; now retries per
+tick, falsifiable test), fired immediately, and completed in 3064s. Every input reached the
+window: STOFS coverage-derived depth, WW3 boundary + coverage check, currents (WCOFS 03Z aligned
+— zero tail held this run, note null as designed). REALITY GATE (tolerances picked before
+looking — dominant train Hs ±0.3m / Tp ±2s / dir ±30° vs NDBC 46253 @05:56Z): served tail
+Aug 16 00:00Z exact ✓; health all-inputs-available + fullRun success block + overdue false ✓;
+tide −0.196m nonzero ✓; period 16.6s vs 16.7s ✓ (Δ0.1s); height 0.23m vs 0.5m ✓ (Δ0.27m, at
+edge); direction 203° vs 166° ✗ MARGINAL (Δ37°, 7° outside tolerance — buoy is San Pedro South,
+not the spot; recorded honestly, not waved through). **B2-Accept: served multiSwell now resolves
+FOUR trains** (0.59m/4.1s/268° wind chop; 0.29m/12.8s/201° + 0.29m/11.8s/183° S-SSW; 0.23m/
+16.6s/203° groundswell matching the buoy's dominant 16.7s SSE swell) — vs the single train that
+opened this plan. Awaiting operator eyeball for formal B2 close. Lessons routed (`c7041006`).
+Next watch: 06Z cycle ~07:50Z exercises the normal event path + currents tail-hold on an
+unaligned WCOFS cycle.
+
 **Z3.8 AUDIT RESULTS (2026-08-13 ~05:00Z, all three closed out; lead spot-verified every
 load-bearing claim in code/manual/live probes). 14 findings; consolidated below.**
 *Coverage auditor (3 CRITICAL + 1 info):* (V1) STOFS WLEVEL anchored to WALL CLOCK not the run
