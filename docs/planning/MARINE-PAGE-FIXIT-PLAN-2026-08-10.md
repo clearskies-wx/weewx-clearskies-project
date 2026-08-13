@@ -1047,8 +1047,24 @@ trains. Tree byte-identical to `634775b` (status/diff empty, hashes match baseli
 **PUSHED 07:40Z (`338b899..634775b`). Deploy deferred to the post-06Z-run gap (~08:45–09:25Z)**
 — Z3.11 is selection/serving-layer only, and the 06Z run (first normal-event-path run on Z3.9
 code, first live currents tail-hold) should be observed WITHOUT a mid-run service restart.
-After deploy: verify served card's dominant flips to the southerly train, sub-5s train still
-listed; then B2 re-accept goes back to the operator.
+
+**Z3.11 DEPLOYED + VERIFIED LIVE (2026-08-13 08:54:21Z, deploy-marine.sh; running `634775b`,
+health 200, auth enforced).** Served-card probe 08:56Z: `swellHeight 0.396 m @ 12.19 s @ 192°`
+— the DOMINANT is now the southerly swell; the 4.14 s @ 269° train (0.588 m) REMAINS LISTED in
+multiSwell but is no longer dominant (+ 16.66 s @ 205° groundswell 0.224 m and a 5.54 s
+listed). Operator ruling R1 satisfied end-to-end in production. Heights still carry the known
+~30–45% S-train bias (A1's territory; eyeball accepts stay FROZEN per operator).
+
+**06Z FULL RUN RECORD (first fully-normal event path on Z3.9 code): COMPLETE 08:51:30Z,
+3149 s, 1/1 spots cached.** Trigger chain: gatherer detected 06Z 07:01:35 → hourly assembled
+07:17:56 → fast cycle complete 07:27:03 → extended assembled + full run fired 07:52:03 →
+complete 08:51:30. Zero failure signatures (all Tracebacks = known NDBC rate-limiter noise on
+serving endpoints). Post-restart (08:54 deploy) state snapshot RESTORED correctly — /health
+inputs show true ages, no false "unavailable" artifact; `fullRun` block green
+(lastSuccessCycle 06Z, 0 failures, not overdue). **NOTE — currents tail-hold NOT exercised:**
+`currentsTailHeld` null; WCOFS 03z delivered 24 timesteps (07:59:00 log) and no hold/refusal
+fired. The tail-hold path (Z3.9 ruling (a)) therefore remains live-unexercised — keep on the
+verification queue for a cycle where WCOFS demonstrably falls short of coverage_end.
 
 **Z3.8 AUDIT RESULTS (2026-08-13 ~05:00Z, all three closed out; lead spot-verified every
 load-bearing claim in code/manual/live probes). 14 findings; consolidated below.**
