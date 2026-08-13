@@ -927,9 +927,75 @@ edge); direction 203° vs 166° ✗ MARGINAL (Δ37°, 7° outside tolerance — 
 not the spot; recorded honestly, not waved through). **B2-Accept: served multiSwell now resolves
 FOUR trains** (0.59m/4.1s/268° wind chop; 0.29m/12.8s/201° + 0.29m/11.8s/183° S-SSW; 0.23m/
 16.6s/203° groundswell matching the buoy's dominant 16.7s SSE swell) — vs the single train that
-opened this plan. Awaiting operator eyeball for formal B2 close. Lessons routed (`c7041006`).
+opened this plan. Lessons routed (`c7041006`).
 Next watch: 06Z cycle ~07:50Z exercises the normal event path + currents tail-hold on an
 unaligned WCOFS cycle.
+
+**❌ B2-ACCEPT FAILED (operator eyeball, 2026-08-13 ~06:35Z): multi-train structure present but
+energy distribution WRONG.** Operator evidence (screenshots: our card vs Surfline vs 5 buoys vs
+surf-forecast): our dominant = W 2.0ft @ 4.1s (268°) — physically implausible in light observed
+wind ("not realistic for this area without a storm"); real dominant everywhere = S/SSE 13s
+~1.6–1.7ft; our S trains 30–50% low (SSW 1.3ft@12.2s + 0.7ft@16.7s vs buoy 46253 spectral
+0.5m@16.7s); card headline direction 268° and 0° closeout driven by the fake dominant. Operator:
+"prior to all of these changes when we picked up from ww3 in the channel, at least we got the
+right basic swell information."
+**OPERATOR RULINGS (2026-08-13 in chat):** (R1) a train with period < 5s must NEVER be flagged
+DOMINANT — it may exist and be listed, but is dominant-ineligible (clarified: not a display
+filter, an eligibility floor on dominant selection). (R2) investigate WIND DOUBLE-COUNTING —
+across the nested grids, and (coordinator's added suspect) a parametric wind-sea added on top of
+SWAN output in the 1-D pipeline. **Z3.10 INVESTIGATION DISPATCHED (~06:45Z, both read-only):**
+z310-wind (dominant-selection path + ≥5s floor placement + every dominant consumer; nest wind
+double-count vs LOCAL manual; WIND.txt-vs-observed-station bias at matched hours — the Addendum-5
+raw-HRRR audit finally running) and z310-boundary (stage-by-stage S-energy number table: WW3
+source → station selection → boundary reconstruction → nest handoffs incl. §2.6.3 directional
+resolution → spot output → served trains; cycle-staleness vs structural dilution split). Briefs:
+BRIEF-Z310-{WIND,BOUNDARY}-INVESTIGATION.md (scratchpad). No fixes until findings are before the
+operator.
+
+**Z3.10 RESULTS (2026-08-13 ~07:00Z; wind report delivered, boundary report RETRACTED once then
+REVISED after operator challenge + lead's own hands-on decode).**
+*z310-wind:* F1 CONFIRMED root cause of the fake dominant — THREE (later found: FOUR) parallel
+dominant-selection implementations with no period test, while `_MIN_SURFABLE_PERIOD_S=5.0`
+already exists and guards the breaking-face channel; the 0.593m@4.14s@268° partition (real SWAN
+watershed output, is_wind_sea:False, classified by Tp<10 only) wins all of them and drives the
+268° headline AND the peel/closeout math. Double-count: nest-level per-grid WIND confirmed
+manual-correct (not a bug); parametric add-on ruled OUT on the display channel (F4/F5 growth is
+gated+scoped); nest-compounding contribution UNRESOLVED (needs controlled run). Wind bias:
+model wind at the spot ran 40-65% LIGHTER than PRJC1 observed at matched hours (directions
+agree ~W) — over-forcing ruled out; PRJC1 is in-harbor (caveat).
+*z310-boundary (REVISED after operator pushback — original "deficit is in raw WW3" retracted):*
+lead + agent hand-decoded the run's own 00Z f006 grids. 16s-SSW-train ledger: open Pacific
+seaward of San Clemente 0.43-0.45m (matches surf-forecast) → our L1 S-boundary line (33.1667N)
+0.22-0.38m per cell (-30-45%: WW3's own island-attenuation zone; boundary is seaward of
+Catalina per design, San Clemente still stands between it and open water for SSW) → our
+boundary spectra 0.24-0.34m (faithful) → served 0.23m. 12s S train: 0.47 → ~0.43 → 0.41
+(healthy). Buoy holds 0.5m@16.7s INSIDE the bight where WW3's cell says 0.21 — WW3's coarse
+grid over-attenuates across the islands vs reality. Git archaeology: THREE boundary-feed
+generations; the oldest (operator-remembered "channel read") was a single-scalar domain-CENTER
+read that never split trains — masked the directional bias a partitioned display now exposes.
+Cycle freshness + wcoast/global byte-identity + reconstruction-faithfulness all verified. OPEN:
+whether the G9 100km clamp is proximate cause of boundary siting (unresolved, trigger-3).
+**ARCHITECTURE DISCUSSION (operator, 2026-08-13 ~07:20Z, no ruling yet):** move-the-handoff-out
+path examined with numbers: >100km breaks the hourly fast cycle's stationary validity (16s
+group speed ~12.5m/s → 3-4h crossing at 170km); "flat grid" costs = UTM meridian-convergence
+skew ~0.5° at edges + scale ~0.05% at 170km (SMALLER than the 5° directional bins — Cartesian
+likely acceptable, documented); manual line 255-256 forbids mixed-coordinate native nesting
+(spherical L1 + Cartesian L2 needs a custom seam adapter — proven pattern at the WW3 edge);
+hourly-on-old-L1 proposal ≈ current design already (hourly reuses 6h-old WW3 B-files and
+recomputes L1 stationary; the delta is losing hourly fresh-wind response over L1's outer belt
+only, swell timing preserved via time-indexed NESTOUT). NEXT (on operator go): timing
+experiment — see PLAN AMENDMENT A1 (the "51-min nonstationary run" phrasing first used here was
+WRONG — operator-corrected; the full run is a QUASI-STATIONARY march, see A1 §fact-base). Parking lot: model_wave_source.py:121 blind swells[0] on non-surf marine
+cards (z311 sweep find); NDBC fetch stagger; RTOFS currents; hotstart age; graceful degradation.
+
+**Z3.11 ROUND (R1 dominant-eligibility floor) — dev CLOSED, lead-ACCEPTED (2026-08-13 ~07:25Z),
+adversarial gate z311-gate RUNNING.** Marine `634775b` + meta `50d8157b` (API-MANUAL callout):
+floor wired at FOUR sites (dev traced a 4th the investigation's call-chain framing missed —
+`_effective_swell()`, the actual 268° headline source — ruled into scope; plus `_score_power()`
+assert→neutral). 15 new KATs (13 falsifiable at HEAD; 2 boundary cases trivially-true,
+disclosed); WC-K5 stale pin updated; 5th-implementation sweep clean for surf path. Lead
+acceptance: independent re-run 4 failed/115 passed with the 4 failures VERIFIED pre-existing at
+`338b899` by lead checkout-and-run (not trusted from the dev). Deploy after gate.
 
 **Z3.8 AUDIT RESULTS (2026-08-13 ~05:00Z, all three closed out; lead spot-verified every
 load-bearing claim in code/manual/live probes). 14 findings; consolidated below.**
@@ -1238,3 +1304,88 @@ needs your sign-off — none is pre-approved):**
 - **D — status quo.** Keep publishing with silent holes. Contradicts the loud-refusal rule.
 
 **Recommendation:** A. Full evidence: scratchpad `Z1-RULING-BRIEF.md`.
+
+---
+
+## PLAN AMENDMENT A1 — Big-L1 / true-non-stationary architecture proposal (2026-08-13, PROPOSED — no ruling yet)
+
+**Problem this addresses (operator-verified, 2026-08-13).** The served southerly swell runs
+30–45% below reality, and the deficit was traced with hand-decoded numbers to WHERE our L1
+boundary samples the WW3 grid: the boundary line (33.1667°N) is seaward of Catalina by design,
+but San Clemente Island still stands between it and open water for SSW swell, and WW3's coarse
+grid attenuates energy crossing the islands HARDER than reality does (buoy 46253 holds 0.5 m of
+the 16 s train inside the bight where WW3's own cell says 0.21 m). Ledger for the 16 s SSW train,
+2026-08-13 00Z f006: open Pacific seaward of San Clemente **0.43–0.45 m** (matches
+surf-forecast's WW3 read) → our boundary cells **0.22–0.38 m** → our boundary spectra files
+0.24–0.34 m (faithful write) → served **0.23 m**. The 12 s S train passes healthily
+(0.47 → 0.41 m). The only way to beat WW3's island bias — not just relocate it — is a domain
+large enough to CONTAIN the islands and do the shadowing ourselves with real bathymetry.
+
+**Fact base (all code/manual-verified this date; corrects two coordinator misstatements):**
+1. **The full run is NOT non-stationary** (operator-corrected after the coordinator misread this
+   repeatedly): `swan_formats.py` T1.0 emits `MODE NONSTATIONARY` (which only enables
+   time-tagged inputs) followed by a SEQUENCE of `COMPUTE STAT [t]` — one stationary
+   equilibrium solve per forecast hour, a quasi-stationary "frozen march." There is NO
+   wave-propagation time-marching anywhere in the system today. Consequence: today's model
+   equilibrates the whole domain instantly each hour — swell effectively teleports across L1,
+   arriving hours early in principle. True non-stationary would fix arrival timing as a genuine
+   physics gain at ANY domain size.
+2. **The 100 km stationary-validity cap (G9, operator ruling 2026-08-09) binds EVERY run**, not
+   just the hourly fast cycle, because every solve is stationary. A 16 s swell crosses a 170 km
+   domain in 3–4 h (group speed ~12.5 m/s) — quasi-stationary is indefensible at that extent.
+3. **Hourly cycle today**: stationary full-nest snapshot reusing the last full run's WW3-derived
+   L1 boundary FILES (6–8 h stale at the WW3 edge already) but RE-COMPUTING L1 stationary each
+   hour with fresh wind.
+4. **Coordinates**: all levels are Cartesian (UTM meters, `CGRID REG`). SWAN manual line
+   255-256: native nesting requires the SAME coordinate type parent↔child — spherical L1 over
+   Cartesian L2 is not natively possible; a custom seam adapter (extract L1 spectra at L2's
+   boundary, write file-based spectra — the proven pattern we already use at the WW3→L1 edge)
+   would be required if spherical were ever chosen.
+5. **Cartesian error at ~170 km** (operator accepted in principle if tolerable): direct size
+   error negligible (~0.02–0.06% scale); the real term is DIRECTION/position — ~0.5–0.9°
+   meridian-convergence skew + up to ~2 km lateral ray displacement (straight-line vs great
+   circle). Height is touched only indirectly where direction matters most (island shadow
+   edges, tight refraction windows: ~1° rotation moves a shadow boundary a couple of km).
+   All bounded below the current 5° directional bin width. Validation must spot-check
+   shadow-edge sensitivity.
+
+**Proposed target architecture (PROPOSED — every element is trigger-3/6 architectural and needs
+an operator ruling after the experiment):**
+- L1 extended south/west far enough to contain San Clemente (south edge ~32.8°N or beyond;
+  ~135–170 km N-S), run TRUE NON-STATIONARY on the 6-hourly full-run cadence only.
+- Hourly cycle drops its L1 recompute: L2+ run hourly (stationary as today), reading the
+  time-indexed hour from the full run's non-stationary L1 nest output. What is lost: ONLY
+  hourly fresh-wind response over L1's outer belt (new offshore wind events reach the forecast
+  up to ~6–8 h late); swell evolution/timing is preserved (time-indexed NESTOUT), and WW3-edge
+  staleness is unchanged from today. Mitigation lever: generous L2 extent.
+- Coordinates stay Cartesian at every level, with the direction-skew numbers above documented
+  as a stated, quantified tolerance (operator: acceptable if within tolerance).
+- Bathymetry: L1's source chain must be verified/extended for deep water 100+ km offshore
+  (CRM/GEBCO-class source likely needed — new provider work to be scoped).
+- Islands inside L1 become real obstacles/dry cells with real bathymetry — OUR model does the
+  shadowing instead of inheriting WW3's over-attenuation.
+
+**Gating experiment (specced, ready on operator go; read-only side runs on librewxr off-cycle,
+nothing published):** FOUR-way timing matrix — {quasi-stationary march, true non-stationary} ×
+{current ~95 km L1, big ~170 km L1} — plus a per-level timing split of the current 51-minute
+production run. Decision inputs the matrix must produce: wall-clock per mode/extent (hourly
+cadence feasibility), and a physics sanity row (swell arrival timing difference between march
+and true non-stationary on the same extent). Cost structures are NOT comparable a priori:
+~73 stationary convergence solves (current) vs ~432 cheap propagation steps (true non-stat,
+10-min dt) — measurement, not assumption, decides.
+
+**Open questions attached to this amendment:**
+- Whether the G9 100 km clamp is the proximate cause of today's boundary siting (unresolved by
+  Z3.10; moot if this amendment proceeds, historical otherwise).
+- Whether SWAN's native BOUNDNEST1 lets a stationary child read a time-indexed record from a
+  non-stationary parent's nest file, or whether our own extraction adapter is needed at the
+  L1→L2 seam (manual verification task inside the experiment round).
+- Deep-water bathymetry source selection and datum consistency (ADR-098 interplay).
+- Interim posture until ruled: current siting stays; its ~30–45% long-period SSW bite is a
+  STATED KNOWN BIAS of the served forecast (recorded here, 2026-08-13).
+
+**Related but independent (not gated on this amendment):** the in-chain ~10–20% long-period
+loss candidates — the L4/1-D handoff at deep ledges (K-round clamp = mitigation, never a
+physics fix) and 5° directional resolution vs the manual's ≤2°-for-swell guidance (§2.6.3) —
+are attackable as controlled experiments WITHOUT touching the domain, and remain on the
+parking lot with the R1 dominant-floor fix (Z3.11) covering the display-layer symptom now.
