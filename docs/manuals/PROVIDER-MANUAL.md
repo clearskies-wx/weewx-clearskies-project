@@ -1435,6 +1435,31 @@ retained as the exception type, new message) — never a partial fetch; a not-ye
 retryable condition (`fetch_partition_corridor_with_cycle_fallback()`, the bounded cycle-fallback idiom carried
 over from the deleted station path).
 
+**Coverage-window-driven fetch depth (Z3.9a, 2026-08-13, MARINE-PAGE-FIXIT-PLAN-2026-08-10 finding V2).**
+`fetch_partition_corridor_with_cycle_fallback(..., anchor_time, coverage_end=None)` gains an optional
+`coverage_end` (this run's own t_end). Per candidate cycle in the fallback ladder, fetch depth is derived —
+`hours_needed = ceil((coverage_end − candidate_cycle) / 1h)`, rounded UP to the product's own per-file step
+(3 h ocean, 1 h Great Lakes), floored at the legacy fixed depth (72 h) as a MINIMUM, never a cap — instead of
+resetting to a fixed 72 h span from whichever cycle the fallback ladder happens to land on. Because
+`anchor_time` is unchanged across every fallback candidate, an OLDER candidate automatically computes a
+DEEPER required depth, closing the defect where fetch coverage structurally fell short of the run's real
+window end whenever the ladder fell back to an older cycle. `coverage_end=None` (both existing callers —
+`boundary_reconstruction.reconstruct_boundary()`, which has no `coverage_end` parameter of its own; the
+live run's `anchor_time` is already correctly the run's own HRRR cycle `C`, and the config-time grid-sizing
+smoke test's `anchor_time=datetime.now(UTC)`) derives `coverage_end` internally as
+`anchor_time + <product's legacy fixed depth>`, byte-identical to pre-Z3.9a behavior for both — this is why
+`coverage_end` did not need to be threaded as a new parameter through `reconstruct_boundary()` itself.
+
+**Boundary-coverage belt-and-suspenders check (Z3.9a finding V4).** `services/swan_runner.py` compares the
+WW3 boundary reconstruction's own last timestep against the run's t_end at the
+`ww3_boundary_files_and_command()` call site; a gap raises `BoundaryCoverageError` (reason
+`boundary_coverage_gap`), naming both times and the gap in hours. This exists even though the fetch-depth
+fix above makes it "impossible" in practice — a silently shorter boundary tail would otherwise leave SWAN
+holding the boundary spectrum at its last available timestep for every remaining `COMPUTE STAT` hour with
+no diagnostic at all. `providers/nearshore/swan.py` also logs one INFO after every boundary reconstruction
+(finding V5) naming the run's own cycle `C`, the WW3 cycle actually used, the delta between them, and the
+boundary reconstruction's own last timestep.
+
 **B2 — reconstruction module (`services/boundary_reconstruction.py`).**
 - **Boundary points:** every L1 boundary cell along the two offshore sides (sides resolved from
   `open_water_bearing` via the existing `_offshore_sides` logic, which moves into this module when the
@@ -1871,6 +1896,17 @@ rung whose domain CONTAINS the entire L1 bbox (containment, never centre-in-box)
 STOFS-3D or an OFS would double-count circulation. Missing timestep on the selected source →
 `CurrentCoverageError`; source selection is per-cycle, never per-timestep (no cross-rung mixing mid-run).
 
+**Currents tail-hold (Z3.9a, MARINE-PAGE-FIXIT-PLAN-2026-08-10 finding V3, operator ruling 2026-08-13
+"(a)").** C-77 (a model runs on all its inputs or it does not run) is amended for the TAIL only: when the
+selected current source's own forecast reach (e.g. WCOFS, `max_fhr=72`) ends BEFORE this run's window
+does, `services/swan_runner.py::_write_current_txt()` holds (repeats) the last available U/V field for
+the wind timesteps beyond that reach, rather than refusing the whole run, logging one WARNING naming the
+reach time, the window end, and the held timestep count, and recording the note via
+`state.record_currents_hold()` (surfaced at `GET /health` as `currentsTailHeld`). An INTERIOR gap (a wind
+timestep inside the source's covered range with no match within 2 h) still raises `CurrentCoverageError`
+unchanged, and a ZERO-field selection still refuses via the ladder above unchanged — the amendment is
+tail-only, never for an interior hole or a total absence of usable current data.
+
 **Why the composite died (evidence, 2026-08-09):** STOFS-2D-Global publishes NO velocity in ANY product —
 regional GRIB2 carries exactly water level + surge (+1 unknown field; eccodes-inspected live), the global
 netCDF fields files carry `zeta` + mesh topology only (header-inspected), and NOAA's own NOMADS STOFS
@@ -2056,6 +2092,20 @@ grammar (`INPGRID/READINP WLEVEL ... NONSTAT`) is pinned unchanged; only the VAL
 Source selection is per-cycle: a timestep gap within STOFS data = STOFS fetch failure for the whole cycle →
 **REFUSE (`tide_fetch_failed`) — the CO-OPS-uniform fallback was removed 2026-08-11 (ONE SOURCE
 amendment above)**; never mixed sources within one run.
+
+**Coverage-window-driven fetch depth (Z3.9a, 2026-08-13, MARINE-PAGE-FIXIT-PLAN-2026-08-10 finding V1).**
+`fetch_stofs_wlevel(bbox, *, coverage_end)` no longer takes a fixed `forecast_hours` depth — the caller
+(`providers/nearshore/swan.py`'s tide fetch site) states the coverage window it requires (`coverage_end`,
+this run's own t_end — for the full cycle, the run's HRRR cycle `C` + 72 h; for the hourly fast cycle, that
+cycle's own 12-hour window end), and the fetcher derives how deep the selected cycle must be fetched:
+`required_hours = ceil((coverage_end − candidate_cycle) / 1h)`. A `required_hours` beyond STOFS's own 180 h
+forecast ceiling refuses immediately (an older candidate only ever needs MORE hours, never fewer, so no
+fallback could help) rather than attempting a doomed fetch. This closes the defect where every supporting
+feed was fetched a fixed 72 h deep from its OWN (sometimes older, fallback) cycle, so coverage structurally
+fell short of the run's real window end whenever the fallback ladder fired. The candidate-cycle
+availability-lag constant (`_CYCLE_AVAILABILITY_LAG`) is corrected from 2 h to **6 h** (measured
+2026-08-13 via Last-Modified probe against live NOMADS — STOFS posts markedly later than the 2 h this
+module previously assumed).
 
 ### §14.14 HRRR wind provider (ADR-093, ADR-094)
 
