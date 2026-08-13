@@ -1449,11 +1449,24 @@ drops L1); full-run initial state = the spin-up solve, no hotfile dependency.
 perimeter moves with the box: S side at 32.60°N (~7–8 gfswave 0p16 wet cells), W side at
 119.25°W (~9 cells). Same source, same time axis, same coverage-window rule (Z3.9a).
 
-**D4 — Bathymetry.** Existing chain unchanged: NCEI regional DEM → **CRM fallback (~90 m)**
-(bathymetry_resolver.py); NOAA CRM's Southern California volume nominally covers the whole big
-box incl. San Clemente and the basin. A1.1 PROBES actual tile coverage/fill at the SW quadrant.
-A GEBCO-class new provider is scoped ONLY if the probe finds a hole. Datum deltas (MSL vs
-NAVD88, <1 m) are noise at basin depths.
+**D4 — Bathymetry (operator-corrected 2026-08-13: datum mismatch is NOT noise — not for swell
+heights).** Existing chain unchanged in mechanism: NCEI regional DEM → CRM fallback
+(bathymetry_resolver.py). **ADR-098 discipline applies to the big box in full**: BOTTOM and
+WLEVEL on the SAME vertical datum; SWAN does not detect mismatches — a mismatch silently
+corrupts depth-dependent physics (breaking, shoaling, and for A1 specifically the island's
+effective shoreline/shelf position, which sets the very shadow this amendment exists to fix).
+Hard requirements: (i) the big-L1 BOTTOM source must have a KNOWN datum — the existing
+UNKNOWN-datum rejection guard in `download_bathymetry_for_level()` stays binding; (ii) **CRM
+has NO guaranteed datum** (PROVIDER-MANUAL: mixed-datum mosaic, unnormalized — the reason CRM
+areas are flagged degraded), so CRM answering the big box is NOT automatically acceptable —
+it is a STOP-and-surface in A1.2 (operator chooses: accept with the existing degraded-quality
+flagging, or bring a known-datum deep source — GEBCO is MSL-referenced); (iii) WLEVEL (STOFS
+≈ LMSL) must be reconciled to the chosen BOTTOM datum via the existing ADR-098 match-at-source
+mechanism, verified for the NEW box, not assumed; (iv) datum consistency ACROSS nest levels —
+the big L1's datum vs the child DEMs' datums — is part of A1.2's acceptance, since a level-to-
+level offset shifts every handoff depth. A1.1(f) therefore reports, for whatever source answers
+the big box: the RESOLVED datum string, coverage/fill, and the SCI dry-cell footprint sanity
+(land where land is).
 
 **D5 — Hourly (fast) cycle rewire.** Fast cycle runs L2→L3→L4 + SwellTrack/1-D exactly as
 today; **L1 is SKIPPED**. L2's `nest_in.dat` := the ARCHIVED `nest_out.dat` of the most recent
@@ -1500,12 +1513,17 @@ the DESIGN above, verbatim; design deviations are findings to surface, never age
   stated; (d) physics arrival row on the CURRENT extent with REAL decks: march vs non-stat,
   arrival-time delta of the ≥12 s front at a probe point (quantifies "swell teleports");
   (e) the D5 seam disambiguation: single mid-file `COMPUTE STAT` against a multi-record nest
-  file — pass/fail with PRINT evidence; (f) CRM coverage/fill probe of the big box SW quadrant
-  (D4). Output: measured numbers beside D9's predictions + the dt confirmation (10 vs 6 MIN
-  per D2's ladder). NOT in scope: choosing extent, seam mechanism, or whether to proceed.
-- **A1.2 BATHYMETRY PER D4.** If A1.1(f) passes: wire the existing chain to the big bbox and
-  verify island dry-cell rendering (San Clemente ~30×8 cells) — small task. If it fails: STOP,
-  surface, and scope the GEBCO-class provider as its own ruled round.
+  file — pass/fail with PRINT evidence; (f) bathymetry probe of the big box SW quadrant per D4:
+  which source answers, its RESOLVED vertical datum (UNKNOWN = automatic FAIL per the existing
+  guard), coverage/fill fraction, and SCI dry-cell footprint sanity. Output: measured numbers
+  beside D9's predictions + the dt confirmation (10 vs 6 MIN per D2's ladder). NOT in scope:
+  choosing extent, seam mechanism, datum policy, or whether to proceed.
+- **A1.2 BATHYMETRY PER D4.** Acceptance = ALL of: known-datum BOTTOM for the whole big box;
+  WLEVEL reconciled to that datum via the existing ADR-098 mechanism, verified for the new box;
+  cross-level datum consistency stated (L1 vs child DEMs); island dry-cell rendering verified
+  (San Clemente ~30×8 cells). If A1.1(f) resolves to CRM or any UNKNOWN/mixed-datum source:
+  STOP and surface for the operator's datum ruling (degraded-flag acceptance vs known-datum
+  deep source, e.g. GEBCO/MSL) — do NOT proceed on an unruled datum.
 - **A1.3 BIG-L1 NON-STATIONARY FULL RUN PER D1+D2+D3.** Domain constants
   (`L1_CONTAINMENT_SW`, cap 175) + union sizing in swan_domain.py; D2 deck emission in
   swan_formats.py (spin-up `COMPUTE STAT` + `COMPUTE NONSTAT <C> 10 MIN <C+72h>`,
