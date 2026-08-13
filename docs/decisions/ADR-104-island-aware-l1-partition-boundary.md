@@ -76,6 +76,15 @@ enclosed, the autosizer must detect it and avoid placing the boundary in that is
 **D2 — 100 km hard cap.** `L1_MAX_EXTENT_KM = 100.0`. An island that cannot be enclosed within the cap is not
 enclosed; its shadow is a recorded residual, mitigated by D11's near-lee avoidance, never silently clipped.
 
+> **SUPERSEDED FOR L1 (ADR-108, 2026-08-13).** The 100 km cap and the island-avoidance siting
+> rationale (D1's enclosure + D11's near-lee clamp) are superseded FOR L1 by ADR-108's
+> island-containment approach: L1 extends to **contain** both Catalina and San Clemente (SW corner
+> 32.60°N, 119.25°W; cap raised to 175 km FOR L1 ONLY), and switches to true non-stationary
+> compute (`COMPUTE NONSTAT` dt=10 MIN) — eliminating the stationary-validity constraint that
+> motivated the 100 km cap. The cap, the per-axis clamp, the near-lee machinery, and the Great
+> Lakes exemption all remain in effect for non-L1 levels and regimes. See ADR-108 for the full
+> ruling record.
+
 **Amendment 2026-08-09 (operator ruling, in chat; plan Q6/G9):** the cap binds the **L1 BOX SIZE per
 axis**, not each scan ray's reach from the spot. The Phase-G implementation shipped the per-ray reading and
 produced a 91×131 km live box — no single ray exceeded 100 km, but the envelope of the fan did, and L1's

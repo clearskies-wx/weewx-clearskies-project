@@ -130,6 +130,12 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | [ADR-101](ADR-101-surf-score-geometric-mean.md) | Surf score rebuild — weighted geometric mean of five components (Size/Shape/Conditions/Power/Consistency), no penalties, single-use rule, admin-adjustable weights; supersedes ADR-096's formula (its per-category bar rule survives) | 2026-08-04 |
 | [ADR-107](ADR-107-wind-provider-decoupling-and-assembly.md) | Wind provider decoupling + assembly — independent wind gatherer background task, single assembled wind timeline store, event-driven SWAN run triggers (`extended_cycle_assembled`/`hourly_cycle_assembled`), 12h fast-cycle scope; lifts the 2026-08-03 operator-approved design brief into a decision record (drafted by the Z3.5 implementer per the fixit plan's re-scope note — not yet operator-accepted) | 2026-08-11 |
 
+## Accepted — pending manual consolidation (marine, A1)
+
+| ADR | Title | Accepted |
+|---|---|---|
+| [ADR-108](ADR-108-big-l1-true-nonstationary-domain.md) | Big-L1 true-non-stationary domain — island containment (SW corner 32.60°N, 119.25°W), `COMPUTE NONSTAT` dt=10 MIN time-marching L1 compute, hourly L2+ seam via archived nest output, `l1NestAge` health surface + 9 h refuse gate; cap 100→175 km for L1 only (supersedes ADR-104 D2 cap + S/W siting rationale for L1) | 2026-08-13 |
+
 ## Accepted — pending manual consolidation
 
 | ADR | Title | Accepted |
