@@ -890,6 +890,66 @@ trigger does NOT survive a restart (in-memory, no cold-start reconcile, no start
 deploy drops the crash-looping 18Z trigger; first store-driven full run on Z3.7 code fires at the
 00Z extended assembly ~01:48Z. Deployed ~20:55Z under the round-pipeline authorization; live
 gate-A verdict + reality gate + B2-Accept re-check at ~01:50Z.**
+
+**GATE A THIRD FAILURE (2026-08-13 02:27Z, live): ❌ STOFS water-level depth — same disease as
+D2, next organ. → OPERATOR ORDERED FULL ADVERSARIAL AUDIT (Z3.8) instead of another iterative
+fix.** The 00Z trigger fired on time (~02:22Z); the Z3.7 wind fix WORKED (run passed the stitch,
+setup, and into `_write_input_files`); it then crashed at `STOFSGridCoverageError`: no STOFS
+water-level match within 2h of wind timestep C+69h (2026-08-15T21:00Z). Arithmetic: STOFS 00Z not
+yet posted at 02:23Z (observed 404) → fallback to 18Z cycle; we fetch `forecast_hours=72` from
+STOFS's OWN cycle (swan.py:3657, :5098) → coverage ends C+66h < C+72h. STOFS publishes to f180
+(manual §14.13a; f084 probed 200 live), so depth is the whole problem. Same trap found waiting
+next: WW3 boundary `_OCEAN_FORECAST_HOURS = 72` (ww3_partition_fields.py:319; gfswave f084
+probed 200). Crash loop retries every ~10 min, cache preserved, site serving. Coordinator's
+monitor missed the new class overnight (filter listed old signatures + success only) — logged as
+lesson 7. Proposed STOFS/WW3 72→84 held per operator order; folded into the audit round.
+**Z3.8 AUDIT DISPATCHED (~03:40Z), three adversarial auditors in parallel, read-only:**
+z38-audit-coverage (every external input: anchor/depth/fallback/worst-case posting-clock
+arithmetic/loud-vs-silent, full-run + fast-cycle paths), z38-audit-swan (every generated SWAN
+command + input file vs the LOCAL SWAN manual — top question: where does SWAN accept deficient
+input silently), z38-audit-state (every mutable state item: restart survival, races, staleness
+honesty, wedge states — the saved_at/pending-trigger class). Briefs:
+BRIEF-Z38-AUDIT-{COVERAGE,SWAN,STATE}.md (scratchpad). Deliverable: one consolidated defect list
+→ ONE operator ruling → ONE fix round → ONE deploy.
+
+**Z3.8 AUDIT RESULTS (2026-08-13 ~05:00Z, all three closed out; lead spot-verified every
+load-bearing claim in code/manual/live probes). 14 findings; consolidated below.**
+*Coverage auditor (3 CRITICAL + 1 info):* (V1) STOFS WLEVEL anchored to WALL CLOCK not the run
+cycle, with a hardcoded 2h posting-lag assumption vs ~6h measured live (stofs_wlevel.py:681,
+:149; depth 72 at swan.py:3657) — the live crash-loop; also STOFSGridCoverageError never caught
+by name in swan.py (0 refs) → logged as generic `swan_fatal` "this is a bug". (V2) WW3 boundary
+depth `_OCEAN_FORECAST_HOURS=72` from floor6(C) with zero lag buffer (ww3_partition_fields.py:319,
+:547) → 2–7h structural shortfall on ~5/6 cycles, −18h worst with fallbacks. (V3) OFS currents:
+wall-clock anchor (ofs.py:265) against WCOFS `cycles=[3]` ONCE-DAILY, max_fhr=72 — with the
+D2-widened C+72h window the currents model STRUCTURALLY cannot reach the far edge on ANY cycle
+(best case ~3h short); CurrentCoverageError IS caught by name → once V1/V2 fixed this becomes
+the next guaranteed refuse-loop. POLICY RULING REQUIRED (C-77 amendment or new source). (info)
+Fast cycle hardcodes ofs_currents=None (swan_runner.py:4641). Wind chain confirmed SAFE live.
+*SWAN-manual auditor (1 CRITICAL + 1 MEDIUM; 13 conforming rows):* (V4) NO coverage check exists
+between the reconstructed WW3 boundary's last timestep and L1's own COMPUTE end
+(swan_formats.py:2551-2652 + call site swan_runner.py:5018 — verified: zero time comparison);
+manual §2.6.2 (swan-user-manual.txt:588-595, quote lead-verified) documents constant-hold-last
+for nonstationary inputs → most plausible behavior is SILENT stale-boundary tail propagated
+L1→L2→L3 undetected. Live: current run's boundary ends 08-15T18Z vs compute end 08-16T00Z (6h
+gap, masked only by V1 crashing earlier). (V5) `cycle_used` returned by reconstruct_boundary is
+never logged/compared vs the run cycle — gap invisible in logs. Conforming: WIND/WLEVEL/CURRENT
+series-vs-COMPUTE by construction; nest windows shared-source; mxc/myc off-by-one correct; HRRR
+Lambert→earth rotation; BOTTOM/WLEV sign; GEN3 deck byte-matches manual example.
+*State auditor (3 CRITICAL + 2 HIGH + 2 MEDIUM + 2 LOW; full inventory):* (V6) retry loop has NO
+backoff/failure-counter/escalation — a permanent bug retries at full cadence forever, invisible;
+22h+ full-run outage while every /health signal read fresh. (V7) staleness-honesty:
+`record_input(..., True)` fires per-substep BEFORE the crash point every retry → /health inputs
+read green during outages; last_run kept fresh by fast cycle. (V8) `state._inputs` pure
+in-memory, no restore → every restart shows false "failed / inputs unavailable" until next full
+run (the recorded post-restart artifact, now root-caused). (V9) forced-run signal
+(`force_full_run_signal`) lost on restart AND unrecoverable by config re-push (geometry already
+persisted); (V10) service.py forced-path fallback reads gatherer `lastExtendedCycleAssembledAt`
+(NOT restart-safe) instead of `tracks.hrrr_extended.lastCompleted` (restart-safe). (V11) hourly
+fast-cycle trigger cleared BEFORE the attempt (service.py:609-613) — no retry, asymmetric with
+the D3 fix. (V12) run-dedup marker MemoryCache-only (no Redis configured — verified), restart
+wipes 6h dedup → duplicate-run waste risk. (V13) swan_grid_sizing.json plain write, only
+non-atomic persist in the service. (V14) LOW: blocking no-timeout lock in geometry-push path;
+post-restart cooldown forgotten; hotstart-token age gate unverified (parked).
 - **⚠ NEW FINDING (blocks Z3.5 item 2, surfaced as Q3):** the Z3.2 display-wind store read is
   structurally failing on EVERY request — 16/16 requests post-restart logged "display wind
   fell back to run-cached field: gap:missing_hour". Mechanism (code-verified at `0ebdd01`):
