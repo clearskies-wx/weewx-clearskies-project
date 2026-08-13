@@ -1,6 +1,36 @@
 # Marine Page Fixit Plan — boundary plug-in, ruled card fixes, break/zone redefinition (2026-08-10)
 
-## 📍 CURRENT STATE — updated every working session (last: 2026-08-11 ~21:15Z, new session)
+## INDEX — ALPHABETICAL (operator order 2026-08-13: keep this current; sections below sit in chronological log order, so FIND THINGS HERE. Every new `##` section gets an entry the same commit.)
+
+Ctrl-F the exact heading text:
+
+- `## 📍 CURRENT STATE` — live-deploy table, rulings, waiting-on-operator
+- `## NAMED CONSTANTS` — plan-fixed values agents may not re-derive
+- `## OPEN OPERATOR QUESTIONS`
+- `## PHASE B2` — Boundary: one spectrum per wet WW3 cell
+- `## PHASE DOC` — governing-doc updates (CLOSED)
+- `## PHASE H` — Heat map + small display fixes
+- `## PHASE K` — Break markers + crash-band impact zone
+- `## PHASE M` — Main map layer reliability (CLOSED)
+- `## PHASE S` — Swell-conditions card ruled ranges
+- `## PHASE T` — Tide coherence
+- `## PHASE Z` — Forecast-hole diagnosis + Z3 wind-gatherer rounds (Z3.1–Z3.11 records inside)
+- `## PLAN AMENDMENT A1` — **Big-L1 / true-non-stationary FIX (ORDERED — the critical path)**
+- `## PRE-APPROVAL REGISTER` — which architectural changes this plan authorizes
+- `## PRIME DIRECTIVE`
+- `## Round-close & bookkeeping`
+- `## SWAN SYNTAX PRESCRIPTIONS`
+
+## 📍 CURRENT STATE — updated every working session (last: 2026-08-13 ~07:55Z)
+
+**2026-08-13 delta (authoritative over the older table below):** marine live = `338b899` (Z3.9
+chain; **gate A PASSED live 06:21:39Z** — first successful store-driven full run, reality-gate
+rows recorded in Phase Z). `634775b` (Z3.11 sub-5s dominant-eligibility floor, adversarial gate
+PASSED 0 findings) **PUSHED 07:40Z, deploy pending** the post-06Z-full-run gap. **OPERATOR
+RULINGS 2026-08-13:** R1 sub-5s never dominant (shipped, Z3.11); R2 wind double-count
+investigation (done, Z3.10); **ALL EYEBALL ACCEPTS FROZEN — "not eyeballing anything else until
+you get the model right." B2/S/K/H re-accepts resume only after PLAN AMENDMENT A1 (the ORDERED
+big-L1 fix) passes its reality validation (task A1.5).** A1 is the critical path.
 
 **RESUME POINTER (updated 2026-08-12 ~05:15Z sign-off): the 2026-08-12 session's scratchpad
 `SESSION-STATE.md` (glob `%LOCALAPPDATA%\Temp\claude\c--CODE-weather-belchertown\*\scratchpad\SESSION-STATE.md`,
@@ -983,8 +1013,8 @@ likely acceptable, documented); manual line 255-256 forbids mixed-coordinate nat
 (spherical L1 + Cartesian L2 needs a custom seam adapter — proven pattern at the WW3 edge);
 hourly-on-old-L1 proposal ≈ current design already (hourly reuses 6h-old WW3 B-files and
 recomputes L1 stationary; the delta is losing hourly fresh-wind response over L1's outer belt
-only, swell timing preserved via time-indexed NESTOUT). NEXT (on operator go): timing
-experiment — see PLAN AMENDMENT A1 (the "51-min nonstationary run" phrasing first used here was
+only, swell timing preserved via time-indexed NESTOUT). NEXT: PLAN AMENDMENT A1 — ORDERED by the
+operator 2026-08-13 as THE FIX (task chain A1.1 measure → A1.5 reality-validate) (the "51-min nonstationary run" phrasing first used here was
 WRONG — operator-corrected; the full run is a QUASI-STATIONARY march, see A1 §fact-base). Parking lot: model_wave_source.py:121 blind swells[0] on non-surf marine
 cards (z311 sweep find); NDBC fetch stagger; RTOFS currents; hotstart age; graceful degradation.
 
@@ -1329,7 +1359,7 @@ needs your sign-off — none is pre-approved):**
 
 ---
 
-## PLAN AMENDMENT A1 — Big-L1 / true-non-stationary architecture proposal (2026-08-13, PROPOSED — no ruling yet)
+## PLAN AMENDMENT A1 — Big-L1 / true-non-stationary FIX (2026-08-13, ORDERED — operator: "put the fix in the plan, not just a timing experiment")
 
 **Problem this addresses (operator-verified, 2026-08-13).** The served southerly swell runs
 30–45% below reality, and the deficit was traced with hand-decoded numbers to WHERE our L1
@@ -1371,8 +1401,10 @@ large enough to CONTAIN the islands and do the shadowing ourselves with real bat
    All bounded below the current 5° directional bin width. Validation must spot-check
    shadow-edge sensitivity.
 
-**Proposed target architecture (PROPOSED — every element is trigger-3/6 architectural and needs
-an operator ruling after the experiment):**
+**TARGET ARCHITECTURE — THE FIX (operator-ordered 2026-08-13 in chat; that order is the
+trigger-3/6/7 authorization for the elements below. Remaining PARAMETER values — exact extent,
+dt, bathymetry source — get surfaced at each task's dispatch; whether the fix happens is
+decided and is not re-litigated):**
 - L1 extended south/west far enough to contain San Clemente (south edge ~32.8°N or beyond;
   ~135–170 km N-S), run TRUE NON-STATIONARY on the 6-hourly full-run cadence only.
 - Hourly cycle drops its L1 recompute: L2+ run hourly (stationary as today), reading the
@@ -1387,24 +1419,43 @@ an operator ruling after the experiment):**
 - Islands inside L1 become real obstacles/dry cells with real bathymetry — OUR model does the
   shadowing instead of inheriting WW3's over-attenuation.
 
-**Gating experiment (specced, ready on operator go; read-only side runs on librewxr off-cycle,
-nothing published):** FOUR-way timing matrix — {quasi-stationary march, true non-stationary} ×
-{current ~95 km L1, big ~170 km L1} — plus a per-level timing split of the current 51-minute
-production run. Decision inputs the matrix must produce: wall-clock per mode/extent (hourly
-cadence feasibility), and a physics sanity row (swell arrival timing difference between march
-and true non-stationary on the same extent). Cost structures are NOT comparable a priori:
-~73 stationary convergence solves (current) vs ~432 cheap propagation steps (true non-stat,
-10-min dt) — measurement, not assumption, decides.
+**TASK BREAKDOWN (strict order — the fix ships at A1.5, not at A1.1):**
+
+- **A1.1 MEASURE (parameters, not permission).** The four-way timing matrix —
+  {quasi-stationary march, true non-stationary} × {current ~95 km L1, big ~170 km L1} — plus a
+  per-level split of the current 51-minute production run. Read-only side runs on librewxr
+  off-cycle, nothing published. Cost structures are NOT comparable a priori (~73 stationary
+  convergence solves vs ~432 cheap propagation steps at 10-min dt) — measurement decides dt,
+  extent margin, and 6-hourly-cadence feasibility, NOT whether the fix happens. Same round
+  answers from the LOCAL manual: can the hourly stationary child read a time-indexed record
+  from the non-stationary parent's nest file (BOUNDNEST1), or does the L1→L2 seam need our
+  proven file-based extraction adapter? Deliverable: the parameter set for A1.3/A1.4.
+- **A1.2 DEEP-WATER BATHYMETRY.** Provider work for the extended L1 (CRM/GEBCO-class source,
+  100+ km offshore; datum consistency per ADR-098). Islands inside the domain (San Clemente,
+  Catalina, ...) become real dry cells/obstacles with real bathymetry — OUR model does the
+  shadowing, not WW3's coarse grid.
+- **A1.3 BIG-L1 TRUE-NON-STATIONARY FULL RUN.** Extend L1 south/west to contain San Clemente
+  (south edge ~32.8°N or beyond, ~135–170 km N-S; exact extent from A1.1); the 6-hourly full
+  run's L1 goes TRUE non-stationary (`COMPUTE NONSTAT`); boundary reconstruction moves to the
+  new perimeter — open-Pacific WW3 cells seaward of the island shadow, where WW3 is verified
+  accurate (0.43–0.45 m ledger row).
+- **A1.4 HOURLY CYCLE REWIRE.** Hourly runs L2+ only (stationary as today), reading the
+  time-indexed hour from the full run's L1 nest output via the A1.1-chosen seam mechanism.
+  Accepted loss: hourly fresh-wind response over L1's outer belt only (~6–8 h late worst case);
+  swell evolution/timing preserved; WW3-edge staleness unchanged. Mitigation lever: generous L2.
+- **A1.5 VALIDATE AGAINST REALITY — gate for everything downstream.** Re-run the 16 s-train
+  ledger vs buoy 46253 spectral at matched hours (target: served S-train no longer 30–45% low);
+  shadow-edge sensitivity spot-check (the Cartesian ~0.5–0.9° skew tolerance); arrival-timing
+  sanity (march vs non-stationary on the same case). **Operator ruling 2026-08-13: no further
+  eyeball accepts until the model is right — B2/S/K/H re-accepts unfreeze only after A1.5
+  passes.**
 
 **Open questions attached to this amendment:**
 - Whether the G9 100 km clamp is the proximate cause of today's boundary siting (unresolved by
-  Z3.10; moot if this amendment proceeds, historical otherwise).
-- Whether SWAN's native BOUNDNEST1 lets a stationary child read a time-indexed record from a
-  non-stationary parent's nest file, or whether our own extraction adapter is needed at the
-  L1→L2 seam (manual verification task inside the experiment round).
-- Deep-water bathymetry source selection and datum consistency (ADR-098 interplay).
-- Interim posture until ruled: current siting stays; its ~30–45% long-period SSW bite is a
-  STATED KNOWN BIAS of the served forecast (recorded here, 2026-08-13).
+  Z3.10; moot once A1.3 lands).
+- Deep-water bathymetry source selection and datum consistency (resolved inside A1.2).
+- Interim posture while A1 is in flight: current siting stays; its ~30–45% long-period SSW bite
+  is a STATED KNOWN BIAS of the served forecast (recorded here, 2026-08-13).
 
 **Related but independent (not gated on this amendment):** the in-chain ~10–20% long-period
 loss candidates — the L4/1-D handoff at deep ledges (K-round clamp = mitigation, never a
