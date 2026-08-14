@@ -122,8 +122,13 @@ drel=0.01 curvat=0.005 npnts=99.5 NONSTAT mxitns=1` before the march (`mxitns` d
 > limited by the Courant stability criterion" (manual ~756); the CFL advisory concerns S&L
 > *accuracy* only. For exactly this case the manual prescribes the first-order upwind scheme:
 > "Otherwise, a first order upwind scheme is recommended in that case; see command PROP BSBT"
-> (5725–5728). BSBT is valid for both stationary and nonstationary computations (4139) and its
-> diffusion penalty is significant only over thousands of km (4165–4169) — L1 spans ~150 km, and
+> (5725–5728). BSBT is valid for both stationary and nonstationary computations (4139). On its
+> diffusion penalty: the manual's only quantified scale statement for first-order upwind
+> diffusion is its unstructured-mesh note (4164–4169: "may only be significant … in the order
+> of thousands of kilometers") — that passage describes the automatic lowest-order scheme on
+> unstructured meshes, NOT `PROP BSBT` on a regular grid; we carry the characterization over as
+> an ANALOGICAL INFERENCE (same first-order upwind scheme class), per Gate DOC-A1-FINAL finding
+> F2, not as a direct manual statement about BSBT. L1 spans ~150 km either way, and
 > its job is basin-scale energy delivery to L2's boundary; fine directional structure is rebuilt
 > by the unchanged higher-order (SORDUP) stationary solves in L2–L4, which stay BSBT-free.
 > Emitted order: `PROP BSBT` precedes both COMPUTE commands. dt returns to the manual-advised
@@ -246,7 +251,8 @@ L1's share. The hourly cycle gets strictly FASTER (drops its L1 solve entirely).
 - [x] D2: All SWAN commands in the emitted deck verified against the local SWAN manual with line
   cites. **Evidence:** this ADR's D2 as-built amendment (manual ~756 implicit/unconditionally
   stable; 5725–5728 CFL-advisory-is-accuracy-only + `PROP BSBT` prescription; 4139 BSBT valid
-  stat/nonstat; 4165–4169 diffusion penalty only at 1000s-km scale) plus D2's original
+  stat/nonstat; 4164–4169 unstructured-mesh first-order-upwind diffusion-scale note, applied to
+  BSBT as an analogical inference — see the D2 as-built amendment's labeling) plus D2's original
   canonical-pattern cites (5708–5731, 4176–4235).
 - [x] D3: Boundary perimeter covers the new S/W edges with ≥2 wet WW3 cells per side.
   **Evidence:** journal 2026-08-14T04:02:38Z: "reconstructed ocean boundary (ocean cycle

@@ -36,8 +36,10 @@ WRONG: SWAN's CFL<10 advisory for the default S&L scheme checks the LOWEST spect
 → 33 s, cg 26 m/s), not the fastest physically-present wave, so dt=6 still tripped the
 `** Error … CFL greater than 10` print_fatal in production (2026-08-14 00:43Z + 02:34Z, service
 retry-looped ~100-min failing cycles). SWAN is implicit/unconditionally stable (manual ~756);
-manual 5725–5728 prescribes `PROP BSBT` for exactly this case; BSBT diffusion matters only at
-1000s-of-km scale (manual 4165–4169) vs L1's ~150 km. KATs pin PROP BSBT presence/order and pin
+manual 5725–5728 prescribes `PROP BSBT` for exactly this case; first-order-upwind diffusion
+matters only at 1000s-of-km scale (manual 4164–4169 — an unstructured-mesh note, carried to
+BSBT as an analogical inference per Gate DOC-A1-FINAL F2) vs L1's ~150 km. KATs pin PROP BSBT
+presence/order and pin
 L2–L4 decks BSBT-free. ADR-108 D2 carries the as-built amendment; ARCHITECTURE.md D2 passage
 synced. **As-built L1: 142×169 CGRID meshes (23,998; the sizing cache's SEPARATE ni×nj-point cost
 estimator reports 24,795 — a different, pre-existing metric, not doc-code drift, see ADR-108
@@ -1613,7 +1615,9 @@ deviations are findings to surface, never agent calls):**
   = ALL of: known-datum BOTTOM for the whole big box;
   WLEVEL reconciled to that datum via the existing ADR-098 mechanism, verified for the new box;
   cross-level datum consistency stated (L1 vs child DEMs); island dry-cell rendering verified
-  (San Clemente ~30×8 cells). If A1.1(f) resolves to CRM or any UNKNOWN/mixed-datum source:
+  (San Clemente **~90–150 dry cells**, the A1.1(f) MEASURED figure — the "~30×8 cells" that
+  previously stood here was the pre-measurement design estimate, superseded; Gate DOC-A1-FINAL
+  F1). If A1.1(f) resolves to CRM or any UNKNOWN/mixed-datum source:
   STOP and surface for the operator's datum ruling (degraded-flag acceptance vs known-datum
   deep source, e.g. GEBCO/MSL) — do NOT proceed on an unruled datum.
 - **A1.3 BIG-L1 NON-STATIONARY FULL RUN PER D1+D2+D3 — ✅ DONE 2026-08-13/14 (marine `b3ff15c`,
