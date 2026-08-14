@@ -24,7 +24,7 @@ Ctrl-F the exact heading text:
 ## 📍 CURRENT STATE — updated every working session (last: 2026-08-14 ~06:20Z)
 
 **2026-08-14 delta (authoritative over everything below): Plan Amendment A1 executed A1.0–A1.6,
-A1.5 PASS-WITH-FINDINGS, A1.6 (this doc round) DONE, Gate DOC-A1-FINAL pending.** A1.0 docs (`74d12332`+`36d81dfb`, Gate DOC-A1 PASS) → A1.1 4/6 rows (c/d
+A1.5 PASS-WITH-FINDINGS, A1.6 DONE, Gate DOC-A1-FINAL PASS after F1/F2 remediation (meta `5afef381`, marine `e40d2c9`) — PLAN AMENDMENT A1 IS CLOSED.** A1.0 docs (`74d12332`+`36d81dfb`, Gate DOC-A1 PASS) → A1.1 4/6 rows (c/d
 closed by live-run data) → A1.2 satisfied (ETOPO 2022 15s LMSL covers the big box; no CRM, no
 datum ruling needed) → A1.3 (`b3ff15c`, Gate PASS) → A1.4 (`ffe0f0c`, Gate PASS after F1/F2).
 **Five deploy-time fixes** (all methodology, each committed+pushed+deployed): `084ecfb`
@@ -64,7 +64,7 @@ coexistence unverifiable from the buoy's `.spec` summary — recorded unverified
 **A1.6 docs-final THIS ROUND:** ADR-108, ARCHITECTURE.md, PROVIDER-MANUAL.md (×3 passages),
 OPERATIONS-MANUAL.md, and this plan's A1 task table/gate records re-synced to the as-built
 numbers above; ADR-108 acceptance-criteria checkboxes checked with evidence citations. Gate
-DOC-A1-FINAL next.
+DOC-A1-FINAL PASSED 2026-08-14 — A1 closed.
 
 **2026-08-13 delta (authoritative over the older table below):** marine live = `338b899` (Z3.9
 chain; **gate A PASSED live 06:21:39Z** — first successful store-driven full run, reality-gate
@@ -1648,7 +1648,7 @@ deviations are findings to surface, never agent calls):**
   sanity (march vs non-stationary on the same case). **Operator ruling 2026-08-13: no further
   eyeball accepts until the model is right — B2/S/K/H re-accepts unfreeze only after A1.5
   passes.**
-- **A1.6 DOCS-FINAL — ✅ DONE 2026-08-14 (this doc re-sync round; Gate DOC-A1-FINAL pending).**
+- **A1.6 DOCS-FINAL — ✅ DONE 2026-08-14 (Gate DOC-A1-FINAL PASS after F1/F2 remediation).**
   (operator order 2026-08-13: "and then done again at the end"). After
   A1.5: re-sync every A1.0 document to AS-BUILT (measured cell counts, final dt if the ladder
   moved it, actual bathy source+datum, seam mechanism as verified, health keys as shipped) +
@@ -1668,7 +1668,7 @@ web-searching SWAN stays forbidden):**
 | GATE-A1.3 | **Deck KAT**: emitted big-L1 deck for a known cycle vs a hand-derived expected deck (CGRID/INPGRID origin+mesh numbers from D1's UTM corners; spin-up `COMPUTE STAT` + `COMPUTE NONSTAT <C> 10 MIN <C+72h>`; both NUMERIC commands; NGRID/NESTOUT byte-unchanged); every changed command manual-verified with line cites (incl. BOUNDNEST1 same-coordinate-system :2592, CGRID-before-BOUNDNEST1 :2575-2576); boundary endpoint rule (§SWAN SYNTAX PRESCRIPTIONS row 2) preserved on the NEW side lengths; frozen-core untouched outside the named files (`CIRCLE 72 0.03 1.0 34` byte-identical at every level, `omp_num_threads` untouched, L2/L3/L4 sizing untouched); falsifiable KATs at pre-round HEAD | ✅ PASS 2026-08-13 (marine `b3ff15c`) |
 | GATE-A1.4 | Hourly deck byte-identical except nest source; archive retention + TTL proven; `l1NestAge` KATs incl. the refuse boundary (9 h exact); health additive-only (no key renamed/removed); restart survival of the archive pointer; falsifiability transcripts | ✅ PASS 2026-08-13 after F1/F2 remediation (marine `ffe0f0c`) |
 | GATE-A1.5 | Reality-gate rows per PRIME DIRECTIVE 4 with quantities pre-picked BEFORE looking (46253 16 s-train ledger re-run vs served; arrival-timing delta; shadow-edge spot-check); baseline-vs-after diff per PRIME DIRECTIVE 2; publish-liveness | ✅ PASS-WITH-FINDINGS 2026-08-14 ~06:15Z (all LOW: F1 cell-count estimator, F2 direction offset observation, F3 sub-partition unverifiable — see A1.5 task record) |
-| DOC-A1-FINAL (after A1.6) | As-built numbers in every A1.0 doc match code/live decks (read the LIVE deck, not the repo's intent); zero drift findings | ⏳ PENDING — runs after this A1.6 round |
+| DOC-A1-FINAL (after A1.6) | As-built numbers in every A1.0 doc match code/live decks (read the LIVE deck, not the repo's intent); zero drift findings | ✅ PASS 2026-08-14 ~06:40Z after remediation. First verdict FAIL (2 MEDIUM: F1 plan's A1.2 line carried the pre-measurement "~30×8" design estimate vs the A1.1(f) measured ~90–150 dry cells; F2 manual 4164–4169 diffusion-scale cite is an unstructured-mesh note, was cited as a direct PROP BSBT statement). Remediated meta `5afef381` + marine `e40d2c9`; targeted re-verification confirmed both closed, zero outstanding drift. Every behavior-governing number (mesh geometry, dt/432 steps, PROP BSBT/NUMERIC order, run times 5280s/3064s/1.72×, 9+9 wet cells/22 files, nest archive, l1NestAge token semantics, leftlon, ETOPO/LMSL, timeout 7200) independently re-derived from the live system and matched. |
 
 **Open ruling for the operator (ONE, non-blocking until A1.4):** when the archived L1 nest
 exceeds `L1_NEST_MAX_AGE_H = 9` (a full run missed its slot), the hourly cycle REFUSES
