@@ -21,7 +21,33 @@ Ctrl-F the exact heading text:
 - `## Round-close & bookkeeping`
 - `## SWAN SYNTAX PRESCRIPTIONS`
 
-## 📍 CURRENT STATE — updated every working session (last: 2026-08-13 ~07:55Z)
+## 📍 CURRENT STATE — updated every working session (last: 2026-08-14 ~04:10Z)
+
+**2026-08-14 delta (authoritative over everything below): Plan Amendment A1 executed A1.0–A1.4;
+A1.5 in progress.** A1.0 docs (`74d12332`+`36d81dfb`, Gate DOC-A1 PASS) → A1.1 4/6 rows (c/d
+closed by live-run data) → A1.2 satisfied (ETOPO 2022 15s LMSL covers the big box; no CRM, no
+datum ruling needed) → A1.3 (`b3ff15c`, Gate PASS) → A1.4 (`ffe0f0c`, Gate PASS after F1/F2).
+**Five deploy-time fixes** (all methodology, each committed+pushed+deployed): `084ecfb`
+containment corner joins the G9 clamp floor; `425f168` fetch-fan horizon decoupled from the box
+cap (NEW `L1_HORIZON_KM = 100`, cap stays 175 — NE rays were discovering LA-bight wrap-candidates
+and dragging the box east); `cb2ce69` dt 10→6 MIN (superseded — see next); `2970f33` SWAN
+timeout 3600→7200 s; **`7097369` PROP BSBT + dt back to 10 MIN** — the D2 ladder's premise was
+WRONG: SWAN's CFL<10 advisory for the default S&L scheme checks the LOWEST spectral bin (0.03 Hz
+→ 33 s, cg 26 m/s), not the fastest physically-present wave, so dt=6 still tripped the
+`** Error … CFL greater than 10` print_fatal in production (2026-08-14 00:43Z + 02:34Z, service
+retry-looped ~100-min failing cycles). SWAN is implicit/unconditionally stable (manual ~756);
+manual 5725–5728 prescribes `PROP BSBT` for exactly this case; BSBT diffusion matters only at
+1000s-of-km scale (manual 4165–4169) vs L1's ~150 km. KATs pin PROP BSBT presence/order and pin
+L2–L4 decks BSBT-free. ADR-108 D2 carries the as-built amendment; ARCHITECTURE.md D2 passage
+synced. **As-built L1: 142×169 cells (24,795), lon_min −119.30, containment corner inside; wind
+store rebuilt at the wider bbox (leftlon −119.60). WW3 input at the new S boundary VERIFIED GOOD
+from raw GRIB: HTSGW 0.77–1.17 m vs old boundary 0.46–0.93 m (the 30–60% energy A1 exists to
+capture).** A1.5 next: full run for cycle 2026-08-14T00Z re-armed post-deploy 03:59Z; on
+completion, judge the pre-declared reality gates (46253 ledger, dominant ≥10 s southerly,
+multiSwell ≥2, publish-liveness, l1NestAge) then A1.6 docs-final. Known pre-existing test debt
+(NOT from `7097369`, fails at `2970f33` too, Windows checkout): 3 tests —
+`test_a14_age_gate_kat_exact_9h_boundary_passes` (wall-clock race at the exact 9.0 h boundary)
++ 2 in `test_swan_stationary_full_nest.py` — to triage in A1.5/A1.6.
 
 **2026-08-13 delta (authoritative over the older table below):** marine live = `338b899` (Z3.9
 chain; **gate A PASSED live 06:21:39Z** — first successful store-driven full run, reality-gate

@@ -86,10 +86,35 @@ inside one NUMERIC command (manual 4176–4182); `[alfa]` is "NOT MEANINGFUL FOR
 commands**: today's STOPC…STAT line before the spin-up solve, then `NUMERIC STOPC dabs=0.005
 drel=0.01 curvat=0.005 npnts=99.5 NONSTAT mxitns=1` before the march (`mxitns` default is already
 1 per 4235 — stated explicitly; manual 5730–5731: ≤10-min dt → 1 iteration/step). **dt = 10 MIN**
-(manual 5721: at most 10 minutes advised). Courant (manual 5725–5728, <10 for fastest/dominant):
-dominant 16 s cg≈12.5 m/s → C≈7.5 ✓; 25 s forerunners cg≈19.5 → C≈11.7, marginally over for the
-rare extreme tail — mitigation ladder if A1.1's physics row shows noise: dt = 6 MIN (C≈7.0 for
-25 s, ×1.67 step cost). All L1 inputs (WIND/BOUND/WLEV/CUR) are already time-tagged files —
+(manual 5721: at most 10 minutes advised).
+
+> **AS-BUILT AMENDMENT (2026-08-14, operator-ordered after two production failures): the deck
+> carries `PROP BSBT`, and dt stays 10 MIN. The original Courant analysis below is WRONG — do not
+> resurrect the dt-shrinking ladder.**
+>
+> The original design computed Courant numbers against the fastest *physically-present* wave
+> (25 s forerunners, cg≈19.5 m/s → C≈11.7 at dt=10; ladder rung dt=6 → C≈7.0). In production,
+> **SWAN's internal CFL<10 advisory for the default higher-order S&L nonstationary scheme is
+> evaluated against the lowest *discrete spectral bin*** — here 0.03 Hz (T=33.3 s, deep-water
+> cg=26.0 m/s) — and behaves as an axis-combined metric (per-axis C≈9.2/9.5 at dt=6, combined
+> ≈13). Result: dt=6 MIN **still tripped** `** Error … CFL greater than 10` (2026-08-14 00:43Z
+> and 02:34Z), which the convergence gate rightly classifies as print-fatal → no-publish → the
+> service retry-looped ~100-minute failing cycles. No practical dt passes at 1 km cells with the
+> 0.03 Hz spectral floor (dt would need to be ≤4 MIN, ~148-min march, breaching the 2 h timeout).
+>
+> The manual resolves this directly: SWAN is **implicit and unconditionally stable** — "not
+> limited by the Courant stability criterion" (manual ~756); the CFL advisory concerns S&L
+> *accuracy* only. For exactly this case the manual prescribes the first-order upwind scheme:
+> "Otherwise, a first order upwind scheme is recommended in that case; see command PROP BSBT"
+> (5725–5728). BSBT is valid for both stationary and nonstationary computations (4139) and its
+> diffusion penalty is significant only over thousands of km (4165–4169) — L1 spans ~150 km, and
+> its job is basin-scale energy delivery to L2's boundary; fine directional structure is rebuilt
+> by the unchanged higher-order (SORDUP) stationary solves in L2–L4, which stay BSBT-free.
+> Emitted order: `PROP BSBT` precedes both COMPUTE commands. dt returns to the manual-advised
+> 10 MIN maximum (forcing varies hourly; 432 steps). KATs pin `PROP BSBT` presence and order and
+> pin L2–L4 decks BSBT-free (`tests/services/test_all_stationary_sequence.py`). Commit `7097369`.
+
+All L1 inputs (WIND/BOUND/WLEV/CUR) are already time-tagged files —
 non-stationary interpolates them natively, zero input-side changes. `NESTOUT … 1 HR` unchanged
 (same L2 contract, and the 48–72 h tail gains hourly nest records vs today's 3-hourly solves).
 L1 hourly hotstart files **retired** (nothing consumes them once the fast cycle drops L1);
@@ -147,7 +172,9 @@ L1's share. The hourly cycle gets strictly FASTER (drops its L1 solve entirely).
 - `L1_CONTAINMENT_SW = (32.60, -119.25)` — containment corner.
 - `L1_MAX_EXTENT_KM = 175` — L1-only cap (supersedes ADR-104 D2's 100 km for L1).
 - `L1_NEST_MAX_AGE_H = 9` — hourly cycle refuses when the archived L1 nest exceeds this age.
-- `COMPUTE NONSTAT` dt = **10 MIN** (mitigation: 6 MIN per D2 ladder if A1.1 shows noise).
+- `COMPUTE NONSTAT` dt = **10 MIN**, with **`PROP BSBT`** in the L1 deck (as-built 2026-08-14;
+  the dt=6 ladder rung is superseded — see the D2 as-built amendment. Do NOT shrink dt to chase
+  SWAN's CFL advisory: it checks the 0.03 Hz bin and no practical dt passes at 1 km cells).
 - `mxitns = 1` (explicit, per SWAN manual 4235 + 5730–5731).
 - Spectral resolution: `CIRCLE 72 0.03 1.0 34` — **UNCHANGED**.
 - L1 cell size: **~1.0 km** — unchanged.
@@ -168,8 +195,8 @@ L1's share. The hourly cycle gets strictly FASTER (drops its L1 solve entirely).
 
 - **Domain constants:** `L1_CONTAINMENT_SW` and `L1_MAX_EXTENT_KM = 175` in
   `services/geography.py`; union sizing in `services/swan_domain.py`.
-- **Deck emission:** `services/swan_formats.py` emits the two-NUMERIC + spin-up + `COMPUTE
-  NONSTAT` pattern for L1 full runs. L2–L4 decks byte-unchanged.
+- **Deck emission:** `services/swan_formats.py` emits `PROP BSBT` + the two-NUMERIC + spin-up +
+  `COMPUTE NONSTAT` pattern for L1 full runs. L2–L4 decks byte-unchanged (BSBT-free, SORDUP).
 - **Runner orchestration:** `services/swan_runner.py` full-run path unchanged except the deck
   it writes; fast-cycle path skips L1, reads the archived nest, and checks the age gate.
 - **Nest archive:** per-run `nest_out_<cycle>.dat` in `level1/`, ≥24 h retention.
@@ -185,8 +212,9 @@ L1's share. The hourly cycle gets strictly FASTER (drops its L1 solve entirely).
 `(ruled 2026-08-13; lands with Plan Amendment A1 tasks A1.1–A1.5 of MARINE-PAGE-FIXIT-PLAN)`
 
 - [ ] D1: L1 domain contains San Clemente at ~1 km resolution; both islands render as dry cells.
-- [ ] D2: Full-run L1 deck emits spin-up `COMPUTE STAT` + `COMPUTE NONSTAT <C> 10 MIN <C+72h>`
-  with two NUMERIC commands (STAT before spin-up, NONSTAT before march).
+- [ ] D2: Full-run L1 deck emits `PROP BSBT` + spin-up `COMPUTE STAT` + `COMPUTE NONSTAT <C>
+  10 MIN <C+72h>` with two NUMERIC commands (STAT before spin-up, NONSTAT before march); L2–L4
+  decks BSBT-free.
 - [ ] D2: All SWAN commands in the emitted deck verified against the local SWAN manual with line
   cites.
 - [ ] D3: Boundary perimeter covers the new S/W edges with ≥2 wet WW3 cells per side.
