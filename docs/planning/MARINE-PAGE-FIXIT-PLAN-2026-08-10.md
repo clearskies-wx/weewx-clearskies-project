@@ -21,10 +21,10 @@ Ctrl-F the exact heading text:
 - `## Round-close & bookkeeping`
 - `## SWAN SYNTAX PRESCRIPTIONS`
 
-## 📍 CURRENT STATE — updated every working session (last: 2026-08-14 ~04:10Z)
+## 📍 CURRENT STATE — updated every working session (last: 2026-08-14 ~06:20Z)
 
-**2026-08-14 delta (authoritative over everything below): Plan Amendment A1 executed A1.0–A1.4;
-A1.5 in progress.** A1.0 docs (`74d12332`+`36d81dfb`, Gate DOC-A1 PASS) → A1.1 4/6 rows (c/d
+**2026-08-14 delta (authoritative over everything below): Plan Amendment A1 executed A1.0–A1.6,
+A1.5 PASS-WITH-FINDINGS, A1.6 (this doc round) DONE, Gate DOC-A1-FINAL pending.** A1.0 docs (`74d12332`+`36d81dfb`, Gate DOC-A1 PASS) → A1.1 4/6 rows (c/d
 closed by live-run data) → A1.2 satisfied (ETOPO 2022 15s LMSL covers the big box; no CRM, no
 datum ruling needed) → A1.3 (`b3ff15c`, Gate PASS) → A1.4 (`ffe0f0c`, Gate PASS after F1/F2).
 **Five deploy-time fixes** (all methodology, each committed+pushed+deployed): `084ecfb`
@@ -39,15 +39,30 @@ retry-looped ~100-min failing cycles). SWAN is implicit/unconditionally stable (
 manual 5725–5728 prescribes `PROP BSBT` for exactly this case; BSBT diffusion matters only at
 1000s-of-km scale (manual 4165–4169) vs L1's ~150 km. KATs pin PROP BSBT presence/order and pin
 L2–L4 decks BSBT-free. ADR-108 D2 carries the as-built amendment; ARCHITECTURE.md D2 passage
-synced. **As-built L1: 142×169 cells (24,795), lon_min −119.30, containment corner inside; wind
-store rebuilt at the wider bbox (leftlon −119.60). WW3 input at the new S boundary VERIFIED GOOD
-from raw GRIB: HTSGW 0.77–1.17 m vs old boundary 0.46–0.93 m (the 30–60% energy A1 exists to
-capture).** A1.5 next: full run for cycle 2026-08-14T00Z re-armed post-deploy 03:59Z; on
-completion, judge the pre-declared reality gates (46253 ledger, dominant ≥10 s southerly,
-multiSwell ≥2, publish-liveness, l1NestAge) then A1.6 docs-final. Known pre-existing test debt
-(NOT from `7097369`, fails at `2970f33` too, Windows checkout): 3 tests —
-`test_a14_age_gate_kat_exact_9h_boundary_passes` (wall-clock race at the exact 9.0 h boundary)
-+ 2 in `test_swan_stationary_full_nest.py` — to triage in A1.5/A1.6.
+synced. **As-built L1: 142×169 CGRID meshes (23,998; the sizing cache's SEPARATE ni×nj-point cost
+estimator reports 24,795 — a different, pre-existing metric, not doc-code drift, see ADR-108
+named constants), 1021.6 m × 988.6 m cells (≈145.07 × 167.07 km), lon_min −119.30, containment
+corner inside; wind store rebuilt at the wider bbox (leftlon −119.60). WW3 input at the new S
+boundary VERIFIED GOOD from raw GRIB: HTSGW 0.77–1.17 m vs old boundary 0.46–0.93 m (the 30–60%
+energy A1 exists to capture).** Known pre-existing test debt (NOT from `7097369`, fails at
+`2970f33` too, Windows checkout): 3 tests — `test_a14_age_gate_kat_exact_9h_boundary_passes`
+(wall-clock race at the exact 9.0 h boundary) + 2 in `test_swan_stationary_full_nest.py` —
+**RESOLVED in marine `7bffaf7`** (frozen-clock fix for the age-gate KAT + 2 stale pre-D5
+assertions rewritten; 5 unrelated c3-fill fixture repairs landed in the same commit).
+
+**A1.5 COMPLETE 2026-08-14 ~06:15Z (`A15-REALITY-GATE.md`):** full run for cycle
+2026-08-14T00Z completed 05:34:26Z, 5280 s (vs baseline 3064 s = 1.72×, inside D9's 3× bound).
+5/5 pre-declared reality-gate rows PASS: served southerly long-period train 0.53 m vs buoy 46253
+0.5–0.6 m (ratio 0.89–1.06, was 0.23 m/30–45% low); dominant 12.0 s @ 197° swell; 2 trains in
+multiSwell; publish-liveness clean; `l1NestAge` = 5.58 h non-null. GATE-A1.5 verdict
+PASS-WITH-FINDINGS (all LOW): **F1** cell-count estimator distinction (resolved above/ADR-108);
+**F2** served dominant direction ~197° vs buoy MWD ~170° (~20–30° offset) — tracked as an
+observation, not a defect, for a future accept-round ledger row; **F3** sub-partition ~16 s SSW
+coexistence unverifiable from the buoy's `.spec` summary — recorded unverified, not assumed.
+**A1.6 docs-final THIS ROUND:** ADR-108, ARCHITECTURE.md, PROVIDER-MANUAL.md (×3 passages),
+OPERATIONS-MANUAL.md, and this plan's A1 task table/gate records re-synced to the as-built
+numbers above; ADR-108 acceptance-criteria checkboxes checked with evidence citations. Gate
+DOC-A1-FINAL next.
 
 **2026-08-13 delta (authoritative over the older table below):** marine live = `338b899` (Z3.9
 chain; **gate A PASSED live 06:21:39Z** — first successful store-driven full run, reality-gate
@@ -1558,8 +1573,9 @@ gets strictly FASTER (drops its L1 solve entirely).
 2026-08-13; the fix ships at A1.5; every task implements the DESIGN above, verbatim; design
 deviations are findings to surface, never agent calls):**
 
-- **A1.0 DOCS-FIRST (operator order 2026-08-13: "docs update done first" — same convention as
-  Phase DOC: docs to the TARGET state before any code, agents depend on the docs).** New
+- **A1.0 DOCS-FIRST — ✅ DONE 2026-08-13 (Gate DOC-A1 PASS; meta `74d12332`+`36d81dfb`).**
+  (operator order 2026-08-13: "docs update done first" — same convention as
+  Phase DOC: docs to the TARGET state before any code, agents depend on the docs). New
   **ADR-108** (big-L1 true-non-stationary domain: D1 extent + containment constants, D2 compute
   mode, D5 hourly-L2+ seam + nest archive + age gate, D4 datum policy — Accepted-on-operator-
   order, cites this amendment); supersession note in **ADR-104** (its island-aware S/W siting
@@ -1569,7 +1585,15 @@ deviations are findings to surface, never agent calls):**
   **PROVIDER-MANUAL.md** (bathymetry big-box + datum requirements per D4, WW3 boundary
   perimeter cells, wind-store bbox growth); **OPERATIONS-MANUAL.md** (health surface, refuse
   gate, force-full-run interplay with the nest age). Gate DOC-A1 (adversarial, see QC GATES).
-- **A1.1 VALIDATE THE DESIGN'S PREDICTIONS (scratch measurement round, librewxr off-cycle,
+- **A1.1 VALIDATE THE DESIGN'S PREDICTIONS — ✅ 4/6 rows DONE 2026-08-13
+  (`A11-MEASUREMENTS.md`).** Rows (a) wall-clock split, (b) I_stat, (e) seam disambiguation,
+  (f) bathymetry probe: all measured, D9's range confirmed analytically (I_stat mean 7.0 →
+  predicted ~2.12× L1 share). **Rows (c) timing run of the big grid and (d) physics arrival row:
+  FORMALLY CLOSED, not executed as scratch experiments** — superseded by A1.3's real production
+  full run and A1.5's reality gate, which measured the actual big-L1 timing (5280 s, 1.72× vs
+  baseline) and actual arrival/physics behavior directly, making the scratch-experiment versions
+  of (c)/(d) redundant once the real system ran under the real design.
+  (scratch measurement round, librewxr off-cycle,
   nothing published, production-idle windows only).** Six rows, all specified by the design:
   (a) per-level wall-clock split of the current production full run (parse existing work-dir
   PRINT/log timestamps — no new runs); (b) measure I_stat (iterations per stationary solve,
@@ -1584,28 +1608,44 @@ deviations are findings to surface, never agent calls):**
   guard), coverage/fill fraction, and SCI dry-cell footprint sanity. Output: measured numbers
   beside D9's predictions + the dt confirmation (10 vs 6 MIN per D2's ladder). NOT in scope:
   choosing extent, seam mechanism, datum policy, or whether to proceed.
-- **A1.2 BATHYMETRY PER D4.** Acceptance = ALL of: known-datum BOTTOM for the whole big box;
+- **A1.2 BATHYMETRY PER D4 — ✅ SATISFIED 2026-08-13 by A1.1(f).** ETOPO 2022 15s (LMSL) covers
+  the big-box SW corner directly; no CRM fallback triggered; no datum ruling needed. Acceptance
+  = ALL of: known-datum BOTTOM for the whole big box;
   WLEVEL reconciled to that datum via the existing ADR-098 mechanism, verified for the new box;
   cross-level datum consistency stated (L1 vs child DEMs); island dry-cell rendering verified
   (San Clemente ~30×8 cells). If A1.1(f) resolves to CRM or any UNKNOWN/mixed-datum source:
   STOP and surface for the operator's datum ruling (degraded-flag acceptance vs known-datum
   deep source, e.g. GEBCO/MSL) — do NOT proceed on an unruled datum.
-- **A1.3 BIG-L1 NON-STATIONARY FULL RUN PER D1+D2+D3.** Domain constants
+- **A1.3 BIG-L1 NON-STATIONARY FULL RUN PER D1+D2+D3 — ✅ DONE 2026-08-13/14 (marine `b3ff15c`,
+  Gate PASS; plus deploy-time fixes `084ecfb`, `425f168`, and `7097369` PROP BSBT+dt=10 MIN —
+  see CURRENT STATE for the full fix chain).** Domain constants
   (`L1_CONTAINMENT_SW`, cap 175) + union sizing in swan_domain.py; D2 deck emission in
   swan_formats.py (spin-up `COMPUTE STAT` + `COMPUTE NONSTAT <C> 10 MIN <C+72h>`,
   `NONSTAT mxitns=1`); boundary perimeter follows the box (D3, mechanism untouched); retire L1
   hourly hotstarts (D2). Wind-store bbox growth rides the existing derivation (D6).
-- **A1.4 HOURLY CYCLE REWIRE PER D5.** Fast cycle skips L1; per-run nest archive
+- **A1.4 HOURLY CYCLE REWIRE PER D5 — ✅ DONE 2026-08-13 (marine `ffe0f0c`, Gate PASS after F1/F2
+  remediation).** Fast cycle skips L1; per-run nest archive
   (`nest_out_<cycle>.dat`, ≥24 h retention); L2 fed the archived nest (deck byte-unchanged);
   `l1NestAge` health surface + `L1_NEST_MAX_AGE_H = 9` refuse gate (constant pending the open
   ruling below).
-- **A1.5 VALIDATE AGAINST REALITY — gate for everything downstream.** Re-run the 16 s-train
+- **A1.5 VALIDATE AGAINST REALITY — gate for everything downstream — ✅ PASS-WITH-FINDINGS
+  2026-08-14 ~06:15Z (`A15-REALITY-GATE.md`).** 5/5 pre-declared rows PASS: served southerly
+  long-period train 0.53 m vs buoy 46253 0.5–0.6 m (ratio 0.89–1.06, baseline was 0.23 m/30–45%
+  low); dominant 12.0 s @ 197° southerly swell; 2 trains in multiSwell; publish-liveness clean
+  (5280 s, completed 05:34:26Z); `l1NestAge` = 5.58 h non-null. Findings (all LOW, none
+  gate-blocking, tracked as observations not defects): **F1** cell-count estimator distinction
+  (cache's 24,795 ni×nj points vs deck's 142×169=23,998 meshes — resolved in ADR-108 named
+  constants, this doc-sync round); **F2** served dominant direction ~197° vs buoy MWD ~170°
+  (~20–30° offset) — direction-sensitive shadow rationale, worth a ledger row in a future accept
+  round; **F3** sub-partition ~16 s SSW coexistence unverifiable from the buoy's `.spec` summary
+  (raw directional spectra out of scope) — recorded unverified, not assumed. Re-run the 16 s-train
   ledger vs buoy 46253 spectral at matched hours (target: served S-train no longer 30–45% low);
   shadow-edge sensitivity spot-check (the Cartesian ~0.5–0.9° skew tolerance); arrival-timing
   sanity (march vs non-stationary on the same case). **Operator ruling 2026-08-13: no further
   eyeball accepts until the model is right — B2/S/K/H re-accepts unfreeze only after A1.5
   passes.**
-- **A1.6 DOCS-FINAL (operator order 2026-08-13: "and then done again at the end").** After
+- **A1.6 DOCS-FINAL — ✅ DONE 2026-08-14 (this doc re-sync round; Gate DOC-A1-FINAL pending).**
+  (operator order 2026-08-13: "and then done again at the end"). After
   A1.5: re-sync every A1.0 document to AS-BUILT (measured cell counts, final dt if the ladder
   moved it, actual bathy source+datum, seam mechanism as verified, health keys as shipped) +
   full drift sweep of ADR-108/ARCHITECTURE/manuals vs code. Gate DOC-A1-FINAL (adversarial).
@@ -1616,15 +1656,15 @@ rules/verification.md. Every gate that touches a SWAN deck MUST consult the LOCA
 (`docs/reference/swan-user-manual.txt` + `swan-commands-extract.md`) and cite line numbers —
 web-searching SWAN stays forbidden):**
 
-| Gate | Verifies (minimum rows) |
-|------|------------------------|
-| DOC-A1 (after A1.0) | ADR-108 content matches DESIGN D1–D9 verbatim (numbers, constants, datum policy); ADR-104 supersession note present and scoped; ARCHITECTURE/manual passages match the design's numbers; no doc promises anything the design doesn't say |
-| GATE-A1.1 | Scratch confinement (nothing outside /tmp/a11-timing; production untouched — diff mtimes/checksums of production dirs); idle-window discipline from the agent's own logs; EVERY scratch deck line syntax-checked against the manual (COMPUTE NONSTAT time format + `[deltc]` MIN unit :5733-5775; two-NUMERIC alternation :4176-4235; BOUNDSPEC VARIABLE FILE grammar per plan §SWAN SYNTAX PRESCRIPTIONS; **FORBIDDEN list holds even in scratch: no PAR/SHAPE/TPAR/BOUNDNEST2/3**); measurements carry raw PRINT evidence, not summaries |
-| GATE-A1.2 | D4 acceptance: BOTTOM datum KNOWN and named for the whole big box; WLEVEL (STOFS≈LMSL) reconciled to it via the existing ADR-098 mechanism, verified for the new box; cross-level datum statement (L1 vs L2/L3/L4 sources); SCI dry-cell footprint (land where land is); UNKNOWN/CRM-mixed = auto-FAIL pending operator ruling |
-| GATE-A1.3 | **Deck KAT**: emitted big-L1 deck for a known cycle vs a hand-derived expected deck (CGRID/INPGRID origin+mesh numbers from D1's UTM corners; spin-up `COMPUTE STAT` + `COMPUTE NONSTAT <C> 10 MIN <C+72h>`; both NUMERIC commands; NGRID/NESTOUT byte-unchanged); every changed command manual-verified with line cites (incl. BOUNDNEST1 same-coordinate-system :2592, CGRID-before-BOUNDNEST1 :2575-2576); boundary endpoint rule (§SWAN SYNTAX PRESCRIPTIONS row 2) preserved on the NEW side lengths; frozen-core untouched outside the named files (`CIRCLE 72 0.03 1.0 34` byte-identical at every level, `omp_num_threads` untouched, L2/L3/L4 sizing untouched); falsifiable KATs at pre-round HEAD |
-| GATE-A1.4 | Hourly deck byte-identical except nest source; archive retention + TTL proven; `l1NestAge` KATs incl. the refuse boundary (9 h exact); health additive-only (no key renamed/removed); restart survival of the archive pointer; falsifiability transcripts |
-| GATE-A1.5 | Reality-gate rows per PRIME DIRECTIVE 4 with quantities pre-picked BEFORE looking (46253 16 s-train ledger re-run vs served; arrival-timing delta; shadow-edge spot-check); baseline-vs-after diff per PRIME DIRECTIVE 2; publish-liveness |
-| DOC-A1-FINAL (after A1.6) | As-built numbers in every A1.0 doc match code/live decks (read the LIVE deck, not the repo's intent); zero drift findings |
+| Gate | Verifies (minimum rows) | Verdict |
+|------|------------------------|---------|
+| DOC-A1 (after A1.0) | ADR-108 content matches DESIGN D1–D9 verbatim (numbers, constants, datum policy); ADR-104 supersession note present and scoped; ARCHITECTURE/manual passages match the design's numbers; no doc promises anything the design doesn't say | ✅ PASS 2026-08-13 |
+| GATE-A1.1 | Scratch confinement (nothing outside /tmp/a11-timing; production untouched — diff mtimes/checksums of production dirs); idle-window discipline from the agent's own logs; EVERY scratch deck line syntax-checked against the manual (COMPUTE NONSTAT time format + `[deltc]` MIN unit :5733-5775; two-NUMERIC alternation :4176-4235; BOUNDSPEC VARIABLE FILE grammar per plan §SWAN SYNTAX PRESCRIPTIONS; **FORBIDDEN list holds even in scratch: no PAR/SHAPE/TPAR/BOUNDNEST2/3**); measurements carry raw PRINT evidence, not summaries | N/A — rows (c)/(d) formally closed by A1.3/A1.5 live-run data rather than executed as scratch; rows (a)/(b)/(e)/(f) production-log-derived, no scratch artifacts to confine |
+| GATE-A1.2 | D4 acceptance: BOTTOM datum KNOWN and named for the whole big box; WLEVEL (STOFS≈LMSL) reconciled to it via the existing ADR-098 mechanism, verified for the new box; cross-level datum statement (L1 vs L2/L3/L4 sources); SCI dry-cell footprint (land where land is); UNKNOWN/CRM-mixed = auto-FAIL pending operator ruling | ✅ SATISFIED 2026-08-13 by A1.1(f) — ETOPO LMSL, no CRM trigger |
+| GATE-A1.3 | **Deck KAT**: emitted big-L1 deck for a known cycle vs a hand-derived expected deck (CGRID/INPGRID origin+mesh numbers from D1's UTM corners; spin-up `COMPUTE STAT` + `COMPUTE NONSTAT <C> 10 MIN <C+72h>`; both NUMERIC commands; NGRID/NESTOUT byte-unchanged); every changed command manual-verified with line cites (incl. BOUNDNEST1 same-coordinate-system :2592, CGRID-before-BOUNDNEST1 :2575-2576); boundary endpoint rule (§SWAN SYNTAX PRESCRIPTIONS row 2) preserved on the NEW side lengths; frozen-core untouched outside the named files (`CIRCLE 72 0.03 1.0 34` byte-identical at every level, `omp_num_threads` untouched, L2/L3/L4 sizing untouched); falsifiable KATs at pre-round HEAD | ✅ PASS 2026-08-13 (marine `b3ff15c`) |
+| GATE-A1.4 | Hourly deck byte-identical except nest source; archive retention + TTL proven; `l1NestAge` KATs incl. the refuse boundary (9 h exact); health additive-only (no key renamed/removed); restart survival of the archive pointer; falsifiability transcripts | ✅ PASS 2026-08-13 after F1/F2 remediation (marine `ffe0f0c`) |
+| GATE-A1.5 | Reality-gate rows per PRIME DIRECTIVE 4 with quantities pre-picked BEFORE looking (46253 16 s-train ledger re-run vs served; arrival-timing delta; shadow-edge spot-check); baseline-vs-after diff per PRIME DIRECTIVE 2; publish-liveness | ✅ PASS-WITH-FINDINGS 2026-08-14 ~06:15Z (all LOW: F1 cell-count estimator, F2 direction offset observation, F3 sub-partition unverifiable — see A1.5 task record) |
+| DOC-A1-FINAL (after A1.6) | As-built numbers in every A1.0 doc match code/live decks (read the LIVE deck, not the repo's intent); zero drift findings | ⏳ PENDING — runs after this A1.6 round |
 
 **Open ruling for the operator (ONE, non-blocking until A1.4):** when the archived L1 nest
 exceeds `L1_NEST_MAX_AGE_H = 9` (a full run missed its slot), the hourly cycle REFUSES

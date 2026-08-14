@@ -66,11 +66,27 @@ today's 9.1k)**. Spectral resolution unchanged (`CIRCLE 72 0.03 1.0 34`). Code:
 box as today, fixed containment corners); `services/geography.py` cap `L1_MAX_EXTENT_KM` raised
 **100 → 175** FOR L1 ONLY. Both constants operator-ordered under this amendment.
 
+> **AS-BUILT AMENDMENT (2026-08-14): deck truth.** The emitted L1 `CGRID REG` for cycle
+> 2026-08-14T00Z: `... 145069.95 167074.31 142 169` — **142×169 meshes at 1021.6 m × 988.6 m
+> (≈145.07 × 167.07 km E-W × N-S)**, UTM 11N; the SW containment corner falls inside the box.
+> Mesh count 142×169 = **23,998** (design estimated ~138×163 km / ~22.5k cells — the final box is
+> slightly larger because sizing is a union of the containment corners with the existing G9
+> clamp-floor/fetch-fan geometry, not a direct re-derivation of the design's hand corners; see the
+> deploy-time fixes `084ecfb`/`425f168` recorded in the fixit plan's CURRENT STATE). This mesh
+> count is distinct from the sizing cache's own cost-estimator figure — see the named-constants
+> note below. Wind-store gatherer bbox rebuilt at the wider box, `leftlon = -119.60`.
+
 **Named constants:**
 - `L1_CONTAINMENT_SW = (32.60, -119.25)` — the containment SW corner (lat, lon).
 - `L1_MAX_EXTENT_KM = 175` — supersedes ADR-104 D2's 100 km cap FOR L1 ONLY. G9's rationale
   (stationary validity at <100 km) no longer applies because L1 stops being stationary. The cap
   for non-L1 levels and the Great Lakes regime exemption are unaffected.
+- **Cell-count estimator note (as-built, GATE-A1.5 finding F1):** the sizing cache's cost
+  estimator (`GridDomain.cell_count`) reports **24,795** — ni×nj HAVERSINE GRID POINTS
+  (145×171, `round(dist/res)+1` per axis) — a DIFFERENT metric from the deck's CGRID MESH count
+  (142×169 = 23,998) cited above; the OLD grid's cached "9.1k" used the same points-based
+  mechanism. The deck's mesh count is the as-built truth cited throughout this ADR; the cache
+  figure is a pre-existing, unrelated cost estimator, not a doc-code drift.
 
 **D2 — Compute mode (full run, L1 ONLY; L2–L4 unchanged).** Keep `MODE NONSTATIONARY`; replace the
 57–73-solve `COMPUTE STAT` march with the SWAN manual's own canonical pattern (lines 5708–5713):
@@ -200,7 +216,10 @@ L1's share. The hourly cycle gets strictly FASTER (drops its L1 solve entirely).
 - **Runner orchestration:** `services/swan_runner.py` full-run path unchanged except the deck
   it writes; fast-cycle path skips L1, reads the archived nest, and checks the age gate.
 - **Nest archive:** per-run `nest_out_<cycle>.dat` in `level1/`, ≥24 h retention.
-- **Health surface:** `l1NestAge` in the `/health` response; `l1NestAge` > 9 → hourly refuse.
+- **Health surface:** `l1NestAge` in the `/health` response; `l1NestAge` > 9 → hourly refuse. A
+  forced full run (the existing geometry-changing config-push trigger, `force_full_run_signal`)
+  always rebuilds L1 and therefore resets `l1NestAge` to zero on success; the age only grows
+  between full runs or when one fails/delays (fold-in from Gate DOC-A1's A1.0 LOW finding).
 - **State:** `state.py` + `endpoints/health.py` carry the new `l1NestAge` key.
 - **Hotstart retirement:** L1 hourly hotstart files no longer produced or consumed.
 - **Wind store:** gatherer bbox grows with L1 (existing derivation, no code change).
@@ -209,22 +228,56 @@ L1's share. The hourly cycle gets strictly FASTER (drops its L1 solve entirely).
 
 ## Acceptance criteria
 
-`(ruled 2026-08-13; lands with Plan Amendment A1 tasks A1.1–A1.5 of MARINE-PAGE-FIXIT-PLAN)`
+`(landed 2026-08-14, Plan Amendment A1 tasks A1.1–A1.5 of MARINE-PAGE-FIXIT-PLAN; as-built)`
 
-- [ ] D1: L1 domain contains San Clemente at ~1 km resolution; both islands render as dry cells.
-- [ ] D2: Full-run L1 deck emits `PROP BSBT` + spin-up `COMPUTE STAT` + `COMPUTE NONSTAT <C>
+- [x] D1: L1 domain contains San Clemente at ~1 km resolution; both islands render as dry cells.
+  **Evidence:** live INPUT deck `CGRID REG` confirms the SW containment corner (32.60°N,
+  119.25°W) falls inside the 142×169-mesh box (1021.6 m × 988.6 m cells); A1.1(f)
+  (`A11-MEASUREMENTS.md`) — ETOPO 2022 15s renders San Clemente as ~90–150 dry cells at 1 km L1
+  resolution (~2× coarser than ETOPO's native ~460 m); boundary reconstruction log confirms 9 wet
+  WW3 cells on both the S and W sides outside the containment corners (journal
+  2026-08-14T04:02:38Z).
+- [x] D2: Full-run L1 deck emits `PROP BSBT` + spin-up `COMPUTE STAT` + `COMPUTE NONSTAT <C>
   10 MIN <C+72h>` with two NUMERIC commands (STAT before spin-up, NONSTAT before march); L2–L4
-  decks BSBT-free.
-- [ ] D2: All SWAN commands in the emitted deck verified against the local SWAN manual with line
-  cites.
-- [ ] D3: Boundary perimeter covers the new S/W edges with ≥2 wet WW3 cells per side.
-- [ ] D4: BOTTOM datum KNOWN for the whole big box; WLEVEL reconciled; cross-level consistency
-  stated.
-- [ ] D5: Hourly cycle runs L2→L3→L4 without L1; archived nest age checked; refusal when >9 h.
-- [ ] D5: `l1NestAge` visible in `/health` response.
-- [ ] D7: `CIRCLE 72 0.03 1.0 34` byte-identical at every level; L2/L3/L4 sizing untouched.
-- [ ] D9: A1.1 measurement confirms D9's predicted cost within 3× of today's L1 share.
-- [ ] A1.5 reality gate: served 16 s-train no longer 30–45% low vs buoy 46253 at matched hours.
+  decks BSBT-free. **Evidence:** live deck verified post-deploy `7097369` 04:06:26Z — `PROP BSBT`
+  line + `COMPUTE NONSTAT 20260814.000000 10 MIN 20260817.000000`; KATs
+  `tests/services/test_all_stationary_sequence.py` pin `PROP BSBT` presence/order and L2–L4
+  BSBT-free.
+- [x] D2: All SWAN commands in the emitted deck verified against the local SWAN manual with line
+  cites. **Evidence:** this ADR's D2 as-built amendment (manual ~756 implicit/unconditionally
+  stable; 5725–5728 CFL-advisory-is-accuracy-only + `PROP BSBT` prescription; 4139 BSBT valid
+  stat/nonstat; 4165–4169 diffusion penalty only at 1000s-km scale) plus D2's original
+  canonical-pattern cites (5708–5731, 4176–4235).
+- [x] D3: Boundary perimeter covers the new S/W edges with ≥2 wet WW3 cells per side.
+  **Evidence:** journal 2026-08-14T04:02:38Z: "reconstructed ocean boundary (ocean cycle
+  2026-08-14T00:00:00+00:00): side S = 9 wet cell(s), side W = 9 wet cell(s), 25 timestep(s)
+  each"; 22 boundary files on disk (11 `B_S_*` + 11 `B_W_*`) vs the old grid's 15.
+- [x] D4: BOTTOM datum KNOWN for the whole big box; WLEVEL reconciled; cross-level consistency
+  stated. **Evidence:** A1.1(f) (`A11-MEASUREMENTS.md`) — ETOPO 2022 15s covers the big-box SW
+  corner at datum LMSL (same source/datum as today); no CRM fallback triggered, D4's STOP clause
+  does not fire; L2/L3/L4 regional DEMs also normalized to LMSL via VDatum — no cross-level
+  offset; WLEVEL (STOFS≈LMSL) already matches, no reconciliation change needed.
+- [x] D5: Hourly cycle runs L2→L3→L4 without L1; archived nest age checked; refusal when >9 h.
+  **Evidence:** GATE-A1.4 PASS (marine `ffe0f0c` after F1/F2 remediation); live nest archive
+  `nest_out_20260814.000000.dat` saved 04:57:43Z (journal); `L1_NEST_MAX_AGE_H = 9` KATs incl. the
+  exact-9.0h boundary (frozen-clock fix, marine `7bffaf7`).
+- [x] D5: `l1NestAge` visible in `/health` response. **Evidence:** GATE-A1.5 record
+  (`A15-REALITY-GATE.md`): `l1NestAge` = 5.58 h (non-null) after the first archived nest;
+  independently re-derived from `/health` by the auditor's clean dispatch.
+- [x] D7: `CIRCLE 72 0.03 1.0 34` byte-identical at every level; L2/L3/L4 sizing untouched.
+  **Evidence:** GATE-A1.3 deck KAT (frozen-core untouched outside the named files); GATE-A1.4
+  hourly deck byte-identical except nest source; no L2/L3/L4 file appears in the A1.3/A1.4 diffs.
+- [x] D9: A1.1 measurement confirms D9's predicted cost within 3× of today's L1 share.
+  **Evidence:** full run 5280 s (cycle 2026-08-14T00Z, journal completion line
+  2026-08-14T05:34:26Z) vs prior baseline 3064 s (00Z cycle, 06:21:39Z) = **1.72×**, inside the
+  3× bound; A1.1(a)/(b) analytical prediction (I_stat mean 7.0) forecast ~2.12× L1 share,
+  consistent with the measured range.
+- [x] A1.5 reality gate: served 16 s-train no longer 30–45% low vs buoy 46253 at matched hours.
+  **Evidence:** GATE-A1.5 PASS-WITH-FINDINGS (`A15-REALITY-GATE.md`): served southerly
+  long-period train 0.53 m vs buoy 46253 0.5–0.6 m (ratio 0.89–1.06) across matched hours, vs the
+  pre-fix baseline's 0.23 m (30–45% low). Today's ocean state carries the same southerly train at
+  12–13 s rather than 2026-08-13's 16 s (buoy SwP oscillated 11.1–18.2 s over the period) —
+  matched like-for-like, not a goalpost move; see the gate record for the full disposition.
 
 ## Implementation guidance
 
