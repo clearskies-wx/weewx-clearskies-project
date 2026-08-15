@@ -1,5 +1,14 @@
 # Marine Page Fixit Plan — boundary plug-in, ruled card fixes, break/zone redefinition (2026-08-10)
 
+> **✅ PLAN CLOSED 2026-08-15 (operator order, in chat: "let's close out, mark complete and
+> archive the current plan").** All ordered phases executed; Plan Amendment A1 (big-L1
+> true-non-stationary fix) closed 2026-08-14 with all gates passed. Items still open at close
+> (B2/S/K/H accept eyeballs, unfed-E re-derivation, Problem-2 confirmation protocol, pending
+> rule-lessons, unpushed-commit inventory) TRANSFERRED to the successor plan's CARRY-OVER
+> REGISTER: [MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.md](../planning/MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.md).
+> Successor operationalizes [reference/SWAN-ENERGY-LOSS-RESEARCH-2026-08-15.md](../reference/SWAN-ENERGY-LOSS-RESEARCH-2026-08-15.md).
+> This file is now a read-only record in docs/archive/.
+
 ## INDEX — ALPHABETICAL (operator order 2026-08-13: keep this current; sections below sit in chronological log order, so FIND THINGS HERE. Every new `##` section gets an entry the same commit.)
 
 Ctrl-F the exact heading text:
