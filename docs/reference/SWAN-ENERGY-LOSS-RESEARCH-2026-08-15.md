@@ -34,20 +34,26 @@ decomposing as:
 
 | Loss line | Points of the >11 s loss | Established by |
 | --- | --- | --- |
-| Island shadowing (real physics, under-refilled) | 20.3 | E1 islands-wetted control |
-| Shelf-break "cliff" (400 m → 37–78 m in 1–2 cells, directly under the L1→L2 seam) | ~15 | E8d field map + 2-min dead-water KAT (uniform 0.650 m boundary → 0.578 m at seam) |
-| Deep-corridor numerical diffusion | ~6–12 | E8d; scheme-insensitive (BSBT = SORDUP = S&L) |
-| ST6 swell dissipation | ~4.6 | e8b2 dead-water delta |
-| Unfed E boundary (upper bound; re-derivation pending) | ≤8–11 | corners census |
+| Island shadowing (real physics, but reality refills shadows more than the model does) | 20.3 | Experiment E1: replacing the islands with 800 m-deep water recovered exactly this much |
+| Shelf-break "cliff" (depth steps from 400 m to 37–78 m within 1–2 cells, directly under the L1→L2 seam) | ~15 | Experiment E8d's spatial map located it; a 2-minute rerun with wind and every dissipation process switched off still showed it — a uniform 0.650 m swell fed in at the boundary arrives at the seam at only 0.578 m, with nothing physical left to cause the loss |
+| Numerical smearing while crossing the deep corridor | ~6–12 | Experiment E8d; identical under all three propagation schemes, so not a scheme-choice problem |
+| ST6 wind-physics package slowly eating swell | ~4.6 | Experiment e8b2: the no-wind rerun with physics off recovered this much |
+| East side of the boundary not being fed with wave data (upper bound; to be re-derived at the correct hour) | ≤8–11 | Boundary-corner census |
 
-Eliminated by experiment: dissipation-physics bundle, refraction on/off, propagation
-scheme + time step + directional-bin count (premier S&L + dt=4 + CIRCLE 144 = null),
-boundary imposition, boundary registration.
+Eliminated by experiment: the dissipation-physics bundle, refraction on/off, and the
+numerics themselves — an upgraded run using the higher-order S&L propagation scheme, a
+4-minute time step, and doubled directional resolution changed nothing at the seam — plus
+how boundary spectra are imposed and how the boundary files are registered.
 
-Deck context: L1 regular grid ~1 km (142×169 meshes, UTM 11N, Southern California Bight);
-CIRCLE 72 (5°), 0.03–1.0 Hz, 34 bins; PROP BSBT, NONSTAT dt=10 min; GEN3 ST6, SSWELL
-ZIEGER, NEGATINP, BREAKING, FRICTION JON, TRIAD; **no NUMERIC CTHETA/CSIGMA limiter, no
-DIFFRAC**; islands are multi-cell dry land; nest chain L1(1 km)→L2(100 m)→L3(40 m)→L4(10 m).
+Model configuration this was measured on: outermost grid (L1) is a regular ~1 km grid of
+142×169 cells covering the Southern California Bight. Wave directions resolved in 5° steps
+(72 bins), frequencies 0.03–1.0 Hz in 34 bins. First-order BSBT propagation scheme,
+10-minute time step, time-marching (non-stationary) run. Full physics on: ST6 wind
+growth/dissipation, swell decay, depth-induced breaking, bottom friction, three-wave
+interactions. **Not enabled: the refraction-rate limiter (NUMERIC CTHETA/CSIGMA) and
+diffraction (DIFFRAC)** — both discussed below. The islands are ordinary dry land many
+cells across. Nesting chain: L1 at 1 km hands off to L2 at 100 m, then L3 at 40 m, then
+L4 at 10 m.
 
 **No published study measures anything against a loss decomposition shaped like ours** —
 the three-line split above is this project's own instrumented finding. Literature findings
@@ -129,8 +135,8 @@ plausibility. Neither substantiates nor refutes seam relocation as a fix.
 | Mitigation | What the sources say | Applicability to our 400→37–78 m step in 1–2 cells | Confidence |
 | --- | --- | --- | --- |
 | **(a) Bathymetry smoothing / pre-filtering** | The manual argues the **opposite** for physically real features: ridges/steps are "vitally important," must be represented, best handled by **aligning grid lines with the feature** — "otherwise the ridge may be 'lost' in the interpolation" (Manual 599–616). The smoothing precedent found is from sigma-coordinate *circulation* models (pressure-gradient error control), a different physics problem [abstract-level only]. | LOW — smoothing a real shelf break changes real shoaling/refraction; the manual's prescription is resolve-or-align, not filter. | LOW |
-| **(b) NUMERIC CTHETA / CSIGMA refraction & frequency-shift limiters** | Manual 4243–4277 [verified]: CTHETA "prevents an excessive directional turning at a single grid point or vertex due to a very coarse bathymetry" (CFL-based, suggested cfl=0.9, **inactive unless specified** — and absent from our deck); CSIGMA the frequency-shift analogue; DIRIMPL cdd=1 upwind "preferable if (strong) gradients in depth or current are present." Dietrich et al. 2013 is the literature basis. | The step is the textbook triggering case — but every documented pathology these limiters fix is **growth/redistribution**, not loss. Whether clamping turning also prevents energy being wrongly refracted *away* (a loss channel) is an unconfirmed hypothesis, so labeled. | MEDIUM (mechanism real), LOW (fixes *our* symptom) |
-| **(c) Grid refinement — the field's quantitative criterion** | SWAN STD node89 ("Some notes on grid generation"): the **topographic length scale constraint, Δh/h < 1 per cell** (Δh = depth range within the cell, h = its average depth), plus "keep the wavelength to grid size ratio relatively large." Manual 864–866 [coordinator-verified addition, extending the researcher's 856–861 quote]: "**the proper solution to this problem is to choose a suitable resolution, both spectral and spatial, and one can thus avoid the use of the limiter.**" | **Our step computes to Δh/h ≈ 1.35–1.66 — 1.4×–1.7× over the threshold.** Our step is under-resolved by the SWAN community's own published metric, independent of the seam question. (Context transfer flagged: the STD states the metric for unstructured-mesh refinement; the dimensionless ratio itself is topology-independent.) | MEDIUM-HIGH |
+| **(b) The refraction-rate limiters (NUMERIC CTHETA / CSIGMA)** | These are the "special adjustments" the literature actually offers for steep steps. CTHETA caps how fast the model is allowed to turn wave direction within a single grid cell, so one badly-resolved cell can't swing waves wildly; CSIGMA is the same cap applied to frequency shifting. Manual 4243–4277 [verified]: CTHETA "prevents an excessive directional turning at a single grid point or vertex due to a very coarse bathymetry"; **off unless explicitly switched on — and our deck does not use them.** A related knob (DIRIMPL) selects a more numerically-cautious refraction treatment "preferable if (strong) gradients in depth or current are present." Literature basis: Dietrich et al. 2013. | Our step is the textbook case these limiters were built for — but every documented problem they fix is spurious energy **growth**, not loss. Could capping the turning rate also stop energy being wrongly steered *away* from our corridor (which would look like our loss)? Possibly — but no source says so; that idea is an unconfirmed hypothesis and is labeled as one. | MEDIUM (mechanism real), LOW (fixes *our* symptom) |
+| **(c) Grid refinement — the field's quantitative criterion** | The SWAN technical documentation (STD node89, "Some notes on grid generation") gives a pass/fail test for whether a grid cell is too coarse for the seabed under it: **take how much the depth changes within one cell, divide by that cell's average depth — the result must stay below 1.** It also advises keeping cells small compared to the local wavelength. The manual's own bottom line for steep-step trouble (864–866, verified): "**the proper solution to this problem is to choose a suitable resolution, both spectral and spatial, and one can thus avoid the use of the limiter**" — SWAN's authors say the real fix is a finer grid; the limiter is damage control. | **Our shelf break fails that test.** The depth drops from ~400 m to 37–78 m inside 1–2 cells. Depth change ≈ 322–363 m, average depth in those cells ≈ 218–239 m, so the ratio is ≈ 1.35–1.66 — the rule says stay below 1. In plain terms: by SWAN's own published rule, our 1 km grid is too coarse at the shelf break, and that is true whether or not the nest handoff sits there. One caveat: the documentation states this rule in its chapter on triangular computational meshes, and our grid is regular/rectangular — the ratio itself doesn't depend on cell shape, but the borrowing is noted. | MEDIUM-HIGH |
 | **(d) Propagation-scheme choice** | Manual 4158–4161: with sharp grid transitions "it is safer to use the BSBT scheme." SWAN STD node38: the higher-order schemes' accuracy case assumes wave-action gradients "often small in coastal areas" — an assumption a grid-scale discontinuity violates for every scheme. | Manual + STD + our own null experiment (BSBT = SORDUP = S&L identical at the seam) triangulate: **scheme choice is not an available mitigation for this loss.** Confirms the deck's BSBT as the "safer" pick. | HIGH (that it doesn't help) |
 | **(e) Action-flux conservation theory across abrupt celerity change** | **GAP — not found** as an explicit STD/manual passage or in literature within budget. Closest: the STD's smoothness assumption in (d). | — | Not established |
 | **(f) Cross-model corroboration (WW3/MIKE21)** | WW3 nest-transition claims surfaced only as unverifiable search summaries — **dropped, not cited**. MIKE21 not searched (budget). | — | Not established |
@@ -206,10 +212,11 @@ class is resolution (864–866), with the limiter as containment.
     water to each nearshore node, built against fixed ~100 m bathymetry — linear physics ⇒
     per-frequency/direction components superpose ⇒ the transformation is computed once and
     reused; it "accounts for island blocking, refraction and shoaling."
-  - **Live per cycle:** offshore buoy spectra every 30 min (MEM directional estimation,
-    multi-buoy weighting), hourly product updates; **sea/swell split** (swell ~0.0375–0.0875
-    Hz from offshore buoys; sea from local buoys) exists precisely because a linear transfer
-    cannot grow wind sea; ECMWF winds extend nowcast→forecast.
+  - **Live per cycle:** offshore buoy spectra ingested every 30 min (wave directions
+    estimated statistically from the buoy data, several buoys blended), products updated
+    hourly; long-period swell is driven by the offshore buoys while shorter local wind
+    waves come from nearshore buoys — that split exists precisely because a precomputed
+    linear transfer cannot grow wind sea; ECMWF winds extend the nowcast into a forecast.
   - Live cost is a re-weighting of the fixed transfer — structurally cheap per cycle (no
     published CPU figure).
 - **Documented failure mode — same mechanism as our islands line, opposite bias:** CDIP's
@@ -241,18 +248,23 @@ class is resolution (864–866), with the limiter as containment.
 **Premise status:** R1 did not refute seam-specific harm (Mechanism B stands as unproven
 plausibility), so the metric question is answered rather than mooted.
 
-- **The metric the literature actually uses: Δh/h < 1 per cell** (SWAN STD node89) — the
-  only explicit, citable, quantitative per-cell bathymetry-resolution criterion found in the
-  manual, the STD, or the searched literature. Companion (qualitative): grid size should
-  shrink with local wavelength.
-- **No source proposes a nest-placement-specific rule** (nothing like "a seam must be N
-  cells from any Δh/h>1 zone"). Using Δh/h in seam-adjacent cells to vet handoff placement
-  would be a **repurposing of a general mesh-quality diagnostic — an inference, not a
-  published practice.**
-- No |∇h|/h-, kh-, or group-speed-based detection metric was found as a named practice;
-  any such metric would have to be derived, not adopted.
-- Applied informationally to our seam cells: Δh/h ≈ 1.35–1.66 (over threshold regardless of
-  whether a seam sits there — consistent with Mechanism A's location-independence).
+- **The only detection rule the field actually publishes is the depth-change test from
+  §3(c):** within one grid cell, the change in depth divided by the average depth must stay
+  below 1 (SWAN STD node89). Nothing else quantitative was found in the manual, the
+  technical documentation, or the searched literature. Qualitative companion: cells should
+  get smaller where the waves get shorter.
+- **Nobody publishes a rule about where nest boundaries may sit relative to bathymetry.**
+  There is no "keep the seam N cells away from a failing zone" guidance anywhere. If our
+  grid-sizing code used the depth-change test to vet handoff placement, that would be our
+  own repurposing of a general grid-quality check — reasonable-looking, but not something
+  any source actually does.
+- The other candidate metrics named in the research brief — ones built on seabed slope, on
+  depth relative to wavelength, or on how much the wave speed changes from one cell to the
+  next — appear in no source as a named detection practice. Any of those would have to be
+  derived from scratch, not adopted from the literature.
+- For the record: our seam cells fail the depth-change test (ratio ≈ 1.35–1.66, computed in
+  §3c) whether or not a seam sits on them — consistent with the R1 finding that the error
+  belongs to the step itself, not to the seam.
 
 ---
 
@@ -262,7 +274,7 @@ plausibility), so the metric question is answered rather than mooted.
 
 | Test | Our value | Threshold (source) | Result |
 | --- | --- | --- | --- |
-| Range in wavelengths (14–18 s ⇒ L ≈ 306–505 m; range 36–90 km) | ≈70–290 λ | "variations in wave height… within a horizontal scale of **a few wave lengths**" (Manual 308–314) | Outside by 1–2 orders of magnitude |
+| Island-to-seam distance, measured in wavelengths (a 14–18 s swell is 306–505 m long; the islands are 36–90 km away) | ≈70–290 wavelengths | Diffraction matters where wave height changes "within a horizontal scale of **a few wave lengths**" (Manual 308–314) | We are 70–290 where the rule says "a few" |
 | Grid at obstacle tip | 1000 m | "1/5 to 1/10 of the dominant wave length" ⇒ 31–101 m (Manual 3893) | 10–30× too coarse |
 | Documented scope | open-ocean islands 36–90 km upstream | "near… coastlines… with an occasional obstacle… but not in harbours" (SWAN STD §2.6) | Geometry mismatch — coastal-fringe tool |
 | Published precedent at O(1 km) cells / O(100 km) domains | — | — | **None found** (absence after honest multi-angle search, not proof of impossibility) |
