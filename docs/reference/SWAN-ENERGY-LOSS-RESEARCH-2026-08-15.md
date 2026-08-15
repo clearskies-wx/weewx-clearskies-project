@@ -344,7 +344,58 @@ SoCal-specific precedents (concrete, all flagged with access level):
 
 ---
 
-## 7. Cross-cutting observations (coordinator synthesis — labeled, not literature claims)
+## 7. R6 (added later on 2026-08-15) — Could we run WAVEWATCH III ourselves as the outer model?
+
+Operator question raised after reading §4 and the manual's efficiency statement. Researched
+from WW3's own manual, NOAA's own documentation, and the WW3 source code — never inferred
+from the SWAN manual (operator correction of an earlier coordinator overreach, applied).
+Source report: `RESEARCH-WW3-FEASIBILITY.md` (session scratchpad).
+
+**Availability:** WW3 is free software (LGPL v3), openly distributed on GitHub
+(NOAA-EMC/WW3) since v6.07 — buildable on ordinary Linux. A read-only reference clone and
+the extracted v5.16 manual text were retained in the session scratchpad. The complete build
+toolchain (Fortran compiler, MPI, NetCDF, CMake) is **already installed on librewxr** —
+verified by read-only queries; a standard regular-grid build needs nothing installed.
+
+**Nesting practice (WW3's own):** the WW3 manual states *no* numeric resolution-ratio rule
+for nesting — boundary spectra are linearly interpolated in space and time at every global
+step, "arbitrary resolutions" allowed, up to 9 child nests per run, telescoping unlimited
+(manual v5.16 §3.14, App. C). What actual practice shows: NOAA's documented 2007
+operational chain stepped 30′ → 10′ → 4′ (roughly 55 → 18.5 → 7.4 km), i.e. **2:1–3:1 per
+hop, never a single jump to kilometer scale**. Most decision-relevant: **NOAA's own path
+to ~1 km nearshore is not deeper WW3 nesting — it is NWPS, which hands WW3 off to SWAN**
+for the 1.8 km–500 m nearshore legs. The architecture the operator is weighing (WW3 outer,
+SWAN from L2 down) is NOAA's own production pattern, running today.
+
+**Cost at our scale (the honest answer):** the SWAN manual's "~10× more efficient" claim
+is explicitly an *ocean-scale* statement, and it **does not survive at 1 km**. WW3's
+explicit schemes are stability-limited: at 1 km cells, our lowest frequency bin (0.03 Hz,
+energy moving ~30 m/s) caps its propagation step at ~33 s, vs SWAN's unconditional
+10-minute implicit steps. Two facts verified in both the WW3 manual's own words (§3.2,
+p.102) and the source code (`model/src/w3pro3md.F90` line 923, coordinator-verified in the
+clone): the limit applies **per frequency bin**, so only the ~10 slowest of our 34 bins
+need sub-stepping (average multiplier ~1.4–1.5×, not the ~33× a worst-case reading
+suggests). Net: over a 72 h march WW3 would perform roughly **1.6–3.3× more
+propagation-sweep events** than SWAN's 1,728 implicit sweep-solves — more events, each far
+cheaper (an explicit flux update vs an iterative linear solve). The final wall-clock
+verdict lands somewhere between rough parity and a modest advantage for either model; the
+one term documentation and code cannot supply is the real per-sweep cost ratio on our
+hardware. **A scratch benchmark is the named blocker — nothing short of running it decides
+this.** (One measured-looking figure from an AI search summary was checked against its own
+cited source, found absent, and dropped.) Side finding: WW3 does have an implicit solver
+with no stability limit, but only for unstructured triangular meshes, not regular grids.
+
+**What this changes and doesn't:** the *efficiency* argument for a WW3 swap at 1 km is
+weak-to-neutral pending benchmark. The arguments independent of cost stand as researched
+facts: spherical coordinates natively (removing the flat-projection strain on the large
+outer domain), WW3's native sub-grid island obstruction scheme (the field's standard
+answer for island blocking, §6), deep-water swell physics as its design center, and NOAA's
+own validation of the exact architectural split. Where the WW3-to-SWAN handoff would sit,
+and at what resolutions each side runs, are design questions the operator rules on —
+NOAA's own practice (WW3 at coarser regional scale, SWAN owning the fine nearshore) is the
+published precedent for that layout.
+
+## 8. Cross-cutting observations (coordinator synthesis — labeled, not literature claims)
 
 1. **Resolution is the through-line of the evidence.** Independently: the manual's own
    bottom line for steep-step error is "choose a suitable resolution" (864–866); the STD's
@@ -366,7 +417,7 @@ SoCal-specific precedents (concrete, all flagged with access level):
    stated for WAM/WW3→SWAN) sits against our 10× L1→L2 jump — applicability to SWAN-in-SWAN
    unconfirmed, recorded here so it isn't lost.
 
-## 8. What the evidence does not establish (consolidated)
+## 9. What the evidence does not establish (consolidated)
 
 - Whether seam relocation off the shelf break helps at all, or how much (R1 — the central
   open question going in remains open; no study isolates the variable).
@@ -388,7 +439,12 @@ SoCal-specific precedents (concrete, all flagged with access level):
   rules; WW3 nest-transition claims; NWPS "1 nmi→10 m" 3-level chain (single-source,
   low-confidence, retained only as a lead).
 
-## 9. Verification record (coordinator)
+Added with §7 (WW3 round): the real per-sweep cost ratio (WW3 explicit update vs SWAN
+implicit solve) on our hardware — benchmark required; the resolution table of NOAA's
+2013–2019 nine-grid mosaic (paywalled); NWPS's exact WW3-side handoff resolution; any
+measured kilometer-scale regional WW3 runtime (none found that survived source-checking).
+
+## 10. Verification record (coordinator)
 
 - **Manual line cites:** all quoted ranges independently re-read verbatim by the coordinator
   against the local manual — 227–241, 243–246, 259–265, 267–273, 305–314, 349–357, 599–616,
@@ -404,7 +460,14 @@ SoCal-specific precedents (concrete, all flagged with access level):
   not independently re-fetch web sources. The manual's own citation of "Dietrich et al.
   (2013)" at line 854 independently corroborates that publication's identity.
 
-## 10. Consolidated bibliography
+For §7 (WW3 round) the coordinator additionally verified: the `NTLOC` sub-stepping formula
+at `model/src/w3pro3md.F90` line 923 in the scratchpad clone (matches the report exactly,
+inside a per-spectral-component routine); the SWAN SIP-solver defaults (max 20 iterations,
+1e-4 tolerance) at local manual lines 4278–4294; and re-derived the full cost arithmetic
+(group velocity 26.0 m/s at 0.03 Hz, 33.4 s critical step, 1,933–3,870 global steps,
+1.6–3.3× sweep-event ratio).
+
+## 11. Consolidated bibliography
 
 **Official SWAN documentation**
 1. SWAN User Manual — local, `docs/reference/swan-user-manual.txt` (authoritative for all
@@ -463,6 +526,25 @@ SoCal-specific precedents (concrete, all flagged with access level):
 22. Anonymous/unread: Comparison between nested grids and unstructured grids for a
     high-resolution wave forecasting system in the western Mediterranean sea.
     *J. Operational Oceanography* (2016). [title/existence only — 403; findings unknown]
+
+**WW3 round (§7)**
+27. WAVEWATCH III User Manual v5.16 — NOAA-hosted PDF
+    (polar.ncep.noaa.gov/waves/wavewatch/manual.v5.16.pdf), §3.2, §3.14, App. B–C.
+    [full text read via pdftotext extraction; text copy retained in session scratchpad]
+28. WW3 source code — github.com/NOAA-EMC/WW3 (LGPL v3), read-only clone;
+    `model/src/w3pro3md.F90` (explicit propagation, per-bin sub-stepping),
+    `model/src/w3profsmd_pdlib.F90` (unstructured-only implicit), `model/src/w3srcemd.F90`
+    (source-term integrator). [full text read; line-cited]
+29. NCEP Technical Implementation Notice 07-51 — the 2007 operational WW3 grid chain
+    (30′/10′/4′), polar.ncep.noaa.gov/waves/implementations.shtml. [full text read]
+30. Tolman H.L. et al. (2013). A multigrid wave forecasting model. *Weather and
+    Forecasting* 28(4). doi:10.1175/WAF-D-12-00007.1. [abstract only — paywalled]
+31. NOAA NWPS announcements/abstracts — weather.gov/news/212901-nwps; AMS 93rd Annual
+    Meeting Paper 222877 (Van der Westhuysen et al.). [secondary/summary level]
+32. Coastal application of unstructured WAVEWATCH III in swell-dominated waters.
+    *Frontiers in Marine Science* (2026), doi:10.3389/fmars.2026.1877867 — real-world
+    explicit-vs-implicit WW3 time-step choices (12/4/6 s explicit vs 150 s implicit).
+    [full text read]
 
 **Institutional**
 23. CDIP model documentation: cdip.ucsd.edu/m/documents/models.html and MOP intro pages.
