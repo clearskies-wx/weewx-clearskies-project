@@ -38,6 +38,12 @@ These apply regardless of domain.
 
 ### Operating posture
 
+- **Scratch files live in `scratch/` at the project root (gitignored) — NEVER in the AppData
+  temp scratchpad.** Briefs, session state, research reports, resume files, drafts: all of it
+  goes in `scratch/`. Bulky third-party material (repo clones, PDFs) is deleted as soon as its
+  extraction is captured — never parked in temp. (Why 2026-08-15: the harness's AppData temp
+  scratchpad had silently accumulated 4.6 GB across sessions; operator order: "STOP WRITING
+  TEMP FILES TO APPDATA... create a directory in the project files.")
 - **NEVER assume state — verify first.** Check current state before running any command.
 - **FQDNs, never raw IPs.** All host reachability checks, service queries, and diagnostics
   use FQDNs (`librewxr.shaneburkhardt.com`, `weewx.shaneburkhardt.com`, …), never raw IPv4

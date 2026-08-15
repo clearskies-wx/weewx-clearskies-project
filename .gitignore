@@ -33,6 +33,9 @@ tmp/
 *.cache
 .pytest_cache/
 
+# Session scratch — working files live in-project (operator order 2026-08-15), never committed
+scratch/
+
 # Backup files
 *.backup.*
 
