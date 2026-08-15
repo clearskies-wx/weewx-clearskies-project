@@ -151,6 +151,10 @@ class is resolution (864–866), with the limiter as containment.
 
 ## 4. R3 — Grid architecture: compared option set (no choice made)
 
+Five options. A–D vary the grids while keeping SWAN as the outer model; Option E — added
+the same day after the operator's WW3 question (full research in §7) — changes which
+*model* owns the outer domain. All five are on equal footing for the operator's ruling.
+
 ### Option A — Whole-domain finer L1 (1 km → 500/250 m regular)
 - **Precedent: STRONG for this basin.** CDIP operational Bight products: ~1000 m regional,
   ~100 m in depths <60 m [full text read, cdip.ucsd.edu]. USGS CoSMoS Tier I (curvilinear
@@ -232,6 +236,34 @@ class is resolution (864–866), with the limiter as containment.
   [403]; the decomposition above is from CDIP's current pages and **may describe a
   later-evolved system than the 2016 paper** (flagged).
 
+### Option E — Replace the outer model: run WAVEWATCH III ourselves, SWAN from L2 down
+
+Full research and verification in §7; summarized here so the option set is complete.
+
+- **What it is:** our own WW3 run takes over today's L1 job (offshore boundary to the
+  nearshore handoff); SWAN starts at L2, whose 100 m cells sit comfortably inside SWAN's
+  own recommended coastal range of 50–1000 m (Manual 822–832).
+- **Precedent: STRONG — this is NOAA's own production architecture.** NWPS runs WW3 for the
+  deep/regional water and hands off to SWAN for the 1.8 km–500 m nearshore at every coastal
+  forecast office. NOAA's documented WW3 chains never carry WW3 itself to kilometer scale;
+  the handoff to SWAN *is* their answer to that scale (§7).
+- **What it buys that no grid rearrangement can:** native spherical coordinates (the
+  flat-map-projection strain on our large Cartesian L1 disappears — WW3 is built for
+  curved-earth domains), and WW3's built-in island obstruction scheme — the field's
+  validated treatment for island blocking on coarse grids (Tolman 2003, §6), which no
+  SWAN option provides. Neither is evidence it fixes our measured loss lines; both are
+  documented capabilities our current outer model lacks.
+- **Cost:** genuinely open — the ocean-scale "10× more efficient" claim does not survive at
+  1 km; the honest range is parity-to-modest-advantage either way, decidable only by a
+  scratch benchmark (§7). The full build toolchain is already on the production host.
+- **Cited risks / open plumbing:** boundary spectra must be reconstructed from NOAA's
+  public output (the same problem our pipeline already solves for SWAN L1, in a different
+  file format); NOAA practice steps resolution 2:1–3:1 per hop, implying our WW3 leg may
+  want an intermediate grid rather than one jump from NOAA's tens-of-km output; no
+  verified measured runtime for kilometer-scale regional WW3 exists in the literature;
+  WW3's stability-unconstrained implicit mode exists only for triangular meshes, not
+  regular grids like ours.
+
 ### Comparison table (cells filled only where cited; empty = no published evidence found)
 
 | Option | Precedent | Islands line | Cliff line | Diffusion line | Cost | Cited risks |
@@ -240,6 +272,7 @@ class is resolution (864–866), with the limiter as containment.
 | B. Distributed sibling nests | Weak (CoSMoS Tier II closest) | — | — | — | L1 unchanged + per-nest cost (undetermined) | Nest-seam mismatch critique exists only as low-confidence synthesis |
 | C. Unstructured single grid | Manual's own preference language; NWPS at WFO scale; none found at Bight scale | — | — | — | "Comparable or lower" only as low-confidence synthesis | SETUP/SURFBEAT manual-stated incompatibility; DIFFRAC convergence poor; mesh-quality rules |
 | D. Precomputed transfer (MOP) | Strong (exact region, operational for decades) | Direct analogue documented, **opposite bias** (over-blocking) | — | — | Live cycle structurally cheap (re-weighting); precompute cost unpublished | Linear transfer can't grow wind sea (hence sea/swell split); narrow-spectrum + complex bathy is pure-refraction's weakest case (O'R&G 91) |
+| E. WW3 outer model, SWAN from L2 (§7) | Strong — NOAA's NWPS production pattern (WW3 deep water → SWAN 1.8 km–500 m nearshore) | WW3's native island obstruction scheme is the field's validated coarse-grid treatment (Tolman 2003) — a capability, not tested against our 20.3-pt line | — | — | Benchmark required: parity-to-modest-advantage band at 1 km (§7); build toolchain already on host | Boundary rebuild from NOAA public output (solved once for SWAN L1, new format); NOAA practice implies an intermediate grid; no measured km-scale WW3 runtime found; WW3's implicit mode is triangular-mesh-only |
 
 ---
 
@@ -340,7 +373,9 @@ SoCal-specific precedents (concrete, all flagged with access level):
 - The field's actual coarse-resolution island answer is WW3's **sub-grid obstruction grid**
   (Tolman 2003; Chawla & Tolman, NCEP Tech Note 255) [abstract/secondary] — a gridded
   transmission-coefficient field, validated operationally for *unresolved* islands;
-  conceptually parallel to OBSTACLE TRANS but **never found ported to SWAN**.
+  conceptually parallel to OBSTACLE TRANS but **never found ported to SWAN** — though if
+  the outer model *were* WW3 rather than SWAN (§4 Option E, §7), this mechanism comes
+  native rather than needing a port.
 
 ---
 
@@ -409,10 +444,13 @@ published precedent for that layout.
    literature describes energy growth/misdirection; our cliff is a deficit. No published
    account matches our loss-shaped symptom. Any fix premised on the published mechanism
    (e.g. limiters) rests on an unverified mapping to our symptom.
-3. **The two strongest-precedent options (A at nearshore tiers, D) are the two the basin's
-   own operational systems actually run.** CDIP runs both a ~1 km regional grid and a
-   precomputed 100 m linear transfer; their documented island failure is over-blocking —
-   the mirror image of ours.
+3. **The strongest-precedent options (A at nearshore tiers, D, and E) are the ones the
+   region's own operational systems actually run.** CDIP runs both a ~1 km regional grid
+   and a precomputed 100 m linear transfer (their documented island failure is
+   over-blocking — the mirror image of ours), and NOAA's NWPS runs the Option-E split
+   (WW3 deep water, SWAN nearshore) at every coastal forecast office. Nobody found in the
+   published record does what our current architecture does — carry SWAN alone from the
+   open ocean boundary down to the surf zone at this domain size.
 4. **Constraint discovered in passing:** the manual's nest-ratio guidance (factor 2–3,
    stated for WAM/WW3→SWAN) sits against our 10× L1→L2 jump — applicability to SWAN-in-SWAN
    unconfirmed, recorded here so it isn't lost.
