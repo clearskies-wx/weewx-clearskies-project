@@ -448,9 +448,15 @@ published precedent for that layout.
    region's own operational systems actually run.** CDIP runs both a ~1 km regional grid
    and a precomputed 100 m linear transfer (their documented island failure is
    over-blocking — the mirror image of ours), and NOAA's NWPS runs the Option-E split
-   (WW3 deep water, SWAN nearshore) at every coastal forecast office. Nobody found in the
-   published record does what our current architecture does — carry SWAN alone from the
-   open ocean boundary down to the surf zone at this domain size.
+   (WW3 deep water, SWAN nearshore) at every coastal forecast office. The one published
+   precedent found for our own architecture — SWAN as the Bight-scale outer model — is
+   Rogers et al. 2007 (§4 Option A), whose authors themselves named "poor resolution of
+   islands in the Bight" as a leading error source, the same symptom we measured. No
+   *currently operational* system found in this research runs SWAN alone from the
+   open-ocean boundary to the surf zone at this domain size; the operational world moved
+   to the split (NWPS) or the transfer approach (CDIP). (Corrected 2026-08-15 — the first
+   version of this observation said "nobody found in the published record," overlooking
+   Rogers 2007 cited in this same document.)
 4. **Constraint discovered in passing:** the manual's nest-ratio guidance (factor 2–3,
    stated for WAM/WW3→SWAN) sits against our 10× L1→L2 jump — applicability to SWAN-in-SWAN
    unconfirmed, recorded here so it isn't lost.
