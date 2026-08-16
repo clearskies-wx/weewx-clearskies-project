@@ -1,5 +1,5 @@
 ---
-status: Proposed
+status: Accepted
 date: 2026-08-11
 deciders: shane
 supersedes:
@@ -8,9 +8,11 @@ superseded-by:
 
 # ADR-107: Wind provider decoupling + assembly (wind gatherer, single assembled timeline)
 
-**Status: Proposed — DRAFTED by the Z3.5 implementer per the fixit plan's Z3 re-scope note ("lifting
-the design into ADR/PROVIDER-MANUAL as the doc-sync this ruling never got"). Not marked Accepted by
-this draft; awaiting operator acceptance.**
+**Status: Accepted 2026-08-15 (operator, in chat: "yes adr107 is approved"). Drafted 2026-08-11 by
+the Z3.5 implementer per the fixit plan's Z3 re-scope note ("lifting the design into
+ADR/PROVIDER-MANUAL as the doc-sync this ruling never got"); it sat Proposed and untracked until the
+2026-08-15 ADR impact sweep prep surfaced it (Marine Model Evolution Plan, carry-over C20). Records
+the design the operator approved verbatim 2026-08-03, as built and running live.**
 
 ## Context
 

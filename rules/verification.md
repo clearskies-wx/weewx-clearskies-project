@@ -241,3 +241,36 @@ accidentally homogeneous (a freshness-gate interaction silently discarded the di
 and the Z3.9 gate found `ceil` vs `floor` indistinguishable under exact-hour fixtures. When a
 gate's mutation drill survives (the mutated code passes every test), that is a FINDING about the
 tests, not a pass.
+
+## Post-remediation reruns cover affected + adjacent suites (added 2026-08-15, operator-approved via Marine Model Evolution Plan Q3(b))
+
+**After remediating any audit finding or test failure, rerun the suites for the changed code AND
+the adjacent ones** — the directory containing the changed modules' tests plus every suite
+exercising the seams the fix touched — not just the single file the fix edited. A remediation that
+reruns only its own test file can break a neighbor silently; the round stays open until the wider
+rerun is green. Targeted scope still governs: the adjacent directories, never a repo-wide run
+(rules/agents.md "Never run the full pytest suite").
+
+**Why (2026-08-13, Z3.3→Z3.4):** a regression introduced at `7aab009` was missed by the round's
+own grep AND its `-k` test sweep, and surfaced only when a later round's lead cross-check happened
+to cover the seam. The false-claim protocol caught the reporting; this rule closes the scope hole
+that let the breakage through in the first place.
+
+## Carried-over items must cite an operator-validated premise (added 2026-08-15, operator-approved via Marine Model Evolution Plan Q3(d))
+
+**When an open item moves from a closed plan into a successor** (carry-over register, parking lot,
+deferred queue), **the receiving entry must cite the operator interaction that validated the
+item's premise** — the chat ruling, eyeball, or accept record showing the operator knows the issue
+exists and wants it worked. A prior session's own observation, hypothesis, or draft protocol is a
+FINDING to surface, never an inherited fact. If no validating interaction exists, the item enters
+tagged "unvalidated — surface to operator before any work," or does not enter at all. Carry-over
+reviews — including adversarial plan reviews — check premise validation, not just fidelity to the
+source document.
+
+**Why (2026-08-15, "Problem-2"):** a single-day observation recorded by a session coordinator in a
+protocol marked "draft for operator review" was carried through a plan close into the successor
+plan as an established defect — with a task, a pre-approval register row, and an open operator
+question built on top of it. The operator first learned the issue existed when asked to approve
+its capture mechanism ("THIS HAS NEVER BEEN RAISED AS AN ISSUE!") and dropped it on the spot. The
+adversarial review had verified the carry-over faithfully tracked the archive, but never asked
+whether the operator had ever validated the premise — fidelity to paperwork is not validation.

@@ -71,6 +71,8 @@ READING LIST (read these files BEFORE writing any code):
 
 SSH to containers is for READ-ONLY operations: running tests, reading logs, checking service status, verifying deployed behavior. That's it.
 
+**Scratch-experiment carve-out (added 2026-08-15, operator-approved via Marine Model Evolution Plan Q3(c)).** With the operator's explicit authorization — given per plan or per experiment, never assumed — an agent may WRITE on a container inside NAMED scratch directories only (e.g. `/tmp/<experiment>/`, a home-directory baselines folder), for build/benchmark/experiment work the plan defines: clone third-party source, build, run model marches, write outputs there. Everything outside the named directories stays read-only; production paths, services, repos, and all git operations remain untouchable; the standing contention rules bind (thread caps, `nice`, never start a march while a production full run is in flight, disk ceilings). The authorization names the directories — a directory not named is not writable. (Pattern: the E1/E2 experiment rounds and Phase F of MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.)
+
 **Agents have NO GitHub rights.** Agents must NOT run `git push`, `git pull`, `git fetch`, `git rebase`, `git merge`, or `git checkout` of remote branches — not on the local machine, not on containers, not anywhere. The coordinator handles all GitHub operations (push/pull) with explicit user authorization. If an agent discovers it needs to sync with a remote, it STOPS and reports via SendMessage.
 
 **The deploy flow is always:** local edit → local commit → coordinator pushes to GitHub → deploy script pulls to container. No shortcuts.
@@ -193,3 +195,9 @@ When a teammate's self-reported numbers are proven wrong by the lead's independe
 6. **Do not attribute malice.** Agents hit context limits, misread output, or run against stale state. The protocol exists to catch the error, not to punish it. But the error must be caught — that is non-negotiable.
 
 **Why (2026-05-11):** api-dev claimed "1762 passed, 0 failed"; reality was "1754 passed, 103 failed." 102 were pre-existing; 1 was introduced. The lead initially trusted the claim. The false-claim protocol ensures the lead always establishes ground truth independently before closing.
+
+## Adversarial gate briefs are results-free (added 2026-08-15, operator-approved via Marine Model Evolution Plan Q3(a))
+
+**An auditor's gate-definition file contains the METHOD to verify — never the implementer's claimed numbers, test output, commit messages, or closeout report.** The auditor derives its own numbers; the lead compares afterwards. rules/verification.md's three-layer model already bars showing the auditor the implementer's work product; this rule extends that to the gate definition itself: gate rows are written results-free, in a separate file the implementing agent never edits, BEFORE the results exist where possible.
+
+**Why (2026-08-14):** a gate brief that embedded the implementing round's expected numbers contaminated the adversarial pass — an auditor handed the answer confirms the answer. Every gate since has used results-free gate-definition files; this rule makes the practice standing project-wide.
