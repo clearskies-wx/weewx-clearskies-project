@@ -385,9 +385,15 @@ researched now against SWAN Manual and WW3 manual, as that is a weak area that t
 ALWAYS screw up." Every row below was re-verified against the LOCAL SWAN manual
 (`docs/reference/swan-user-manual.txt`) or the WW3 manual text on 2026-08-15, with line
 cites. **WW3 manual authority is v6.07 as of the 2026-08-16 Q5 ruling**
-(`scratch/ww3-manual-6.07.txt`, committed at DOC-W.4; the original research used the
-5.16 text, and the WW3-side rows' line cites are being re-derived against 6.07 — the
-re-verification pass's corrections land here as amendments BEFORE any F2 deck).
+(`scratch/ww3-manual-6.07.txt`, committed at DOC-W.4). **6.07 re-verification COMPLETE
+2026-08-16 (lead-spot-checked): every WW3-side row's grammar, code table, and quoted
+numeric value is UNCHANGED at 6.07 digit-for-digit** — the manual was reorganized (new
+Ch.6, deck examples → new App. G, appendix relettering C→B/D→C/E→D, §5.4.x→§5.9.x), so
+the `:NNNN` cites in the WW3-side rows below are 5.16-era HISTORICAL locations; the
+authoritative per-claim 6.07 line cites live in `scratch/SYNTAX-607-VERIFICATION.md`
+(committed at DOC-W.4 beside the manual). Gates syntax-checking decks use the 6.07
+cites from that report. One substantive 6.07 delta, absorbed by design: ST6's
+calibration-table defaults changed from 5.16 (see the F1b note).
 **Standing rule: a deck/input construct NOT prescribed here is a STOP-and-surface, never
 an agent improvisation; every gate that reads an emitted deck syntax-checks it line by
 line against these rows AND the cited manual text.**)*
@@ -524,7 +530,11 @@ manual; line cites below are 5.16-era pending the 6.07 re-verification amendment
      (:10397–10423).
 6c. **Wind-field preprocessor decks (WD6's ww3_prnc/prep path):**
    - `ww3_prep` (ASCII, §4.4.6 :9225–9433): field-type line `'WND' 'LL' T T` (field
-     type, format type AI/LL/F1/F2, time-in-file flag, header flag, :9253–9306); for
+     type, format type AI/LL/F1/F2, time-in-file flag, header flag, :9253–9306 —
+     provenance correction 2026-08-16: the manual's own §4.4.6 worked example is
+     `'ICE' 'LL' F T` (6.07 :17983); our `'WND' 'LL' T T` is the same grammar with the
+     wind field type and time-in-file TRUE, composed from the field-definition table,
+     not a verbatim manual example); for
      `'LL'` a grid-range line `x0 xn nx y0 yn ny` (degrees or metres, :9320–9328);
      data-file definition — FROM/IDLA/IDFM + format string(s), then unit + filename
      per file (:9374–9384; unit 10 = data inline, :9391–9393). Product: `wind.ww3`.
@@ -715,6 +725,13 @@ designed in-plan, decided by measurement, frozen in ADR-109:
   :2746–2769; ST4 TEST471 defaults :2381–2412). Phase F measures the packages AS
   PUBLISHED — it does not calibrate them; any tuning away from defaults is a
   physics-constant change and an operator ruling (register withheld line).
+  **"Defaults" means the 6.07 defaults (2026-08-16, from the Q5 syntax
+  re-verification):** 6.07's ST6 Table 2.8 carries a genuine new vers-6.07 default
+  column differing from 5.16 (SDSP1 a1 3.74E-7→4.75E-6; SINA0 a0 5.24E-6→7.00E-5;
+  β/CSTB1 28.0-hardcoded→32.0-namelist; 6.07 text :3070/:3139) — our 6.07.1 build
+  picks these up automatically under the untouched rule; ADR-109 quotes the 6.07
+  column, never 5.16-era ST6 numbers. CDFAC=0.09 (the one value F1b names) is
+  unchanged at 6.07.
 - **Companion tokens (designed now, grammar per SYNTAX row 7):** propagation `PR3 UQ`
   (the third-order, garden-sprinkler-alleviated scheme — the default operational scheme
   per the feasibility report's source read of `w3pro3md.F90`); `LN1` linear input for
@@ -894,7 +911,7 @@ health/config surface (PW5). Help-content keys for wizard/admin surface changes 
 rule: same commit).
 
 ### DOC-W.4 — Reference docs committed
-WW3 manual v6.07 text extraction (Q5 ruling — matches the built 6.07.1 binaries) → `docs/reference/ww3-user-manual-v6.07.txt` with a
+WW3 manual v6.07 text extraction (Q5 ruling — matches the built 6.07.1 binaries) → `docs/reference/ww3-user-manual-v6.07.txt` — plus `scratch/SYNTAX-607-VERIFICATION.md` committed beside it (the authoritative 6.07 line-cite map for the SYNTAX rows) — with a
 provenance header (NOAA-hosted PDF, extraction date/method) + a short
 `docs/reference/ww3-commands-extract.md` (frozen, syntax-lookup-only, same convention as
 the SWAN extract). CLAUDE.md routing row gains the WW3 manual (SWAN row pattern: local
