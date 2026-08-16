@@ -44,7 +44,7 @@ cited as history.
 | # | Task (plain name) | Status |
 |---|---|---|
 | F0 | Back up the benchmark input files before /tmp eats them | ✅ DONE 2026-08-15 (session 2). `~/ww3-baselines/e1e2/` on librewxr: 288 files / 1,440,943,416 B, sha256-verified vs source (empty diff); local input-set mirror `scratch/baselines-e1e2/`: 237 files / 289,790,098 B, sha256-verified; lead independently spot-checked counts+bytes+3 file hashes at all three ends (match). Report: `scratch/F0-INVENTORY.md`. Deviation (methodology-only, disclosed): rsync -a used instead of cp -a. /tmp/e1e2 untouched. |
-| F1 | Build WW3 from source + smoke test, both physics candidates | ✅ DONE 2026-08-15 (session 2). NOAA-EMC/WW3 tag 6.07.1 (b582f8c); P1 (ST6/FLX4) + P2 (ST4/FLX0) built clean per F1b tokens verbatim, 10 binaries, all sha256s lead-verified OK; smoke ww3_ts2 normal end both (0.56 s / 1.15 s, lead-verified); NOAA-practice check: README.NCEP shows operational ST4+FLX0 = P2's pairing, no contradiction. Report `scratch/F1-BUILD-REPORT.md`, artifacts `scratch/f1-artifacts/`. TWO LEAD FINDINGS: (1) version skew — plan/manual say v5.16, only buildable release is 6.07.1 → **Q5 OPEN, F2 holds for the ruling**; (2) aux programs (ww3_bound/bounc, ww3_prnc/prep) not built and source clone deleted (re-fetchable) → folded into F2's scope |
+| F1 | Build WW3 from source + smoke test, both physics candidates | ✅ DONE 2026-08-15 (session 2). NOAA-EMC/WW3 tag 6.07.1 (b582f8c); P1 (ST6/FLX4) + P2 (ST4/FLX0) built clean per F1b tokens verbatim, 10 binaries, all sha256s lead-verified OK; smoke ww3_ts2 normal end both (0.56 s / 1.15 s, lead-verified); NOAA-practice check: README.NCEP shows operational ST4+FLX0 = P2's pairing, no contradiction. Report `scratch/F1-BUILD-REPORT.md`, artifacts `scratch/f1-artifacts/`. TWO LEAD FINDINGS: (1) version skew — RESOLVED by Q5 ruling 2026-08-16 (6.07 manual pulled, syntax re-verification pass dispatched, F2 unblocks after it); (2) aux programs (ww3_bound/bounc, ww3_prnc/prep) not built and source clone deleted (re-fetchable) → folded into F2's scope |
 | F2 | Configure WW3 for our waters (scratch only) | ⬜ |
 | F3 | Run the benchmark marches | ⬜ |
 | F4 | The three verdict measurements (cost / physics / handoff) | ⬜ |
@@ -64,8 +64,8 @@ cited as history.
 | Gate V | Independent audit of the campaign method (declared before data) | ⬜ |
 | V4 | **YOUR RULING:** cut over / hold shadow + start LUT / extend | ⬜ |
 | V5 | Post-cutover watch + retirement ruling (only if V4 = cut over) | ⬜ |
-| R2.1 | Recount the unfed-east-boundary bound (read-only; unblocked now, runs when scheduled) | ✅ DONE + Gate R2.1 PASS 2026-08-15 (session 2). Corrected bound at 06Z (index 2): seam points 16.6–24.5% unfed (worst seam6 24.5%, Hs 0.644→0.560 m), mean 15.3% across 10 points — ~2.2× the defective-18Z figure (which reproduced exactly: 7.0–11.1%). Two independent derivations agree (implementer + blind auditor; `scratch/R21-CENSUS-REPORT.md`, `scratch/GATE-R21-AUDIT.md`). Caveats attached: ambient-substitution assumption + single-snapshot sensitivity. **AWAITING OPERATOR: PW7 materiality ruling (Q4)** |
-| R2.2 | Feed the east boundary (ONLY if you rule R2.1's number material) | ⬜ |
+| R2.1 | Recount the unfed-east-boundary bound (read-only; unblocked now, runs when scheduled) | ✅ DONE + Gate R2.1 PASS 2026-08-15 (session 2). Corrected bound at 06Z (index 2): seam points 16.6–24.5% unfed (worst seam6 24.5%, Hs 0.644→0.560 m), mean 15.3% across 10 points — ~2.2× the defective-18Z figure (which reproduced exactly: 7.0–11.1%). Two independent derivations agree (implementer + blind auditor; `scratch/R21-CENSUS-REPORT.md`, `scratch/GATE-R21-AUDIT.md`). Caveats attached: ambient-substitution assumption + single-snapshot sensitivity. Q4 RULED 2026-08-16: NOT MATERIAL (premise physically impossible — see Q4 record); R2.2 dead |
+| R2.2 | ~~Feed the east boundary~~ DEAD 2026-08-16 (Q4 ruled NOT MATERIAL — premise physically impossible for >11 s; PW7 dead) | ✅ closed-no-work |
 | R4 | Numerics experiments (scratch, idle time only) | ⬜ |
 | L0+ | Lookup-table system design + build (LAST; opens only on your "accurate and defensible") | ⬜ |
 
@@ -305,7 +305,7 @@ scratch-only and needs no register row (no production change of any kind).
 | PW4 | **Boundary reconstruction gains a WW3-input emitter**: the existing parametric-spectra reconstruction (constants UNCHANGED) gains an output path writing WW3 boundary input for the WW3 leg's offshore boundary — assembled by ww3_bound OR ww3_bounc, whichever ADR-109 picks from F evidence (SYNTAX row 9; this row does not pre-decide it). | 4, 7 | Research brief §7 (nesting mechanism); reuse of the solved reconstruction problem |
 | PW5 | **WW3-leg operational surface**: health keys (WW3 nest age analog of `l1NestAge`), refuse gates, config keys for the WW3 leg **including the per-site shadow-mode key (run-without-serving — the mechanism W-Accept's dark launch uses)**, wizard+admin surface for install/health status DISPLAY only (read-only — there is NO enable/disable knob: WW3 is always-on per Q1, and the sole write-capable key is the TRANSITION-ONLY shadow-mode key, which dies with the transition at cutover/retirement); no model-setup controls of any kind reach a product surface (PRIME DIRECTIVE 11). Key names/values fixed in ADR-109. | 6, 7 | Refuse-loudly posture carry-over; OPERATIONS-MANUAL sync; Q1 always-ruling (no enable state exists to surface) |
 | PW6 | **Handoff placement rule (R1) — DETECTION ONLY**: grid-sizing gains the depth-step DETECTION rule (brief §5: per-cell depth-change ratio), computed and logged as a standing diagnostic and as an F5-catalog input to WW3 grid sizing. Placement preference is APPLIED only to the new WW3→L2 handoff at Phase W. **Relocating the LIVE SWAN-L1 path's L1→L2 seam is WITHHELD** — the research verdict is that seam relocation is UNPROVEN as a fix (brief §2); if V2's cliff-KAT measurement shows it helps, the relocation returns to the operator and, if ruled, enters by plan amendment with its own task row, gate, and separate deploy. (Fix 2026-08-15, adversarial review F3 — the prior text pre-authorized an unproven change that no task owned.) | 3 | Research brief §2 + §5; V2 delivers the verdict; operator rules |
-| PW7 | **Fed E-side boundary (R2)** — IF the OPERATOR rules the re-derived census (R2.1, read-only) material. "Material" has NO numeric default: R2.1's corrected bound goes to the operator, and R2.2 dispatches only on that explicit ruling. Then: the E offshore side gains boundary feeding via the existing per-wet-cell mechanism. NOT pre-approved beyond that mechanism; a different mechanism returns to the operator. | 3, 4 | Fixit-plan unfed-E finding (8–11 pt upper bound, index-corrected derivation pending) |
+| PW7 | **DEAD 2026-08-16** (operator ruling, Q4: NOT MATERIAL — "the east side is land?"). Was: fed E-side boundary (R2.2) contingent on a materiality ruling over R2.1's bound. The bound was arithmetically verified twice (16.6–24.5%) but rested on a physically impossible premise for >11 s energy (coast/Baja-blocked directions filled with open-ocean ambient). Nothing is authorized by this row; R2.2 never dispatches. | — | Operator ruling 2026-08-16 (Q4 record) |
 | PW8 | **DROPPED 2026-08-15** (operator, in chat: "drop it"). Was: the Problem-2 multiSwell-selection fix, withheld pending a confirmation protocol whose underlying observation the operator was never shown. Nothing is authorized by this row; any future multiSwell selection/assembly change starts from scratch as a new operator ruling. | — | Operator ruling 2026-08-15 |
 | PW9 | **LUT system (Phase L)**: WITHHELD ENTIRELY. Phase L opens with its own design round and ADR-110; nothing in Phase L is authorized by this register. Listed so the boundary is explicit. | all | Operator: LUT is last, gated on defensible model results |
 
@@ -383,8 +383,11 @@ changes only through the V4/V5 rulings).
 *(Operator order 2026-08-15: "syntax prescriptions NEED TO BE DETAILED IN THE PLAN and
 researched now against SWAN Manual and WW3 manual, as that is a weak area that the agents
 ALWAYS screw up." Every row below was re-verified against the LOCAL SWAN manual
-(`docs/reference/swan-user-manual.txt`) or the WW3 v5.16 manual text
-(`scratch/ww3-manual-5.16.txt`, committed at DOC-W.4) on 2026-08-15, with line cites.
+(`docs/reference/swan-user-manual.txt`) or the WW3 manual text on 2026-08-15, with line
+cites. **WW3 manual authority is v6.07 as of the 2026-08-16 Q5 ruling**
+(`scratch/ww3-manual-6.07.txt`, committed at DOC-W.4; the original research used the
+5.16 text, and the WW3-side rows' line cites are being re-derived against 6.07 — the
+re-verification pass's corrections land here as amendments BEFORE any F2 deck).
 **Standing rule: a deck/input construct NOT prescribed here is a STOP-and-surface, never
 an agent improvisation; every gate that reads an emitted deck syntax-checks it line by
 line against these rows AND the cited manual text.**)*
@@ -441,7 +444,8 @@ line against these rows AND the cited manual text.**)*
    CLOSED` chain untouched (same-coordinate-system rule :2592; CGRID-before-BOUNDNEST1
    :2575–2576).
 
-**WW3 side (v5.16 manual + WW3 source; NEVER inferred from the SWAN manual):**
+**WW3 side (v6.07 manual + WW3 source per the Q5 ruling; NEVER inferred from the SWAN
+manual; line cites below are 5.16-era pending the 6.07 re-verification amendments):**
 
 6. **`ww3_grid.inp` structure (the model-definition input):**
    - Spectral definition line: frequency increment factor, first frequency (Hz), number
@@ -564,7 +568,7 @@ line against these rows AND the cited manual text.**)*
     match SWAN's `UNFORMATTED`/`FREE` keyword (row 4); the output points must be the
     SWAN nest-boundary locations in boundary sequence (rows 4/8). **F-phase compatibility
     row (mandatory before ADR-109 picks A): one real transfer file written by OUR
-    v5.16-built `ww3_outp` and read by OUR SWAN 41.51AB `BOUNDNEST3`, end to end — a
+    6.07.1-built `ww3_outp` (version per F1-as-built + Q5 ruling) and read by OUR SWAN 41.51AB `BOUNDNEST3`, end to end — a
     reader/writer format mismatch here is exactly the hours-of-troubleshooting class
     this section exists to prevent.**
 11. **The boundary-only validation run is a standing instrument:** the WW3 manual's own
@@ -833,7 +837,7 @@ boundary if ADR-109 picks mechanism A). For EACH input, four columns: the govern
 determines it, the derivation formula or criterion, and which existing setup analysis
 (ray tracing / fetch fan, bathymetry analysis, OSM chain) supplies that information — or a
 named GAP where the setup chain must be extended (**the gap list becomes W4's scope**).
-Sources: the WW3 manual (scratch extraction `scratch/ww3-manual-5.16.txt` until DOC-W.4
+Sources: the WW3 manual (v6.07 per the Q5 ruling — scratch extraction `scratch/ww3-manual-6.07.txt` until DOC-W.4
 commits it), NOAA's practice record (feasibility report), F1–F4 hands-on results.
 Deliverable: the catalog document — it lands in ADR-109 + PROVIDER-MANUAL at DOC-W, and
 every F2 deck line must trace to one of its rows.
@@ -890,7 +894,7 @@ health/config surface (PW5). Help-content keys for wizard/admin surface changes 
 rule: same commit).
 
 ### DOC-W.4 — Reference docs committed
-WW3 manual v5.16 text extraction → `docs/reference/ww3-user-manual-v5.16.txt` with a
+WW3 manual v6.07 text extraction (Q5 ruling — matches the built 6.07.1 binaries) → `docs/reference/ww3-user-manual-v6.07.txt` with a
 provenance header (NOAA-hosted PDF, extraction date/method) + a short
 `docs/reference/ww3-commands-extract.md` (frozen, syntax-lookup-only, same convention as
 the SWAN extract). CLAUDE.md routing row gains the WW3 manual (SWAN row pattern: local
@@ -1376,7 +1380,18 @@ refuse design where V14's themes already land; (c) drop (especially the three va
 ones, which would otherwise sit unfalsifiable forever). No work happens on any of them
 without your word.
 
-### Q5 — OPEN (2026-08-15): The WW3 we can build is version 6.07.1; the plan's manual and grammar research are version 5.16. How do you want the mismatch handled?
+### Q5 — ✅ RULED 2026-08-16 (operator, in chat): use the 6.07 manual — "if 6.07 is the current model, then you should pull the manual for it… And update the plan to reflect the current manual."
+**Applied same day:** NOAA's official v6.07 manual (2019 Tech Note, the NOAA-EMC/WW3
+wiki's own copy) downloaded and extracted to `scratch/ww3-manual-6.07.txt` (22,961
+lines); it REPLACES the 5.16 text as the project's WW3 authority everywhere forward
+(binding sections swept below; DOC-W.4 now commits the 6.07 manual). ALL WW3-side
+SYNTAX line cites pointed into the 5.16 extraction — a re-verification pass of every
+WW3-side row (6–13 + F1b's cites) against the 6.07 text was dispatched at the ruling;
+its corrections land as plan amendments BEFORE F2 writes any deck. F2 dispatches after
+that pass. Historical round-close entries keep their 5.16 mentions (they describe what
+happened then).
+
+### ~~Q5 (original question, kept for the record)~~ The WW3 we can build is version 6.07.1; the plan's manual and grammar research are version 5.16. How do you want the mismatch handled?
 
 **Plain English.** The plan's detailed model-input grammar rules (the SYNTAX
 PRESCRIPTIONS you ordered researched in advance) were researched against the WW3 user
@@ -1401,7 +1416,22 @@ NOAA no longer supports).
 **F2 (our-domain configuration) HOLDS until you rule** — its decks depend on exactly the
 grammar in question. F1's binaries and everything else already done are unaffected.
 
-### Q4 — OPEN (2026-08-15): Is the corrected unfed-East-boundary number big enough to fund the fix (the PW7 ruling)?
+### Q4 — ✅ RULED 2026-08-16 (operator, in chat): NOT MATERIAL — R2.2 is DEAD. Ruling delivered as a premise challenge: "Ummm the east side is land?"
+**What the challenge established (lead verification, commands in session record):** the
+census's arithmetic was correct twice over, but its QUESTION was physically senseless
+for the headline band. The E-exit directions are azimuths 100–170° (from the ESE–SSE);
+beyond the grid's East edge lies ~50–60 km of water and then the San Diego/Baja
+coastline — no fetch, Baja shadowing — so >11 s swell cannot arrive from those
+directions. The census substituted open-ocean southern-boundary energy into
+coast-blocked direction bins, manufacturing the 16.6–24.5% figure. Common-sense premise
+check failed before any arithmetic mattered. R2.2 does not run; PW7 authorizes nothing
+(marked DEAD below); the only physical residue (occasional short-period easterly
+wind-sea) is V3's to catch with real evidence if it ever matters, and the WW3 leg's
+NOAA-fed boundaries (real geography, Baja included) make the question obsolete at
+target state. LESSON routed at the ruling: premise-sanity-before-arithmetic →
+rules/verification.md (pending operator OK on the wording, offered in chat).
+
+### ~~Q4 (original question, kept for the record)~~ Is the corrected unfed-East-boundary number big enough to fund the fix (the PW7 ruling)?
 
 **Plain English.** Our wave model's offshore box has four sides. We feed real wave data
 in through the South and West sides; the East side gets nothing. For waves arriving from
