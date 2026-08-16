@@ -336,8 +336,8 @@ changes only through the V4/V5 rulings).
 | C12 | Research-round scratch artifacts worth keeping (WW3 manual text extraction, energy-ledger scripts, and the `/tmp/e1e2` pinned baseline inputs + cliff-KAT deck) | `scratch/` holds the manual extraction. The ledger scripts were /tmp-ONLY until 2026-08-15 — the final review (G18) caught this row claiming otherwise — and are NOW mirrored to `scratch/energy-ledger-scripts/` (9 .py files copied from /tmp/e1e2 the same day). The /tmp/e1e2 pinned INPUTS + decks remain /tmp-only and NOT re-fetchable (the WW3 source clone was DELETED 2026-08-15 per the SSD cleanup — re-fetchable) | DOC-W.4 commits the WW3 manual text to docs/reference AND the ledger scripts to `scripts/analysis/` (repo changes belong to DOC-W, keeping Phase F pure scratch); task F0 still preserves the FULL /tmp/e1e2 pinned-input set + cliff-KAT deck at GO, BEFORE any other work (the script mirror does not shrink F0's scope — checksummed inventory of everything) |
 | C13 | Phase T (tide coherence) close acknowledgment — the archived plan's WAITING-ON-OPERATOR item 4, deployed but never nodded closed | owed since 2026-08-11 | One-line operator acknowledgment (or reopen) at any convenience; listed so it isn't lost |
 | C14 | ~~Un-answered `L1_NEST_MAX_AGE_H = 9` semantics~~ ✅ RULED 2026-08-15 (operator, in chat: "yes a"): **REFUSE** — when the archived nest exceeds 9 h, the hourly cycle stops publishing, the site serves the last good forecast, health goes red with the named reason. The live default is now operator-confirmed | resolved | ADR-109 copies these semantics to the WW3-leg age gate; the same refuse posture is the precedent for LUT-era input-freshness gates |
-| C15 | Z3.8 state-audit findings with NO recorded closure: V6 (retry loop: no backoff/failure-counter/escalation), V7 (staleness-honesty — health reads green during outages), V11 (hourly trigger cleared before the attempt, no retry), V12 (run-dedup MemoryCache-only, lost on restart), V13 (non-atomic `swan_grid_sizing.json` persist), V14 (parked LOWs) | disposition unknown — buried in the archive's audit narrative. **UNVALIDATED — surface to operator before any work** (carried-premise rule: these are a session audit's findings; no operator ruling on them is on record) | Read-only disposition audit (any time after GO): verify each at current HEAD — closed-by-later-round (cite the commit) vs still open; the surviving list goes TO THE OPERATOR before any becomes a tracked work row. Findings feed W5's health/refuse design |
-| C16 | Z3.10/Z3.11 parking lot: `model_wave_source.py:121` blind `swells[0]` on non-surf marine cards; NDBC fetch stagger; RTOFS currents; hotstart age; graceful degradation | parked in archive narrative, no live home. **UNVALIDATED — surface to operator before any work** (carried-premise rule: session-audit parking-lot items, never operator-ruled) | Tracked here; triaged with C15's disposition audit, same surface-first discipline |
+| C15 | Z3.8 state-audit findings with NO recorded closure: V6 (retry loop: no backoff/failure-counter/escalation), V7 (staleness-honesty — health reads green during outages), V11 (hourly trigger cleared before the attempt, no retry), V12 (run-dedup MemoryCache-only, lost on restart), V13 (non-atomic `swan_grid_sizing.json` persist), V14 (parked LOWs) | ✅ DISPOSITION AUDIT DONE 2026-08-15 (session 2, lead-spot-checked): **V6/V7/V11/V12/V13 CLOSED** by marine `237b34c` (Z3.9b, operator-ruled 2026-08-13 "all the mechanical fixes need done"; verified un-reverted at HEAD). **V14 STILL OPEN** (3 sub-items: blocking no-timeout lock in geometry-push path; post-restart cooldown in-memory only; no hotstart-age gate). Full evidence `scratch/C15C16-DISPOSITION.md` | Surviving list → **Q6 (operator)**. Findings feed W5's health/refuse design |
+| C16 | Z3.10/Z3.11 parking lot: `model_wave_source.py:121` blind `swells[0]` on non-surf marine cards; NDBC fetch stagger; RTOFS currents; hotstart age; graceful degradation | ✅ DISPOSITION AUDIT DONE 2026-08-15 (session 2, lead-spot-checked): `model_wave_source.py` gap REAL but archive framing WRONG (module is surf-spot-only; the live gap is the missing `_MIN_SURFABLE_PERIOD_S` 5 s floor every other selection site has — bare `swells[0]` now at :123). "Hotstart age" = V14 sub-item 3 (not double-counted). NDBC stagger / RTOFS currents / graceful degradation: **CANNOT ESTABLISH** — archive gives bare phrases, no testable claim. Evidence `scratch/C15C16-DISPOSITION.md` | Surviving + unresolvable items → **Q6 (operator)** |
 | C17 | ~181 stale old-design `B_*.txt` on librewxr disk (inert — INPUT never references them; B2-Accept record) | cleanup candidate | Housekeeping round, operator-visible before any deletion |
 | C18 | Currents tail-hold path (Z3.9 ruling (a)) never live-exercised | verification queue. Premise citation (carried-premise rule): Z3.9 ruling (a) IS an operator ruling, recorded in the archived Fixit plan | Watch during the V1 shadow campaign: confirm on a cycle where WCOFS demonstrably falls short of coverage_end |
 | C19 | Parked physics candidates from the archive's close: L4/1-D deep-ledge handoff loss; 5° directional-resolution experiment for the NEARSHORE chain (E7 closed the directional question for the L1 seam ONLY) | parked. **UNVALIDATED — surface to operator before any work** (carried-premise rule: lead/agent-parked candidates; no operator ruling on either is on record) | Experiment-class (R4 pattern): scratch-only, idle capacity, operator-INFORMED FIRST (the tag above makes that mandatory, not courtesy); listed so they are not lost |
@@ -1348,6 +1348,33 @@ architectural permission record.
 
 *(Plain English, self-contained, newest at top. Answered items get their ruling recorded
 here and applied.)*
+
+### Q6 — OPEN (2026-08-15): Old audit leftovers — what survives, what's dead. Your call on each.
+
+**Plain English.** Last week's deep audit of the marine service produced a list of
+mechanical defects. Most were fixed then; a few were parked with no ruling from you on
+record. A read-only audit (evidence: `scratch/C15C16-DISPOSITION.md`, spot-checked by
+the lead) has now established exactly what remains. Five of the six main findings are
+CONFIRMED FIXED (commit `237b34c`, which you ordered on 2026-08-13). What survives:
+
+1. **Three small "V14" leftovers** (all graded LOW at the time): (a) one code path that
+   grabs the model-run lock with no timeout — if the model hangs, that caller hangs
+   forever behind it; (b) the "don't re-run too soon after a full model run" cooldown is
+   forgotten whenever the service restarts; (c) nothing checks the age of the model's
+   warm-start file before reusing it.
+2. **One real gap in the wave-source module:** it picks the first swell in the list with
+   no minimum-period sanity floor — every other place in the code that picks a dominant
+   swell now requires ≥ 5 s period first. (The archived description of this item was
+   wrong about where it applies; the audit corrected the record.)
+3. **Three items too vague to judge** — "NDBC fetch stagger," "RTOFS currents,"
+   "graceful degradation" exist in the archive only as bare phrases with no described
+   defect. They cannot be verified or refuted as written.
+
+**Your options, per item or wholesale:** (a) fund as small tracked fix rows in this plan
+(items 1–2 are mechanical, each small); (b) defer — e.g. fold into Phase W's health/
+refuse design where V14's themes already land; (c) drop (especially the three vague
+ones, which would otherwise sit unfalsifiable forever). No work happens on any of them
+without your word.
 
 ### Q5 — OPEN (2026-08-15): The WW3 we can build is version 6.07.1; the plan's manual and grammar research are version 5.16. How do you want the mismatch handled?
 
