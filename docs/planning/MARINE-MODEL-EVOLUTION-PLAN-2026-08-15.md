@@ -1374,6 +1374,23 @@ here and applied.)*
 **Lead triage under the ruling (this chat ruling is the authorization for the named
 fixes, including their mechanical trigger-7 edges — new persisted shadow file, new
 timeout constant):**
+**ROUND CLOSED 2026-08-16:** all three fixes landed as marine locals 43744de (V14a) /
+de2738f (V14b) / 09c0a1b (C16 floor) with same-commit tests (falsifiability proven:
+period-floor tests verified by actual revert-and-run 3-fail/4-pass; V14a/V14b by
+structural argument). Lead independently reproduced the targeted suite (25 passed),
+verified the allowlist diff (7 files exact), and confirmed the one uncertain
+pre-existing failure at baseline e40d2c9 via temp-clone rerun. Adversarial audit
+(results-free, firewalled): **could-not-disprove, 0 defects**, 2 LOW observations —
+(F1) the pre-existing `run_grid_sizing_chain()` catch-all makes a lock-timeout abort
+indistinguishable from other chain failures at the health surface → routed to W5's
+health/refuse design (same bucket as V14c); (F2) theoretical unguarded reconstruction
+race, single-caller-path, convergent — no action. Commits LOCAL ONLY (C9 inventory:
+marine now ahead by 4); deploy + authoritative librewxr test rerun happen at the next
+operator-authorized push/deploy round. Incident on record: the round's triage briefly
+applied a stale Aug-11 pre-split stash (content already landed as 1ff5124) via
+`git stash pop` in the shared checkout — agent froze correctly, lead verified
+staleness and restored the tree (`git reset --hard HEAD`, stash ref preserved);
+stash-ref disposal + the no-git-stash rule-lesson pending with the operator.
 - **FIX NOW (live serving path, matters through the whole transition and beyond):**
   (1) V14a — bounded, loud lock acquisition in the geometry-push path
   (`grid_sizing_chain.py:407`, `tools/reestablish_spot.py:402`): timeout 7200 s (above
