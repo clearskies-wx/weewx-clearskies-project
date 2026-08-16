@@ -1,25 +1,27 @@
 # Marine Model Evolution Plan — WW3 deep-water leg, evidence-driven strengthening, hybrid LUT (2026-08-15)
 
-## INDEX — alphabetical, except the PHASE entries sit in EXECUTION ORDER (keep current; sections below sit in execution order — FIND THINGS HERE. Every new `##` section gets an entry the same commit.)
+## INDEX — sections listed in FILE ORDER, top to bottom. The phases execute in exactly the order they appear. (Keep current; every new `##` section gets an entry the same commit.)
+
+**EXECUTION ORDER, one line:** F → DOC-W → W → DOC-W-FINAL (concurrent with V1–V3) → V4 → V5 (only if V4 rules cutover) → L. Phase R is the one exception to straight-through reading: R2.1 is unblocked at GO, R4 is idle-capacity-only, R1 lives inside W4/V2 — its section sits after V because its gated work (R2.2) cannot start before V-era rulings.
 
 Ctrl-F the exact heading text:
 
 - `## 📍 CURRENT STATE` — live state, rulings, waiting-on-operator
+- `## PRIME DIRECTIVE` — binding on every task
+- `## PRE-APPROVAL REGISTER` — which architectural changes this plan authorizes
 - `## CARRY-OVER REGISTER` — open items inherited from the closed Fixit plan
 - `## NAMED CONSTANTS` — plan-fixed values agents may not re-derive
-- `## OPEN OPERATOR QUESTIONS`
-- `## PHASE F` — WW3 feasibility build + benchmark (scratch-only, first)
-- `## PHASE DOC-W` — ADR-109 + governing docs BEFORE implementation code (preliminary round)
-- `## PHASE DOC-W-FINAL` — as-built doc re-sync AFTER Phase W; gates V4 (final round)
-- `## PHASE W` — WW3 deep-water leg implementation
-- `## PHASE V` — validation against reality + disposition ruling (cutover no longer forced)
-- `## PHASE R` — strengthening fixes from the research brief
-- `## PHASE L` — hybrid lookup-table (LUT) system (LAST, gated)
-- `## PRE-APPROVAL REGISTER` — which architectural changes this plan authorizes
-- `## PRIME DIRECTIVE`
-- `## Round-close & bookkeeping`
 - `## SYNTAX PRESCRIPTIONS` — SWAN (local manual) + WW3 (its own manual), binding
 - `## WW3 MODEL DESIGN v1` — the WW3 model definition (WD1–WD10): grids, spectral, steps, forcings, outputs
+- `## PHASE F` — WW3 feasibility build + benchmark (scratch-only, FIRST)
+- `## PHASE DOC-W` — ADR-109 + governing docs BEFORE implementation code (preliminary round)
+- `## PHASE W` — WW3 deep-water leg implementation
+- `## PHASE DOC-W-FINAL` — as-built doc re-sync AFTER Phase W; gates V4 (final round)
+- `## PHASE V` — validation against reality + disposition ruling (cutover no longer forced)
+- `## PHASE R` — strengthening fixes (exception to straight-through order — see the one-liner above)
+- `## PHASE L` — hybrid lookup-table (LUT) system (LAST, gated)
+- `## Round-close & bookkeeping`
+- `## OPEN OPERATOR QUESTIONS`
 
 ## 📍 CURRENT STATE — updated every working session (last: 2026-08-15, GO received)
 
