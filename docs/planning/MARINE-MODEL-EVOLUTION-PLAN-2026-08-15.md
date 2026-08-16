@@ -43,7 +43,7 @@ cited as history.
 
 | # | Task (plain name) | Status |
 |---|---|---|
-| F0 | Back up the benchmark input files before /tmp eats them | 🔄 IN PROGRESS (re-dispatched 2026-08-15 session 2 — the first dispatch died with its session, no output; /tmp/e1e2 re-verified intact 1.4 GB before re-dispatch) |
+| F0 | Back up the benchmark input files before /tmp eats them | ✅ DONE 2026-08-15 (session 2). `~/ww3-baselines/e1e2/` on librewxr: 288 files / 1,440,943,416 B, sha256-verified vs source (empty diff); local input-set mirror `scratch/baselines-e1e2/`: 237 files / 289,790,098 B, sha256-verified; lead independently spot-checked counts+bytes+3 file hashes at all three ends (match). Report: `scratch/F0-INVENTORY.md`. Deviation (methodology-only, disclosed): rsync -a used instead of cp -a. /tmp/e1e2 untouched. |
 | F1 | Build WW3 from source + smoke test, both physics candidates | ⬜ |
 | F2 | Configure WW3 for our waters (scratch only) | ⬜ |
 | F3 | Run the benchmark marches | ⬜ |
