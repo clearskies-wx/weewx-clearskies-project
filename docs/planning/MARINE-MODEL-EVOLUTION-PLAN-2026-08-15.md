@@ -1353,7 +1353,30 @@ architectural permission record.
 *(Plain English, self-contained, newest at top. Answered items get their ruling recorded
 here and applied.)*
 
-### Q6 — OPEN (2026-08-15): Old audit leftovers — what survives, what's dead. Your call on each.
+### Q6 — ✅ RULED 2026-08-16 (operator, in chat): "If they still matter with the new plan, and need fixed, then fix them, if they are moot under the new plan, who cares."
+**Lead triage under the ruling (this chat ruling is the authorization for the named
+fixes, including their mechanical trigger-7 edges — new persisted shadow file, new
+timeout constant):**
+- **FIX NOW (live serving path, matters through the whole transition and beyond):**
+  (1) V14a — bounded, loud lock acquisition in the geometry-push path
+  (`grid_sizing_chain.py:407`, `tools/reestablish_spot.py:402`): timeout 7200 s (above
+  any legitimate ~88-min full-run hold), on timeout refuse loudly with named reason —
+  never hang, never proceed lock-less; (2) V14b — post-restart cooldown survival:
+  on-disk shadow of the last-full-run time (the V9/V12 Z3.9b shadow pattern, atomic
+  persist per V13), reconstructed on restart; (3) C16 period floor —
+  `model_wave_source.py` swell-slot selection gains the Z3.11
+  `_MIN_SURFABLE_PERIOD_S` (5 s) eligibility floor every other selection site already
+  has (imported from `surf_1d_pipeline`, the surf.py pattern). Round: `clearskies-api-dev`
+  implements + same-commit tests; adversarial auditor pass; lead gate. Deploy is a
+  SEPARATE later authorization (needs the push word; commits stay local per C9).
+- **FOLD INTO W5 (moot as standalone — the new plan owns it):** V14c hotstart-age gate —
+  exactly W5's health/refuse design territory, and SWAN hotstart mechanics are frozen
+  core besides. No separate work.
+- **DROPPED (moot/unfalsifiable):** "NDBC fetch stagger," "RTOFS currents," "graceful
+  degradation" — bare phrases with no describable defect (C15/C16 audit: CANNOT
+  ESTABLISH). Dead unless a real symptom ever surfaces with evidence.
+
+### ~~Q6 (original question, kept for the record)~~ Old audit leftovers — what survives, what's dead. Your call on each.
 
 **Plain English.** Last week's deep audit of the marine service produced a list of
 mechanical defects. Most were fixed then; a few were parked with no ruling from you on
