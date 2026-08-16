@@ -43,7 +43,7 @@ cited as history.
 
 | # | Task (plain name) | Status |
 |---|---|---|
-| F0 | Back up the benchmark input files before /tmp eats them | 🔄 IN PROGRESS (agent running) |
+| F0 | Back up the benchmark input files before /tmp eats them | 🔄 IN PROGRESS (re-dispatched 2026-08-15 session 2 — the first dispatch died with its session, no output; /tmp/e1e2 re-verified intact 1.4 GB before re-dispatch) |
 | F1 | Build WW3 from source + smoke test, both physics candidates | ⬜ |
 | F2 | Configure WW3 for our waters (scratch only) | ⬜ |
 | F3 | Run the benchmark marches | ⬜ |
@@ -64,7 +64,7 @@ cited as history.
 | Gate V | Independent audit of the campaign method (declared before data) | ⬜ |
 | V4 | **YOUR RULING:** cut over / hold shadow + start LUT / extend | ⬜ |
 | V5 | Post-cutover watch + retirement ruling (only if V4 = cut over) | ⬜ |
-| R2.1 | Recount the unfed-east-boundary bound (read-only; unblocked now, runs when scheduled) | ⬜ |
+| R2.1 | Recount the unfed-east-boundary bound (read-only; unblocked now, runs when scheduled) | 🔄 IN PROGRESS (re-dispatched 2026-08-15 session 2; corners.py located at /tmp/march-loss/, text preserved to scratch as evidence; Gate R2.1 definition authored results-free before dispatch) |
 | R2.2 | Feed the east boundary (ONLY if you rule R2.1's number material) | ⬜ |
 | R4 | Numerics experiments (scratch, idle time only) | ⬜ |
 | L0+ | Lookup-table system design + build (LAST; opens only on your "accurate and defensible") | ⬜ |
@@ -95,6 +95,13 @@ Ctrl-F the exact heading text:
 ## 📍 CURRENT STATE — updated every working session (last: 2026-08-15, GO received)
 
 **Status:** EXECUTING — operator GO received 2026-08-15 in chat ("Execute" this plan).
+**Session 2 (2026-08-15, "get it done" order):** the GO session's F0 + R2.1 dispatches
+died with that session before producing output (no ~/ww3-baselines, no F0-INVENTORY, no
+R2.1 report — verified, not assumed). Pre-flight re-verified: /tmp/e1e2 intact 1.4 GB,
+meta repo clean at bee94fa0, marine service active. Both tasks RE-dispatched. New facts:
+corners.py (R2.1's census script) lives at /tmp/march-loss/corners.py — outside F0's
+preservation set and at /tmp-cleanup risk; the R2.1 brief preserves its text to scratch.
+Session-local detail: `scratch/SESSION-STATE-EVOLUTION.md`.
 Pre-flight at GO: `/tmp/e1e2` intact on librewxr (1.4 GB), marine service active, no march
 in flight, meta repo clean except the five files riding this GO commit. F0 dispatched
 first (blocks F1–F4); R2.1 dispatched in parallel (read-only, unblocked at GO). Adversarial review history: (1) the
