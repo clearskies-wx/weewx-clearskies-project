@@ -64,7 +64,7 @@ cited as history.
 | Gate V | Independent audit of the campaign method (declared before data) | ⬜ |
 | V4 | **YOUR RULING:** cut over / hold shadow + start LUT / extend | ⬜ |
 | V5 | Post-cutover watch + retirement ruling (only if V4 = cut over) | ⬜ |
-| R2.1 | Recount the unfed-east-boundary bound (read-only; unblocked now, runs when scheduled) | 🔄 IN PROGRESS (re-dispatched 2026-08-15 session 2; corners.py located at /tmp/march-loss/, text preserved to scratch as evidence; Gate R2.1 definition authored results-free before dispatch) |
+| R2.1 | Recount the unfed-east-boundary bound (read-only; unblocked now, runs when scheduled) | ✅ DONE + Gate R2.1 PASS 2026-08-15 (session 2). Corrected bound at 06Z (index 2): seam points 16.6–24.5% unfed (worst seam6 24.5%, Hs 0.644→0.560 m), mean 15.3% across 10 points — ~2.2× the defective-18Z figure (which reproduced exactly: 7.0–11.1%). Two independent derivations agree (implementer + blind auditor; `scratch/R21-CENSUS-REPORT.md`, `scratch/GATE-R21-AUDIT.md`). Caveats attached: ambient-substitution assumption + single-snapshot sensitivity. **AWAITING OPERATOR: PW7 materiality ruling (Q4)** |
 | R2.2 | Feed the east boundary (ONLY if you rule R2.1's number material) | ⬜ |
 | R4 | Numerics experiments (scratch, idle time only) | ⬜ |
 | L0+ | Lookup-table system design + build (LAST; opens only on your "accurate and defensible") | ⬜ |
@@ -1348,6 +1348,37 @@ architectural permission record.
 
 *(Plain English, self-contained, newest at top. Answered items get their ruling recorded
 here and applied.)*
+
+### Q4 — OPEN (2026-08-15): Is the corrected unfed-East-boundary number big enough to fund the fix (the PW7 ruling)?
+
+**Plain English.** Our wave model's offshore box has four sides. We feed real wave data
+in through the South and West sides; the East side gets nothing. For waves arriving from
+directions that would have entered through the East side, the model substitutes a
+stand-in guess. An earlier count of how much energy this affects used the wrong hour of
+the day by mistake (18Z instead of 06Z). Task R2.1 redid the count at the right hour,
+and an independent auditor — never shown the first result — recomputed it from the raw
+files and got the same numbers, so the count is now trustworthy.
+
+**The corrected numbers:** at the seven measurement points along the model handoff line,
+16.6–24.5% of the long-period wave energy would have entered through the unfed East side
+(worst point: 24.5%, which would move wave height there from 0.64 m to 0.56 m if the
+stand-in guess were exactly wrong). Averaged over all ten check points: 15.3%. The old,
+wrong-hour figure was roughly half that (7–11%) — so the correction made the problem
+look BIGGER, not smaller.
+
+**Two honest caveats from the audit:** (1) this is an upper BOUND resting on an
+assumption — nobody has East-side data (that's the problem itself), so the count assumes
+unfed directions would carry energy like the South side's average; (2) it is a snapshot
+from one 3-hour instant, and the number moved ~2.2× between two instants of the same
+day, so it is sensitive to when you look.
+
+**Your ruling (PW7 — no numeric default, deliberately):** is this material enough to
+build the fix (R2.2: feed the East side using the same mechanism the South and West
+sides already use)? Options: (a) YES — material: R2.2's design block gets written into
+this plan, then docs, then implementation with its own gate and solo deploy; (b) NO —
+not material: recorded, no work; (c) DEFER — let the V-phase shadow campaign's
+served-quality evidence decide later. Recommendation: none offered — the plan
+deliberately reserves this call for you.
 
 ### Q1 — ✅ RULED 2026-08-15 (operator, in chat): ALWAYS — our WW3 owns the deep-water leg for every install ("Yup it is option 2 for sure now")
 The discussion that produced the ruling, recorded so future phases argue in the right
