@@ -44,7 +44,7 @@ cited as history.
 | # | Task (plain name) | Status |
 |---|---|---|
 | F0 | Back up the benchmark input files before /tmp eats them | ✅ DONE 2026-08-15 (session 2). `~/ww3-baselines/e1e2/` on librewxr: 288 files / 1,440,943,416 B, sha256-verified vs source (empty diff); local input-set mirror `scratch/baselines-e1e2/`: 237 files / 289,790,098 B, sha256-verified; lead independently spot-checked counts+bytes+3 file hashes at all three ends (match). Report: `scratch/F0-INVENTORY.md`. Deviation (methodology-only, disclosed): rsync -a used instead of cp -a. /tmp/e1e2 untouched. |
-| F1 | Build WW3 from source + smoke test, both physics candidates | ⬜ |
+| F1 | Build WW3 from source + smoke test, both physics candidates | ✅ DONE 2026-08-15 (session 2). NOAA-EMC/WW3 tag 6.07.1 (b582f8c); P1 (ST6/FLX4) + P2 (ST4/FLX0) built clean per F1b tokens verbatim, 10 binaries, all sha256s lead-verified OK; smoke ww3_ts2 normal end both (0.56 s / 1.15 s, lead-verified); NOAA-practice check: README.NCEP shows operational ST4+FLX0 = P2's pairing, no contradiction. Report `scratch/F1-BUILD-REPORT.md`, artifacts `scratch/f1-artifacts/`. TWO LEAD FINDINGS: (1) version skew — plan/manual say v5.16, only buildable release is 6.07.1 → **Q5 OPEN, F2 holds for the ruling**; (2) aux programs (ww3_bound/bounc, ww3_prnc/prep) not built and source clone deleted (re-fetchable) → folded into F2's scope |
 | F2 | Configure WW3 for our waters (scratch only) | ⬜ |
 | F3 | Run the benchmark marches | ⬜ |
 | F4 | The three verdict measurements (cost / physics / handoff) | ⬜ |
@@ -1348,6 +1348,31 @@ architectural permission record.
 
 *(Plain English, self-contained, newest at top. Answered items get their ruling recorded
 here and applied.)*
+
+### Q5 — OPEN (2026-08-15): The WW3 we can build is version 6.07.1; the plan's manual and grammar research are version 5.16. How do you want the mismatch handled?
+
+**Plain English.** The plan's detailed model-input grammar rules (the SYNTAX
+PRESCRIPTIONS you ordered researched in advance) were researched against the WW3 user
+manual version 5.16 — the manual text we have on disk — and the plan in places assumes a
+"v5.16-built" model. But when the build agent went to NOAA's official code repository,
+the ONLY released versions available to build are 6.07 and 6.07.1 (5.16 is a 2016-era
+release that predates NOAA's move to GitHub; there is no 5.16 to check out). So we now
+have working 6.07.1 binaries and a 5.16 rulebook. The input-file formats are largely
+stable between these versions, but "largely" is not a guarantee, and the whole point of
+the syntax prescriptions was to stop grammar surprises.
+
+**Lead recommendation:** keep the 6.07.1 binaries (they are what NOAA actually maintains
+and what our decision record would freeze anyway), and BEFORE F2 writes any deck, run a
+verification pass of all 16 syntax-prescription rows against the version 6.07 manual
+(NOAA publishes it; fetching it is allowed — it is NOAA's own documentation), amending
+any row that changed with a marked correction. DOC-W.4 would then commit the 6.07 manual
+as the project's authoritative WW3 reference instead of 5.16. Alternative if you prefer:
+attempt to obtain and build the old 5.16 source from NOAA's legacy archives — not
+recommended (unmaintained code, toolchain friction, and ADR-109 would freeze a version
+NOAA no longer supports).
+
+**F2 (our-domain configuration) HOLDS until you rule** — its decks depend on exactly the
+grammar in question. F1's binaries and everything else already done are unaffected.
 
 ### Q4 — OPEN (2026-08-15): Is the corrected unfed-East-boundary number big enough to fund the fix (the PW7 ruling)?
 
