@@ -1837,9 +1837,14 @@ The response's `osm_type` field carries the raw OSM tag value (e.g. `groyne`, `d
 
 **Module identity:** `providers/ocean/ofs.py`, `PROVIDER_ID = "ofs"`, `DOMAIN = "ocean"`.
 
-**CAPABILITY:** `geographic_coverage = "us_coastal"` (major coasts — see coverage table below), `auth_required = []`. Supplies: water temperature (full column), salinity (full column), ocean currents (u/v components, full column), sea surface elevation (vs MSL and MLLW), seafloor depth, forecast time series. Dependencies: `xarray` + `netCDF4`, now in the marine service's `[nearshore]` pip extra (the API's `[marine]` extra is removed).
+**CAPABILITY:** `geographic_coverage = "us_coastal"` (major coasts — see coverage table below), `auth_required = []`. Supplies: water temperature (full column), salinity (full column), ocean currents (u/v components, full column), sea surface elevation (vs MSL and MLLW), seafloor depth, forecast time series. Dependencies: `xarray` + `netCDF4` + `fsspec` + `aiohttp`, now in the marine service's `[nearshore]` pip extra (the API's `[marine]` extra is removed).
 
 **Data source:** NOAA Operational Forecast Systems — 15 physics-based coastal ocean models (ROMS, FVCOM) at 34m–4km resolution, served via THREDDS/OPeNDAP at `opendap.co-ops.nos.noaa.gov/thredds/`. Updated 1–4 times daily depending on the model. Full research, verified OPeNDAP metadata, grid structure details, and code examples in `docs/planning/briefs/WATER-TEMPERATURE-DATA-SOURCE-BRIEF.md` §"Technical Detail: THREDDS/OPeNDAP Data Extraction".
+
+**THREDDS timeout + NODD S3 fallback rung (operator-ordered 2026-08-16):** CO-OPS THREDDS hung indefinitely twice in 3 days (host root 200, all `/thredds` paths timed out; production refused and served stale for 7+ h both times), while the same files were verifiably present the whole time on NOAA's Open Data Dissemination (NODD) S3 mirror. Every THREDDS/OPeNDAP dataset open (`_get_grid`, `_extract_data`, the `fetch_forecast` per-fhr loop, and both opens in `fetch_surface_currents`) now goes through `_open_regulargrid_dataset(url)`:
+1. THREDDS is tried first (unchanged primary), bounded to `_DATASET_TIMEOUT` seconds (60s, up from the previously-unused 20s constant) via `_open_dataset_with_timeout()` — a single-worker `ThreadPoolExecutor` per call, discarded with `shutdown(wait=False, cancel_futures=True)` on timeout (mirrors `services/bathymetry_resolver.py::fetch_opendap_grid`'s existing OPeNDAP-timeout idiom). A hung endpoint costs at most 60s per attempt, never an open-ended stall.
+2. On THREDDS failure (timeout or any other exception), the same logical file is retried via its NODD S3 mirror URL — `_thredds_to_nodd_s3_url()` maps `NOAA/{MODEL}/MODELS/{Y}/{M}/{D}/{fname}` → `{model_lower}/netcdf/{Y}/{M}/{D}/{fname}` under `https://noaa-nos-ofs-pds.s3.amazonaws.com`. Opened via `fsspec.open(url, mode="rb").open()` + `xr.open_dataset(..., engine="h5netcdf")` for HTTPS ranged reads (never a whole-file download; the bucket verified HTTP 206 support). Same 60s timeout bound applies.
+3. Both rungs failing raises, which every existing call site already catches identically to a pre-change failure — the file/cycle is treated as failed and the existing cycle-fallback loop continues. One INFO log line fires when the S3 rung succeeds (`OFS S3 fallback used: THREDDS failed for %s; served from NODD S3 mirror %s`). The three "cycles exhausted" refuse/warning messages in `fetch()`, `fetch_forecast()`, and `fetch_surface_currents()` now name both paths as exhausted. The C-77 refuse semantics in `providers/nearshore/swan.py` (empty-result → no-publish) are unchanged — this rung only changes how hard `fetch_surface_currents()` tries before returning empty.
 
 **OFS models covered:** WCOFS (US West Coast, ~4km), GOMOFS (Gulf of Maine, ~700m), CBOFS (Chesapeake Bay, 34m–4.9km), DBOFS (Delaware Bay, 100m–3km), TBOFS (Tampa Bay, 100m–1.2km), CIOFS (Cook Inlet, 10m–3.5km), SFBOFS (San Francisco Bay, 10m–3.9km), NGOFS2 (Northern Gulf of Mexico, 45m–300m), SSCOFS (Salish Sea + Columbia River, 100m–10km), LMHOFS (Lake Michigan + Huron), LEOFS (Lake Erie), LOOFS (Lake Ontario), LSOFS (Lake Superior), NYOFS (Port of NY/NJ), SJROFS (St. Johns River FL). Full coverage and gap analysis in `docs/planning/briefs/WATER-TEMPERATURE-DATA-SOURCE-BRIEF.md`.
 
@@ -1852,7 +1857,7 @@ The response's `osm_type` field carries the raw OSM tag value (e.g. `groyne`, `d
 
 **Cache:** Key includes model name + cycle + lat/lon (rounded to 3 decimals). TTL = 1800s.
 
-**Error handling:** THREDDS 404 → cycle fallback. Timeout (>10s) → `TransientNetworkError`. Grid point on land → null result. All per error taxonomy.
+**Error handling:** THREDDS 404 → cycle fallback. THREDDS timeout (>60s, `_DATASET_TIMEOUT`) or any other open failure → NODD S3 fallback rung (above); both failing → cycle fallback, same as a THREDDS 404. Grid point on land → null result. All per error taxonomy.
 
 **Implementation details (from code, 2026-07-13):**
 
@@ -1864,7 +1869,8 @@ The response's `osm_type` field carries the raw OSM tag value (e.g. `groyne`, `d
 - `_select_cycle(model, now_utc)` — walks back up to 48 hours in 6-hour steps. Returns the most recent valid cycle. 1x/day models (WCOFS) use fixed cycle (03z).
 - Result cache key: `ofs:{model}:{lat:.3f}:{lon:.3f}`, TTL 1800s.
 - Grid cache key: `ofs:grid:{model}`, TTL 86400s (grid topology is static).
-- Constants: `_RESULT_CACHE_TTL = 1800`, `_GRID_CACHE_TTL = 86400`, `_MAX_CYCLE_FALLBACKS = 3`, `_DATASET_TIMEOUT = 20` seconds.
+- Constants: `_RESULT_CACHE_TTL = 1800`, `_GRID_CACHE_TTL = 86400`, `_MAX_CYCLE_FALLBACKS = 3`, `_DATASET_TIMEOUT = 60` seconds (raised from 20s 2026-08-16; now enforced via `_open_dataset_with_timeout()`, previously declared but unused).
+- `_thredds_to_nodd_s3_url(thredds_url)` / `_open_dataset_with_timeout(opener, url, timeout)` / `_open_regulargrid_dataset(url)` — the THREDDS-timeout + NODD S3 fallback chain (2026-08-16), see above.
 
 ### §14.10a RTOFS surface-current provider for SWAN forcing (target — Phase S of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D9) **(ruled 2026-08-08; lands with Phase S of L1-BOUNDARY-REBUILD-PLAN)**
 
