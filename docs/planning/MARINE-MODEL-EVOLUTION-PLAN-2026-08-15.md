@@ -95,6 +95,7 @@ Ctrl-F the exact heading text:
 ## 📍 CURRENT STATE — updated every working session (last: 2026-08-15, GO received)
 
 **Status:** EXECUTING — operator GO received 2026-08-15 in chat ("Execute" this plan).
+**Session 2/3 checkpoint (2026-08-16 22:25Z):** Phase F COMPLETE (Gate F PASS); ADR-109 Proposed (8e00541e) AWAITING OPERATOR. Operator-ordered OFS fix (THREDDS 60s timeout + NODD S3 fallback, marine 00c8dae + 3 Q6 fixes) PUSHED + DEPLOYED 22:20:48Z on the operator's push word — post-deploy reality gate + adversarial audit of 00c8dae OWED next session. F4c dead-water WW3 KAT (the energy-loss verdict number) running on librewxr. Full checkpoint: scratch/SESSION-STATE-EVOLUTION.md.
 **Session 2 (2026-08-15, "get it done" order):** the GO session's F0 + R2.1 dispatches
 died with that session before producing output (no ~/ww3-baselines, no F0-INVENTORY, no
 R2.1 report — verified, not assumed). Pre-flight re-verified: /tmp/e1e2 intact 1.4 GB,
