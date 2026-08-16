@@ -1,5 +1,74 @@
 # Marine Model Evolution Plan — WW3 deep-water leg, evidence-driven strengthening, hybrid LUT (2026-08-15)
 
+## START HERE — what this plan is and how to read it
+
+**What we're doing, one paragraph:** We are adding our own deep-ocean wave model
+(WaveWatch III, "WW3" — the model NOAA itself runs) to handle the deep water offshore,
+because research proved our current model (SWAN) loses too much wave energy crossing it.
+First we build WW3 in a scratch folder and benchmark it (Phase F). Then we write the
+docs and the decision record (Phase DOC-W). Then we build it into the product (Phase W),
+re-sync the docs to what was actually built (Phase DOC-W-FINAL), and validate it against
+real buoys for weeks while the current system keeps serving (Phase V). At the end of
+Phase V, YOU decide whether to switch over. Only after you call the results "accurate
+and defensible" does the speed-up work (Phase L, lookup tables) begin.
+
+**THE ACTUAL WORK is the `## PHASE …` sections, and they run top-to-bottom in file
+order:** F → DOC-W → W → DOC-W-FINAL → V → (R is a side-track) → L. Inside each phase,
+tasks run in the order written: F0, F1, F2… Each task says who does it and what
+"done" looks like. **Current status of every task: see the TASK CHECKLIST right below.**
+
+**Everything that is NOT a `## PHASE` section is reference material** — tasks cite it;
+you don't need to read it to know where we are:
+- **CURRENT STATE** — the running status log (updated every session).
+- **PRIME DIRECTIVE** — standing rules every task obeys (numbered 1–12).
+- **PRE-APPROVAL REGISTER (rows PW1–PW9)** — the architecture changes you have
+  pre-approved by approving this plan. Anything not listed still requires asking you.
+- **CARRY-OVER REGISTER (rows C1–C20)** — loose ends inherited from the previous
+  (closed) plan, so nothing gets lost.
+- **NAMED CONSTANTS** — fixed numbers agents may not re-derive.
+- **SYNTAX PRESCRIPTIONS (rows 1–13)** — exact model-input grammar, pre-researched from
+  the manuals, because agents kept getting it wrong.
+- **WW3 MODEL DESIGN v1 (rows WD1–WD10)** — the WW3 model's design values.
+- **Round-close & bookkeeping** — how each round gets closed out.
+- **OPEN OPERATOR QUESTIONS (Q1, Q2, Q3…)** — questions for you; answered ones keep
+  their ruling on record.
+
+**The letter codes, decoded once:** `F0/W1/V2/…` = task number inside its phase.
+`PW#` = Pre-approved-change roW. `C#` = Carry-over item. `WD#` = WW3 Design row.
+`Q#` = operator Question. `F1–F14`/`G1–G18` = findings from the two plan reviews
+(historical record only). `A1/Z3/B2/…` in prose = task names from the PREVIOUS plan,
+cited as history.
+
+## ✅ TASK CHECKLIST — the whole plan at a glance (keep current every session)
+
+| # | Task (plain name) | Status |
+|---|---|---|
+| F0 | Back up the benchmark input files before /tmp eats them | 🔄 IN PROGRESS (agent running) |
+| F1 | Build WW3 from source + smoke test, both physics candidates | ⬜ |
+| F2 | Configure WW3 for our waters (scratch only) | ⬜ |
+| F3 | Run the benchmark marches | ⬜ |
+| F4 | The three verdict measurements (cost / physics / handoff) | ⬜ |
+| F5 | Parameterization catalog (the no-generic-setup deliverable) | ⬜ |
+| Gate F | Independent audit of the measurement method | ⬜ |
+| DOC-W.1 | Write ADR-109 (the WW3 decision record) → YOUR acceptance | ⬜ |
+| DOC-W.2–.4 | Architecture + manuals + reference docs to target state | ⬜ |
+| DOC-W.5 | Sweep every existing ADR: amend / supersede / untouched | ⬜ |
+| Gate DOC-W | Independent audit of the docs | ⬜ |
+| W1–W6 | Build the WW3 leg into the product (runner, boundary, handoff, sizing, health, tests) | ⬜ |
+| W-Accept | Deploy in shadow mode (runs but does not serve) | ⬜ |
+| Gate W | Independent audit per round | ⬜ |
+| DOC-W-FINAL | Re-sync all docs to as-built + zero-drift audit | ⬜ |
+| V1 | ≥10-cycle shadow campaign vs live system + buoys | ⬜ |
+| V2 | Measure the three known deficit lines | ⬜ |
+| V3 | Served-quality comparison + your pending card/cam eyeballs (C1–C4) | ⬜ |
+| Gate V | Independent audit of the campaign method (declared before data) | ⬜ |
+| V4 | **YOUR RULING:** cut over / hold shadow + start LUT / extend | ⬜ |
+| V5 | Post-cutover watch + retirement ruling (only if V4 = cut over) | ⬜ |
+| R2.1 | Recount the unfed-east-boundary bound (read-only; unblocked now, runs when scheduled) | ⬜ |
+| R2.2 | Feed the east boundary (ONLY if you rule R2.1's number material) | ⬜ |
+| R4 | Numerics experiments (scratch, idle time only) | ⬜ |
+| L0+ | Lookup-table system design + build (LAST; opens only on your "accurate and defensible") | ⬜ |
+
 ## INDEX — sections listed in FILE ORDER, top to bottom. The phases execute in exactly the order they appear. (Keep current; every new `##` section gets an entry the same commit.)
 
 **EXECUTION ORDER, one line:** F → DOC-W → W → DOC-W-FINAL (concurrent with V1–V3) → V4 → V5 (only if V4 rules cutover) → L. Phase R is the one exception to straight-through reading: R2.1 is unblocked at GO, R4 is idle-capacity-only, R1 lives inside W4/V2 — its section sits after V because its gated work (R2.2) cannot start before V-era rulings.
