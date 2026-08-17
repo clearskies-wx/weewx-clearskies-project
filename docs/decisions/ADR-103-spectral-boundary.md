@@ -307,3 +307,32 @@ ADR's "Real 2-D spectrum writer" paragraph describes is extracted and kept, reus
 `_KD_AGREEMENT_SHORTFALL_TOLERANCE` (C-104, still provisional as of this note) becomes moot for L1 once Phase
 B lands, since station depth/agreement filtering no longer applies to the L1 boundary — it is not otherwise
 affected by this amendment.
+
+## Amendment (2026-08-17): reconstruction lineage gains a `ww3_bound` consumer; L1-emission remnant tagged SUPERSEDED-AT-V5 — ADR-109
+
+**Status: Accepted.** Recorded by the DOC-W.5 full-index ADR impact sweep
+(`docs/planning/MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.md`, Phase DOC-W, task DOC-W.5), following
+acceptance of **ADR-109** ("WW3 deep-water leg"). Pointer + scope note only — no decision content in
+this ADR is restated or re-opened.
+
+**New consumer (PW4/W2, current — lands with Phase W).** The per-cell parametric-spectrum
+reconstruction lineage this ADR started (the "Real 2-D spectrum writer" this document describes,
+extracted and kept per the 2026-08-08 amendment above, now the per-cell reconstruction path ADR-104
+D3 built on it) gains a WW3-consumable output path: the same per-cell partition-summed spectra feed
+`ww3_bound`, the boundary-assembly program ADR-109 D5 picked, via a new emitter (ADR-109 D5/D6, plan
+task W2/PW4) so WW3's OWN deep-water leg can assemble its SWAN-facing boundary from the identical
+per-cell construction this ADR's writer already produces. The emitter's file format follows
+`ww3_bound`'s own transfer format (ADR-109 D5's frequency-fastest ordering, trap 21) — it does not
+change the spectral-construction math itself (JONSWAP wind-sea, Gaussian swell shapes, cos²ˢ
+directional spreads — untouched by this amendment, per ADR-106's own "R1 changes where, never how"
+framing, which this addition follows).
+
+**SUPERSEDED-AT-V5 (tag only — the supersession note itself lands at Phase V5, never before).** This
+ADR's own **L1-emission remnant** — the original per-station, real-2-D-spectrum
+`BOUNDSPEC SIDE ... VARIABLE FILE` emission mechanism this document's "Multi-station command
+assembly" section describes, already noted superseded-for-L1 by ADR-104's D3 mechanism per the
+2026-08-08 amendment above — is tagged **SUPERSEDED-AT-V5**. It dies fully (its emission code path
+is retired, not merely unused) only if and when Phase V5 rules retirement of the live SWAN-L1
+serving path; until then this tag records the disposition, nothing more. This is consistent with
+ADR-109 D15: the live SWAN-L1 path is not superseded by ADR-109, so nothing here is superseded NOW —
+only tagged for what happens if/when V5 rules retirement.

@@ -209,3 +209,27 @@ a forced hour. Rejected alternatives: option 1 (store keeps both sources at over
 schema change, bit-identical legacy reproduction) and option 3 (GFS wins ≥48 h in the merge —
 moves the same crash into the near window). Store schema, gatherer merge rule, and
 `_stitch_wind()` itself are unchanged.
+
+## Amendment (2026-08-17): WW3 leg becomes a second consumer of the assembled wind store — ADR-109
+
+**Status: Accepted.** Recorded by the DOC-W.5 full-index ADR impact sweep
+(`docs/planning/MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.md`, Phase DOC-W, task DOC-W.5), following
+acceptance of **ADR-109** ("WW3 deep-water leg"). Pointer + amendment only — no prior ruling above
+(D1–D5, the Q3/Z3.6/Z3.7 amendments) is re-opened.
+
+**What changes.** This ADR's assembled wind timeline store (§2, "the store — ONE assembled wind
+timeline, updated in place") gains a second consumer beyond the existing SWAN full-run/fast-cycle/
+display-wind readers already listed in the Decision §3 table: **ADR-109's WW3 deep-water leg**
+(wind-only forcing, D9; the `ww3_prep` preprocessor path, D7). Per ADR-109 D9/D12, the WW3 leg reads
+the store on the same full-run (6-hourly) cadence the live SWAN-L1 path already reads it on —
+**current cycles only**; the WW3 leg does not read archived/past cycles from this store (that
+archived-cycle need, if any, belongs to F0/F2's own Phase-F scratch tooling, not this store's
+production contract, per the plan's DOC-W.5 provisional table).
+
+**What does not change.** This is a read-only addition: the store's file format, retention, schema,
+gatherer merge rule, `get_wind_series()`/`get_wind_records()`/`get_present_hours()` read APIs, and
+every existing consumer's behavior (full-run trigger, fast-cycle trigger, display wind's PRIMARY/
+fallback split per the Q3 amendment) are unchanged by this amendment. The WW3 leg's own wind
+regrid/re-emit step onto its own grid (ADR-109 D9, F5-CATALOG Gap G7 — "production wind-store→WW3-
+grid regrid/re-emit step is unbuilt") is separately-built Phase W work (W4/W5), not a change to this
+store.

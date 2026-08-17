@@ -324,6 +324,33 @@ Checked at Gate DOC (this document's own completeness), and at each implementing
   verify against actual file state before acting (plan PRIME DIRECTIVE 7: line numbers are hints, not
   gospel).
 
+## Amendment (2026-08-17): scope note vs the WW3 deep-water leg — ADR-109
+
+**Status: Accepted.** Recorded by the DOC-W.5 full-index ADR impact sweep
+(`docs/planning/MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.md`, Phase DOC-W, task DOC-W.5), following
+acceptance of **ADR-109** ("WW3 deep-water leg"). Pointer + scope note only — no ruling above is
+re-opened.
+
+**L1-sizing rulings — SUPERSEDED-AT-V5 (tag only; the supersession note itself lands at Phase V5,
+never before).** D1 (island-aware autosizing) and D2 (the 100 km hard cap, already superseded for L1
+by ADR-108 at 175 km — see D2's own supersession note above) govern the **live SWAN-L1 serving
+path** and continue to do so until at least Phase V4's cutover verdict, and indefinitely under a
+verdict-2 or verdict-3 ruling (ADR-109 D15). They are tagged SUPERSEDED-AT-V5 because L1's own
+offshore-domain-sizing job is exactly the job ADR-109's WW3 leg takes over if and when Phase V5 rules
+retirement of the SWAN-L1 path — at that point D1/D2's L1-sizing rulings become moot, not before.
+
+**Reconstruction (D3), no-silent-fallback (D5/D6), and whole-service-area (D7/D12) rulings — CARRY
+FORWARD unchanged, NOT tagged.** These rulings are not about L1's domain size — they are about *how*
+a boundary is built once a domain exists (D3: per-partition reconstruction from gridded WW3 fields,
+refuse-don't-degrade), *how loudly* missing inputs are handled (D5/D6: setup-time availability
+reporting, hard aborts over silent fallbacks — the "a model runs on all its inputs or it does not
+run" rule, rules/coding.md §1), and *what geographic area* the system must serve (D7/D12: CONUS +
+Great Lakes + Hawaii, every input chain must serve or refuse with a reason). None of these are
+domain-boundary-specific to L1 — they apply identically to the WW3 leg's own boundary-assembly and
+setup-time reporting (ADR-109 D5/D6/D9's own refuse-don't-degrade posture, W2/W4's own no-silent-
+default logging requirement, PRIME DIRECTIVE 11). They carry forward into the WW3 leg unchanged and
+are explicitly **not** part of this SUPERSEDED-AT-V5 tag.
+
 ## References
 
 - Brief: `docs/planning/briefs/L1-ISLAND-BOUNDARY-RELOCATION-BRIEF-2026-08-08.md` — full findings, literature,
@@ -333,4 +360,5 @@ Checked at Gate DOC (this document's own completeness), and at each implementing
 - Related ADRs: ADR-093 (SWAN nearshore model — amended, boundary/inputs sections point here); ADR-100
   (geography-aware study-area geometry — amended, horizon/enclosure sections point here); ADR-103
   (multi-station real spectral boundary — amended, superseded for L1 when Phase B lands); ADR-091 (ocean data
-  resolver, water-level compositor — consumed by the RTOFS/STOFS selection rules).
+  resolver, water-level compositor — consumed by the RTOFS/STOFS selection rules); ADR-109 (WW3 deep-water
+  leg — Amendment above, DOC-W.5).

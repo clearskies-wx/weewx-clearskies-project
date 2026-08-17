@@ -200,11 +200,37 @@ wrap qualification, enclosure at `resume + 10 km` (capped; > cap ⇒ no enclosur
 never zero-width. Deployment happens at G-Accept; until that deploy the RUNNING service still uses the
 pre-G sizing.
 
+## Amendment (2026-08-17): WW3 setup derivation gains this subsystem as a consumer — ADR-109
+
+**Status: Accepted.** Recorded by the DOC-W.5 full-index ADR impact sweep
+(`docs/planning/MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.md`, Phase DOC-W, task DOC-W.5), following
+acceptance of **ADR-109** ("WW3 deep-water leg — always-on deep-ocean wave model, handoff to SWAN at
+L2"). Pointer + scope note only — this ADR's own decision content (the geography module, the fetch
+fan, water-body classification, the two-stage study-area basis) is unchanged.
+
+**What changes.** ADR-109's W4 task ("WW3 setup derivation in grid-sizing," Phase W) reads this
+ADR's geography subsystem as a new consumer, alongside the existing L1-aim/WW3-boundary-side-select
+consumers this ADR already documents. Specifically: the fetch fan's **open-water bearing** and
+**regime classification** (this ADR's §3, "Wrap-aware fetch/openness fan + regime + exposure +
+open-water bearing") — already read by ADR-093 Amendment 5 for L1 aim and WW3 boundary-side
+selection — are also read by ADR-109's W4 derivation to place the WW3 deep-water leg's own grid
+extent, boundary placement, and time steps mechanically at config time (ADR-109 D3, D8; PW2's
+"regional input, never spot-local" rule this ADR's own domain-extent language already states). This
+ADR's own "WaveWatch III boundary sides" language (§3, "the open-water bearing... feeding ADR-093
+Amendment 5 AD-3") now also feeds OUR own WW3 domain (ADR-109) at target state, not only the
+existing WW3-as-NOAA's-own-output boundary-side read this ADR was originally written against.
+
+**No data-contract or module change.** `services/geography.py`'s outputs (exposure, open-water
+bearing, fetch value, the `RayResult` list) are read-only-consumed by ADR-109's W4 task in their
+existing shape — this amendment adds a reader, not a new output or a new computation inside this
+module.
+
 ## References
 
 - Related: ADR-093 (SWAN nearshore model) Amendment 5 (the model-derivation changes that consume this
   subsystem — AD-1/AD-3/AD-4/AD-5/AD-8); ADR-098 (datum match-at-source, which the Stage-2 bathymetry relies on);
-  ADR-104 (island-aware L1 sizing and partition-reconstruction WW3 boundary — Amendment above)
+  ADR-104 (island-aware L1 sizing and partition-reconstruction WW3 boundary — Amendment above); ADR-109
+  (WW3 deep-water leg — Amendment above, DOC-W.5)
 - Plan: `docs/archive/MARINE-GEOMETRY-MODEL-PLAN.md` (architecture decisions AD-2/AD-6/AD-7; Phases G0/G6;
   approval of the plan IS the acceptance of this ADR)
 - Brief: `docs/planning/briefs/STUDY-AREA-GEOMETRY-BRIEF.md` (Fable-reviewed x2, 24 findings incorporated)

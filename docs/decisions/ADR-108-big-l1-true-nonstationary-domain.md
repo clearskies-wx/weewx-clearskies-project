@@ -301,10 +301,33 @@ L1's share. The hourly cycle gets strictly FASTER (drops its L1 solve entirely).
   SwellTrack/1-D/SurfBeat, the per-wet-cell reconstruction algorithm, API/served contracts, the
   5° directional-resolution question.
 
+## Amendment (2026-08-17): scope note — remains the live serving path, NOT superseded — ADR-109
+
+**Status: Accepted.** Recorded by the DOC-W.5 full-index ADR impact sweep
+(`docs/planning/MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.md`, Phase DOC-W, task DOC-W.5), following
+acceptance of **ADR-109** ("WW3 deep-water leg — always-on deep-ocean wave model, handoff to SWAN at
+L2"). Pointer + scope note only — no ruling above (D1–D9) is re-opened.
+
+**This ADR remains the LIVE serving path.** Per ADR-109 D15: this ADR's domain (the big-L1
+island-containment box), compute mode (`COMPUTE NONSTAT` time-marching), hourly-cycle rewire (L2+
+seam via archived nest output), and refuse-gate mechanics (`l1NestAge` + `L1_NEST_MAX_AGE_H = 9`)
+are **unchanged** by ADR-109 and continue to serve production traffic until a Phase V4 verdict-1
+(cutover) ruling, if one is ever given. Under a verdict-2 (hold shadow, open Phase L) or verdict-3
+(extend) ruling, this ADR's path keeps serving indefinitely.
+
+**This ADR is NOT superseded by ADR-109, and gets NO SUPERSEDED-AT-V5 tag** — the plan's DOC-W.5
+provisional table is explicit on this point: any supersession of this ADR belongs exclusively to a
+future Phase V5 disposition ruling, never before, and never as a byproduct of this sweep. The WW3
+deep-water leg (ADR-109) runs in shadow mode alongside this ADR's live path (ADR-109 D1, D12's
+per-site shadow-mode key) — it computes and stores its own artifacts without affecting this ADR's
+serving behavior in any way.
+
 ## References
 
 - Plan: `docs/planning/MARINE-PAGE-FIXIT-PLAN-2026-08-10.md` §PLAN AMENDMENT A1 — A1 DESIGN v1
   (the operator-ordered design this ADR records), PA7 pre-approval register entry, QC gates.
+- ADR-109: WW3 deep-water leg — scope note above (D15); this ADR's own path is unaffected and remains
+  live-serving until at least Phase V4.
 - ADR-104: island-aware L1 sizing — D2 cap superseded for L1; S/W siting rationale superseded
   by containment.
 - ADR-106: marine page fixit rulings — R1 per-WW3-cell boundary (mechanism unchanged, perimeter

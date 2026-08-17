@@ -247,6 +247,31 @@ exactly one of R1–R4 above, verified by the DOC.1 self-check against the regis
   serving shape only). Frozen-core lists from MARINE-FORWARD-PLAN / L1-BOUNDARY-REBUILD-PLAN stay
   closed for everything else, per the fixit plan's PRIME DIRECTIVE 1.
 
+## Amendment (2026-08-17): PA1 scope note — SWAN-side-interpolation half tagged SUPERSEDED-AT-V5 — ADR-109
+
+**Status: Accepted.** Recorded by the DOC-W.5 full-index ADR impact sweep
+(`docs/planning/MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.md`, Phase DOC-W, task DOC-W.5), following
+acceptance of **ADR-109** ("WW3 deep-water leg"). Pointer + scope note only — R1's own ruling above
+is not re-opened; PA2–PA5 (R2–R4) are untouched by this amendment.
+
+**PA1 (R1, "one spectrum per wet WW3 cell, SWAN interpolates") has two halves.** (1) the
+per-cell-construction half — select the WW3 cell nearest each offshore side, build one spectrum per
+wet cell purely from that cell's own partition values, no spatial mixing across cells; and (2) the
+**SWAN-side-interpolation half** — the `BOUNDSPEC SIDE ... VARIABLE FILE` position list handed to
+SWAN's own documented spectral interpolation (SWAN manual §2.6.3) to fill the space between the
+listed per-cell positions along the L1 boundary side.
+
+**The SWAN-side-interpolation half is tagged SUPERSEDED-AT-V5 (tag only — the supersession note
+itself lands at Phase V5, never before).** This half is specific to the SWAN-L1-boundary emission
+path (`BOUNDSPEC SIDE`) — a mechanism that exists only because SWAN's L1 boundary is fed a discrete
+position list SWAN itself must interpolate between. If and when Phase V5 rules retirement of the
+live SWAN-L1 serving path (ADR-109 D15), this SWAN-side interpolation mechanism retires with it, not
+before. **The per-cell-construction half (1) is NOT tagged** — the same per-cell partition-summed
+spectrum construction (JONSWAP wind-sea, Gaussian swell shapes, cos²ˢ directional spreads, the
+bin-sum identity guard) is the identical construction ADR-103's 2026-08-17 amendment (above, via
+ADR-104 D3) documents as the new `ww3_bound` emitter's own input — it carries forward into the WW3
+leg unchanged, it does not retire at V5.
+
 ## References
 
 - Evidence: `docs/planning/MARINE-PAGE-FIXIT-2026-08-10.md` — Items 0–6, all raw measurements,
