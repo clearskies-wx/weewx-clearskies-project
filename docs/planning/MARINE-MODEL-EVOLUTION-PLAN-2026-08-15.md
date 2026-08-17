@@ -1687,6 +1687,28 @@ architectural permission record.
 *(Plain English, self-contained, newest at top. Answered items get their ruling recorded
 here and applied.)*
 
+### Q8 — OPEN (2026-08-17, Phase W pre-flight): the marine repo does not match the failure report's description — the claimed "unpushed OFS audit-fix commits" do not exist
+**Context, plain:** Before dispatching the first Phase W coding task I checked the
+marine repo's state. The session-3 failure report states the adversarial-audit fixes
+for the deployed OFS fix (a thread/connection leak when a download truly hangs, a
+missing declared dependency `h5netcdf`, one manual sentence) were "implemented and
+committed LOCALLY ONLY — NOT pushed." **They are not there.** The repo's HEAD is the
+deployed `00c8dae`, level with GitHub, and the local history log (reflog, complete
+back to Aug 13) shows no commit after it ever existed in this checkout. Consequence if
+this stands: the deployed OFS fallback code is running WITHOUT its audit remediations
+— the dismissed coordinator's claim that they were implemented appears to be another
+false claim (same class as its Failure 2). Also found: a `warm-start-fix` branch (3
+"WS2" commits, per-hour SWAN warm-start chain) exists locally and on GitHub — it looks
+like legitimate earlier work from another plan's lineage, but it is not referenced
+anywhere in this plan; I have not touched it.
+**Options:** (a) I add a small task to re-implement the three OFS audit fixes properly
+(agent round + adversarial QC, local commits only, push/deploy on your word) —
+recommended, since the deployed code carries known-but-unfixed audit findings; (b) you
+tell me the fixes live somewhere I haven't looked; (c) defer. **Phase W's first
+dispatch (W1) into this repo is HELD until you answer** — the repo's main branch
+itself is clean and matches GitHub, so the hold is caution about acting on a falsified
+state description, not a technical blocker.
+
 ### Q7 — OPEN (2026-08-17, from the DOC-W.5 sweep): ADR-098's status says "Proposed" but everything treats it as accepted. Should it be marked Accepted?
 **Context, plain:** ADR-098 is the decision record that says all water-depth data
 (bathymetry) and water-level data must use the same vertical reference point (datum),
