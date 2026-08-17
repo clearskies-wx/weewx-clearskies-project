@@ -248,6 +248,25 @@ into a real `nest.ww3` (22,710 B, F2c.3) and a corrected 22-file one-per-positio
 proof. `ww3_bounc` would need a fresh switch-file decision (adding `NC4`) plus a full
 smoke-test round before it could be considered — not attempted this phase.
 
+**⚠ MATERIAL CAVEAT (added 2026-08-17, F4c.7 finding — read before accepting this row).**
+`ww3_bound` 6.07.1 has a confirmed spectral read-order defect: `ww3_bound.ftn:414` fills
+its `SPEC2D(NK1,NTH1)` array with a bare list-directed `READ`, which in Fortran fills
+column-major (frequency index fastest), while the ASCII transfer-file stream — as written
+by WW3's OWN `ww3_outp` (writer source `w3iobcmd.ftn` ~526–545) — is direction-fastest.
+For any grid with NK≠NTH (ours: 35×72) every assembled spectrum is silently SCRAMBLED
+across (frequency, direction) bins: total energy is preserved (sum-level checks pass)
+but spectral shape, and therefore Hs under WW3's frequency-weighted quadrature, is
+corrupted by a shape-dependent factor (measured: 1.98× Hs on the uniform KAT spectrum,
+1.62× on a real F4b spectrum). Confirmed by exact reproduction — the scrambled binary
+was reconstructed from the ASCII in simulation to float32 precision (F4-REPORT.md
+§F4c.7). **Consequence for this row:** the recommendation survives only with a
+compensating measure — the project writes its boundary input files PRE-TRANSPOSED so
+`ww3_bound`'s fill order lands every value on its correct bin (workaround validated in
+F4c.8), or the boundary emitter writes `nest.ww3` directly, or the defect is reported/
+patched upstream. It also VOIDS the amplitude-fidelity (not cost/mechanics) evidence of
+every F4b `ww3_bound`-fed march. The operator should accept/reject this row with the
+compensating measure named.
+
 ## D6 — SWAN-ingestion mechanism [OPERATOR ACCEPTANCE ROW]
 
 **Candidates:** A — `BOUNDNEST3` (WW3-native SWAN command reading WW3's own transfer
@@ -528,7 +547,7 @@ ST6-vs-ST4 physics-package choice: resolved above at **D4**.
 | `restart*.ww3` size | Measured fact, F3 §2.2 | G1: 212,839,200 B. G2: 13,920,480 B (scales with grid cell count only, not physics package) |
 | Wall-clock stop rule | Named Constants (E1/E2 protocol) | Fixed budget; the production scheduling cadence itself is D12's item, not this catalog's scope |
 
-### Measured traps (20 items — hands-on F-phase findings)
+### Measured traps (22 items — hands-on F-phase findings; 21–22 added post-draft from F4c)
 
 1. `ww3_grid.inp` model-flags line must be space-separated (F2-CONFIG-REPORT.md §7#1; S607#1).
 2. An empty namelist section breaks the `ww3_grid` reader — always state ≥1 entry (F2#7-2; S607#2).
@@ -550,6 +569,8 @@ ST6-vs-ST4 physics-package choice: resolved above at **D4**.
 18. 6.07 manual reorganization is cite-location-only except one high-impact substantive delta: the ST6 default calibration column (D2 above) (SYNTAX-607-VERIFICATION.md).
 19. Cliff-KAT wetted-depth-substitution crash — see D14 below (F4-REPORT §3.1).
 20. Production-shaped WW3 marches run 1.25×–1.64× slower per simulated hour than F3's cheap-shaped configuration — see D12 (F4-REPORT §F4b.3).
+21. **`ww3_bound` SPEC2D read-order defect (NK≠NTH grids): list-directed READ fills column-major (frequency-fastest) while the transfer-file stream — including `ww3_outp`'s own output — is direction-fastest; every assembled spectrum is silently scrambled (energy-sum preserved, shape/Hs corrupted by a shape-dependent factor). Compensate by writing boundary input files pre-transposed, or emit `nest.ww3` directly. Voids F4b amplitude-fidelity evidence; see the D5 caveat (F4-REPORT §F4c.7).**
+22. **A single-time-record `nest.ww3` self-disarms boundary forcing: `W3IOBC`'s second read hits EOF and sets `FLBPI=.FALSE.`, permanently disabling boundary updates after one application — it does NOT hold the last record steady. Any steady/KAT-style boundary needs ≥2 time records bracketing the run (F4-REPORT §F4c.1 item 5, source-cited `w3iobcmd.ftn` label 810 / `w3wavemd.ftn:1072`).**
 
 ### GAP SUMMARY (feeds W4's scope — a gap is a finding, not a failure)
 
