@@ -129,13 +129,13 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 | [ADR-100](ADR-100-geography-aware-study-area-geometry.md) | Geography-aware study-area geometry — OSM coastline, wrap-aware fetch fan, classification-first, two-stage basis (AD-2/AD-6/AD-7; consumed by ADR-093 Amendment 5) | 2026-07-31 |
 | [ADR-101](ADR-101-surf-score-geometric-mean.md) | Surf score rebuild — weighted geometric mean of five components (Size/Shape/Conditions/Power/Consistency), no penalties, single-use rule, admin-adjustable weights; supersedes ADR-096's formula (its per-category bar rule survives) | 2026-08-04 |
 | [ADR-107](ADR-107-wind-provider-decoupling-and-assembly.md) | Wind provider decoupling + assembly — independent wind gatherer background task, single assembled wind timeline store, event-driven SWAN run triggers (`extended_cycle_assembled`/`hourly_cycle_assembled`), 12h fast-cycle scope; lifts the 2026-08-03 operator-approved design brief into a decision record (drafted by the Z3.5 implementer per the fixit plan's re-scope note; **Accepted 2026-08-15**, operator in chat) | 2026-08-11 |
-| [ADR-109](ADR-109-ww3-deep-water-leg.md) | WW3 deep-water leg — our own WaveWatch III replaces NOAA's WW3 as the deep-water model at every install (Q1: always, no conditionality), handoff to SWAN at L2; version 6.07.1/6.07-manual authority (Q5); grid/physics/handoff/boundary/forcings/initial-state decisions from Phase F evidence, several marked explicit operator-acceptance rows; embeds the F5 parameterization catalog in full (PRIME DIRECTIVE 11, no product-facing model-setup controls) | 2026-08-16 |
 
 ## Accepted — pending manual consolidation (marine, A1)
 
 | ADR | Title | Accepted |
 |---|---|---|
 | [ADR-108](ADR-108-big-l1-true-nonstationary-domain.md) | Big-L1 true-non-stationary domain — island containment (SW corner 32.60°N, 119.25°W), `COMPUTE NONSTAT` dt=10 MIN time-marching L1 compute, hourly L2+ seam via archived nest output, `l1NestAge` health surface + 9 h refuse gate; cap 100→175 km for L1 only (supersedes ADR-104 D2 cap + S/W siting rationale for L1) | 2026-08-13 |
+| [ADR-109](ADR-109-ww3-deep-water-leg.md) | WW3 deep-water leg — our own WaveWatch III replaces NOAA's WW3 as the deep-water model at every install (Q1: always, no conditionality), handoff to SWAN at L2; 6.07.1/6.07-manual authority (Q5); accepted values: no intermediate grid (G1 direct), P1 (ST6/FLX4), `ww3_bound`, BOUNDNEST3, `ww3_prep`, wind-only forcings, restart-chaining, `WW3_RESTART_MAX_AGE_H = 9`; embeds the F5 parameterization catalog in full (PRIME DIRECTIVE 11, no product-facing model-setup controls); evidence corrected 2026-08-17 to the real buoy validation (proxy KATs invalidated) | 2026-08-17 |
 
 ## Accepted — pending manual consolidation
 

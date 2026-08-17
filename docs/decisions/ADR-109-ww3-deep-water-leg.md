@@ -1,7 +1,7 @@
 ---
-status: Proposed
-date: 2026-08-16
-deciders: shane (pending)
+status: Accepted
+date: 2026-08-17 (drafted 2026-08-16)
+deciders: shane
 supersedes:
 superseded-by:
 ---
@@ -82,6 +82,18 @@ operator's Aug 16 buoy observations of 1.0–1.2 m); (b) its cold-start companio
 restart-chaining, direct evidence for D10. Every D-row below that leaned on F4b/F4c
 amplitude evidence carries a dated correction note; cost and mechanics evidence
 (F1–F3, F4.1, F4.3) stands per trap 21's carve-out.
+
+## Acceptance record (2026-08-17)
+
+**Accepted by the operator in chat, 2026-08-17** ("approved"), after the evidence-citation
+correction of the same date (buoy validation replacing the invalidated proxy KATs). All
+nine open rows accepted AS RECOMMENDED: **D3a** no intermediate grid (NOAA output → G1
+direct); **D3b** acknowledged (G2 has no general sizing formula; unused at this install);
+**D4** P1 (ST6/FLX4); **D5** `ww3_bound` (ASCII); **D6** BOUNDNEST3 (candidate A);
+**D7** `ww3_prep` (ASCII); **D9** wind-only forcings split; **D10** restart-file
+chaining; **D11** `WW3_RESTART_MAX_AGE_H = 9`. D12's layout/cadence/budget design is
+accepted with the ADR. These values are now FROZEN for Phase W (plan PRIME DIRECTIVE
+12: W DESIGN v1 implements them as-frozen).
 
 ## Decision at a glance — what evidence decided vs. what you are ruling on
 
@@ -688,27 +700,34 @@ disposition ruling, never before.
 
 *(Verifiable rows; these become DOC-W-FINAL/W-Accept evidence rows once Phase W lands.)*
 
-- [ ] D1: operator confirms the always-WW3 assignment (already ruled 2026-08-15, Q1 —
-  restated here for the record this ADR carries forward).
-- [ ] D2: operator confirms WW3 6.07.1 / 6.07-manual authority (already ruled
-  2026-08-16, Q5 — restated here).
-- [ ] D3a: operator rules on the intermediate-grid question (lead recommends NO).
-- [ ] D3b: operator accepts G2's resolution remains an undecided general formula (not
-  used at this install per D3a's recommendation).
-- [ ] D4: operator accepts P1 (ST6/FLX4) or directs P2 (ST4/FLX0) or a different
-  candidate.
-- [ ] D5: operator accepts `ww3_bound` (ASCII) or directs `ww3_bounc`.
-- [ ] D6: operator accepts BOUNDNEST3 (candidate A) or directs the Appendix-D writer
-  (candidate B).
-- [ ] D7: operator accepts `ww3_prep` (ASCII) or directs `ww3_prnc`.
-- [ ] D8: spectral grid and time-step values are evidence-confirmed exact — no
+- [x] D1: operator confirms the always-WW3 assignment (already ruled 2026-08-15, Q1 —
+  restated here for the record this ADR carries forward). ✅ Carried into acceptance
+  2026-08-17.
+- [x] D2: operator confirms WW3 6.07.1 / 6.07-manual authority (already ruled
+  2026-08-16, Q5 — restated here). ✅ Carried into acceptance 2026-08-17.
+- [x] D3a: operator rules on the intermediate-grid question (lead recommends NO).
+  ✅ RULED 2026-08-17: NO intermediate grid.
+- [x] D3b: operator accepts G2's resolution remains an undecided general formula (not
+  used at this install per D3a's recommendation). ✅ ACCEPTED 2026-08-17.
+- [x] D4: operator accepts P1 (ST6/FLX4) or directs P2 (ST4/FLX0) or a different
+  candidate. ✅ ACCEPTED 2026-08-17: P1.
+- [x] D5: operator accepts `ww3_bound` (ASCII) or directs `ww3_bounc`.
+  ✅ ACCEPTED 2026-08-17: `ww3_bound`.
+- [x] D6: operator accepts BOUNDNEST3 (candidate A) or directs the Appendix-D writer
+  (candidate B). ✅ ACCEPTED 2026-08-17: BOUNDNEST3.
+- [x] D7: operator accepts `ww3_prep` (ASCII) or directs `ww3_prnc`.
+  ✅ ACCEPTED 2026-08-17: `ww3_prep`.
+- [x] D8: spectral grid and time-step values are evidence-confirmed exact — no
   operator action needed, listed for completeness.
-- [ ] D9: operator accepts the wind-only forcings split.
-- [ ] D10: operator accepts restart-file chaining (candidate i) as the initial-state
+- [x] D9: operator accepts the wind-only forcings split. ✅ ACCEPTED 2026-08-17.
+- [x] D10: operator accepts restart-file chaining (candidate i) as the initial-state
   mechanism, understanding the numeric staleness-gate value is not yet measured.
-- [ ] D11: operator accepts `WW3_RESTART_MAX_AGE_H = 9` or sets a different value.
-- [ ] D12: operator accepts the file/dir layout, full-run-only cadence, shadow-mode
-  key design, and thread/budget numbers as stated.
+  ✅ ACCEPTED 2026-08-17.
+- [x] D11: operator accepts `WW3_RESTART_MAX_AGE_H = 9` or sets a different value.
+  ✅ ACCEPTED 2026-08-17: 9 h.
+- [x] D12: operator accepts the file/dir layout, full-run-only cadence, shadow-mode
+  key design, and thread/budget numbers as stated. ✅ ACCEPTED 2026-08-17 (with the
+  ADR).
 - [ ] D13: F5 catalog embedded in full — auditor (Gate DOC-W) confirms no deck line in
   any future Phase W artifact lacks a traceable catalog row (PRIME DIRECTIVE 11).
 - [ ] D14: the three known defects are carried into Phase V's validation plan (cliff-KAT
