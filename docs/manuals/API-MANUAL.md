@@ -3498,6 +3498,16 @@ Always HTTP 200 (session auth failure aside) — an unreachable or misbehaving m
 | 2xx but body is not a JSON object | `false` | `"Marine service returned a non-JSON response"` |
 | 2xx with a JSON object body | `true` | `null` (`health` carries the body) |
 
+### §19.7a WW3 deep-water leg surface (target — Phase W; ADR-109)
+
+**Not yet built — target state.** No WW3-leg endpoints or config keys exist on the API today; this subsection documents the surface ADR-109/PW5 fixes for when Phase W lands.
+
+**Health/install DISPLAY is read-only, via the existing marine→API pass-through — no new endpoint.** Per §19.7 above, `GET /setup/marine/health`'s `health` field is an **opaque, unmodeled pass-through** of the marine service's own `/health` JSON body — the API does not name or validate any key inside it. This means the WW3-leg's restart-age/refuse-reason keys (OPERATIONS-MANUAL.md "WW3 deep-water leg" §4) surface to the admin status page automatically, through this same pass-through, once the marine service publishes them — no API-side schema change is needed or should be made (the same "do not add a nested Pydantic schema" rule from §19.7 applies).
+
+**The sole write-capable surface is the transition-only `ww3_shadow_mode_enabled` key (PW5).** A single per-site boolean, transiting through the existing marine config-push mechanism (§19.5's payload — the same `POST {marine_service_url}/config` flow, `marine.locations.<location_id>` scope). It gates whether the WW3 leg runs at all for a given site; there is **no enable/disable knob for WW3 itself** (Q1 ruled always-on) — this key exists only for the shadow-mode transition and is retired at cutover or retirement (ADR-109 D12). No other WW3 setup value (grid, physics, boundary placement, time steps — the full ADR-109 D13 catalog) is writable from any product surface — **PRIME DIRECTIVE 11: zero model-setup controls reach a product surface; an installing operator still just picks a surf location.**
+
+**Wizard/admin display — pointer only, no UI exists yet.** The wizard/admin install-state DISPLAY surface for the WW3 leg (health/status rendering, and the `ww3_shadow_mode_enabled` toggle where PW5 exposes one) is designed but not built until Phase W task W5. When it lands, the CLAUDE.md doc-sync table's help-content-key process rule applies in full: `help.wizard.{step_id}.*` / `help.admin.{section_id}.*` keys land in the SAME commit as the UI change, not a follow-up. No wizard/admin surface change is authorized by this subsection alone.
+
 ### §19.8 Post-conversion enrichment — station observations, alerts, locale text
 
 The marine service has no weewx archive and no locale/i18n configuration (ADR-034 co-location; MARINE-SEP-CONCERNS.md C-24/C-29). Four categories of data that lived in the pre-separation API's marine endpoints are therefore restored **on the API side**, after §19.3's unit conversion and before envelope wrapping — `services/marine_enrichment.py`, called from `services/companion_proxy.py`'s `_apply_post_conversion_enrichment()` seam. This is the API's own logic operating on its own data (weewx archive, alert provider, locale files); it is not a second copy of anything the marine service does.
