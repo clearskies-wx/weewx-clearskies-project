@@ -66,6 +66,23 @@ marches against the same archived cycle the SWAN baseline uses, and measured cos
 physics, and handoff fidelity. This ADR freezes what that evidence decided and marks,
 explicitly, what it did not.
 
+**Evidence correction (2026-08-17) — read before the D-rows.** The original F4c
+"energy-ledger" verdict measurements were INVALIDATED: they measured an internal
+boundary-to-seam energy proxy on synthetic boundaries, not agreement with the real
+ocean (coordinator failure report, plan §"⛔ COORDINATOR FAILURE REPORT — 2026-08-17").
+They are REPLACED by a real buoy validation
+(`scratch/F4-BUOY-VALIDATION-REPORT.md`, 2026-08-17): two G1×P1 marches with the
+corrected frequency-fastest boundary axis order (the D5 caveat's fix) —
+(a) a restart-chained run driven by real NOAA gfswave boundary spectra and wind
+matches NDBC buoys 46253/46222 within 5–15% on Hs (model/buoy ratio 0.93–0.94 over
+the equilibrated hours), direction within ±10–15°, period within ±3 s, and correctly
+captures an arriving SSW swell pulse (1.19–1.20 m at window close, matching the
+operator's Aug 16 buoy observations of 1.0–1.2 m); (b) its cold-start companion is
+34–38% low at h=24 with Hs still rising — a startup artifact eliminated by
+restart-chaining, direct evidence for D10. Every D-row below that leaned on F4b/F4c
+amplitude evidence carries a dated correction note; cost and mechanics evidence
+(F1–F3, F4.1, F4.3) stands per trap 21's carve-out.
+
 ## Decision at a glance — what evidence decided vs. what you are ruling on
 
 | # | Item | Status |
@@ -210,14 +227,19 @@ marches — supersedes the original F3/F4 single-snapshot-boundary verdict, F4-R
 | G1×P1 | 10 of 11 (BUOY46256 never sustains ≤5%) | h=12 to h=17 |
 | G1×P2 | 11 of 11 | h=12 to h=14 |
 
-**Seam Hs (F4b.5), quasi-steady hours 18/22:** P1 0.676–0.720 m total, P2 0.766–0.780 m
-total — P2 runs ~13% higher than P1 at the same hours. Neither is compared against a
-buoy yet (no ground-truth check exists this round) — the plan's F4.2 per-band
-discriminator rows (>11s transmission, island-shadow-lee, W-corridor survival) exist as
-real numbers (F4b.5's directional table, west→east >11s-band rotation 204°→236° across
-the seam) but interpretation is explicitly left to this ADR, per the plan's
-no-verdict-language rule — the numbers do not by themselves say which package is more
-accurate.
+**Seam Hs (F4b.5) — VOIDED (2026-08-17):** the F4b seam figures (P1 0.676–0.720 m,
+P2 0.766–0.780 m) were produced by marches fed through the direction-fastest
+(scrambled) boundary emitters — trap 21 voids their amplitude fidelity, and they carry
+no evidentiary weight in this row. The earlier statement "no ground-truth check exists"
+is superseded: **G1×P1 now has a real buoy validation**
+(`scratch/F4-BUOY-VALIDATION-REPORT.md`): restart-chained, corrected axis order, real
+NOAA gfswave boundary+wind — Hs within 5–15% of NDBC 46253/46222 (model/buoy ratio
+0.93–0.94 over the equilibrated hours h06–h20), direction within ±10–15°, period within
+±3 s, arriving SSW swell pulse captured. **P2 has no buoy validation — the buoy round
+ran P1 only.** (The convergence-timing table above derives from the same scramble-fed
+F4b marches; its timing is retained as mechanics-class evidence under trap 21's
+cost/mechanics carve-out, but the cold-vs-warm-start question is now answered directly
+by the buoy round — see D10.)
 
 **Lead recommendation: P1 (ST6/FLX4).** Rationale: (1) cost — P1 is cheaper at both
 measured shapes (1.5–2× cheaper than P2); (2) physics-family consistency across the
@@ -225,9 +247,12 @@ WW3→SWAN handoff (same growth/decay family as the existing SWAN deck, carrying
 this project's own measured ST6 behavior as prior knowledge); (3) the one convergence
 gap (BUOY46256 not sustaining quasi-steady within 24h under P1) is a single holdout
 point, not a systemic failure, and the plan's own shadow-mode design (D12) gives weeks
-of further observation before any cutover decision. **This is not evidence-decided —
-P2's NOAA-operational pedigree and its cleaner 11/11 convergence are real, competing
-considerations. Accept P1, or direct otherwise.**
+of further observation before any cutover decision; (4) **P1 is the only candidate
+with real-ocean validation evidence** — the 2026-08-17 buoy round (above) shows G1×P1
+matching real buoys within 5–15% under production-like restart-chained conditions.
+**This is not fully evidence-decided — P2's NOAA-operational pedigree is a real,
+competing consideration, and P2 was never buoy-validated (choosing it would require
+its own validation round). Accept P1, or direct otherwise.**
 
 ## D5 — Boundary-assembly program [OPERATOR ACCEPTANCE ROW]
 
@@ -268,6 +293,11 @@ WITHOUT any compensating measure — but PW4's boundary emitter MUST write the s
 block frequency-fastest (the corrected-order files passed every known-answer gate
 exactly: boundary 0.6500 m, real-spectrum control 0.9604 vs 0.9607). The scramble VOIDS
 the amplitude-fidelity (not cost/mechanics) evidence of every F4b `ww3_bound`-fed march.
+**The corrected emitter is since proven in production-like use (2026-08-17):** the buoy
+validation round's frequency-fastest generator (`gen_boundary_buoy_val.py`, on librewxr
+under `/tmp/ww3-feas/`) fed real NOAA gfswave spectra through `ww3_bound` into marches
+that match real buoys within 5–15% (`scratch/F4-BUOY-VALIDATION-REPORT.md`) — the
+end-to-end amplitude proof the scramble had voided now exists with the corrected order.
 
 ## D6 — SWAN-ingestion mechanism [OPERATOR ACCEPTANCE ROW]
 
@@ -366,11 +396,26 @@ staleness gate, or (ii) cold start with a spin-up lead (6–12 h before the serv
   ~40 minutes to ~2 h of simulated time (source-term numerical stiffness during rapid
   initial energy growth, F2c.4) — exactly the transient a spin-up lead exists to absorb
   before the served window opens.
+- **The buoy round answers cold-vs-warm directly (2026-08-17,
+  `scratch/F4-BUOY-VALIDATION-REPORT.md`):** an identical G1×P1 march pair with the
+  corrected boundary order shows the flat-ocean cold start 34–38% LOW against the buoys
+  after a full 24 h (Hs still rising +10–16% over the last 12 h — not equilibrated),
+  while the restart-chained warm start matches the buoys within 5–15%. Note the F4b
+  convergence numbers in the row above came from scramble-fed marches (mechanics-class
+  only, per trap 21); this buoy-round measurement is the corrected-order, real-data
+  answer — restart-chaining is the measured difference between failing and passing the
+  buoy comparison inside a 24 h window.
+- **A real restart constraint (measured, 2026-08-17):** WW3 refuses a restart file
+  whose timestamp does not exactly match the run's start time (`w3iorsmd.ftn:468–473`,
+  `EXTCDE(20)`, no fallback) — the chaining design must produce a restart stamped at
+  each cycle's exact start time (trap 23).
 
 **Lead recommendation: restart-file chaining (candidate i), with a staleness gate set by
 analogy to the live SWAN-L1 mechanism (D11 below).** Rationale: it is the more efficient
-steady-state mechanism once a trusted restart exists, and the calm-start transient
-measured above (D10 evidence) shows cold starts pay a real, non-trivial cost every cycle.
+steady-state mechanism once a trusted restart exists; the calm-start transient
+measured above (D10 evidence) shows cold starts pay a real, non-trivial cost every
+cycle; and the 2026-08-17 buoy round shows a 24 h cold start is not merely costly but
+INSUFFICIENT — it fails the buoy comparison that restart-chaining passes.
 **The exact staleness-gate hour count is NOT measured — this ADR proposes a value in D11
 by analogy, not by WW3-specific evidence; the operator may set a different number.**
 
@@ -438,7 +483,11 @@ SWAN cycle to avoid contention, consistent with F-phase's own measurement condit
 representative served window, the leg is measured in the tens-of-minutes class per
 cycle (F4b's real 24 h march: 4706.82 s ≈ 78.4 min for G1×P1; 9269.60 s ≈ 154.5 min for
 G1×P2) — well inside the plan's contention-budget wall-clock ceiling used throughout
-Phase F (never approached).
+Phase F (never approached). **Corroborated with the corrected boundary order
+(2026-08-17):** the buoy-validation 24 h G1×P1 marches ran 4183.58 s (cold) and
+4509.74 s (restart-chained, real live-fetched NOAA gfswave GRIB2) ≈ 174–188 s/sim-hr —
+inside the production-shaped budget above (`scratch/F4-BUOY-VALIDATION-REPORT.md`;
+cost evidence was never voided by trap 21, this is confirmation, not replacement).
 
 ## D13 — F5 Parameterization catalog (embedded in full — PRIME DIRECTIVE 11, never product-facing)
 
@@ -549,7 +598,7 @@ ST6-vs-ST4 physics-package choice: resolved above at **D4**.
 | `restart*.ww3` size | Measured fact, F3 §2.2 | G1: 212,839,200 B. G2: 13,920,480 B (scales with grid cell count only, not physics package) |
 | Wall-clock stop rule | Named Constants (E1/E2 protocol) | Fixed budget; the production scheduling cadence itself is D12's item, not this catalog's scope |
 
-### Measured traps (22 items — hands-on F-phase findings; 21–22 added post-draft from F4c)
+### Measured traps (23 items — hands-on F-phase findings; 21–22 added post-draft from F4c; 23 added 2026-08-17 from the buoy-validation round)
 
 1. `ww3_grid.inp` model-flags line must be space-separated (F2-CONFIG-REPORT.md §7#1; S607#1).
 2. An empty namelist section breaks the `ww3_grid` reader — always state ≥1 entry (F2#7-2; S607#2).
@@ -573,6 +622,7 @@ ST6-vs-ST4 physics-package choice: resolved above at **D4**.
 20. Production-shaped WW3 marches run 1.25×–1.64× slower per simulated hour than F3's cheap-shaped configuration — see D12 (F4-REPORT §F4b.3).
 21. **Transfer-file spectrum order is FREQUENCY-FASTEST — a direction-fastest emitter silently scrambles every assembled spectrum.** Official order verified in NOAA's own source at tag 6.07.1: `ww3_outp.ftn` writes `((E(IK,ITH),IK=1,NK),ITH=1,NTH)`; `ww3_bound`'s column-major `SPEC2D(NK1,NTH1)` READ matches it. Our F4b/F4c emitters wrote direction-fastest → scrambled spectra (energy-sum preserved so sum-checks pass; shape/Hs corrupted by a shape-dependent factor). NOT a WW3 bug (earlier attribution corrected after operator challenge + external verification). PW4's emitter must write frequency-fastest. Voids F4b amplitude-fidelity evidence; see the D5 caveat (F4-REPORT §F4c.7/§F4c.7c).
 22. **A single-time-record `nest.ww3` self-disarms boundary forcing: `W3IOBC`'s second read hits EOF and sets `FLBPI=.FALSE.`, permanently disabling boundary updates after one application — it does NOT hold the last record steady. Any steady/KAT-style boundary needs ≥2 time records bracketing the run (F4-REPORT §F4c.1 item 5, source-cited `w3iobcmd.ftn` label 810 / `w3wavemd.ftn:1072`).**
+23. **A restart file initializes ONLY a run starting at its exact timestamp** — WW3 enforces the match in source (`w3iorsmd.ftn:468–473`, `EXTCDE(20)` "CONFLICTING TIMES", no fallback). The chaining design must emit each cycle's restart stamped at the NEXT cycle's exact start time (F4-BUOY-VALIDATION-REPORT.md finding 4).
 
 ### GAP SUMMARY (feeds W4's scope — a gap is a finding, not a failure)
 
@@ -604,13 +654,17 @@ confirmed: the abrupt -800 m synthetic step next to real shallow shelf cells may
 an assumption in WW3's nearest-cell search. **No cliff-KAT number exists for WW3.**
 Flag before any future wetted-substitution KAT attempt.
 
-**2. Seam AGG forcing-comparability caveat.** F4b's real, active-wind-forced 24 h
-marches show seam-aggregate Hs 0.68–0.78 m — 15–39% higher than SWAN's real production
-seam number (0.561 m, e8/e8d1). This is **not** resolved as a WW3-vs-SWAN accuracy
-verdict: the two runs' exact forcing match (wind window, boundary window) was not
-re-verified this round, and the comparison is explicitly flagged as a comparability
-caveat, not a defect finding, in F4-REPORT.md §F4b.5. Carried forward here so Phase V's
-buoy-validated shadow campaign resolves it with real ground truth, not left implicit.
+**2. Seam AGG forcing-comparability caveat — premise VOIDED, question stands
+(corrected 2026-08-17).** F4b's marches showed seam-aggregate Hs 0.68–0.78 m — 15–39%
+higher than SWAN's real production seam number (0.561 m, e8/e8d1). Those F4b figures
+were scramble-fed (trap 21 — the direction-fastest emitter inflates Hs by a
+shape-dependent factor), so the apparent high bias carries no amplitude weight. What
+real ground truth now shows instead: the corrected, restart-chained G1×P1 march runs
+6–7% LOW against the buoys (model/buoy ratio 0.93–0.94,
+`scratch/F4-BUOY-VALIDATION-REPORT.md`) — no evidence of a WW3 high bias survives the
+correction. The underlying question (WW3-leg vs live-SWAN-path served quality under
+matched forcing) remains open and is Phase V's to answer with the shadow campaign;
+carried forward for that purpose.
 
 **3. ADR-098 datum-match discipline binds this ADR's bathymetry (D3).** WW3's
 bathymetry/mask (ETOPO 2022 15s, LMSL) is the SAME source and datum as the live L1 path
@@ -676,8 +730,13 @@ disposition ruling, never before.
 - Research brief: `docs/reference/SWAN-ENERGY-LOSS-RESEARCH-2026-08-15.md` §4 (Option
   E) + §7 (NWPS precedent).
 - Phase F reports: `scratch/F1-BUILD-REPORT.md`, `scratch/F2-CONFIG-REPORT.md` (+F2b/
-  F2c addenda), `scratch/F3-MARCH-REPORT.md`, `scratch/F4-REPORT.md` (+F4b addendum),
-  `scratch/F5-CATALOG.md`, `scratch/SYNTAX-607-VERIFICATION.md`.
+  F2c addenda), `scratch/F3-MARCH-REPORT.md`, `scratch/F4-REPORT.md` (+F4b addendum —
+  amplitude-fidelity sections superseded, see next line), `scratch/F5-CATALOG.md`,
+  `scratch/SYNTAX-607-VERIFICATION.md`.
+- **Buoy validation (2026-08-17): `scratch/F4-BUOY-VALIDATION-REPORT.md`** — the
+  corrected-axis-order G1×P1 validation against NDBC 46253/46222; supersedes every
+  F4c proxy-KAT number and all F4b amplitude-fidelity evidence (Context "Evidence
+  correction" note; corrections in D4, D5, D10, D12, D14 item 2; trap 23).
 - ADR-108: big-L1 true-non-stationary domain — the live serving path this ADR does not
   supersede (D15); its `L1_NEST_MAX_AGE_H = 9` is D11's analog precedent.
 - ADR-098: bathymetry datum discipline — binds the WW3 leg's own ETOPO cut (D14 item 3).

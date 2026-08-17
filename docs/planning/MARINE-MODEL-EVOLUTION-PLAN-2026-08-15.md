@@ -45,12 +45,12 @@ cited as history.
 |---|---|---|
 | F0 | Back up the benchmark input files before /tmp eats them | ✅ DONE 2026-08-15 (session 2). `~/ww3-baselines/e1e2/` on librewxr: 288 files / 1,440,943,416 B, sha256-verified vs source (empty diff); local input-set mirror `scratch/baselines-e1e2/`: 237 files / 289,790,098 B, sha256-verified; lead independently spot-checked counts+bytes+3 file hashes at all three ends (match). Report: `scratch/F0-INVENTORY.md`. Deviation (methodology-only, disclosed): rsync -a used instead of cp -a. /tmp/e1e2 untouched. |
 | F1 | Build WW3 from source + smoke test, both physics candidates | ✅ DONE 2026-08-15 (session 2). NOAA-EMC/WW3 tag 6.07.1 (b582f8c); P1 (ST6/FLX4) + P2 (ST4/FLX0) built clean per F1b tokens verbatim, 10 binaries, all sha256s lead-verified OK; smoke ww3_ts2 normal end both (0.56 s / 1.15 s, lead-verified); NOAA-practice check: README.NCEP shows operational ST4+FLX0 = P2's pairing, no contradiction. Report `scratch/F1-BUILD-REPORT.md`, artifacts `scratch/f1-artifacts/`. TWO LEAD FINDINGS: (1) version skew — RESOLVED by Q5 ruling 2026-08-16 (6.07 manual pulled, syntax re-verification pass dispatched, F2 unblocks after it); (2) aux programs (ww3_bound/bounc, ww3_prnc/prep) not built and source clone deleted (re-fetchable) → folded into F2's scope |
-| F2 | Configure WW3 for our waters (scratch only) | 🔄 MOSTLY DONE 2026-08-16, F2b follow-up running. ACCEPTED (lead-verified): aux programs built both switches (NC4 absence flagged for ADR-109); G1 143×171 ~1 km + G2 37×43 ~4 km grids through ww3_grid rc=0 ALL 4 combos (G1 85.4% sea, 313 boundary points); depth-sign KAT exact (scale 1.0 — ETOPO sign already ZBIN-native, 6.07:16388–16443); WD3/WD4 confirmed via program echo; live corners from swan_grid_sizing.json; L1's own ETOPO cut reused (no download); intermediate-grid evidence: both hops ~4:1 > NOAA's 2:1–3:1 → ADR-109 decides; 4 manual-vs-reality ww3_grid findings → cite-map addendum. F2b DONE 2026-08-16 (lead-verified): wind path RESOLVED via regtests worked example (ww3_ts4; two format strings + external-file read were the misses; real wind.ww3 produced rc=0); ww3_bound worked example confirmed ABSENT from the entire 6.07.1 tree (three-angle search). F2c DONE 2026-08-16 → **F2 ✅ CLOSED (lead-verified)**: transfer format PROVEN end-to-end — self-generated specimen via our ww3_outp (regtests worked examples; out_pnt byte-matched F1's), ww3_bound ingestion proven incl. a real ILLEGAL-XFR rejection confirming row 9's single-grid constraint is source-enforced, and REAL reconstructed archived-cycle spectra → real nest.ww3 (22,710 B, all 313 G1 boundary points weighted; lead-verified on host). The proven framing is W2's emitter format authority (cite-map finding #7 of 7). WD8: mechanism proven end-to-end (wind+nest+calm-start+march ran), but the numeric transient NOT captured — both attempts stalled in the calm-start wind-ramp hours (source-term stiffness, disclosed) and were killed on session budget; **WD8's number moves to F3's march budget** (proven deck: `scratch/f2-artifacts/f2c/spinup_ww3_shel.inp`). Report `scratch/F2-CONFIG-REPORT.md` |
+| F2 | Configure WW3 for our waters (scratch only) | ✅ DONE 2026-08-16 (F2c closed, lead-verified). ACCEPTED (lead-verified): aux programs built both switches (NC4 absence flagged for ADR-109); G1 143×171 ~1 km + G2 37×43 ~4 km grids through ww3_grid rc=0 ALL 4 combos (G1 85.4% sea, 313 boundary points); depth-sign KAT exact (scale 1.0 — ETOPO sign already ZBIN-native, 6.07:16388–16443); WD3/WD4 confirmed via program echo; live corners from swan_grid_sizing.json; L1's own ETOPO cut reused (no download); intermediate-grid evidence: both hops ~4:1 > NOAA's 2:1–3:1 → ADR-109 decides; 4 manual-vs-reality ww3_grid findings → cite-map addendum. F2b DONE 2026-08-16 (lead-verified): wind path RESOLVED via regtests worked example (ww3_ts4; two format strings + external-file read were the misses; real wind.ww3 produced rc=0); ww3_bound worked example confirmed ABSENT from the entire 6.07.1 tree (three-angle search). F2c DONE 2026-08-16 → **F2 ✅ CLOSED (lead-verified)**: transfer format PROVEN end-to-end — self-generated specimen via our ww3_outp (regtests worked examples; out_pnt byte-matched F1's), ww3_bound ingestion proven incl. a real ILLEGAL-XFR rejection confirming row 9's single-grid constraint is source-enforced, and REAL reconstructed archived-cycle spectra → real nest.ww3 (22,710 B, all 313 G1 boundary points weighted; lead-verified on host). The proven framing is W2's emitter format authority (cite-map finding #7 of 7). WD8: mechanism proven end-to-end (wind+nest+calm-start+march ran), but the numeric transient NOT captured — both attempts stalled in the calm-start wind-ramp hours (source-term stiffness, disclosed) and were killed on session budget; **WD8's number moves to F3's march budget** (proven deck: `scratch/f2-artifacts/f2c/spinup_ww3_shel.inp`). Report `scratch/F2-CONFIG-REPORT.md` |
 | F3 | Run the benchmark marches | ✅ DONE 2026-08-16 (lead-verified: every wall-clock + the 59× mod_def reproduce exactly). 12 h archived window, 4 threads, nice 15: **G1×P1 ≈31 min (1877.92 s, twice-reproduced 1850.61 s)** vs the SWAN L1 march's 50–70 min class; G2×P1 29.05 s (~64× cheaper); G1×P2 2828.27 s (ST4 ≈1.5× ST6); P2 mod_def 51.8 MB vs P1 876 KB (package-precomputed data). Restart-chaining PROVEN ("Restart file read; full restart."). All marches normal-end, 22 artifacts hashed. RESIDUALS → F4: quasi-steady spin-up NUMBER blocked on ww3_outp point-mode extraction (3× IOSTAT=2, STOP honored; pre-declared 5% criterion recorded in report §0); grid choice NOT physics-decided (G1 carried on disclosed non-physics grounds — F4.2's rows decide). Two self-caught, fully-evidenced incidents in report §4 (a ~95 s contention violation from a detection bug, post-overlap health check clean — L4 99.7% convergence, 0 new error classes; and a binary-hygiene truncation → new cite-map rule: never invoke ww3_* in a directory whose outputs you keep). Report `scratch/F3-MARCH-REPORT.md` |
-| F4 | The three verdict measurements (cost / physics / handoff) | ✅ DONE 2026-08-16 incl. F4b (lead-verified). F4b: boundary misassembly PROVEN (one-file-per-position semantics; hashes recorded; F3 physics superseded, cost stands); 24 h corrected marches G1×P1 4706.82 s / G1×P2 9269.60 s; **WD8 REVERSED — quasi-steady reached 10/11 and 11/11 points (h=12–17)**, original verdict was the boundary artifact; band-ledger + directional lee/corridor rows delivered at the 11 points (seam AGG 0.68–0.78 m vs SWAN 0.561 m, forcing-comparability caveat flagged); cliff transect physically-scaled on quasi-steady hours; pace-delta 1.25×/1.64× production-shaped vs cheap-shaped (measured, not assumed) — F4.1 cost conclusion qualified accordingly; reader units bug (7.6×) caught by cross-check before use. Earlier F4 core: cost (SWAN L1 52.5 min @6T vs WW3 31/47 min @4T), BOUNDNEST3 compat PASSED, cliff-KAT BLOCKED (WW3 init crash, full trail). Report `scratch/F4-REPORT.md` §F4b.0–.8 | DONE: point-extraction root cause (ww3_outp opens its .inp by filename, never stdin — cite-map finding); **F4.1 cost with real production numbers: SWAN L1 isolated ≈52.5 min @6 threads (3 real full runs, journal markers) vs WW3 G1×P1 ≈31 min / G1×P2 ≈47 min / G2×P1 ≈29 s @4 threads**; **F4.3 mandatory WW3→SWAN BOUNDNEST3 compatibility PASSED** (zero boundary-read errors; SWAN's ≥2-point nesting floor found — design constraint, not format mismatch); cliff-KAT transplant BLOCKED — reproducible WW3 init crash (w3grmp/w3gfcl) specific to the wetted-depth substitution, spec-correct islands-only fixture, FLSOU exonerated by differential test — first-class finding, full bisection trail. F4b (running, same agent): 24 h TIME-VARYING boundary (all 8 archived timesteps through the proven converter), G1×P1+G1×P2 marches with point-SPECTRA output at seam/lee/corridor/buoy points → the three band-ledger rows, WD8 re-verdict on realistic boundary, cliff field-transect redo on quasi-steady tail. Report `scratch/F4-REPORT.md` |
+| F4 | The three verdict measurements (cost / physics / handoff) | ✅ DONE 2026-08-16 (cost/compat), **CORRECTED 2026-08-17 (buoy validation replaces proxy KATs)**. **F4.2 PROXY MEASUREMENTS INVALIDATED** — the F4c energy-ledger KAT chain (runs 1–4) measured an internal boundary-to-seam proxy, not buoy validation; see Coordinator Failure Report above. **F4.2 CORRECTED — REAL BUOY VALIDATION 2026-08-17:** two WW3 G1×P1 marches with corrected boundary axis order (frequency-fastest, ADR-109 d801b04a): (1) cold-start Aug 14 00Z→Aug 15 00Z (4183.58 s, real NOAA boundary+wind from baselines) showed 34–38% low Hs vs NDBC 46253/46222 — startup artifact, Hs still rising at h=24; (2) restart-chained Aug 15 00Z→Aug 16 00Z (4509.74 s, real NOAA gfswave GRIB2 fetched live from NOMADS, restart accepted "full restart") — **model matches buoys within 5–15% during equilibrated hours (h06–h20): model/buoy Hs ratio 0.93–0.94 avg, direction ±10–15°, period within ±3s. Arriving SSW swell pulse correctly captured (model 1.19–1.20 m at Aug 16 00Z, matching the operator's Aug 16 buoy screenshot of 3.3–3.9 ft).** Cold-start deficit confirmed as startup artifact eliminated by production restart-chaining (WD8). Report: `scratch/F4-BUOY-VALIDATION-REPORT.md`. **What stands from the original F4:** F4.1 cost (SWAN L1 ≈52.5 min @6T vs WW3 G1×P1 ≈31 min @4T); F4.3 BOUNDNEST3 compat PASSED; cliff-KAT BLOCKED (WW3 init crash, first-class finding). Original report `scratch/F4-REPORT.md` retained for the standing items; proxy-KAT sections superseded. |
 | F5 | Parameterization catalog (the no-generic-setup deliverable) | ✅ DONE 2026-08-16: `scratch/F5-CATALOG.md` — 7 groups / 90+ rows / 4 columns each, 20-item measured-traps appendix, 11 named GAPs (→ W4 scope), 7 OPEN rows for ADR-109. Gate F initially FAILED it on a real completeness miss (compiled LN1 linear-input switch had zero catalog trace, + IOSTYP low) — remediated same day, full §5.9.1 20-category re-walk clean |
-| Gate F | Independent audit of the measurement method | ✅ **PASS 2026-08-16** (adversarial, results-free, firewalled): comparability traced to F0-hashed sources; instrument identity byte-verified (shared ledger code; the 7.6× units bug found self-disclosed-and-fixed); seam sampling derivation traced; catalog completeness PASS after remediation; 17 deck lines traced to catalog rows, zero orphans; method-first discipline clean. **PHASE F COMPLETE** |
-| DOC-W.1 | Write ADR-109 (the WW3 decision record) → YOUR acceptance | 🔄 DRAFTED 2026-08-16 (Proposed; commit 8e00541e, 664 lines, lead-verified): 8 [OPERATOR ACCEPTANCE ROW]s (D3a intermediate grid, D3b G2 resolution, D4 physics, D5 assembly program, D6 SWAN-ingestion mechanism, D7 wind preprocessor, D9 forcings split, D10 initial state) + 1 [OPERATOR-SET] (D11 nest-age gate, 9 h proposed); F5 catalog embedded; every number Phase-F-cited. **AWAITING OPERATOR ACCEPTANCE — nothing in Phase W dispatches before it** |
+| Gate F | Independent audit of the measurement method | ✅ **PASS 2026-08-16** (adversarial, results-free, firewalled): comparability traced to F0-hashed sources; instrument identity byte-verified (shared ledger code; the 7.6× units bug found self-disclosed-and-fixed); seam sampling derivation traced; catalog completeness PASS after remediation; 17 deck lines traced to catalog rows, zero orphans; method-first discipline clean. **PHASE F COMPLETE.** **NOTE 2026-08-17:** Gate F's original PASS audited the measurement METHOD (decks, scripts, comparability rule) — results-free by design, so the gate itself is not invalidated by the F4.2 proxy-vs-buoy correction. The buoy validation (F4-BUOY-VALIDATION-REPORT.md) uses the same Gate-F-audited instruments (same grid, same boundary assembly, same extraction scripts) with corrected axis order and real buoy comparison — the method the gate verified is the method the buoy validation used. |
+| DOC-W.1 | Write ADR-109 (the WW3 decision record) → YOUR acceptance | 🔄 DRAFTED 2026-08-16 (Proposed; commit 8e00541e, 664 lines, lead-verified): 8 [OPERATOR ACCEPTANCE ROW]s (D3a intermediate grid, D3b G2 resolution, D4 physics, D5 assembly program, D6 SWAN-ingestion mechanism, D7 wind preprocessor, D9 forcings split, D10 initial state) + 1 [OPERATOR-SET] (D11 nest-age gate, 9 h proposed); F5 catalog embedded; every number Phase-F-cited. **Evidence citations CORRECTED 2026-08-17 (lead-direct, governance doc):** proxy-KAT/F4b-amplitude references replaced with the buoy validation (`scratch/F4-BUOY-VALIDATION-REPORT.md`) — Context evidence-correction note; D4 seam-Hs voided + P1-only-buoy-validated rationale row; D5 corrected-emitter proof; D10 cold-vs-warm buoy answer + restart-timestamp constraint; D12 corrected-boundary cost corroboration; D14 item 2 premise voided/question stands; trap 23 added; References row. Recommendations unchanged in substance. **AWAITING OPERATOR ACCEPTANCE — nothing in Phase W dispatches before it** |
 | DOC-W.2–.4 | Architecture + manuals + reference docs to target state | ⬜ |
 | DOC-W.5 | Sweep every existing ADR: amend / supersede / untouched | ⬜ |
 | Gate DOC-W | Independent audit of the docs | ⬜ |
@@ -67,7 +67,7 @@ cited as history.
 | R2.1 | Recount the unfed-east-boundary bound (read-only; unblocked now, runs when scheduled) | ✅ DONE + Gate R2.1 PASS 2026-08-15 (session 2). Corrected bound at 06Z (index 2): seam points 16.6–24.5% unfed (worst seam6 24.5%, Hs 0.644→0.560 m), mean 15.3% across 10 points — ~2.2× the defective-18Z figure (which reproduced exactly: 7.0–11.1%). Two independent derivations agree (implementer + blind auditor; `scratch/R21-CENSUS-REPORT.md`, `scratch/GATE-R21-AUDIT.md`). Caveats attached: ambient-substitution assumption + single-snapshot sensitivity. Q4 RULED 2026-08-16: NOT MATERIAL (premise physically impossible — see Q4 record); R2.2 dead |
 | R2.2 | ~~Feed the east boundary~~ DEAD 2026-08-16 (Q4 ruled NOT MATERIAL — premise physically impossible for >11 s; PW7 dead) | ✅ closed-no-work |
 | R4 | Numerics experiments (scratch, idle time only) | ⬜ |
-| L0+ | Lookup-table system design + build (LAST; opens only on your "accurate and defensible") | ⬜ |
+| L0+ | Lookup-table system design + build (LAST; opens only on your "accurate and defensible") | ⬜ Research brief DONE 2026-08-17: `docs/reference/LUT-INTEGRATION-RESEARCH-2026-08-17.md` — mandatory reading before ADR-110. Tied to Phase L by operator order. |
 
 ## INDEX — sections listed in FILE ORDER, top to bottom. The phases execute in exactly the order they appear. (Keep current; every new `##` section gets an entry the same commit.)
 
@@ -94,9 +94,50 @@ Ctrl-F the exact heading text:
 
 ## 📍 CURRENT STATE — updated every working session (last: 2026-08-15, GO received)
 
-**Status: ⛔ HALTED BY OPERATOR 2026-08-17 — coordinator dismissed ("you're fired"). ALL
-WORK STOPPED on operator order ("ENOUGH CODING! DO NOTHING!"). Read the FAILURE REPORT
-below before anything in this plan is trusted or resumed.**
+**Status: 🔄 RESUMED 2026-08-17 — operator re-authorized work after the halt, with
+corrected direction. Phase F COMPLETE with corrected buoy validation evidence. Phase
+DOC-W next (ADR-109 acceptance). Phase W proceeds as originally planned (full model
+chain, then LUT). LUT research brief completed and tied to Phase L.**
+
+**Previous status (preserved for the record): ⛔ HALTED BY OPERATOR 2026-08-17 —
+coordinator dismissed. Read the FAILURE REPORT below for what went wrong and why.**
+
+## Session 4 record (2026-08-17, post-halt resumption)
+
+**Operator re-authorized work** after reading the failure report and confirming all five
+failures. Direction: "STAY ON TRACK — get the model producing comparable information at
+the buoy locations." Specific rulings this session:
+
+1. **Phase F buoy validation completed.** Two WW3 G1×P1 marches with corrected boundary
+   axis order: (a) cold-start Aug 14 (34–38% low Hs — startup artifact, model still
+   rising at h=24), (b) restart-chained Aug 15 with REAL NOAA gfswave GRIB2 from NOMADS
+   (model matches buoys within 5–15%, direction ±10–15°, period within ±3s, arriving SSW
+   swell pulse correctly captured at 1.19–1.20 m matching operator's buoy screenshot).
+   Report: `scratch/F4-BUOY-VALIDATION-REPORT.md`. F4 row and Gate F note updated.
+
+2. **LUT research completed.** Comprehensive research brief covering per-model LUT
+   analysis, CDIP/O'Reilly-Guza precedent, Kudryavtsev wind-sea integration, Dutch WTM,
+   SnapWave, GPU options, boundary monitor + correction run design, Great Lakes
+   multi-point fetch. Brief: `docs/reference/LUT-INTEGRATION-RESEARCH-2026-08-17.md`.
+   Tied to Phase L by operator order.
+
+3. **Operator direction on plan structure (2026-08-17):** Get the complete model chain
+   running and validated against buoys FIRST. LUT conversion comes after. The original
+   Phase W→V→L sequence is correct: build it, prove it matches buoys, THEN precompute.
+   Phase L's scope is defined by the research brief, not the prior lead-recollection list.
+
+4. **Operator rulings on LUT scope (2026-08-17):**
+   - Wind-sea CANNOT be dropped — mandatory component, especially for Great Lakes
+   - Wind-sea handled via parametric JONSWAP with precomputed fetch (SoCal) or
+     Kudryavtsev integration (Great Lakes)
+   - SWAN L2/L3/L4 ALL get precomputed WTMs — not open, not optional
+   - SurfBeat keeps running per-cycle (seconds, nonlinear, already fast)
+   - LUT boundary monitor: out-of-range inputs trigger correction model runs that
+     extend the LUT
+
+**Standing state:** Phase F COMPLETE. Next: ADR-109 operator acceptance (DOC-W.1),
+then Phase W implementation. All local commits from this session uncommitted (plan
+edits + buoy validation report + LUT research brief). No pushes authorized.
 
 ## ⛔ COORDINATOR FAILURE REPORT — 2026-08-17 (operator-ordered write-up; session 3)
 
@@ -1309,16 +1350,41 @@ and cutover alone is NOT the ruling: the operator may say the words at V4, after
 final review G8). PW9: nothing here is pre-approved.
 
 ### L0 — Design round + ADR-110 (Proposed → operator)
-Scope per the LEAD'S RECORD of the operator's 2026-08-14 direction — adversarial review
-F11 established that conversation is NOT written in any companion record, so the list
-below is lead recollection and is RE-CONFIRMED with the operator at L0 before ADR-110
-drafting (the operator may also confirm it earlier, e.g. at GO): hybrid LUT — precomputed
-swell transfer (bin-separable
-transfer matrices, CDIP/O'Reilly-Guza precedent per brief §4 Option D), live wind/tide/
-currents; coverage: WW3 leg + SWAN nests + 1D models; partial rebuilds (e.g. expanding
-swell-period coverage ahead of a storm); lifecycle invalidation hooked to the existing
-geometry-change detection; operator rebuild notifications + education surface (wizard/
-admin). The design round produces ADR-110 with the LUT build/rebuild cost model measured
+
+**GOVERNING RESEARCH BRIEF (operator-ordered tie, 2026-08-17):**
+[docs/reference/LUT-INTEGRATION-RESEARCH-2026-08-17.md](../reference/LUT-INTEGRATION-RESEARCH-2026-08-17.md)
+— the comprehensive LUT integration research conducted 2026-08-17. This brief is the
+MANDATORY starting point for Phase L. It covers: the per-model LUT analysis (what gets
+precomputed, what keeps running, what the build method is for each), the CDIP/O'Reilly-Guza
+backward ray tracing precedent (swell), Kudryavtsev characteristic-form integration
+(wind-sea), Dutch WTM methodology (nearshore with breaking), precomputation cost analysis,
+GPU acceleration options, the boundary monitor + correction run design (out-of-range input
+handling), Great Lakes multi-point fetch research, and all open ADR-110 design questions
+with their options and dependencies. **Read this brief in full before drafting ADR-110.**
+
+**Operator direction (2026-08-17):** Get the complete model chain running and validated
+against buoys FIRST. The LUT converts a PROVEN model chain, not an unvalidated one.
+Phase L opens only after Phase V confirms the end-to-end chain (WW3 → SWAN L2 →
+SWAN L3/L4 → SurfBeat) matches real buoy observations.
+
+**Scope from the research brief (supersedes the prior lead-recollection list):**
+- **Swell transfer:** backward ray tracing transfer coefficients (CDIP/O'Reilly-Guza,
+  WaveRay open-source tool). Precomputed once per geometry.
+- **Wind-sea:** Kudryavtsev characteristic-form ray integration to build a wind-sea LUT
+  indexed by (wind speed, wind direction) with precomputed fetch. Parametric JONSWAP for
+  SoCal; Kudryavtsev for Great Lakes long-fetch installations.
+- **Nearshore (L2/L3/L4):** precomputed Wave Transformation Matrix (Dutch WTM approach) —
+  stationary SWAN or SnapWave runs for a condition matrix (Hs, Tp, direction, water level).
+  Per-spot grids.
+- **SurfBeat:** keeps running per-cycle (seconds, nonlinear physics, no proven LUT method).
+- **Boundary monitor:** per-cycle bounds check; out-of-range inputs trigger a correction
+  model run that extends the LUT (refuse-not-extrapolate).
+- **Lifecycle:** invalidation hooked to the existing geometry-change detection; LUT extends
+  over time as correction runs cover the site's full observed climate.
+- **GPU:** prototype on CPU first; add GPU if precomputation cost warrants it (backward ray
+  tracing is an ideal GPU workload; librewxr has an RTX A400).
+
+The design round produces ADR-110 with the LUT build/rebuild cost model measured
 from the by-then-live system, not estimated.
 
 ### L1+ — Implementation/validation tasks
