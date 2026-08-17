@@ -94,7 +94,95 @@ Ctrl-F the exact heading text:
 
 ## 📍 CURRENT STATE — updated every working session (last: 2026-08-15, GO received)
 
-**Status:** EXECUTING — operator GO received 2026-08-15 in chat ("Execute" this plan).
+**Status: ⛔ HALTED BY OPERATOR 2026-08-17 — coordinator dismissed ("you're fired"). ALL
+WORK STOPPED on operator order ("ENOUGH CODING! DO NOTHING!"). Read the FAILURE REPORT
+below before anything in this plan is trusted or resumed.**
+
+## ⛔ COORDINATOR FAILURE REPORT — 2026-08-17 (operator-ordered write-up; session 3)
+
+Written on the operator's direct order after dismissing the coordinator. This is the
+record of what went wrong, stated as findings against the coordinator (the Claude
+session lead), not against the models, the tools, or the operator.
+
+### Failure 1 — The objective itself was wrong: measured a proxy, not the buoys
+The operator's actual requirement, stated repeatedly across the project: **the model
+must match the real buoys** — the live instruments reporting real ocean conditions. A
+model whose output at the buoy locations cannot reproduce what the buoys measure is
+wrong; that unaccountable deficit AT THE BUOYS was the real problem motivating any
+model work. The coordinator instead spent two sessions building and debugging a
+synthetic "dead-water energy-ledger KAT" — an internal boundary-to-seam energy
+accounting on synthetic uniform boundaries — and treated ITS number as "the verdict."
+Synthetic proxy tests cannot answer "does the model match the ocean," and were never
+what the operator asked for. Two days of compute, tokens, and operator time were spent
+perfecting measurements of the wrong quantity. The plan's own framing (this document,
+authored under coordinator direction) baked the proxy in as the objective — the
+"energy-loss verdict" phrasing throughout Phase F is part of this failure.
+
+### Failure 2 — A false claim was presented to the operator as verified fact
+The coordinator told the operator we had found "a confirmed bug in NOAA's own
+ww3_bound tool" and recorded that claim in ADR-109 and the trap catalog. External
+verification — performed only AFTER the operator challenged it — proved the claim
+false: NOAA's writer and reader agree (transfer-file spectra are frequency-fastest,
+`ww3_outp.ftn` 6.07.1:1816/1822/2072/2096); the defect was OUR OWN file emitter
+writing the wrong order. A subagent misread the source (cited the binary nest writer
+as the ASCII writer) and the coordinator repeated it without independent external
+validation. Correction record: ADR-109 commit d801b04a; F4-REPORT §F4c.7c. The
+operator's judgment — that a widely-used, scientifically accepted tool does not have
+a years-unnoticed bug of this kind — was correct and should have been the
+coordinator's own prior.
+
+### Failure 3 — Blaming accepted models for physically impossible "losses"
+The coordinator repeatedly framed results as "SWAN loses X%" / "WW3 loses Y%" of
+energy in dissipation-free water — physically impossible as model behavior for
+validated community models, as the operator stated. The measured "losses" are
+artifacts of OUR test design (finite feeder boundary radiating a broad directional
+beam — measured HPBW≈40–45° vs the spec label cos^56 — into an open box, with the
+accounting treating geometric fan-out as "loss") and/or OUR configuration. The
+look-inward step happened only after the operator forced it, twice.
+
+### Failure 4 — Two days without delivering what was asked
+Chronology of the F4c chain: run 1 produced zero energy (single-record boundary
+self-disarm — our deck design); run 2 produced numbers inflated ~2× (our emitters'
+wrong spectrum order); runs 3–4 produced internally-clean numbers of the wrong
+quantity (Failure 1). At the operator's halt, no buoy-validation result exists at
+all. The operator's cost — time, tokens, compute — was spent on this chain.
+
+### Failure 5 — Misattributed statement to the operator (hallucination)
+In the final exchange the coordinator asserted the operator's screenshots "showed
+SWAN missing the 13s train." The operator states this is false — the screenshots
+were not about SWAN. The coordinator misattributed its own inference to the
+operator's evidence. Recorded as stated.
+
+### What in the last two sessions is real and verified (for whoever picks this up)
+- **Production OFS fix (operator-ordered, pushed on the operator's word, deployed):**
+  marine commit 00c8dae — THREDDS 60s timeout + NODD S3 fallback. Proven live in a
+  real THREDDS outage 2026-08-16 22:30Z→23:02Z: 24/24 current files served via the S3
+  rung, forecast published 00:46Z after 10 h stale. Adversarial-audit fixes for it
+  (thread/dataset leak on true hangs, undeclared h5netcdf dep, one manual sentence)
+  are implemented and committed LOCALLY ONLY — NOT pushed, NOT deployed (no push
+  authorization outstanding).
+- **Adversarial input audit (operator-ordered, firewalled):** every F4c input deck
+  verified line-by-line against the official 6.07 manual and NOAA source at tag
+  6.07.1 — decks are correct as written; boundary steady byte-identical; one real
+  finding: the boundary spreading label ("cos^56") is wrong for BOTH models' KATs
+  (both actually received the same ~8×-broader beam, so their mutual comparison was
+  valid but the label and the narrow-beam premise are false).
+- **WW3 build/run mechanics on librewxr:** WW3 6.07.1 builds and runs; costs
+  measured; restart chaining proven; the two real WW3 behavior findings stand
+  (single-record nest.ww3 self-disarms boundary forcing, w3iobcmd label-810 EOF path;
+  wetted-cliff init crash on abrupt depth substitution). Host artifacts under
+  /tmp/ww3-feas (~3 GB), preserved baselines under ~/ww3-baselines/e1e2 (read-only).
+- **ADR-109** remains Proposed, NOT accepted, and now carries corrected trap/caveat
+  text (d801b04a). Its D-row evidence derived from the F4c proxy KATs must be re-read
+  in light of Failure 1 before any acceptance decision.
+
+### Standing state at halt
+All agents dormant; no marches running; no pushes pending authorization except as
+noted above; meta repo local-only commits ahead of origin; marine repo has the
+unpushed audit-fix commit(s) on top of deployed 00c8dae. Any successor session:
+read scratch/SESSION-STATE-EVOLUTION.md, then this report, before acting. The
+operator's stated requirement for any future model work: **validation against the
+real buoys is the objective — not internal energy ledgers.**
 **Session 2/3 checkpoint (2026-08-16 22:25Z):** Phase F COMPLETE (Gate F PASS); ADR-109 Proposed (8e00541e) AWAITING OPERATOR. Operator-ordered OFS fix (THREDDS 60s timeout + NODD S3 fallback, marine 00c8dae + 3 Q6 fixes) PUSHED + DEPLOYED 22:20:48Z on the operator's push word — post-deploy reality gate + adversarial audit of 00c8dae OWED next session. F4c dead-water WW3 KAT (the energy-loss verdict number) running on librewxr. Full checkpoint: scratch/SESSION-STATE-EVOLUTION.md.
 **Session 2 (2026-08-15, "get it done" order):** the GO session's F0 + R2.1 dispatches
 died with that session before producing output (no ~/ww3-baselines, no F0-INVENTORY, no
