@@ -1103,6 +1103,162 @@ convention. W DESIGN v1 REFINES §WW3 MODEL DESIGN v1 to its ADR-109-frozen valu
 does not re-open WD rows. The task blocks below fix scope and acceptance; W DESIGN v1 fixes WHAT gets
 built; agents implement it verbatim and surface deviations as findings.
 
+### W DESIGN v1 — per-task designs, frozen to ADR-109 (lead-authored amendment, 2026-08-17, post-Gate-DOC-W)
+
+*(Authored after ADR-109 acceptance (2026-08-17, all rows as recommended) and Gate
+DOC-W PASS, per PRIME DIRECTIVE 12. REFINES §WW3 MODEL DESIGN v1 to the ADR-109-frozen
+values; re-opens no WD row. Every value below cites ADR-109 (D-rows, D13 catalog,
+traps 1–23) or a Phase F/buoy-validation measurement. An agent hitting a value this
+section does not fix STOPS and surfaces — it never picks.)*
+
+**Frozen inputs (ADR-109, for reference throughout):** G1 grid only, no intermediate
+grid (D3a); P1 = ST6/FLX4 (D4); `ww3_bound` ASCII assembly (D5); BOUNDNEST3 ingestion
+(D6); `ww3_prep` wind path (D7); D8's spectral grid `1.1086 0.030 35 72 0.` and G1
+time-step line `100 33 50 10`; wind-only forcing (D9); restart-chaining (D10);
+`WW3_RESTART_MAX_AGE_H = 9` (D11); `level0/` layout, 6-hourly full-run cadence, serial
+execution at `OMP_NUM_THREADS ≤ 4` nice 15 (D12).
+
+**W1-DESIGN — `services/ww3_runner.py`.** Single responsibility: orchestrate one WW3-leg
+run as a step sequence, refuse loudly on any failure. (a) **Binary management:** binary
+dir + expected sha256 pins come from config (values recorded at deploy from the
+OPERATIONS-MANUAL build story); before any step the runner verifies every needed binary
+exists and hashes match — mismatch/missing = refuse `ww3_binaries_invalid`, no
+degrade-to-skip. (b) **Step sequence (WD10):** `ww3_grid` is NOT a per-cycle step (runs
+only on geometry change — W4/W5 wire the hook); per cycle: wind-prep (`ww3_prep`) →
+boundary assembly (`ww3_bound`) → march (`ww3_shel`) → handoff extraction (`ww3_outp`).
+(c) **Invocation hygiene (traps 12/13):** every `ww3_*` binary runs in a FRESH throwaway
+working directory assembled per step (symlink/copy in `mod_def.ww3` + inputs, harvest
+outputs, delete); `ww3_outp`'s deck is literally named `ww3_outp.inp` in that CWD, no
+stdin redirect. (d) **Environment:** `OMP_NUM_THREADS` from config capped at 4, `nice 15`
+— the runner sets both itself; it never inherits an uncapped environment. (e) **Per-step
+timeouts (lead-derived ceilings from D12 measurements, stated here so agents don't
+invent):** march 180 min (≈2.3× the worst measured production-shaped 24 h march,
+78.4 min, F4b/buoy runs 69.7–75.2 min); each of prep/bound/outp 10 min (all measured in
+the seconds-to-minute class in Phase F). Timeout = kill process tree, refuse
+`ww3_step_timeout:<step>`. (f) **Refusal contract:** any step rc≠0, timeout, or missing
+expected output artifact refuses the WHOLE leg cycle with a named reason; partial
+artifacts are deleted, never left where a later step or reader could mistake them for
+complete (PRIME DIRECTIVE 8). Log lines carry the step, rc, wall-clock, artifact sizes.
+**Acceptance (task row unchanged):** command-assembly KATs pin exact argv/CWD/env per
+step against a fixture config; failure-injection proves refuse-not-degrade for each of:
+nonzero rc, timeout, missing output, hash mismatch.
+
+**W2-DESIGN — WW3-input emitter (PW4): `services/ww3_formats.py` (writer) + the output
+path in `services/boundary_reconstruction.py`.** Spectral CONSTRUCTION is untouched
+(Named Constants); this adds serialization only. (a) **Format (SYNTAX row 10, proven by
+F2c + the buoy round):** ww3_outp ASCII transfer format; ONE file per geographic
+boundary position (trap 15); every file ≥2 time records bracketing the run window
+(trap 22 — single-record self-disarm); spectrum block written FREQUENCY-FASTEST —
+`for ith in dirs: for ik in freqs:` emission order matching Fortran `SPEC2D(NK1,NTH1)`
+column-major (trap 21; the corrected `gen_boundary_buoy_val.py` on librewxr is the
+proven reference implementation, read-only). (b) **Axes:** exactly WD3/D8 —
+35 freqs from 0.03 Hz factor 1.1086, 72 directions/5°; directions converted
+nautical-FROM-degrees → oceanographic-TO-radians via `rad = radians((deg_from + 180)
+mod 360)` (trap 17); all files share this ONE spectral grid (row 9 hard constraint,
+source-enforced via XFR check, trap 8). (c) **Data flow:** per-wet-cell partition sets
+(existing ADR-104/106 reconstruction) → E(f,θ) on WD3 axes → one transfer file per G1
+boundary position (S-row + W-column wet perimeter cells, D13 Group 2) → `ww3_bound`
+WRITE mode, nearest-neighbor interpolation flag per the proven F2c deck → `nest.ww3`.
+(d) `ww3_bound`'s spectra-file list closes with the literal `'STOPSTRING'` (trap 6).
+**Acceptance (task row unchanged, plus):** the round-trip KAT's known-answer set
+includes a deliberately direction-fastest (transposed) control that must FAIL the
+known-answer comparison — the KAT is falsifiable against the exact defect class that
+voided F4b (rules/verification.md known-answer mandate); bin-sum identity ≤ 5%.
+
+**W3-DESIGN — WW3→SWAN L2 handoff (PW3): `services/swan_formats.py` L2
+boundary-source block + `services/swan_runner.py` call site.** (a) **Grammar (SYNTAX
+row 4):** `BOUNDNEST3 WW3 'fname' FREE CLOSED [xgc] [ygc]` — FREE because `ww3_outp`
+writes formatted output (the unformatted flag and SWAN keyword MUST agree, row 10
+pairing); `[xgc]/[ygc]` are MANDATORY (L2 is Cartesian): the L2 grid's SW corner in
+geographic degrees, longitude then latitude (row 4's misprint trap), sourced from the
+live sizing json — never retyped. CGRID precedes the command (row 4). (b) **Point
+placement contract with W2/W4:** WW3 output points are written IN SEQUENCE along the
+nest boundary; consecutive-point spacing must respect SWAN's 0.1×-spacing acceptance
+window (row 4 trap — sloppy placement silently starves boundary segments), and ≥2
+boundary points always (F4.3's measured SWAN floor). (c) **Shadow discipline:** the
+BOUNDNEST3-emitting path exists behind the shadow artifacts only — the LIVE L2 deck
+emission is untouched this phase; the serving flip that would make L2 consume WW3
+output in production is DESIGNED (a single boundary-source selector in
+`swan_formats.py` with the live path as default) but NOT BUILT-INTO-SERVING until a V4
+verdict-1 ruling (W5 note below). **Acceptance (task row unchanged):** handoff
+round-trip KAT with a known spectrum (energy at L2 boundary within a stated tolerance
+the implementer computes from the KAT construction, not invents); live L2–L4 decks
+byte-identical (KAT-pinned).
+
+**W4-DESIGN — setup derivation (PW2) + depth-step detection (PW6):
+`services/swan_domain.py` + `services/grid_sizing_chain.py`.** All derivation is
+config-time, regional-input-only, logged-with-provenance. (a) **Derivations (each a
+D13 catalog rule):** G1 extent = the `level1` block of `swan_grid_sizing.json` read
+live (D3/WD1); resolution = L1's existing `resolution_m` (~1 km); NX/NY from
+extent/resolution; time-step line via D8's formula (`critical_xy = 33.4 s ×
+min_cell_km`; `global = 3×critical`; `k-theta = global/2`; source floor 10) — for G1
+today that reproduces `100 33 50 10` exactly, and the formula (not the constants) is
+what's implemented; spectral line fixed `1.1086 0.030 35 72 0.`; `FLAGTR = 0` (G1
+resolved-dry-cell islands); boundary marking = status 2 on wet S-row + W-column
+perimeter cells only (Q4: east is land), status-map segment block closed by the
+mandatory `0 0 F` (row 6a); output-boundary-points section always `0. 0. 0. 0.  0`
+(trap 3); model-flags line `F T T T F T` space-separated (trap 1). (b) **Gap closures
+assigned here (ADR-109 GAP SUMMARY):** G2 — the bottom-read line's limiting-depth and
+minimum-water-depth values are STATED in the emitted deck from the F2 as-built deck
+values, with a derivation comment (never a silent default); G1(gap) — the PR3/UQ
+namelist question is resolved as "6.07 defaults, deliberately untouched" and logged as
+such (a considered choice, recorded, mirroring the ST6 rule); G8 — the REAL L2
+boundary/seam point list is derived from the live L2 grid geometry (the handoff points
+W3 consumes), replacing F-phase placeholders. (c) **Depth-step detection (PW6,
+DETECTION ONLY):** the per-cell depth-change-ratio diagnostic computed over the G1
+bathymetry at config time, logged with the cells and ratios — feeds nothing yet; the
+live L1→L2 seam does NOT move (WITHHELD, V2 decides). (d) **Bathymetry:** ETOPO 2022
+15s LMSL, same source+datum as L1 (ADR-098 discipline, D14 item 3); depth scale factor
+1.0 with the sign-KAT from F2 §3 re-run as a unit test (trap 14). **Acceptance:** as
+the task row states (two hand-derived fixtures, step-detection KAT, no-silent-default
+test, live-path deck diff EMPTY).
+
+**W5-DESIGN — scheduling + health + config (PW5): `service.py`, `state.py`,
+`endpoints/health.py`, `config/marine_config.py` (+ API pass-through files named at
+dispatch).** (a) **Cadence & ordering:** the WW3 shadow leg runs on the 6-hourly FULL
+cycle only, STARTING AFTER the production SWAN full run has published (serial, never
+concurrent — D12's contention protocol; the shadow leg must never delay serving).
+(b) **Restart chaining mechanics (D10 + trap 23):** each leg run writes its restart
+stamped at the NEXT cycle's exact start time (WW3 rejects any timestamp mismatch,
+`w3iorsmd.ftn` EXTCDE(20), no fallback); the runner consumes the newest restart whose
+stamp equals the current cycle start. (c) **Staleness gate:** `ww3RestartAge` computed
+from the consumed restart's cycle stamp (not file mtime — mtime lies after copies);
+age > `WW3_RESTART_MAX_AGE_H = 9` → the leg REFUSES the cycle (C14 semantics: no
+publish of leg artifacts, health red with named reason `ww3_restart_stale`); a missing
+restart entirely = cold-start is NOT silently substituted — refuse
+`ww3_restart_missing` and surface (the buoy round measured a 24 h cold start 34–38%
+low; a silent cold start would serve exactly the deficit this plan exists to kill).
+Recovery from a missing/stale restart is an operator-visible action (documented in
+OPERATIONS-MANUAL at DOC-W-FINAL): a deliberate spin-up run, not an automatic fallback.
+(d) **Wind production path (Gap G7, closed here):** per cycle, read the assembled wind
+store (ADR-107's second consumer — current cycles only), regrid nearest-neighbor onto
+G1's exact NX×NY (trap 16: dimensions must match exactly), emit via row 6c's `ww3_prep`
+deck grammar (two format strings, `FROM='NAME'`, trap 5). (e) **Config:**
+`ww3_shadow_mode_enabled` per-site boolean through the existing config-push — the SOLE
+writable key; everything else read-only display via the API pass-through (§19.7a as
+documented at DOC-W.3). (f) **Health:** leg status block — last cycle result, named
+refuse reason (slug convention), `ww3RestartAge`, last march wall-clock vs the 180-min
+ceiling, artifact sizes. (g) **Cutover-only piece:** the serving flip (L2 consuming WW3
+via W3's selector) is DESIGNED here — flip = one config-side switch changing the L2
+boundary source, gated on a V4 verdict-1 operator ruling — and explicitly NOT BUILT.
+**Acceptance:** as the task row (health-key KATs, frozen-clock age-gate KAT at the
+exact 9 h boundary, wizard round-trip), plus a restart-timestamp KAT: a restart
+stamped ≠ cycle start must be refused, not consumed.
+
+**W6-DESIGN — test consolidation.** Full-chain fixture test: fixture partitions → W2
+files → real `ww3_bound` → (mocked-or-real per test tier) march artifacts → W3 deck
+emission → assertions on each seam; stale-test sweep greps for "L1 is the only
+deep-water model"-class pins across the suite. No new design surface.
+
+**Cross-cutting rows binding every W task:** every emitted deck line traces to a D13
+catalog row (PRIME DIRECTIVE 11 — Gate W checks line-by-line); a construct not in
+SYNTAX PRESCRIPTIONS is a STOP; live serving path byte-identical throughout (Gate W
+standing row); doc-sync in the same round for any behavior the manuals describe;
+LUT-era note (session-4 operator direction): W1's runner keeps march invocation
+callable for an arbitrary window/config independent of cycle scheduling — Phase L's
+correction-model runs will reuse it unchanged; this costs nothing now and is a design
+constraint, not new scope.
+
 ### W1 — WW3 runner service module
 **Files:** NEW `services/ww3_runner.py` (+ its test file). Wiring into the cycle is W5's
 job, not W1's.
