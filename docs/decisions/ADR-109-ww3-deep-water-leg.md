@@ -248,24 +248,26 @@ into a real `nest.ww3` (22,710 B, F2c.3) and a corrected 22-file one-per-positio
 proof. `ww3_bounc` would need a fresh switch-file decision (adding `NC4`) plus a full
 smoke-test round before it could be considered — not attempted this phase.
 
-**⚠ MATERIAL CAVEAT (added 2026-08-17, F4c.7 finding — read before accepting this row).**
-`ww3_bound` 6.07.1 has a confirmed spectral read-order defect: `ww3_bound.ftn:414` fills
-its `SPEC2D(NK1,NTH1)` array with a bare list-directed `READ`, which in Fortran fills
-column-major (frequency index fastest), while the ASCII transfer-file stream — as written
-by WW3's OWN `ww3_outp` (writer source `w3iobcmd.ftn` ~526–545) — is direction-fastest.
-For any grid with NK≠NTH (ours: 35×72) every assembled spectrum is silently SCRAMBLED
-across (frequency, direction) bins: total energy is preserved (sum-level checks pass)
-but spectral shape, and therefore Hs under WW3's frequency-weighted quadrature, is
-corrupted by a shape-dependent factor (measured: 1.98× Hs on the uniform KAT spectrum,
-1.62× on a real F4b spectrum). Confirmed by exact reproduction — the scrambled binary
-was reconstructed from the ASCII in simulation to float32 precision (F4-REPORT.md
-§F4c.7). **Consequence for this row:** the recommendation survives only with a
-compensating measure — the project writes its boundary input files PRE-TRANSPOSED so
-`ww3_bound`'s fill order lands every value on its correct bin (workaround validated in
-F4c.8), or the boundary emitter writes `nest.ww3` directly, or the defect is reported/
-patched upstream. It also VOIDS the amplitude-fidelity (not cost/mechanics) evidence of
-every F4b `ww3_bound`-fed march. The operator should accept/reject this row with the
-compensating measure named.
+**⚠ MATERIAL CAVEAT (added 2026-08-17; ATTRIBUTION CORRECTED same day after operator
+challenge and external verification — read before accepting this row).**
+The transfer-file spectrum block is **frequency-fastest**, and `ww3_bound` reads it
+correctly. Verified against NOAA's own source (fetched live from NOAA-EMC/WW3, not
+recalled): the official writer `ww3_outp.ftn` at tag 6.07.1 (lines 1816/1822/2072/2096)
+emits `WRITE (...) ((E(IK,ITH),IK=1,NK),ITH=1,NTH)` — frequency index varies fastest —
+and `ww3_bound`'s `SPEC2D(NK1,NTH1)` whole-array list-directed READ fills column-major,
+also frequency-fastest. Writer and reader agree; NOAA's issue tracker shows no such
+defect; **there is no WW3 bug** (an earlier F4c.7 claim to the contrary misread
+`w3iobcmd.ftn` — the binary nest writer — as the ASCII writer). **The defect was OURS:**
+the project's F4b/F4c transfer-file emitters wrote the spectrum block direction-fastest,
+so `ww3_bound` — reading per the official convention — assembled silently SCRAMBLED
+spectra: energy sum preserved (sum-level checks pass), spectral shape and Hs corrupted
+by a shape-dependent factor (measured 1.98× Hs on the uniform KAT spectrum, 1.62× on a
+real F4b spectrum; confirmed by float32-exact reproduction, F4-REPORT §F4c.7/§F4c.7c).
+**Consequence for this row:** `ww3_bound` is exonerated and the recommendation stands
+WITHOUT any compensating measure — but PW4's boundary emitter MUST write the spectrum
+block frequency-fastest (the corrected-order files passed every known-answer gate
+exactly: boundary 0.6500 m, real-spectrum control 0.9604 vs 0.9607). The scramble VOIDS
+the amplitude-fidelity (not cost/mechanics) evidence of every F4b `ww3_bound`-fed march.
 
 ## D6 — SWAN-ingestion mechanism [OPERATOR ACCEPTANCE ROW]
 
@@ -569,7 +571,7 @@ ST6-vs-ST4 physics-package choice: resolved above at **D4**.
 18. 6.07 manual reorganization is cite-location-only except one high-impact substantive delta: the ST6 default calibration column (D2 above) (SYNTAX-607-VERIFICATION.md).
 19. Cliff-KAT wetted-depth-substitution crash — see D14 below (F4-REPORT §3.1).
 20. Production-shaped WW3 marches run 1.25×–1.64× slower per simulated hour than F3's cheap-shaped configuration — see D12 (F4-REPORT §F4b.3).
-21. **`ww3_bound` SPEC2D read-order defect (NK≠NTH grids): list-directed READ fills column-major (frequency-fastest) while the transfer-file stream — including `ww3_outp`'s own output — is direction-fastest; every assembled spectrum is silently scrambled (energy-sum preserved, shape/Hs corrupted by a shape-dependent factor). Compensate by writing boundary input files pre-transposed, or emit `nest.ww3` directly. Voids F4b amplitude-fidelity evidence; see the D5 caveat (F4-REPORT §F4c.7).**
+21. **Transfer-file spectrum order is FREQUENCY-FASTEST — a direction-fastest emitter silently scrambles every assembled spectrum.** Official order verified in NOAA's own source at tag 6.07.1: `ww3_outp.ftn` writes `((E(IK,ITH),IK=1,NK),ITH=1,NTH)`; `ww3_bound`'s column-major `SPEC2D(NK1,NTH1)` READ matches it. Our F4b/F4c emitters wrote direction-fastest → scrambled spectra (energy-sum preserved so sum-checks pass; shape/Hs corrupted by a shape-dependent factor). NOT a WW3 bug (earlier attribution corrected after operator challenge + external verification). PW4's emitter must write frequency-fastest. Voids F4b amplitude-fidelity evidence; see the D5 caveat (F4-REPORT §F4c.7/§F4c.7c).
 22. **A single-time-record `nest.ww3` self-disarms boundary forcing: `W3IOBC`'s second read hits EOF and sets `FLBPI=.FALSE.`, permanently disabling boundary updates after one application — it does NOT hold the last record steady. Any steady/KAT-style boundary needs ≥2 time records bracketing the run (F4-REPORT §F4c.1 item 5, source-cited `w3iobcmd.ftn` label 810 / `w3wavemd.ftn:1072`).**
 
 ### GAP SUMMARY (feeds W4's scope — a gap is a finding, not a failure)
