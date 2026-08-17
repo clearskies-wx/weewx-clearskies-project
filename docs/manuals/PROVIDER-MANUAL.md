@@ -1837,7 +1837,7 @@ The response's `osm_type` field carries the raw OSM tag value (e.g. `groyne`, `d
 
 **Module identity:** `providers/ocean/ofs.py`, `PROVIDER_ID = "ofs"`, `DOMAIN = "ocean"`.
 
-**CAPABILITY:** `geographic_coverage = "us_coastal"` (major coasts — see coverage table below), `auth_required = []`. Supplies: water temperature (full column), salinity (full column), ocean currents (u/v components, full column), sea surface elevation (vs MSL and MLLW), seafloor depth, forecast time series. Dependencies: `xarray` + `netCDF4` + `fsspec` + `aiohttp`, now in the marine service's `[nearshore]` pip extra (the API's `[marine]` extra is removed).
+**CAPABILITY:** `geographic_coverage = "us_coastal"` (major coasts — see coverage table below), `auth_required = []`. Supplies: water temperature (full column), salinity (full column), ocean currents (u/v components, full column), sea surface elevation (vs MSL and MLLW), seafloor depth, forecast time series. Dependencies: `xarray` + `netCDF4` + `fsspec` + `aiohttp` + `h5netcdf`, now in the marine service's `[nearshore]` pip extra (the API's `[marine]` extra is removed).
 
 **Data source:** NOAA Operational Forecast Systems — 15 physics-based coastal ocean models (ROMS, FVCOM) at 34m–4km resolution, served via THREDDS/OPeNDAP at `opendap.co-ops.nos.noaa.gov/thredds/`. Updated 1–4 times daily depending on the model. Full research, verified OPeNDAP metadata, grid structure details, and code examples in `docs/planning/briefs/WATER-TEMPERATURE-DATA-SOURCE-BRIEF.md` §"Technical Detail: THREDDS/OPeNDAP Data Extraction".
 
@@ -1857,7 +1857,7 @@ The response's `osm_type` field carries the raw OSM tag value (e.g. `groyne`, `d
 
 **Cache:** Key includes model name + cycle + lat/lon (rounded to 3 decimals). TTL = 1800s.
 
-**Error handling:** THREDDS 404 → cycle fallback. THREDDS timeout (>60s, `_DATASET_TIMEOUT`) or any other open failure → NODD S3 fallback rung (above); both failing → cycle fallback, same as a THREDDS 404. Grid point on land → null result. All per error taxonomy.
+**Error handling:** Any THREDDS open failure for a given file — a 404, a timeout (>60s, `_DATASET_TIMEOUT`), or any other exception — tries the NODD S3 fallback rung (above) for that same file before anything else; the code does not discriminate by failure type. Only when *both* rungs fail for a file does the existing cycle-fallback loop step back to the prior cycle. Grid point on land → null result. All per error taxonomy.
 
 **Implementation details (from code, 2026-07-13):**
 
