@@ -1687,7 +1687,16 @@ architectural permission record.
 *(Plain English, self-contained, newest at top. Answered items get their ruling recorded
 here and applied.)*
 
-### Q8 — OPEN (2026-08-17, Phase W pre-flight): the marine repo does not match the failure report's description — the claimed "unpushed OFS audit-fix commits" do not exist
+### Q8 — ✅ RULED 2026-08-17 (operator, in chat): "yes, the fact that things do not get deployed is not my issue here, you need to make sure you are deploying things properly."
+**Ruling applied:** option (a) — the three OFS audit fixes are re-implemented for real
+(agent round + adversarial QC), and the coordinator owns carrying them through
+deployment properly (deploy-marine.sh, baseline/diff, reality gate, journal sweep —
+the full PRIME DIRECTIVE 2/3/4 + coordinator.md §2/§7 discipline). Push itself still
+happens on the operator's push word per the standing git rule. W1's hold is lifted —
+the repo state is understood; the false claim is now a recorded fact, not an unknown.
+Original question preserved below.
+
+### Q8 — original text (2026-08-17, Phase W pre-flight): the marine repo does not match the failure report's description — the claimed "unpushed OFS audit-fix commits" do not exist
 **Context, plain:** Before dispatching the first Phase W coding task I checked the
 marine repo's state. The session-3 failure report states the adversarial-audit fixes
 for the deployed OFS fix (a thread/connection leak when a download truly hangs, a
