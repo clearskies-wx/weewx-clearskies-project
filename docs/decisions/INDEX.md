@@ -120,36 +120,50 @@ Format defined in [_TEMPLATE.md](_TEMPLATE.md). Process discipline in [rules/cle
 
 ## Proposed
 
+*(DOC-W.5 sweep, 2026-08-17: ADR-095/099/100/101/107 removed from this table — each ADR's own status
+line already reads Accepted; they were never re-filed after acceptance. Moved to the Accepted table
+below, dated at their own file's acceptance date. ADR-098 added — present on disk, absent from every
+INDEX table before this sweep; its own status line reads Proposed, so it is correctly filed here
+despite being treated as binding by other documents, incl. ADR-109 D14 item 3 — see DOC-W.5 finding.)*
+
 | ADR | Title | Proposed |
 |---|---|---|
-| [ADR-095](ADR-095-swan-model-corrections.md) | SWAN model corrections — cross-shore transect, WLEVEL, CURRENT, OBSTACLE | 2026-07-18 |
 | [ADR-096](ADR-096-scoring-restructure.md) | Surf scoring restructure — Wave Organization composite, SWAN-only data, SwellTrack branding | 2026-07-18 |
 | [ADR-097](ADR-097-beach-profile-endpoint.md) | Beach profile endpoint — cross-shore transect visualization | 2026-07-18 |
-| [ADR-099](ADR-099-marine-service-separation.md) | Marine service separation — unified standalone companion service replacing SWAN+compute half-services | 2026-07-22 |
-| [ADR-100](ADR-100-geography-aware-study-area-geometry.md) | Geography-aware study-area geometry — OSM coastline, wrap-aware fetch fan, classification-first, two-stage basis (AD-2/AD-6/AD-7; consumed by ADR-093 Amendment 5) | 2026-07-31 |
-| [ADR-101](ADR-101-surf-score-geometric-mean.md) | Surf score rebuild — weighted geometric mean of five components (Size/Shape/Conditions/Power/Consistency), no penalties, single-use rule, admin-adjustable weights; supersedes ADR-096's formula (its per-category bar rule survives) | 2026-08-04 |
-| [ADR-107](ADR-107-wind-provider-decoupling-and-assembly.md) | Wind provider decoupling + assembly — independent wind gatherer background task, single assembled wind timeline store, event-driven SWAN run triggers (`extended_cycle_assembled`/`hourly_cycle_assembled`), 12h fast-cycle scope; lifts the 2026-08-03 operator-approved design brief into a decision record (drafted by the Z3.5 implementer per the fixit plan's re-scope note; **Accepted 2026-08-15**, operator in chat) | 2026-08-11 |
+| [ADR-098](ADR-098-swan-datum-consistency.md) | Vertical datum consistency for SWAN inputs — grid-wise LMSL conversion (ocean/tidal), per-lake `LWD_IGLD85` (Great Lakes), USGS Rohweder 2025 DEM Great Lakes bathymetry source. **Status line reads Proposed but the decision is treated as binding elsewhere** (ADR-109 D14 item 3 cites it as binding on the WW3 leg's bathymetry; ARCHITECTURE.md/manuals apply its rules) — a status-line contradiction, reported as a DOC-W.5 finding for the operator, not resolved here | 2026-07-19 |
 
 ## Accepted — pending manual consolidation (marine, A1)
 
 | ADR | Title | Accepted |
 |---|---|---|
-| [ADR-108](ADR-108-big-l1-true-nonstationary-domain.md) | Big-L1 true-non-stationary domain — island containment (SW corner 32.60°N, 119.25°W), `COMPUTE NONSTAT` dt=10 MIN time-marching L1 compute, hourly L2+ seam via archived nest output, `l1NestAge` health surface + 9 h refuse gate; cap 100→175 km for L1 only (supersedes ADR-104 D2 cap + S/W siting rationale for L1) | 2026-08-13 |
+| [ADR-108](ADR-108-big-l1-true-nonstationary-domain.md) | Big-L1 true-non-stationary domain — island containment (SW corner 32.60°N, 119.25°W), `COMPUTE NONSTAT` dt=10 MIN time-marching L1 compute, hourly L2+ seam via archived nest output, `l1NestAge` health surface + 9 h refuse gate; cap 100→175 km for L1 only (supersedes ADR-104 D2 cap + S/W siting rationale for L1). **Scope note added 2026-08-17 (DOC-W.5/ADR-109 D15): remains the live serving path — NOT superseded; any supersession belongs to Phase V5, never before.** | 2026-08-13 |
 | [ADR-109](ADR-109-ww3-deep-water-leg.md) | WW3 deep-water leg — our own WaveWatch III replaces NOAA's WW3 as the deep-water model at every install (Q1: always, no conditionality), handoff to SWAN at L2; 6.07.1/6.07-manual authority (Q5); accepted values: no intermediate grid (G1 direct), P1 (ST6/FLX4), `ww3_bound`, BOUNDNEST3, `ww3_prep`, wind-only forcings, restart-chaining, `WW3_RESTART_MAX_AGE_H = 9`; embeds the F5 parameterization catalog in full (PRIME DIRECTIVE 11, no product-facing model-setup controls); evidence corrected 2026-08-17 to the real buoy validation (proxy KATs invalidated) | 2026-08-17 |
 
 ## Accepted — pending manual consolidation
 
+*(DOC-W.5 sweep, 2026-08-17: ADR-079 and ADR-092 added — present on disk, absent from every INDEX
+table before this sweep; both status lines read Accepted, filed here. ADR-095/099/100/101/107 moved
+in from the Proposed table above — each file's own status line already reads Accepted; the row move
+had not happened. Dates are each ADR's own acceptance date, not its draft date.)*
+
 | ADR | Title | Accepted |
 |---|---|---|
 | [ADR-078](ADR-078-geographic-features-overlay.md) | Geographic features overlay (OSM via Overpass API) | 2026-06-29 |
+| [ADR-079](ADR-079-forecast-correction-engine.md) | Forecast correction engine — provider-agnostic Random Forest bias correction (MOS methodology), predicts bias not absolute temp, applied after cache/before response, SQLite-backed, scikit-learn required dependency | 2026-06-30 |
 | [ADR-080](ADR-080-provider-attribution-architecture.md) | Provider attribution architecture | 2026-07-01 |
 | [ADR-081](ADR-081-license-change-polyform.md) | License change — PolyForm Noncommercial 1.0.0 (supersedes ADR-003) | 2026-07-09 |
+| [ADR-092](ADR-092-hot-reload-config.md) | Hot-reload configuration without API restart | 2026-07-16 |
 | [ADR-093](ADR-093-swan-trushore-nearshore-model.md) | SWAN + SwellTrack replaces NWPS as nearshore wave model (supersedes ADR-084) | 2026-07-16 |
 | [ADR-094](ADR-094-hrrr-surf-wind-source.md) | HRRR forecast wind as surf quality scoring source for SWAN + SwellTrack forecasts | 2026-07-16 |
+| [ADR-095](ADR-095-swan-model-corrections.md) | SWAN model corrections — cross-shore transect, WLEVEL, CURRENT, OBSTACLE | 2026-07-18 |
+| [ADR-099](ADR-099-marine-service-separation.md) | Marine service separation — unified standalone companion service replacing SWAN+compute half-services | 2026-07-26 |
+| [ADR-100](ADR-100-geography-aware-study-area-geometry.md) | Geography-aware study-area geometry — OSM coastline, wrap-aware fetch fan, classification-first, two-stage basis (AD-2/AD-6/AD-7; consumed by ADR-093 Amendment 5). **Amended 2026-08-17 (DOC-W.5/ADR-109): the geography subsystem gains the WW3 setup derivation as a consumer.** | 2026-07-31 |
+| [ADR-101](ADR-101-surf-score-geometric-mean.md) | Surf score rebuild — weighted geometric mean of five components (Size/Shape/Conditions/Power/Consistency), no penalties, single-use rule, admin-adjustable weights; supersedes ADR-096's formula (its per-category bar rule survives) | 2026-08-04 |
 | [ADR-102](ADR-102-statistical-breaking-roller.md) | Statistical breaking fraction (Q_b, Battjes & Janssen 1978) and roller energy balance replace the hard-trigger DDD cap — Q_b-weighted one-sided dissipation, whitewater/impact-zone extent from roller energy, closure + no-gain invariants (Round X). **Published break-marker/impact-zone section superseded 2026-08-10 by ADR-106 R3/R4 — internal Q_b/roller physics unaffected; see amendment note.** | 2026-08-06 |
-| [ADR-103](ADR-103-spectral-boundary.md) | Multi-station real spectral boundary for the SWAN L1 domain — WW3 station selection, refuse-don't-degrade (no fallback tiers), distinct `/health` refusal naming (H-1); catch-up document for design shipped 2026-07-26 | 2026-07-26 |
-| [ADR-104](ADR-104-island-aware-l1-partition-boundary.md) | Island-aware L1 sizing and partition-reconstruction WW3 boundary — decoupled fetch-fan horizon, 100 km cap, near-lee clamp, admin-exposed override; per-L1-cell reconstructed boundary spectra replacing per-station `.spec` (supersedes ADR-103 for L1 when Phase B lands); RTOFS currents, STOFS water level, Hawaii tidal-datum branch, CONUS+GL+HI service area (D1–D13). **D4/P4 boundary-point-spacing ruling superseded 2026-08-10 by ADR-106 R1 — see amendment note.** | 2026-08-08 |
-| [ADR-106](ADR-106-marine-page-fixit-rulings.md) | Marine page fixit rulings — one spectrum per wet WW3 cell (SWAN interpolates, supersedes ADR-104 D4/P4); ranged Breaking Face Height/Period fields (`periodMinS/MaxS` replace `combinedPeriodS`, `faceHeightMinFt/MaxFt` removed); adjustable breaking-onset threshold + fixed crash-band impact zone, break markers decoupled from cessation (amends ADR-102's published path, internal physics unchanged) | 2026-08-10 |
+| [ADR-103](ADR-103-spectral-boundary.md) | Multi-station real spectral boundary for the SWAN L1 domain — WW3 station selection, refuse-don't-degrade (no fallback tiers), distinct `/health` refusal naming (H-1); catch-up document for design shipped 2026-07-26. **Amended 2026-08-17 (DOC-W.5/ADR-109): reconstruction lineage gains the `ww3_bound` consumer; L1-emission remnant tagged SUPERSEDED-AT-V5.** | 2026-07-26 |
+| [ADR-104](ADR-104-island-aware-l1-partition-boundary.md) | Island-aware L1 sizing and partition-reconstruction WW3 boundary — decoupled fetch-fan horizon, 100 km cap, near-lee clamp, admin-exposed override; per-L1-cell reconstructed boundary spectra replacing per-station `.spec` (supersedes ADR-103 for L1 when Phase B lands); RTOFS currents, STOFS water level, Hawaii tidal-datum branch, CONUS+GL+HI service area (D1–D13). **D4/P4 boundary-point-spacing ruling superseded 2026-08-10 by ADR-106 R1 — see amendment note. Scope note added 2026-08-17 (DOC-W.5/ADR-109): L1-sizing rulings tagged SUPERSEDED-AT-V5; reconstruction/no-silent-fallback/whole-service-area rulings carry forward into the WW3 leg unchanged.** | 2026-08-08 |
+| [ADR-106](ADR-106-marine-page-fixit-rulings.md) | Marine page fixit rulings — one spectrum per wet WW3 cell (SWAN interpolates, supersedes ADR-104 D4/P4); ranged Breaking Face Height/Period fields (`periodMinS/MaxS` replace `combinedPeriodS`, `faceHeightMinFt/MaxFt` removed); adjustable breaking-onset threshold + fixed crash-band impact zone, break markers decoupled from cessation (amends ADR-102's published path, internal physics unchanged). **Scope note added 2026-08-17 (DOC-W.5/ADR-109): PA1's SWAN-side-interpolation half tagged SUPERSEDED-AT-V5; PA2–PA5 untouched.** | 2026-08-10 |
+| [ADR-107](ADR-107-wind-provider-decoupling-and-assembly.md) | Wind provider decoupling + assembly — independent wind gatherer background task, single assembled wind timeline store, event-driven SWAN run triggers (`extended_cycle_assembled`/`hourly_cycle_assembled`), 12h fast-cycle scope; lifts the 2026-08-03 operator-approved design brief into a decision record (drafted by the Z3.5 implementer per the fixit plan's re-scope note; Accepted 2026-08-15, operator in chat). **Amended 2026-08-17 (DOC-W.5/ADR-109): the WW3 leg becomes a second consumer of the assembled wind store (current cycles only).** | 2026-08-15 |
 
 ## Archived — consolidated into PROVIDER-MANUAL.md (marine)
 
