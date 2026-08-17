@@ -1158,7 +1158,14 @@ mod 360)` (trap 17); all files share this ONE spectral grid (row 9 hard constrai
 source-enforced via XFR check, trap 8). (c) **Data flow:** per-wet-cell partition sets
 (existing ADR-104/106 reconstruction) → E(f,θ) on WD3 axes → one transfer file per G1
 boundary position (S-row + W-column wet perimeter cells, D13 Group 2) → `ww3_bound`
-WRITE mode, nearest-neighbor interpolation flag per the proven F2c deck → `nest.ww3`.
+WRITE mode, interpolation method **2 (linear)** per the proven F2c deck → `nest.ww3`.
+*(Corrected 2026-08-17 mid-W2: the lead's original text here said "nearest-neighbor" —
+a transcription error conflating this flag with D9's wind-regrid resample. The W2
+implementing agent STOPped on the contradiction; verified against
+REFERENCE-gen_boundary_buoy_val.py, F4-REPORT §linear-branch trace
+(`ww3_bound.ftn:479`), and SYNTAX-607-VERIFICATION's digit-for-digit manual-example
+match — all three agree on method 2. The design's own cited authority, "the proven
+F2c deck," always meant this value.)*
 (d) `ww3_bound`'s spectra-file list closes with the literal `'STOPSTRING'` (trap 6).
 **Acceptance (task row unchanged, plus):** the round-trip KAT's known-answer set
 includes a deliberately direction-fastest (transposed) control that must FAIL the
