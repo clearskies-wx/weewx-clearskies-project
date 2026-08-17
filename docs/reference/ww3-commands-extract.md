@@ -75,7 +75,7 @@ IDFM codes (6.07:15677–15681):
 Unit 10 = field read inline in the deck itself, no comment lines allowed
 (6.07:15665–15667).
 
-Status-map legend (6.07:16050–16054):
+Status-map legend (6.07:16073–16079; cite corrected at Gate DOC-W 2026-08-17):
 ```
 0  Land point.
 1  Regular sea point.

@@ -1,7 +1,11 @@
-> **Committed copy.** Source: `scratch/SYNTAX-607-VERIFICATION.md`, verbatim (no content
-> changes below this note). This is the authoritative `6.07:NNNN` line-cite map for the
-> plan's WW3 SYNTAX PRESCRIPTIONS rows — cites below point INTO
+> **Committed copy.** Source: `scratch/SYNTAX-607-VERIFICATION.md`, verbatim except for
+> two cite corrections from Gate DOC-W (2026-08-17), marked inline: the `!/O1` row's range
+> extended 13735–13738 → 13735–13741 (the quoted sentence sits at :13741), and the
+> status-map-legend row's cite corrected 16050–16054 → 16073–16079 (16050–16054 is the
+> numeric example map, not the legend). This is the authoritative `6.07:NNNN` line-cite
+> map for the plan's WW3 SYNTAX PRESCRIPTIONS rows — cites below point INTO
 > `docs/reference/ww3-user-manual-v6.07.txt`, committed alongside this file at DOC-W.4.
+> The scratch original retains the pre-correction numbers as a historical artifact.
 
 # WW3 SYNTAX PRESCRIPTIONS — re-verification against v6.07 manual (Q5 ruling)
 
@@ -45,7 +49,7 @@ CHANGED/ADDITION findings are called out explicitly per-row below.
 | `&MISC FLAGTR = n` codes 0/1/2/3/4 | UNCHANGED | 15349–15361 | "0: No subgrid... 1: Transparancies at cell boundaries... 2: Transp. at cell centers. 3: Like 1 with cont. ice. 4: Like 2 with cont. ice." | identical wording |
 | FLAGTR example `= 4` | UNCHANGED | 15490 | `&MISC CICE0 = 0.25, CICEN = 0.75, FLAGTR = 4 /` | digit-for-digit identical to 5.16:8175 |
 | Obstruction field read as additional bottom-style input when FLAGTR>0 | UNCHANGED | 15927–15939 | "If sub-grid information is available as indicated by FLAGTR above, additional input... unit number of file (can be 10, and/or identical to bottom depth unit)" | identical |
-| `!/O1` switch mandatory for nested-run boundary marking (App C.1 step 3) | UNCHANGED | 13735–13738 (now App **B**, not C — see structural note) | "Make sure that the model switch !/O1 is selected in the switch file" | identical wording, appendix letter changed C→B |
+| `!/O1` switch mandatory for nested-run boundary marking (App C.1 step 3) | UNCHANGED | 13735–13741 (now App **B**, not C — see structural note; range corrected at Gate DOC-W 2026-08-17, quoted sentence at :13741) | "Make sure that the model switch !/O1 is selected in the switch file" | identical wording, appendix letter changed C→B |
 
 **Row 6 bottom line: no grammar or numeric-constant changes. All cites need updating (mostly a ~+7,160-line shift into the new Appendix G); the App C→B relettering applies.**
 
@@ -60,7 +64,7 @@ CHANGED/ADDITION findings are called out explicitly per-row below.
 | Unit 10 = field read inline, no comment lines | UNCHANGED | 15665–15667 | "If the above unit number equals 10, then the bottom depths are read this file... No comment lines allowed" | identical |
 | Sign-convention TRAP example `-0.1 2.50 10 -10. 3 1 '(....)' 'NAME' 'bottom.inp'` | UNCHANGED | 15725 | `-0.1 2.50 10 -10. 3 1 '(....)' 'NAME' 'bottom.inp'` | digit-for-digit identical to 5.16:8418 — trap's factual basis (negative scale turns positive digits into water) still holds |
 | Obstruction read: unit==bottom unit ⇒ same file assumed; scale example `0.2`; two NX×NY fields | UNCHANGED | 15920–16019 | "10 0.2 3 1 '(....)' 'NAME' 'obstr.inp'" / "if this unit number is the same as the previous bottom depth unit number, it is assumed that this is the same file without further checks" / "size of fields is always NX * NY" | all digit-for-digit identical |
-| Status-map legend 0=land/1=sea/2=active boundary/3=excluded | UNCHANGED | 16050–16054 | "0: Land point. 1: Regular sea point. 2: Active boundary point. 3: Point excluded from grid." | identical |
+| Status-map legend 0=land/1=sea/2=active boundary/3=excluded | UNCHANGED | 16073–16079 (corrected at Gate DOC-W 2026-08-17; 16050–16054 is the numeric example map, not the legend) | "0: Land point. 1: Regular sea point. 2: Active boundary point. 3: Point excluded from grid." | identical |
 | `FROM='PART'` segmented data, closed by mandatory `0 0 F` | UNCHANGED | 16022–16112 | "if FROM = 'PART', then segmented data is read from below" ... `00F` (pdftotext squishes the spaces; same artifact present at 5.16:8794 too — not a real syntax change) | identical |
 
 **Row 6a bottom line: every claim UNCHANGED, all numeric examples verified digit-for-digit. Cites shift into Appendix G (~+7,300 lines from the 5.16 citations).**

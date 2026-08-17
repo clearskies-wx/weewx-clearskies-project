@@ -520,7 +520,7 @@ product-facing setting) except where a row is explicitly marked per-install-deri
 |---|---|---|---|
 | Build/machine | `F90 NOGRB LRB4 NOPA SHRD OMPG OMPX` | `SYNTAX-row-7`; manual §5.9.1 pure-OpenMP combination 6.07:10279–10282 | Fixed; honors `OMP_NUM_THREADS≤4` F3 budget |
 | Propagation scheme | `PR3 UQ` | F1b (third-order ULTIMATE-QUICKEST, "default operational scheme," `w3pro3md.F90` source read) | Fixed, universal |
-| Flux | `FLX4` (P1) / `FLX0` (P2) | F1b: FLX4 pairs with ST6 (Hwang 2011, ST6's own calibration table binds CDFAC as an FLX4 param, 6.07 Table 2.8); FLX0 pairs with ST4 (WAM4-family stress computed inside source terms, 6.07:13739/10052) | Fixed pairing per candidate, no per-site choice |
+| Flux | `FLX4` (P1) / `FLX0` (P2) | F1b: FLX4 pairs with ST6 (Hwang 2011, ST6's own calibration table binds CDFAC as an FLX4 param, 6.07 Table 2.8); FLX0 pairs with ST4 (WAM4-family stress computed inside source terms — "flx0: No routine used; flux computation included in source terms", 6.07:10052–10056; cite corrected 2026-08-17, Gate DOC-W F1b — the prior "13739" pointed at nesting-appendix text) | Fixed pairing per candidate, no per-site choice |
 | Linear input | `LN1` (both) | manual §5.9.1 mandatory group, 6.07:10061–10066 | Fixed, universal, both candidates |
 | Source-term package | `ST6` (P1) / `ST4` (P2) | F1b candidate design; decided by D4 above | **See D4 — [OPERATOR ACCEPTANCE ROW]** |
 | Stability | none (P1); none in Phase F (P2, no STAB3) | F1b defaults-untouched rule; `stab3` compatible with ST3/ST4 per 6.07 (widened from 5.16's "ST4 only") | P1: no stab switch exists for ST6. P2: STAB3 withheld in Phase F — a future addition is a physics change requiring its own operator ruling |
@@ -529,8 +529,8 @@ product-facing setting) except where a row is explicitly marked per-install-deri
 | Breaking | `DB1` (both) | F1b: Battjes-Janssen, stated-not-silent | Fixed |
 | Triads/bottom scattering/supplemental/reflection | `TR0 BS0 XX0 REF0` (both) | F1b: none on a SoCal deep leg | Fixed off |
 | Ice/ice source | `IC0 IS0` (both) | F1b: SoCal, no-ice, consistent with FLAGTR's no-ice values | Fixed off |
-| Wind/current interpolation | `WNT1 WNX1 CRT1 CRX1` (both) | F1b: linear, confirmed against shipped center-example switch files 6.07:14046–14050 | Fixed |
-| Nested-boundary marking | `O1` (mandatory when a child grid marks input-boundary points) | `SYNTAX-row-6`/`row-8`; App B.1 step 3, 6.07:13735–13738 | Only relevant if D3a adds an intermediate grid — not yet exercised |
+| Wind/current interpolation | `WNT1 WNX1 CRT1 CRX1` (both) | F1b: linear — interpolation-method token definitions (wnt1/wnx1/crt1/crx1 "linear") at 6.07:10155–10166, confirmed against the shipped center-example switch string (`… WNX1 WNT1 CRX1 CRT1 …`) at 6.07:10802 (cite corrected 2026-08-17, Gate DOC-W F1 — the prior "14046–14050" pointed at unrelated MPI-tag text) | Fixed |
+| Nested-boundary marking | `O1` (mandatory when a child grid marks input-boundary points) | `SYNTAX-row-6`/`row-8`; App B.1 step 3, 6.07:13735–13741 (range extended 2026-08-17, Gate DOC-W — the "!/O1 is selected" sentence sits at :13741) | Only relevant if D3a adds an intermediate grid — not yet exercised |
 | NetCDF (`NC4`) | absent from both P1/P2 strings | F2 §1 finding: `w3_make` warns NC4 configured but not in switch | Needed only if D5/D7 pick a NetCDF path — this ADR does not, so `NC4` stays absent |
 | Propagation-scheme namelist tuning (`&PRO2/&PRO3/&PRO4`) | not set in any F-phase deck | F-phase decks set only `&MISC FLAGTR=n` | **GAP** — W4 must confirm whether PR3/UQ needs explicit namelist tuning or whether "manual default, deliberately untouched" is a considered choice (as for ST6/ST4) or an oversight |
 | `MLIM` (NOAA's own operational modifier) | absent from both P1/P2 | Not a mandatory-group token; F1 built/smoke-tested clean without it | Not a gap — recorded for completeness since NOAA's own operational string carries it |

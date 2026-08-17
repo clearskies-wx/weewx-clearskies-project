@@ -3075,7 +3075,7 @@ pushed/deployed at the time of this doc-sync pass. No run/convergence/reality-ga
 
 **Full parameterization catalog — pointer only, not duplicated here.** Every WW3 configuration input (switch-file physics-package selections, `ww3_grid.inp` namelist parameters, grid definition, the four deck time steps, spectral discretization, boundary placement/point spacing, obstruction-grid generation, wind regridding, nest-output point placement) traces to a derivation rule in **ADR-109 D13's embedded F5 parameterization catalog** — the full catalog, including the 7 catalog groups and the 23 measured hands-on traps, is the single source of truth (PRIME DIRECTIVE 11: no generic model setup; a deck line with no catalog row is a defect, not a default). Do not duplicate the catalog here — see ADR-109 D13 directly.
 
-**Physics package:** P1 (ST6/FLX4, same physics family as the existing SWAN deck's `GEN3 ST6 … AGROW`) — ADR-109 D4, the only candidate with real-ocean buoy validation (`scratch/F4-BUOY-VALIDATION-REPORT.md`: restart-chained G1×P1 matches NDBC 46253/46222 within 5–15% on Hs, direction within ±10–15°, period within ±3 s).
+**Physics package:** P1 (ST6/FLX4 — ST6 is the wave-growth/decay physics package, FLX4 its paired wind-stress formulation; the same physics family as the existing SWAN deck's `GEN3 ST6 … AGROW`) — ADR-109 D4, the only candidate with real-ocean buoy validation (`scratch/F4-BUOY-VALIDATION-REPORT.md`: restart-chained G1×P1 matches NDBC 46253/46222 within 5–15% on Hs, direction within ±10–15°, period within ±3 s).
 
 ### Source ADRs
 
