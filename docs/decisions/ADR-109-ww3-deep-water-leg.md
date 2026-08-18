@@ -83,6 +83,26 @@ restart-chaining, direct evidence for D10. Every D-row below that leaned on F4b/
 amplitude evidence carries a dated correction note; cost and mechanics evidence
 (F1–F3, F4.1, F4.3) stands per trap 21's carve-out.
 
+**Evidence caveat (2026-08-18) — buoy-validation wind forcing was wrong; validation
+stands for SWELL only.** During the W-Accept spin-up bootstrap, the ad-hoc F-phase
+fetch script (`/tmp/ww3-feas/fetch_aug15_boundary.py`, copied for the spin-up) was
+found to sample its WIND field at longitude ≈ 0° (mid-Atlantic): `get_wind_grid()`
+passes raw negative longitudes into a nearest-match lookup on the grib's 0–360
+longitude coordinate, so every longitude column snaps to the grid's first column.
+Proof: every row of the archived `config/buoy_val_aug15/wind_data.txt` holds ONE
+value repeated across all 143 columns. The accepted Run 2 above therefore ran under
+a longitude-constant phantom wind (~4.6 m/s that day) instead of real local winds.
+Consequences: (a) the buoy match above remains valid evidence for the BOUNDARY-SWELL
+path (boundary spectra use a separate, correctly-converted lookup, and the validated
+day was swell-dominated with light winds); (b) it is NOT evidence of wind-sea
+fidelity under real local winds — that evidence comes from the Phase V shadow
+campaign, whose production wind path (`service.py
+_ww3_regrid_wind_nearest_neighbor`, lines 383–386) normalizes the longitude
+convention correctly and is unaffected by this bug; (c) the 2026-08-18 spin-up was
+re-run with the corrected script before its restart files were consumed. The
+reference script under `/tmp/ww3-feas/` is read-only and retains the bug — do not
+reuse its wind path without this fix.
+
 ## Acceptance record (2026-08-17)
 
 **Accepted by the operator in chat, 2026-08-17** ("approved"), after the evidence-citation
