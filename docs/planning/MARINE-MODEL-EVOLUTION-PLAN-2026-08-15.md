@@ -1129,7 +1129,14 @@ boundary assembly (`ww3_bound`) → march (`ww3_shel`) → handoff extraction (`
 (c) **Invocation hygiene (traps 12/13):** every `ww3_*` binary runs in a FRESH throwaway
 working directory assembled per step (symlink/copy in `mod_def.ww3` + inputs, harvest
 outputs, delete); `ww3_outp`'s deck is literally named `ww3_outp.inp` in that CWD, no
-stdin redirect. (d) **Environment:** `OMP_NUM_THREADS` from config capped at 4, `nice 15`
+stdin redirect. *(Clarified 2026-08-17, surfaced by W5's integration STOP:
+`run_leg_cycle` SEEDS each subsequent step's fresh CWD with `mod_def.ww3` plus the
+leg's previously HARVESTED artifacts — prep's `wind.ww3` → bound/shel/outp; bound's
+`nest.ww3` → shel/outp; the march's outputs → outp — in addition to the spec's own
+input_files, spec files winning on name collision. W1 as first built required the
+caller to name staging paths that do not exist until the runner executes — an
+interface defect against this design's own WD10 chain, fixed in the reopened W1
+round.)* (d) **Environment:** `OMP_NUM_THREADS` from config capped at 4, `nice 15`
 — the runner sets both itself; it never inherits an uncapped environment. (e) **Per-step
 timeouts (lead-derived ceilings from D12 measurements, stated here so agents don't
 invent):** march 180 min (≈2.3× the worst measured production-shaped 24 h march,
