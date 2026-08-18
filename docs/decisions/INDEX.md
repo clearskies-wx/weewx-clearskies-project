@@ -130,12 +130,12 @@ despite being treated as binding by other documents, incl. ADR-109 D14 item 3 �
 |---|---|---|
 | [ADR-096](ADR-096-scoring-restructure.md) | Surf scoring restructure — Wave Organization composite, SWAN-only data, SwellTrack branding | 2026-07-18 |
 | [ADR-097](ADR-097-beach-profile-endpoint.md) | Beach profile endpoint — cross-shore transect visualization | 2026-07-18 |
-| [ADR-098](ADR-098-swan-datum-consistency.md) | Vertical datum consistency for SWAN inputs — grid-wise LMSL conversion (ocean/tidal), per-lake `LWD_IGLD85` (Great Lakes), USGS Rohweder 2025 DEM Great Lakes bathymetry source. **Status line reads Proposed but the decision is treated as binding elsewhere** (ADR-109 D14 item 3 cites it as binding on the WW3 leg's bathymetry; ARCHITECTURE.md/manuals apply its rules) — a status-line contradiction, reported as a DOC-W.5 finding for the operator, not resolved here | 2026-07-19 |
 
 ## Accepted — pending manual consolidation (marine, A1)
 
 | ADR | Title | Accepted |
 |---|---|---|
+| [ADR-098](ADR-098-swan-datum-consistency.md) | Vertical datum consistency for SWAN inputs — grid-wise LMSL conversion (ocean/tidal), per-lake `LWD_IGLD85` (Great Lakes), USGS Rohweder 2025 DEM Great Lakes bathymetry source. Accepted 2026-08-17 (Q7 ruling), resolving the DOC-W.5 status-line contradiction | 2026-08-17 |
 | [ADR-108](ADR-108-big-l1-true-nonstationary-domain.md) | Big-L1 true-non-stationary domain — island containment (SW corner 32.60°N, 119.25°W), `COMPUTE NONSTAT` dt=10 MIN time-marching L1 compute, hourly L2+ seam via archived nest output, `l1NestAge` health surface + 9 h refuse gate; cap 100→175 km for L1 only (supersedes ADR-104 D2 cap + S/W siting rationale for L1). **Scope note added 2026-08-17 (DOC-W.5/ADR-109 D15): remains the live serving path — NOT superseded; any supersession belongs to Phase V5, never before.** | 2026-08-13 |
 | [ADR-109](ADR-109-ww3-deep-water-leg.md) | WW3 deep-water leg — our own WaveWatch III replaces NOAA's WW3 as the deep-water model at every install (Q1: always, no conditionality), handoff to SWAN at L2; 6.07.1/6.07-manual authority (Q5); accepted values: no intermediate grid (G1 direct), P1 (ST6/FLX4), `ww3_bound`, BOUNDNEST3, `ww3_prep`, wind-only forcings, restart-chaining, `WW3_RESTART_MAX_AGE_H = 9`; embeds the F5 parameterization catalog in full (PRIME DIRECTIVE 11, no product-facing model-setup controls); evidence corrected 2026-08-17 to the real buoy validation (proxy KATs invalidated) | 2026-08-17 |
 

@@ -1,6 +1,6 @@
 # ADR-098: Vertical Datum Consistency for SWAN Inputs
 
-**Status:** Proposed
+**Status:** Accepted (operator in chat, 2026-08-17 — Q7 ruling, MARINE-MODEL-EVOLUTION-PLAN: "adr098 accepted"; the decision had been operating as binding since the 2026-07-26/27 amendments, cited by ADR-108 D4, ADR-109 D14 item 3, and the manuals)
 **Date:** 2026-07-19
 **Amended:** 2026-07-26 — grid-wise conversion to LMSL adopted for the US (reversing the CMVD deferral), worldwide path enumerated, cross-level datum guard added. 2026-07-27 — the single-datum contract is split by region: LMSL for ocean/tidal domains (unchanged), per-lake `LWD_IGLD85` for Great Lakes domains (new — the Great Lakes are non-tidal, so no tidal datum including LMSL applies to them). 2026-07-27 (later same day) — Great Lakes bathymetry source routing corrected from NCEI Great Lakes Bathymetry to the USGS Rohweder 2025 DEM the code actually calls (C-106), and that source decided at all three levels, superseding the "undecided option" framing this ADR carried briefly. Amendments are marked inline.
 **Supersedes:** None

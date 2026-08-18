@@ -1732,7 +1732,9 @@ dispatch (W1) into this repo is HELD until you answer** — the repo's main bran
 itself is clean and matches GitHub, so the hold is caution about acting on a falsified
 state description, not a technical blocker.
 
-### Q7 — OPEN (2026-08-17, from the DOC-W.5 sweep): ADR-098's status says "Proposed" but everything treats it as accepted. Should it be marked Accepted?
+### Q7 — ✅ RULED 2026-08-17 (operator, in chat: "adr098 accepted"): ADR-098 flipped to Accepted; file status line + INDEX row (moved Proposed → marine Accepted table) synced same commit. Original question preserved below.
+
+### Q7 — original text (2026-08-17, from the DOC-W.5 sweep): ADR-098's status says "Proposed" but everything treats it as accepted. Should it be marked Accepted?
 **Context, plain:** ADR-098 is the decision record that says all water-depth data
 (bathymetry) and water-level data must use the same vertical reference point (datum),
 because the wave models cannot detect a mismatch themselves. Its own file still says
