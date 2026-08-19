@@ -104,6 +104,16 @@ produced a ledger row — see its retroactive checklist row for the 19 h restart
 stall and the monitor miss that hid it. Push inventory correction: the MARINE repo was
 pushed 2026-08-18 as part of the vchain deploy (C9's "marine ahead 1" is stale).**
 
+**Operator direction 2026-08-19 (standing, in chat — bind all rounds until Phase L):
+(1) CHAIN-SERVES is a PURE SUBSTITUTION — "the only thing we are doing is substituting
+the WW3 model for L1, it does not mean redesigning the entire chain." Everything that
+consumed L1's output keeps its exact mechanism, now consuming the substituted model's
+output ("what feeds the hourly runs should not change" — same archive seam, same 9 h
+gate, same cadence). (2) LONG-TERM GOAL: "once everything is converted to LUTs, there
+will no longer be a need for short runs and long runs" — the 6-hourly-full/hourly-fill
+duality is TRANSITIONAL plumbing that dies at Phase L. Keep every change to it minimal;
+entrench nothing around the dual cadence.**
+
 **Previous status (2026-08-17): RESUMED — operator re-authorized work after the halt.
 Phase F COMPLETE with corrected buoy validation evidence; DOC-W then Phase W completed
 per the rows above.**
