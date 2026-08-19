@@ -1721,6 +1721,17 @@ architectural permission record.
 *(Plain English, self-contained, newest at top. Answered items get their ruling recorded
 here and applied.)*
 
+### Q9 — OPEN 2026-08-19: the new chain cannot start itself the first time — how do we hand it its first warm start?
+
+**Context, plain English.** The chain deployed cleanly and refused its first cycle exactly the way it is designed to: loudly, with a named reason, no bad forecast published, and the buoy scorecard correctly wrote a "refused" row. The reason is a chicken-and-egg problem in the deep-water model's safety rule. The rule (from the decision record you accepted, ADR-109): each run starts from the warm-state file the PREVIOUS run saved, and it refuses any warm-state file it did not make itself — that protects against ever running from a stale or fabricated ocean state. But on a fresh install there IS no previous run, so the hand-made warm-state file we installed this morning (from a real, verified 24-hour warm-up run — same procedure that passed the buoy validation) is rejected as "untrusted: no recorded generating cycle." As written, the chain can never run its first cycle anywhere, ever. This check was never reached in yesterday's testing (an earlier failure masked it), so today is its first live exercise.
+
+**Options:**
+1. **One-time seed (no code change, ~minutes):** write one line into the service's saved state recording what is genuinely true — that today's installed warm-state file came from a real warm-up run ending at this cycle. The chain then starts on its next attempt and self-chains forever after. Honest content, but it is a by-hand edit of the service's own memory, done once and documented here.
+2. **Proper bootstrap mechanism (code round + gate, ~hours):** a deliberate "operator-installed warm start" path — e.g. the install procedure drops a small provenance note next to the warm-state file and the service accepts it once. Right answer for real installs; amends the ADR-109 decision record.
+3. **Both (recommended):** seed now so testing proceeds today, and queue option 2 as a plan row so fresh installs have a real answer before this ships to anyone else.
+
+**Recommendation: option 3.** The seed's content is true (the warm-up run really happened and is hash-verified); the mechanism gap is real but should not block today's testing.
+
 ### Q8 — ✅ RULED 2026-08-17 (operator, in chat): "yes, the fact that things do not get deployed is not my issue here, you need to make sure you are deploying things properly."
 **Ruling applied:** option (a) — the three OFS audit fixes are re-implemented for real
 (agent round + adversarial QC), and the coordinator owns carrying them through
