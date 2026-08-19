@@ -1721,7 +1721,11 @@ architectural permission record.
 *(Plain English, self-contained, newest at top. Answered items get their ruling recorded
 here and applied.)*
 
-### Q9 — OPEN 2026-08-19: the new chain cannot start itself the first time — how do we hand it its first warm start?
+### Q9 — ✅ RULED 2026-08-19 (operator, in chat): "THAT IS NOT ARCHITECTURAL, THAT IS JUST PROCEDURAL" — seed executed same hour, no further ask. LESSON (rule-shaped, applied): a one-time operational state seed whose content is TRUE (recording real, verified provenance the service just couldn't witness) is PROCEDURAL — the coordinator executes it and reports, never escalates it as an option menu. Seed record: `state_snapshot.json` ww3_leg.lastSuccessCycleTime = 2026-08-19T00:00:00Z (the minted restart's real generating march; backup `.bak-preseed-20260819T085347Z`), service stop/edit/start, state verified reloaded. The durable first-install bootstrap mechanism is PARKED as a pre-ship row (design + gate + ADR-109 amendment) — needed before any fresh install exists, not for this test install.
+
+*(Original question preserved below for the record.)*
+
+### Q9 (original text) — the new chain cannot start itself the first time — how do we hand it its first warm start?
 
 **Context, plain English.** The chain deployed cleanly and refused its first cycle exactly the way it is designed to: loudly, with a named reason, no bad forecast published, and the buoy scorecard correctly wrote a "refused" row. The reason is a chicken-and-egg problem in the deep-water model's safety rule. The rule (from the decision record you accepted, ADR-109): each run starts from the warm-state file the PREVIOUS run saved, and it refuses any warm-state file it did not make itself — that protects against ever running from a stale or fabricated ocean state. But on a fresh install there IS no previous run, so the hand-made warm-state file we installed this morning (from a real, verified 24-hour warm-up run — same procedure that passed the buoy validation) is rejected as "untrusted: no recorded generating cycle." As written, the chain can never run its first cycle anywhere, ever. This check was never reached in yesterday's testing (an earlier failure masked it), so today is its first live exercise.
 
