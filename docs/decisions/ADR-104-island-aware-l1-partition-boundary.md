@@ -236,6 +236,14 @@ near-lee `SIGMA_THETA_REF = 15°`; `K_FILL = 1`; swell spread `σθ = 15°` (cos
 `σθ = 30°` (`s = 7`); swell frequency shape Gaussian `σf = 0.015 Hz`; wind-sea shape JONSWAP `γ = 3.3`;
 boundary point spacing = L1 `dx` (1 km); wind bbox pad `0.3°`; STOFS cutover bias gate `≤ 0.15 m`.
 
+**Amendment 2026-08-22 (operator ruling in chat, "1 ok"):** swell trains with `SWPER ≤ 8 s`
+(`_SHORT_PERIOD_SWELL_MAX_PERIOD_S = 8.0`) take the wind-sea JONSWAP frequency shape (`γ = 3.3`, `fp = 1/SWPER`)
+instead of the Gaussian; spread unchanged (`s = 28`). Reason: such partitions are decayed wind sea relabelled
+"swell" by the source's partitioner, and the 0.015 Hz Gaussian carried no high-frequency tail — live 2026-08-22
+12Z the W-edge boundary spectrum had zero energy above 0.21 Hz while NDBC 46025 (23 km inside, open water)
+showed a broad 0.13–0.27 Hz spectrum; band totals matched, the split did not. Code:
+`services/boundary_reconstruction.py`; KAT K8 in `tests/test_boundary_reconstruction.py`.
+
 Two constants are **measured then pinned** — the method is decided here, the value is measured at
 implementation, within a bound:
 - B2's `r` (wind-sea mean→peak period ratio): bounds `[1.10, 1.35]`, measured vs 3 live `.spec` cycles.

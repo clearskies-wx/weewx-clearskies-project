@@ -1499,7 +1499,12 @@ boundary reconstruction's own last timestep.
   interpolates the boundary spectrum itself.
   Wind-sea train: JONSWAP `γ = 3.3`, `Tp = r × WVPER` (`r = 1.0`, operator-ruled 2026-08-09 — see the
   measured-then-pinned constants paragraph below), spread cos²ˢ `s = 7` (σθ ≈ 30°). Swell trains: Gaussian `σf = 0.015 Hz` centred at
-  `1/SWPER` (narrow-band: mean ≈ peak), spread cos²ˢ `s = 28` (σθ ≈ 15°). Each `S_p(f)`/`D_p(θ)` normalized to
+  `1/SWPER` (narrow-band: mean ≈ peak), spread cos²ˢ `s = 28` (σθ ≈ 15°) — **except short-period swell trains
+  (`SWPER ≤ 8 s`, `_SHORT_PERIOD_SWELL_MAX_PERIOD_S`; operator ruling 2026-08-22 "1 ok")**, which take the wind-sea
+  JONSWAP frequency shape (`γ = 3.3`, `fp = 1/SWPER`, same `s = 28` spread): they are decayed wind sea the source's
+  partitioner relabels "swell" once local wind is light, and the Gaussian gave them no high-frequency tail (live
+  2026-08-22 12Z: W-edge point zero energy above 0.21 Hz vs NDBC 46025's broad 0.13–0.27 Hz spectrum 23 km
+  inside; band totals matched, the split did not). Each `S_p(f)`/`D_p(θ)` normalized to
   unit integral on the discrete grid BEFORE scaling by `Hs_p²/16`, so the bin-sum identity is exact by
   construction.
 - **Runtime guard:** per point, `|4√m0 − √(ΣHs_p²)| ≤ 5%` (the discretization identity) → raise on breach. No
