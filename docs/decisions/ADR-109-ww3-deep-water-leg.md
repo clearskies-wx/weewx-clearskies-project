@@ -331,6 +331,28 @@ under `/tmp/ww3-feas/`) fed real NOAA gfswave spectra through `ww3_bound` into m
 that match real buoys within 5–15% (`scratch/F4-BUOY-VALIDATION-REPORT.md`) — the
 end-to-end amplitude proof the scramble had voided now exists with the corrected order.
 
+**⚠ SECOND MATERIAL CAVEAT (added 2026-08-22; trap 24 — direction-axis ORDER/SENSE).**
+The frequency-fastest fix above was necessary but not sufficient. `ww3_bound` copies the
+spectrum bins POSITIONALLY (checks only the direction COUNT) and carries only the FIRST
+direction into `nest.ww3`'s header (`MOD(2.5*PI-THETA(1),TPI)`); `W3IOBC` aligns on that
+first direction and assumes the model's own sense (bin k at Cartesian `TH(1)+k*DTH`). The
+model's axis as `ww3_outp.ftn` prints it is nautical going-TO **90° DESCENDING**. Both the
+W2 emitter AND the F4 reference generator (`scratch/REFERENCE-gen_boundary_buoy_val.py:122`)
+wrote the axis nautical-ASCENDING from 180° — opposite sense — so every assembled boundary
+spectrum was ingested MIRRORED about the N–S axis (FROM_model = 360° − FROM_file). The F4
+buoy-validation "5–15%" match measured BULK Hs only and could not see this; the first
+buoy-co-located point output (2026-08-22T00Z) did: S swell 155–175° vs buoy 189–196°, and
+the W boundary's 0.82 m @281° of 5–10 s energy arriving as 60–100° (outflow at the W edge),
+0.10 m at the buoy vs 0.59 m observed. Fix: `services/ww3_formats.py::
+_ww3_direction_bin_order` emits axis AND energy columns in `ww3_outp`'s exact order/sense;
+falsifiable KATs (real writer round-trips direction exactly through a source-faithful
+WW3-ingest emulation; the pre-fix emitter produces the 360°−FROM mirror) in
+`tests/services/test_ww3_formats.py`. Full source cites in
+`docs/reference/SYNTAX-607-VERIFICATION.md` row 7 (corrected). **Consequence:** the
+amplitude-and-direction fidelity evidence of every `ww3_bound`-fed march before this fix is
+direction-voided (bulk-Hs evidence stands only where the incoming field was near-symmetric
+about N–S); `ww3_bound` itself remains exonerated and D5 stands.
+
 ## D6 — SWAN-ingestion mechanism [OPERATOR ACCEPTANCE ROW]
 
 **Candidates:** A — `BOUNDNEST3` (WW3-native SWAN command reading WW3's own transfer
