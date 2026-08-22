@@ -2473,9 +2473,10 @@ SurfBeat strip (every 3 hours, when surfbeat_enabled=true):
     COMPUTE)
   → Hs_ig per station from TABLE: sqrt(Hbig[COMPUTE 1]² + Hsig[COMPUTE 2]²)
     (bound + reflected free IG); shoreline value = igWaveHeightM/setAmplitudeM
-  → set timing from the combined bound+free IG 1-D spectrum peak (SPECOUT L,
-    per-degree densities); null when the IG frequency axis of the SPECOUT L
-    file cannot be resolved (open follow-up, brief §2)
+  → set timing from the bound-IG 1-D spectrum peak (SPECOUT L, FIRST block
+    only — the L file's second block is the bound-IG array after COMPUTE 2,
+    not the free IG, per the 2026-08-22 live run; per-degree densities, 8-bin
+    IG axis 0.005–0.04 Hz); null when the bound block's axis cannot be resolved
   → approach-zone Hs (TABLE COMPUTE-1 Hsig) for the blended beach profile
 
 At each transect point: Hs_total = sqrt(sum(Hs_partition_i²))
@@ -2582,7 +2583,7 @@ SWAN cross-shore transect output for the timestep
 | `transectCount` | Total transects in measurement zone | Integer |
 | `openTransectCount` | Transects not crossing any OBSTACLE | Integer. **Since 2026-08-01 (BD-8 rescinded, ADR-093 Amendment 7): metadata/map-UI count ONLY — plays no role in any aggregation field on this page.** A structure-affected transect qualifies for `mainBreakZoneFaceHeight`/`bestPeakFaceHeight`/`spotAverageFaceHeight`/`peelAngle` exactly like any other; a structure-degraded one simply fails to qualify on its own merits, never by exclusion on this flag. |
 | `degraded` | SwellTrack fallback indicator | `true` when SwellTrack failed and legacy SWAN pipeline used |
-| `setTimingMinutes` | float \| null | Set wave timing from SurfBeat's combined bound+free IG spectral peak (minutes between sets). `null` when SurfBeat disabled or unavailable, or when the IG frequency axis of the SPECOUT L file cannot be resolved (SURFBEAT-FIX round 1 follow-up). |
+| `setTimingMinutes` | float \| null | Set wave timing from SurfBeat's bound-IG spectral peak (SPECOUT L first block, minutes between sets). `null` when SurfBeat disabled or unavailable, or when the bound-IG block's frequency axis cannot be resolved. |
 | `setAmplitudeM` | float \| null | IG wave height at shoreline (m) = `igWaveHeightM` (display alias). `null` when SurfBeat disabled or unavailable. |
 | `igWaveHeightM` | float \| null | Infragravity significant wave height at the shore station (m), from the strip TABLE: sqrt(Hbig[first COMPUTE]² + Hsig[second COMPUTE]²) — bound + reflected free IG (SURFBEAT-FIX round 1, 2026-08-22). `null` when SurfBeat disabled or unavailable. |
 
