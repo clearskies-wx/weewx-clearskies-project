@@ -1294,7 +1294,7 @@ Three verbosity levels are available. `weatherText` carries the terse level (bac
 
 | Level | Field | Style |
 |-------|-------|-------|
-| Terse | `weatherText` | Current style — compound form OK: "Sunny, Hazy, Warm and Humid." |
+| Terse | `weatherText` | Current style — compound form OK, NWS-style sentence case (locale order, e.g. sky-first for English): "Sunny, hazy, warm and humid." |
 | Standard | `weatherTextStandard` | NWS one-sentence per component: "Sunny. Hazy. Temperature in the mid 80s. South winds around 8 mph." |
 | Verbose | `weatherTextVerbose` | Full narrative: "Currently in the mid 80s under hazy sunshine. Dew point in the lower 60s. South winds around 8 mph with gusts to around 25 mph." |
 
@@ -2466,10 +2466,17 @@ Each partition × each transect → independent SwellTrack run (handoff to shore
   → wave shapes: Stokes/cnoidal by depth regime
 
 SurfBeat strip (every 3 hours, when surfbeat_enabled=true):
-  → SWAN SURFBEAT stationary 2D strip run
-  → IG spectral analysis: Hs_ig below 0.04 Hz
-  → set timing from IG spectral peak period
-  → approach-zone Hs for blended beach profile
+  → SWAN SURFBEAT (IEM) stationary 2D strip run, two COMPUTEs; IG cut-off
+    fig = CGRID flow = 0.04 Hz (SURFBEAT-FIX round 1, 2026-08-22, operator
+    "1 ok": deck per SWAN manual §SURFBEAT — IEM physics only, SPECOUT L
+    for the IG spectrum, HBIG in TABLE, transparent/reflecting obstacle per
+    COMPUTE)
+  → Hs_ig per station from TABLE: sqrt(Hbig[COMPUTE 1]² + Hsig[COMPUTE 2]²)
+    (bound + reflected free IG); shoreline value = igWaveHeightM/setAmplitudeM
+  → set timing from the combined bound+free IG 1-D spectrum peak (SPECOUT L,
+    per-degree densities); null when the IG frequency axis of the SPECOUT L
+    file cannot be resolved (open follow-up, brief §2)
+  → approach-zone Hs (TABLE COMPUTE-1 Hsig) for the blended beach profile
 
 At each transect point: Hs_total = sqrt(sum(Hs_partition_i²))
   → combined saturation check: Hs_total ≤ γd
@@ -2575,9 +2582,9 @@ SWAN cross-shore transect output for the timestep
 | `transectCount` | Total transects in measurement zone | Integer |
 | `openTransectCount` | Transects not crossing any OBSTACLE | Integer. **Since 2026-08-01 (BD-8 rescinded, ADR-093 Amendment 7): metadata/map-UI count ONLY — plays no role in any aggregation field on this page.** A structure-affected transect qualifies for `mainBreakZoneFaceHeight`/`bestPeakFaceHeight`/`spotAverageFaceHeight`/`peelAngle` exactly like any other; a structure-degraded one simply fails to qualify on its own merits, never by exclusion on this flag. |
 | `degraded` | SwellTrack fallback indicator | `true` when SwellTrack failed and legacy SWAN pipeline used |
-| `setTimingMinutes` | float \| null | Set wave timing from SurfBeat IG spectral peak (minutes between sets). `null` when SurfBeat disabled or unavailable. |
-| `setAmplitudeM` | float \| null | IG wave height at shoreline (m). `null` when SurfBeat disabled or unavailable. |
-| `igWaveHeightM` | float \| null | Infragravity significant wave height at shoreline (m). `null` when SurfBeat disabled or unavailable. |
+| `setTimingMinutes` | float \| null | Set wave timing from SurfBeat's combined bound+free IG spectral peak (minutes between sets). `null` when SurfBeat disabled or unavailable, or when the IG frequency axis of the SPECOUT L file cannot be resolved (SURFBEAT-FIX round 1 follow-up). |
+| `setAmplitudeM` | float \| null | IG wave height at shoreline (m) = `igWaveHeightM` (display alias). `null` when SurfBeat disabled or unavailable. |
+| `igWaveHeightM` | float \| null | Infragravity significant wave height at the shore station (m), from the strip TABLE: sqrt(Hbig[first COMPUTE]² + Hsig[second COMPUTE]²) — bound + reflected free IG (SURFBEAT-FIX round 1, 2026-08-22). `null` when SurfBeat disabled or unavailable. |
 
 **swellHeight and breakingFaceHeight are now from fundamentally different sources.** `swellHeight` is the dominant deep-water partition from SWAN's own watershed partitioning at ~15m (TABLE PT*, T4B.2) — what's arriving at the coast. `breakingFaceHeight` is the main-break-zone headline (or the whole-area best peak, on a no-headline hour) — what surfers see. The ratio varies with bathymetry, swell period, and tide.
 

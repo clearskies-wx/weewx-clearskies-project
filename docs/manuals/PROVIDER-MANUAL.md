@@ -2560,14 +2560,17 @@ breakwater/jetty/seawall/groin as of this correction.
 
 **SurfBeat strip (SWAN SURFBEAT):** A complementary SWAN run type for infragravity energy. Uses the SURFBEAT command in a stationary 2D strip configuration. Runs at 3-hour intervals (configurable via `surfbeat_cadence_hours`). Intermediate forecast hours carry forward the nearest SurfBeat result (not interpolated).
 
-**SurfBeat strip SURFBEAT syntax** (verified against SWAN 41.51AB — see `docs/reference/swan-commands-extract.md` §SURFBEAT):
-- Grid: regular 2D (REG), not 1D or curvilinear
-- Mode: STATIONARY
+**SurfBeat strip SURFBEAT syntax** (SURFBEAT-FIX round 1, 2026-08-22, operator "1 ok" — deck brought to the SWAN 41.51 manual's IEM prescription, `docs/reference/swan-user-manual.txt` §SURFBEAT :3942–3999; see `docs/reference/swan-commands-extract.md` §SURFBEAT):
+- Grid: regular 2D (REG), not 1D or curvilinear; `CGRID … CIRCLE 36 0.04 1.0 34` — **the CGRID low frequency IS the IG cut-off fig** (manual :3960–3962; no separate fig parameter, summary :6359–6369). The pre-fix deck's 0.004 Hz made the free-IG range `[df, fig]` empty (PRINT "NTF 1") — no IG existed in any run before this round.
+- Mode: STATIONARY; two bare COMPUTEs (not `COMPUTE STAT`): first = sea-swell + bound IG, second = reflected free IG
 - Boundary: west side only (`BOUND SIDE WEST`)
-- Wind: uniform HRRR field (INPGRID WIND + READINP WIND) — mandatory, GEN3 WESTHUYSEN refuses to run without it
-- Two bare COMPUTEs (not `COMPUTE STAT` — triggers "Illegal keyword: STAT")
-- OBSTACLE on east side with REFL + RDIFF (POWN required — omitting causes severe error)
-- SPECOUT values are integer-scaled: actual density = integer × FACTOR
+- Physics: IEM only (manual :3962–3964 — propagation, shoaling, refraction, breaking, friction): no `GEN`/`TRIAD` line; `OFF WINDGROWTH`, `OFF QUAD`, `OFF WCAP` (manual :4082–4121); `BREAKING`, `FRICTION JON` kept
+- Wind: uniform HRRR field still written (harmless with wind growth off; removal is a follow-up once a live run shows it unnecessary)
+- `SURFBEAT 0.005 50000 0.05 UNIFORM` (lead call df = 0.005 Hz → 8 free-IG bins 0.005–0.04 Hz; manual default 0.01 gives 4)
+- OBSTACLE on the east side TWICE (manual :3978–3982): `TRANSM 1.0` before the first COMPUTE, `TRANSM 0.0 REFL [reflc] RDIFF [pown]` before the second (POWN required)
+- `TABLE … HEAD … HSIGN HBIG HSWELL TM01 DIR DEPTH QB` at every station; `HBIG` = bound-IG Hs, first COMPUTE only (manual :5159); row 2's `Hsig` = free-IG Hs
+- `SPECOUT … SPEC2D ABS` (S, sea-swell) and `SPECOUT … SPEC2D ABS L` (IG, frequencies below fig; manual :5455–5504) at the shore station
+- Parsing: SWAN's `TABLE HEAD` writes `%`-prefixed header lines with SWAN's OWN printed names (`Hsig`, not `HSIGN`); SPEC2D files are frequency-major (nf rows × nd cols), `VaDens` in m²/Hz/**degr**, integer-scaled by FACTOR, and SurfBeat's stationary files carry one block per COMPUTE back-to-back with NO timestamp (the production `parse_specout_file_multi` cannot read them — the runner has a dedicated reader)
 
 **Friction per condition type:**
 - Swell (Tp ≥ 10s): cfjon = 0.038 (default)
