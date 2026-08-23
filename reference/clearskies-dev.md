@@ -141,7 +141,7 @@ that has been superseded by a single unified service:
 
 | systemd unit | Port | ExecStart module | What it computes |
 |---|---|---|---|
-| `weewx-clearskies-marine.service` | 8780 | `weewx_clearskies_marine` (`__main__.py`, default `--port 8780`) | SWAN nested grid (L1-L4) + SwellTrack + SurfBeat strip — all in one process |
+| `weewx-clearskies-marine.service` | 8780 | `weewx_clearskies_marine` (`__main__.py`, default `--port 8780`) | WW3 (our own deep-water model) + 3-level SWAN nest (L2-L3-L4) + SwellTrack — all in one process. No SWAN L1 compute level (removed 2026-08-23, marine `3c550ae`/`c29266d`); WW3 feeds SWAN L2 via BOUNDNEST3. SurfBeat removed 2026-08-23 (operator ruling). |
 
 **Port 8780 serves TLS** (verified live 2026-08-03): `curl http://127.0.0.1:8780/health` gets an
 empty reply; use `curl -sk https://127.0.0.1:8780/health`. The unit name for journal reads is
