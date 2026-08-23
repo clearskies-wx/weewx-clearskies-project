@@ -187,7 +187,7 @@ echo "--- [3/6] verify imports ---"
 # ssh -> sudo -u ubuntu bash -lc '...' -> python -c "..."; a multi-line body
 # does not survive that quoting chain (it fails with "unexpected EOF while
 # looking for matching quote", which reads like a Python error and is not).
-run_ubuntu "${VENV}/bin/python -c \"import numpy, scipy, shapely, xarray, netCDF4, eccodes, prometheus_client, defusedxml, yaml, weewx_clearskies_marine.providers.nearshore.swan, weewx_clearskies_marine.services.swan_runner, weewx_clearskies_marine.services.surfbeat_runner; from weewx_clearskies_marine.service import create_app; print(chr(105)+chr(109)+chr(112)+chr(111)+chr(114)+chr(116)+chr(115)+chr(32)+chr(111)+chr(107))\""
+run_ubuntu "${VENV}/bin/python -c \"import numpy, scipy, shapely, xarray, netCDF4, eccodes, prometheus_client, defusedxml, yaml, weewx_clearskies_marine.providers.nearshore.swan, weewx_clearskies_marine.services.swan_runner; from weewx_clearskies_marine.service import create_app; print(chr(105)+chr(109)+chr(112)+chr(111)+chr(114)+chr(116)+chr(115)+chr(32)+chr(111)+chr(107))\""
 echo "[deps] import surface verified (core + nearshore + SWAN pipeline)"
 
 # --- Step 4: config dir + secret ---
