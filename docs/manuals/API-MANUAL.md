@@ -2477,7 +2477,10 @@ SurfBeat strip (every 3 hours, when surfbeat_enabled=true):
     only — the L file's second block is the bound-IG array after COMPUTE 2,
     not the free IG, per the 2026-08-22 live run; per-degree densities, 8-bin
     IG axis 0.005–0.04 Hz); null when the bound block's axis cannot be resolved
-  → approach-zone Hs (TABLE COMPUTE-1 Hsig) for the blended beach profile
+  → (the strip's sea-swell Hs profile, TABLE COMPUTE-1 Hsig, is still parsed
+    into SurfBeatResult.hs_sw_profile for diagnostics but is NOT served:
+    the "blended beach profile" was removed 2026-08-23 — operator ruling,
+    SurfBeat is not an input to the beach profile)
 
 At each transect point: Hs_total = sqrt(sum(Hs_partition_i²))
   → combined saturation check: Hs_total ≤ γd
@@ -2640,15 +2643,9 @@ The CUDEM source profile is interpolated to the variable-resolution grid using *
 
 **Precomputed SwellTrack cache (T4B).** `GET /api/v1/surf/{locationId}`'s per-timestep loop no longer runs the 1D pipeline on every request — it reads a precomputed result from the SWAN forecast cache (`payload["swelltrack"][validTime]`), falling back to the on-demand call only on a cache miss or a malformed entry. The precompute happens once per forecast timestep per spot at the end of each successful SWAN cycle. See PROVIDER-MANUAL §14.15 "Precomputed SwellTrack cache" for the full design and the measured cache-size tradeoff. **Corrected 2026-08-07 (operator ruling: "the dashboard should never have the ability to trigger a model run. If there is no data, there is no data.")** — the clause that used to close this paragraph, describing `GET /api/v1/surf/{locationId}/profile` (the beach-profile endpoint) as deliberately staying on an on-demand call rather than reading a cache, is void: the beach-profile endpoint's on-demand 1D-pipeline fallback was removed entirely (marine `00c66b4`). It now reads only from its own precomputed SQLite profile store, populated by the SWAN cycle's precompute loop, and returns `modelStatus: "unavailable"` when that store has no entry for the requested spot/timestep — never recomputing on request. Full §18 "Beach profile endpoint" below has not yet been reconciled to this change; treat its on-demand/remote-mode description as stale pending that follow-up.
 
-### Blended beach profile
+### Beach profile Hs is SwellTrack only (blend removed 2026-08-23)
 
-The beach profile endpoint (`GET /api/v1/surf/{locationId}/profile`) returns a cross-shore wave height profile. When SurfBeat data is available, the profile blends two sources with a 50m linear taper centered on the break point:
-
-- **Offshore of (break_point + 25m):** 100% SurfBeat strip Hs (approach zone — physically accurate, avoids the 24% SwellTrack overestimate)
-- **Between (break_point ± 25m):** Linear ramp from SurfBeat to SwellTrack
-- **Shoreward of (break_point - 25m):** 100% SwellTrack Hs (surf zone — detailed breaking physics)
-
-When SurfBeat is unavailable: SwellTrack Hs for the entire profile (no blend). The blend affects only the display profile — face height, scoring, and break points always come from SwellTrack.
+The beach profile endpoint (`GET /api/v1/surf/{locationId}/profile`) returns a cross-shore wave height profile that is SwellTrack's own Hs for the whole transect. **Operator ruling 2026-08-23 (chat): "surfbeat should NOT be used for the profile."** The former "blended beach profile" (T2.3, 2026-07: SurfBeat strip sea-swell Hs seaward of the break point, SwellTrack shoreward, 50 m linear taper) put two different models on one curve and was a standing cause of profile inaccuracy; `_blend_hs_profiles()`, the `surfbeat_hs_profile` input to `_build_transect_profile()`, and the surf.py → beach_profile.py SurfBeat-result hand-off (`cache_surfbeat_result`/`get_cached_surfbeat_result`) are all deleted. SurfBeat has no input to this endpoint. Its products are `setTimingMinutes` / `setAmplitudeM` / `igWaveHeightM` on the surf forecast entries (§17).
 
 ### Validation method
 

@@ -1170,8 +1170,8 @@ Surfaces the surf scoring system (`enrichment/surf_scorer.py`). Data sources fro
    - Wind speed, gust, direction (from MarineObservation via useMarineDetail), wind quality label (from SurfForecast)
 5. **Current Conditions Card** — `Card footprint="wide" rowSpan="half"`:
    - 5-column grid: weather icon (WeatherIcon), air temp (Thermometer icon, station observation), dewpoint (Drop icon, station observation), water temp (WaterThermometerIcon, marine observation), UV index (UvIndex icon, station observation)
-6. **Beach Profile** — `Card footprint="full"` (ADR-097; T5.3 rewrite, blended Hs):
-   - When SurfBeat data is available, the Hs envelope renders the blended profile: SurfBeat approach-zone Hs (lower, physically accurate) transitioning to SwellTrack surf-zone Hs at the break point with a 50m linear taper. When SurfBeat unavailable: SwellTrack Hs for the full profile (current behavior).
+6. **Beach Profile** — `Card footprint="full"` (ADR-097; T5.3 rewrite):
+   - The Hs envelope is SwellTrack's Hs for the full profile. (The former "blended profile" — SurfBeat approach-zone Hs tapering into SwellTrack at the break point — was removed 2026-08-23 by operator ruling: SurfBeat is not an input to the beach profile. The dashboard never knew which source it was drawing; nothing changes on the dashboard side.)
    - Cross-shore transect visualization. Data source: `GET /api/v1/surf/{id}/profile`.
    - Inline SVG (not Recharts). viewBox 820×292 (PAD_LEFT=72, PAD_BOTTOM=72, PAD_TOP=32). Shore on right, offshore on left.
    - 9 elements: bathymetry fill (tan/brown), water column fill (blue 0.25 opacity — SURF-20 fix), Hs envelope, optional wave shapes, surf zone overlays (impact/foam/reform), enhanced break point markers (face height, breaker type icon, partition label, jacking annotation), Y-axis title (rotated), translated axis labels with unit+datum, transect selector.
