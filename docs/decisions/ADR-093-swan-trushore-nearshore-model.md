@@ -34,7 +34,7 @@ Replace NWPS with a locally-run SWAN instance paired with SwellTrack (proprietar
 
 **SWASH and XBeach are ruled out entirely** — for production, LUT precomputation, and referee/benchmark use. SWASH is unvalidated itself and cannot serve as a truth standard. XBeach surfbeat's runtime (~2 min for a 30-min simulation) is incompatible with the 72-timestep forecast pipeline.
 
-**Compute offloading** is operator-configurable via `surf_compute_host` in `api.conf`. When set, SwellTrack and SurfBeat computations run on a remote compute service (e.g., librewxr) instead of in-process on the weewx host. Fallback to in-process when unconfigured or unreachable.
+**Compute offloading** is operator-configurable via `surf_compute_host` in `api.conf`. When set, SwellTrack computations (and SurfBeat's, until SurfBeat was removed 2026-08-23) run on a remote compute service (e.g., librewxr) instead of in-process on the weewx host. Fallback to in-process when unconfigured or unreachable.
 
 The four supplements from ADR-084 (γ correction, structure effects, spatial interpolation, topographic focusing) survive unchanged and apply to SWAN output. Only the primary nearshore source decision changes.
 
