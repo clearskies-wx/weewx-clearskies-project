@@ -1149,7 +1149,7 @@ Accepted datums for operator uploads: **NAVD88, MLLW, MHW, MHHW, MSL**. These ar
 |-----|------|---------|-------------|
 | `friction_coefficient` | float | `0.038` | Bottom friction coefficient (cfjon) for SwellTrack. Swell default 0.038, windsea 0.067. Always enabled — frictionless is not production-valid. Advanced setting, hidden from wizard by default. |
 | `surfbeat_enabled` | bool | `true` | Enable SurfBeat strip for IG/set timing predictions. Adds set timing to the surf card and 72h forecast scroll. Increases compute time by ~12 minutes per full forecast cycle (25 SurfBeat runs × ~28s each). |
-| `surfbeat_cadence_hours` | int | `3` | Hours between SurfBeat strip runs. Intermediate forecast hours carry forward the last result (not interpolated — design decision). Range: 1-6. Lower values increase compute time proportionally. |
+| `surfbeat_cadence_hours` | int | `3` | **DEAD since 2026-08-23 (SURFBEAT-CYCLE round): SurfBeat runs every forecast hour inside the forecast cycle; this key is still parsed but nothing reads it.** Removal pending operator ruling (MARINE-MODEL-EVOLUTION-PLAN Q10). Was: hours between SurfBeat strip runs, carry-forward between runs. |
 
 #### Compute offloading — removed (T6.8, 2026-07-25)
 

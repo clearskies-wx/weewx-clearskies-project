@@ -2465,7 +2465,17 @@ Each partition × each transect → independent SwellTrack run (handoff to shore
   → breaker type: Iribarren number (xi_0)
   → wave shapes: Stokes/cnoidal by depth regime
 
-SurfBeat strip (every 3 hours, when surfbeat_enabled=true):
+SurfBeat strip (SURFBEAT-CYCLE round 2026-08-23: EVERY forecast hour, in the
+cycle precompute next to SwellTrack — `services/surfbeat_precompute.py`,
+both swan.py precompute sites, 4 strips in parallel; results cached under
+payload key `surfbeat` and only READ by the surf endpoint; when surfbeat_enabled=true):
+  → boundary = that hour's deep-water-reference 2-D spectrum (SPEC_DWR, the
+    15 m-contour point = the strip's own seaward start), rotated into the
+    strip frame, `BOUNDSPEC SIDE WEST … FILE 'BOUND.spc'`; exact-hour match,
+    a missing hour is skipped (WARNING), never substituted; no wind input
+  → full cached median profile (15 m contour → shore) at 1 m spacing
+    (= ANALYTICAL_TARGET_DX_M), 500 m wide; shore end trimmed to SWAN-wet
+    cells (depth > SET depmin 0.05 m)
   → SWAN SURFBEAT (IEM) stationary 2D strip run, two COMPUTEs; IG cut-off
     fig = CGRID flow = 0.04 Hz (SURFBEAT-FIX round 1, 2026-08-22, operator
     "1 ok": deck per SWAN manual §SURFBEAT — IEM physics only, SPECOUT L
@@ -2614,7 +2624,7 @@ The former ad-hoc depth-aware correction (SWAN-output-in-shallow-water lerp, `SH
 |---|---|---|---|---|
 | `friction_coefficient` | float | `0.038` | Per-spot (`SurfSpotConfig`) | Bottom friction coefficient (cfjon). Swell default 0.038, windsea 0.067. Always enabled — frictionless propagation is not production-valid. |
 | `surfbeat_enabled` | bool | `true` | Per-spot (`SurfSpotConfig`) | Enable SurfBeat strip for IG/set timing. Increases compute time by ~12 min per cycle. |
-| `surfbeat_cadence_hours` | int | `3` | Per-spot (`SurfSpotConfig`) | Hours between SurfBeat strip runs. Intermediate hours carry forward the last result (not interpolated). |
+| `surfbeat_cadence_hours` | int | `3` | Per-spot (`SurfSpotConfig`) | **DEAD since 2026-08-23 (SURFBEAT-CYCLE round): SurfBeat runs every forecast hour in the cycle; nothing reads this key any more.** Still parsed; removal pending operator ruling (plan Q10). Was: hours between SurfBeat strip runs, intermediate hours carried forward. |
 | `max_hs_m` | float | `4.0` | Per-spot (`SurfSpotConfig`) | Maximum expected significant wave height (m) for this spot. Used to compute the surf zone depth threshold: `d_break_max = max_hs_m / gamma`. The 1D grid uses 1–2m dx from shore to `d_break_max`. Computed at wizard setup from wave climate or operator input. |
 | `profile_display_window_m` | float | `150.0` | Per-spot (`SurfSpotConfig`) | **NEW 2026-08-09 (SURF-REMEDIATION-PLAN Phase R3.1, D-R2 ruling, marine `5ffd50e`).** Fixed beach-profile chart seaward window (m) — one of the D-R2 preset ladder values (150/300/500), assigned at spot setup and sticky (never re-chosen hour-to-hour). Served in `/profile`'s `metadata.displayWindowM`. Default 150.0 is Huntington's D-R2 assignment (its modeled profile spans 145 m; its breaks never exceed ~94 m). |
 | `profile_display_landward_m` | float | `30.0` | Per-spot (`SurfSpotConfig`) | **NEW 2026-08-09 (Phase R3.1, D-R2 ruling, marine `5ffd50e`).** Fixed beach-profile chart landward window (m), same 30 m for every spot per D-R2. Served in `/profile`'s `metadata.displayLandwardM`. |
