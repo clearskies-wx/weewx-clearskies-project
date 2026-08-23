@@ -2108,7 +2108,7 @@ Surf quality forecast for one spot at one timestep.
 | `shape` | int | Wave Shape (0–100). Peel-angle bands (0.6) + Iribarren breaker type (0.4) + jacking bonus (S-GAP-1, unwired); closeout clamp min(blend, 0.10) below 15°. |
 | `conditions` | int | Conditions (0–100). Wind brackets capped at 1.0 (0.6) + DSPR buckets (0.25) + cross-swell (0.15); blown-out clamp 0.05. |
 | `power` | int | Swell Power (0–100). Dominant `multiSwell` partition period table (0.7) + dominant partition's SHARE of total partition energy, bucketed (0.3). Never Tm01. `multiSwell` null → 0.5 neutral (logged). Dominant partition and "total partition energy" both use the `Hs² · Tp` proxy, not the partition's raw `energy` field (corrected 2026-08-07, ADR-096 Amendment 2 — see the dominant-swell-selection callout in §17 above). |
-| `consistency` | int | Consistency (0–100). SurfBeat set timing (0.6) + amplitude (0.4); SurfBeat unavailable → swell-dominance bucket mapping fallback. |
+| `consistency` | int | Consistency (0–100). Swell-dominance bucket mapping (≥0.8 → 0.9, 0.5–0.8 → 0.7, <0.5 → 0.4, null → 0.5) — interim since SurfBeat was removed 2026-08-23; the set-timing/set-amplitude definition (SET-TIMING-AND-AMPLITUDE brief) is pending operator ruling. |
 | `weights` | object | The five effective (normalized) weights actually used, keys `size`/`shape`/`conditions`/`power`/`consistency`, floats. |
 
 #### FishingForecast
@@ -2465,32 +2465,14 @@ Each partition × each transect → independent SwellTrack run (handoff to shore
   → breaker type: Iribarren number (xi_0)
   → wave shapes: Stokes/cnoidal by depth regime
 
-SurfBeat strip (SURFBEAT-CYCLE round 2026-08-23: EVERY forecast hour, in the
-cycle precompute next to SwellTrack — `services/surfbeat_precompute.py`,
-both swan.py precompute sites, 4 strips in parallel; results cached under
-payload key `surfbeat` and only READ by the surf endpoint; when surfbeat_enabled=true):
-  → boundary = that hour's deep-water-reference 2-D spectrum (SPEC_DWR, the
-    15 m-contour point = the strip's own seaward start), rotated into the
-    strip frame, `BOUNDSPEC SIDE WEST … FILE 'BOUND.spc'`; exact-hour match,
-    a missing hour is skipped (WARNING), never substituted; no wind input
-  → full cached median profile (15 m contour → shore) at 1 m spacing
-    (= ANALYTICAL_TARGET_DX_M), 500 m wide; shore end trimmed to SWAN-wet
-    cells (depth > SET depmin 0.05 m)
-  → SWAN SURFBEAT (IEM) stationary 2D strip run, two COMPUTEs; IG cut-off
-    fig = CGRID flow = 0.04 Hz (SURFBEAT-FIX round 1, 2026-08-22, operator
-    "1 ok": deck per SWAN manual §SURFBEAT — IEM physics only, SPECOUT L
-    for the IG spectrum, HBIG in TABLE, transparent/reflecting obstacle per
-    COMPUTE)
-  → Hs_ig per station from TABLE: sqrt(Hbig[COMPUTE 1]² + Hsig[COMPUTE 2]²)
-    (bound + reflected free IG); shoreline value = igWaveHeightM/setAmplitudeM
-  → set timing from the bound-IG 1-D spectrum peak (SPECOUT L, FIRST block
-    only — the L file's second block is the bound-IG array after COMPUTE 2,
-    not the free IG, per the 2026-08-22 live run; per-degree densities, 8-bin
-    IG axis 0.005–0.04 Hz); null when the bound block's axis cannot be resolved
-  → (the strip's sea-swell Hs profile, TABLE COMPUTE-1 Hsig, is still parsed
-    into SurfBeatResult.hs_sw_profile for diagnostics but is NOT served:
-    the "blended beach profile" was removed 2026-08-23 — operator ruling,
-    SurfBeat is not an input to the beach profile)
+SurfBeat strip — REMOVED 2026-08-23 (operator ruling "surfbeat is gone"): no
+  SurfBeat model run, precompute, cache key, API field or config key exists.
+  Set timing / set strength for the score's consistency factor are to come
+  from the wave spectrum + SwellTrack (docs/planning/briefs/
+  SET-TIMING-AND-AMPLITUDE-BRIEF-2026-08-23.md, pending operator ruling);
+  until then consistency = the swell-dominance bucketing. Historical record
+  of the deleted design: ARCHITECTURE.md SurfBeat paragraph,
+  PROVIDER-MANUAL §14 "SurfBeat strip — REMOVED".
 
 At each transect point: Hs_total = sqrt(sum(Hs_partition_i²))
   → combined saturation check: Hs_total ≤ γd
@@ -2596,9 +2578,7 @@ SWAN cross-shore transect output for the timestep
 | `transectCount` | Total transects in measurement zone | Integer |
 | `openTransectCount` | Transects not crossing any OBSTACLE | Integer. **Since 2026-08-01 (BD-8 rescinded, ADR-093 Amendment 7): metadata/map-UI count ONLY — plays no role in any aggregation field on this page.** A structure-affected transect qualifies for `mainBreakZoneFaceHeight`/`bestPeakFaceHeight`/`spotAverageFaceHeight`/`peelAngle` exactly like any other; a structure-degraded one simply fails to qualify on its own merits, never by exclusion on this flag. |
 | `degraded` | SwellTrack fallback indicator | `true` when SwellTrack failed and legacy SWAN pipeline used |
-| `setTimingMinutes` | float \| null | Set wave timing from SurfBeat's bound-IG spectral peak (SPECOUT L first block, minutes between sets). `null` when SurfBeat disabled or unavailable, or when the bound-IG block's frequency axis cannot be resolved. |
-| `setAmplitudeM` | float \| null | IG wave height at shoreline (m) = `igWaveHeightM` (display alias). `null` when SurfBeat disabled or unavailable. |
-| `igWaveHeightM` | float \| null | Infragravity significant wave height at the shore station (m), from the strip TABLE: sqrt(Hbig[first COMPUTE]² + Hsig[second COMPUTE]²) — bound + reflected free IG (SURFBEAT-FIX round 1, 2026-08-22). `null` when SurfBeat disabled or unavailable. |
+| *(removed 2026-08-23)* | — | `setTimingMinutes`, `setAmplitudeM`, `igWaveHeightM` were SurfBeat outputs; SurfBeat was removed from the system 2026-08-23 (operator ruling "surfbeat is gone") and the three fields no longer exist on the wire (marine response model, API unit-conversion map, dashboard types/openapi all updated in the SURFBEAT-REMOVAL round). |
 
 **swellHeight and breakingFaceHeight are now from fundamentally different sources.** `swellHeight` is the dominant deep-water partition from SWAN's own watershed partitioning at ~15m (TABLE PT*, T4B.2) — what's arriving at the coast. `breakingFaceHeight` is the main-break-zone headline (or the whole-area best peak, on a no-headline hour) — what surfers see. The ratio varies with bathymetry, swell period, and tide.
 
@@ -2623,13 +2603,12 @@ The former ad-hoc depth-aware correction (SWAN-output-in-shallow-water lerp, `SH
 | Config key | Type | Default | Location | Description |
 |---|---|---|---|---|
 | `friction_coefficient` | float | `0.038` | Per-spot (`SurfSpotConfig`) | Bottom friction coefficient (cfjon). Swell default 0.038, windsea 0.067. Always enabled — frictionless propagation is not production-valid. |
-| `surfbeat_enabled` | bool | `true` | Per-spot (`SurfSpotConfig`) | Enable SurfBeat strip for IG/set timing. Increases compute time by ~12 min per cycle. |
-| `surfbeat_cadence_hours` | int | `3` | Per-spot (`SurfSpotConfig`) | **DEAD since 2026-08-23 (SURFBEAT-CYCLE round): SurfBeat runs every forecast hour in the cycle; nothing reads this key any more.** Still parsed; removal pending operator ruling (plan Q10). Was: hours between SurfBeat strip runs, intermediate hours carried forward. |
+| *(removed 2026-08-23)* | — | — | — | `surfbeat_enabled` and `surfbeat_cadence_hours` were deleted from the marine config parser, the API apply model/writer/reader and the manuals in the SURFBEAT-REMOVAL round (operator ruling "surfbeat is gone"). An old api.conf carrying them is ignored (unknown keys are not read). |
 | `max_hs_m` | float | `4.0` | Per-spot (`SurfSpotConfig`) | Maximum expected significant wave height (m) for this spot. Used to compute the surf zone depth threshold: `d_break_max = max_hs_m / gamma`. The 1D grid uses 1–2m dx from shore to `d_break_max`. Computed at wizard setup from wave climate or operator input. |
 | `profile_display_window_m` | float | `150.0` | Per-spot (`SurfSpotConfig`) | **NEW 2026-08-09 (SURF-REMEDIATION-PLAN Phase R3.1, D-R2 ruling, marine `5ffd50e`).** Fixed beach-profile chart seaward window (m) — one of the D-R2 preset ladder values (150/300/500), assigned at spot setup and sticky (never re-chosen hour-to-hour). Served in `/profile`'s `metadata.displayWindowM`. Default 150.0 is Huntington's D-R2 assignment (its modeled profile spans 145 m; its breaks never exceed ~94 m). |
 | `profile_display_landward_m` | float | `30.0` | Per-spot (`SurfSpotConfig`) | **NEW 2026-08-09 (Phase R3.1, D-R2 ruling, marine `5ffd50e`).** Fixed beach-profile chart landward window (m), same 30 m for every spot per D-R2. Served in `/profile`'s `metadata.displayLandwardM`. |
 
-**`surf_compute_host` / `surf_compute_verify_tls` removed from the API (T6.8, 2026-07-25).** `marine_service_url` (`api.conf [providers]`, §19.2) is the single key that replaced them. `POST /setup/providers/test-compute` (which tested connectivity using them) was orphaned by that removal and is itself removed as of T7.3/C-49 (2026-07-25), replaced by `POST /setup/providers/test-marine` (§18 setup-endpoint table; tests the marine service, not the retired compute-offload connection). SwellTrack/SurfBeat compute offloading is entirely internal to the marine service now; this note is historical.
+**`surf_compute_host` / `surf_compute_verify_tls` removed from the API (T6.8, 2026-07-25).** `marine_service_url` (`api.conf [providers]`, §19.2) is the single key that replaced them. `POST /setup/providers/test-compute` (which tested connectivity using them) was orphaned by that removal and is itself removed as of T7.3/C-49 (2026-07-25), replaced by `POST /setup/providers/test-marine` (§18 setup-endpoint table; tests the marine service, not the retired compute-offload connection). SwellTrack compute offloading is entirely internal to the marine service now (SurfBeat itself was removed 2026-08-23); this note is historical.
 
 **1D grid resolution (variable, depth-based).** The SwellTrack 1D grid uses variable resolution defined by depth zones, not distance from shore (see SURF-ZONE-MODEL-BRIEF §6.1 for full rationale). Depth zones are computed at wizard setup from the CUDEM bathymetric profile, the spot's `max_hs_m`, and the L3 SWAN grid extent:
 
@@ -2655,7 +2634,7 @@ The CUDEM source profile is interpolated to the variable-resolution grid using *
 
 ### Beach profile Hs is SwellTrack only (blend removed 2026-08-23)
 
-The beach profile endpoint (`GET /api/v1/surf/{locationId}/profile`) returns a cross-shore wave height profile that is SwellTrack's own Hs for the whole transect. **Operator ruling 2026-08-23 (chat): "surfbeat should NOT be used for the profile."** The former "blended beach profile" (T2.3, 2026-07: SurfBeat strip sea-swell Hs seaward of the break point, SwellTrack shoreward, 50 m linear taper) put two different models on one curve and was a standing cause of profile inaccuracy; `_blend_hs_profiles()`, the `surfbeat_hs_profile` input to `_build_transect_profile()`, and the surf.py → beach_profile.py SurfBeat-result hand-off (`cache_surfbeat_result`/`get_cached_surfbeat_result`) are all deleted. SurfBeat has no input to this endpoint. Its products are `setTimingMinutes` / `setAmplitudeM` / `igWaveHeightM` on the surf forecast entries (§17).
+The beach profile endpoint (`GET /api/v1/surf/{locationId}/profile`) returns a cross-shore wave height profile that is SwellTrack's own Hs for the whole transect. **Operator ruling 2026-08-23 (chat): "surfbeat should NOT be used for the profile."** The former "blended beach profile" (T2.3, 2026-07: SurfBeat strip sea-swell Hs seaward of the break point, SwellTrack shoreward, 50 m linear taper) put two different models on one curve and was a standing cause of profile inaccuracy; `_blend_hs_profiles()`, the `surfbeat_hs_profile` input to `_build_transect_profile()`, and the surf.py → beach_profile.py SurfBeat-result hand-off (`cache_surfbeat_result`/`get_cached_surfbeat_result`) are all deleted. SurfBeat has no input to this endpoint — and SurfBeat itself was removed from the system later on 2026-08-23 (§17).
 
 ### Validation method
 
@@ -3130,7 +3109,7 @@ A missing profile used to raise HTTP 404 for all of the above, which read as "wr
 
 This section documents the target-state architecture for the marine service (`weewx-clearskies-marine`). The patterns described here take effect when the marine service is extracted from the API into a standalone companion service per ADR-099. The current state (SWAN runner, SwellTrack, all marine providers embedded in the API) continues to apply until ADR-099 is accepted and the migration executed.
 
-**Current state:** All marine logic — SWAN runner, SwellTrack, SurfBeat, and all provider modules listed in PROVIDER-MANUAL §14 — runs inside the API process. Marine endpoints (`/surf`, `/marine`, `/tides`, `/fishing`, `/beach-safety`) are hardcoded routes in `endpoints/`.
+**Current state:** All marine logic — SWAN runner, SwellTrack (SurfBeat removed 2026-08-23), and all provider modules listed in PROVIDER-MANUAL §14 — runs inside the API process. Marine endpoints (`/surf`, `/marine`, `/tides`, `/fishing`, `/beach-safety`) are hardcoded routes in `endpoints/`.
 
 **Target state:** Marine logic moves to a standalone FastAPI service (`weewx-clearskies-marine`) on port 8780. The API communicates with it over HTTP (authenticated, TLS). Marine endpoints are dynamically mounted from the service's manifest. Zero API code changes are needed to add or modify a marine endpoint after the separation.
 
@@ -3352,8 +3331,6 @@ The marine service never parses `api.conf` directly. This ensures the API remain
           "surf_height_display": "face",
           "l3_enabled": "auto",
           "friction_coefficient": 0.038,
-          "surfbeat_enabled": true,
-          "surfbeat_cadence_hours": 3,
           "max_hs_m": 4.0,
           "bathymetric_profile": {"0": {"distance_m": 0.0, "depth_m": 0.0}},
           "structures": {
@@ -3519,7 +3496,7 @@ This subsection documents the WW3-leg + production-chain surface as built (ADR-1
 
 **Health/install DISPLAY is read-only, via the existing marine→API pass-through — no new endpoint.** Per §19.7 above, `GET /setup/marine/health`'s `health` field is an **opaque, unmodeled pass-through** of the marine service's own `/health` JSON body — the API does not name or validate any key inside it. This means the WW3-leg's restart-age/refuse-reason keys and the `vchain` buoy-scorecard ledger block (OPERATIONS-MANUAL.md "WW3 deep-water leg + chain-serves") surface to the admin status page automatically, through this same pass-through, once the marine service publishes them — no API-side schema change is needed or should be made (the same "do not add a nested Pydantic schema" rule from §19.7 applies).
 
-**The sole write-capable surface is the single per-location `ww3_chain_enabled` key (CHAIN-SERVES D1).** A single per-site boolean, transiting through the existing marine config-push mechanism (§19.5's payload — the same `POST {marine_service_url}/config` flow, `marine.locations.<location_id>` scope), plus one chain-specific key under the existing `[ww3]` section: `vchain_buoys` (`{station_id: [lat, lon]}`, default NDBC 46253/46222 — `services/vchain.py`'s `DEFAULT_VCHAIN_BUOYS`). `ww3_chain_enabled` REPLACES the two transition-era keys `ww3_shadow_mode_enabled` (PW5) and `vchain_enabled` (Phase V wiring round) — both retired by CHAIN-SERVES; a config carrying either old key now parses as an unknown key, not as this flag. True: this location's full-run cycle IS the production chain end-to-end (WW3 → SWAN L2 via BOUNDNEST3 → nested levels → 1D handoff → SwellTrack with the SurfBeat companion), the hourly quick-update's L2 boundary substitutes to the same WW3-derived artifact (CHAIN-SERVES D8), and every cycle attempt writes one buoy-scorecard ledger row (`services/vchain.py`). False/absent (default): the legacy L1-fed path, byte-identical to pre-round behaviour — the rollback lever. There is **no separate enable/disable knob for WW3 itself** (Q1 ruled always-on) — this key governs consumption/serving, not whether the leg computes. No other WW3 setup value (grid, physics, boundary placement, time steps — the full ADR-109 D13 catalog) is writable from any product surface — **PRIME DIRECTIVE 11: zero model-setup controls reach a product surface; an installing operator still just picks a surf location.**
+**The sole write-capable surface is the single per-location `ww3_chain_enabled` key (CHAIN-SERVES D1).** A single per-site boolean, transiting through the existing marine config-push mechanism (§19.5's payload — the same `POST {marine_service_url}/config` flow, `marine.locations.<location_id>` scope), plus one chain-specific key under the existing `[ww3]` section: `vchain_buoys` (`{station_id: [lat, lon]}`, default NDBC 46253/46222 — `services/vchain.py`'s `DEFAULT_VCHAIN_BUOYS`). `ww3_chain_enabled` REPLACES the two transition-era keys `ww3_shadow_mode_enabled` (PW5) and `vchain_enabled` (Phase V wiring round) — both retired by CHAIN-SERVES; a config carrying either old key now parses as an unknown key, not as this flag. True: this location's full-run cycle IS the production chain end-to-end (WW3 → SWAN L2 via BOUNDNEST3 → nested levels → 1D handoff → SwellTrack; the SurfBeat companion was removed 2026-08-23), the hourly quick-update's L2 boundary substitutes to the same WW3-derived artifact (CHAIN-SERVES D8), and every cycle attempt writes one buoy-scorecard ledger row (`services/vchain.py`). False/absent (default): the legacy L1-fed path, byte-identical to pre-round behaviour — the rollback lever. There is **no separate enable/disable knob for WW3 itself** (Q1 ruled always-on) — this key governs consumption/serving, not whether the leg computes. No other WW3 setup value (grid, physics, boundary placement, time steps — the full ADR-109 D13 catalog) is writable from any product surface — **PRIME DIRECTIVE 11: zero model-setup controls reach a product surface; an installing operator still just picks a surf location.**
 
 **Chain-serves ledger surface (as-built, CHAIN-SERVES round, operator order 2026-08-19).** The marine `/health` body carries a read-only `vchain` block (same opaque pass-through to `GET /setup/marine/health` as every other marine health key — no API-side schema change); it never feeds the marine `status`/`reasons`. See OPERATIONS-MANUAL.md "Chain-serves" for the full runtime story (WW3-leg-first cycle order, the production `chain=ChainSpec(...)` publish, the hourly-fill substitution, and every named refuse slug the ledger records — `ww3_leg_<cause>`, `vchain_bad_cycle_time`, `chain_transfer_missing`, `chain_scaffold_missing`, `chain_l2_boundary_staging_failed` (catch-all), `chain_swan_refused` or the production no-publish slug verbatim, `vchain_ledger_write_failed`, and the escape catch-all `vchain_unexpected_error`).
 

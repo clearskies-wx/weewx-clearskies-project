@@ -63,7 +63,7 @@ measured quantity feeds exactly ONE component, as input or internal modifier):
 | Wave Shape | 0.25 | peel angle band curve (closeout ~0° → ~0; ~45–70° → full; >~70° mush → reduced) + breaker type (Iribarren) | jacking factor sweetener (> 1.3) |
 | Conditions | 0.20 | wind speed/direction vs beach facing + cleanliness (DSPR, cross-swell) | ruin states rated harshly (blown out → ≤ 0.05) |
 | Swell Power | 0.20 | dominant `multiSwell` partition period + energy (NOT Tm01) | short-period discount |
-| Consistency | 0.10 | SurfBeat set timing/amplitude | fallback: swell-dominance proxy when SurfBeat disabled |
+| Consistency | 0.10 | **Interim since 2026-08-23: swell-dominance bucketing (the former fallback) unconditionally** — SurfBeat was removed from the system (operator ruling "surfbeat is gone"; its IG peak is the within-set wave-group period, not a set interval). The replacement inputs — set interval + waves-per-set from the dominant partition's spectral group statistics, set strength from SwellTrack per-partition break heights + spectral coherence — are proposed in `docs/planning/briefs/SET-TIMING-AND-AMPLITUDE-BRIEF-2026-08-23.md` and await the operator's ruling before this row is amended and coded. | (was: SurfBeat set timing 0.6 / amplitude 0.4; swell-dominance fallback) |
 
 **Within-component aggregation:** sub-inputs blend by weighted **arithmetic** mean (compensatory)
 with FIXED internal weights; the **geometric** (non-compensatory) aggregation exists across
