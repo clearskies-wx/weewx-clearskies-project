@@ -62,6 +62,8 @@ cited as history.
 | SURFBEAT-CYCLE | SurfBeat rebuilt per operator rulings 2026-08-23: strip FED FROM ITS OWN START (the hour's 15 m-contour DWR 2-D spectrum — the existing `SPEC_DWR_<n>` extraction IS that point — rotated into the strip frame, `BOUNDSPEC SIDE WEST … FILE`), runs IN THE CYCLE precompute next to SwellTrack at BOTH call sites (full + hourly fill), EVERY forecast hour, 4 parallel strips × OMP 2; 1 m spacing (= the 1-D model's `ANALYTICAL_TARGET_DX_M`), width 500 m / df unchanged (measured: narrower loses energy; SWAN refuses lateral boundaries with SURFBEAT), timeout 600 s; inert WIND input dropped; cache key `surfbeat` (scalars only), endpoint READS only; vchain companion reads the production result | 🔄 **DISPATCHED 2026-08-23 ~06:15Z** — dev agent `surfbeat-cycle-dev` on the marine repo; brief `scratch/BRIEF-SURFBEAT-CYCLE-2026-08-23.md` (design to file/line D1–D9, allowlist, lead calls LC1–LC8, open questions OQ1–3); results-free gate `scratch/GATE-SURFBEAT-CYCLE-DEFINITION.md` (12 rows incl. the auditor's own live strip in `/tmp/surfbeat-fix/audit5`); lead-captured fixture `tests/fixtures/surfbeat/dwr_live_20260823/SPEC_DWR_1.txt` (12 h, 35×72, descending ladder). Lead calls flagged for the operator: LC1 boundary = the full 2-D spectrum of the 15 m point (manual :3964–3965 "offshore directionally spread spectrum must be imposed"), not three bulk numbers; LC3 WIND dropped (inert under OFF WINDGROWTH, proven by a live control run); LC7 the chain ledger's SurfBeat companion stops running its own strip and records the production result (D5 read-from-production). Pre-approved scratch dirs `/tmp/surfbeat-fix/run5*` (agent) and `/tmp/surfbeat-fix/audit5` (auditor). **DEV DONE 2026-08-23 ~08:40Z** — marine local `b576d3c..09edb4e` (11 commits; diff = 16 files, exactly the allowlist + the two lead-authorised stale-pin fixes in `tests/test_bathy_refinement.py`); agent STOPPED correctly three times (two stale pins outside its allowlist; the dry-shore-station finding → lead ruling D10: trim the profile's shore end to SWAN-wet cells `depth > DEPMIN` — single constant `_SWAN_DEPMIN_M = 0.05` shared with the SET line; manual :1269–1271 + OBSTACLE wet-both-sides :3690–3706). **Live run5 (real `run_surfbeat_strip()` end-to-end on librewxr, real swan.exe, real HB profile, real DWR hour 05Z):** wall 48.3 s per 1 m strip; boundary Hs 0.5459 m; S00 Hs 0.09 % off the spectrum's own; shore HBig 0.107 m, free row-2 0.064 m (was 0.0008 before D10 — reflection now active, free/bound 0.60 vs REFL 0.5); **Hs_ig 0.125 m = 0.23 × boundary Hs** (pre-stated band 0.15–0.35 ✓); **set timing 33 s** (25–200 s band ✓); WIND-present control byte-identical ⇒ WIND inert (D4 proven). **Lead test run on librewxr (round tree in `/tmp/surfbeat-fix/lead-test`, deployed venv, 50 affected+adjacent files): 509 passed / 11 failed — ALL 11 reproduce identically at baseline `b576d3c` (`/tmp/surfbeat-fix/lead-base`: same 11 failed / 15 passed on those 3 files) ⇒ ZERO introduced.** Pre-existing classes PARKED (tracked here): (p1) `tests/test_serve_nothing_on_failure.py` 8 tests — `swan_runner.py:5306 NoneType.by_side` (the already-tracked L4-nesting harness class) + `_full_harness` lambda lacking `coverage_end`; (p2) `tests/test_swan_quickupdate_swelltrack_merge.py` 2 tests — harness drift (closest-key merge never reached in the stubbed quick-update); (p3) `tests/test_h4_chunked_json.py::test_after_chunked_encode_passes_the_threshold` — wall-clock threshold (12.96 s) under host load. **GATE SURFBEAT-CYCLE: PASS 12/12 (auditor ~09:00Z, firewalled, results-free definition, own numbers):** deck traced to the manual (BOUNDSPEC FILE, no PAR/WIND, 1 m, 20×25 m, two COMPUTE/OBSTACLE); rotation proven not a mirror on an off-axis bin (mutation killed the repo KAT); boundary Hs round-trip 0.0000 %/0.0002 %; exact-time discipline (nearest-hour mutation killed); parallelism 0.25× serial, 8 distinct workdirs; cache contract at both write sites + whitelist (mutation killed); beach_profile diff empty; scalars-only cache; own live strip in `/tmp/surfbeat-fix/audit5` (48 s, accuracy OK 99.92/99.87 %, S00 Hs 0.083 % off, shore HBig 0.107 / row-2 0.064, Hs_ig 0.1247 = 0.228×, set timing 0.556 min at 0.03 Hz interior bin); scope = allowlist exactly; wet shore end (trimmed to 13.49 m / 0.064 m; BOTTOM shore+pad columns 0.11/0.09/0.06/0.06/0.06 > 0.05; threshold-drift mutation killed). 1 non-blocking finding: `surfbeat_cadence_hours` dead config key → **Q10**. Auditor self-reported one local pytest invocation (corrected at once; tree clean). Doc-sync DONE (ARCHITECTURE SurfBeat paragraph; PROVIDER-MANUAL §14 SurfBeat strip + syntax bullets; API-MANUAL §17 pipeline block + config row; OPERATIONS-MANUAL config row; DASHBOARD-MANUAL set-timing row; ADR-093 amendment note). Remaining: operator "push" → deploy → first cycle's `surfbeat` cache + reality row (shoreline Hs_ig vs 0.15–0.35 × boundary Hs; set timing in 25–200 s) + Q10/Q11 rulings (shoreline Hs_ig vs the 0.15–0.35× boundary-Hs envelope stated beforehand; set timing vs the 25–200 s bound-IG band). |
 | **SURFBEAT-REMOVAL** | **Operator ruling 2026-08-23 (chat): "surfbeat is gone."** Why: SurfBeat was recommended in July on the claim that its infragravity peak = set timing in minutes and its height = set strength; it never ran correctly until 2026-08-22/23; the first real numbers showed the peak is the within-set wave-GROUP period (25–200 s) and the set interval/strength the score needs come from the wave spectrum + SwellTrack directly (SET-TIMING-AND-AMPLITUDE brief). Coordinator acknowledged the July claim was untested when recommended. With no scoring consumer, it is an expensive instrument with no purpose → removed entirely: model run, precompute, cache key `surfbeat`, response fields `setTimingMinutes/setAmplitudeM/igWaveHeightM`, config keys `surfbeat_enabled/surfbeat_cadence_hours` (absorbs SURFBEAT-CADENCE-KEY-REMOVAL), vchain companion + ledger key (schema 2), dashboard Set Timing row + 13 locale keys, API apply/config fields + conversion map + benchmark script, tests/fixtures, docs. Scorer consistency = the existing swell-dominance bucketing unconditionally until the set-timing/amplitude definition (Q14) is ruled and coded. | 🔄 **DISPATCHED 2026-08-23** — three agents (marine Part A on top of the unpushed 09edb4e; API Part B; dashboard Part C), brief `scratch/BRIEF-SURFBEAT-REMOVAL-2026-08-23.md`; then firewalled audit, deploy marine (fixes the live 50-min-per-build failing-strip waste too) + api + dashboard on the operator's word. SURFBEAT-CYCLE's rebuild (09edb4e) is superseded before deploy — never shipped. **DEV DONE 2026-08-23 ~13:15Z:** marine `f65f70b..935c985` (19 commits; vs deployed `b576d3c`: 62 files, 23 deleted / 39 modified, −4,568 lines), API `2d9beee` (5 files), dashboard `125b642` (16 files; 4 locale keys per locale — two orphaned SurfBeat-era keys found and ruled deleted). Lead acceptance: diffs = allowlists; own gone-greps: API 0, dashboard 0, marine 0 in executable code (dated "(removed 2026-08-23)" notes in docstrings/comments permitted by lead ruling). Mid-round rulings: identifier renames containing "surfbeat" allowed; a pre-existing stale pin in `test_surf_score_s1` (small_clean power 60/60 vs code 72/59) — code's Hs²·Tp energy proxy is the documented, deliberate criterion (`_partition_energy` docstring), so the pin and the `:341–343` comment were the stale parties → re-pinned + comment corrected (lead authorised, first ruling reversed after reading the function). **GATE SURFBEAT-REMOVAL (firewalled auditor, ~13:40Z): 10/12 PASS, 2 findings — R1: `test_vchain_module.py:560 assert "surfbeat" not in spot` is a code-level string (PUSHED BACK: the literal IS the regression guard proving the ledger key is gone — keeping it); R4/11: `surf_scorer.py :339–345` comment rewrite outside the file's allowed line ranges (ACCEPTED as lead-authorised scope extension — the stale energy-share comment, see above); R10: four doc spots still read as live (ARCHITECTURE port table :74 + compute-offloading paragraph, ADR-093 :37 compute-offloading line, DESIGN-MANUAL :1390 swell-card row) → fixed lead-direct same hour.** Auditor ruled out: right-by-accident (bucketing driven across both thresholds), one-timestep-only (all 67 golden entries), silent fallback (swan_runner byte-identical to b576d3c), stale artifacts (files absent on disk). **librewxr test run of the removal tree (50 affected+adjacent files, `/tmp/surfbeat-fix/lead-test2`, ~14:00Z): 488 passed, 11 failed — the 11 are byte-for-byte the pre-existing baseline set on deployed `b576d3c` (8× `test_serve_nothing_on_failure` by_side class, 2× `test_swan_quickupdate_swelltrack_merge` harness, 1× `test_h4_chunked_json` timing); zero new failures, zero removal-related failures.** **Operator instruction 2026-08-23 (chat): "push/deploy after this round of coding is done"** — i.e. the removal commits are HELD locally and pushed + deployed TOGETHER with the CONSISTENCY-SCORING coding round once that round closes its gate; no push before then. Then: push marine + API + dashboard (+ meta docs), deploy all three, post-deploy journal sweep (expect the 25×120 s failing-strip class to vanish from /surf builds). |
 | **CONSISTENCY-SCORING** | Code the Q14-approved Consistency definitions (brief `SET-TIMING-AND-AMPLITUDE-BRIEF-2026-08-23.md` §3.2, §3.3 steps 1–3+5, §4.3, §7) into `surf_scorer.py` + the data path that feeds it, with ADR-101 row-5 amendment and known-answer tests. **Facts the coding brief must carry (lead-verified 2026-08-23):** (1) the DWR 2-D spectrum is parsed per timestep in `swan_runner.py` ~:3900–3974 but its `freqs_hz/dirs_deg/energy` are deliberately NOT attached to the spectral entries (M-0b, 2026-08-06 — "zero live readers"); the Consistency inputs are therefore NEW readers — either attach the arrays or (lead's recommendation) compute the per-partition group statistics (ν, Qp, κ, Tm01, T_set, N_set) at parse time where the spectrum exists and attach scalars to each entry — a contract change inside the marine service that the Q14 approval covers (brief §7 names `S_dom(f)` as a new input), to be stated explicitly in the brief; (2) production partitions at the DWR point are SWAN's own watershed PT* TABLE (Hs/Tp/Dir/Dspr per partition, T4B.2) — no frequency-band bounds, so "restrict to the dominant partition's band" needs a band rule (V2 tests the half-way-between-peaks rule against the real spectra); `decompose_spectrum()` (which does return `frequencyRange`) is NOT the production partitioner; (3) SwellTrack per-partition break heights exist as `PartitionBreakResult.hs_at_break_m` / `TransectResult.hs_total_profile` (brief §4.1). | 🔄 **PRE-CODING VERIFICATION DISPATCHED 2026-08-23 ~14:45Z** — V1 (research agent): `docs/planning/briefs/WAVE-GROUP-FORMULAS-VERIFICATION-BRIEF-2026-08-23.md` → deliverable `WAVE-GROUP-FORMULAS-VERIFICATION-2026-08-23.md` (exact Longuet-Higgins / Kimura / Battjes–van Vledder expressions + KAT worked numbers); V2 (compute agent): `docs/planning/briefs/PARTITION-NARROWNESS-SURVEY-BRIEF-2026-08-23.md` → deliverable `PARTITION-NARROWNESS-SURVEY-2026-08-23.md` (ν/Qp/κ distributions per partition band from the 3 days of `spec_l2_dwr` trace spectra on librewxr — 568+556+266 records — plus the latest run's `SPEC_DWR_1.txt`/`TABLE_DWR_1.txt`; read-only on the host, computed locally in `scratch/partition-narrowness/`). **V1 + V2 DONE ~15:30Z, both lead-verified** (V2: first record's ν/κ/T_set reproduced by independent code to 4 digits; V1: Kimura numbers at κ 0.3/0.5/0.8 reproduced by independent integration to 3 digits; FSPR definition confirmed in the local SWAN manual :5908–5913). **V1 result:** Kimura 1980 Markov route + Battjes & van Vledder 1984 κ = |∫S(f)e^{i2πf·Tm02}df|/m0 (lag Tm02, modulus) PRIMARY-verified, KAT values cross-checked against Kimura's own Table 1; the Longuet-Higgins envelope closed form could NOT be reached (paywalled) → code the Kimura route; wave counts → seconds via Tm02 (brief said Tm01 — corrected); SWAN's FSPR is this κ for the whole spectrum (per-band κ still needs our own integral). **V2 result:** DWR spectrum is 35 geometric bins (0.03–1.0 Hz, ~11 %/bin) × 72 dirs; ν resolution floor ≈ 0.05; measured dominant groundswell band ν ≈ 0.17 (p10 0.135/p90 0.193), κ ≈ 0.59, windsea partition ν ≈ 0.53; watershed (P) and repo (D) partitioners agree (94 % dominant period within 10 %); half-way band rule recovers 0.92–1.17 of each partition's own energy; sample = ONE small clean groundswell event (Hs 0.4–0.6 m, Tp 13–15 s) — no windsea-dominant or mixed day measured. **Lead threshold analysis (Kimura route, κ 0.59 / Tm02 14.1 s):** set-wave threshold H>Hs → T_set 2.6 min (curve saturates); H>H1/10 (ρ=1.8) → 7.6 min (clean swell κ 0.8 → 10 min; windsea κ 0.3 → 1.9 min) — spans the graded curve and matches the code's existing H1/10 set-wave definition; waves-above-threshold per run is 1–3 at every threshold, so the brief's 3–6 waves-per-set curve cannot be fed by this theory. **Decisions A–E put to the operator IN CHAT 2026-08-23 ~15:40Z** (threshold; waves-per-set term; band rule; parse-time data path; Tm02/Kimura route) — rulings to be recorded here when given. Then: ADR-101 row-5 amendment + coding brief + implementation round + firewalled gate → push/deploy together with SURFBEAT-REMOVAL per operator instruction. |
+| **Q16-ROUND-B** | Swell card → deep-water reference points (Q16 C1+C2+C3; operator-approved 2026-08-25) | ✅ **CODE + GATE DONE 2026-08-25 (local, NOT pushed):** marine `a7e788e..122c599` (7 commits at HEAD 122c599). C1 `derive_deep_reference_points()` — per-corridor rays to ≥200 m, land-exclusion, shadow guardrail, 3 km merge (lead ruling after 12-at-cap finding) → 8 points on real Huntington geometry; persisted `deep_reference_points` block (W4 pattern). C2 bare-named `DREF*` Type-2 deck points, absent-block byte-identity tested. C3 `get_deep_swell_catalog()` (existing parser + partitioner reused), card display fields switched, scorer/1-D pipeline inputs byte-untouched (consumer-grep verified), additive `swellSource`, `frequencyRange` now real, 15 m-table fallback for uncovered hours. **k2 on the real 18Z transfer: 13.05 s @168° and 15.9 s @250° served as SEPARATE swells** (today's card: one). Lead acceptance: diff = allowlist (+authorized invariants.py extension), 38/38 then 39/39 reproduced in lead's shell. **Adversarial gate PASS 9/10** (firewalled, results-free def `scratch/GATE-Q16-ROUND-B-DEFINITION.md`, report `scratch/GATE-Q16-ROUND-B-AUDIT.md`): auditor reimplemented C1 from scratch (8 points reproduced exactly), captured its own transfer file (two-train signature confirmed), trap-24 mirror ruled out; row-9 literal-allowlist FAIL = F1/F2 brief-drafting omissions (lead-owned), F3 (unpinned sort contract) remediated `122c599`, lead re-verified. Doc-sync DONE meta `b5828653` (ARCHITECTURE :103 card bullet; PROVIDER-MANUAL new §14.19; DASHBOARD-MANUAL :1166 stale "SWAN SPECOUT" source fixed; CHANGELOG — lead re-read the ARCHITECTURE diff, exact; pre-existing uncommitted API-MANUAL/plan files verifiably untouched). **API-MANUAL §17 held** — pre-existing uncommitted fog-section edit awaiting operator ruling; §14.15 "Feeds the swell display card" bullet judged still-true-via-fallback, tidy with the API-MANUAL follow-up. Deploy: held for operator "push" together with Round A per one-change-per-deploy sequencing. Flagged for live measurement at deploy: catalog parses the ~32 MB transfer once per forecast build (no cache added — would be trigger-5; goes to operator if latency matters). |
+| **Q16-ROUND-A** | Forecast-horizon repair: daily 96 h WW3 continuation march + merged BOUNDNEST3 transfer (Q16 C4+C5, Q16.1 approved 2026-08-25) | ✅ **CODE + GATE CLOSED 2026-08-25 (rows 1–10 + R12 PASS; F1–F3 remediated `ac5c464`, lead re-verified 67/1-known, auditor re-verified all three with its OWN mutation drills — F1's boundary mutation now caught, F3's real-loop test proven wired to the actual isolation mechanism). Live row 11 owed at deploy. Doc-sync DONE meta `23318ae4` (ARCHITECTURE ⚓ WW3-leg horizon paragraph; ADR-109 dated amendment — accepted content untouched, lead-verified structure; PROVIDER-MANUAL §14.18; OPERATIONS-MANUAL incl. the SWAN-PRINT post-deploy-sweep addition; CHANGELOG. Agent correctly resolved a lead brief path typo: live ADR-109 is docs/decisions/, not docs/archive/decisions/). **PUSH-READY: marine `a7e788e..ac5c464` (Rounds B+A, 15 commits) + meta `b5828653`+`23318ae4` — awaiting operator "push". Deploy sequence: push both repos → deploy-marine.sh → post-deploy journal sweep + SWAN-PRINT scan → live gates (B: served multiSwell vs buoy bands; A: row 11 — first 00Z horizon march wall-clock ≤5h/no overlap, zero boundary-exhausted, DWR variance across hours 7–72, +24/+48h reality rows as those hours arrive). C6 builds AFTER the A+B live gates pass (deploy attribution).** Audit highlights (report `scratch/GATE-Q16-ROUND-A-AUDIT.md`): merge mutation caught at the REAL build_chain_spec path; auditor's own harness proved publish isolation at the real runner loop (the round's own k4 was a re-simulation — F3 fixed to the real-loop pattern); NOMADS real-clock PASS across 3 cycles (worst margin 26 min); cycle-pin chain fully traced; boundary_reconstruction diff line-walked clean. Parked pre-existing debt (NOT this round's): tests/test_service_full_run_trigger.py fails 10/28 at baseline 122c599 (predates round, traced to the WW3-chain-unconditional change). Marine `5c11ee7..ac5c464` (8 commits, local, NOT pushed): native-cadence wind accessor (pass-through, no interpolation — WW3 interpolates internally, manual-cited :8211/:10155–159/:14405–409); fetch depths 72→99 h ocean / 84→96 h GFS wind (per-cycle cost disclosed: 25→34 GRIB2 files, +36%); `merge_transfer_files()` byte-preserving splice (byte-identical header/axis/point-list guards); `ww3Horizon` health block + `fullRun.l2BoundaryExhausted` + the SWAN-PRINT exhausted-warning detector (KAT on a real captured librewxr PRINT); `_run_ww3_horizon_march()` — 00Z continuation from a COPY of the leg's +6 h restart, strictly after publish, wind-coverage guard, retention 2, k4 publish-isolation proven on a real unstubbed raise; **NOAA cycle-pin** (lead-caught seam gap: horizon refetch could silently upgrade past the leg's fallback cycle → physics jump at the +6 h splice; ruling (b): additive `pinned_cycle` through ww3_partition_fields + 9-line pure forwarding in boundary_reconstruction — lead diff-walked that file, zero physics lines); vchain staging wiring with degrade-to-nowcast-alone + coverage WARNING. Five agent STOPs, all ruled in-band (state/health allowlist extension; stale partition-fields tests; staging derivation conditions; merge byte-equality; the cycle pin). Lead acceptance: diff = allowlist+authorized extensions; verification reproduced in lead's shell: **179 passed / 1 failed = the known pre-existing wind_gatherer Windows-path failure** (stash-verified by agent, reproduced by lead). Firewalled auditor dispatched (results-free def `scratch/GATE-Q16-ROUND-A-DEFINITION.md` + R12 cycle-pin row; row 11 live gate deferred to deploy). Then: Round A doc-sync (précis in dev closeout), C6 round, and deploy of A+B+docs together on the operator's "push" — post-deploy live rows owed per gate row 11. |
 | SURFBEAT-CADENCE-KEY-REMOVAL | Delete the dead `surfbeat_cadence_hours` setting everywhere (operator ruling Q10, 2026-08-23 "delete"): marine `config/marine_config.py` parser + field, API config writer/reader + wizard/admin help keys, dashboard forms if any, manuals' config tables (API-MANUAL, OPERATIONS-MANUAL), example configs | ⬜ NEXT small round after the SURFBEAT-CYCLE deploy — spans marine + api (+ dashboard) repos; one agent per repo, allowlists per repo, grep-proven zero residue; doc-sync same commits |
 | CONSISTENCY-RESEARCH | Research the surf score's "consistency" factor properly (operator ruling Q11, 2026-08-23: "the entire score for that section seems completely wrong and poorly researched. It needs researched properly") — what set/lull timing and consistency physically are, what our model can observe (SurfBeat bound-IG peak period 25–200 s, spectral bandwidth/groupiness, partition structure, Tp), literature + commercial-forecast treatment, proposed scoring definition with citations → ADR-101 amendment PROPOSAL for the operator; no scorer code changes before acceptance | ✅ **RESEARCH DONE 2026-08-23** (`docs/planning/briefs/RESEARCH-SET-CONSISTENCY-2026-08-23.md`, lead-read): sets = wave groups (beat period 1/Δf; groupiness rises with spectral narrowness — Longuet-Higgins ν, Goda GF); two scales both called "sets": wave-group/IG 25–250 s (a few waves per group) vs surfers' "set interval" of minutes (VLF 4–30 min band = envelope of the group envelope); our SurfBeat bound-IG peak (8 bins 0.005–0.04 Hz → always 25–200 s; live 33 s) is the dominant WITHIN-set group period, not a set interval, and per SWAN's own authors the IEM captures group-forced IG only (field: bound IG < 30 % of total in 10–15 m; Lange 2024, Herbers 1994). Commercial: Surfline "Wave Consistency" = modelled count of waves above a spot threshold ("not a measure of surf quality"; windswell scores higher); surf-forecast.com "Reliability" = spot climatology; Swellnet qualitative (period, source distance, secondary swells); nobody uses IG. Defects D1–D8: minutes-vs-seconds (timing sub-score pinned at 0.8, three bands dead code); amplitude bands 0.05/0.15/0.30 m uncited and size-confounded (free IG ∝ Hs, bound ∝ Hs² → a disguised Size bonus); "minutes between sets" mislabel; 8-value quantisation blind to the 200–1800 s band; uncited fallback thresholds; **D8 unsettled semantic: "well-defined regular sets" (groundswell high) vs "many rideable waves/hour" (windswell high) are near-opposites on the bandwidth axis — operator must rule first.** Candidates: **A (recommended)** groupiness from the hourly 15 m spectrum (ν → expected set interval/waves per set via Longuet-Higgins run statistics + two-swell beat override; no new SWAN runs; formulas flagged to re-verify against Holthuijsen before coding); **B** SurfBeat IG used correctly (seconds; IG/Hs ratio; `[df]` extension to reach 200–600 s = architectural); **C** Surfline-style rideable-wave rate (violates single-use with Size — not recommended). Validation debt: no set-interval observations exist; cheapest = webcam time-lapse set counting at the spot; buoys stop at ~0.02–0.025 Hz. → operator questions **Q12 (semantic) / Q13 (candidate)** below; no scorer code until ruled. |
 | (prior status) | | 🔄 DISPATCHED 2026-08-19. Operator's explicit architectural approval overrides the V4 serving gate for this test install: chain-enabled locations' production full run = WW3 leg FIRST (refusal → cycle attempt fails, no publish, retry-same-cycle) → SWAN chain consuming the cycle's transfer file at L2 via BOUNDNEST3 (no SWAN L1) → nested levels → 1D handoff → SwellTrack+SurfBeat → NORMAL production publish/serve. Shadow diversion deleted; single flag `ww3_chain_enabled` replaces `ww3_shadow_mode_enabled`+`vchain_enabled` (PW5's "dies with the transition"); buoy ledger kept, fed from production outputs, one row per enabled cycle INCLUDING leg-refused cycles. Brief `scratch/BRIEF-CHAIN-SERVES.md`; results-free gate def `scratch/GATE-CHAIN-SERVES-DEFINITION.md` + firewalled auditor before deploy. Parallel ops round: restart mint for 2026-08-19 00Z/06Z (`scratch/BRIEF-RESTART-MINT-20260819.md`) so the ~10:30Z cycle has its warm start. |
@@ -104,11 +106,23 @@ Ctrl-F the exact heading text:
 
 ## 📍 CURRENT STATE — updated every working session (last: 2026-08-22)
 
-**Status 2026-08-22: chain running live; trap 24 (boundary direction-axis mirror) FIXED +
-verified on the 06Z/12Z cycles — directions now right in every band at both buoys; PW10
-(JONSWAP shape for ≤ 8 s swell partitions) ruled "1 ok" and implemented locally, awaiting
-the operator's "push" → deploy → reality gate. Island shadowing is operator-ordered LAST.
-See the TRAP-24 + RECON-SHAPE checklist row.**
+**Status 2026-08-25: Q16 BOTH ROUNDS PUSH-READY.** Operator-reported "missing swells" traced
+end-to-end (Q15 findings: partition identity lost at the 15 m card point; forecast frozen
+beyond +6 h — SWAN's "boundary file exhausted" every cycle since the Aug 19 switchover; the
+9–10 s interior oscillation attributed to an upstream NOAA partition-merge event, model
+exonerated). Q16 approved + built + gated the same day: Round B (swell card from deep-water
+reference points — real 18Z data now yields 13.05 s AND 15.9 s as separate served swells) and
+Round A (daily 96 h continuation march + merged BOUNDNEST3 transfer + NOAA cycle pin +
+exhausted-detector). Both adversarial gates CLOSED; doc-sync committed (meta `b5828653` +
+`23318ae4`). **Awaiting operator "push"** → deploy → live gates (see Q16-ROUND-A/B checklist
+rows). Then C6 (seam ledger row) as its own round. OPEN: operator ruling on the pre-existing
+uncommitted API-MANUAL fog-section edit (blocks the last doc target). Island shadowing still
+operator-ordered LAST.
+
+Previous (2026-08-22): chain running live; trap 24 (boundary direction-axis mirror) FIXED +
+verified on the 06Z/12Z cycles — directions right in every band at both buoys; PW10
+(JONSWAP shape for ≤ 8 s swell partitions) ruled "1 ok", implemented, deployed 2026-08-22,
+reality-gate PASS 2026-08-23. See the TRAP-24 + RECON-SHAPE checklist row.
 
 **Previous status (2026-08-19): 🔄 CHAIN-SERVES round dispatched 2026-08-19 (see checklist row). Operator
 order in chat: the new chain is no longer a shadow passenger — it IS the production
@@ -1737,6 +1751,223 @@ architectural permission record.
 
 *(Plain English, self-contained, newest at top. Answered items get their ruling recorded
 here and applied.)*
+
+### Q16 (2026-08-25) — WRITTEN PROPOSAL FOR APPROVAL: swell-card deep-water reference + forecast-horizon repair (implements the Q15(a) ruling; resolves Q15(b))
+
+**What this fixes (both verified live, evidence in `scratch/SESSION-2026-08-25-SWELL-TRACE.md`
+and `scratch/SWELL-BAND-INVESTIGATION-2026-08-25.md`):**
+1. The swell card lists ONE swell because it is built from SWAN's partition table at the 15 m
+   point, where refraction has already merged the trains (16 s SW and 13 s S arrive within 5°
+   of each other there). You ruled 2026-08-25: move the measurement point to deep water.
+2. Every published forecast hour beyond +6 h runs on a frozen ocean: the WW3 leg marches only
+   6 h per cycle (its shadow-era design, promoted to production at CHAIN-SERVES without the
+   forecast-horizon feed ever being built), while SWAN consumes its output as the offshore
+   boundary for all 73 forecast hours. SWAN prints "data on boundary file exhausted" every
+   cycle and holds the +6 h ocean constant for the remaining 66 hours.
+
+**PROPOSED CHANGES — approving Q16 authorizes exactly these six, nothing else:**
+
+- **C1 — Per-corridor deep-water reference points (per spot, computed ONCE at spot setup —
+  operator clarification 2026-08-25: at grid-sizing time, persisted to disk, recomputed only
+  when the spot's configuration changes and sizing re-runs; NEVER computed per cycle).** From
+  the spot, trace rays seaward along each direction in the spot's exposure window (existing
+  ray-tracing/bathymetry machinery). Each ray's reference point is where it first reaches
+  ≥ 200 m depth (deep water for a 16 s swell — half its wavelength), pushed farther seaward if
+  within ~2 grid cells of an island-shadow boundary (steep-gradient guardrail). Dedup to WW3
+  G1 cells → a small fan of points (expected: 3–8 for Huntington). Persisted alongside the
+  existing sizing artifacts.
+- **C2 — WW3 outputs spectra at those points.** The reference points are added as Type-2
+  output points in the existing WW3 march decks (same mechanism as the B46222/B46253 buoy
+  co-location points — a deck line each; no new model, no new grid).
+- **C3 — The swell card is built from those spectra.** Each hour, partition each reference
+  point's spectrum with the standard watershed method (the project's existing partitioner);
+  build `multiSwell` by taking each swell train from the reference point aligned with its
+  arrival direction — one point per swell, algorithmically chosen, never averaged. The card
+  becomes post-island (our model's field, Surfline-style), pre-refraction (deep water,
+  industry convention). Wind-sea entry continues to be carried alongside as today.
+  **NOT changed:** the 1-D surf model, its 15 m handoff, SwellTrack, breaks, and the surf
+  SCORE — the score judges the water at the break and keeps its existing post-refraction
+  inputs unchanged (operator question 2026-08-25, answered: the deep card is
+  display/reporting only; feeding the score's cross-swell term from the deep catalog would
+  be a separate ADR-101 decision, not part of this round). The 15 m machinery keeps every
+  job it has except naming the card's swells; the 15 m DWR SPECOUT/TABLE outputs stay.
+- **C4 — One march per day becomes the full-horizon march (AMENDED 2026-08-25 per operator:
+  it REPLACES that cycle's short march, it is not additional).** Four marches a day, same
+  count as today: three stay short (6 h), and one per day runs the full 73 h forecast
+  horizon on the EXISTING G1 grid, existing binary, existing physics, driven by the NOAA
+  boundary + wind data we already download to +78 h (today we use the first 6 h and discard
+  the rest). The long march's first 6 hours ARE that cycle's nowcast, and it emits the +6 h
+  restart the next cycle chains from, exactly like a short march. Measured cost basis:
+  ~160 s wall-clock per simulated hour → the long march ≈ 3.3 h; total daily compute goes
+  ~1.1 h → ~4.1 h at the standing contention budget (4 threads, nice 15, never started
+  while a production full run is in flight). All four marches long (= 4×-daily forecast
+  refresh) would be ~13 h/day — over this box's budget; "two long per day" is a future dial
+  if fresher forecasts are wanted.
+- **C5 — Fill SWAN's boundary file all the way (the delivery plumbing for C4).** SWAN
+  computes 73 forecast hours and reads the deep-ocean state for each hour from the file WW3
+  writes; today that file contains 7 hours and SWAN reuses hour 6 for the remaining 66 (the
+  frozen-forecast bug, "data on boundary file exhausted"). C5: the file gets all 73 hours —
+  hours 0–6 from the cycle's fresh march, hours 7–72 from the day's long march. No behavior
+  change inside SWAN itself. Trade accepted: hours 7–72 refresh once daily (vs never
+  today). The card's hours 7–72 come from the same long-march output at the C1 points — no
+  pre-island NOAA numbers anywhere in the card.
+- **C6 — Seam-fidelity ledger row.** Background: the operator wanted SWAN checked at the
+  buoys ("that is a good idea", 2026-08-25), but both buoys sit outside SWAN's 7.6×8.3 km
+  grid (46222 is 23.4 km west of it, 46253 10.8 km — verified) — SWAN has no field there to
+  check. The nearest checkable thing: at the handoff line where WW3 passes the ocean to
+  SWAN, record side-by-side in the nightly ledger, every cycle, what WW3 handed vs what SWAN
+  actually absorbed (SWAN outputs its spectrum at one point just inside its boundary). If
+  SWAN ever ingests the handoff wrong — the trap-24 mirrored-boundary bug was exactly this
+  class — it shows the same day instead of after weeks. One bookkeeping row, no new model
+  runs. Model-vs-model by construction — proves ingest fidelity, not truth; labeled as such
+  in the ledger. Independent of C1–C5; droppable on request.
+
+**Alternatives considered and rejected:** raw NOAA partitions at our pickup corridor
+(pre-island — your rejection: "we would be seaward of the islands"); a G2 coarse-grid
+forecast march (your rejection: "not a fan of running another grid just for one reading");
+full-horizon march every 6 h cycle (~3.3 h × 4/day — exceeds the box's budget); single fixed
+deep point per spot (mis-shadows one corridor or another — your "best location" objection);
+averaging multiple points (smears across shadow edges).
+
+**Architectural triggers this touches (so the approval is explicit):** new WW3 output points
+and persisted reference-point file (triggers 3/7); multiSwell data-source change (trigger 4;
+INVARIANT_7's card-source definition is superseded accordingly); new daily schedule entry
+(trigger 6); transfer-file assembly change (trigger 4); new SWAN output point + ledger field
+(trigger 7).
+
+**Doc-sync deliverables (operator order 2026-08-25 "make sure you also update all docs" —
+each round's close REQUIRES these, committed with the round, before its deploy):**
+- *Round B (card):* ARCHITECTURE.md ⚓ marine-handoff callout (the "Swell display card ≠
+  handoff" bullet and INVARIANT_7 description — card source becomes the deep-water
+  reference points, 15 m table retained for internals); API-MANUAL §17 (multiSwell source,
+  new `swellSource` field, populated `frequencyRange`); PROVIDER-MANUAL §14 (deep reference
+  points: derivation rule, persistence block, deck points); DASHBOARD-MANUAL if it names
+  the swell card's source; `services/invariants.py` INVARIANT_7 text itself (code-adjacent
+  doc — the invariant's wording must match the new source).
+- *Round A (horizon):* ARCHITECTURE.md ⚓ WW3-leg block (march window: 6 h legs + daily 96 h
+  continuation march; transfer horizon; no more boundary-exhausted state); ADR-109
+  amendment note (D12 compute budget + the horizon design — amendment, not rewrite);
+  PROVIDER-MANUAL §14.18 (long-march mechanics, fetch depth +100 h); OPERATIONS-MANUAL
+  (schedule, new artifacts, disk retention, the SWAN-PRINT sweep addition).
+- *C6 round:* PROVIDER-MANUAL ledger section + OPERATIONS-MANUAL monitoring row.
+- All three: CHANGELOG entries; plan checklist rows kept current.
+
+**Acceptance (the round's reality gates, stated now):** (i) the served multiSwell for a
+matched hour lists ≥ the number of distinct trains NDBC 46222/46253 resolve as separable
+bands, with per-train period/direction within ±2 s / ±30° of the matching buoy band;
+(ii) TABLE_DWR-era static-forecast signature gone — the served forecast's dominant partition
+must vary beyond ±0.02 m / ±0.05 s across hours 7–72 when NOAA's forecast varies;
+(iii) SWAN PRINT contains zero "boundary file exhausted" lines on a full cycle;
+(iv) long-march wall-clock ≤ 4 h and zero overlap with production runs across 2 observed days;
+(v) seam row present in the ledger with WW3-vs-SWAN band agreement within stated tolerance.
+Firewalled adversarial gate per standing rules; results-free gate definition file.
+
+**→ APPROVED 2026-08-25 (operator, chat: "ok", after the C1/C3/C4/C5/C6 clarifications were
+folded into this text). C1–C6 are authorized as written. Execution: Round A = C4+C5 (horizon),
+Round B = C1+C2+C3 (card), C6 as its own small round — one functional change per deploy.**
+
+**→ Q16.1 APPROVED 2026-08-25 (operator, chat: "that is fine") — 96 h march span, NOAA
+boundary + wind fetch extended to ≈ +100 h. Original request text follows for the record:**
+coverage arithmetic caught in brief-writing: a march spanning 73 h covers 73 h from ITS start,
+but the worst-placed consumer cycle runs 24 h after the daily long march, so covering all 72
+forecast hours for EVERY cycle requires the long march to span **96 h** (73 + 24 aging), not
+73 — wall-clock ≈ 4.3 h/day instead of 3.3 (still one background march at the contention
+budget). That in turn requires staging NOAA boundary + wind data to ≈ **+100 h** instead of
+today's +78 h — NOAA publishes to +120 h; this extends our existing fetches deeper, same
+feeds, same code paths. This exceeds the approved text's "data we already download to +78 h",
+hence this written amendment. Alternative (staying at +78 h): the last ~18 forecast hours
+remain frozen on the worst cycle — the defect survives in the tail. Recommendation: approve
+the 96 h / +100 h numbers. Also recorded as design decisions for Round A (mechanics within
+the approved intent, disclosed): (i) the daily long march runs as a CONTINUATION — the
+cycle's normal 6 h leg runs and publishes first, then the long march continues from that
+leg's saved state out to +96 h in the background, so no publish is ever delayed ~4 h and no
+hours are marched twice; (ii) the long march's wind file uses hourly records to +48 h and
+NOAA's native 3-hourly records beyond (WW3 interpolates forcing in time internally — no
+interpolation code of ours is added, keeping the 2026-08-04 wind-store ruling untouched);
+(iii) the designated long-march cycle is 00Z (overnight local, quietest box window).
+
+### Q15 (2026-08-25) — swells are being lost: where the chain loses them (verified), and two fixes that need your ruling
+
+**Your report:** surf-forecast shows 3 swells (2 ft @ 16 s SW, 1.5 ft @ 13 s S, 1.5 ft @ 9 s W);
+the buoys resolve 4+ distinct bands; our surf endpoint publishes ONE swell (0.71 m @ 13.1 s S)
+plus a 6.6 s wind sea. Verified live on the 2026-08-25 18Z cycle, stage by stage.
+
+**What was traced (every number from live artifacts on librewxr, session record
+`scratch/SESSION-2026-08-25-SWELL-TRACE.md`):**
+1. **NOAA hands us all three swells, separately.** The boundary spectra we build from NOAA's
+   partition fields carry three directionally distinct trains: 16–18 s from 215° (SW),
+   13 s from 190° (S), 9–10 s from 165° (SSE). The ingest is NOT the loss site.
+2. **WW3 carries them acceptably.** At the buoy-co-located points WW3's per-band heights are
+   0.65–1.0× of what buoys 46222/46253 measured at the same hour. (One anomaly — see item 5.)
+3. **LOSS SITE A — the swell card's partition point (15 m).** At the 15 m reference point the
+   spectrum still CONTAINS the trains (16 s band 0.23 m — matching the buoys' 0.17–0.24 m;
+   13 s 0.62 m; 9–10 s 0.12 m; sea 0.13 m), but by 15 m depth refraction has bent the 16 s SW
+   and 13 s S trains to within 5° of each other, and on our 35-bin frequency grid they are
+   2 bins apart — SWAN's partitioner (correctly, given that input) sees ONE peak. The swell
+   card can never show two swells that the 15 m point has already merged. Commercial forecasts
+   list swells partitioned in DEEP water, before refraction merges them — we partition after.
+4. **LOSS SITE B — the forecast beyond +6 h runs on a FROZEN ocean.** The WW3 leg marches
+   exactly 6 h per cycle (by design, `_WW3_LEG_WINDOW_HOURS = 6`), but SWAN's L2 run consumes
+   that 7-timestep file as its offshore boundary for all 73 forecast hours. SWAN's own log
+   prints "** Warning : data on boundary file exhausted" every cycle and holds the +6 h
+   spectrum constant for the remaining 66 hours — the published partition sits at a static
+   0.75–0.79 m / 13.46 s for 48 h while NOAA's own forecast (already in our boundary files,
+   which run out to +78 h) shows the SSE band building to ~1.0 m. Any NEW swell arriving
+   beyond +6 h of the last full run cannot appear in the forecast at all.
+5. **Anomaly ATTRIBUTED (read-only investigation, same day — report
+   `scratch/SWELL-BAND-INVESTIGATION-2026-08-25.md`, lead spot-checked against pre-agent
+   numbers):** the 9–10 s interior swing is a faithful, correctly-lagged response to a
+   transient hole in the boundary data, and the hole is UPSTREAM — a **NOAA gfswave
+   partition-merge event**: for ~6 h NOAA's own partitioner absorbed the 9–10 s SSE swell
+   into the 13 s S partition (energy conserved, band identity lost), the merge front sweeping
+   across our boundary cells over the day, reproduced identically in three independent NOAA
+   fetches. Our reconstruction (one narrow Gaussian per NOAA partition triple) turns that
+   merge into a near-total absence of 9–10 s energy at the boundary; WW3 then propagates the
+   hole inward at exactly the physical group speed (predicted onset 13.4–16.4Z vs observed
+   14Z; predicted recovery ~20Z vs observed 20Z). NDBC shows reality had NO swing (46222
+   steady 0.24–0.43 m while the model dipped to 0.058 m). Ruled OUT: restart chain, boundary
+   interpolation, unfed-edge geometry (for this band at the buoys), dissipation. Side finding
+   flagged, no change proposed: the L2P S-leg points DO have residual east-edge dependence at
+   9–10 s (outside Q4's >11 s premise). Remedies (merge detection, broader merged-triple
+   shapes, sourcing boundary spectra differently) are all architectural — options only,
+   nothing changed.
+6. The 16 s SW train's ENERGY deficit at Huntington is largely the already-known island-shadow
+   problem (Catalina sits at ~215° from HB; narrow reconstruction lobe + no diffraction) —
+   operator-ordered LAST; not re-litigated here. Item 3 is about its IDENTITY (it isn't listed
+   at all), which is a different, fixable defect.
+
+**Decisions needed (both architectural — nothing has been changed):**
+- **(a) Swell card source.** To show the swells that are actually in the water, the card's
+  catalog must come from a partitioning done BEFORE nearshore refraction merges the trains —
+  e.g. WW3's own partition output (currently switched off in the march deck) at the spot's
+  offshore point, or partitioning the deep-water spectrum we already output at the L2 edge.
+  This changes the swell card's data source (today: SWAN's partition table at the 15 m point,
+  INVARIANT_7 territory) — your call, with a recommendation to serve the card from deep-water
+  partitions while leaving the 1-D pipeline's handoff completely untouched.
+
+  **→ RULED 2026-08-25 (operator, chat): "we need to fix our point that we measure the swells
+  to match this, and not at 15m which is what we set right now. So what we report on the site
+  would then match more closely these other models."** The swell card's measurement point
+  moves to deep water (before refraction — the industry convention: Surfline defines its
+  reported swells as deep-water heights before shoaling; surf-forecast serves NOAA's
+  offshore-node partitions; coastal engineering's reference quantity is the unrefracted
+  deep-water H0). The 1-D pipeline's 15 m handoff is NOT touched — height/energy handoff at
+  15 m stays as designed; only where the card NAMES the swells moves. Depth bar: "deep" for a
+  16 s swell means ≥ ~200 m (half the wavelength), so the reference point must sit in
+  San Pedro Channel-class water offshore of the spot — NOT the L2 edge (~20–30 m, already
+  refracting). Sub-design (which source feeds the card per forecast hour; interacts with
+  decision (b)) put to the operator in chat same day; the coding round dispatches after that
+  answer.
+- **(b) Forecast-horizon boundary.** Options: (b1) march WW3 across the full 73 h each cycle
+  (~3.3 h wall-clock at measured speed — likely too slow on this box at 6-h cadence);
+  (b2) hybrid boundary file: WW3's transfer for hours 0–6, then the NOAA-reconstructed
+  spectra we ALREADY build out to +78 h (they feed WW3's own boundary today) re-emitted at the
+  L2 edge for hours 7–72 — forecast hours lose WW3's in-bight refinement but stop being frozen;
+  (b3) a once-daily long WW3 march for the horizon + 6-h nowcast marches. Recommendation: (b2)
+  now, revisit at Phase L (the LUT plan moots the cadence question). Your call.
+  **→ Superseded by Q16 (2026-08-25): after the chat design discussion (pre-island NOAA
+  rejected, extra grid rejected), the proposal on the table is the (b3) shape — Q16 items
+  C4/C5. Ruling happens on Q16.**
 
 **Q12/Q13 WITHDRAWN 2026-08-23 — operator correction (verbatim essentials):** "i did not ask you to rewrite the way we score the waves. That was well researched and fully documented in a brief [SURF-SCORE-REBUILD-RESEARCH-BRIEF]. I asked you to simply look at how we were scoring the sets itself ... how we need to score consistency. What timings are better than other timings. You seem to think this is a binary score where it has to be one or the other, and I do not think that is correct. If you have RIDEABLE wind surf, that is fine! BUT IT HAS TO BE RIDEABLE, we have part of our scoring that handles that ... you have NO HANDLE ON WHAT SETS MEAN OR WHAT IS GOOD AND WHAT IS NOT, HOW LONG PEOPLE ARE WILLING TO WAIT OR NOT WAIT ... WHY are we using the surfbeat height measurement? We DEVELOPED OUR OWN MODEL FOR THIS VERY PURPOSE ... surf beat is really not that good at that kind of thing and that was the ENTIRE POINT OF USING OUR OWN 1D MODEL." Also: research briefs go in `docs/planning/briefs/` (moved, `060d6788`), never scratch. → Refocused research dispatched (SET-TIMING-AND-AMPLITUDE-BRIEF-2026-08-23.md, in docs/planning/briefs/): (1) inside the EXISTING consistency factor, a GRADED set-timing curve — which set intervals / waves-per-set are better, how long surfers will wait — independent of swell type; (2) set amplitude from OUR 1-D model (SwellTrack) + the spectrum, not SurfBeat IG height; (3) what SurfBeat's group-period output can legitimately contribute. No score-architecture proposals, no commercial comparisons. The two Q texts below are kept only as the record of the rejected framing.
 
