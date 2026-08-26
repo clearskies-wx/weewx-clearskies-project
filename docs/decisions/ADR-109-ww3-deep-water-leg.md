@@ -783,6 +783,94 @@ disposition ruling, never before.
 - [ ] Plain-language standard: every term used in this document is defined at first use
   (see "How to read this document").
 
+## Amendment (2026-08-25): Q16 Round A — forecast-horizon repair (continuation march + NOAA cycle pin)
+
+**Status: Accepted.** Recorded per the plan's Q16/Q16.1 operator approvals
+(`docs/planning/MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.md`, Q16 "→ APPROVED 2026-08-25
+(operator, chat: 'ok', after the C1/C3/C4/C5/C6 clarifications were folded into this
+text)"; Q16.1 "→ APPROVED 2026-08-25 (operator, chat: 'that is fine')"). Pointer +
+addendum only — no D-row ruling above is re-opened; this note freezes what Q16 Round A
+(C4/C5, Q16.1) added on top of D10's restart-chaining design and D12's file/dir layout.
+
+**The defect this closes.** D12's cadence design (this ADR, as accepted 2026-08-17) had
+the leg march 6 h/cycle with no continuation — but SWAN's L2 full run consumes that
+7-record transfer as its offshore boundary for all 73 forecast hours, so hours 7–72 ran
+on a frozen +6 h ocean (SWAN's own log, "data on boundary file exhausted," every cycle
+since 2026-08-19). Q16 Round A closes this without touching D10's restart chain, D12's
+6-hourly leg cadence, or any D13 catalog row.
+
+**Continuation-march design (restart COPY, never a consume).** Once daily at the 00Z
+cycle, strictly AFTER that cycle's own 6 h leg and its production publish complete, WW3
+marches cycle+6 h → cycle+96 h on the same G1 grid/binary/physics, starting from a COPY
+of the leg's own +6 h restart file — the leg's restart chain itself (D10, trap 23
+stamping) is untouched, never consumed or diverted. 96 h (not 73) because the
+worst-placed consumer cycle is 24 h older than the daily march: 24 + 72 = 96, exact
+cover (Q16.1's coverage-arithmetic correction to the original Q16 text's 73 h/+78 h
+figures). Failure-isolated by design: any horizon-march failure logs a named refusal
+and can never delay, block, or alter a production publish.
+
+**D12 compute-budget delta.** Q16's original text estimated the long march at ~3.3 h
+(73 h span); Q16.1 corrected this to **96 h span, ≈4.3 h wall-clock**, still a single
+background march at D12's standing contention budget (`OMP_NUM_THREADS ≤ 4`, `nice 15`,
+never started while a production full run is in flight) — daily compute rises from
+D12's ~1.1 h (four 6 h legs) to ~4.1–4.3 h/day. Measured basis: ~160 s wall-clock per
+simulated hour (Q16 text), consistent with D12's own production-shaped rate table
+above. Ceiling accepted: 6 h. Constants are lead-set, not config keys (cycle **00Z**,
+span **96 h**, retention **2**) — the designated long-march cycle is 00Z because it is
+the quietest overnight local box window (Q16.1 design decision iii).
+
+**NOAA cycle pin (new — not in the original D5/D7 boundary/wind fetch design).** The
+horizon march re-fetches NOAA boundary data but is PINNED to the exact NOAA cycle the
+6 h leg used, persisted per cycle as `level0/boundary_cycle_<token>.txt`. Pin
+unavailable → named refusal `ww3_horizon_cycle_unpinned`; the pinned fetch makes exactly
+one attempt, no fallback ladder (a deliberate departure from D5/D7's general fetch
+posture — a substituted, unpinned NOAA cycle at the horizon march would silently
+reintroduce a physics discontinuity at the +6 h splice, the same failure mode this round
+closes). Implemented as additive `pinned_cycle` parameters through the fetch layer and
+the D3/D5-reused reconstruction entry point — default (unpinned) path stays
+byte-identical, mutation-verified.
+
+**Fetch-depth deltas (Q16.1, extends D9's wind-only forcing split — the split itself
+unchanged).** Boundary partition fields extended to **+99 h** (was 72); GFS far-window
+wind extended to **+96 h** (was 84), at GFS's own native 3-hourly cadence — no
+interpolation code of ours added anywhere (WW3 interpolates forcing internally, D9's
+existing mechanism; manual-cited `docs/reference/ww3-user-manual-v6.07.txt` :8211,
+:10155–159, :14405–409). Per-cycle fetch cost rises 25→34 GRIB2 files (+36%), uniformly
+across all cycles, not just the 00Z long-march cycle (the leg's own fetch depth grows
+too, to stay one fetch path). Great-Lakes product depth deliberately NOT extended
+(unused at this deployment).
+
+**Merged boundary transfer (the delivery plumbing for the march above — no SWAN-side
+behavior change).** Each full cycle stages ONE BOUNDNEST3 transfer file: the cycle's own
+6 h leg records for hours 0–6, the newest horizon march's records for hours 7–72.
+Byte-preserving splice; header/axis/point-list must be byte-identical between the two
+sources or the merge refuses loudly. No horizon file, or short coverage, stages the
+nowcast file alone with one WARNING (`ww3_horizon_short`) — never a crashed cycle.
+Hourly fill cycles (D12's own hourly-substitution design, CHAIN-SERVES D8) inherit the
+staged merged file unchanged — no new mechanism at that seam.
+
+**Health surfaces (additive to D12's monitoring-key design).** A new top-level
+`ww3Horizon` health block (`lastSuccessCycleTime`, `coverageEndTime`, `wallClockS`,
+`refuseReason`) and a new `fullRun.l2BoundaryExhausted` boolean: a detector now scans
+SWAN L2's PRINT output every run for the "data on boundary file exhausted" warning and
+surfaces it (one WARNING log line + the health boolean). Acceptance expectation
+post-deploy: this boolean reads FALSE every cycle — TRUE is a regression signal, not an
+expected state. See OPERATIONS-MANUAL.md and PROVIDER-MANUAL.md §14.18 for the full
+monitoring-key list and mechanics.
+
+**New artifacts + retention (additive to D12's `level0/` layout).**
+`level0/horizon_<token>/` (retention: newest 2), `level0/hstage_<token>/` (merge
+staging), `level0/boundary_cycle_<token>.txt` (the NOAA cycle pin above). Disk: horizon
+transfer output runs to hundreds of MB/day, retention-bounded (394 GB free measured at
+implementation time).
+
+**UNCHANGED by this amendment:** D10's restart-chaining mechanism and trap-23 stamping;
+D12's 6-hourly leg cadence and thread/nice budget; every D13 catalog row (deck grammar
+zero-diff); D4–D8's physics/assembly-program/ingestion-mechanism choices; the D9
+wind-only forcing split itself (only its fetch depth changes); D11's
+`WW3_RESTART_MAX_AGE_H = 9` staleness gate; `get_wind_series()`'s strict contract; the
+1-D pipeline, scoring, and boundary_reconstruction physics downstream of this leg.
+
 ## References
 
 - Plan: `docs/planning/MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.md` — §WW3 MODEL DESIGN

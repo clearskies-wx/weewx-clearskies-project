@@ -13,6 +13,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **`multiSwell` frequency-range field now populated** for the deep-water-sourced hours (previously always a placeholder `[0.0, 0.0]`).
 - No change to the 1-D surf break model, the surf score, or any break-point calculation — this round only changes what feeds the display card. Docs: [ARCHITECTURE.md](ARCHITECTURE.md) ⚓ MARINE HANDOFF MODEL, [manuals/PROVIDER-MANUAL.md](manuals/PROVIDER-MANUAL.md) §14.19, [manuals/DASHBOARD-MANUAL.md](manuals/DASHBOARD-MANUAL.md) Swell Card section.
 
+### 2026-08-25 — WW3 forecast-horizon repair: frozen-forecast defect fixed (Q16 Round A)
+
+- **Frozen-forecast defect fixed.** The deep-water WW3 leg marches 6 hours per forecast cycle; SWAN's nearshore model previously consumed that 6-hour file as its offshore boundary for the entire 73-hour forecast, holding the ocean state frozen from hour 7 onward (SWAN's own log recorded "data on boundary file exhausted" every cycle since 2026-08-19). Every published forecast hour now receives an evolving deep-water boundary instead.
+- **Daily continuation march.** Once a day, after the normal 6-hour cycle finishes and publishes, WW3 continues marching in the background out to 96 hours, starting from a copy of that cycle's own 6-hour restart state. This never delays or blocks a normal forecast publish — a failure in the background march is logged and skipped, not surfaced to the served forecast.
+- **Merged boundary file.** SWAN now reads a boundary file assembled from the fresh 6-hour march (hours 0–6) plus the latest daily long march (hours 7–72), refreshing the far-out forecast hours once a day instead of never. Missing or short long-march coverage falls back to the 6-hour file alone with a logged warning — never a crashed forecast cycle.
+- **NOAA data fetch extended** to cover the longer march (boundary wave data to +99 hours, wind data to +96 hours) — no interpolation added; same data feeds, same cadence, just deeper.
+- **New health indicators**: `ww3Horizon` (daily-march status) and `fullRun.l2BoundaryExhausted` (should read false every cycle; true signals the old frozen-forecast defect has returned).
+- Docs: [ARCHITECTURE.md](ARCHITECTURE.md) ⚓ WW3 DEEP-WATER LEG, [decisions/ADR-109-ww3-deep-water-leg.md](decisions/ADR-109-ww3-deep-water-leg.md) amendment (2026-08-25), [manuals/PROVIDER-MANUAL.md](manuals/PROVIDER-MANUAL.md) §14.18, [manuals/OPERATIONS-MANUAL.md](manuals/OPERATIONS-MANUAL.md) WW3 deep-water leg section.
+
 ### 2026-06-04 — Planet Viewing Quality Index + 7Timer seeing forecast integration
 
 - **Planet Viewing Quality Index** — per-planet viewing quality ratings (Excellent/Good/Fair/Poor/Not Visible) computed from 7Timer atmospheric seeing forecast combined with planet altitude, cloud cover, and special-case rules for Mercury (elongation gate), Uranus/Neptune (moon penalty), and close lunar conjunctions
