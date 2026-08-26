@@ -828,3 +828,104 @@ factor, the cited literature above) is UNCHANGED and still authoritative — onl
 aggregation-policy questions this addendum lists have moved. Do not treat this brief's own multi-transect/
 handoff proposal sections as the current design; treat them as the historical motivation for the spec that
 superseded them.
+
+---
+
+## 13. Break–Reform Cycle Correction — Research Addendum (2026-08-26, operator-ordered)
+
+**Status: PROPOSED — physics design researched and recorded; awaiting operator ruling before any
+code change. Ordered by the operator in chat 2026-08-26: "do the research so we can create a better
+and more accurate model for the break."**
+
+### 13.1 The defect (live evidence, 2026-08-26 22Z, Huntington representative transect)
+
+The served profile drew FIVE break points for one marched wave: 2.54 m / 1.27 m / 0.95 m /
+0.77 m / 0.43 m depth — the inner three within 35 m of the shoreline, two only 5 m apart.
+Observed reality that hour: 2–3 zones (outer bar break + shorebreak). The operator's diagnosis,
+confirmed by inspection of `_ddd_breaking_march` / `apply_ddd_saturation`:
+
+- Breaking CESSATION fires when Qb falls through `Q_B_CESSATION = 0.02` ALONE, which happens while
+  the wave is still at ~0.57×depth — far above the DDD stable height (0.40×depth). All dissipation
+  stops at that instant.
+- Re-ONSET fires a few meters later when Qb re-crosses `Q_B_VISIBLE = 0.05` — a brand-new "break"
+  is minted for what is physically the same wave still whitewatering shoreward.
+- The state machine never consults the roller energy the code itself computes
+  (`_roller_energy_step`); the energy dumped by the first break has no influence on whether the
+  wave has actually recovered.
+- Two-regime failure (operator observation): on rough days the model reforms too fast (spurious
+  extra breaks); under the pre-2026-08-08 AND-condition (`H <= Gamma*d`) it never reformed at all
+  on calm/flat days (the 90 m never-ceasing impact-zone bug, D-R1). Huntington's signature DOUBLE
+  BREAK — the SAME wave breaking twice — is the behavior the model must reproduce (this brief's
+  original operator scope: "...the break zone, the foam zones, AND double breaks").
+
+### 13.2 What the literature says is missing (sources verified 2026-08-26)
+
+1. **The transition zone / roller lag** — Nairn, Roelvink & Southgate (1990), *Transition Zone
+   Width and Implications for Modelling Surfzone Hydrodynamics*, ICCE 22 ch. 5 (full text
+   extracted: `scratch/nairn1990-transition-zone.txt`). Organized-wave energy loss and actual
+   energy dissipation are SEPARATED by a lag: the just-broken wave first converts potential energy
+   into forward momentum in the surface roller (Svendsen 1984); dissipation follows as the roller
+   decays. The roller is "a storage of kinetic energy, leading to a lag effect." Roller balance
+   (their Eq. 16, after Deigaard & Fredsøe 1989):
+   `d(E·Cg)/dx + d(Er·c)/dx = −2·β·g·Er/c`, with roller slope β ≈ 0.10. Empirical transition-zone
+   width (their Eq. 2, monochromatic lab data, r = 0.85): `d_i/d_b = 0.47·ξ_b^(−0.275)` for
+   ξ_b > 0.05 — the zone spans 5–50% of the surf zone width. A model that omits this lag puts
+   current/setup gradients (and by extension visible-break structure) in the wrong place.
+2. **Continuous formulations have no binary break state at all** — XBeach (Roelvink et al.; manual
+   wave-physics sections, xbeach.readthedocs.io): dissipation `D_w = 2(alpha/T)·Qb·E` with
+   `Qb = 1 − exp(−(Hrms/Hmax)^n)` evolving CONTINUOUSLY, plus the roller balance
+   `dEr/dt + div(Er·c) = S − D_r`, `D_r = 2·beta_s·beta_u·(g/c_g)·Er`. No cessation/re-onset
+   thresholds exist; reformation over bar-trough profiles EMERGES from the energy balance. The
+   manual states the roller produces exactly the delay ("transition zone effect") our state
+   machine lacks.
+3. **Field observation rejects threshold switching** — *The Fraction of Broken Waves in Natural
+   Surf Zones* (arXiv:1904.06821; local copy in session tool-results): broken water persists into
+   troughs ("breaking does not necessarily cease in troughs; whitecaps and broken water persist due
+   to momentum effects and residual turbulence"); binary Qb on/off switching "oversimplifies the
+   actual physics."
+4. **Even wave-by-wave DDD gets reformation wrong without the roller** — Dally (1992), *Random
+   breaking waves: Field verification of a wave-by-wave algorithm*, Coastal Eng. 16:369–397:
+   verified at DUCK'85 (rms error < 10% on height statistics) but "overpredicts the number of waves
+   that reform as they pass over a trough" — the author's own named weak point. Reformation error
+   is intrinsic to on/off treatments, not unique to our implementation of one.
+5. **A modern explicit wave-recovery criterion exists** — *Calculation Model for Multiple Breaking
+   Waves and Wave-Induced Currents on Very Gentle Beaches*, J. Waterway Port Coastal Ocean Eng.
+   147(5), 2021: re-establishes the reference energy and dissipation coefficient with SMALL residual
+   dissipation across the recovery region and an explicit criterion for the beginning of wave
+   recovery; lab-validated for multiple-break/recovery profiles. (Abstract-level access only —
+   fetch the full criterion before implementing if this route is chosen.)
+6. Supporting: Dally & Brown (1995), JGR 100(C12) — roller model coupled to breaker decay for
+   cross-shore currents; Chen et al. (2024), JGR Oceans 129, 10.1029/2023JC020413 — roller
+   momentum/energy transformation over barred bathymetry (paywalled; abstract only).
+
+### 13.3 Proposed design (for operator ruling — no code without approval)
+
+Replace the binary Qb-threshold cessation/re-onset state machine at BOTH sites
+(`_ddd_breaking_march`, `apply_ddd_saturation`) with a roller-energy-coupled cycle:
+
+- **Keep**: DDD organized-wave decay (Gamma = 0.40, K = 0.15) as the sink term S; the existing
+  forward-Euler roller step (its equation already matches Nairn Eq. 16 / XBeach D_r form); onset
+  criterion for a FIRST break (Qb rising through Q_B_VISIBLE) unchanged.
+- **Change 1 — breaking persists while the roller is loaded**: a breaking zone does not end at
+  `Qb < Q_B_CESSATION`; it ends where ROLLER energy density decays below a visibility floor
+  (calibrated so whitewater the camera can see = breaking the model draws). Rough day at
+  Huntington: the roller stays loaded across the short trough → the inner 3–4 spurious breaks
+  fuse into one continuous zone → 2 served zones.
+- **Change 2 — reformation requires a spent roller**: re-onset of a NEW break (the double break's
+  second break) is permitted only where roller energy has fallen below the floor AND the organized
+  wave re-steepens to the onset criterion. Calm day: weak roller dies in the trough → wave reforms
+  → second break. This is the same-wave double break, not a different wave population.
+- **Change 3 — dissipation continues across the "ceased" stretch**: while the roller is loaded the
+  organized wave keeps paying the DDD decay toward Gamma·d (resolves "not enough force dissipated
+  in the first break", the operator's original diagnosis).
+- **Sanity pin**: Nairn's empirical transition width `d_i/d_b = 0.47·ξ_b^(−0.275)` as a KAT-style
+  order-of-magnitude check on the lag length the coupled model produces.
+- Publication floors (`_MIN_BREAK_DEPTH_M`, `_MIN_BREAK_HS_M`) 0.15/0.10 → 0.20/0.20 m (operator,
+  2026-08-26: "we definitely need to" raise the cutoff to 0.2 m) — independent cosmetic cull;
+  removes 27 marginal breaks in the 2026-08-26 73 h forecast but none of the 22Z hour's five.
+
+**Acceptance gate (two regimes, both required before deploy):** (i) a rough day (2026-08-26-class):
+served break zones collapse to the observed 2–3 (camera-verified), outer-break position preserved
+(operator: current outer break "is probably a good approximation"); (ii) a calm day: the double
+break EXISTS — cessation, true reformation, second break — where the camera shows one. Plus: no
+regression of the D-R1 flat-profile bug (the 90 m never-ceasing zone case re-run as a KAT).

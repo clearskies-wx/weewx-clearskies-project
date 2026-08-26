@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-26 — Swell card no longer drops split-swell energy (DREF-MERGE-FIX)
+
+- **Missing west-swell energy found and fixed.** The spectral partitioner sometimes splits one swell into two or three near-duplicate fragments at a single deep-water reference point; the card's merge then published only the best-aligned fragment's height and silently discarded the rest of that swell's energy. Live case (2026-08-26 21Z): the ~15 s west swell was served at 0.09 m while buoy 46222 measured 0.24 m in that band — the operator caught the ~2–3× gap against the buoy. Fragments at a single point are now recombined energy-conserving (heights add as the square root of summed squares — standard spectral theory) before the cross-point merge, which is unchanged: different points are independent measurements of the same wave and are never summed (that would double-count). Recombined value for the live case: 0.26 m, matching both the buoy (0.24 m) and the model field at the buoy's own location (0.25 m). Marine `6abb831`; [manuals/PROVIDER-MANUAL.md](manuals/PROVIDER-MANUAL.md) §14.19 updated.
+
+### 2026-08-26 — Surf break/reform cycle now governed by the whitewater roller (BREAK-REFORM)
+
+- **Too-many-breaks defect fixed.** The 1-D surf model was drawing 5–7 break points per hour on the beach profile where reality showed 2–3: breaking "ceased" the instant the statistical breaking fraction dipped in a trough — while the wave was still far above its stable height — and re-tripped a few meters later as a fake new break (two markers were 5 m apart). The model computed the whitewater roller's energy at every step but never consulted it.
+- **Roller-coupled cycle.** A breaking zone now ends only where the roller (the whitewater the camera actually sees) has decayed below a visibility floor of 40 J/m² — derived from pre-existing model constants, not fitted — and a NEW break (Huntington's double break: the same wave breaking twice) can only begin once that roller is spent. Wave decay keeps being paid while the roller is loaded. Verified both regimes: a rough-day fixture drops from 6 published breaks to 2 with the outer break position unchanged, and a calm-day fixture produces a true cessation → reformation → second break. The 2026-08-08 flat-terrace never-ending-impact-zone bug stays fixed (pinned by test).
+- **Publication floors raised** to 0.20 m depth / 0.20 m wave height at break (operator-ordered) — breaks in ankle water are swash, not surf.
+- Research and design: [planning/briefs/SURF-ZONE-MODEL-BRIEF.md](planning/briefs/SURF-ZONE-MODEL-BRIEF.md) §13 (Nairn/Roelvink/Southgate 1990 transition zone, XBeach roller balance, Dally 1992 field verification, arXiv:1904.06821 field observations). Marine `57af5d6`.
+
+### 2026-08-26 — Per-cycle roller-closure invariant retired (INVARIANT_11)
+
+- The independent recomputation of the roller energy budget that ran on every point of every transect every cycle (INVARIANT_11) is removed from production — operator ruling: a typo-catching check belongs in change-time tests, not re-run thousands of times a day. In its entire history it fired on exactly two days, both from its own coverage guard, never from the energy budget actually being off. Its protection now lives solely in `tests/services/test_roller_closure_kat.py`, strengthened with an independent frozen reference value and proven by deliberate-sabotage drills to catch a wrong coefficient (+20% → 47% deviation flagged) and a sign error in the physics step. Production roller physics byte-identical. Marine `7b6a711`.
+
 ### 2026-08-25 — Surf swell card now reads deep-water reference points (Q16 Round B)
 
 - **Swell card source changed.** The surf forecast's swell card (`multiSwell`, swell height/period ranges) now comes primarily from a small fan of deep-water reference points seaward of the surf break — the same offshore field WW3 already models, read before refraction bends nearby swells together. Previously it read a single point in 15 m of water, which had already merged distinct swell trains that arrive from similar directions into one reading. The card should now list separate swell trains more often, matching what buoys offshore report.
