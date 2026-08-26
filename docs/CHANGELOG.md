@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-25 — Surf swell card now reads deep-water reference points (Q16 Round B)
+
+- **Swell card source changed.** The surf forecast's swell card (`multiSwell`, swell height/period ranges) now comes primarily from a small fan of deep-water reference points seaward of the surf break — the same offshore field WW3 already models, read before refraction bends nearby swells together. Previously it read a single point in 15 m of water, which had already merged distinct swell trains that arrive from similar directions into one reading. The card should now list separate swell trains more often, matching what buoys offshore report.
+- **Fallback for far-out hours.** Forecast hours the offshore model hasn't yet reached (today, roughly beyond 6 hours out) keep the prior 15 m reading — no functional change for those hours. A new field, `forecast[].swellSource`, records which source produced each hour so this is inspectable.
+- **`multiSwell` frequency-range field now populated** for the deep-water-sourced hours (previously always a placeholder `[0.0, 0.0]`).
+- No change to the 1-D surf break model, the surf score, or any break-point calculation — this round only changes what feeds the display card. Docs: [ARCHITECTURE.md](ARCHITECTURE.md) ⚓ MARINE HANDOFF MODEL, [manuals/PROVIDER-MANUAL.md](manuals/PROVIDER-MANUAL.md) §14.19, [manuals/DASHBOARD-MANUAL.md](manuals/DASHBOARD-MANUAL.md) Swell Card section.
+
 ### 2026-06-04 — Planet Viewing Quality Index + 7Timer seeing forecast integration
 
 - **Planet Viewing Quality Index** — per-planet viewing quality ratings (Excellent/Good/Fair/Poor/Not Visible) computed from 7Timer atmospheric seeing forecast combined with planet altitude, cloud cover, and special-case rules for Mercury (elongation gate), Uranus/Neptune (moon penalty), and close lunar conjunctions
