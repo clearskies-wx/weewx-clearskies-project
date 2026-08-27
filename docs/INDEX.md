@@ -14,6 +14,7 @@ This repo started as a Belchertown skin evaluation and pivoted to the Clear Skie
 
 - **[archive/CLEAR-SKIES-PLAN.md](archive/CLEAR-SKIES-PLAN.md)** — phase tracker for the Clear Skies build (api / realtime / dashboard / stack repos). Plan body is an index — decision content lives in ADRs per [rules/clearskies-process.md](../rules/clearskies-process.md).
 - **[archive/CONFIGURABLE-CHARTS-PLAN.md](archive/CONFIGURABLE-CHARTS-PLAN.md)** — operator-configurable charts system (charts.conf, wind rose, custom SQL, weather range, LTTB, export, migration tool).
+- [MARINE-AND-MAPS-PLAN-2026-08-27](archive/MARINE-AND-MAPS-PLAN-2026-08-27.md) — maps (product basemap, imagery removal) + marine (handoff restart, seam ledger, Consistency, warm start, G1 transparency, rename) — all rows gated and done 2026-08-27; push held. Briefs: `archive/briefs/*-2026-08-27.md`
 - ~~planning/briefs/LAYER-CORRECTION-PLAN.md~~ → archived (see below)
 
 ## Decisions

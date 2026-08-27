@@ -1,3 +1,5 @@
+> **ARCHIVED 2026-08-27 (Phase D1 closed).** Every checklist row is done and gated; the round briefs moved with it to `docs/archive/briefs/`. What is NOT done: the push/deploy and the live gate rows held until the operator says "push" (deploy order J1; first post-deploy step J11); the four Proposed ADR amendments awaiting acceptance; the journal/lessons digest in `scratch/MM-OPERATOR-DIGEST.md`. Relative links inside this file still say `docs/planning/briefs/` — read them as `docs/archive/briefs/`.
+
 # Marine & Maps Plan — finish the surf system, fix the maps (2026-08-27)
 
 ## START HERE — what this plan is and how to read it
