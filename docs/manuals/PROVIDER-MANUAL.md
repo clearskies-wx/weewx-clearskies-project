@@ -2526,7 +2526,7 @@ also why higher-resolution bathymetry shoreward of 15 m is a standing limitation
 
 **Multi-SPECOUT extraction.** Two distinct SPECOUT types per spot:
 
-1. **Deep-water reference SPECOUT (L2):** One per spot at ~15m depth along the central transect bearing. SWAN POINTS + SPECOUT syntax. Feeds the swell display card — pre-nearshore spectrum comparable to NDBC buoy readings.
+1. **Deep-water reference SPECOUT (L2):** One per spot at ~15m depth along the central transect bearing. SWAN POINTS + SPECOUT syntax. **Feeds the swell display card only via FALLBACK, since Q16 Round B (2026-08-25, S3 correction, MARINE-AND-MAPS-PLAN §S3):** the card's primary source is now a small fan of true deep-water (≥200 m) WW3 reference points (`services/model_wave_source.py`'s `get_deep_swell_catalog()`, `endpoints/surf.py`'s `swellSource: "deep_reference"`), derived once at grid-sizing time from the WW3 leg — never SWAN L2/L3/L4. This L2 ~15 m SPECOUT serves the card only for forecast hours the WW3 leg's currently-staged transfer file does not cover (`swellSource: "nearshore_table"`, today: hours beyond the leg's ~6h march window). It still unconditionally feeds `canonical_partitions`/cross-swell scoring (the pipeline's own consumers, distinct from the card), which this correction does not touch — SwellTrack's own boundary condition is the separate Handoff SPECOUT (item 2 below), unaffected. See API-MANUAL §17.
 
 2. **Handoff SPECOUT (L3 or L2):** One per unique L3 grid cell at each transect's handoff depth. When L3 is enabled, extracted from L3 (includes structure effects). When L3 is disabled, same as the deep-water reference (L2 at 15m). Deduplicated: multiple transects sharing the same grid cell share one SPECOUT. Feeds SwellTrack as boundary condition.
 
