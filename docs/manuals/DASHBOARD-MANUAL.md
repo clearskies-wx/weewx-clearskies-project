@@ -78,7 +78,7 @@ Year/month dropdowns populated from `NOAA-*.txt` files actually present. HTML-pa
 **About (`/about`):**
 Operator-authored markdown. Setup wizard pre-populates from collected station fields. Operator edits via configuration UI.
 
-The Data Providers card dynamically shows active providers by reading the capabilities API — only providers the operator has actually configured appear. Static providers with no operator-configurable equivalent (OpenStreetMap, CARTO, GEM Global Active Faults, Skyfield, IMO) are always shown regardless of configuration, since they are used unconditionally wherever their underlying feature (maps, seismic overlay, almanac, meteor showers) is active. Provider display names and links resolve through the capabilities API's `attribution.displayName` and `attribution.url` fields; entries reflect the Aeris→Xweather rebrand (Vaisala's product name, not the retired "Aeris"/"AerisWeather" naming). Dead provider entries with no path to ever appearing (`geonet`, `emsc`, `renass`, `msc_geomet`, `dwd_radolan`) do not appear, since they have no capabilities API entry.
+The Data Providers card dynamically shows active providers by reading the capabilities API — only providers the operator has actually configured appear. Static providers with no operator-configurable equivalent (OpenStreetMap, Protomaps, GEM Global Active Faults, Skyfield, IMO) are always shown regardless of configuration, since they are used unconditionally wherever their underlying feature (maps, seismic overlay, almanac, meteor showers) is active. Provider display names and links resolve through the capabilities API's `attribution.displayName` and `attribution.url` fields; entries reflect the Aeris→Xweather rebrand (Vaisala's product name, not the retired "Aeris"/"AerisWeather" naming). Dead provider entries with no path to ever appearing (`geonet`, `emsc`, `renass`, `msc_geomet`, `dwd_radolan`) do not appear, since they have no capabilities API entry.
 
 **In-context provider attribution:** Beyond the About page's centralized index, forecast cards (Today's Forecast on Now, and the Forecast page) and the AQI card show a `ProviderAttribution` footer (see §8 "Attribution rendering") including the provider's logo when `logoRequired` is true. The alert banner shows text-only attribution in the expanded detail section — no logo. **UI-1 (2026-08-07):** The expanded alert banner body now prepends the FULL areas-affected text (`alert.areaDesc`) above the alert description — previously only the truncated header showed the area, and expanding the banner did not reveal the full text. The collapsed header's truncation is unchanged (space constraint). Radar and seismic pages continue to rely on Leaflet's built-in attribution controls; that mechanism is unchanged by this work.
 
@@ -905,7 +905,7 @@ Full-viewport overlay with enhanced controls. Pushed as a SPA route (`/radar`) f
 - Tile URL pattern: `{caddyPrefix}/{path}/{size}/{z}/{x}/{y}/0/0_0.webp` (from `satelliteTileUrlTemplate` on the capability response).
 - **Primary sources:** GOES-18/19 ABI (Americas, 2 km, 5-min) and Himawari-9 AHI (Asia-Pacific, 2 km, 10-min). **Global fallback:** NOAA GMGSI composite (8 km, hourly, ±72.7° latitude).
 - **Rendering:** GOES/Himawari tiles are rendered opaque — white clouds on a dark ground, alpha=255 for all data pixels, alpha=0 for no-data only. GMGSI tiles use the legacy semi-transparent RGBA renderer (alpha ~172/255) designed for overlay on a basemap.
-- **Basemap swap:** When satellite is enabled, the basemap switches from OSM/CartoDB to CartoDB `light_only_labels` overlay (light text on transparent background) — showing state boundaries, city names, roads, and water labels over the satellite imagery. Light labels are used in both themes because satellite imagery is always dark. When satellite is disabled, the normal OSM/CartoDB basemap returns.
+- **Basemap swap (M1 CS-BASEMAP / M3 RADAR-REBASE, 2026-08-27):** When satellite is enabled, the base ground layer (OSM raster in light theme, the Clear Skies product basemap in dark theme) is replaced by ONE `ProtomapsLayer mode="satellite-outlines"` layer (`src/lib/basemap.ts`, `radar-map.tsx`) — boundaries/roads/water outline lines plus place/water name labels, drawn above the satellite imagery. Dark-styled labels are used regardless of the active theme, since satellite imagery is always dark. When satellite is disabled, the normal theme-appropriate base returns (light: OSM raster; dark: `ProtomapsLayer mode="dark-base"`, `tier="radar"`).
 - **Radar toggle:** Radar tiles can be toggled on/off independently via the `RadarLayerPanel`, allowing satellite-only or satellite+radar views. Default: on. State persisted to localStorage key `clearskies-radar-show`.
 - **512px tile optimization:** Satellite TileLayer uses `tileSize={512}` and `zoomOffset={-1}`, reducing tile requests 4x compared to default 256px tiles while maintaining the same pixel density.
 - **Pre-warming:** LibreWxR's tile warmer pre-renders satellite tiles at zoom levels matching the dashboard viewport (configured via `warm_overview_zoom_regional`) after each ingest cycle. On cache miss, demand-driven warming pre-renders all timestamps at the same tile coordinate, so subsequent frames are immediate cache hits.
@@ -915,19 +915,19 @@ Full-viewport overlay with enhanced controls. Pushed as a SPA route (`/radar`) f
 - **Animation strategy:** All tile layers remain mounted during animation with `visibility: hidden` on inactive frames (no mount/unmount churn). Client-side tile prefetching via `new Image()` populates the browser HTTP cache before animation starts, ensuring smooth playback without mid-animation tile fetches.
 - State persisted to localStorage key `clearskies-radar-satellite`.
 
-**Geographic features vector tile overlay (ADR-078):**
-- Rendered as a `protomaps-leaflet` Canvas-based vector tile layer when satellite view is active. NOT shown on normal basemap view (basemap already has roads/boundaries).
-- Data source: `GET /api/v1/geographic-features/tiles` — PMTiles file served with HTTP Range requests. Browser loads only tiles visible in the current viewport (~20-50 KB per tile, on-demand).
-- npm packages: `protomaps-leaflet` (Canvas renderer) + `pmtiles` (Range-request tile reader).
-- Rendering: `protomapsL.leafletLayer()` with custom `paintRules` (lines only) and empty `labelRules` (no labels). No full basemap — only geographic feature lines.
-- Availability check: `GET /api/v1/geographic-features/status` — if `available` is false (PMTiles not yet downloaded), no overlay is added. Not an error state.
-- Per-type line styling (`LineSymbolizer`, no fill):
+**Geographic features vector tile overlay (ADR-078 → Superseded by the M1 CS-BASEMAP plan, 2026-08-27):**
+- ADR-078's standalone feature (its own extract service, `/api/v1/geographic-features/*` endpoints, admin action, `[geographic_features]` config) is absorbed into the M1 CS-BASEMAP machinery — one extract family (`/api/v1/basemap/*`), one endpoint family, one admin action. Nothing dashboard-side reads `/api/v1/geographic-features/*` any more.
+- The satellite view's outline+label overlay is now `ProtomapsLayer mode="satellite-outlines"` (`src/lib/basemap.ts`, `SATELLITE_OUTLINE_PAINT_RULES`) — the same four line rules ADR-078 defined, moved verbatim, PLUS the product basemap's own dark place/water labels in the same layer (previously a separate CARTO labels TileLayer). One layer replaces both of the former two.
+- Data source: `GET /api/v1/basemap/radar/tiles` — the radar tier of the product basemap (Q8/directive 14: sized to the radar provider's declared coverage box, z0–12), PMTiles served with HTTP Range requests. Browser loads only tiles visible in the current viewport, on-demand.
+- npm packages: `protomaps-leaflet` (Canvas renderer) + `pmtiles` (Range-request tile reader) — unchanged.
+- Rendering: `leafletLayer()` with `paintRules: SATELLITE_OUTLINE_PAINT_RULES` (lines only) and `labelRules` from the product basemap's dark theme (places + water only — no road shields, no POIs).
+- Availability check: `GET /api/v1/basemap/status` (`useBasemapStatus()`) — if the `radar` tier's `available` is false, no overlay is added. Not an error state.
+- Per-type line styling (`LineSymbolizer`, no fill) — unchanged from ADR-078:
   - Boundaries: `color: '#ffffff'`, `width: 1.5`, `opacity: 0.7`
-  - Roads: `color: '#999999'`, `width: 1`, `opacity: 0.5` (filtered to `pmap:kind` highway/trunk)
+  - Roads: `color: '#999999'`, `width: 1`, `opacity: 0.5` (filtered to `kind` highway/major_road)
   - Water: `color: '#4a90d9'`, `width: 1`, `opacity: 0.6`
 - Non-interactive — no popups, no hover, just visual context.
-- Replaces the CSS blend-mode hack (`SATELLITE_FEATURES_URL` + `dark_nolabels` TileLayer + `.satellite-features` class in `index.css`). The hack is removed entirely.
-- Attribution: "© OpenStreetMap contributors (ODbL)".
+- Attribution: "© OpenStreetMap contributors © Protomaps" (`PROTOMAPS_OSM_ATTRIBUTION`, `src/lib/map-attribution.ts`) — replaces the ADR-078 ODbL string.
 
 **Zoom bounds enforcement:**
 - Read geographic bounds from API capability response.
@@ -1056,14 +1056,14 @@ Map and LocationCards are direct children of the `PageLayout` Grid — no intern
 - Numbered `L.divIcon` pins — each location gets a 1-based index number
 - Pin style: 24×24px circle, `background: var(--primary)` (operator accent color), white centered number text (12px, weight 600)
 - Alert locations: amber circle (`background: #f59e0b`) with number
-- CARTO `light_only_labels` tile overlay (`basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png`) renders geographic labels (water body names, city names) as a transparent overlay above the basemap
+- Product basemap labels overlay (M1 CS-BASEMAP, 2026-08-27) — a two-tier `ProtomapsLayer mode="labels"` pair (`src/lib/basemap.ts`; world z0–6 capped at maxZoom 6, local z7–15 from minZoom 7) renders geographic labels (water body names, place names) as a transparent overlay above the basemap, styled per the active theme. Replaces the former CARTO `light_only_labels` tile overlay.
 - Linked hover: pin `mouseover` → highlights corresponding LocationCard (`ring-2 ring-primary`), pin scale 1.3× when its card is hovered
 - Map height adapts to site geography via aspect ratio computation:
   - Compute bounding box from location coordinates, adjust longitude span by `cos(centerLat)`
   - `aspect ≥ 0.8` (horizontal spread): map full-width above cards, height 400px
   - `aspect < 0.8` (vertical spread): at lg, map as `footprint="panel"` (3 columns) with cards stacked in 1 column; height 600px. Below lg: stacked (map on top)
 - `LocationMap` accepts `height: number` prop — no hardcoded CSS class for height
-- **Map layer / tile-error-handling contract (LIVE 2026-08-10, MARINE-PAGE-FIXIT-PLAN Phase M, dashboard `eb424fd`+`73d9017`; fixit log Item 6).** Both `TileLayer`s (base + labels) carry `tileerror`/`tileload` handlers via `eventHandlers` (`useTileErrorRecovery` in `LocationMap.tsx`). After **3 consecutive tile errors** on a layer, a non-blocking banner appears over the map ("Map imagery failed to load — retrying", i18n `map.tileError`); the layer retries via redraw with a **5 s backoff** (pending retry timer cleared before rescheduling), max **3 retries per mount**; the banner clears on the first successful load. Silent gray is impossible: either tiles render, or the banner is visible — never neither. Theme changes remount atomically: the `MapContainer` itself is keyed on `resolvedTheme` (no per-layer key), so labels can never outlive the base layer. No theme-provider logic involved.
+- **Map layer / tile-error-handling contract (LIVE 2026-08-10, MARINE-PAGE-FIXIT-PLAN Phase M, dashboard `eb424fd`+`73d9017`; fixit log Item 6 — updated 2026-08-27, M1 CS-BASEMAP).** Light theme's OSM base `TileLayer` carries `tileerror`/`tileload` handlers via `eventHandlers` (`useTileErrorRecovery` in `LocationMap.tsx`): after **3 consecutive tile errors**, a non-blocking banner appears over the map ("Map imagery failed to load — retrying", i18n `map.tileError`); the layer retries via redraw with a **5 s backoff** (pending retry timer cleared before rescheduling), max **3 retries per mount**; the banner clears on the first successful load. The product basemap layers (dark theme base, and the labels overlay in both themes) have no per-tile error events to hook — instead, `useBasemapStatus()` (`GET /api/v1/basemap/status`) drives the same banner with a distinct message (i18n `map.basemapUnavailable`) whenever the `world` or `local` tier is reported unavailable. Silent gray is impossible either way: tiles render, or a banner is visible — never neither. Theme changes remount atomically: the `MapContainer` itself is keyed on `resolvedTheme` (no per-layer key), so labels can never outlive the base layer. No theme-provider logic involved.
 
 **LocationCards (each `footprint="wide"`):**
 - Uses `Card` component from `components/ui/card.tsx` with `footprint="wide"` — placed as direct Grid children
@@ -1089,7 +1089,7 @@ Map and LocationCards are direct children of the `PageLayout` Grid — no intern
 **Combo card (`Card footprint="full"`):**
 - Replaces the 120px hero map strip
 - Interior layout: `flex-row` at md+, `flex-col` on mobile
-- Left ~60%: `LocationMap variant="hero"`, height 220px, zoomed to single location at zoom 14-15 (coastal features visible — pier, harbor, breakwater). Only the selected marker rendered. CARTO light_only_labels overlay active. Back-to-map button overlaid inside the map container (top-left, card-glass background, z-1000). No fly-to animation on initial render.
+- Left ~60%: `LocationMap variant="hero"`, height 220px, zoomed to single location at zoom 14-15 (coastal features visible — pier, harbor, breakwater). Only the selected marker rendered. Product basemap labels overlay active (M1 CS-BASEMAP). Back-to-map button overlaid inside the map container (top-left, card-glass background, z-1000). No fly-to animation on initial render.
 - Right ~40%: `<img src={selectedLocation.photoUrl}>` with `object-fit: cover`, clipped to card's right border-radius. `alt` = location name.
 - No photo: map takes full width, height 220px
 - Mobile: map full width 180px, photo below or hidden
