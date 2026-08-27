@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-27 — CS-BASEMAP (M1): Clear Skies product basemap, API side (CARTO retirement in progress)
+
+- **CARTO, the free dark-theme tile provider every map surface used, began watermarking tiles
+  "API KEY REQUIRED" around 2026-08-25 and is retiring the free product.** Fix: Clear Skies serves
+  its own product basemap — three zoom-tiered Protomaps-derived PMTiles files (`world` z0–6 global
+  fallback, `local` z7–15 station+earthquake-radius+marine-locations box, `radar` z0–12 the radar
+  provider's declared coverage box or a station-box fallback) — for every map surface (marine,
+  seismic, radar/satellite, surf height map).
+- **New API endpoints (`weewx-clearskies-api`):** `GET /api/v1/basemap/{tier}/tiles` (Range
+  requests, 206 partial content), `GET /api/v1/basemap/status` (per-tier availability + extraction
+  state, `last_error`), `POST /setup/basemap/update` (proxy-secret, background extraction of all
+  three tiers in one daemon thread; 202/409). New `[basemap] enabled` config key (the only one —
+  no operator-typed box, per PRIME DIRECTIVE 14). Generalises ADR-078's single-file
+  geographic-features overlay into three tiers; ADR-078's own endpoints/service/config stay live
+  additively this round — see ADR-078 Amendment 2 (Proposed) for the side-by-side replacement
+  mapping and the acceptance gate on removal.
+- **Not yet in this entry:** dashboard consumption (marine/seismic/radar map dark-theme rendering
+  via the new tiers), the admin "Basemap" section (stack repo), and the M4 surf-height-map /
+  Esri-NAIP removal — separate rounds, tracked in
+  `docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md` Phase M.
+- Measured extract sizes (this install, M0): world 42.8 MB, local 513.6 MB (exceeds the plan's
+  400 MB ceiling — accepted as-designed by the operator, Q12), radar 195.1 MB.
+- Docs: ADR-078 Amendment 2 (Proposed); ARCHITECTURE.md endpoints/config-files tables;
+  API-MANUAL.md §12b; `docs/contracts/openapi-v1.yaml`; OPERATIONS-MANUAL.md §1/§4/§7.
+
 ### 2026-08-27 — Daily WW3 horizon march finally has the wind it asks for (Q17)
 
 - **The 96-hour horizon march (Q16 Round A) had never run.** It fires once a day right after the 00Z cycle publishes and demands wind out to 00Z + 96 h. The wind store's far window comes from NOAA's GFS model, and at that moment it holds the *previous* 18Z GFS run (NOAA posts the 00Z run's +96 h file ~04:00Z, after the march has already fired), fetched to that run's +96 h — which is only 00Z + 90 h. Six hours short by arithmetic, every day; the march refused `ww3_horizon_wind_short` with no retry, and SWAN's forecast beyond +6 h stayed frozen (`fullRun.l2BoundaryExhausted: true`).
