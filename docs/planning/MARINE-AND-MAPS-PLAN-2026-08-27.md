@@ -47,19 +47,21 @@ predecessor's Q1–Q18 are cited as `EVO-Q#`).
 |---|---|---|
 | S0 | **Q17 push + live gate** — GFS far-window fetch f096→f108 so the daily 96 h WW3 horizon march finally runs | 🔄 CODE DONE (marine `2a05856`, meta `b7142574`; 31/1-known tests) — **awaiting operator "push"**; live gate at the next 00Z cycle after deploy (rows in S0) |
 | M0 | Map extent inventory + extract-size measurements (read-only) | ⬜ NEXT — no ruling needed (read-only) |
-| M1 | **CS-BASEMAP** — Clear Skies product basemap: marine + seismic maps, OSM light kept, Protomaps dark + marine labels from a self-served extract, CARTO removed | ⬜ RULED 2026-08-27 (EVO-Q18 Round 1) — design block below; brief after M0 |
-| M2 | **LIBREWXR-BASEMAP** — the fork gains a new tile family: opaque `basemap` (ground + freeways + labels, light/dark) and transparent `labels` (labels + outlines, for over satellite), rendered from a Protomaps extract of its own BBOX and advertised in its catalog; radar/satellite tiles themselves unchanged (RainViewer contract kept) | ⬜ RULED 2026-08-27 (EVO-Q18 Round 3); fork verified 2026-08-27 — M2.0 design round first; needs **Q6** (two optional capability fields) for the box to draw it |
-| M3 | **RADAR-STRIP** — Clear Skies provides NOTHING for the radar box: remove base, labels, outlines, the whole ADR-078 feature | ⬜ RULED 2026-08-27 (EVO-Q18 Round 2) — ships ONLY after M2 serves labelled tiles |
+| M1 | **CS-BASEMAP** — Clear Skies product basemap for EVERY Clear Skies map box (marine, seismic, radar/satellite, surf height map): OSM light kept, Protomaps dark + labels layer from a self-served extract, CARTO removed | ⬜ RULED 2026-08-27 (EVO-Q18 Round 1; scope widened by Q6 + Q5 rulings, same day) — design block below; brief after M0 |
+| M2 | ~~LIBREWXR-BASEMAP~~ **CANCELLED 2026-08-27 (Q6 ruling)** — LibreWxR, RainViewer and every radar provider are overlay-only; the client brings the basemap AND its labels, so nothing moves into the fork. Kept as a row so the reversal is on record | ✅ closed-no-work |
+| M3 | ~~RADAR-STRIP~~ → **RADAR-REBASE** — the radar/satellite box keeps a Clear Skies basemap; only its SOURCE changes: CARTO dark → product basemap dark; CARTO satellite labels + ADR-078 outlines → the product basemap's labels/outlines layer; the standalone ADR-078 feature is absorbed into M1's basemap machinery (one extract family, one endpoint family) | ⬜ RULED 2026-08-27 (Q6) — part of the M1 build |
+| M4 | **SURF-MAP-BASEMAP** — the surf height map's background becomes the product basemap (light OSM / dark Protomaps); Esri World Topo (IMAGERY-MAP) and NAIP removed from every user-facing surface; the wizard's Esri satellite toggle STAYS (operator-only, not user-facing) | ⬜ RULED 2026-08-27 (Q5) — after M1 |
 | Gate M | Adversarial gate per round + one end-to-end row (every map surface rendered in both themes, screenshots side-by-side) | ⬜ |
 | S1 | **C6 seam-fidelity ledger row** — WW3-handed vs SWAN-absorbed at the L2 boundary, every cycle | ⬜ APPROVED 2026-08-25 (EVO-Q16 C6) — after S0's gate passes |
-| S2 | **CONSISTENCY-SCORING** — code the Q14-approved set-timing/set-amplitude definitions into the surf score (ADR-101 row-5 amendment first) | ⬜ APPROVED 2026-08-23 (EVO-Q14 "recommendation is fine"); V1/V2 pre-coding verifications DONE 2026-08-23; decisions A–E were put to the operator in chat 2026-08-23 — **rulings NOT on record → Q3 below** |
-| S3 | **Substitution cleanup** — dead `ww3_chain_enabled` key, `level1` label rename, stale `inputs.ww3_boundary` health entry, vestigial `_reused_l1_boundary_command_lines()`, PROVIDER-MANUAL §14.15 swell-card bullet, API-MANUAL `closeoutFraction` field + the pending fog-section edit | ⬜ methodology (dead code / doc drift) except the fog edit → **Q4** |
+| S2 | **CONSISTENCY-SCORING** — code the Q14-approved set-timing/set-amplitude definitions into the surf score (ADR-101 row-5 amendment first). NOT in code today — the scorer still runs the interim swell-dominance bucketing | ⬜ APPROVED 2026-08-23 (EVO-Q14); sub-decisions A–E RULED 2026-08-27 (Q3 "yes") — ready to brief after S8.1 |
+| S3 | **Substitution cleanup** — dead `ww3_chain_enabled` key, `level1` label rename, stale `inputs.ww3_boundary` health entry, vestigial `_reused_l1_boundary_command_lines()`, PROVIDER-MANUAL §14.15 swell-card bullet, API-MANUAL §17 `swellSource` + `closeoutFraction` | ⬜ methodology (dead code / doc drift) |
+| S10 | **FOG-REVERT** (API) — revert the 2026-08-24 fog cross-check narrowing (API `1ad6e74` + `f2c5ecd`): two nights of live testing showed the night-time standalone ≤ 1 °F rule cries wolf (conditions right, fog rarely formed); the provider cross-check returns at every level, as before. The uncommitted API-MANUAL edit documenting the narrowing is discarded | ⬜ RULED 2026-08-27 (Q4 "we actually need to revert the change") — lead-direct `git revert` + fog tests on weewx + CHANGELOG; deploy on "push" |
 | S4 | **Test-debt triage** — the parked pre-existing failure classes, one ruling per class (repair harness / delete stale pin / keep) | ⬜ |
 | S5 | **First-install WW3 warm-start bootstrap** — the durable mechanism EVO-Q9 parked as a pre-ship row | ⬜ pre-ship; not needed for this install |
 | S6 | **ADR-109 gap closure** — G7 (wind regrid step: now BUILT by the horizon march's `_ww3_regrid_wind_nearest_neighbor` — confirm + close), G10 (`ww3_grid` geometry-change trigger never exercised), D14 wetted-grid crash (unconfirmed) | ⬜ |
-| S7 | **Live-chain validation campaign** — the predecessor's V1–V4 rewritten for a chain that is already production (buoy scorecard over ≥10 cycles, the three deficit lines, served-quality vs Surfline, operator eyeballs C1–C4) | ⬜ **framing needs your ruling → Q1** |
-| S8 | **Island shadowing** — the S-swell <0.1 Hz 0.56–0.60× deficit (narrow reconstruction lobe σθ 15° vs measured 27–31°, no diffraction, Catalina lee) | ⬜ **OPERATOR-ORDERED LAST** (2026-08-22 "deal with the island shadowing last"; reaffirmed 2026-08-25) — research brief then ruling; nothing dispatches before S1–S7 close |
-| S9 | Inherited-queue reconciliation — verify the live state of every C-row from the other live plans and present the survivors | ⬜ NEXT (read-only) → **Q2** |
+| S7 | ~~Live-chain validation campaign~~ **DROPPED 2026-08-27 (Q1: "THIS IS ALL TESTING... NO ONE IS ACTUALLY VISITING THE SITE")** — no formal campaign, no ceremony gate. The per-cycle buoy ledger keeps running as the standing instrument; the operator checks the site as they see fit; when Phase L opens is the operator's call, not a gate this plan computes | ✅ closed-no-work |
+| S8 | **Island shadowing** — the S-swell <0.1 Hz 0.56–0.60× deficit (narrow reconstruction lobe σθ 15° vs measured 27–31°, no diffraction, Catalina lee). **S8.1 (transparency field) RUNS NOW (Q7 "run now")**; the rest (lobe width, diffraction) stays LAST | 🔄 S8.1 briefing now; S8 research LAST |
+| S9 | ~~Inherited-queue reconciliation~~ **OUT OF THIS PLAN (Q2: "keep that crap out of here. Let's chat separately")** — the other plans' open rows are NOT tracked here | ✅ removed |
 | D1 | As-built doc re-sync + zero-drift audit (the predecessor's DOC-W-FINAL) | ⬜ after M and S close |
 | L0+ | Lookup-table system (design round + ADR-110) | ⬜ LAST — opens only on the operator's "accurate and defensible" (unchanged) |
 
@@ -104,18 +106,24 @@ the round; (7) line numbers are hints; (8) no silent fallbacks; (9) plain Englis
 cross-inferred); (11) no generic model setup, zero model-setup controls on product surfaces;
 (12) design lives in the plan — agents implement design blocks, never produce them.
 
-**Added by this plan (operator rulings 2026-08-27, map thread):**
-13. **Clear Skies provides NOTHING for the radar box.** The radar/satellite map is an empty
-    Leaflet container plus the provider's tiles. No basemap, no labels, no outlines, no extent,
-    no styling of Clear Skies' own goes into it, ever. Decoration of a provider's imagery is
-    the provider's job — for our own LibreWxR fork, a customisation IN THE FORK.
+**Added by this plan (operator rulings 2026-08-27, map thread; 13 amended the same day):**
+13. **Radar providers are overlay-only; Clear Skies brings the basemap — the PRODUCT basemap.**
+    LibreWxR (ours or public), RainViewer and any other radar provider serve transparent radar
+    and opaque satellite tiles and require the client to supply the ground underneath, labels
+    included (verified in the fork's own integration guide). So the radar/satellite box gets
+    the same Clear Skies basemap as every other map box — never a provider-specific one, never
+    anything derived from the provider — and nothing of ours is moved into LibreWxR. (Earlier
+    same-day wording "Clear Skies provides NOTHING for the radar box" was withdrawn by the
+    operator once the provider contract was verified: "you did not do it wrong, i apologize.")
 14. **External providers' extents are not inputs.** LibreWxR is an external provider like
     RainViewer. Its BBOX, tiles and satellite imagery are never read by anything Clear Skies
-    derives (basemap extents included). Most installs will not run LibreWxR at all.
-15. **No Esri anywhere in Clear Skies' basemaps** (compliance + caching restrictions).
-    Esri imagery already in production for the surf height map (`esri_topo.py`, IMAGERY-MAP
-    2026-08-26) and the wizard's satellite toggle is NOT covered by this ruling until the
-    operator says so → **Q5**.
+    derives (basemap extents included). Most installs will not run LibreWxR at all. Consequence,
+    accepted: the dark basemap is detailed only inside the box derived from Clear Skies' own
+    config; a radar view dragged far outside it shows the coarse world baseline.
+15. **No Esri, no aerial photography, on any USER-FACING surface** (compliance + caching
+    restrictions; the low-tide NAIP finding). The surf height map's background becomes the
+    product basemap (Q5). The wizard's Esri satellite toggle stays — operator-only, not
+    user-facing.
 
 ---
 
@@ -124,12 +132,14 @@ cross-inferred); (11) no generic model setup, zero model-setup controls on produ
 | # | Change | Trigger(s) | Ruling basis |
 |---|---|---|---|
 | PA1 | **GFS far-window fetch depth f096 → f108** (`wind_gatherer._GFS_FAR_FETCH_END_HOUR`) so the daily horizon march's wind is already held when it fires | 7 (changes the Q16.1-approved "+96 h" number) | Operator 2026-08-27, chat: "a" (EVO-Q17 option a). DONE marine `2a05856` |
-| PA2 | **CS-BASEMAP**: a Clear Skies product basemap for the marine and seismic maps — dark theme + marine label overlay from a Protomaps extract Clear Skies derives from its own configuration (station + earthquake radius, marine locations) and serves itself; light theme stays OSM raster; CARTO removed from the product | 2, 4, 7 (new persisted files + endpoint shape; external service removed) | Operator 2026-08-27 in chat (EVO-Q18 Round 1): "NO ESRI!"; keep OSM light; Protomaps for dark; extent from our own config only |
-| PA3 | **RADAR-STRIP**: remove from Clear Skies the OSM/CARTO base under the radar, the CARTO satellite label overlay, `GeoFeaturesLayer`, and the entire ADR-078 geographic-features feature (API endpoints, extract service, admin action, `[geographic_features]` config, `pmtiles` CLI dependency on the API host); ADR-078 → Superseded | 2, 7 | Operator 2026-08-27 in chat (EVO-Q18 Round 2): "WE DO NOT PROVIDE ANYTHING FOR THE RADAR ... whatever they provide, we dump it in our leaflet box, that is all" |
-| PA4 | **LIBREWXR-BASEMAP** (in the LibreWxR fork, `repos/librewxr`, branch `deploy/shaneburkhardt` — not a Clear Skies repo): the fork's tile output carries its own ground, place labels and outlines from OSM data (Protomaps extract of its own `LIBREWXR_BBOX`), rendered server-side | fork-internal | Operator 2026-08-27 in chat (EVO-Q18 Round 3): "any labeling should have been a customized change TO LIBREWXR ... you need to undo that and move it" |
+| PA2 | **CS-BASEMAP**: a Clear Skies product basemap for EVERY Clear Skies map box (marine, seismic, radar/satellite, surf height map) — dark theme + labels/outlines layer from a Protomaps extract Clear Skies derives from its own configuration (station + earthquake radius, marine locations) and serves itself; light theme stays OSM raster; CARTO removed from the product; the ADR-078 geographic-features feature is ABSORBED into this machinery (its extract, endpoint, admin action and config key are replaced by the basemap's, ADR-078 → Superseded by this plan) | 2, 4, 7 | Operator 2026-08-27 in chat: "NO ESRI!"; keep OSM light; Protomaps for dark; extent from our own config only; Q6 ("we needed to bring our own basemap") and Q5 rulings same day |
+| PA3 | ~~RADAR-STRIP~~ **WITHDRAWN 2026-08-27** (Q6 — the provider contract requires the client's basemap; see directive 13). Replaced by M3 RADAR-REBASE inside PA2 | — | Operator 2026-08-27 in chat |
+| PA4 | ~~LIBREWXR-BASEMAP~~ **WITHDRAWN 2026-08-27** (Q6 — nothing moves into the fork) | — | Operator 2026-08-27 in chat |
+| PA9 | **SURF-MAP-BASEMAP** (M4): the surf height map's background switches from Esri World Topo / NAIP to the product basemap; `providers/imagery/{naip,esri,esri_topo}.py` and the `[imagery] provider` selection are removed from user-facing use (the wizard's own Esri satellite toggle is untouched) | 2, 7 | Operator 2026-08-27 in chat (Q5): "get rid of the orthophotography for the surf height map and replace it with a regular basemap ... eliminates [NAIP] completely from user facing work" |
+| PA10 | **FOG-REVERT** (S10): revert API `1ad6e74` + `f2c5ecd` (night-time standalone ≤ 1 °F fog rule) to the prior provider-cross-checked behaviour | 1 (a threshold inside a criterion) | Operator 2026-08-27 in chat (Q4): "we actually need to revert the change ... we are crying wolf most of the time" |
 | PA5 | **C6 seam-fidelity ledger row**: one SWAN L2 output point just inside its boundary + a per-cycle ledger field comparing WW3-handed vs SWAN-absorbed spectra | 7 | Operator 2026-08-25, chat "ok" on EVO-Q16 (C6 named there; "droppable on request") |
 | PA6 | **CONSISTENCY-SCORING**: ADR-101 row-5 amendment + parse-time attachment of per-partition group statistics (ν, Qp, κ, Tm02, T_set) to the DWR spectral entries (a data-contract change inside the marine service), scorer reads them | 1, 4 | Operator 2026-08-23, chat "q14 recommendation is fine" (EVO-Q14 record); the per-partition data path was disclosed in that row as covered by the Q14 approval. Open sub-decisions → Q3 |
-| PA8 | **WW3 G1 transparency field for partially-land cells** (S8.1): fraction-based land/sea mask + `FLAGTR = 2` cell-centre transparencies derived at setup from the finest cached DEM; `F_DRY` named constant (value to confirm) | 1, 3 | Operator 2026-08-27, chat: "it should also apply to cells that are not 100 percent island … so you are not OVERCOUNTING an island". Scheduling → Q7 |
+| PA8 | **WW3 G1 transparency field for partially-land cells** (S8.1): fraction-based land/sea mask + `FLAGTR = 2` cell-centre transparencies derived at setup from the finest cached DEM; `F_DRY = 0.05` | 1, 3 | Operator 2026-08-27, chat: "it should also apply to cells that are not 100 percent island … so you are not OVERCOUNTING an island"; Q7 "run now"; 5 % floor accepted by silence on the stated default |
 | PA7 | **Substitution cleanup** (S3): deletion of provably-dead keys/code left by the L1 → WW3 substitution | none (methodology: nothing was being done; nothing stops being done — CLAUDE.md table) | Standing rule; each deletion still gets the pre-deletion grep + post-deletion green accept (rules/coding.md "Never keep dead code") |
 
 Withheld: model-physics changes of any kind (island shadowing S8 included — research and
@@ -154,9 +164,9 @@ after the operator confirms it in Q2.
 | C6 | Phase T (tide coherence) close acknowledgment, owed since 2026-08-11 | EVO-C13 | Q2 (one-line nod) |
 | C7 | V14 residuals: blocking no-timeout lock in the geometry-push path; post-restart cooldown in-memory only; no hotstart-age gate | EVO-C15 → EVO-Q6 ruled 2026-08-16 "if they still matter ... fix them" | S3 (verify each still exists post-substitution; fix if live) |
 | C8 | `model_wave_source.py` bare `swells[0]` without the 5 s surfable floor | EVO-C16 → EVO-Q6 same ruling | S3 |
-| C9 | L1-BOUNDARY-REBUILD-PLAN deferred queue: Gate S wlevel (blind audit) → S1+S4a currents ladder → S-Accept currents rows → Phase A (A1/A2 service-area/setup report) → Gate A → Gate C (C1–C3 rows) → V1/V3/V4 | That plan is operator-approved 2026-08-08 ("the plan serves as permission") and its status block says "Remaining: …"; several items have since landed by other rounds (STOFS wlevel live, currents ladder live per ARCHITECTURE, `currentsTailHeld` live) — **state not re-verified since 2026-08-09** | S9 reconciles; survivors → Q2 |
-| C10 | SURF-REMEDIATION-PLAN R1–R4 (min/max range served; reform/second break; fixed chart scale + `/var/lib` work root; R4 parallel report) | Operator-approved 2026-08-08; R2's subject was re-done by BREAK-REFORM 2026-08-26; `/var/lib/weewx-clearskies/swan` is live (health `ledgerPath`) | S9 reconciles which rows are closed by later work; survivors → Q2 |
-| C11 | SURF-PHYSICS-REMODEL-PLAN rounds Y/X/Z + DOC-0/DOC-1 debts; MARINE-FORWARD-PLAN open rows; EYEBALL-FIX residuals (subsumed into the remodel plan per its own header) | Operator-approved 2026-08-06 / 2026-08-02 / 2026-08-04 | S9 reconciles; survivors → Q2 |
+| C9 | L1-BOUNDARY-REBUILD-PLAN deferred queue: Gate S wlevel (blind audit) → S1+S4a currents ladder → S-Accept currents rows → Phase A (A1/A2 service-area/setup report) → Gate A → Gate C (C1–C3 rows) → V1/V3/V4 | That plan is operator-approved 2026-08-08 ("the plan serves as permission") and its status block says "Remaining: …"; several items have since landed by other rounds (STOFS wlevel live, currents ladder live per ARCHITECTURE, `currentsTailHeld` live) — **state not re-verified since 2026-08-09** | **OUT OF THIS PLAN** (Q2 ruling 2026-08-27) — separate operator conversation |
+| C10 | SURF-REMEDIATION-PLAN R1–R4 (min/max range served; reform/second break; fixed chart scale + `/var/lib` work root; R4 parallel report) | Operator-approved 2026-08-08; R2's subject was re-done by BREAK-REFORM 2026-08-26; `/var/lib/weewx-clearskies/swan` is live (health `ledgerPath`) | **OUT OF THIS PLAN** (Q2 ruling 2026-08-27) — separate operator conversation |
+| C11 | SURF-PHYSICS-REMODEL-PLAN rounds Y/X/Z + DOC-0/DOC-1 debts; MARINE-FORWARD-PLAN open rows; EYEBALL-FIX residuals (subsumed into the remodel plan per its own header) | Operator-approved 2026-08-06 / 2026-08-02 / 2026-08-04 | **OUT OF THIS PLAN** (Q2 ruling 2026-08-27) — separate operator conversation |
 | C12 | LIBREWXR-SATELLITE-SEAM (GOES-18/19 seam over New Mexico) | Operator: "put a pin in this" (2026-08-08) — parked, physics-formula change, needs chat approval | Stays parked; listed so the M2 fork work does not accidentally touch it |
 | C13 | Pre-existing test failures (all reproduced at their baselines, none introduced): `test_serve_nothing_on_failure` 8× (`NoneType.by_side`, L4-nesting harness class), `test_swan_quickupdate_swelltrack_merge` 2×, `test_h4_chunked_json` 1× (wall-clock), `test_service_full_run_trigger` 10/28 (traced to the WW3-chain-unconditional change), `test_double_break_transect55_kat`, `test_wind_gatherer::TestColdStartReconcile` (Windows path) | Each recorded in an EVO checklist row with the lead's checkout-verified reproduction | S4 |
 | C14 | Marine failure monitor armed | EVO-C10 | stays armed |
@@ -224,8 +234,12 @@ network, not just at street zooms); primary roads from z11 in the local tier; no
 smaller. Marine label overlay (both themes) = a labels-only rule set from the same sources. `CARTO_OSM_ATTRIBUTION` deleted; attribution becomes
 "© OpenStreetMap contributors © Protomaps" (About page row already exists). Tile-error
 banner logic (M1 fixit constants) kept.
-**Not touched:** the radar box (directive 13), wizard/admin maps (OSM raster, unaffected),
-the surf height map (Q5).
+**Also served by this basemap (Q6 + Q5 rulings, 2026-08-27):** the radar/satellite box (M3
+RADAR-REBASE — dark base + the labels/outlines layer over satellite) and the surf height map
+(M4 — replaces Esri World Topo / NAIP). **Not touched:** wizard/admin maps (OSM raster +
+the operator-only Esri satellite toggle).
+**Extent consequence, accepted by the operator (directive 14):** detail only inside the
+derived box; coarse world baseline beyond it.
 **Gate rows (results-free file, stated now):** both maps render in both themes with no
 watermark and no blank inside the derived box (screenshots side-by-side vs today's light
 theme); **freeways visible on the dark seismic map at its initial zoom and on the dark marine
@@ -234,7 +248,14 @@ SR-55 for this install); a pan outside the box shows the world baseline, not bla
 across dashboard/api/stack = 0; extract sizes within the M0-measured envelope; attribution
 string present on both maps; dashboard `tsc` zero errors; vitest for the two components.
 
-### M2 — LIBREWXR-BASEMAP (fork; verified against the fork's own docs + code 2026-08-27)
+### M2 — ~~LIBREWXR-BASEMAP~~ CANCELLED 2026-08-27 (Q6). Text below kept as the record of what was verified in the fork and why the reversal followed.
+
+**Q6 ruling (operator, chat):** "you did not do it wrong, i apologize. So we needed to bring our
+own basemap." Verified consequence: LibreWxR is overlay-only and its integration guide tells
+every client to supply its own basemap — labels included, since labels are a basemap layer.
+Therefore nothing moves into the fork; the radar box keeps a Clear Skies basemap and gets it from
+the product basemap (M1/M3). The tile-family design below is NOT built. The fork's own broken
+CARTO example page is the fork's business, not this plan's.
 
 **What the fork is (read: `repos/librewxr` CLAUDE.md, AGENTS.md, `docs/web-integration-guide.md`,
 `docs/configuration-reference.md`, `src/librewxr/api/routes.py`, `tiles/*`):** a RainViewer-
@@ -295,9 +316,22 @@ Source data: OSM via Protomaps; not CARTO, not Esri. The fork's own `examples/le
 switches from CARTO to the new family in the same round. Gate: the fork serves labelled tiles for both radar and satellite at every zoom
 the dashboard requests; memory within budget; C12's seam untouched.
 
-### M3 — RADAR-STRIP (after M2 is live; M2.1 is this task's companion — its table lists what replaces each deletion)
+### M3 — RADAR-REBASE (Q6 ruling 2026-08-27; replaces the RADAR-STRIP text below, kept as record)
 
-Delete from Clear Skies: `TILE_CONFIG` base under the radar map, `SATELLITE_LABELS_URL` +
+The radar/satellite box keeps a Clear Skies basemap; only the SOURCE changes, inside the M1
+build: `radar-map.tsx` `TILE_CONFIG.dark` CARTO → product basemap dark (Protomaps, same layer
+stack as the marine/seismic maps); `TILE_CONFIG.light` OSM raster unchanged; the CARTO
+`voyager_only_labels` satellite overlay AND the ADR-078 `GeoFeaturesLayer` outlines → the product
+basemap's single labels/outlines layer, drawn above the satellite frames; `SATELLITE_LABELS_URL`
+and the direct `/api/v1/geographic-features/tiles` read deleted. The API's standalone
+geographic-features feature (endpoints, extract service, admin action, `[geographic_features]`
+config) is absorbed into the basemap machinery — one extract family, one endpoint family, one
+admin action — ADR-078 → Superseded by this plan. Provider contract untouched: the box still
+draws whatever radar/satellite tiles the provider sends, with nothing derived from the provider.
+Gate: radar view renders in both themes with no watermark; satellite view shows labels + outlines
+from our layer; `grep -r cartocdn` = 0; RainViewer still works.
+
+~~RADAR-STRIP (withdrawn) — original text:~~ Delete from Clear Skies: `TILE_CONFIG` base under the radar map, `SATELLITE_LABELS_URL` +
 its TileLayer, `GeoFeaturesLayer` + the `protomaps-leaflet`/`pmtiles` import IN THAT FILE
 (the packages stay — M1 uses them), API `endpoints/geographic_features.py` +
 `services/geographic_features.py` + settings section + app wiring, stack admin page +
@@ -375,7 +409,12 @@ regrid step (the leg's own wind path uses the same helper?) and close the gap in
 G10: exercise `ww3_grid`'s geometry-change trigger in a scratch config push and record it.
 D14: leave registered; no wetted-substitution KAT attempts without a design.
 
-### S7 — Live-chain validation campaign (blocked on Q1)
+### S7 — ~~Live-chain validation campaign~~ DROPPED 2026-08-27 (Q1)
+
+**Ruling (operator, chat):** "THIS IS ALL TESTING... NO ONE IS ACTUALLY VISITING THE SITE." No
+formal campaign, no ceremony gate; the per-cycle buoy ledger stays on as the standing
+instrument and the operator judges the site directly. Phase L's opening is the operator's call.
+Text below kept as record only.
 
 The predecessor's V1–V4 assumed a shadow chain beside a serving SWAN-L1. Since CHAIN-SERVES
 (2026-08-19) the WW3 chain IS production and SWAN L1 no longer exists, so "cut over / hold
@@ -437,7 +476,9 @@ authorized by the operator's chat direction above, recorded as PA8. **Ordering:*
 operator-ordered LAST; S8.1 is mechanical and manual-native, so it CAN run ahead of the S8
 research if the operator says so → Q7.
 
-### S9 — Inherited-queue reconciliation (read-only; C9–C11)
+### S9 — ~~Inherited-queue reconciliation~~ REMOVED 2026-08-27 (Q2: "NO NO NO, keep that crap out of here. Let's chat separately about that")
+
+The other plans' open rows (C9–C11) are not tracked by this plan. Text below kept as record only.
 
 For every row in the L1-BOUNDARY-REBUILD, SURF-REMEDIATION, SURF-PHYSICS-REMODEL,
 MARINE-FORWARD and EYEBALL-FIX plans still marked open: verify against the live code and
@@ -475,7 +516,26 @@ authorization from commit.
 
 *(Plain English, self-contained, newest at top. Answered items keep their ruling here.)*
 
-### Q7 (2026-08-27) — island transparency field (S8.1): run it now, or hold it with the rest of island shadowing (LAST)?
+### Q8 (2026-08-27) — the radar box spans SoCal to New Mexico; the derived basemap box is ~230 km. How do we cover the dark radar view without reading the radar provider's extent?
+
+Operator: "the radar box will blow all of our other sizings out the window as it covers most of
+the SW well into New Mexico." Directive 14 forbids sizing anything from the provider. Options:
+- **(A) Raise the world baseline tier from zoom 0–6 to zoom 0–8, for everyone.** Worldwide, so it
+  depends on nothing local; at zoom 8 (~600 m/pixel) a regional radar view shows states,
+  coastlines, cities, interstates. Detail beyond zoom 8 only inside the derived box. Cost is a
+  bigger one-time world extract — M0 measures it (expected hundreds of MB, not GB); if it measures
+  badly, zoom 0–7.
+- **(B) Dark theme for the RADAR box only = the light OSM raster tiles darkened in the browser**
+  (a CSS invert/hue-rotate/desaturate filter — a standard Leaflet trick). Worldwide, no extract,
+  no sizing, available today; marine/seismic keep the Protomaps dark basemap. Downside: it shows
+  every street, so the radar's dark view is busier than the other dark maps, and it rides on OSM's
+  tile server (which we already use for light).
+**Recommendation: (A)**, with (B) as the fallback if the world extract measures too large.
+**Ruling needed:** A, B, or both (A for everything, B until A ships).
+
+### Q7 (2026-08-27) — ✅ RULED "q7, run now." S8.1 dispatches now; `F_DRY = 0.05` stands (stated default, not objected to).
+
+*(original question)*
 
 Today every 1 km WW3 cell is all-land or all-water from one ~460 m bathymetry sample at its
 centre, so island edges are quantised to the grid and a cell holding only an island's tip
@@ -487,7 +547,9 @@ fraction as transparency. It's mechanical and manual-native, but it is part of t
 problem you ordered LAST. **Ruling needed:** (a) run S8.1 now as its own round (after the Q17
 push), or (b) hold it inside S8. Also confirm `F_DRY = 0.05` or give a number.
 
-### Q6 (2026-08-27) — the radar box needs to be TOLD the provider offers a basemap: approve two optional capability fields?
+### Q6 (2026-08-27) — ✅ RULED: "Ok wait, so you did not do it wrong, i apologize. So we needed to bring our own basemap. Did we need to bring our own legends too or do those need to move into librewxr?" — Answer recorded: yes, labels too — a radar provider's contract is overlay-only, labels are a basemap layer, so both stay in Clear Skies from the product basemap. M2 cancelled, M3 becomes RADAR-REBASE, directive 13 amended, the two capability fields are NOT added.
+
+*(original question)*
 
 Verified in the LibreWxR fork's own docs and code: LibreWxR serves only transparent radar
 overlays and opaque satellite imagery; it has no basemap of its own and tells every client to
@@ -502,7 +564,9 @@ present — Clear Skies still derives nothing, decorates nothing; it just stacks
 sends. **Ruling needed:** approve the two fields (recommended), or rule that the box shows
 radar/satellite over nothing even when the provider offers ground.
 
-### Q5 (2026-08-27) — does "NO ESRI" also cover the surf height map's imagery and the wizard's satellite toggle?
+### Q5 (2026-08-27) — ✅ RULED: surf height map → "a regular basemap" (the product basemap); NAIP "eliminated completely from user facing work"; the wizard's Esri satellite toggle stays ("I just do not want to use it in user facing situations when we do not have to"). → M4, PA9, directive 15.
+
+*(original question)*
 
 Esri World Topo tiles became the surf height map's background yesterday (IMAGERY-MAP,
 API `a5e45a9`, config `[imagery] provider = map`), and the wizard's marine step has an Esri
@@ -512,7 +576,9 @@ these two as they are, or replace them too (with what — the NAIP aerial provid
 public-domain but was rejected for its abnormal-low-tide photography; a Protomaps-rendered
 topo is not photography).
 
-### Q4 (2026-08-27) — the uncommitted API-MANUAL fog-section edit
+### Q4 (2026-08-27) — ✅ RULED: REVERT. "I have tested that over the past two nights and we actually need to revert the change. Just because we hit the right conditions, we are rarely getting the fog formed so we are crying wolf most of the time which is why we had the provider check there." → S10 FOG-REVERT (PA10); the uncommitted API-MANUAL edit was discarded (`git checkout`) the same hour.
+
+*(original question)*
 
 An edit to API-MANUAL's fog cross-check section has sat uncommitted in the working tree
 since 2026-08-24. It documents code that is already live (API `1ad6e74`, `f2c5ecd`: the
@@ -521,7 +587,9 @@ band; ≤ 1 °F is fog on the station's own reading). Every doc-sync since has s
 the file, which now also blocks the `swellSource`/`closeoutFraction` additions to §17.
 **Ruling needed:** commit it as written, or tell me what's wrong with it.
 
-### Q3 (2026-08-27) — CONSISTENCY-SCORING decisions A–E have no recorded ruling
+### Q3 (2026-08-27) — ✅ RULED: "yes as that is what is in code correct?" — A–E accepted as recommended. CORRECTION recorded back to the operator: it is NOT in code yet; the scorer runs the interim swell-dominance bucketing, and this ruling authorizes the S2 coding round.
+
+*(original question)*
 
 On 2026-08-23 the coordinator put five sub-decisions to you in chat after the V1/V2
 verifications; the plan row says "rulings to be recorded here when given" and nothing was
@@ -541,14 +609,18 @@ lead's recommendation each:
   not the unreachable Longuet-Higgins closed form.
 **Ruling needed:** accept all five as recommended, or say which differ.
 
-### Q2 (2026-08-27) — the inherited queues from the other live plans (answered after S9)
+### Q2 (2026-08-27) — ✅ RULED: "NO NO NO, keep that crap out of here. Let's chat separately about that." S9 removed; C9–C11 marked out of this plan.
+
+*(original placeholder)*
 
 Placeholder: S9 lists, for each still-open row of the L1-BOUNDARY-REBUILD, SURF-REMEDIATION,
 SURF-PHYSICS-REMODEL, MARINE-FORWARD and EYEBALL-FIX plans, whether it is closed by later
 work, still open, or moot — and the UNVALIDATED items (C5: L4/1-D deep-ledge handoff loss;
 5° nearshore directional resolution; C6: Phase T close nod). You rule per survivor.
 
-### Q1 (2026-08-27) — how should the validation campaign be framed now that the chain is production?
+### Q1 (2026-08-27) — ✅ RULED: "THIS IS ALL TESTING... NO ONE IS ACTUALLY VISITING THE SITE." No campaign; S7 dropped; the buoy ledger keeps running; Phase L's opening is the operator's call.
+
+*(original question)*
 
 The previous plan's Phase V was written for a WW3 chain running in shadow beside a serving
 SWAN-L1, ending in a "cut over / hold shadow / extend" ruling. Since your 2026-08-19 order
