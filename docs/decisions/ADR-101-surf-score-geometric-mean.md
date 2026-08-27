@@ -126,6 +126,48 @@ factors — they average together, but one very poor factor sinks the whole scor
 7. Out of scope, explicitly: skill-level lenses, spot-relative calibration, crowding, section
    length (peel angle covers it), any tide-based scoring.
 
+## Amendment 1 (2026-08-27) — Consistency (row 5) rebuilt on spectral group statistics — **Status: Proposed**
+
+**Basis.** Operator rulings recorded in `docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md`: EVO-Q14
+(2026-08-23, "q14 recommendation is fine"), Q3 (2026-08-27, sub-decisions A–E "yes"; the lead's
+correction that nothing was in code yet was recorded back and the coding round re-authorised as
+Q10 item 1 "yes"). SurfBeat was removed 2026-08-23 ("surfbeat is gone"). This amendment replaces the
+row-5 interim text in the Decision table. It takes effect on the operator's acceptance of THIS text
+in chat (rules/clearskies-process.md ADR discipline); the S2 coding round lands after that.
+
+**Inputs of record.** `docs/planning/briefs/SET-TIMING-AND-AMPLITUDE-BRIEF-2026-08-23.md` §3.2, §3.3,
+§4.3, §7; `WAVE-GROUP-FORMULAS-VERIFICATION-2026-08-23.md` §G (Kimura route verified from the
+primary papers; Tm02 lag; KAT values §F.2); `PARTITION-NARROWNESS-SURVEY-2026-08-23.md` (measured
+dominant-groundswell ν ≈ 0.17, κ ≈ 0.59; windsea ν ≈ 0.53; the half-way band rule recovers 0.92–1.17
+of each partition's own energy; the spectral grid cannot resolve ν < 0.05).
+
+**Row 5 becomes:**
+
+| Component | Weight | Inputs | Internal modifiers |
+|---|---|---|---|
+| Consistency | 0.10 | `consistency = 0.6 × timing + 0.4 × amplitude`. **Timing** = `f_int(T_set / 60)` (brief §3.2 interval curve, piecewise-linear; the waves-per-set term is DROPPED — ruling B: timing weight 1.0 on the interval curve). `T_set = N_rep × Tm02`, `N_rep = 1/(1−p11) + 1/(1−p22)` (Kimura 1980 eq. 19), `p11`/`p22` from the bivariate-Rayleigh transition integrals (Kimura eqs. 5, 6, 12) with `ρ_K = κ/2` (Battjes & van Vledder 1984) and the set-wave threshold `H > H1/10`, i.e. `h* = 1.80 × h_rms` (ruling A — the code's existing set-wave definition; ≈ 7.6 min on the measured groundswell). `κ = |∫S_dom(f) e^{i2πf·Tm02} df| / m0` over the DOMINANT partition's band (ruling E; SWAN's `FSPR` is this quantity when requested). Band = half-way between adjacent partition peaks, outermost to the spectral edges (ruling C). Two-swell beat override per brief §3.3 step 3 (secondary ≥ 25 % of partition energy; `60 s ≤ T_beat ≤ 1800 s` → `T_set = max(T_set, T_beat)`). **Amplitude** = `f_amp(S)` (brief §4.3 table), `S = 0.4 × C′ + 0.6 × κ_dom`, `C′ = (C − 0.50)/0.17`, `C = 1 − H_lull/H_set` with `H_set = 1.27 × Hs_total,break`, `H_lull = √((0.42 Hs_dom,break)² + (0.63 Hs_rest,break)²)` on the main-break-zone transects. **Fallback** when no dominant-band spectrum exists for the hour: the swell-dominance bucketing for the WHOLE factor, unchanged. | none beyond the curves; every knot carries its source or "judgement" label (brief §3.2/§4.3) |
+
+**Data path (ruling D).** The group statistics are computed ONCE at parse time where the spectrum
+exists (`swan_runner.py`, the L2 DWR SPECOUT/TABLE parse that builds the per-timestep entries) and
+attached as SCALARS per partition: `nu`, `qp`, `kappa`, `tm02_s`, `t_set_s`, `n_rep`, `band_hz:
+[f_lo, f_hi]`. No 2-D array is attached to any carrier (M-0b memory rule). The scorer reads scalars.
+
+**Single-use rulings (brief §4.5 — proposed here, accepted with this amendment):** (1) the at-the-
+break partition share `Hs_dom,break / Hs_total,break` is a distinct measured quantity (SwellTrack
+output after refraction and breaking), used only inside the ratio `C`; accepted. (2) `H_set` is
+Size's face height entering only as a ratio denominator; accepted. (3) `swellDominance` stays the
+no-spectrum fallback only.
+
+**Consequences.** `SurfScoringBreakdown` wire shape unchanged (five 0–100 bars); the
+`setTimingMinutes`/`setAmplitudeM` fields (SurfBeat era) are already gone. API-MANUAL §17 gains the
+per-partition scalar fields on the `multiSwell` entries; DESIGN-MANUAL explainer text for Consistency
+is rewritten ("sets arrive in a rhythm the spectrum's narrowness predicts; the bands are operator
+judgement pending observation"). Known-answer tests: the Kimura table in
+`WAVE-GROUP-FORMULAS-VERIFICATION-2026-08-23.md` §F.2 (κ 0.3/0.5/0.8 → N_rep 9.06/10.15/15.11 at
+threshold Hs; the KAT ALSO states the H1/10-threshold values computed by the same independent
+integration before looking at the implementation) and fixed synthetic spectra → exact T_set, C, S,
+factor value.
+
 ## References
 
 - [SURF-SCORE-REBUILD-RESEARCH-BRIEF.md](../planning/briefs/SURF-SCORE-REBUILD-RESEARCH-BRIEF.md) — research basis and §6 operator rulings (2026-08-04)

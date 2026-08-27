@@ -478,6 +478,47 @@ Gate: radar view renders the provider's ground+labels (from M2) with nothing of 
 it; `grep -r geographic.features` across all four repos = 0; RainViewer provider still
 works (its own transparent radar over an empty box is the operator-accepted state).
 
+### M4 — SURF-MAP-BASEMAP (Q5 ruling; PA9) — lead mechanics (2026-08-27; executes after M1-API + M1-DASH land)
+
+**What the surf height map is (M0 finding):** `HeatMapCard.tsx` is not a Leaflet map. It is an SVG
+whose background is a hand-rolled mosaic of north-up raster tiles (`<image href=…>`, `:1892–1907`),
+fetched at z14–19 from the URL template `GET /api/v1/imagery/config` returns
+(`useImageryConfig.ts`), rotated to the beach bearing. So "the product basemap" means: same
+mosaic mechanism, different tile source per theme.
+- **API (`endpoints/imagery.py`):** `/imagery/config` answers with ONE user-facing provider,
+  `"basemap"`, regardless of `[imagery] provider` (naip/esri/map/auto are no longer reachable from
+  any user-facing surface — PA9; the modules, key, admin section and wizard selector stay until
+  Q10-6 is ruled, and the API logs ONE startup WARNING naming the ignored value). Response
+  (additive over `ImageryConfigResponse`; `provider: "basemap"`, `proxyMode: "direct"`):
+  `light: {tileUrl: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" with `{s}` pre-expanded to
+  `a`, attribution: OSM}`, `dark: {pmtilesUrl: "/api/v1/basemap/local/tiles", maxDataZoom: 15,
+  attribution: "© OpenStreetMap contributors © Protomaps"}`, `zoomMin: 0`, `zoomMax: 19`. The legacy
+  top-level `tileUrl`/`attribution` fields carry the light values so an old client still renders.
+  `/imagery/tiles/{z}/{x}/{y}` (NAIP proxy) is untouched (unreferenced after this round; Q10-6).
+- **Dashboard (`HeatMapCard.tsx` + `useImageryConfig.ts` + `src/lib/basemap.ts`):** light theme →
+  `href = substituteTileUrl(light.tileUrl, …)` exactly as today. Dark theme → `href` = a PNG data
+  URL rasterized in the browser from the local tier: `basemap.ts` gains `rasterizeBasemapTile(z, x,
+  y): Promise<string>` built on protomaps-leaflet's exported primitives — `new View(new
+  TileCache(new PmtilesSource(url, true), 1024), 15, 2)`, `view.getDisplayTile({z, x, y})`, then
+  `paint(ctx, z, new Map([[key, [tile]]]), null, darkBasePaintRules(), bbox, origin, true)` on an
+  offscreen 256×256 canvas → `canvas.toDataURL('image/png')` (the exact call sequence is
+  `node_modules/protomaps-leaflet/src/frontends/leaflet.ts`'s `renderTile`; mirror it). No labels
+  in the surf-map dark tiles (per-tile label placement without cross-tile collision handling
+  clips text; the map is a 50 m-buffered study rectangle, not a navigational map). A hook
+  `useRasterizedTiles(tiles, enabled)` resolves the data URLs; tiles render as they resolve; the
+  attribution string in the info modal follows the theme. Over-zoom above z15 is vector
+  magnification (crisp). Light OSM tiles at z14–19 are browser-direct exactly like the Leaflet
+  light maps.
+- **Removed from user-facing use:** every Esri/NAIP template read in `HeatMapCard.tsx`; the
+  `[imagery]` API modules stay (Q10-6). Attribution rows on the About page for Esri/NAIP are
+  removed only if no user-facing surface still uses them (the wizard's toggle is not a dashboard
+  surface).
+- **Gate rows:** the surf height map renders in both themes with the product ground under the heat
+  cells (screenshots side-by-side vs today's Esri render); no request to `arcgisonline`/`usgs`
+  leaves the browser from the marine page (network log); the mosaic geometry (rotation, pivot,
+  tile placement) is byte-identical to today (KAT b lineage — diff the `imageryLayer` object);
+  vitest for `useImageryConfig` + the rasterizer (mocked View); `tsc` zero.
+
 ### Gate M
 
 Per round + a phase-close sweep: every map surface, both themes, screenshots side-by-side;
