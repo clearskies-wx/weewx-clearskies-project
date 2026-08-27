@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-27 — MARINE-AND-MAPS-PLAN — consolidated repo commit ranges (D1 as-built re-sync)
+
+Two threads landed together this plan (`docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md`): **Maps**
+— Clear Skies' own product basemap (OSM light + self-served Protomaps dark) replaces CARTO on every
+map surface, and Esri/NAIP orthophotography is removed from user-facing use. **Surf** — the SWAN
+handoff now checks and restarts itself instead of trusting a formula station, a WW3-vs-SWAN
+boundary-fidelity ledger row, the Consistency score rebuilt on real spectral group statistics, a
+partial-land-cell transparency field for WW3's island grid, plus test-debt/doc-drift/bootstrap
+cleanup. Every entry below is a per-round detail; this entry is the cross-repo index.
+
+- **marine** (`weewx-clearskies-marine`) `2a05856`..`5c0cb21` — Q17 GFS far-fetch fix; S3 doc-cited
+  code fixes (`ww3_boundary` health recorder, `level1`→`deep_water` label rename, stale-test sweep);
+  S12 HANDOFF-RESTART; S1 seam-fidelity ledger row; S2 Consistency scoring; S4/S4b test-debt triage;
+  S5 first-install warm-start bootstrap; S8.1-A WW3 transparency field + S8.1-B grid-rebuild hook;
+  S10 fog cross-check revert; Gate S sweep fixes (F1 invariant re-check, F2 warm-start fixture);
+  `5c0cb21` docstring fix from this D1 round.
+- **api** (`weewx-clearskies-api`) `45d1b63`..`811fe88` — M1-API basemap extract/endpoints (+F1/F2
+  gate fixes); M4-API `/imagery/config` basemap answer; M4-B imagery-provider-machinery removal
+  (+F1 write-allowlist gate fix); S10 fog-revert (local, unpushed as of this entry).
+- **dashboard** (`weewx-clearskies-dashboard`) `eb7c915`..`b307797` — M1-DASH product-basemap
+  consumption (marine/seismic dark two-tier stack, label rules, tile-error banner) + M3 radar rebase
+  (`ec27bfd`) + Gate M1-DASH D16 fix (`414372e`); M4-DASH surf-map client-side dark-tile
+  rasterization.
+- **stack** (`weewx-clearskies-stack`) `065ac62`..`d3d8bec` — M1-STACK basemap admin section; M4-B
+  imagery admin-section/wizard-selector removal.
+- **meta** (this repo) — ARCHITECTURE.md, the five manuals, ADR-078/093/101/109 amendments (all
+  Proposed), CHANGELOG, openapi contract — re-synced per round, and D1 (this round) closes the two
+  Gate M sweep findings (F2/F3, stale "not yet shipped" sentences) plus health-block/doc-code gaps
+  the per-round docs rounds left open.
+
+Not yet pushed/deployed as of this entry (operator: "nothing needs pushed... everything can wait"):
+S0 (Q17 live gate), S10 (fog-revert deploy), and every round's live reality-gate row. See each
+round's task row in the plan's TASK CHECKLIST for exact status.
+
 ### 2026-08-27 — S3(b): `level1` label rename to `deep_water` (marine, cosmetic)
 
 - **Marine repo, code/cache label only — no formula, grid, or wire field changed.** `level1`
@@ -30,6 +64,152 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 MARINE-AND-MAPS-PLAN-2026-08-27.md §S3 (b); brief
 `docs/planning/briefs/S3B-LEVEL1-RENAME-BRIEF-2026-08-27.md`.
+
+### 2026-08-27 — S1: C6 seam-fidelity ledger row (WW3-handed vs SWAN-absorbed)
+
+- **A new per-cycle ledger field compares the deep-water spectrum WW3 hands to SWAN against the
+  spectrum SWAN reports absorbing at its own L2 boundary** — a model-vs-model boundary-transfer
+  fidelity check, explicitly labelled "NOT a truth check" (that remains the buoy-scorecard rows).
+  One new SWAN L2 output point, `SEAM`, placed one L2 cell inward from the most-seaward WW3
+  boundary transfer point (`services/vchain.py`'s `locate_seam_point()`); compared per frequency
+  band (`SEAM_BAND_EDGES_HZ = (0.09, 0.20)` Hz) as Hs ratio (`SEAM_HS_TOLERANCE = ±10%`) and
+  direction difference (flagged `> 30°`). Ledger schema bumped to 3; the `seam` block is written
+  on every chain-enabled cycle's success path, with a named `error` (never a skip) on any
+  parse/alignment failure.
+- **Finding:** the WW3 transfer-file writer and the SWAN SPECOUT writer store the frequency axis
+  at different significant-figure precision, producing a real ≈0.3% `hs_ratio` noise floor even
+  for a perfectly-transmitted spectrum — well inside the ±10% tolerance, documented rather than
+  chased.
+- Marine `3958c7d`, `a3c6437`, `dd62663`; KATs `a638026`, `4595303`. Docs: PROVIDER-MANUAL §14.15
+  Amendment "C6 seam-fidelity ledger row"; OPERATIONS-MANUAL "Seam-fidelity row" monitoring note.
+
+MARINE-AND-MAPS-PLAN-2026-08-27.md §S1, PA5, EVO-Q16 C6.
+
+### 2026-08-27 — S12: HANDOFF-RESTART — the SWAN→beach-model handoff checks itself instead of trusting a formula
+
+- **The wave handoff from SWAN to the 1-D beach model (SwellTrack) is no longer a single
+  formula-picked station trusted blind.** Operator ruling (Q11): "if 1d starts running and finds
+  the break is wrong, then it restarts the run from the correct location." The 1-D model now runs
+  from the formula's station, checks its own result (break at the profile's own first node, or the
+  outermost break marker closer than `HANDOFF_BREAK_CLEARANCE_M` = 10 m — one L4 cell — to the
+  handoff), and on failure walks the handoff one SWAN band station (10 m spacing) seaward and
+  re-runs every surfable partition, in the same cycle, until it passes or the band's deep end is
+  reached (`handoff_restart_exhausted` — the whole transect-hour is refused, nothing served from
+  the last failed attempt).
+- **The health invariant this fixes:** since the BREAK-REFORM deploy (08-26), `/health` had been
+  firing `degraded` on `1:break_depth_le_handoff_depth` thousands of times/day. Root cause was
+  twofold — the check compared a tided break depth against an untided handoff depth (a bug), and
+  the beach model's own break marker was landing at its starting line ~37% of the time (BREAK-REFORM
+  moved it seaward with no feedback loop to the handoff). S12 fixes both: invariant 1 now compares
+  both sides untied, with the same clearance test the restart loop itself enforces.
+- **The KATs caught a real defect:** the production call site never passed the two new kwargs, so
+  the loop was silently disabled end-to-end — fixed in the same round (`fca09ec`).
+- Published `handoffDepthM` is now the SETTLED station, not necessarily the formula's first pick.
+  `GET /health` gains an additive `handoffRestart` block (count-only: `runs`/`restartedRuns`/
+  `exhausted`/`attemptsHistogram`/`lastExhaustedAt`).
+- Marine `47254a2`, `7174e65`, `69167aa`, `3f489e1`, `a29acf7`, `9743500`, `fca09ec`; KATs `4eb9cca`.
+  ADR-093 Amendment 9 (Proposed) is the decision record. Docs: ARCHITECTURE.md handoff paragraph,
+  PROVIDER-MANUAL §14.15 Amendment "HANDOFF-RESTART", API-MANUAL `handoffDepthM`/`handoffRestart`,
+  OPERATIONS-MANUAL `handoffRestart` monitoring note (this D1 round).
+
+MARINE-AND-MAPS-PLAN-2026-08-27.md §S12, Q11 ruling, ADR-093 Amendment 9.
+
+### 2026-08-27 — S4/S4b: marine test-debt triage — 32 failing tests resolved, 0 production-code changes
+
+- **Two named test files (18 failing) plus their same-class adjacent failures (14 more in
+  `tests/services`) triaged one class at a time** (repair harness to current design / delete a
+  stale pin of superseded behaviour / keep with a probe-keyed skip). 8 Class A deletes (pins of
+  behaviour the SWAN-L1 removal and CHAIN-SERVES already superseded), 28 Class B harness repairs
+  (assertion intent unchanged, only fixtures updated), 1 Class D probe-keyed skip
+  (Windows: no `/etc/weewx-clearskies`), 0 Class C. `tests/services` now passes clean on this
+  checkout (323 passed / 1 skipped / 0 failed).
+- Marine `e7e917a`, `e2e3809`, `b0af6ec`, `3785f44` (S4); `3fdea40`, `8f2dee1`, `079a8fc`,
+  `4c1b0c3`, `4810294` (S4b).
+
+MARINE-AND-MAPS-PLAN-2026-08-27.md §S4, C13.
+
+### 2026-08-27 — S5: first-install WW3 warm-start bootstrap (C17, EVO-Q9 option 2)
+
+- **A fresh install has no prior WW3 restart file, so the WW3 leg's own staleness gate
+  (`WW3_RESTART_MAX_AGE_H = 9`) would refuse forever without a seed.** The install procedure now
+  drops a provenance note (`restart_<token>.provenance.json`) beside a seeded restart file; the
+  service accepts it ONCE (age gate still applies afterward), consumed after the leg's first
+  successful run. Mismatch → today's refusal, quoting the note's contents. Not needed for the
+  current install — this is the fresh-install path.
+- Marine `dcec2d8`, `a1e4113`; tests `85c45e8`. Docs: OPERATIONS-MANUAL "First install — WW3 warm
+  start" step; ADR-109 D10 amendment (Proposed).
+
+MARINE-AND-MAPS-PLAN-2026-08-27.md §S5, C17, EVO-Q9.
+
+### 2026-08-27 — S8.1-A: WW3 partial-land-cell transparency field (island shadowing, mechanical piece)
+
+- **WW3's 1 km G1 grid previously called every cell fully land or fully water from ONE ~460 m
+  ETOPO sample at its centre** — an island's edge (or a cell holding only its tip) was either a
+  full wall or fully passed, over/under-counting energy blocking depending on grid-cell luck.
+  Operator direction: "it should also apply to cells that are not 100 percent island... so you are
+  not OVERCOUNTING an island." Fix uses WW3's own `FLAGTR = 2` mechanism (transparency at cell
+  centres, manual §3.4.7): open-water fraction per cell computed from a new one-time regional DEM
+  fetch (NOAA NCEI CRM Vol. 6, ~90 m, via OPeNDAP — the cached ETOPO source has only ~5.6 samples
+  per 1 km cell, too coarse to meet the design's 2% KAT tolerance). Cells ≤ `F_DRY` (0.05) stay
+  dry; wet cells carry transparency = their open-water fraction.
+- New persisted cache `/etc/weewx-clearskies/swan_bathymetry_G1_fine.npz`; new grid NAME-file
+  writers (`G1_bottom.txt`/`G1_status.txt`/`G1_obstr.txt`) — previously nothing wrote these; the
+  live grid file had been hand-minted 2026-08-18.
+- Reality gate (S-swell model/buoy ratio, cliff-KAT seam aggregate) is a separate, later
+  measurement — not asserted by this entry.
+- Marine `2b492e5`, `42260b3`, `3a49fa9`, `270be88`, `1e3cd7a`; KATs `4691356` (harness mock fix
+  `8fd5a24` — the original mock patched the wrong binding, letting a real CRM fetch run in tests).
+  Docs: ADR-109 amendment (Proposed) for the resolver + grid mechanics, PROVIDER-MANUAL,
+  ARCHITECTURE.md.
+
+MARINE-AND-MAPS-PLAN-2026-08-27.md §S8.1, PA8.
+
+### 2026-08-27 — S10: fog cross-check narrowing reverted (two nights of live testing)
+
+- **The 2026-08-24 fog cross-check narrowing (night-time standalone ≤1°F rule) is reverted.**
+  Two nights of live testing showed the narrowed rule "crying wolf" — conditions matched the
+  standalone criterion far more often than fog actually formed. The provider cross-check returns
+  at every dewpoint-depression level, as before `1ad6e74`/`f2c5ecd`.
+- API `96bec7b`, `cf0318d` (local `git revert`s of the narrowing commits). Local/unpushed as of
+  this entry — awaiting the operator's "push"; a CHANGELOG entry for the API repo itself is owed
+  post-deploy.
+
+MARINE-AND-MAPS-PLAN-2026-08-27.md §S10, PA10, Q4.
+
+### 2026-08-27 — M1-DASH + M3: dashboard consumes the product basemap; radar/satellite rebased off CARTO
+
+- **Marine and seismic maps' dark theme now renders the self-served product basemap** (two-tier
+  Protomaps stack: `world` z0–6 under `local` z7–15, freeway+label rule sets, per-rule zoom
+  windows to work around a Leaflet `GridLayer` zoom-limit aggregation bug found during this round)
+  instead of watermarked CARTO tiles. New `src/lib/basemap.ts` is the one place that knows the
+  product basemap (tiers, rule builders, `useBasemapStatus()`, `<ProtomapsLayer>`).
+- **Radar/satellite box rebased (M3):** same basemap machinery, `radar` tier (z0–12, sized to the
+  provider's declared coverage box or the station-box fallback); the CARTO satellite-labels overlay
+  and the standalone ADR-078 geographic-features outline layer are replaced by one labels/outlines
+  layer from the same source.
+- **Gate M1-DASH finding D16 fixed same round:** with the basemap server unreachable, the status
+  request itself was also failing and `basemapUnavailable` stayed false — a silent gray box,
+  contradicting the manual's own invariant. Fixed: the banner now also fires on a status-request
+  error (`414372e`).
+- `CARTO_OSM_ATTRIBUTION` deleted; attribution reads "© OpenStreetMap contributors © Protomaps".
+- Dashboard `eb7c915`…`43afaee` (dev), `47ac0e5`…`c183473` (tests), `ec27bfd` (M3 radar rebase),
+  `414372e` (D16 fix). Docs: DASHBOARD-MANUAL §10/§12 rewritten to the as-built.
+
+MARINE-AND-MAPS-PLAN-2026-08-27.md §M1, §M3, PA2, Q6/Q8.
+
+### 2026-08-27 — M4-DASH: surf height map's dark theme rasterized client-side from the product basemap
+
+- **The surf height map (`HeatMapCard.tsx`, an SVG mosaic of raster image tiles, not a Leaflet
+  map) now renders the product basemap in both themes** — light theme unchanged (OSM raster
+  fetched by the browser); dark theme rasterizes PNG data URLs client-side from the `local`
+  Protomaps tier (`rasterizeBasemapTile()`, built on `protomaps-leaflet`'s own `View`/`paint`
+  primitives, LRU-cached ≤ 256 tiles) — zero external tile requests in dark mode.
+- Mosaic geometry (rotation, pivot, tile placement) is byte-identical to the pre-change Esri/NAIP
+  version (KAT-verified against `43afaee`'s geometry helpers).
+- Dashboard `ba00a35`…`b307797` (100 tests passed incl. a geometry byte-identity KAT). Docs:
+  DASHBOARD-MANUAL §12; API-MANUAL §12a (the `/imagery/config` response this consumes).
+
+MARINE-AND-MAPS-PLAN-2026-08-27.md §M4, PA9.
 
 ### 2026-08-27 — M4-B: Imagery provider machinery removed (Q10-6)
 
