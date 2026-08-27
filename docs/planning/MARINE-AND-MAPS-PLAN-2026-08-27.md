@@ -948,6 +948,15 @@ reports the flip count.
   operator-visible: health `ww3.gridRebuiltAt`, OPERATIONS-MANUAL procedure with the baseline/diff
   commands) → adversarial gate → reality gate (item 5) after the push.
 - `F_DRY = 0.05` (Q10-2 ruled) in `swan_domain.py` beside the other WW3 G1 constants.
+- **Depth values (lead, 2026-08-27):** `G1_bottom.txt` carries the ETOPO L1-cache nearest-sample
+  elevation for every cell exactly as the live grid was minted (F2's convention), EXCEPT a cell
+  that is WET by fraction (`f > F_DRY`) while its centre sample is land (≥ 0): that cell needs a
+  water depth to be a sea point, so its bottom value = the mean of the fine-DEM samples below
+  zero inside the cell (CRM, datum note J10). Cells dry by fraction keep their value (status 0
+  makes it irrelevant). KAT (d) reports the count of such CRM-depth cells alongside the flips.
+  Status map: 0 = excluded (dry by fraction), 1 = sea, 2 = active boundary (the existing S-row/
+  W-col wet rule, now evaluated on the fraction mask); every code and the array ordering quoted
+  from the local manual (pre-flight Q5: IDLA 1 = line-by-line bottom to top, free format).
 - The transparency `τ = f` for wet cells; dry cells get τ = 0 in the file (irrelevant to WW3 for
   land, but keeps the array total); boundary S-row/W-col wet test reads the SAME mask.
 
