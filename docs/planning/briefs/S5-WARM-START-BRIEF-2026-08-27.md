@@ -6,8 +6,13 @@ Auditor: lead spot-check + the Gate S sweep (small round).
 **Dispatch condition:** after S12's dev closeout is accepted (keeps one dev in the marine repo at a
 time; S5 touches only `service.py`, which S12 does not).
 
-**Pre-round verification (lead, fill at dispatch):** marine HEAD `<hash>`, clean; baseline
-`.venv_local\Scripts\python.exe -m pytest tests/test_service_full_run_trigger.py tests/test_service_vchain_trigger.py tests/test_health_ww3_block.py -q -p no:cacheprovider` → `<n passed>`.
+**Pre-round verification (lead, 2026-08-27):** marine HEAD `fca09ec`, clean; baseline
+`.venv_local\Scripts\python.exe -m pytest tests/test_service_full_run_trigger.py tests/test_service_vchain_trigger.py tests/test_health_ww3_block.py -q --tb=no -p no:cacheprovider`
+→ **1 failed (pre-existing: `test_service_vchain_trigger.py::test_leg_silent_disabled_call_site_is_inert`,
+being deleted by the concurrent S4b round as a superseded pin), 42 passed**. Other agents active in this
+repo: S1 (`vchain.py`, `swan_runner.py`), S4b (`tests/services/*` + that one file) — none touch `service.py`.
+The S4-repaired `_base_monkeypatches()` in `tests/test_service_full_run_trigger.py` is the current harness
+for `_run_ww3_leg` stubbing (test-author: mirror it; you may not edit that file).
 
 ## The design — read it at the source
 `docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md` §"S5 — First-install WW3 warm-start bootstrap"
