@@ -962,61 +962,13 @@ The seismic faults overlay is not a provider module. It is served from a bundled
 
 ---
 
-## §9a Geographic Features (ADR-078)
+## §9a Geographic Features — REMOVED (ADR-078, deleted M5 — ADR-078 Amendment 2, Accepted 2026-08-27)
 
-### Data source
-
-OpenStreetMap via PMTiles vector tiles. PMTiles is a single-file archive of pre-processed, zoom-level-simplified vector tiles. The browser loads only the tiles visible in the current viewport via HTTP Range requests — typically 20-50 KB per tile. Geometry is pre-simplified per zoom level (coarse at zoom 5, detailed at zoom 12). Data license: ODbL (OpenStreetMap contributors).
-
-| Property | Value |
-|---|---|
-| Format | PMTiles v3 (vector tiles) |
-| Data source | Protomaps daily builds (`https://build.protomaps.com/YYYYMMDD.pmtiles`) |
-| Auth | None (public download) |
-| License | ODbL — attribution required |
-| File location | `/etc/weewx-clearskies/geographic-features.pmtiles` |
-| Update mechanism | Operator-triggered via admin UI (`POST /setup/geographic-features/update`) |
-| Extraction tool | Go `pmtiles` CLI (`go-pmtiles`) — BBOX extraction with maxzoom limit |
-
-### What gets rendered
-
-Three feature types from the Protomaps basemap layers, rendered as unfilled lines only:
-
-| Feature type | PMTiles layer | Filter | Line style |
-|---|---|---|---|
-| Political boundaries | `boundaries` | All (country + state/region) | White, weight 1.5, opacity 0.7 |
-| Major roads | `roads` | `pmap:kind` in `highway`, `trunk` | Gray, weight 1, opacity 0.5 |
-| Water features | `water` | All (rivers, lakes, ocean) | Blue, weight 1, opacity 0.6 |
-
-### Data pipeline
-
-The PMTiles file is created in two steps, both triggered by the admin's "Update Map Data" action:
-
-1. **Download:** The API's setup endpoint downloads the latest Protomaps daily build PMTiles file. The Go `pmtiles extract` command reads only the byte ranges needed for the operator's BBOX — it does NOT download the full planet file (~120 GB).
-2. **Extract:** `pmtiles extract <remote-url> <output> --bbox=<west,south,east,north> --maxzoom=<N>` crops to the operator's configured bounds and zoom limit. Result written to `/etc/weewx-clearskies/geographic-features.pmtiles`.
-
-Expected extract size: 200-500 MB for a 14°×24° regional BBOX at maxzoom 12.
-
-### Endpoints
-
-| Endpoint | Method | Purpose |
-|---|---|---|
-| `/api/v1/geographic-features/tiles` | GET | Serves PMTiles file with HTTP Range request support (206 Partial Content). Returns 404 when file not yet downloaded. Public, no auth. |
-| `/api/v1/geographic-features/status` | GET | Returns `{available: bool, size_bytes: int|null, updated_at: str|null}`. Public. |
-| `/setup/geographic-features/update` | POST | Downloads latest Protomaps build, extracts to operator BBOX, stores result. Auth: proxy secret. |
-
-### Config
-
-`[geographic_features]` section in `api.conf`:
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `enabled` | bool | `true` | Whether geographic features are available |
-| `bounds` | str | None | CSV BBOX for extraction (`west,south,east,north`). Falls back to LibreWxR bounds if unset. |
-
-### Not a provider module
-
-Geographic features are NOT a provider module (no capability declaration, no dispatch registry entry, no `PROVIDER_MODULES` entry). PMTiles is a utility data source, similar to the GEM Active Faults file — not a switchable provider. The service is wired directly in `__main__.py` like the faults service.
+The original ADR-078 single-file PMTiles overlay (`endpoints/geographic_features.py`,
+`services/geographic_features.py`, the `[geographic_features]` api.conf section, the three routes
+`GET /api/v1/geographic-features/tiles`, `GET /api/v1/geographic-features/status`, `POST
+/setup/geographic-features/update`) is deleted. Superseded entirely by the `[basemap]` family — see
+the "Basemap" entries in ARCHITECTURE.md and API-MANUAL.md §12b.
 
 ---
 
