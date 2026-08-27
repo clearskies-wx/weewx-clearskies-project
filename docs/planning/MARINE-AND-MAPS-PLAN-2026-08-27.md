@@ -60,6 +60,7 @@ predecessor's Q1–Q18 are cited as `EVO-Q#`).
 | S3 | **Substitution cleanup** — CORRECTED after the adversarial review: `_reused_l1_boundary_command_lines()`, the `swan/level1/` directory and `ww3_chain_enabled` are LIVE dependencies (production L2 scaffold; buoy-ledger gate) and are NOT deleted. Remaining: `level1` label rename (cosmetic), the health `ww3_boundary` entry (record it or remove it — Q10), doc corrections (ARCHITECTURE.md:130/132 wrong "no-op"/"vestigial" claims + gap rows #12–#16, PROVIDER-MANUAL:2529 swell-card bullet, API-MANUAL §17 `swellSource` + `closeoutFraction`, ADR-109 G7 struck, D14 item 2 disposition), hotstart-age gate (Q10: drop or own row) | ⬜ doc round + rename only; nothing live deleted |
 | S10 | **FOG-REVERT** (API) — revert the 2026-08-24 fog cross-check narrowing (API `1ad6e74` + `f2c5ecd`): two nights of live testing showed the night-time standalone ≤ 1 °F rule cries wolf (conditions right, fog rarely formed); the provider cross-check returns at every level, as before. The uncommitted API-MANUAL edit documenting the narrowing is discarded | 🔄 CODE DONE (API `96bec7b` + `cf0318d`, local `git revert`s; `tests/test_fog_provider_crosscheck.py` 68 passed on Windows — host run owed after deploy; CHANGELOG entry NOT yet written) — **awaiting operator "push"** |
 | S11 | **INVARIANT-1** — health is `degraded` since the BREAK-REFORM deploy (08-26 09Z; ~7,600 firings): (1) read-only look at where BREAK-REFORM now places the outermost break marker relative to the per-transect handoff (untided terms), and what in `57af5d6` moved it; (2) then fix the check to compare like with like (tided break depth vs tided handoff, or both untided) with a guard test that fails pre-change | 🔄 (1) DONE 2026-08-27 — `scratch/inv1/S11-FINDINGS.md`: firings began at the `57af5d6` deploy hour (0/day before); the check adds tide to one side only (bug); AND the primary marker now sits at the beach model's first node in 37 % of transect-hours (10.7 % before), median distance from handoff 0.90 → 0.41 m — the roller-based cessation keeps a boundary-started zone alive so its first dissipation step becomes the marker. Options A/B/C → **Q11**; (2) waits on Q11 |
+| S12 | **HANDOFF-RESTART** — the beach model's handoff is set dynamically WITHIN the cycle: run the 1-D from the formula's station; if its first break lands on (or within the margin of) its own starting node, step the handoff one SWAN band station seaward and re-run, until the first break is interior or the band's deep end is reached (then refuse loudly for that transect-hour). SWAN's per-transect band tables already carry Hs/Tp/Dir + partitions at every 10 m station, so no SWAN re-run. Absorbs the invariant-1 tide-datum fix (S11-2) | ⬜ RULED 2026-08-27 (Q11, operator's design) — design block below; brief after the operator confirms the block |
 | S4 | **Test-debt triage** — two test files, 18 failing tests (`test_serve_nothing_on_failure` 8, `test_service_full_run_trigger` 10; re-verified 2026-08-27), one ruling per class (repair harness / delete stale pin / keep) | ⬜ |
 | S5 | **First-install WW3 warm-start bootstrap** — the durable mechanism EVO-Q9 parked as a pre-ship row | ⬜ pre-ship; not needed for this install |
 | S6 | ~~ADR-109 gap closure~~ **DISSOLVED 2026-08-27 (Q9)** — G7 is built (one-line ADR edit → S3); G10 (`ww3_grid` rebuild hook) is part of S8.1; D14 stays a note | ✅ closed-no-work |
@@ -456,6 +457,65 @@ input; PRIME DIRECTIVE 8 prefers visibility) or delete the entry. (d) hotstart-a
 EVO-Q6 folded it into the W5 health/refuse design, which shipped without it; recommend drop.
 C7's other two items and C8 are already in HEAD (`43744de`, `de2738f`, `09c0a1b`).
 
+### S12 — HANDOFF-RESTART (Q11 ruling 2026-08-27; triggers 1 and 3, authorized by that ruling)
+
+**Plain English.** Today the ocean model (SWAN) hands the wave to the beach model (the 1-D
+SwellTrack run) at one station per transect, chosen by a formula from wave height. The beach
+model then trusts that starting point. If the wave is already breaking there, the beach model
+reports the break on its own starting line — which is what the health alarm has been catching
+since Tuesday. The operator's design: the beach model checks its own result, and if the break is
+wrong (at the start), it moves its starting point seaward and runs again, in the same cycle,
+until the break is genuinely inside its domain.
+
+**What exists that this builds on (verified 2026-08-27):**
+- Per transect, SWAN writes a TABLE at every station of the transect's band, 10 m apart, from the
+  deep end to the breaking contour: `HSIGN HSWELL TM01 DIR DEPTH QB DISSURF DSPR PTHSIGN PTRTP
+  PTDIR PTDSPR` (`swan_formats.py:2375–2380`; `_TRANSECT_BAND_SPACING_M = 10`, `swan_runner.py:1576`).
+  The beach model runs per partition on `PTHSIGN/PTRTP/PTDIR` at the selected station only.
+- `select_hourly_handoff()` (`services/transect_handoff.py:680`) picks the station nearest
+  `1.3 × Hs / 0.73` inside the band, strictly seaward of SWAN's own suspected break zone (BD-1/2).
+- `_truncate_bathy_at_handoff()` (`surf_1d_pipeline.py:597`) trims the beach profile to start at
+  the seaward-most node ≤ the handoff depth (untided) and the 1-D run (`_ddd_breaking_march`,
+  `surf_1d_analytical.py:776`) starts breaking at node 0 when the 5 % onset is already met there
+  (`:1042–1046`); the zone's marker is its maximum-dissipation point (`:1091–1093`).
+
+**Design (executes verbatim; a deviation is a finding):**
+1. **Restart loop, per transect × partition × hour, inside the cycle.** Start from the station
+   `select_hourly_handoff()` picks today. Run the 1-D. **Acceptance test:** the outermost break
+   marker (`break_points[0]`) lies strictly interior — its node index ≥ `N_INTERIOR` (named
+   constant, proposed 3 = 30 m of profile at 10 m spacing) — AND the wave at node 0 is below the
+   onset criterion (`Qb(node 0) < Q_B_VISIBLE`). If either fails, take the next station seaward
+   in the band (its own `PTHSIGN/PTRTP/PTDIR` for this partition, its own depth as the new
+   handoff), re-truncate the profile, re-run. Repeat until the test passes.
+2. **Termination.** The band's deep end reached without passing → that transect-hour-partition
+   is REFUSED with a named reason (`handoff_restart_exhausted`), counted in health, never served
+   from the last attempt (PRIME DIRECTIVE 8, "a model runs on all its inputs or it does not run").
+   A hard cap on attempts equal to the band length (≤ 150 stations) — no other cap.
+3. **The published handoff depth** for the transect-hour becomes the station the loop settled on
+   (`handoff_depth_m` in the wire payload, `handoff_selection` trace stage gains
+   `restart_attempts` and `restart_reason`). The formula's station remains the FIRST attempt only.
+4. **Invariant 1 re-defined on one basis:** compare the break depth and the handoff depth both
+   UNTIDED (subtract `tide_level` from `break_points[0].depth_m`, or carry the node's chart-datum
+   depth on `BreakPoint`), and require the outermost marker's node index ≥ `N_INTERIOR` — the same
+   test the loop enforces, so a firing after S12 means the loop failed, not the tide.
+5. **KATs:** (a) Huntington transect 4, 2026-08-27T05Z, from the journal firing (break 2.15 m
+   tided / handoff 1.98 m / tide from the STOFS record of that cycle): with the loop, the settled
+   station is seaward of the first, the marker is interior, invariant 1 is quiet; (b) a synthetic
+   profile where node 0 is below onset → zero restarts, byte-identical output to today;
+   (c) a synthetic profile breaking at every band station → `handoff_restart_exhausted`, nothing
+   served. (d) Regression: `tests/test_break_reform_kat.py`, `test_double_break_transect55_kat.py`
+   unchanged. Each KAT's pre-change failure transcript pasted.
+6. **Reality gate (stated before looking):** after deploy, over one full day: invariant-1 firings
+   = 0; the fraction of transect-hours whose marker sits within 5 cm of node 0 falls from 37 % to
+   < 5 % (`scratch/inv1/compare.py` re-run on that day's trace); median restart count and the
+   count of `handoff_restart_exhausted` pasted; served face heights at Huntington compared to the
+   day before (same swell within ±10 % Hs at 46222) — a change > 20 % is a finding to surface.
+7. **Docs, same round:** ARCHITECTURE.md handoff paragraph, ADR-093 amendment (the handoff is
+   selected by restart, not by the formula alone), PROVIDER-MANUAL §14.15, API-MANUAL §17
+   (`handoff_depth_m` semantics), invariants docstring, CHANGELOG.
+
+**Open for the operator before briefing:** `N_INTERIOR = 3` (30 m) — confirm or give a number.
+
 ### S4 — Test-debt triage (C13)
 
 Scope (re-verified 2026-08-27, Windows run: 18 failed / 36 passed across the four named
@@ -605,7 +665,21 @@ authorization from commit.
 
 ## OPEN OPERATOR QUESTIONS
 
-### Q11 (2026-08-27) — OPEN: the degraded-health alarm has two causes; which do we fix?
+### Q11 (2026-08-27) — ✅ RULED by the operator's own design, superseding options A/B/C:
+
+> "the handoff point is never SET IN STONE, it needs to continuously change based upon the break
+> locations. That means if it is unusually larger waves the handoff is going to move seaward …
+> that is the way it was supposed to work" / "No you cannot fucking set the next cycle based upon
+> the previous cycle, you need to dynamically set the handoff, if 1d starts running and finds the
+> break is wrong, then it restarts the run from the correct location"
+
+→ **S12 HANDOFF-RESTART** (design block in Phase S). The alarm's tide-datum bug (A) is fixed inside
+S12, since the check's two sides are re-defined by the same round. Lead's finding that led here:
+the coded "30 % margin" is measured against full breaking (`Hs/0.73`), while the beach model
+calls onset at 5 % breaking fraction, which occurs at 1.72 × Hs vs the handoff's 1.78 × Hs — a
+3.5 % margin in practice; and no feedback from the beach model's own break exists.
+
+### ~~Q11 (original)~~ — the degraded-health alarm has two causes; which do we fix?
 
 Plain English (full evidence `scratch/inv1/S11-FINDINGS.md`). The alarm compares "how deep the
 wave breaks" against "how deep the ocean model hands the wave to the beach model". Two things:
