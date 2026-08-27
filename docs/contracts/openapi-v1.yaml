@@ -3616,6 +3616,19 @@ components:
         classification:
           type: string
           enum: [groundswell, swell, wind_swell]
+        nu: { type: number, nullable: true, description: "Added S2 (2026-08-27, ADR-101 Amendment 1). Longuet-Higgins spectral width parameter (sqrt(m0*m2/m1^2 - 1)) over this partition's half-way band. Null when no band could be computed this hour." }
+        qp: { type: number, nullable: true, description: "Added S2. Goda (1970) spectral peakedness over this partition's band. Null under the same conditions as nu." }
+        kappa: { type: number, nullable: true, description: "Added S2. Battjes & van Vledder (1984) successive-height correlation at lag tm02S, divided by m0. Null under the same conditions as nu." }
+        tm02S: { type: number, nullable: true, description: "Added S2. Mean zero-up-crossing period (Tm02 = sqrt(m0/m2)) over this partition's band, seconds. Null under the same conditions as nu." }
+        nRep: { type: number, nullable: true, description: "Added S2. Kimura (1980) mean total run length (waves) at threshold H > H1/10 (rho = 1.80). Null under the same conditions as nu." }
+        tSetS: { type: number, nullable: true, description: "Added S2. Set interval, T_set = nRep * tm02S, seconds -- feeds the Consistency factor's timing term. Null under the same conditions as nu." }
+        bandHz:
+          type: array
+          nullable: true
+          items: { type: number }
+          minItems: 2
+          maxItems: 2
+          description: "Added S2. [f_lo, f_hi] half-way band edges (ADR-101 Amendment 1 ruling C) used to compute this partition's group statistics. Null under the same conditions as nu."
       required: [height, period, direction, energy, frequencyRange, classification]
 
     MarineObservation:
