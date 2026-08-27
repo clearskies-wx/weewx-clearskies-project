@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-27 — M5: ADR-078 geographic-features removal (Amendment 2 Accepted)
+
+ADR-078 Amendment 2 was accepted (operator, 2026-08-27: "that was in the plan, why do i need to
+approve what i already approved" — the plan's PRE-APPROVAL register was the approval). The removal
+commit queued behind that acceptance landed the same day: the original ADR-078 single-file
+geographic-features feature — `GET /api/v1/geographic-features/tiles`, `GET
+/api/v1/geographic-features/status`, `POST /setup/geographic-features/update`,
+`services/geographic_features.py`, `config/settings.py` `GeographicFeaturesSettings` /
+`Settings.geographic_features`, the `[geographic_features]` api.conf section, and the stack's
+"Geographic Features" admin page/route — is deleted, side by side no more. The `[basemap]` family
+(CS-BASEMAP, M1) stands alone as its sole successor.
+
+- **api** (`weewx-clearskies-api`) `811fe88`..`78776ba` — `endpoints/geographic_features.py` and
+  `services/geographic_features.py` deleted; `app.py`/`__main__.py` wiring removed;
+  `GeographicFeaturesSettings` deleted from `config/settings.py`. A legacy `[geographic_features]`
+  section in `api.conf` is now silently ignored (no crash, no warning — same treatment `[imagery]`
+  got after M4-B). The on-disk `/etc/weewx-clearskies/geographic-features.pmtiles` file may be
+  deleted by the operator; nothing reads it any more.
+- **stack** (`weewx-clearskies-stack`) `d3d8bec`..`ba0c64a` — admin "Geographic Features"
+  section/routes/template, locale keys (`help.admin.geographic_features.*`, all 13 files), and
+  orphaned literal-string translation keys removed.
+- **meta** (this repo) — `docs/contracts/openapi-v1.yaml`'s three `deprecated: true` legacy paths
+  removed; API-MANUAL.md §12c, PROVIDER-MANUAL.md §9a, ARCHITECTURE.md, OPERATIONS-MANUAL.md,
+  DASHBOARD-MANUAL.md geographic-features mentions reworded to history/removal notes; ADR-078
+  Amendment 2 records the removal commit hashes.
+
 ### 2026-08-27 — MARINE-AND-MAPS-PLAN — consolidated repo commit ranges (D1 as-built re-sync)
 
 Two threads landed together this plan (`docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md`): **Maps**

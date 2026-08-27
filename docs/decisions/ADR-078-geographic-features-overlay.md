@@ -162,6 +162,8 @@ amendment is accepted.
   settings section, the stack repo's "Geographic Features" admin page/route, the
   `geographic-features.pmtiles` file/path, and the dashboard's `GeoFeaturesLayer` component —
   per plan journal J3. Until then, both features run side by side.
+- **Removal landed** `weewx-clearskies-api` `811fe88`..`78776ba` and `weewx-clearskies-stack`
+  `d3d8bec`..`ba0c64a`, 2026-08-27 (M5 round).
 - License/attribution unchanged: OpenStreetMap contributors, ODbL, via Protomaps — attribution
   string becomes "© OpenStreetMap contributors © Protomaps" project-wide (M1), not specific to
   this feature.
