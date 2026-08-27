@@ -1016,7 +1016,7 @@ authorization from commit.
 
 ## OPEN OPERATOR QUESTIONS
 
-### Q12 (2026-08-27) — NON-BLOCKING (work continues as designed): the local basemap extract measures 514 MB against the plan's 400 MB ceiling
+### Q12 (2026-08-27) — ✅ CLOSED (operator 2026-08-27: "q12 that is fine" → option (a) accepted; the local tier stays one z7–15 file at 514 MB; Gate M1-API's size row re-based to the measured number). Original text kept below.
 
 Plain English. The dark-theme map data for the area around the station is one file. The plan said,
 before measuring, that this file should be at most 400 MB. M0 measured it: **513.6 MB** (the box is
