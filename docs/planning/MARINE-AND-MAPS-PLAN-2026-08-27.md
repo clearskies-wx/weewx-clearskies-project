@@ -907,6 +907,26 @@ multiply. Regular grids only (ours is). No compile switch — grid-preprocessor 
    vs the standing 0.56–0.60×; the cliff-KAT seam aggregate vs 0.578 m; direction unchanged
    within ±5°. Improvement expected but NOT assumed — the lobe-width and diffraction items in
    S8 remain separate.
+**Lead mechanics (2026-08-27, provisional until the pre-flight lands — `scratch/S8.1-PREFLIGHT.md`,
+brief `docs/planning/briefs/S8.1-PREFLIGHT-BRIEF-2026-08-27.md`, dispatched read-only):**
+- Sequence: S8.1-PRE (read-only: fine DEM source, samples per cell, WW3 grammar quotes, today's
+  dry/wet/partial counts) → S8.1-A (marine: `derive_ww3_setup()` gains `open_water_fraction`,
+  `depths`, `status`, `transparency` arrays; the fine-DEM fetch persisted as
+  `/etc/weewx-clearskies/swan_bathymetry_G1_fine.json` beside the other caches, same dict shape,
+  refuse loudly if unfetchable; `write_ww3_grid_name_files(derivation, dir)` writing
+  `G1_bottom.txt`, `G1_status.txt`, `G1_obstr.txt` in the manual's IDLA/IDFM convention; deck gains
+  `FLAGTR = 2` + the obstruction read line; KATs a–d) → S8.1-B (marine `service.py`: the G10 hook —
+  at the WW3 leg's start, if `level0/mod_def.provenance.json` is missing or its `derivation_sha256`
+  ≠ the current derivation's, write deck + NAME files to a staging dir, `WW3Runner.run_grid()`,
+  keep the old file as `mod_def.ww3.prev-<token>`, write the provenance note, and REFUSE the
+  restart for that cycle with the named reason `ww3_grid_rebuilt_cold_start` (the restart was
+  generated against the old grid) — a cold start follows exactly as today's cold-start path;
+  operator-visible: health `ww3.gridRebuiltAt`, OPERATIONS-MANUAL procedure with the baseline/diff
+  commands) → adversarial gate → reality gate (item 5) after the push.
+- `F_DRY = 0.05` (Q10-2 ruled) in `swan_domain.py` beside the other WW3 G1 constants.
+- The transparency `τ = f` for wet cells; dry cells get τ = 0 in the file (irrelevant to WW3 for
+  land, but keeps the array total); boundary S-row/W-col wet test reads the SAME mask.
+
 **Triggers:** 1 and 3 (obstruction input to the propagation scheme; wet/dry criterion) —
 authorized by the operator's chat direction above, recorded as PA8. **Ordering:** S8 is
 operator-ordered LAST; S8.1 is mechanical and manual-native, so it CAN run ahead of the S8
