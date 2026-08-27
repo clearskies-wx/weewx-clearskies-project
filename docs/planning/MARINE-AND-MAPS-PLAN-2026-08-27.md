@@ -316,7 +316,13 @@ finding):**
   `{"status": "started"}` / 409 `{"status": "already_running"}`); `wire_basemap_settings()`.
   Wiring mirrors `app.py:54–56, 139–141, 193–205` and `__main__.py:83, 986–988`.
 - `config/settings.py`: `BasemapSettings` for `[basemap]` with ONE key, `enabled` (bool, default
-  true). No operator-typed box, no zoom knobs (directive 14; PRIME DIRECTIVE 11).
+  true). No operator-typed box, no zoom knobs (directive 14; PRIME DIRECTIVE 11). **As built
+  (2026-08-27, accepted):** `enabled=false` gates ONLY the tiles endpoint (404); status and the
+  update action stay reachable so an operator can see and fix the state.
+- **M1-API round landed 2026-08-27** (API local `45d1b63`, `94e9437`, `ecdd3d4`, `fc7cdfa`,
+  `6fda155`; lead re-ran the four test files: 38 passed; commit stats all inside the allowlist).
+  Computed for this install: local bounds `-120.4649,31.5907,-115.5005,35.7229`, radar
+  `-129.5,26.75,-105.5,40.75`. Adversarial gate `scratch/GATE-M1-API-DEFINITION.md` running.
 - ADR-078's feature stays in place this round (additive build); its removal is the final Phase M
   commit after the operator accepts the ADR-078 amendment (journal J3).
 
