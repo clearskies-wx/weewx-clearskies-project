@@ -956,3 +956,112 @@ from an accepted note instead of a prior success record); D12's file/dir layout 
 cadence; no new config key, health field, or module — `service.py`'s `_run_ww3_leg()`
 only, plus the note file itself (a new, transient, self-deleting persisted artifact under
 the existing `level0/` directory).
+
+## Amendment (2026-08-27): D3/D13 Group2 — G1 partially-land cells: fraction-based wet/dry mask, FLAGTR=2 transparency field (S8.1-A)
+
+**Status: Proposed.** Recorded per `docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md`
+§"S8.1 — Partially-land cells", PA8; operator direction 2026-08-27 (chat): "it should also
+apply to cells that are not 100 percent island … so you are not OVERCOUNTING an island when
+you may only have the tip in the grid"; Q10 "2. yes" (F_DRY=0.05) and "3. ok" (the DEM
+download, grid-file writers and rebuild hook). Pointer + addendum only — no D-row ruling
+above is re-opened. This amendment supersedes D3a's own text ("G1 resolved dry-cell
+islands, no obstruction field") and D13 Group2's `FLAGTR` row ("G1: FLAGTR=0") for the
+**fine_dem-supplied** derivation path only; the `fine_dem=None` path (no fine DEM
+available) reproduces D3a/D13's original FLAGTR=0 behavior byte-identical.
+
+**The defect this closes.** D3 (this ADR, accepted 2026-08-17) classified every G1 cell
+wet or dry from ONE ETOPO 2022 15" (~460 m) sample nearest its centre
+(`_ww3_nearest_source_depth`, round-to-nearest-index). A coastline cell was therefore
+entirely wall or entirely pass on the luck of which sample sat at its centre — island
+outlines quantised to the 1 km grid, jittering ±½ cell, over-counting on some edges and
+under-counting on others; a tip covering 20% of a cell was either a full wall or absent.
+Live-measured before this round (pre-flight `scratch/S8.1-PREFLIGHT.md` Q4): the G1 mask's
+own cache carries exactly ONE ETOPO sample per cell (cache resolution ratio 1.0000 to G1's
+own spacing) — no sub-cell information exists in the live cache to detect partiality with
+at all; a finer source is required to compute a fractional openness.
+
+**Fine source.** No fine DEM covering the G1 box was cached anywhere (pre-flight Q2a: 0 of
+199 shipped NCEI regional DEM entries fully contain the G1 box). **NOAA NCEI Coastal Relief
+Model (CRM) Vol. 6 — Southern California** (3 arc-second ≈ 90 m, public domain, THREDDS/
+OPeNDAP `https://www.ngdc.noaa.gov/thredds/dodsC/crm/crm_vol6.nc`, vertical datum MLLW
+(bathymetry)/NAVD88 (topography), horizontal datum NAD83) fully covers the G1 box and
+delivers ≈139 samples per 1 km cell (≈0.72% fraction-quantisation step) — comfortably under
+the design's <2% accuracy target for KAT (b); ETOPO's own ≈5.6 samples/cell (≈18% step)
+cannot meet it (pre-flight Q3). `elevation_var="z"` verified directly from the dataset's
+own OPeNDAP DDS/DAS (2026-08-27) — its coordinate variables are named `x`/`y` (degrees_east/
+degrees_north), not `lat`/`lon`, a different convention from the existing `regional/`
+collection's DEMs. Datum note: CRM's MLLW/NAVD88 differs from the L1 ETOPO cache's LMSL —
+the wet/dry sign test at the ±0.5 m intertidal margin moves a small number of coastline
+cells (KAT (d) records the flip count as the recorded before/after).
+
+**Design.**
+1. **Open-water fraction.** `derive_ww3_setup()` (`services/swan_domain.py`), when given a
+   `fine_dem` (the CRM cut, `services/ww3_grid_files.fetch_or_load_g1_fine_dem()`), computes
+   per G1 cell the share of native-resolution fine samples inside the cell's footprint
+   (centre ± half a cell) with elevation < 0 — vectorised (`np.floor` + `np.bincount`
+   binning, never a Python loop over the ~3M-sample source; empty-footprint cells fall back
+   to the nearest fine sample, counted and logged, expected 0 at CRM's density).
+   `fine_dem=None` (no fine DEM available) reproduces the pre-round derivation byte-identical
+   — deck text and persisted dict — verified against the 34 pre-existing KATs.
+2. **Fraction-based mask.** New named constant `F_DRY = 0.05` (Q10 "2. yes"): a cell is DRY
+   iff `f ≤ F_DRY`, WET otherwise, carrying transparency `τ = f` (`F_DRY < f < 1` → partial;
+   `f = 1` → fully open). The S-row/W-column active-boundary test (D13 Group2/Group4) now
+   reads the SAME fraction mask — no second criterion.
+3. **Deck grammar.** `ww3_grid.inp` gains `&MISC FLAGTR = 2 /` (manual §3.4.7, :6722–6793;
+   FLAGTR codes :15349–15363: "2: Transp. at cell centers") and the obstruction read line
+   immediately after the status-map line (manual SYNTAX row 6a, :15927–16018):
+   `   12 1.0 1 1 '(....)' 'NAME' 'G1_obstr.txt'` — unit 12, scale factor 1.0, IDLA 1/IDFM 1
+   (line-by-line bottom-to-top, free format, matching the depth block's own convention, D13
+   Group2). Unit 12 is deliberately distinct from the bottom-depth unit (11, D3) and the
+   status-map unit (13, D13 Group2) — the manual's own shared-unit shortcut ("can be …
+   identical to bottom depth unit") is NOT used, so the three NAME files stay independently
+   readable/debuggable.
+4. **Depth values.** `G1_bottom.txt` keeps the ETOPO L1-cache nearest-sample elevation for
+   every cell (D3's existing convention) EXCEPT a cell that is wet by fraction (`f > F_DRY`)
+   while its centre ETOPO sample is land (≥ 0) — that cell needs a real water depth to be a
+   sea point, so its bottom value becomes the mean of the fine-DEM's own wet (elevation < 0)
+   samples inside it (`services/ww3_grid_files.wet_mean_depth()`). Refuses loudly
+   (`RuntimeError`) rather than fabricate a depth if no wet fine sample exists there (rules/
+   coding.md §1: "a model runs on all its inputs"). Cells dry by fraction keep their ETOPO
+   value (status 0 makes it irrelevant to the propagation scheme).
+5. **Status map.** Unchanged codes (manual :12000–12002, D13 Group2): 0 = excluded (dry by
+   fraction), 1 = sea, 2 = active boundary (the existing S-row/W-col wet perimeter rule, now
+   evaluated on the fraction mask).
+6. **NAME-file writers (new — nothing wrote these before this round).**
+   `services/ww3_grid_files.write_ww3_grid_name_files()` writes `G1_bottom.txt`,
+   `G1_status.txt`, `G1_obstr.txt` from the derivation's arrays, same IDLA 1/IDFM 1
+   convention, ready for `WW3StepSpec.input_files` (`services/ww3_runner.py`).
+7. **Persisted fine-DEM cache (new artifact).**
+   `/etc/weewx-clearskies/swan_bathymetry_G1_fine.npz` (`numpy.savez_compressed`: `lat`/`lon`
+   axes, `elev` float32 array, JSON `meta` string recording source URL/datum/fetched-at/
+   bbox) — fetched once via `services/bathymetry_resolver.fetch_crm_grid()` (a second
+   OPeNDAP base URL, `_OPENDAP_CRM_BASE_URL`, reaching the THREDDS `crm/` collection distinct
+   from the existing `regional/` collection `_OPENDAP_BASE_URL` reaches), refetched only when
+   the cache no longer covers the current G1 box. **No ETOPO substitution on fetch failure**
+   — the config-time grid-sizing chain (`services/grid_sizing_chain.py`, the sole caller of
+   `derive_ww3_setup()`) refuses the whole `ww3_leg` derivation for that cycle instead
+   (same failure-isolated posture the block already had; the pre-flight proved ETOPO cannot
+   meet the fraction field's accuracy target, so a silent fallback would serve a
+   fabricated-precision mask).
+
+**KATs (S8.1-A round, `tests/services/test_s81_transparency_kat.py`):** (a) a hand-built 3×3
+fine grid with a known tip reproduces the exact fraction, own arithmetic; (b) a synthetic
+island of known area, sampled at CRM density, reproduces the area to < 2% via `Σ f × cell
+area` while the old nearest-sample mask's error is measured and asserted larger; (c)
+`derive_ww3_setup(..., fine_dem=None)` deck text and persisted dict byte-identical to the
+pre-round function; (d) the real G1 derivation diff against the live L1 cache + a real CRM
+cut — dry↔wet flip counts, τ distribution, CRM-depth-override cell count, recorded as the
+before/after.
+
+**Not built this round (S8.1-B, separate round).** The production `ww3_grid` execution
+hook on geometry/config change (Gap G10, still open — `WW3Runner.run_grid()` exists
+standalone, `service.py` does not call it); the operator-visible procedure for replacing the
+live `mod_def.ww3` (baseline copy, diff, restart-chain cold-start consequence). Round A does
+not run `ww3_grid` or touch `level0/mod_def.ww3`.
+
+**UNCHANGED by this amendment:** D3's ETOPO-sourced bottom-depth default and its L1 cache
+convention (still the base value, only conditionally overridden per item 4 above); D3a's
+"no intermediate grid" ruling (still true — G1 is still the only grid); D8's time-step
+formula; D10's restart-chaining mechanism; D12's file/dir layout and cadence; every other
+D13 catalog row not named above; the `fine_dem=None` derivation path (byte-identical to
+pre-round, KAT c).
