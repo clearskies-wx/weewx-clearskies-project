@@ -1085,7 +1085,10 @@ from the sizing cache (`swan_domain.ww3_setup_derivation_from_dict()`, the inver
 `level0/mod_def.provenance.json`. A mismatch (or a missing/unreadable note) triggers
 `WW3Runner.run_grid()`, keeps the superseded artifact as `mod_def.ww3.prev-<token>`, writes
 the provenance note atomically, and cold-starts that cycle (`ww3_grid_rebuilt_cold_start` —
-not a leg refusal, the cycle still runs). A sizing cache still missing the S8.1-A arrays
+not a leg refusal, the cycle still runs). *Live correction 2026-08-27:* a retry of the
+rebuild cycle must cold-start as well — the restart-chaining block now refuses any restart
+file written before the note's `rebuilt_at` (`_ww3_restart_predates_grid()`), because the
+first production retry consumed the pre-rebuild restart and `ww3_shel` failed (rc=13). A sizing cache still missing the S8.1-A arrays
 refuses the cycle (`ww3_grid_rebuild_inputs_missing`) unless a readable provenance note
 already exists, in which case it proceeds unchanged. See OPERATIONS-MANUAL.md's "WW3 grid
 rebuild (G10 hook)" subsection for the operator-visible baseline/diff/force-rebuild
