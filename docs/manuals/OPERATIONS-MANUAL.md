@@ -199,19 +199,19 @@ Operators who do not configure a marine service never encounter this dependency.
 
 **Precedent:** This establishes the pattern for native dependencies in companion services: pip extras for opt-in features, clear detection with actionable error messages at feature-enable time, detection performed by the service that owns the dependency.
 
-### pmtiles CLI (API host — geographic features + basemap)
+### pmtiles CLI (API host — basemap)
 
 The Go `pmtiles` CLI (https://github.com/protomaps/go-pmtiles/releases) must be on `PATH` on
-whichever host runs the API. It is invoked by two features that both extract regional/tiered
-OpenStreetMap vector tiles from the daily Protomaps build: ADR-078's geographic-features overlay
-(`services/geographic_features.py`, one file, operator BBOX) and the CS-BASEMAP basemap family
+whichever host runs the API. It is invoked by the CS-BASEMAP basemap family
 (`services/basemap_extract.py`, three tiers — world/local/radar — plan
-`MARINE-AND-MAPS-PLAN-2026-08-27.md` §M1, ADR-078 Amendment 2). Neither feature installs or
-downloads the CLI itself; `pip install weewx-clearskies-api` does not require it. A missing binary
-surfaces as a `RuntimeError` at extraction time (`POST /setup/geographic-features/update` or
-`POST /setup/basemap/update`) naming the install URL, not a silent no-op. Both extraction paths
-also require outbound HTTPS access to `https://build.protomaps.com` at extraction time only — no
-runtime dependency once a tier's PMTiles file has been written to `/etc/weewx-clearskies/`.
+`MARINE-AND-MAPS-PLAN-2026-08-27.md` §M1, ADR-078 Amendment 2), the sole extraction feature since
+ADR-078's original geographic-features overlay (`services/geographic_features.py`, one file,
+operator BBOX) was removed (M5, ADR-078 Amendment 2, Accepted 2026-08-27). Basemap does not install
+or download the CLI itself; `pip install weewx-clearskies-api` does not require it. A missing
+binary surfaces as a `RuntimeError` at extraction time (`POST /setup/basemap/update`) naming the
+install URL, not a silent no-op. Extraction also requires outbound HTTPS access to
+`https://build.protomaps.com` at extraction time only — no runtime dependency once a tier's
+PMTiles file has been written to `/etc/weewx-clearskies/`.
 
 ### NOAA VDatum grid data (marine service, US surf/nearshore only)
 
@@ -572,7 +572,7 @@ The service refuses to start with no config file and no `--init` flag. A missing
 | `now-layout.json` | Now page card layout: `{ "version": 1, "cards": [...] }`. Dashboard reads at boot. Written by admin card layout editor. | No | 0644 |
 | `forecast_correction.db` | Forecast correction SQLite DB — forecast-observation pairs + model metadata. Created by the correction engine on first pair collection. (ADR-079) | No | 0640 |
 | `forecast_correction_model.pkl` | Trained Random Forest model for forecast temperature correction. Written atomically by the trainer (temp file + `os.rename()`). (ADR-079) | No | 0640 |
-| `basemap-world.pmtiles` | Basemap tier — global vector-tile archive, z0–6, fixed extraction box, the coarse fallback ground for panning outside the local/radar tiers on the non-radar maps. Extracted by `POST /setup/basemap/update` (CS-BASEMAP, plan §M1, ADR-078 Amendment 2). | No | 0600 (mkstemp default; the API process is the only reader — same as `geographic-features.pmtiles`; Gate M1-API F2, 2026-08-27) |
+| `basemap-world.pmtiles` | Basemap tier — global vector-tile archive, z0–6, fixed extraction box, the coarse fallback ground for panning outside the local/radar tiers on the non-radar maps. Extracted by `POST /setup/basemap/update` (CS-BASEMAP, plan §M1, ADR-078 Amendment 2). Supersedes the removed `geographic-features.pmtiles` (ADR-078's single-file overlay, deleted M5) — the operator may delete the old file at `/etc/weewx-clearskies/geographic-features.pmtiles`. | No | 0600 (mkstemp default; the API process is the only reader — same mode the old `geographic-features.pmtiles` had; Gate M1-API F2, 2026-08-27) |
 | `basemap-local.pmtiles` | Basemap tier — z7–15, union(seismic box, marine locations bbox +40px@z15). Serves the marine + seismic maps' dark-theme detail. Extracted by `POST /setup/basemap/update`. | No | 0600 |
 | `basemap-radar.pmtiles` | Basemap tier — z0–12, the radar provider's declared coverage box (or the seismic box if none declared). Serves the radar/satellite map's dark-theme base + labels/outlines layer. Extracted by `POST /setup/basemap/update`. | No | 0600 |
 | `api-cert.pem` | API TLS certificate (Ed25519 self-signed, auto-generated) | No | 0644 |
@@ -647,21 +647,24 @@ The config UI serves an admin landing page at `/admin`. This is the default post
 | TLS | `stack.conf [tls]` | Mode, domain, email, provider |
 | Sky Classification | `api.conf [conditions]` (`sky_*` keys) | SkyPyEye threshold calibration: decay rate, clear threshold, threshold floor, min elevation |
 | Haze Calibration | `api.conf [conditions]` + calibration storage | Per-month calibration status (12-month grid), drift warnings, active sensor display, sensor override (dropdown + manual ID), reset button, gamma override |
-| Geographic Features | `api.conf [geographic_features]` | PMTiles vector-tile overlay status + "Update Map Data" trigger (`/admin/geographic-features`, `POST /admin/geographic-features/update` → `POST /setup/geographic-features/update`). Superseded by Basemap (below) pending ADR-078 Amendment 2 acceptance (ADR-078). |
+
+**Geographic Features section — REMOVED (M5, ADR-078 Amendment 2, Accepted 2026-08-27).** The
+admin section (`/admin/geographic-features`, `POST /admin/geographic-features/update`) and the
+`api.conf [geographic_features]` key it managed are deleted; superseded entirely by Basemap below.
 
 The Haze Calibration section shows a 12-month status grid with each month's sample count, learned baseline Kcs value, and calibration status (green = fully calibrated, amber = bootstrapping, gray = no data). An overall summary shows "N of 12 months calibrated." When sensor drift or a station type change is detected, a warning banner is shown. The section also provides a "Reset Calibration" button (clears all samples and baselines, triggers re-bootstrap), a toggle to enable or disable haze detection without removing calibration data, and a gamma override input for the hygroscopic correction exponent.
 
 **Basemap (CS-BASEMAP, plan `MARINE-AND-MAPS-PLAN-2026-08-27.md` §M1-STACK, ADR-078 Amendment 2 —
-Proposed) — SHIPPED (stack `065ac62`).** One "Basemap" admin section beside Geographic Features
+Accepted) — SHIPPED (stack `065ac62`).** One "Basemap" admin section, now the only PMTiles admin
+section — the Geographic Features section above it is removed (M5, ADR-078 Amendment 2, Accepted
+2026-08-27, plan journal J3)
 (`GET /admin/basemap`, `weewx_clearskies_config/admin/routes.py` `basemap_get()`; landing-page
 summary rows via `_fetch_basemap_status()`), showing per-tier status (world/local/radar:
 available/size/updated-at/last-error) and one "update basemap" action
 (`POST /admin/basemap/update` → the API's `POST /setup/basemap/update` — 202 started flash /
 409 already-running flash / other API error via the existing error path); the status page polls
 every 10 s while an extraction is in progress (`role="status"`); no operator-typed bounds/zoom
-fields (directive 14; PRIME DIRECTIVE 11). The Geographic Features section is retired in the same
-commit that accepts ADR-078 Amendment 2 (plan journal J3) — until then both sections coexist, same
-as their underlying API features.
+fields (directive 14; PRIME DIRECTIVE 11).
 
 The Status section is read-only — it displays, it does not act. It polls every 30 seconds (HTMX) and shows whether the API is reachable (`ApiClient.health()`, a bare reachable/not-reachable signal — no API version or last-update timestamp is available to this page), and the marine service's own reported health, proxied through the API's `GET /setup/marine/health` (the admin UI never contacts the marine service directly — ARCHITECTURE.md's "add-on reached only through the API" invariant). The marine health block shows `status` (`ok`/`degraded`/`failed`, rendered with colour plus a text label so it is not colour-only), the `reasons` list shown verbatim and in full, per-input freshness (`ww3_boundary`, `wind`, `bathymetry`, `tide` — availability and age), and invariant activity (total fired, last fired time, and the names of anything that fired). An unreachable marine service renders as a status with the API's own error string, not as a stack trace. A marine service that does not yet report `reasons`/`inputs`/`invariants` (a version older than the Marine Model Restoration Plan's B3 task) shows a note that those fields are not reported by this version, rather than a blank section.
 
