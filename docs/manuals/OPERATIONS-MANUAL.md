@@ -563,9 +563,9 @@ The service refuses to start with no config file and no `--init` flag. A missing
 | `now-layout.json` | Now page card layout: `{ "version": 1, "cards": [...] }`. Dashboard reads at boot. Written by admin card layout editor. | No | 0644 |
 | `forecast_correction.db` | Forecast correction SQLite DB — forecast-observation pairs + model metadata. Created by the correction engine on first pair collection. (ADR-079) | No | 0640 |
 | `forecast_correction_model.pkl` | Trained Random Forest model for forecast temperature correction. Written atomically by the trainer (temp file + `os.rename()`). (ADR-079) | No | 0640 |
-| `basemap-world.pmtiles` | Basemap tier — global vector-tile archive, z0–6, fixed extraction box, the coarse fallback ground for panning outside the local/radar tiers on the non-radar maps. Extracted by `POST /setup/basemap/update` (CS-BASEMAP, plan §M1, ADR-078 Amendment 2). | No | 0640 |
-| `basemap-local.pmtiles` | Basemap tier — z7–15, union(seismic box, marine locations bbox +40px@z15). Serves the marine + seismic maps' dark-theme detail. Extracted by `POST /setup/basemap/update`. | No | 0640 |
-| `basemap-radar.pmtiles` | Basemap tier — z0–12, the radar provider's declared coverage box (or the seismic box if none declared). Serves the radar/satellite map's dark-theme base + labels/outlines layer. Extracted by `POST /setup/basemap/update`. | No | 0640 |
+| `basemap-world.pmtiles` | Basemap tier — global vector-tile archive, z0–6, fixed extraction box, the coarse fallback ground for panning outside the local/radar tiers on the non-radar maps. Extracted by `POST /setup/basemap/update` (CS-BASEMAP, plan §M1, ADR-078 Amendment 2). | No | 0600 (mkstemp default; the API process is the only reader — same as `geographic-features.pmtiles`; Gate M1-API F2, 2026-08-27) |
+| `basemap-local.pmtiles` | Basemap tier — z7–15, union(seismic box, marine locations bbox +40px@z15). Serves the marine + seismic maps' dark-theme detail. Extracted by `POST /setup/basemap/update`. | No | 0600 |
+| `basemap-radar.pmtiles` | Basemap tier — z0–12, the radar provider's declared coverage box (or the seismic box if none declared). Serves the radar/satellite map's dark-theme base + labels/outlines layer. Extracted by `POST /setup/basemap/update`. | No | 0600 |
 | `api-cert.pem` | API TLS certificate (Ed25519 self-signed, auto-generated) | No | 0644 |
 | `api-key.pem` | API TLS private key | **Yes** | **0600** |
 | `ui-cert.pem` | Config UI TLS certificate (auto-generated when `--tls` active) | No | 0644 |

@@ -322,7 +322,14 @@ finding):**
 - **M1-API round landed 2026-08-27** (API local `45d1b63`, `94e9437`, `ecdd3d4`, `fc7cdfa`,
   `6fda155`; lead re-ran the four test files: 38 passed; commit stats all inside the allowlist).
   Computed for this install: local bounds `-120.4649,31.5907,-115.5005,35.7229`, radar
-  `-129.5,26.75,-105.5,40.75`. Adversarial gate `scratch/GATE-M1-API-DEFINITION.md` running.
+  `-129.5,26.75,-105.5,40.75`. **Adversarial gate PASSED 2026-08-27** (13/13 rows met by the
+  auditor's own probes; 2 findings): F1 (medium) — a marine service installed but with no locations
+  answers 404 on `/marine`, which the extractor read as an outage and refused the local tier
+  forever → FIXED lead-direct (API `MarineDiscoveryUnavailableError.status_code`; 404 = seismic box
+  alone; 3 guard tests; 41 tests pass); F2 (low) — OPERATIONS-MANUAL claimed 0640 for the basemap
+  files while `mkstemp` yields 0600 (ADR-078's precedent identical) → manual corrected to 0600.
+  Docs round M1-DOCS landed (ADR-078 Amendment 2 Proposed, ARCHITECTURE, API-MANUAL §12b, openapi,
+  OPERATIONS-MANUAL, CHANGELOG).
 - ADR-078's feature stays in place this round (additive build); its removal is the final Phase M
   commit after the operator accepts the ADR-078 amendment (journal J3).
 
