@@ -48,7 +48,7 @@ predecessor's Q1–Q18 are cited as `EVO-Q#`).
 | S0 | **Q17 push + live gate** — GFS far-window fetch f096→f108 so the daily 96 h WW3 horizon march finally runs | 🔄 CODE DONE (marine `2a05856`, meta `b7142574`; 31/1-known tests) — **awaiting operator "push"**; live gate at the next 00Z cycle after deploy (rows in S0) |
 | M0 | Map extent inventory + extract-size measurements (read-only) | ⬜ NEXT — no ruling needed (read-only) |
 | M1 | **CS-BASEMAP** — Clear Skies product basemap: marine + seismic maps, OSM light kept, Protomaps dark + marine labels from a self-served extract, CARTO removed | ⬜ RULED 2026-08-27 (EVO-Q18 Round 1) — design block below; brief after M0 |
-| M2 | **LIBREWXR-BASEMAP** — the fork renders its own ground + place labels + outlines under/into its radar and satellite tiles (OSM data via a Protomaps extract of its own BBOX) | ⬜ RULED 2026-08-27 (EVO-Q18 Round 3) — M2.0 design round in the fork first |
+| M2 | **LIBREWXR-BASEMAP** — the fork gains a new tile family: opaque `basemap` (ground + freeways + labels, light/dark) and transparent `labels` (labels + outlines, for over satellite), rendered from a Protomaps extract of its own BBOX and advertised in its catalog; radar/satellite tiles themselves unchanged (RainViewer contract kept) | ⬜ RULED 2026-08-27 (EVO-Q18 Round 3); fork verified 2026-08-27 — M2.0 design round first; needs **Q6** (two optional capability fields) for the box to draw it |
 | M3 | **RADAR-STRIP** — Clear Skies provides NOTHING for the radar box: remove base, labels, outlines, the whole ADR-078 feature | ⬜ RULED 2026-08-27 (EVO-Q18 Round 2) — ships ONLY after M2 serves labelled tiles |
 | Gate M | Adversarial gate per round + one end-to-end row (every map surface rendered in both themes, screenshots side-by-side) | ⬜ |
 | S1 | **C6 seam-fidelity ledger row** — WW3-handed vs SWAN-absorbed at the L2 boundary, every cycle | ⬜ APPROVED 2026-08-25 (EVO-Q16 C6) — after S0's gate passes |
@@ -233,28 +233,65 @@ SR-55 for this install); a pan outside the box shows the world baseline, not bla
 across dashboard/api/stack = 0; extract sizes within the M0-measured envelope; attribution
 string present on both maps; dashboard `tsc` zero errors; vitest for the two components.
 
-### M2 — LIBREWXR-BASEMAP (fork; M2.0 design round first)
+### M2 — LIBREWXR-BASEMAP (fork; verified against the fork's own docs + code 2026-08-27)
 
-**M2.0 (read-only, fork):** how the fork's tile pipeline composes radar/satellite tiles
-(`src/librewxr/tiles/*`), where a ground+labels layer can be rendered server-side
-(Python: PMTiles read + MVT decode + raster draw, or a pre-rendered label PNG pyramid at
-build time), the fork's BBOX/zoom range, and the memory budget on librewxr (5.7 GB box,
-radar container ~3.2 GB resident). Output: a design block appended here as an amendment
-BEFORE M2.1 dispatches (directive 12).
-**M2.1 (implement in the fork) — the companion to M3: everything M3 deletes from Clear Skies
-is re-created here, as LibreWxR's own output.** Mapping, item by item:
+**What the fork is (read: `repos/librewxr` CLAUDE.md, AGENTS.md, `docs/web-integration-guide.md`,
+`docs/configuration-reference.md`, `src/librewxr/api/routes.py`, `tiles/*`):** a RainViewer-
+compatible OVERLAY server. Radar tiles are transparent PNG/WebP squares at
+`/v2/radar/{ts}/{size}/{z}/{x}/{y}/{color}/{smooth}_{snow}.{ext}` (only query: `?arrows=light|dark`,
+rendered server-side); satellite tiles are opaque imagery at `/v2/satellite/{ts}/{size}/{z}/{x}/{y}/0/0_0.{ext}`;
+`LIBREWXR_MAX_ZOOM` = 12; a compute/present split with a byte-capped `TileGeometry` cache
+(200 MB single mode) and a per-timestamp warmer; BBOX `LIBREWXR_BBOX` crops regions, satellite
+selection and warm lists; memory is tight (container ~3.2 GB resident on the 5.7 GB box).
+**LibreWxR has NO basemap concept** — its integration guide tells every client to bring its own
+basemap (its bundled `examples/leaflet.html` uses CARTO dark and is broken today too). Nothing in
+its pipeline renders ground or labels; nothing in it reads OSM data.
+
+**Design consequences (why "bake it into the tiles" is wrong):** radar tiles MUST stay
+transparent overlays — the dashboard fades them (opacity ≤ 0.8) and every RainViewer-style client
+expects the same; ground painted into them would fade with the rain and break the public contract.
+So the fork gains a **new tile family**, not a change to existing tiles:
+- `GET /v2/basemap/{theme}/{size}/{z}/{x}/{y}.{ext}` — OPAQUE ground: land, water, coastline,
+  admin boundaries, freeways (motorway+trunk from z≥5, primary from z≥9), place labels;
+  `theme` ∈ {`light`,`dark`}; z 0–12 (the fork's max); `size` 256/512 like the other families.
+- `GET /v2/labels/{theme}/{size}/{z}/{x}/{y}.{ext}` — TRANSPARENT labels + outlines, for use
+  over satellite imagery (replaces the CARTO overlay + ADR-078 outlines in one layer).
+- Both rendered server-side from a Protomaps extract of `LIBREWXR_BBOX` (OSM data; `pmtiles`
+  CLI or the Python `pmtiles` reader + `mapbox-vector-tile` decode + PIL/numpy raster draw —
+  M2.0 picks), cached to disk under `LIBREWXR_CACHE_DIR` (a static layer, NOT the per-timestamp
+  geometry cache), pre-rendered for the BBOX at startup/refresh by a separate warmer pass; outside
+  the BBOX → transparent/empty tile, never an error. Attribution string added to the catalog.
+- Advertised in `/public/weather-maps.json` (additive keys, e.g. `basemap: {light: path,
+  dark: path}`, `labels: {…}`) so any client can discover it — the same pattern the fork already
+  uses for `satellite.infrared`. Upstream-mergeable: a generic feature, not a Clear Skies hook.
+
+**M2.0 (read-only design round in the fork, BEFORE M2.1):** tile-count and byte arithmetic for
+the deploy BBOX (26.75,−129.5,40.75,−105.5) at z0–12; decode/draw cost per tile in Python and the
+disk footprint of a full pre-render vs on-demand+disk-cache; memory ceiling; the exact Protomaps
+layer/kind values for freeways/boundaries/places at the v4 schema; where the family plugs into
+`routes.py` / `warmer.py` / `cache.py` / `config.py` (new `LIBREWXR_BASEMAP_*` settings). Output:
+a design block appended here (directive 12) — no code before it.
+
+**M2.1 (implement in the fork) — the companion to M3: everything M3 deletes from Clear Skies is
+re-created here as LibreWxR's own output.** Item by item:
 
 | Deleted from Clear Skies by M3 | Re-created in the LibreWxR fork by M2.1 |
 |---|---|
-| OSM light / CARTO dark base under the radar (`radar-map.tsx` `TILE_CONFIG`) | a ground layer (land, water, coastline, boundaries, freeways) rendered by the fork under its radar tiles, light and dark variants selected by the same `?…` query the dashboard already sends for colour scheme |
-| CARTO `voyager_only_labels` overlay on the satellite view | place-name labels rendered by the fork into/over its satellite tiles |
-| ADR-078 outlines (`GeoFeaturesLayer`: coastlines, boundaries, roads, water) on the satellite view | the same outlines rendered by the fork into/over its satellite tiles |
-| `[geographic_features] bounds` + admin extract action (API host) | the fork's own Protomaps extract of `LIBREWXR_BBOX`, refreshed by the fork's existing ingest/warm cycle — no operator action in Clear Skies |
+| OSM light / CARTO dark base under the radar (`radar-map.tsx` `TILE_CONFIG`) | `/v2/basemap/{light|dark}/…` opaque ground tiles, drawn by the dashboard UNDER the radar frames |
+| CARTO `voyager_only_labels` overlay on the satellite view | `/v2/labels/{theme}/…` transparent labels, drawn ABOVE the satellite frames |
+| ADR-078 outlines (`GeoFeaturesLayer`) on the satellite view | the same `/v2/labels/…` layer (outlines + labels in one) |
+| `[geographic_features] bounds` + admin extract action (API host) | the fork's own extract of `LIBREWXR_BBOX`, refreshed on the fork's schedule — nothing in Clear Skies |
 
-Source data: a Protomaps extract of `LIBREWXR_BBOX` (OSM), rendered server-side; not CARTO,
-not Esri. The dashboard keeps sending exactly the tile requests it sends today — the radar
-provider contract (`tileUrlTemplate`, `satelliteTileUrlTemplate`, colour-scheme query) does
-not change; only what the returned pictures contain changes. Gate: the fork serves labelled tiles for both radar and satellite at every zoom
+**The one Clear Skies-side change this needs — Q6 (data contract, trigger 4):** the radar
+provider capability gains two optional fields, `basemapTileUrlTemplate` (per theme) and
+`labelsTileUrlTemplate`, populated by `providers/radar/librewxr.py` from the catalog and null for
+RainViewer/iframe; the dashboard's radar box draws them only when present. This is the ONLY way
+the box can be "empty Leaflet + whatever the provider sends" AND still show the provider's ground —
+the box has to be told the provider sends one. With RainViewer (no basemap) the box shows radar
+over nothing, which is the operator-accepted state.
+
+Source data: OSM via Protomaps; not CARTO, not Esri. The fork's own `examples/leaflet.html`
+switches from CARTO to the new family in the same round. Gate: the fork serves labelled tiles for both radar and satellite at every zoom
 the dashboard requests; memory within budget; C12's seam untouched.
 
 ### M3 — RADAR-STRIP (after M2 is live; M2.1 is this task's companion — its table lists what replaces each deletion)
@@ -391,6 +428,21 @@ authorization from commit.
 ## OPEN OPERATOR QUESTIONS
 
 *(Plain English, self-contained, newest at top. Answered items keep their ruling here.)*
+
+### Q6 (2026-08-27) — the radar box needs to be TOLD the provider offers a basemap: approve two optional capability fields?
+
+Verified in the LibreWxR fork's own docs and code: LibreWxR serves only transparent radar
+overlays and opaque satellite imagery; it has no basemap of its own and tells every client to
+bring one. Painting ground into the radar tiles would break the RainViewer-compatible contract
+(radar must stay a fade-able overlay). So M2 gives the fork a new tile family — `/v2/basemap/…`
+(opaque ground + freeways + labels, light/dark) and `/v2/labels/…` (transparent labels +
+outlines for over satellite) — advertised in its catalog like satellite already is.
+For the dashboard's radar box to draw them, the radar provider capability needs two optional
+fields (`basemapTileUrlTemplate` per theme, `labelsTileUrlTemplate`), filled by the LibreWxR
+provider module from the catalog, null for RainViewer/iframe. The box draws them only when
+present — Clear Skies still derives nothing, decorates nothing; it just stacks what the provider
+sends. **Ruling needed:** approve the two fields (recommended), or rule that the box shows
+radar/satellite over nothing even when the provider offers ground.
 
 ### Q5 (2026-08-27) — does "NO ESRI" also cover the surf height map's imagery and the wizard's satellite toggle?
 
