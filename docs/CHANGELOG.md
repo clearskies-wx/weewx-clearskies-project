@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-26 — Surf shape score unstuck: segmented peel angle + graded closeout (PEEL-SEGMENTS)
+
+- **Shape score was pinned at 10% every hour.** Cause found: peel angle was computed as ONE beach-wide number — swell obliqueness minus the *average* break-line angle over all transects — which at Huntington's geometry can never clear the closeout threshold (served peel 0.3°–10.1°), and the scorer's closeout ruin clamp then pinned the shape blend at 0.10 permanently. Averaging erases exactly the local bar corners (peaks) that produce rideable peel.
+- **Segmented peel.** Peel is now evaluated per local segment (sliding 3-transect windows, ~20–40 m of beach — the scale of one surfable peak): the served peel angle/direction/classification come from the BEST segment (the peak a surfer picks), and a new additive field `closeoutFraction` reports how much of the stretch closes out. A sign-coupling test with an independent geometric ground truth pins that the *correct* (down-swell) flank of a peak is crowned under angled swell.
+- **Graded closeout in the shape score.** The hard 10% pin now applies only when literally every segment closes out; otherwise shape = the blend scaled by (1 − 0.5 × closeout fraction) — so the score finally responds to swell angle and bar structure day to day.
+- Marine `b62008f`. Wire: `closeoutFraction` additive on the surf forecast entries (API-MANUAL update pending the open fog-section ruling).
+
 ### 2026-08-26 — Swell card no longer drops split-swell energy (DREF-MERGE-FIX)
 
 - **Missing west-swell energy found and fixed.** The spectral partitioner sometimes splits one swell into two or three near-duplicate fragments at a single deep-water reference point; the card's merge then published only the best-aligned fragment's height and silently discarded the rest of that swell's energy. Live case (2026-08-26 21Z): the ~15 s west swell was served at 0.09 m while buoy 46222 measured 0.24 m in that band — the operator caught the ~2–3× gap against the buoy. Fragments at a single point are now recombined energy-conserving (heights add as the square root of summed squares — standard spectral theory) before the cross-point merge, which is unchanged: different points are independent measurements of the same wave and are never summed (that would double-count). Recombined value for the live case: 0.26 m, matching both the buoy (0.24 m) and the model field at the buoy's own location (0.25 m). Marine `6abb831`; [manuals/PROVIDER-MANUAL.md](manuals/PROVIDER-MANUAL.md) §14.19 updated.
