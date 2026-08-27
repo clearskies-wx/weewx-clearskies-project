@@ -129,6 +129,7 @@ cross-inferred); (11) no generic model setup, zero model-setup controls on produ
 | PA4 | **LIBREWXR-BASEMAP** (in the LibreWxR fork, `repos/librewxr`, branch `deploy/shaneburkhardt` — not a Clear Skies repo): the fork's tile output carries its own ground, place labels and outlines from OSM data (Protomaps extract of its own `LIBREWXR_BBOX`), rendered server-side | fork-internal | Operator 2026-08-27 in chat (EVO-Q18 Round 3): "any labeling should have been a customized change TO LIBREWXR ... you need to undo that and move it" |
 | PA5 | **C6 seam-fidelity ledger row**: one SWAN L2 output point just inside its boundary + a per-cycle ledger field comparing WW3-handed vs SWAN-absorbed spectra | 7 | Operator 2026-08-25, chat "ok" on EVO-Q16 (C6 named there; "droppable on request") |
 | PA6 | **CONSISTENCY-SCORING**: ADR-101 row-5 amendment + parse-time attachment of per-partition group statistics (ν, Qp, κ, Tm02, T_set) to the DWR spectral entries (a data-contract change inside the marine service), scorer reads them | 1, 4 | Operator 2026-08-23, chat "q14 recommendation is fine" (EVO-Q14 record); the per-partition data path was disclosed in that row as covered by the Q14 approval. Open sub-decisions → Q3 |
+| PA8 | **WW3 G1 transparency field for partially-land cells** (S8.1): fraction-based land/sea mask + `FLAGTR = 2` cell-centre transparencies derived at setup from the finest cached DEM; `F_DRY` named constant (value to confirm) | 1, 3 | Operator 2026-08-27, chat: "it should also apply to cells that are not 100 percent island … so you are not OVERCOUNTING an island". Scheduling → Q7 |
 | PA7 | **Substitution cleanup** (S3): deletion of provably-dead keys/code left by the L1 → WW3 substitution | none (methodology: nothing was being done; nothing stops being done — CLAUDE.md table) | Standing rule; each deletion still gets the pre-deletion grep + post-deletion green accept (rules/coding.md "Never keep dead code") |
 
 Withheld: model-physics changes of any kind (island shadowing S8 included — research and
@@ -387,9 +388,54 @@ file written before the campaign starts.
 
 ### S8 — Island shadowing (C15) — LAST
 
-Research brief first (reconstruction lobe width σθ 15° vs measured 27–31°; WW3 obstruction
-grid; diffraction; Catalina/San Clemente lee at the S edge), with the cliff KAT as the
-instrument; operator ruling; nothing dispatches before S1–S7 close and Q2 is answered.
+Research brief first (reconstruction lobe width σθ 15° vs measured 27–31°; diffraction;
+Catalina/San Clemente lee at the S edge), with the cliff KAT as the instrument; operator
+ruling; nothing dispatches before S1–S7 close and Q2 is answered.
+
+**S8.1 — Partially-land cells: WW3 transparency field on G1 (operator direction 2026-08-27:
+"it should also apply to cells that are not 100 percent island … so you are not OVERCOUNTING
+an island when you may only have the tip in the grid").** Verified state today
+(`swan_domain.py:3153–3179`, `:3295–3313`; ADR-109 D3 table): the production G1 grid runs
+`FLAGTR=0` — no obstruction information — and every 1 km cell is called wet or dry from the
+ONE ETOPO 15″ (~460 m) sample nearest its centre (`_ww3_nearest_source_depth`, round-to-
+nearest index; dry iff that sample ≥ 0). A coastline cell is therefore all-block or all-pass
+on the luck of which sample sits at its centre: island outlines are quantised to the 1 km
+grid and jitter ±½ cell, over-counting on some edges and under-counting on others; a tip
+covering 20 % of a cell is either a full wall or absent. The only transparency field ever
+built was for the rejected 4 km G2 (`FLAGTR=2`, mean 0.854; `scratch/REFERENCE-gen_grids.py`
+"obstruction-fraction generator").
+**WW3's own mechanism (manual §3.4.7, :6722–6793; codes :15349–15363; file grammar
+:15927–16018):** `&MISC FLAGTR = 2` = transparencies AT CELL CENTRES, read as a second field
+in `ww3_grid.inp` after the depths (same unit 10, own scale factor, `NX*NY` values). For a
+cell of transparency τ, inflow through its upstream face is 0.5(1+τ), outflow 1, and the next
+cell's inflow 2τ/(1+τ), so the product across the cell is exactly τ; consecutive partial cells
+multiply. Regular grids only (ours is). No compile switch — grid-preprocessor only.
+**Design (executes S8.1's block verbatim; a deviation is a finding):**
+1. At WW3 setup derivation (`derive_ww3_setup()`, config-time, PRIME DIRECTIVE 11), compute
+   per G1 cell the **open-water fraction** `f ∈ [0,1]` = share of fine-source samples inside
+   the cell's footprint with depth < 0. Fine source = the finest regional DEM already cached
+   for the region (NCEI ~90 m CRM / ~10 m regional DEM where present; ETOPO 15″ only as the
+   fallback — at ~460 m it yields ≤ 4–5 samples per cell, i.e. steps of ~0.2, disclosed).
+2. Land/sea mask becomes fraction-based: cell is DRY iff `f ≤ F_DRY` (named constant,
+   proposed 0.05 — operator to confirm), WET otherwise; wet cells carry transparency `τ = f`
+   (F_DRY < f < 1 → partial; f = 1 → 1.0). The S-row/W-column boundary-cell wet test reads
+   the same mask (no second criterion).
+3. `ww3_grid.inp` gains `FLAGTR = 2` in `&MISC` and the transparency field block (scale
+   factor 1.0, same IDLA/IDFM conventions as the depth block, SYNTAX row 6a); `mod_def.ww3`
+   rebuilt (geometry-change trigger — S6's G10 gets exercised for real here).
+4. KATs: (a) a hand-built 3×3 fine grid with a known tip → exact f per cell; (b) a synthetic
+   island whose true area is known → summed f × cell area reproduces it to < 2 % while the
+   old nearest-sample mask errs by its measured amount; (c) transfer-file byte-identity for a
+   region with no partial cells (guards the depth block); (d) a real G1 derivation diff:
+   count of cells that flip dry↔wet and the distribution of τ, pasted.
+5. Reality gate (stated before looking): S-swell (<0.1 Hz) model/buoy ratio at 46222/46253
+   vs the standing 0.56–0.60×; the cliff-KAT seam aggregate vs 0.578 m; direction unchanged
+   within ±5°. Improvement expected but NOT assumed — the lobe-width and diffraction items in
+   S8 remain separate.
+**Triggers:** 1 and 3 (obstruction input to the propagation scheme; wet/dry criterion) —
+authorized by the operator's chat direction above, recorded as PA8. **Ordering:** S8 is
+operator-ordered LAST; S8.1 is mechanical and manual-native, so it CAN run ahead of the S8
+research if the operator says so → Q7.
 
 ### S9 — Inherited-queue reconciliation (read-only; C9–C11)
 
@@ -428,6 +474,18 @@ authorization from commit.
 ## OPEN OPERATOR QUESTIONS
 
 *(Plain English, self-contained, newest at top. Answered items keep their ruling here.)*
+
+### Q7 (2026-08-27) — island transparency field (S8.1): run it now, or hold it with the rest of island shadowing (LAST)?
+
+Today every 1 km WW3 cell is all-land or all-water from one ~460 m bathymetry sample at its
+centre, so island edges are quantised to the grid and a cell holding only an island's tip
+is either a full wall or nothing. You said it should be fractional. WW3 supports exactly that
+(`FLAGTR = 2`, transparency per cell; manual §3.4.7): a cell that is 20 % land passes 80 %.
+S8.1 designs it: open-water fraction per cell from the finest DEM we already cache, cells
+below a small floor (`F_DRY`, proposed 0.05) stay dry, everything else is water with its
+fraction as transparency. It's mechanical and manual-native, but it is part of the island
+problem you ordered LAST. **Ruling needed:** (a) run S8.1 now as its own round (after the Q17
+push), or (b) hold it inside S8. Also confirm `F_DRY = 0.05` or give a number.
 
 ### Q6 (2026-08-27) — the radar box needs to be TOLD the provider offers a basemap: approve two optional capability fields?
 
