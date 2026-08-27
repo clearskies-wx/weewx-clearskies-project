@@ -214,16 +214,22 @@ global) and `basemap-local.pmtiles` (z7–15, the union box). Served by one endp
 today) + `/api/v1/basemap/status`. Admin page: one "update basemap" action + status.
 `pmtiles` CLI stays a documented API-host prerequisite (OPERATIONS-MANUAL).
 **Dashboard:** marine and seismic maps — light theme unchanged (OSM raster); dark theme =
-`protomaps-leaflet` `leafletLayer` over the two sources (world under local), Protomaps dark
-theme tuned to the current sparse look; marine label overlay (both themes) = a labels-only
-rule set from the same sources. `CARTO_OSM_ATTRIBUTION` deleted; attribution becomes
+`protomaps-leaflet` `leafletLayer` over the tiered sources (world under regional under
+local), Protomaps dark theme tuned to the current sparse look. **Required content of the dark
+basemap (operator, 2026-08-27): water, land/coastline, admin boundaries, place labels, and
+FREEWAYS** — the Protomaps `roads` layer's motorway + trunk classes drawn at every zoom of
+the regional and local tiers (visible from z7, so the seismic view shows the interstate
+network, not just at street zooms); primary roads from z11 in the local tier; nothing
+smaller. Marine label overlay (both themes) = a labels-only rule set from the same sources. `CARTO_OSM_ATTRIBUTION` deleted; attribution becomes
 "© OpenStreetMap contributors © Protomaps" (About page row already exists). Tile-error
 banner logic (M1 fixit constants) kept.
 **Not touched:** the radar box (directive 13), wizard/admin maps (OSM raster, unaffected),
 the surf height map (Q5).
 **Gate rows (results-free file, stated now):** both maps render in both themes with no
 watermark and no blank inside the derived box (screenshots side-by-side vs today's light
-theme); a pan outside the box shows the world baseline, not blank; `grep -r cartocdn`
+theme); **freeways visible on the dark seismic map at its initial zoom and on the dark marine
+map at z14** (named roads checked against the light OSM map at the same view — I-405/I-5/
+SR-55 for this install); a pan outside the box shows the world baseline, not blank; `grep -r cartocdn`
 across dashboard/api/stack = 0; extract sizes within the M0-measured envelope; attribution
 string present on both maps; dashboard `tsc` zero errors; vitest for the two components.
 
