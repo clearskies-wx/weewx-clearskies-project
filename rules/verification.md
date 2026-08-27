@@ -274,3 +274,16 @@ question built on top of it. The operator first learned the issue existed when a
 its capture mechanism ("THIS HAS NEVER BEEN RAISED AS AN ISSUE!") and dropped it on the spot. The
 adversarial review had verified the carry-over faithfully tracked the archive, but never asked
 whether the operator had ever validated the premise — fidelity to paperwork is not validation.
+
+**Corollary — carry the CLOSE record, not the OPEN row (added 2026-08-28, MARINE-AND-MAPS Q9).**
+Before copying a row forward, check the source plan for a later ruling, round-close, or commit
+that already settled it, and check the live code/service for the fix. A chat ruling that closes
+or drops an item is written into the plan the same hour it is given — "discussed in chat" with no
+plan mark is how a settled item resurfaces as open in every successor plan.
+
+**Why (2026-08-28):** the MARINE-AND-MAPS plan's carry-over register was built from the
+predecessor's ORIGINAL C15/C16 rows, not its Q6 close record eleven days later. Three items
+already fixed and in HEAD (`43744de`, `de2738f`, `09c0a1b`) were carried as open work with a
+cleanup task built on them; two items the operator had settled in chat (C5, C6) were carried as
+"unvalidated" because nobody had marked them closed. The operator caught it: "the fact that you
+did not mark that is disconcerting … if this was done why did you not mark it complete?"

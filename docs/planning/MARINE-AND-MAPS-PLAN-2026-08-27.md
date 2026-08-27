@@ -54,11 +54,11 @@ predecessor's Q1–Q18 are cited as `EVO-Q#`).
 | Gate M | Adversarial gate per round + one end-to-end row (every map surface rendered in both themes, screenshots side-by-side) | ⬜ |
 | S1 | **C6 seam-fidelity ledger row** — WW3-handed vs SWAN-absorbed at the L2 boundary, every cycle | ⬜ APPROVED 2026-08-25 (EVO-Q16 C6) — after S0's gate passes |
 | S2 | **CONSISTENCY-SCORING** — code the Q14-approved set-timing/set-amplitude definitions into the surf score (ADR-101 row-5 amendment first). NOT in code today — the scorer still runs the interim swell-dominance bucketing | ⬜ APPROVED 2026-08-23 (EVO-Q14); sub-decisions A–E RULED 2026-08-27 (Q3 "yes") — ready to brief after S8.1 |
-| S3 | **Substitution cleanup** — dead `ww3_chain_enabled` key, `level1` label rename, stale `inputs.ww3_boundary` health entry, vestigial `_reused_l1_boundary_command_lines()`, PROVIDER-MANUAL §14.15 swell-card bullet, API-MANUAL §17 `swellSource` + `closeoutFraction` | ⬜ methodology (dead code / doc drift) |
+| S3 | **Substitution cleanup** — dead `ww3_chain_enabled` key, `level1` label rename, stale `inputs.ww3_boundary` health entry, vestigial `_reused_l1_boundary_command_lines()` + the on-disk `swan/level1/` directory, hotstart-age gate (C7 survivor), PROVIDER-MANUAL §14.15 swell-card bullet, API-MANUAL §17 `swellSource` + `closeoutFraction`, ADR-109 G7 "unbuilt" note struck | ⬜ methodology (dead code / doc drift). Register re-audited 2026-08-28 (Q9) |
 | S10 | **FOG-REVERT** (API) — revert the 2026-08-24 fog cross-check narrowing (API `1ad6e74` + `f2c5ecd`): two nights of live testing showed the night-time standalone ≤ 1 °F rule cries wolf (conditions right, fog rarely formed); the provider cross-check returns at every level, as before. The uncommitted API-MANUAL edit documenting the narrowing is discarded | ⬜ RULED 2026-08-27 (Q4 "we actually need to revert the change") — lead-direct `git revert` + fog tests on weewx + CHANGELOG; deploy on "push" |
-| S4 | **Test-debt triage** — the parked pre-existing failure classes, one ruling per class (repair harness / delete stale pin / keep) | ⬜ |
+| S4 | **Test-debt triage** — two test files, 18 failing tests (`test_serve_nothing_on_failure` 8, `test_service_full_run_trigger` 10; re-verified 2026-08-28), one ruling per class (repair harness / delete stale pin / keep) | ⬜ |
 | S5 | **First-install WW3 warm-start bootstrap** — the durable mechanism EVO-Q9 parked as a pre-ship row | ⬜ pre-ship; not needed for this install |
-| S6 | **ADR-109 gap closure** — G7 (wind regrid step: now BUILT by the horizon march's `_ww3_regrid_wind_nearest_neighbor` — confirm + close), G10 (`ww3_grid` geometry-change trigger never exercised), D14 wetted-grid crash (unconfirmed) | ⬜ |
+| S6 | ~~ADR-109 gap closure~~ **DISSOLVED 2026-08-28 (Q9)** — G7 is built (one-line ADR edit → S3); G10 (`ww3_grid` rebuild hook) is part of S8.1; D14 stays a note | ✅ closed-no-work |
 | S7 | ~~Live-chain validation campaign~~ **DROPPED 2026-08-27 (Q1: "THIS IS ALL TESTING... NO ONE IS ACTUALLY VISITING THE SITE")** — no formal campaign, no ceremony gate. The per-cycle buoy ledger keeps running as the standing instrument; the operator checks the site as they see fit; when Phase L opens is the operator's call, not a gate this plan computes | ✅ closed-no-work |
 | S8 | **Island shadowing** — the S-swell <0.1 Hz 0.56–0.60× deficit (narrow reconstruction lobe σθ 15° vs measured 27–31°, no diffraction, Catalina lee). **S8.1 (transparency field) RUNS NOW (Q7 "run now")**; the rest (lobe width, diffraction) stays LAST | 🔄 S8.1 briefing now; S8 research LAST |
 | S9 | ~~Inherited-queue reconciliation~~ **OUT OF THIS PLAN (Q2: "keep that crap out of here. Let's chat separately")** — the other plans' open rows are NOT tracked here | ✅ removed |
@@ -154,28 +154,39 @@ Per rules/verification.md "Carried-over items must cite an operator-validated pr
 without a citation enters tagged **UNVALIDATED — surface before any work** and is worked only
 after the operator confirms it in Q2.
 
+**RE-AUDITED 2026-08-28 (Q9 — operator: "i am very nervous about all of the carry over tasks
+without going through each one and assessing what has been done and if it is still needed").**
+Every row was checked against marine HEAD, the live service, and the predecessor's own close
+records. Result: three rows were ALREADY DONE when this plan was created (C7 ×2/3, C8, C18 —
+lead error: carried from the predecessor's original C15/C16 rows without reading its Q6 close),
+two were moot (C3, C4), five were operator-dropped in this pass (C1, C2, C5, C6, C14) — C5 and
+C6 had been discussed and settled in chat earlier but never marked closed in any plan, which is
+exactly why they kept resurfacing. LESSON (rule-shaped, applied to rules/verification.md): a
+chat ruling that closes an item is written into the plan the same hour; a carried row cites the
+predecessor's CLOSE record, not its OPEN row.
+
 | # | Item | Premise citation | Lands in |
 |---|---|---|---|
-| C1 | Operator eyeballs owed: B2-Accept (multiSwell shows real trains), S-Accept card, K-Accept cam + knob drill, H re-accept — unblocked since A1.5 PASS 2026-08-14 | EVO-C1–C4; operator freeze condition satisfied per EVO-CURRENT STATE 2026-08-14 | S7 (consolidated eyeball round) |
-| C2 | Fresh buoy apples-to-apples for the 18 s SSW event — leaves NDBC's ~45-day window ~2026-09-26 | EVO-C7 (owed on request) | S7, before 2026-09-26 or substitute a fresh event and say so |
-| C3 | Housekeeping: ~181 stale `B_*.txt` on librewxr (inert) | EVO-C17 | S3 (operator-visible before deletion) |
-| C4 | Currents tail-hold path never live-exercised | EVO-C18; Z3.9 ruling (a) is an operator ruling | S7 watch row |
-| C5 | Parked physics candidates: L4/1-D deep-ledge handoff loss; 5° directional resolution for the nearshore chain | EVO-C19 — **UNVALIDATED** | Q2 |
-| C6 | Phase T (tide coherence) close acknowledgment, owed since 2026-08-11 | EVO-C13 | Q2 (one-line nod) |
-| C7 | V14 residuals: blocking no-timeout lock in the geometry-push path; post-restart cooldown in-memory only; no hotstart-age gate | EVO-C15 → EVO-Q6 ruled 2026-08-16 "if they still matter ... fix them" | S3 (verify each still exists post-substitution; fix if live) |
-| C8 | `model_wave_source.py` bare `swells[0]` without the 5 s surfable floor | EVO-C16 → EVO-Q6 same ruling | S3 |
+| ~~C1~~ | ~~Operator eyeballs owed (multiSwell trains, surf card, cam + knob drill, dry-beach re-accept)~~ | operator 2026-08-28 "c1 drop" | DROPPED — the operator looks at the site nightly; no formal sign-off rows |
+| ~~C2~~ | ~~Fresh buoy apples-to-apples for the 18 s SSW event~~ | operator 2026-08-28 "c2 drop" | DROPPED — the per-cycle buoy ledger is the same comparison, continuously |
+| ~~C3~~ | ~~~181 stale `B_*.txt` on librewxr~~ | verified 2026-08-28: the service work root holds 88 `B_*.txt`, all 2026-08-19, all referenced by the live L2 INPUT — not stale; the 176 under `/home/claude/ww3-baselines/e1e2/` are the PRESERVED research baselines (EVO-F0) — never delete | MOOT. Residue: `swan/level1/` (34 files, 08-19) is the removed L1 level's directory — folded into C19 (the stationary fill still reads its INPUT) |
+| ~~C4~~ | ~~Currents tail-hold never live-exercised~~ | verified 2026-08-28: live health `currentsTailHeld: {hours: 21, reachUntil: 2026-08-29T03Z, recorded_at: 2026-08-27T03:26Z}` | DONE — exercised live |
+| ~~C5~~ | ~~Parked physics candidates (L4/1-D deep-ledge handoff loss; 5° nearshore directional bins)~~ | operator 2026-08-28: "these were discussed" — settled in chat earlier, never recorded as closed | DROPPED. If the island work (S8) does not close the deficit they return WITH evidence, not as guesses |
+| ~~C6~~ | ~~Phase T (tide coherence) close acknowledgment~~ | deployed 2026-08-11; operator 2026-08-28 "if this was done why did you not mark it complete?" | CLOSED |
+| C7 | V14 residuals — **two of three FIXED 2026-08-16** (marine `43744de` bounded lock, `de2738f` cooldown persistence; both in HEAD). Surviving: **no hotstart-age gate** (nothing checks the warm-start file's age before reuse) | EVO-Q6 ruled 2026-08-16; the age gate was ruled "fold into the health/refuse design" | S3 (one item) |
+| ~~C8~~ | ~~`model_wave_source.py` bare `swells[0]`~~ | FIXED 2026-08-16 marine `09c0a1b` (floor at `model_wave_source.py:543–547`, in HEAD) | DONE |
 | C9 | L1-BOUNDARY-REBUILD-PLAN deferred queue: Gate S wlevel (blind audit) → S1+S4a currents ladder → S-Accept currents rows → Phase A (A1/A2 service-area/setup report) → Gate A → Gate C (C1–C3 rows) → V1/V3/V4 | That plan is operator-approved 2026-08-08 ("the plan serves as permission") and its status block says "Remaining: …"; several items have since landed by other rounds (STOFS wlevel live, currents ladder live per ARCHITECTURE, `currentsTailHeld` live) — **state not re-verified since 2026-08-09** | **OUT OF THIS PLAN** (Q2 ruling 2026-08-27) — separate operator conversation |
 | C10 | SURF-REMEDIATION-PLAN R1–R4 (min/max range served; reform/second break; fixed chart scale + `/var/lib` work root; R4 parallel report) | Operator-approved 2026-08-08; R2's subject was re-done by BREAK-REFORM 2026-08-26; `/var/lib/weewx-clearskies/swan` is live (health `ledgerPath`) | **OUT OF THIS PLAN** (Q2 ruling 2026-08-27) — separate operator conversation |
 | C11 | SURF-PHYSICS-REMODEL-PLAN rounds Y/X/Z + DOC-0/DOC-1 debts; MARINE-FORWARD-PLAN open rows; EYEBALL-FIX residuals (subsumed into the remodel plan per its own header) | Operator-approved 2026-08-06 / 2026-08-02 / 2026-08-04 | **OUT OF THIS PLAN** (Q2 ruling 2026-08-27) — separate operator conversation |
-| C12 | LIBREWXR-SATELLITE-SEAM (GOES-18/19 seam over New Mexico) | Operator: "put a pin in this" (2026-08-08) — parked, physics-formula change, needs chat approval | Stays parked; listed so the M2 fork work does not accidentally touch it |
-| C13 | Pre-existing test failures (all reproduced at their baselines, none introduced): `test_serve_nothing_on_failure` 8× (`NoneType.by_side`, L4-nesting harness class), `test_swan_quickupdate_swelltrack_merge` 2×, `test_h4_chunked_json` 1× (wall-clock), `test_service_full_run_trigger` 10/28 (traced to the WW3-chain-unconditional change), `test_double_break_transect55_kat`, `test_wind_gatherer::TestColdStartReconcile` (Windows path) | Each recorded in an EVO checklist row with the lead's checkout-verified reproduction | S4 |
-| C14 | Marine failure monitor armed | EVO-C10 | stays armed |
-| C15 | Island-shadowing deficit (S-swell <0.1 Hz 0.56–0.60× in-domain vs ~1.0× at unshadowed buoys) | Operator 2026-08-22 "deal with the island shadowing last"; EVO-Q15 item 6 | S8 — LAST |
-| C16 | ADR-109 gaps G7/G10, D14 crash | ADR-109 Accepted by the operator 2026-08-17 (gaps registered in the accepted text) | S6 |
-| C17 | First-install warm-start bootstrap | EVO-Q9 ruling 2026-08-19: seed executed; durable mechanism "PARKED as a pre-ship row" | S5 |
-| C18 | Pre-existing uncommitted API-MANUAL fog-section edit (2026-08-24; documents API `1ad6e74`/`f2c5ecd`, which are already live) | Sitting in the meta working tree across four sessions; every doc-sync commit has stepped around it | Q4 |
-| C19 | `ww3_chain_enabled` is a no-op key; `level1` label in sizing code/cache names the WW3 domain; `_reused_l1_boundary_command_lines()` vestigial; health `inputs.ww3_boundary` is a stale registry entry (no producer in code — only in the persisted `state_snapshot.json`) | ARCHITECTURE.md records the first three as tracked follow-ups (⚓ WW3 leg + chain-serves paragraphs); the fourth found 2026-08-27 in `/health` | S3 |
-| C20 | Doc drift: PROVIDER-MANUAL §14.15 "feeds the swell display card" bullet (true only via fallback since Q16-B); API-MANUAL §17 lacks `swellSource` + `closeoutFraction` | EVO Q16-ROUND-B row; PEEL-SEGMENTS CHANGELOG entry ("API-MANUAL update pending the open fog-section ruling") | S3 (after Q4) |
+| ~~C12~~ | ~~LIBREWXR-SATELLITE-SEAM~~ | operator 2026-08-28: "c12 has nothing to do with this plan" | REMOVED — a LibreWxR item; its pin (2026-08-08) is the fork's record, not this plan's |
+| C13 | Pre-existing test failures — **re-run 2026-08-28 (Windows)**: `test_serve_nothing_on_failure` 8 FAIL and `test_service_full_run_trigger` 10 FAIL, identical to baseline; `test_h4_chunked_json` and `test_double_break_transect55_kat` PASSED this run (the first was always a wall-clock flake); `test_wind_gatherer::TestColdStartReconcile` is Windows-path only. 18 failing tests in the model's own suite | Each recorded in an EVO checklist row with the lead's checkout-verified reproduction | S4 (two test files) |
+| ~~C14~~ | ~~Marine failure monitor armed~~ | operator 2026-08-28 "c14 no" | DROPPED. Fact: the old monitor was a previous chat session's watch and died with it — nothing watches the marine service now |
+| ~~C15~~ | ~~Island-shadowing deficit~~ | operator 2026-08-28: "why c15 is needed if we replaced it with a new task" | FOLDED — S8 IS this item; no separate row |
+| ~~C16~~ | ~~ADR-109 gaps G7/G10, D14~~ | verified 2026-08-28: **G7 (wind onto the WW3 grid) is BUILT** — the horizon march's wind path (`service.py:831`); **G10 (`ww3_grid` rebuild on geometry change) is NOT** — `service.py:938–947` refuses, and the live `mod_def.ww3` was hand-minted 2026-08-18; **D14** is a note about a test that could not be run, not a defect in the running model | DISSOLVED (operator 2026-08-28): G7 → one-line ADR-109 edit (S3 doc round); G10 → part of S8.1 (the island round rebuilds the grid and needs this hook); D14 → stays a note in ADR-109, no task |
+| C17 | First-install warm-start bootstrap | EVO-Q9 ruling 2026-08-19: seed executed; durable mechanism "PARKED as a pre-ship row" | S5 (parked; not needed for this install) |
+| ~~C18~~ | ~~Uncommitted API-MANUAL fog-section edit~~ | discarded (`git checkout`) 2026-08-27 under Q4 | DONE |
+| C19 | Leftovers of the SWAN-L1 removal, all CONFIRMED 2026-08-28: `ww3_chain_enabled` is a no-op (`service.py:668`); `level1` naming — 170 occurrences in 11 files; `_reused_l1_boundary_command_lines()` still runs in the stationary-fill path (`swan_runner.py:4686`, `vchain.py:727`) reading the dead `level1/INPUT`; health lists `ww3_boundary` as a REQUIRED input that nothing records (live: `inputs.ww3_boundary.available: false`; only exempt from turning the status red because never-recorded inputs are skipped, `health.py:446–458`); plus the `swan/level1/` directory on disk (from C3) | ARCHITECTURE.md records the first three as tracked follow-ups; the fourth found 2026-08-27 in `/health` | S3 |
+| C20 | Doc drift, CONFIRMED 2026-08-28: PROVIDER-MANUAL:2529 "Feeds the swell display card" (true only via fallback since Q16-B); API-MANUAL §17 lacks `swellSource` + `closeoutFraction` | EVO Q16-ROUND-B row; PEEL-SEGMENTS CHANGELOG entry | S3 (doc round; Q4 is ruled so the file is unblocked) |
 
 ---
 
@@ -384,17 +395,26 @@ per partition in `swan_runner.py` ~:3900–3974; scorer reads scalars) → KATs 
 V1 worked numbers → firewalled gate → deploy → reality row (a groundswell day and a windsea
 day ranked as the operator expects).
 
-### S3 — Substitution cleanup (PA7; C7, C8, C19, C20, C3)
+### S3 — Substitution cleanup (PA7; C7 survivor, C19, C20)
 
-One deletion round in the marine repo (dead-key grep proofs in the brief), one doc round
-(PROVIDER-MANUAL §14.15, API-MANUAL §17 `swellSource` + `closeoutFraction`, after Q4
-unblocks the file). C7/C8 verified-live-or-closed first.
+One deletion round in the marine repo (dead-key grep proofs in the brief): `ww3_chain_enabled`,
+`level1` rename, `_reused_l1_boundary_command_lines()` + the stationary-fill dependence on
+`level1/INPUT`, the `ww3_boundary` required-input entry in health, the on-disk `swan/level1/`
+directory (operator-visible before deletion), and the hotstart-age gate (the health/refuse
+design's last V14 item). One doc round: PROVIDER-MANUAL:2529 swell-card bullet, API-MANUAL
+§17 `swellSource` + `closeoutFraction`, ADR-109 G7 row struck as built. C7's other two items
+and C8 are already in HEAD (`43744de`, `de2738f`, `09c0a1b`) — nothing to do.
 
 ### S4 — Test-debt triage (C13)
 
-One brief: for each class, the lead's ruling (repair harness to current design / delete a
-pin of superseded behaviour / keep with a probe-keyed skip) with the reason; test-author
-implements; nothing in production code moves. Baseline count before, count after.
+Scope (re-verified 2026-08-28, Windows run: 18 failed / 36 passed across the four named
+files): `test_serve_nothing_on_failure.py` (8 — L4-nesting harness class) and
+`test_service_full_run_trigger.py` (10 — the WW3-chain-unconditional change). `test_h4_chunked_json`
+and `test_double_break_transect55_kat` passed and leave the row; the wind-gatherer cold-start
+test is a Windows-path artefact, not a defect. One brief: for each class, the lead's ruling
+(repair harness to current design / delete a pin of superseded behaviour / keep with a
+probe-keyed skip) with the reason; test-author implements; nothing in production code moves.
+Baseline count before, count after.
 
 ### S5 — First-install WW3 warm-start bootstrap (C17)
 
@@ -402,12 +422,16 @@ Design (EVO-Q9 option 2): the install procedure drops a provenance note beside t
 restart file; the service accepts it once; ADR-109 D10 amendment. Not needed for this
 install; required before any fresh install.
 
-### S6 — ADR-109 gap closure (C16)
+### S6 — ~~ADR-109 gap closure~~ DISSOLVED 2026-08-28 (Q9)
 
-G7: confirm the horizon march's `_ww3_regrid_wind_nearest_neighbor` IS the production
-regrid step (the leg's own wind path uses the same helper?) and close the gap in ADR-109.
-G10: exercise `ww3_grid`'s geometry-change trigger in a scratch config push and record it.
-D14: leave registered; no wetted-substitution KAT attempts without a design.
+Plain English record: ADR-109 (the decision record for our own deep-water model) listed three
+unfinished things when it was accepted. (1) Putting the gathered wind onto the model's grid —
+built; the daily 96 h run uses it (`service.py:831`). Closes with one ADR line, in S3's doc
+round. (2) Rebuilding the model's grid file when the grid changes — NOT built; the service
+refuses on a geometry change (`service.py:938–947`) and the live grid file was hand-made on
+2026-08-18. The island round (S8.1) changes the grid, so it builds this hook — same task, not a
+separate one. (3) A crash hit while trying a sensitivity test — a note about a test that could
+not run, not a defect in the running model; stays a note in ADR-109.
 
 ### S7 — ~~Live-chain validation campaign~~ DROPPED 2026-08-27 (Q1)
 
@@ -513,6 +537,8 @@ authorization from commit.
 ---
 
 ## OPEN OPERATOR QUESTIONS
+
+### Q9 (2026-08-28) — ✅ RULED: carry-over register re-audit. Operator: "i am very nervous about all of the carry over tasks without going through each one and assessing what has been done and if it is still needed." Rulings, verbatim: "c1 drop c2 drop c5 again these were discussed, the fact that you did not mark that is disconcerting c6 if this was done why did you not mark it complete? geesh." / "c14 no" / "c12 has nothing to do with this plan" / "why c15 is needed if we replaced it with a new task" / C16 dissolved after a plain-English explanation. Lead findings the same pass: C7 ×2/3, C8, C18 already done; C3, C4 moot; C13 re-verified at 18 failures in two files; C19/C20 confirmed live. Register rewritten; S6 dissolved; S3/S4 rows corrected. Also disclosed: nothing is watching the marine service for failures now (the old monitor died with its chat session).
 
 *(Plain English, self-contained, newest at top. Answered items keep their ruling here.)*
 
