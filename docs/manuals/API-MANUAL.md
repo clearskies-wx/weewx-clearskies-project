@@ -1671,10 +1671,9 @@ effect either way. See OPERATIONS-MANUAL §4 for the migration note.
 
 The Clear Skies product basemap — replaces CARTO (watermarked/retired 2026-08-25) on every map
 surface: marine, seismic, radar/satellite, and the surf height map. Generalises ADR-078's
-single-file geographic-features overlay into three zoom-tiered PMTiles files. **ADR-078 Amendment
-2 (Proposed)** records this as the successor to the geographic-features feature — both features
-run side by side until the operator accepts the amendment; nothing is removed by this section.
-Three endpoints, `endpoints/basemap.py`, service `services/basemap_extract.py`, wired via
+single-file geographic-features overlay (removed, M5 — ADR-078 Amendment 2, Accepted 2026-08-27;
+see §12c) into three zoom-tiered PMTiles files — the sole successor now that the old feature is
+gone. Three endpoints, `endpoints/basemap.py`, service `services/basemap_extract.py`, wired via
 `wire_basemap_settings()`:
 
 **`GET /api/v1/basemap/{tier}/tiles`** → PMTiles file (public, no auth). `tier` ∈ `world` (z0–6,
@@ -1709,7 +1708,7 @@ place — `available` reflects what's on disk, `last_error` names which tier(s) 
 
 **`POST /setup/basemap/update`** → starts a background extraction of all three tiers, one daemon
 thread, world → local → radar in sequence. Auth: `X-Clearskies-Proxy-Auth` shared-secret header
-(same pattern as `POST /setup/geographic-features/update`) — 503 if the proxy secret isn't
+(same pattern the old, now-removed `POST /setup/geographic-features/update` used) — 503 if the proxy secret isn't
 configured, 401 if the header is missing/wrong. **202** `{"status": "started"}` when a new
 extraction begins; **409** `{"status": "already_running"}` when one is already in flight — never
 two threads at once. A tier's own extraction failure does not stop the others; each failure is
@@ -1763,19 +1762,11 @@ tiles client-side into PNG data URLs via `rasterizeBasemapTile()` for its own SV
 
 ---
 
-## §12c Geographic-features endpoints (LEGACY — ADR-078 Amendment 2 Proposed, 2026-08-27)
+## §12c Geographic-features endpoints — REMOVED (M5, ADR-078 Amendment 2, Accepted 2026-08-27)
 
-Three routes from the original ADR-078 single-file overlay are still mounted at API `811fe88`
-(`endpoints/geographic_features.py`; `app.py` includes both routers) and run side by side with
-§12b until the operator accepts ADR-078 Amendment 2, whose removal commit deletes them. No
-dashboard code reads them as of `b307797`. Recorded here (and in the contract, `deprecated: true`)
-because they are live and one is an authenticated write — Gate D1 X9, 2026-08-27.
-
-| Route | Behaviour (from code) |
-| --- | --- |
-| `GET /api/v1/geographic-features/tiles` | Range-capable `FileResponse` of the single PMTiles file (206 on `Range`); 404 + JSON `detail` when not downloaded |
-| `GET /api/v1/geographic-features/status` | `{available, size_bytes, updated_at}` (nulls when absent) |
-| `POST /setup/geographic-features/update` | Synchronous pmtiles download/extract (30–120 s) using `[geographic_features]` bounds/maxzoom; `X-Clearskies-Proxy-Auth` required (401), 503 when no proxy secret, 500 on CLI/extraction failure; returns `{status:"ok", size_bytes, updated_at}` |
+The three routes from the original ADR-078 single-file overlay (`GET /api/v1/geographic-features/tiles`,
+`GET /api/v1/geographic-features/status`, `POST /setup/geographic-features/update`) and
+`endpoints/geographic_features.py`/`services/geographic_features.py` are deleted; superseded by §12b.
 
 ## §13 Anti-Patterns
 
