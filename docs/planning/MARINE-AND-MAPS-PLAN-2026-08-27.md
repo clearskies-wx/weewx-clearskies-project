@@ -605,44 +605,58 @@ authorization from commit.
 
 ## OPEN OPERATOR QUESTIONS
 
-### Q10 (2026-08-27) — OPEN: the rulings the adversarial plan review showed are missing (`scratch/ADVERSARIAL-PLAN-REVIEW-2026-08-28.md`; lead re-verified #1, #2, #14, #18 at the code/live service before recording)
+### Q10 (2026-08-27) — PARTLY RULED: the rulings the adversarial plan review showed are missing (`scratch/ADVERSARIAL-PLAN-REVIEW-2026-08-28.md`; lead re-verified #1, #2, #14, #18 at the code/live service before recording)
+
+**Operator, 2026-08-27, verbatim: "q10 1. yes. 2. yes. 3. ok 5. ok 6. we still need the api
+for the admin do we not? 7. ok 8. UMMM this is an issue is it not? … 9. FUCK OFF 10. what?"**
+→ 1 RULED yes (S2 unblocked; PA6 sub-decisions A–E stand). 2 RULED `F_DRY = 0.05`. 3 RULED
+(the DEM download, grid-file writers and rebuild hook are part of S8.1 — PA8 trigger-7 items
+authorized). 5 RULED drop (hotstart-age gate gone; C7 closed). 7 RULED record the input
+(S3 wires a `ww3_boundary` recorder instead of deleting the health entry). 9 RULED no watch.
+6, 8, 10 answered back in chat, still open — see below. Item 4 ruled (a) earlier.
 
 Each item is one decision. Plain English; the letter in brackets is the review finding.
 
-1. **[#4] Consistency score, sub-decisions A–E.** Your "q3 yes" was given on the belief it was
-   already in code. It is not. Same recommendation as before (A–E as written in Q3): do you
-   accept them knowing it is a new coding round? *Recommend: yes.*
-2. **[#5] Island transparency — the dry threshold.** A cell counts as land when less than
-   `F_DRY` of it is water. Proposed 5 %. Confirm 0.05 or give a number. *Recommend: 0.05.*
-3. **[#19, #6] Island transparency — three things that must be built or fetched first**, each a
-   new persisted file or lifecycle step: (i) a one-time finer seabed download of the WW3 box
-   (~90 m; the cached data is 1 km); (ii) the writers for the grid-file inputs the deck names
-   (nothing in the service writes them today — the live grid file was hand-made 08-18); (iii) the
-   rebuild-on-geometry-change hook. *Recommend: approve all three as part of S8.1; without them
-   S8.1 cannot run on the service.*
+1. ~~**[#4] Consistency score, sub-decisions A–E.**~~ ✅ yes.
+2. ~~**[#5] Island transparency — the dry threshold.**~~ ✅ 0.05.
+3. ~~**[#19, #6] Island transparency — three things that must be built or fetched first**~~ ✅ ok —
+   (i) a one-time finer seabed download of the WW3 box (~90 m; the cached data is 1 km);
+   (ii) the writers for the grid-file inputs the deck names; (iii) the rebuild-on-geometry-change
+   hook — all part of S8.1.
 4. ~~**[#7] Radar box view bounds.**~~ ✅ RULED (a) 2026-08-27 — operator: "Yes, but then when
    you did the research on the librewxr code, that reverse that as we found out that librewxr
    does NOT provide anything but the radar and satellite data and that we ARE responsible for
    the basemap." The provider's coverage box may shape the radar VIEW (pan limits, min zoom,
    mask — existing code, untouched); the basemap extract is sized from our own config only.
    Directive 14 reworded to say exactly that.
-5. **[#8] Warm-start file age check** (the last V14 leftover). Drop it (the health/refuse round it
-   was folded into shipped without it, and SWAN warm-start mechanics are frozen core) or give it
-   its own row. *Recommend: drop.*
-6. **[#11] Esri/NAIP in the API.** M4 un-wires them from the surf map. Remove the `[imagery]`
-   config key and the three provider modules from the API entirely (so no operator can put Esri
-   back on a user-facing map), or leave them installed but unused? *Recommend: remove (trigger 7).*
-7. **[#26] Health's `ww3_boundary` "required input".** Nothing records it, so health shows it as
-   unavailable forever. Record it (the NOAA boundary IS an input — more visibility) or delete the
-   entry? *Recommend: record it.*
-8. **[#14] Health is `degraded` right now** — invariant 1 (break depth deeper than the 1-D handoff
-   depth) has fired 130 times since the BREAK-REFORM/PEEL-SEGMENTS deploy, Huntington transects
-   4–7, ~2.2 m vs ~2.0 m. Investigate as a task, or accept as a known post-BREAK-REFORM state
-   for now? *Recommend: investigate (read-only first), separate row.*
-9. **[#14] Monitoring.** Nothing watches the marine service for failures. Arm a session watch
-   (dies with the session), or leave it? *Your call.*
-10. **[#23] The rule corollary** written into `rules/verification.md` ("carry the close record,
-    not the open row") was committed before you saw it. Keep, edit, or remove?
+5. ~~**[#8] Warm-start file age check**~~ ✅ drop.
+6. **[#11] Esri/NAIP in the API — OPEN.** Operator: "we still need the api for the admin do we
+   not?" Answer given: no — the API's imagery modules, the `[imagery]` key, the admin "Imagery"
+   section (`admin/routes.py:384`, `imagery_section.html`) and the wizard's "Imagery provider"
+   selector (`wizard/routes.py:2113–2126`) exist ONLY to choose the surf map's aerial-photo source;
+   the wizard's satellite toggle on the marine map step is a direct Esri URL in the browser
+   (`step_marine.html:931`), independent of all of that, and stays. "Remove" therefore means API
+   modules + key + admin section + wizard selector (API and stack repos). Awaiting the word.
+7. ~~**[#26] Health's `ww3_boundary` "required input".**~~ ✅ record it.
+8. **[#14] Health `degraded` — OPEN, and the lead's first description was wrong.** Operator: "UMMM
+   this is an issue is it not? … you have NO CLUE what the fuck that error means do you." Correct.
+   Traced 2026-08-27 (read-only): the check compares the beach model's break depth WITH the tide
+   added (`surf_1d_analytical.py:2352`, `depths = bathy + tide_level`) against the handoff depth
+   WITHOUT the tide (`_truncate_bathy_at_handoff` docstring: "RAW (chart-datum) profile depth, NOT
+   tide-adjusted"). Newport Beach tide at the firing hour (05Z 08-27) was +0.88 m above MSL, so a
+   break at 1.27 m of untided water reads 2.15 m and "beats" a 1.98 m handoff. The check is
+   comparing two different measures — that part is a defect in the CHECK. But it only started
+   firing when BREAK-REFORM (`57af5d6`) deployed: journal counts 0/day on 08-22…08-25, then 1,885
+   in 08-26 09Z and ~8,000 since — so BREAK-REFORM moved the outermost break marker seaward, to
+   within one tide-height of the handoff, which the 30 % handoff margin was designed to prevent.
+   Two questions for the operator: (a) fix the check to compare like with like (one line;
+   changes what the health check measures, so it gets the word first); (b) a read-only look at
+   where BREAK-REFORM now puts the outermost marker relative to the handoff, before deciding
+   whether the marker move is right. *Recommend: both, (b) before anything is judged.*
+9. ~~**[#14] Monitoring.**~~ ✅ no ("FUCK OFF").
+10. **[#23] — OPEN.** Plain: the lead added a paragraph to the project's rulebook
+    (`rules/verification.md`) saying "when carrying unfinished items into a new plan, first check
+    whether they were already closed" — and committed it before the operator saw it. Keep or remove?
 
 ### Q9 (2026-08-27) — ✅ RULED: carry-over register re-audit. Operator: "i am very nervous about all of the carry over tasks without going through each one and assessing what has been done and if it is still needed." Rulings, verbatim: "c1 drop c2 drop c5 again these were discussed, the fact that you did not mark that is disconcerting c6 if this was done why did you not mark it complete? geesh." / "c14 no" / "c12 has nothing to do with this plan" / "why c15 is needed if we replaced it with a new task" / C16 dissolved after a plain-English explanation. Lead findings the same pass: C7 ×2/3, C8, C18 already done; C3, C4 moot; C13 re-verified at 18 failures in two files; C19/C20 confirmed live. Register rewritten; S6 dissolved; S3/S4 rows corrected. Also disclosed: nothing is watching the marine service for failures now (the old monitor died with its chat session).
 
