@@ -6,9 +6,11 @@ Auditor: Gate S sweep (Z6) + lead spot-check. **Dispatch condition:** S8.1-B AND
 accepted (this round touches `service.py`, `swan_domain.py`, `grid_sizing_chain.py`, `swan_runner.py`,
 `vchain.py`, `ww3_grid_files.py` — every file the concurrent rounds edit; it runs ALONE in the marine tree).
 
-**Pre-round verification (lead, fill at dispatch):** marine HEAD `<hash>`, clean, NO other agent in the
-tree; occurrence inventory `grep -rn "level1\|LEVEL1" weewx_clearskies_marine/ | wc -l` → `<n>` (193 across
-12 files at `8fd5a24`); baseline `.venv_local\Scripts\python.exe -m pytest tests/services tests/test_health.py tests/test_health_ww3_block.py tests/test_bathy_refinement.py -q --tb=no -p no:cacheprovider` → `<n passed>`.
+**Pre-round verification (lead, 2026-08-27):** marine HEAD `42314a4`, clean, NO other agent in the marine
+tree (the running auditors are read-only in other repos); occurrence inventory `level1|LEVEL1` in
+`weewx_clearskies_marine/*.py` → **193** across 12 files; **0** in `models/` (no wire field carries the
+label); baseline `.venv_local\Scripts\python.exe -m pytest tests/services tests/test_health.py tests/test_health_ww3_block.py tests/test_bathy_refinement.py -q --tb=no -p no:cacheprovider` → **`407 passed, 1 skipped`**.
+Also run `tests/test_s1_seam_ledger_kat.py tests/test_s2_consistency_kat.py tests/test_s3_ww3_boundary_recorded.py tests/test_rw1_cards_from_model.py tests/enrichment` before and after (they exercise `vchain`/`swan_runner`/`service` which you rename inside).
 
 ## What the plan says (binding)
 Plan §S3 "Remaining scope (b)": *`level1` label rename in code/cache names (170 occurrences, cosmetic;
