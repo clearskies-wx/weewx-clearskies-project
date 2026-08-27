@@ -521,8 +521,10 @@ until the break is genuinely inside its domain.
    selected by restart, not by the formula alone), PROVIDER-MANUAL §14.15, API-MANUAL §17
    (`handoff_depth_m` semantics), invariants docstring, CHANGELOG.
 
-**Open for the operator before briefing:** `HANDOFF_BREAK_CLEARANCE_M = 10` (one SWAN band
-station) — confirm or give a number.
+**`HANDOFF_BREAK_CLEARANCE_M = 10` ✅ RULED 2026-08-27** — operator: "if that is the size of the
+L4 grid then that is fine." It is: L4 is the fixed 10 m structure grid (operator ruling
+2026-07-27) and `_TRANSECT_BAND_SPACING_M = 10` matches it. Constant documented as "one L4 cell".
+S12 is fully ruled; brief on the operator's go.
 
 ### S4 — Test-debt triage (C13)
 
