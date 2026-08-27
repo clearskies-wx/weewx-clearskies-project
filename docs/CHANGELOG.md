@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-27 — Daily WW3 horizon march finally has the wind it asks for (Q17)
+
+- **The 96-hour horizon march (Q16 Round A) had never run.** It fires once a day right after the 00Z cycle publishes and demands wind out to 00Z + 96 h. The wind store's far window comes from NOAA's GFS model, and at that moment it holds the *previous* 18Z GFS run (NOAA posts the 00Z run's +96 h file ~04:00Z, after the march has already fired), fetched to that run's +96 h — which is only 00Z + 90 h. Six hours short by arithmetic, every day; the march refused `ww3_horizon_wind_short` with no retry, and SWAN's forecast beyond +6 h stayed frozen (`fullRun.l2BoundaryExhausted: true`).
+- **Fix (operator ruling, option a):** the gatherer's GFS far-window fetch depth goes from +96 h to +108 h — one constant, `_GFS_FAR_FETCH_END_HOUR`. The march now finds its wind already in the store when it fires; no waiting, no retry machinery, no schedule change. Cost: 4 more GRIB2 files per GFS cycle (17 → 21). The ocean-boundary side was already correct (its depth derives from the window end). Marine `2a05856`; ARCHITECTURE ⚓ WW3 leg, ADR-109 fetch-depth note, PROVIDER-MANUAL §14.18 updated.
+
 ### 2026-08-26 — Surf height map: photography replaced by map tiles (IMAGERY-MAP)
 
 - **Orthophoto background retired from the surf height map.** The NAIP aerial photography behind the heat map was flown at an extremely abnormal low tide, so the surf almost always rendered on what looks like dry land (operator finding). New `[imagery] provider = map` option serves Esri's World Topo Map tiles instead — a fixed cartographic coastline with the pier and streets, immune to the tide at photo time. The dashboard's mosaic/placement machinery is unchanged; only the tile source config differs. Live-verified: cached tile pyramid to zoom 23 (map uses 14–19); service is in Esri "mature support" (successor noted in PROVIDER-MANUAL §16.3 in case of future sunset). API `a5e45a9`; live config flipped from `auto` to `map`.

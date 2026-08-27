@@ -832,7 +832,11 @@ byte-identical, mutation-verified.
 
 **Fetch-depth deltas (Q16.1, extends D9's wind-only forcing split — the split itself
 unchanged).** Boundary partition fields extended to **+99 h** (was 72); GFS far-window
-wind extended to **+96 h** (was 84), at GFS's own native 3-hourly cadence — no
+wind extended to **+108 h** (was 84; Q16.1 set 96, corrected to 108 by Q17, operator
+ruling 2026-08-27 option (a) — the gatherer holds the GFS run one 6 h step behind the
+march's HRRR cycle when the march fires, so +96 h reached only cycle+90 h and the march
+refused `ww3_horizon_wind_short` on every attempt; +108 h covers cycle+96 h under a
+two-step lag; +4 GRIB2 files per GFS cycle, 17 → 21), at GFS's own native 3-hourly cadence — no
 interpolation code of ours added anywhere (WW3 interpolates forcing internally, D9's
 existing mechanism; manual-cited `docs/reference/ww3-user-manual-v6.07.txt` :8211,
 :10155–159, :14405–409). Per-cycle fetch cost rises 25→34 GRIB2 files (+36%), uniformly
