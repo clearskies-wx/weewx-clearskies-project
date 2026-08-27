@@ -62,7 +62,7 @@ To render ONLY lines without labels, buildings, or landuse, pass custom `paintRu
 import * as protomapsL from "protomaps-leaflet";
 
 const layer = protomapsL.leafletLayer({
-  url: "/api/v1/geographic-features/tiles",
+  url: "/api/v1/basemap/local/tiles",  // was /api/v1/geographic-features/tiles (removed 2026-08-27, ADR-078 Amendment 2)
   paintRules: [
     {
       dataLayer: "boundaries",

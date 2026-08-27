@@ -53,7 +53,7 @@ Config sections are classified into two tiers:
 | `[social]` | `wire_social_settings()` | |
 | `[charts]` | Re-parse `charts.conf`, update charts config | |
 | `[units]` | Rebuild `UnitTransformer` | |
-| `[geographic_features]` | `wire_geographic_features_settings()` | |
+| `[basemap]` | `wire_basemap_settings()` | (replaced `[geographic_features]`/`wire_geographic_features_settings()`, removed 2026-08-27 under ADR-078 Amendment 2) |
 | `[freshness]` | Update freshness defaults | |
 
 **Tier 2 — Restart required** (process-level state that cannot be swapped safely):
