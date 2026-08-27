@@ -39,7 +39,10 @@ restating it.
 **Before marking anything done:**
 
 1. **Independently re-run the live check and paste the raw output.** Not the agent's number. Yours,
-   from a fresh shell, with the command shown. The teammate's self-reported numbers are one data
+   from a fresh shell, with the command shown — and READ it: a verification command whose output you
+   did not look at (wrong cwd, empty result, a grep that matched nothing) is not a verification
+   (2026-08-27: the lead once wrote "verified" over a spot-check that had returned nothing because it
+   ran in the wrong directory). The teammate's self-reported numbers are one data
    point, not truth.
 2. **Diff the actual changes against the allowlist** — `git show <commit> --stat`.
 3. **Compare the commit list against the scope block.** Every file in "Files to create or modify"

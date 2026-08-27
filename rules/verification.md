@@ -54,6 +54,12 @@ the same sign error, it is testing nothing.
 **Every KAT closeout states which tests FAIL against the pre-change code, with the transcript** — a
 KAT that passes pre-change proves nothing; non-falsifiable pins are declared as such (2026-08-03).
 
+**A transcript is pasted only from a run that happened (added 2026-08-27).** When a live pre-change run is impossible (the dev already landed in the shared tree), the docstring says so and cites the `git show <base>:<file>` absence check instead — never a reconstructed or expected transcript. **Why:** a test-author wrote a pre-change "transcript" before running the file, then caught and corrected it before closeout.
+
+**Harness mocks are patched where the caller LOOKS THE NAME UP, and every harness mock asserts it was invoked (added 2026-08-27).** `monkeypatch.setattr(module, "fn", …)` does nothing for a caller that did `from module import fn`. A mock that is never called proves nothing — and can hide a real side effect. Tests never write outside `tmp_path`/their fixtures dir. **Why:** an integration test's mock patched the source module while the caller had a name-bound import; a real network fetch ran inside pytest and its leaked cache file then made the test green by accident. Found by the dev, not the test's author.
+
+**The acceptance check for a dashboard round is the production build command — `npm run build` (`tsc -b` + `vite build`) — not `tsc --noEmit` on a sub-config and not a grep that excludes test files (added 2026-08-27).** `tsc -b` type-checks the test files; fixtures typed against a narrowed union fail the deploy, not the review. **Why:** a round closed with "tsc clean" from `tsc --noEmit -p tsconfig.app.json | grep -v .test.`, and the deploy build failed on 11 test-file type errors.
+
 ## Validate against reality, never against the model's own output
 
 A physical model's own output is **never** evidence that the model is right. It is evidence about the

@@ -15,7 +15,11 @@ These rules were collected here on 2026-07-27 from six locations — `CLAUDE.md`
 
 These rules apply to ALL repos, ALL domains. No exceptions.
 
-**Agents must NOT run any of these git commands:** `git pull`, `git push`, `git fetch`, `git rebase`, `git merge`, `git remote`, `git checkout` of remote branches, or any command that introduces remote changes or sends local changes to a remote. Agents may only: `git add`, `git commit` (to the local branch), `git status`, `git log`, `git diff`. If an agent encounters a situation where it thinks it needs to pull or push, it MUST stop and report to the coordinator.
+**Agents must NOT run any of these git commands:** `git pull`, `git push`, `git fetch`, `git rebase`, `git merge`, `git remote`, `git stash`, `git checkout`/`git restore`/`git clean` of ANY path, `git checkout` of remote branches, or any command that introduces remote changes or sends local changes to a remote. Agents may only: `git add <explicit paths>`, `git commit` (to the local branch), `git status`, `git log`, `git diff`, `git show`. If an agent encounters a situation where it thinks it needs to pull or push, it MUST stop and report to the coordinator.
+
+**The file allowlist bounds EVERY working-tree and filesystem operation, not just edits (added 2026-08-27).** No `mv`, `rm`, `git stash`, `git checkout`/`restore`/`clean` of anything — including files an agent's own tests or tools produced, and anything under `C:\etc\weewx-clearskies` or on a container. Pre-change evidence comes from `git show <base>:<file>` into scratch, or from running the tests BEFORE the dev lands — never from moving or stashing another agent's work. **Why (2026-08-27):** in one session a test-author `mv`'d the dev's uncommitted module aside to fake a pre-change run, two agents ran `git stash` in a shared tree (one stash swept another agent's edits, hand-restored), and a test-author deleted a cache file its own test had leaked outside the repo.
+
+**`git add` a shared file only after `git diff -- <file>` shows every hunk is yours (added 2026-08-27).** If a foreign hunk is present, wait and re-check; never commit another agent's hunks. Concurrent rounds in one repo get disjoint files wherever possible. **Why:** three times in one session a commit swept another agent's uncommitted hunks (content right, attribution and review boundary wrong).
 
 **No worktree isolation for implementation agents.** Git worktrees create a parallel checkout that bypasses the local repo. Work done in a worktree gets pushed to GitHub without ever appearing in the primary checkout — the user never sees or approves it. All implementation work happens in the primary local checkout at the known repo path. Worktrees may only be used for read-only exploration.
 
@@ -178,6 +182,8 @@ silently reverting across the 2026-07 plans.
 7. **Open questions** — questions the agent must surface to the lead via SendMessage, NOT resolve unilaterally. Every open question must have been audited against ADRs first per the existing "Audit open questions against ADRs before surfacing" rule.
 
 **Prompt anti-patterns (from incidents):**
+- A design that names a third-party field, option or API is verified against the INSTALLED package before it goes into a brief (2026-08-27: a brief specified `kind_detail === 'primary'`, which does not exist in the Protomaps roads schema; and Leaflet layer `minZoom`/`maxZoom` — which the map aggregates and which silently forced the fitBounds zoom).
+- Dispatching the dev and the test-author into one working tree at the same moment: the dev's edits land before the test-author can run a live pre-change transcript. Give the test-author a head start on the pinned base (or a read-only worktree) before the dev starts editing shared files (2026-08-27: happened in five rounds of one session).
 - "Implement X and related files" — vague scope invites scope creep. Name every file.
 - Citing a file path without verifying it exists (3b-10: `settings.aeris.client_id` was wrong).
 - Citing a helper function without verifying it does what the brief claims (3b-10: brief said "don't extend datetime_utils.py" but the helper already existed there).
