@@ -59,6 +59,7 @@ predecessor's Q1–Q18 are cited as `EVO-Q#`).
 | S2 | **CONSISTENCY-SCORING** — code the Q14-approved set-timing/set-amplitude definitions into the surf score (ADR-101 row-5 amendment first). NOT in code today — the scorer still runs the interim swell-dominance bucketing | ⏸ APPROVED 2026-08-23 (EVO-Q14); sub-decisions A–E **NOT ruled** — the Q3 "yes" rested on a false "it's in code" premise (review #4); re-asked as Q10 item 1 |
 | S3 | **Substitution cleanup** — CORRECTED after the adversarial review: `_reused_l1_boundary_command_lines()`, the `swan/level1/` directory and `ww3_chain_enabled` are LIVE dependencies (production L2 scaffold; buoy-ledger gate) and are NOT deleted. Remaining: `level1` label rename (cosmetic), the health `ww3_boundary` entry (record it or remove it — Q10), doc corrections (ARCHITECTURE.md:130/132 wrong "no-op"/"vestigial" claims + gap rows #12–#16, PROVIDER-MANUAL:2529 swell-card bullet, API-MANUAL §17 `swellSource` + `closeoutFraction`, ADR-109 G7 struck, D14 item 2 disposition), hotstart-age gate (Q10: drop or own row) | ⬜ doc round + rename only; nothing live deleted |
 | S10 | **FOG-REVERT** (API) — revert the 2026-08-24 fog cross-check narrowing (API `1ad6e74` + `f2c5ecd`): two nights of live testing showed the night-time standalone ≤ 1 °F rule cries wolf (conditions right, fog rarely formed); the provider cross-check returns at every level, as before. The uncommitted API-MANUAL edit documenting the narrowing is discarded | 🔄 CODE DONE (API `96bec7b` + `cf0318d`, local `git revert`s; `tests/test_fog_provider_crosscheck.py` 68 passed on Windows — host run owed after deploy; CHANGELOG entry NOT yet written) — **awaiting operator "push"** |
+| S11 | **INVARIANT-1** — health is `degraded` since the BREAK-REFORM deploy (08-26 09Z; ~7,600 firings): (1) read-only look at where BREAK-REFORM now places the outermost break marker relative to the per-transect handoff (untided terms), and what in `57af5d6` moved it; (2) then fix the check to compare like with like (tided break depth vs tided handoff, or both untided) with a guard test that fails pre-change | ⬜ RULED 2026-08-27 (Q10-8 "ok"); (1) in progress lead-direct, read-only |
 | S4 | **Test-debt triage** — two test files, 18 failing tests (`test_serve_nothing_on_failure` 8, `test_service_full_run_trigger` 10; re-verified 2026-08-27), one ruling per class (repair harness / delete stale pin / keep) | ⬜ |
 | S5 | **First-install WW3 warm-start bootstrap** — the durable mechanism EVO-Q9 parked as a pre-ship row | ⬜ pre-ship; not needed for this install |
 | S6 | ~~ADR-109 gap closure~~ **DISSOLVED 2026-08-27 (Q9)** — G7 is built (one-line ADR edit → S3); G10 (`ww3_grid` rebuild hook) is part of S8.1; D14 stays a note | ✅ closed-no-work |
@@ -184,9 +185,8 @@ records. Result: three rows were ALREADY DONE when this plan was created (C7 ×2
 lead error: carried from the predecessor's original C15/C16 rows without reading its Q6 close),
 two were moot (C3, C4), five were operator-dropped in this pass (C1, C2, C5, C6, C14) — C5 and
 C6 had been discussed and settled in chat earlier but never marked closed in any plan, which is
-exactly why they kept resurfacing. LESSON (rule-shaped, applied to rules/verification.md): a
-chat ruling that closes an item is written into the plan the same hour; a carried row cites the
-predecessor's CLOSE record, not its OPEN row.
+exactly why they kept resurfacing. (A rule paragraph written for this was removed on the
+operator's ruling, Q10-10 "worthless".)
 
 | # | Item | Premise citation | Lands in |
 |---|---|---|---|
@@ -649,14 +649,13 @@ Each item is one decision. Plain English; the letter in brackets is the review f
    firing when BREAK-REFORM (`57af5d6`) deployed: journal counts 0/day on 08-22…08-25, then 1,885
    in 08-26 09Z and ~8,000 since — so BREAK-REFORM moved the outermost break marker seaward, to
    within one tide-height of the handoff, which the 30 % handoff margin was designed to prevent.
-   Two questions for the operator: (a) fix the check to compare like with like (one line;
-   changes what the health check measures, so it gets the word first); (b) a read-only look at
-   where BREAK-REFORM now puts the outermost marker relative to the handoff, before deciding
-   whether the marker move is right. *Recommend: both, (b) before anything is judged.*
+   ✅ RULED 2026-08-27 "8 ok" — both: (b) the read-only look first, then (a) the check fix.
+   → task **S11 INVARIANT-1** (checklist). Second journal count confirmed: 0 / 0 on 08-24, 08-25;
+   2,219 + 4,239 + 1,184 since the deploy.
 9. ~~**[#14] Monitoring.**~~ ✅ no ("FUCK OFF").
-10. **[#23] — OPEN.** Plain: the lead added a paragraph to the project's rulebook
-    (`rules/verification.md`) saying "when carrying unfinished items into a new plan, first check
-    whether they were already closed" — and committed it before the operator saw it. Keep or remove?
+10. ~~**[#23]**~~ ✅ RULED 2026-08-27 "10 worthless" — the paragraph is removed from
+    `rules/verification.md`; the register preamble's "LESSON … applied to rules/verification.md"
+    claim is void.
 
 ### Q9 (2026-08-27) — ✅ RULED: carry-over register re-audit. Operator: "i am very nervous about all of the carry over tasks without going through each one and assessing what has been done and if it is still needed." Rulings, verbatim: "c1 drop c2 drop c5 again these were discussed, the fact that you did not mark that is disconcerting c6 if this was done why did you not mark it complete? geesh." / "c14 no" / "c12 has nothing to do with this plan" / "why c15 is needed if we replaced it with a new task" / C16 dissolved after a plain-English explanation. Lead findings the same pass: C7 ×2/3, C8, C18 already done; C3, C4 moot; C13 re-verified at 18 failures in two files; C19/C20 confirmed live. Register rewritten; S6 dissolved; S3/S4 rows corrected. Also disclosed: nothing is watching the marine service for failures now (the old monitor died with its chat session).
 
