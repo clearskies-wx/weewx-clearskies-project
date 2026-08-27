@@ -728,10 +728,66 @@ specify (the `BOUNDSPEC ... VARIABLE FILE` grammar itself is unchanged; only the
 the domain the boundary sits on change). The handoff model, the 1-D surf model, and every physics formula
 this ADR governs are unaffected.
 
+### Amendment 9 (2026-08-27): HANDOFF-RESTART — the per-hour handoff is selected by restart, not by the formula alone
+
+**Status: Proposed.**
+
+**Context.** Amendment 2 §2 defined the per-hour handoff depth as `1.3 × Hs(hour) / gamma` — a single
+formula lookup against the transect's own station set (Amendment 3's L4/L3/L2 first-match-wins rule for
+*which* station set), trusted for the whole hour once computed. No feedback existed from the 1-D surf model
+(SwellTrack) back to that choice. Measurement after the BREAK-REFORM round (2026-08-26,
+`scratch/inv1/S11-FINDINGS.md`) found SwellTrack reported its main break AT its own starting line on
+roughly a third of transect-hours — the formula's assumed ~30% margin and the margin actually realized
+against SwellTrack's own 5% breaking-onset criterion is only ~3.5% in practice (`1.72 × Hs` vs `1.78 × Hs`
+onset thresholds), close enough that ordinary shoaling variability between the formula's target depth and
+SWAN's own discrete station grid regularly erases it.
+
+**Operator's ruling (Q11, verbatim), quoted as this amendment's basis:**
+
+> "the handoff point is never SET IN STONE, it needs to continuously change based upon the break
+> locations. That means if it is unusually larger waves the handoff is going to move seaward ... that is
+> the way it was supposed to work" / "No you cannot fucking set the next cycle based upon the previous
+> cycle, you need to dynamically set the handoff, if 1d starts running and finds the break is wrong, then
+> it restarts the run from the correct location."
+
+**Decision.** The formula's station (Amendment 2 §2, unchanged) becomes the FIRST ATTEMPT only, not the
+final answer. SwellTrack checks its own result against an acceptance test — (i) the wave at the profile's
+own first node is not already breaking (below the 5% `Q_B_VISIBLE` onset criterion), AND (ii) any published
+break marker sits at least `HANDOFF_BREAK_CLEARANCE_M` (10 m — one L4 cell, matching the SWAN band's own
+10 m station spacing, RULED 2026-08-27: *"if that is the size of the L4 grid then that is fine"*) shoreward
+of the handoff station used. Any failure re-truncates the SHARED per-transect-hour profile at the next
+SWAN band station seaward (the existing T4B.1 10 m band, Amendment 2 §2's own station set — no new grid,
+no new sizing) and re-runs every surfable partition, until every one passes or the band's deep end is
+reached (the whole transect-hour is then refused — nothing published from a failed attempt, per
+`rules/coding.md` §1). One handoff per transect-hour (not per partition — every partition of a transect
+shares one walk and one re-truncated profile; a partition whose own SWAN component has no period match at
+a candidate station is simply absent for that attempt, never blocking the others).
+
+**What does NOT change.** The formula itself (`1.3 × Hs / gamma`, Amendment 2 §2) — it remains the FIRST
+attempt. The Amendment 3 L4→L3→L2 first-match-wins rule for which station SET a transect reads from — the
+restart walks stations WITHIN one already-selected set, never across levels. No SWAN grid geometry is
+resized; the band this walks was already sized at setup (T4B.1). `select_hourly_handoff()`'s and
+`refine_handoff_with_qb()`'s own logic bodies are unchanged.
+
+**INVARIANT_1 redefined** (the alarm's own bug, Q11 finding A, closed the same round it created): compares
+the break depth and the handoff depth on the same UNTIED (chart-datum) basis — the prior definition
+compared a tide-adjusted break depth against an untied handoff depth — AND requires the same clearance
+test the restart loop itself enforces. A post-amendment firing means the restart loop failed to hold its
+own contract, not a tide-datum mismatch.
+
+**Full design record:** `docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md` §"S12 — HANDOFF-RESTART" (Design
+items 1–7, Lead mechanics M1–M9) and Q11. Implementation: PROVIDER-MANUAL §14.15 Amendment "HANDOFF-RESTART
+— the handoff station is checked, not trusted", API-MANUAL §17 (`handoffDepthM`/`handoffSourceLevel`),
+`services/transect_handoff.py` (`HANDOFF_BREAK_CLEARANCE_M`), `services/surf_1d_pipeline.py`
+(`_run_pipeline_per_transect()`'s restart loop, both INVARIANT_1 sites), `services/surf_1d_analytical.py`
+(`Analytical1DResult.onset_at_node0`), `services/swan_runner.py` (`band_stations` on the published handoff
+entry), `state.py`/`endpoints/health.py` (`handoffRestart` counters).
+
 ## References
 
 - Supersedes: ADR-084 (NWPS as primary nearshore source with supplementation)
 - Related: ADR-094 (HRRR forecast wind source for surf scoring); ADR-100 (geography-aware study-area geometry — the OSM coastline + fetch-fan subsystem Amendment 5's AD-1/AD-3/AD-4/AD-5 consume); ADR-104 (island-aware L1 sizing and partition-reconstruction WW3 boundary — Amendment 8)
 - Plan (Amendment 5): `docs/archive/MARINE-GEOMETRY-MODEL-PLAN.md` (architecture decisions AD-1..AD-8; approval of the plan IS the acceptance of Amendment 5 and ADR-100)
+- Plan (Amendment 9): `docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md` §"S12 — HANDOFF-RESTART" and Q11
 - Research: `docs/planning/briefs/SWAN-TRUSHORE-RESEARCH-BRIEF.md`, `docs/planning/briefs/SURF-ZONE-MODEL-BRIEF.md`, `docs/planning/briefs/1D-MODEL-BENCHMARK-BRIEF.md`
 - Plan: `docs/archive/SWAN-TRUSHORE-PLAN.md`, `docs/archive/SURF-1D-IMPLEMENTATION-PLAN.md`, `docs/archive/SURF-MODEL-FIX-PLAN.md`

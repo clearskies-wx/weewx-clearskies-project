@@ -2688,6 +2688,73 @@ corrupt output and zero wave energy in the child. The runner's `level{n}/nest_ou
 `level{n+1}/nest_in.dat` copy-between-subdirs convention (§14.15 above) exists specifically so
 the filenames never collide within one working directory.
 
+#### §14.15 Amendment: HANDOFF-RESTART — the handoff station is checked, not trusted (S12, 2026-08-27, ADR-093 Amendment 9)
+
+**Why.** The handoff formula (`1.3 × Hs(hour) / γ`, above) places the SWAN→SwellTrack boundary
+~30% seaward of that hour's breaking depth — but it is a target-depth lookup against a fixed
+station set, not a guarantee. Measurement after the BREAK-REFORM round (2026-08-26) found
+SwellTrack reported its main break AT its own starting line on roughly a third of transect-hours
+(was a tenth before BREAK-REFORM): the margin the formula assumes (30%) and the margin actually
+realized against the 1-D model's own 5% breaking-onset criterion (`Q_B_VISIBLE`) is only ~3.5% in
+practice (`1.72 × Hs` vs `1.78 × Hs`) — close enough that ordinary variability in the shoaling
+between the formula's target and SWAN's own station grid regularly crosses it. The operator's
+ruling (Q11, verbatim): *"the handoff point is never SET IN STONE ... if 1d starts running and
+finds the break is wrong, then it restarts the run from the correct location."*
+
+**The mechanism.** SWAN's per-transect band (T4B.1, 10 m spacing, §14.15 above) already exists for
+every transect with an L3/L4 handoff; the runner (`swan_runner._select_l3_handoff_position_and_
+spectrum()`) now additionally publishes, on every hourly handoff entry, a `band_stations` list:
+every band station strictly seaward of the formula's own pick, ordered seaward-most first, each
+carrying its own depth and PT* watershed partitions for that hour. The 1-D pipeline
+(`surf_1d_pipeline._run_pipeline_per_transect()`) reads that list and, ONE handoff per
+transect-hour (not per partition — every surfable partition of a transect shares the same walk and
+the same shared truncated profile):
+
+1. Runs attempt 0 (today's formula station) — every partition at/above the 5 s surfability floor.
+2. **Acceptance test, both parts, every voting partition:** (i) the wave at the profile's own
+   first node is already below the 5% breaking-onset criterion (not `onset_at_node0`); AND (ii)
+   when a partition produced a break, its outermost published marker sits at least
+   `HANDOFF_BREAK_CLEARANCE_M` (10 m — one L4 cell, matching the SWAN band's own 10 m station
+   spacing; `services/transect_handoff.py`) shoreward of the attempt's own handoff station.
+3. Any failure re-truncates the SHARED profile at the next band station seaward and re-runs every
+   voting partition. A partition's own component is re-matched at the new station by nearest
+   period (≤ 2 s, tie → nearest direction); no match leaves that partition ABSENT for the attempt
+   (does not block the rest of the transect, one aggregate WARNING per transect-hour). A wind-sea
+   (F5-synthesized) partition has no station component — it simply recomputes its growth from the
+   new station's own fetch and depth.
+4. The band's deep end reached without every voting partition passing → the WHOLE transect-hour is
+   REFUSED (`handoff_restart_exhausted`) — nothing is served from the last failed attempt (rules/
+   coding.md §1, "a model runs on all its inputs or it does not run"). Attempt cap =
+   `len(band_stations) + 1` (never exceeds the band; the existing ≤ 150 station clamp bounds it).
+
+**What is published.** `handoffDepthM`/`handoffSourceLevel` (API-MANUAL §17) are the SETTLED
+station's, not necessarily the formula's first pick — same grid level (L4/L3/L2), different
+station along it. The `handoff_selection` trace stage gains `restart_attempts` and
+`restart_reason` (`None` | `"onset_at_node0"` | `"clearance"` | `"handoff_restart_exhausted"`).
+`GET /health` gains an additive `handoffRestart` block: `runs`/`restartedRuns`/`exhausted`/
+`attemptsHistogram`/`lastExhaustedAt` counters since service start (count only, never changes
+`status`).
+
+**INVARIANT_1 redefined** (`services/invariants.py`): both sides now UNTIED (the break depth
+`run_1d_analytical()` reports is tide-adjusted; the handoff depth was already chart-datum —
+comparing them directly was the alarm's own bug, Q11 finding A) plus the same clearance test the
+restart loop itself enforces. A post-S12 firing therefore means the restart loop failed to hold
+its own contract, not a tide-datum mismatch. This redefinition applies at BOTH INVARIANT_1 call
+sites — the per-transect settled check, and the shared-spectrum (non-per-transect) legacy path,
+which carries no restart loop and evaluates the same redefined test against attempt-0's own
+handoff/profile.
+
+**Two spacings, not to be confused.** The SWAN band stations the restart walks between are the
+existing 10 m T4B.1 spacing. SwellTrack's own profile is the variable-resolution PCHIP profile
+from the 3 m bathymetry download (~1.5 m nodes in the breaking zone, ~4 m in the shoaling zone,
+native points beyond 15 m) — a different grid entirely. `HANDOFF_BREAK_CLEARANCE_M` is a
+DISTANCE (metres), never a node count on either grid.
+
+**What does NOT change.** `select_hourly_handoff()`'s own formula/rule-of-three (L4→L3→L2) and
+`breaking_margin_depth_m()` (`1.3 × Hs / γ`) are unchanged — the formula's station stays the FIRST
+attempt only. No SWAN grid geometry moves; the restart walks an already-existing, already-sized
+band. See ADR-093 Amendment 9 for the decision record.
+
 #### §14.15 Amendment: geography-aware study-area geometry (target — Marine Geometry-Model Plan G0–G6; ADR-093 Amendment 5 + ADR-100)
 
 **This amendment changes the VALUES fed into the SWAN emitters, never their syntax, and never the sizing

@@ -1618,31 +1618,63 @@ The API-side dataclass (`ProviderAttribution`) lives in `providers/_common/capab
 
 ---
 
-## §12a Imagery Endpoints (Phase LM, 2026-08-03)
+## §12a Imagery Endpoints (Phase LM, 2026-08-03; `/imagery/config` rewritten to the product
+basemap by SURF-MAP-BASEMAP, PA9/Q5, plan `MARINE-AND-MAPS-PLAN-2026-08-27.md` §M4, 2026-08-27)
 
-Orthophoto imagery for display backgrounds (PROVIDER-MANUAL §16 for the provider modules and the
-DISPLAY-ONLY hard rule). Two endpoints, `endpoints/imagery.py`, wired via
-`wire_imagery_settings()` (radar mirror):
+Two endpoints, `endpoints/imagery.py`, wired via `wire_imagery_settings()` (radar mirror).
+`/imagery/tiles` remains an orthophoto proxy (PROVIDER-MANUAL §16 for the provider modules and
+the DISPLAY-ONLY hard rule); `/imagery/config` no longer serves orthophotography — it answers
+with the Clear Skies product basemap (§12b) for the surf height map.
 
-**`GET /api/v1/imagery/config?lat=&lon=`** → 200
-`{provider: "naip"|"esri", tileUrl, attribution, proxyMode: "api"|"direct", bounds: {south,west,north,east}|null}`.
-NAIP: `tileUrl = "/api/v1/imagery/tiles/{z}/{x}/{y}"` (our proxy path, never the upstream USGS
-URL), `proxyMode: "api"`, `bounds = CONUS_BOUNDS`. ESRI: `tileUrl` = the ESRI XYZ template,
-`proxyMode: "direct"`, `bounds = null`. No `[imagery]` config / `provider` unset → 404
-problem+json. Params model `ImageryConfigQueryParams` (lat ±90, lon ±180, `extra="forbid"`).
-Response model `ImageryConfigResponse` — **flat shape, not the usual data+envelope wrapper**
-(intentional deviation per the plan's pinned contract sketch; noted in the model docstring).
+**`GET /api/v1/imagery/config?lat=&lon=`** → 200, ALWAYS — never 404s (the surf height map must
+always get a basemap). lat/lon are still validated (`ImageryConfigQueryParams`: ±90/±180,
+`extra="forbid"`, 422 outside range) but no longer select a provider; the answer does not vary by
+coordinates. `[imagery] provider` (naip/esri/map/auto) is no longer read by this endpoint — PA9
+retired NAIP/Esri/Esri-Topo orthophotography from every user-facing surface (operator, Q5: "get
+rid of the orthophotography for the surf height map and replace it with a regular basemap").
+Response (`ImageryConfigResponse`, still a **flat shape, not the usual data+envelope wrapper** —
+intentional deviation per the plan's pinned contract sketch, noted in the model docstring):
+```json
+{
+  "provider": "basemap",
+  "tileUrl": "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  "attribution": "© OpenStreetMap contributors",
+  "proxyMode": "direct",
+  "bounds": null,
+  "light": {"tileUrl": "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            "attribution": "© OpenStreetMap contributors"},
+  "dark": {"pmtilesUrl": "/api/v1/basemap/local/tiles", "maxDataZoom": 15,
+           "attribution": "© OpenStreetMap contributors © Protomaps"},
+  "zoomMin": 0,
+  "zoomMax": 19
+}
+```
+The top-level `tileUrl`/`attribution` are legacy fields carrying the `light` values, kept so an
+old client still renders. `dark.pmtilesUrl` is the **local** basemap tier (§12b) — the surf
+height map lives inside the local box's extraction area by construction. `zoomMax: 19` is the
+surf map's own ceiling, distinct from the tile proxy's `_MAX_ZOOM = 20` below. `light`/`dark`/
+`zoomMin`/`zoomMax` are additive optional fields on `ImageryConfigResponse`
+(`ImageryLightSource`, `ImageryDarkSource` in `models/responses.py`).
+
+`wire_imagery_settings()` logs one startup WARNING if `[imagery] provider` is set, naming the
+ignored value — not per request. The `[imagery]` config section, its provider modules
+(`naip`/`esri`/`esri_topo`), the admin section, and the wizard's Esri satellite toggle all remain
+in place — removing them is a separate, not-yet-ruled decision (Q10-6). `_select_provider()`
+remains in the endpoint module, unused by `/imagery/config`.
 
 **`GET /api/v1/imagery/tiles/{z}/{x}/{y}`** → binary tile (Content-Type from upstream,
-`image/png`). NAIP only — `[imagery] provider` absent or `esri` → 404 (ESRI tiles never
-transit the API). Input validation (amplification-surface guard, lead-ruled 2026-08-03):
-`z` Path-constrained [0, 20] → 422 outside; `x`/`y` validated against `[0, 2**z)` → 400
-outside; the upstream host/path is a constant — only validated integers feed the bbox math.
-Error mapping: upstream 429 → 503 + Retry-After; upstream 404 → 404; other upstream 4xx/5xx →
-502.
+`image/png`). Unchanged by SURF-MAP-BASEMAP — still NAIP only. `[imagery] provider` absent, or
+pinned to `esri`/`map` → 404 (Esri/Esri-Topo tiles never transit the API). Input validation
+(amplification-surface guard, lead-ruled 2026-08-03): `z` Path-constrained [0, 20] → 422 outside;
+`x`/`y` validated against `[0, 2**z)` → 400 outside; the upstream host/path is a constant — only
+validated integers feed the bbox math. Error mapping: upstream 429 → 503 + Retry-After; upstream
+404 → 404; other upstream 4xx/5xx → 502. Unreferenced by any user-facing surface after this
+round (Q10-6).
 
-**`api.conf [imagery]`:** `provider` (`auto` | `naip` | `esri`; absent = domain disabled),
-`api_key` (future-proofing, unused v1), `tile_cache_ttl_seconds` (default 604800).
+**`api.conf [imagery]`:** `provider` (`auto` | `naip` | `esri` | `map`; absent = domain
+disabled) — no longer read by `/imagery/config` (PA9); still read by `/imagery/tiles` and logged
+once (WARNING) at wiring time if set. `api_key` (future-proofing, unused v1),
+`tile_cache_ttl_seconds` (default 604800).
 
 ---
 
@@ -3156,7 +3188,7 @@ A handoff partition that matches no canonical partition still has its break poin
 | `surfZones` | object \| null | Impact / foam / total / reform-trough zone widths. **Round P:** classified from the pipeline arrays with `BreakPoint`s built 1:1 from the PUBLISHED `breakPoints` list (seaward-first) — zones now anchor exactly to the published breaks (`impactZone.startDistance` == outermost `breakPoints[].distance`); the pre-Round-P "phantom zones" disjoint from published breaks are gone. **Round Z (2026-08-05, marine `4c0f7e7`, operator-approved criterion change):** the foam zone ends at the first transect sample at/inside the tide-aware `waterlineDistance` (foam runs to the sand, matching observed surf); the old bore criterion (Hs < 0.3 m / depth < 0.2 m) survives only as the fallback when no waterline exists. **Round X (2026-08-05/06, marine `9b6a669`, operator-approved, ADR-102):** the impact-zone end (where whitewater fades) is now derived from the roller-energy reservoir E_r — the first point where E_r falls below 5% of its own local maximum within the zone — replacing the previous `Hs <= 0.707 x Hs_break` height-ratio criterion; `reform_trough` and the foam-zone-end criteria above are unaffected. Field names/shapes unchanged — only the impact-zone-end derivation changed. **LIVE (shipped 2026-08-11, Phase K of MARINE-PAGE-FIXIT-PLAN, marine `57ee18d`+`d75e507`, ADR-106 R3, PA4) — impact/foam-zone criterion, supersedes the Round X E_r-floor description above for the PUBLISHED path only.** Operator ruling, in substance: the break zone is where the wave CRASHES, not where it produces whitewater — a surfer needs to know where to paddle out behind, not how long the broken wave rolls. **As shipped:** `impactZone` becomes a FIXED-WIDTH crash band per marker — `[d_m, max(d_m − impact_zone_width_m, waterlineDistance)]` where `d_m` is the marker's shore distance and `impact_zone_width_m` is a new operator-adjustable config key (default 25.0 m, CONFIRMED by operator 2026-08-10). Bands may overlap when markers sit closer than the width — served as computed, no merging logic. `foamZone` becomes pure geometry: the shoreward edge of the most shoreward band to `waterlineDistance`, no roller-energy term. `totalSurfZone` = outermost marker to `waterlineDistance`. **`reformTrough` is served `null`** — the roller-energy zone scan (`_WHITEWATER_ER_FLOOR_FRACTION` and the next-break clamp) leaves the published path entirely; the concept no longer applies once whitewater-decay termination is gone from publication. The band never crosses the waterline (swash-exclusion safety ruling, unchanged). The internal roller-energy reservoir E_r and INVARIANT_11's closure check are UNTOUCHED — only the published zone's derivation changes. |
 | `perBreakZones` | list[object] \| null | **NEW 2026-08-05 (Round Z Z3, marine `b551d03`, operator-approved D6 contract addition).** One entry per published break, outermost-first: `{"breakDistance", "breakerType", "impactZone": {startDistance, endDistance, startDepth, endDepth}, "foamZone": {same}}`. Impact end uses the 50%-energy decay criterion, clamped so it never crosses the next break; each outer break's foam ends at the next break; the innermost break's foam ends at the waterline (Z1 semantics). **Round X (2026-08-05/06, marine `9b6a669`, operator-approved, ADR-102):** the same E_r-derived swap documented on `surfZones` above applies per-break here too — impact end is the first point where roller energy E_r falls below 5% of its own local maximum within that break's zone (clamping against the next break is unchanged), replacing the 50%-energy (`0.707 x Hs`) criterion. Aggregate `surfZones` is retained unchanged for back-compat. Empty list when the model is available but no breaks exist; null-mirrored when unavailable. **Consumer note (audit F3):** when two breaks sit closer than the impact zone's decay length, the outer entry's `foamZone` legitimately collapses to zero width (start == end) — renderers should skip zero-width bands (operator ruling 2026-08-05; ties into the standing heat-map smoothing direction). **LIVE (shipped 2026-08-11, Phase K of MARINE-PAGE-FIXIT-PLAN, marine `57ee18d`+`d75e507`, ADR-106 R3, PA4) — per-break band semantics, supersedes the 50%/E_r-decay criterion above for the PUBLISHED path only.** Same fixed-width-crash-band definition as `surfZones` above applies per break here: `impactZone` end = `max(breakDistance − impact_zone_width_m, waterlineDistance)`, no next-break clamp needed by construction (each band is independently sized, not decay-terminated) though bands may still overlap for closely-spaced markers, served as computed. `foamZone` for each entry becomes pure geometry (no roller-energy or 50%-decay term) — same rule as `surfZones.foamZone`. The zero-width-band consumer note above still applies where overlap fully collapses a band. Aggregate `surfZones` stays the same fixed-band derivation, not a separate criterion. |
 | `jackingFactors` | list[object] \| null | Per-bar `barIndex`/`distance`/`factor` (Hs at bar crest ÷ Hs approach). **Round P:** computed from the same pipeline arrays (gamma=0.73 unchanged). May legitimately be an empty list (no detected bars) — empty both pre- and post-Round-P at the reference spot. |
-| `handoffDepthM` | float \| null | This transect's per-hour handoff depth (T4A.9 per-hour selection, not the setup-time placeholder) |
+| `handoffDepthM` | float \| null | This transect's per-hour handoff depth (T4A.9 per-hour selection, not the setup-time placeholder). **S12 HANDOFF-RESTART (2026-08-27, ADR-093 Amendment 9):** the SETTLED station the 1-D model's own restart loop stopped on, not necessarily the formula's first pick — the 1-D pipeline checks its own result (onset-at-node-0 / clearance ≥ `HANDOFF_BREAK_CLEARANCE_M`) and walks the handoff seaward, re-running, until it passes or the band is exhausted (`modelStatus: "unavailable"` for that transect-hour). Same grid level (`handoffSourceLevel`, below) as the formula's first pick — the restart never crosses grid levels, only stations within one. |
 | `handoffSourceLevel` | str \| null | `"L4"`, `"L3"`, or `"L2"` — which grid level the handoff spectrum came from (E5 ruling D3, 2026-07-27: first match wins — L4 if the transect's cross-shore line enters the structure grid's footprint, else L3 if a classified refraction feature covers it, else L2 at the fixed 15 m reference depth) |
 | `tideLevel` | float \| null | **NEW 2026-08-05 (Round P, marine `8c2def8`, operator-approved contract addition).** The tide level (relative to LMSL) the pipeline used for this timestep — the same value blended into `transect[]` depths. SI metres at the marine boundary; display units on this endpoint. Negative when the tide is below datum. |
 | `waterlineDistance` | float \| null | **NEW 2026-08-05 (Round P).** Cross-shore distance of the actual (tide-aware) waterline: the seaward-most crossing where the RAW signed bathymetric profile satisfies `signed_depth == -tideLevel`, linearly interpolated (`_interpolate_waterline_crossing()`, `enrichment/bathymetry.py`). Positive = seaward of the LMSL zero-depth anchor (distance 0), negative = landward; e.g. a below-datum tide puts it at a positive distance. `null` (with a WARNING in the marine journal naming the shortfall) when the profile never reaches `-tideLevel` landward. |
@@ -3170,7 +3202,7 @@ A handoff partition that matches no canonical partition still has its break poin
 | `verticalDatum` | str \| null | **Corrected 2026-08-02 — the prior "always null" claim was FALSE, not just stale.** `_read_vertical_datum()` (`endpoints/beach_profile.py`) reads the real `vertical_datum` key from the per-spot profile cache and returns it as-is; `null` only when the cache is missing/unreadable, the key is absent, or the key is the `"UNKNOWN"` sentinel — never a hardcoded default. Live-confirmed serving `"LMSL"` (coordinator verification, 2026-08-02). A `null` here means the cache genuinely has no resolved datum for this spot, not that the field is wired-but-inert. |
 | `transectCount` | int \| null | Total transects computed for this spot |
 | `openTransectCount` | int \| null | Transects not crossing any OBSTACLE. **Since 2026-08-01 (BD-8 rescinded, ADR-093 Amendment 7): metadata/map-UI count only** — plays no role in transect selection on this endpoint (see `transect_index=best` above) or in the `/surf` aggregation fields. |
-| `handoffDepthM` | float \| null | Representative handoff depth (the "best" transect's) |
+| `handoffDepthM` | float \| null | Representative handoff depth (the "best" transect's). **S12 HANDOFF-RESTART:** that transect's own SETTLED depth — see the per-transect field's own note above. |
 | `handoffSourceLevel` | str \| null | Representative handoff source level — `"L4"`, `"L3"`, or `"L2"` (E5 ruling D3) |
 | `displayWindowM` | float \| null | **NEW 2026-08-09 (SURF-REMEDIATION-PLAN Phase R3.1, D-R2 ruling, marine `5ffd50e`).** The spot's fixed beach-profile chart seaward window (m), from `SurfSpotConfig.profile_display_window_m` — one of the D-R2 preset ladder values (150/300/500), assigned at spot setup and sticky (never re-chosen hour-to-hour). Default 150.0 (Huntington's assignment). Additive. |
 | `displayLandwardM` | float \| null | **NEW 2026-08-09 (Phase R3.1, D-R2 ruling, marine `5ffd50e`).** The spot's fixed beach-profile chart landward window (m), from `SurfSpotConfig.profile_display_landward_m`. Default 30.0, same for every spot per D-R2. Additive. |
