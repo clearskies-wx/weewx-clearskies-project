@@ -688,7 +688,7 @@ ST6-vs-ST4 physics-package choice: resolved above at **D4**.
 | G4 | `ww3_bounc` has zero F-phase evidence |
 | G5 | SWAN-ingestion candidate B (Appendix-D writer) has zero F-phase evidence |
 | G6 | `ww3_prnc` has zero F-phase evidence |
-| G7 | The production wind-store→WW3-grid regrid/re-emit step is unbuilt |
+| G7 | ~~The production wind-store→WW3-grid regrid/re-emit step is unbuilt~~ — **Built (verified 2026-08-27, MARINE-AND-MAPS-PLAN §S3/C16).** `service.py`'s WW3 leg reads the live wind-gatherer store (`wind_timeline_store.get_wind_series()`) and regrids it onto the WW3 grid per cycle (`_ww3_regrid_wind_nearest_neighbor()`, `service.py:424`, called `:911`–`925`). Struck as built, not a gap. |
 | G8 | The real L2 boundary/seam/lee/corridor point list does not exist yet in F-phase artifacts |
 | G9 | Production Type-1 (field) output symbol set for the full band ledger is undetermined |
 | G10 | `ww3_grid`'s production execution trigger (geometry-change hook) was never exercised |
@@ -708,17 +708,21 @@ confirmed: the abrupt -800 m synthetic step next to real shallow shelf cells may
 an assumption in WW3's nearest-cell search. **No cliff-KAT number exists for WW3.**
 Flag before any future wetted-substitution KAT attempt.
 
-**2. Seam AGG forcing-comparability caveat — premise VOIDED, question stands
-(corrected 2026-08-17).** F4b's marches showed seam-aggregate Hs 0.68–0.78 m — 15–39%
-higher than SWAN's real production seam number (0.561 m, e8/e8d1). Those F4b figures
-were scramble-fed (trap 21 — the direction-fastest emitter inflates Hs by a
-shape-dependent factor), so the apparent high bias carries no amplitude weight. What
-real ground truth now shows instead: the corrected, restart-chained G1×P1 march runs
-6–7% LOW against the buoys (model/buoy ratio 0.93–0.94,
-`scratch/F4-BUOY-VALIDATION-REPORT.md`) — no evidence of a WW3 high bias survives the
-correction. The underlying question (WW3-leg vs live-SWAN-path served quality under
-matched forcing) remains open and is Phase V's to answer with the shadow campaign;
-carried forward for that purpose.
+**2. Seam AGG forcing-comparability caveat — premise VOIDED, question CLOSED
+(corrected 2026-08-17; re-homed 2026-08-27, S3, MARINE-AND-MAPS-PLAN §S3/C16).** F4b's
+marches showed seam-aggregate Hs 0.68–0.78 m — 15–39% higher than SWAN's real production
+seam number (0.561 m, e8/e8d1). Those F4b figures were scramble-fed (trap 21 — the
+direction-fastest emitter inflates Hs by a shape-dependent factor), so the apparent high
+bias carries no amplitude weight. What real ground truth now shows instead: the
+corrected, restart-chained G1×P1 march runs 6–7% LOW against the buoys (model/buoy ratio
+0.93–0.94, `scratch/F4-BUOY-VALIDATION-REPORT.md`) — no evidence of a WW3 high bias
+survives the correction. **The underlying question (WW3-leg vs live-SWAN-path served
+quality under matched forcing) is no longer Phase V's to answer — Phase V (the shadow
+validation campaign) is DROPPED (Q1, 2026-08-27: "THIS IS ALL TESTING... NO ONE IS
+ACTUALLY VISITING THE SITE").** The per-cycle buoy ledger (`vchain.py`) keeps running as
+the standing instrument in Phase V's place; the operator checks the site as they see fit,
+and reopening this question (if ever wanted) is the operator's call, not a gate this plan
+computes. Closed, not carried forward.
 
 **3. ADR-098 datum-match discipline binds this ADR's bathymetry (D3).** WW3's
 bathymetry/mask (ETOPO 2022 15s, LMSL) is the SAME source and datum as the live L1 path
