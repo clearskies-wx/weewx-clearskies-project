@@ -49,8 +49,8 @@ predecessor's Q1–Q18 are cited as `EVO-Q#`).
 | # | Task (plain name) | Status |
 |---|---|---|
 | S0 | **Q17 push + live gate** — GFS far-window fetch f096→f108 so the daily 96 h WW3 horizon march finally runs | 🔄 CODE DONE (marine `2a05856`, meta `b7142574`; 31/1-known tests) — **awaiting operator "push"**; live gate at the next 00Z cycle after deploy (rows in S0) |
-| M0 | Map extent inventory + extract-size measurements (read-only) | ⬜ NEXT — no ruling needed (read-only) |
-| M1 | **CS-BASEMAP** — Clear Skies product basemap for EVERY Clear Skies map box (marine, seismic, radar/satellite, surf height map): OSM light kept, Protomaps dark + labels layer from a self-served extract, CARTO removed | ⬜ RULED 2026-08-27 (EVO-Q18 Round 1; scope widened by Q6 + Q5 rulings; Q8 closed same day: radar basemap = provider coverage box, z0–12) — design block below; brief after M0 |
+| M0 | Map extent inventory + extract-size measurements (read-only) | ✅ DONE 2026-08-27 — `scratch/M0-MAP-EXTENTS.md`; lead reproduced the four sizes on weewx. world z0–6 **42.8 MB** (≤ 100 MB ✓); local z7–15 union box **513.6 MB** (> 400 MB ceiling → **Q12 finding**, not a re-fit); radar z0–12 **195.1 MB**; marine box alone z15 3.1 MB. Union box = seismic box (marine nests inside). `protomaps-leaflet` 5.1.0 + `@protomaps/basemaps` 5.7.2: flavors LIGHT/DARK/…; labels-only = `labelRules(namedFlavor('dark'),'en')` + `paintRules: []` |
+| M1 | **CS-BASEMAP** — Clear Skies product basemap for EVERY Clear Skies map box (marine, seismic, radar/satellite, surf height map): OSM light kept, Protomaps dark + labels layer from a self-served extract, CARTO removed | 🔄 IN PROGRESS 2026-08-27 — **M1-API round dispatched** (brief `docs/planning/briefs/M1-API-BASEMAP-BRIEF-2026-08-27.md`; api-dev + test-author); dashboard round next; ADR-078 amendment Proposed → operator (journal J3) |
 | M2 | ~~LIBREWXR-BASEMAP~~ **CANCELLED 2026-08-27 (Q6 ruling)** — LibreWxR, RainViewer and every radar provider are overlay-only; the client brings the basemap AND its labels, so nothing moves into the fork. Kept as a row so the reversal is on record | ✅ closed-no-work |
 | M3 | ~~RADAR-STRIP~~ → **RADAR-REBASE** — the radar/satellite box keeps a Clear Skies basemap; only its SOURCE changes: CARTO dark → product basemap dark; CARTO satellite labels + ADR-078 outlines → the product basemap's labels/outlines layer; the standalone ADR-078 feature is absorbed into M1's basemap machinery (one extract family, one endpoint family) | ⬜ RULED 2026-08-27 (Q6) — part of the M1 build |
 | M4 | **SURF-MAP-BASEMAP** — the surf height map's background becomes the product basemap (light OSM / dark Protomaps); Esri World Topo (IMAGERY-MAP) and NAIP removed from every user-facing surface; the wizard's Esri satellite toggle STAYS (operator-only, not user-facing) | ⬜ RULED 2026-08-27 (Q5) — after M1 |
@@ -60,7 +60,7 @@ predecessor's Q1–Q18 are cited as `EVO-Q#`).
 | S3 | **Substitution cleanup** — CORRECTED after the adversarial review: `_reused_l1_boundary_command_lines()`, the `swan/level1/` directory and `ww3_chain_enabled` are LIVE dependencies (production L2 scaffold; buoy-ledger gate) and are NOT deleted. Remaining: `level1` label rename (cosmetic), the health `ww3_boundary` entry (record it or remove it — Q10), doc corrections (ARCHITECTURE.md:130/132 wrong "no-op"/"vestigial" claims + gap rows #12–#16, PROVIDER-MANUAL:2529 swell-card bullet, API-MANUAL §17 `swellSource` + `closeoutFraction`, ADR-109 G7 struck, D14 item 2 disposition), hotstart-age gate (Q10: drop or own row) | ⬜ doc round + rename only; nothing live deleted |
 | S10 | **FOG-REVERT** (API) — revert the 2026-08-24 fog cross-check narrowing (API `1ad6e74` + `f2c5ecd`): two nights of live testing showed the night-time standalone ≤ 1 °F rule cries wolf (conditions right, fog rarely formed); the provider cross-check returns at every level, as before. The uncommitted API-MANUAL edit documenting the narrowing is discarded | 🔄 CODE DONE (API `96bec7b` + `cf0318d`, local `git revert`s; `tests/test_fog_provider_crosscheck.py` 68 passed on Windows — host run owed after deploy; CHANGELOG entry NOT yet written) — **awaiting operator "push"** |
 | S11 | **INVARIANT-1** — health is `degraded` since the BREAK-REFORM deploy (08-26 09Z; ~7,600 firings): (1) read-only look at where BREAK-REFORM now places the outermost break marker relative to the per-transect handoff (untided terms), and what in `57af5d6` moved it; (2) then fix the check to compare like with like (tided break depth vs tided handoff, or both untided) with a guard test that fails pre-change | 🔄 (1) DONE 2026-08-27 — `scratch/inv1/S11-FINDINGS.md`: firings began at the `57af5d6` deploy hour (0/day before); the check adds tide to one side only (bug); AND the primary marker now sits at the beach model's first node in 37 % of transect-hours (10.7 % before), median distance from handoff 0.90 → 0.41 m — the roller-based cessation keeps a boundary-started zone alive so its first dissipation step becomes the marker. Options A/B/C → **Q11**; (2) waits on Q11 |
-| S12 | **HANDOFF-RESTART** — the beach model's handoff is set dynamically WITHIN the cycle: run the 1-D from the formula's station; if its first break lands on (or within the margin of) its own starting node, step the handoff one SWAN band station seaward and re-run, until the first break is interior or the band's deep end is reached (then refuse loudly for that transect-hour). SWAN's per-transect band tables already carry Hs/Tp/Dir + partitions at every 10 m station, so no SWAN re-run. Absorbs the invariant-1 tide-datum fix (S11-2) | ⬜ RULED 2026-08-27 (Q11, operator's design) — design block below; brief after the operator confirms the block |
+| S12 | **HANDOFF-RESTART** — the beach model's handoff is set dynamically WITHIN the cycle: run the 1-D from the formula's station; if its first break lands on (or within the margin of) its own starting node, step the handoff one SWAN band station seaward and re-run, until the first break is interior or the band's deep end is reached (then refuse loudly for that transect-hour). SWAN's per-transect band tables already carry Hs/Tp/Dir + partitions at every 10 m station, so no SWAN re-run. Absorbs the invariant-1 tide-datum fix (S11-2) | 🔄 IN PROGRESS 2026-08-27 — dispatched (brief `docs/planning/briefs/S12-HANDOFF-RESTART-BRIEF-2026-08-27.md`; api-dev + test-author; lead mechanics M1–M10 appended to the design block); gate file `scratch/GATE-S12-DEFINITION.md`; live reality gate waits on the push |
 | S4 | **Test-debt triage** — two test files, 18 failing tests (`test_serve_nothing_on_failure` 8, `test_service_full_run_trigger` 10; re-verified 2026-08-27), one ruling per class (repair harness / delete stale pin / keep) | ⬜ |
 | S5 | **First-install WW3 warm-start bootstrap** — the durable mechanism EVO-Q9 parked as a pre-ship row | ⬜ pre-ship; not needed for this install |
 | S6 | ~~ADR-109 gap closure~~ **DISSOLVED 2026-08-27 (Q9)** — G7 is built (one-line ADR edit → S3); G10 (`ww3_grid` rebuild hook) is part of S8.1; D14 stays a note | ✅ closed-no-work |
@@ -290,6 +290,91 @@ RADAR-REBASE — dark base + the labels/outlines layer over satellite) and the s
 the operator-only Esri satellite toggle).
 **Extent consequence, accepted by the operator (directive 14):** detail only inside the
 derived box; coarse world baseline beyond it.
+**Lead mechanics — API side (2026-08-27, coordinator; agents execute these; a deviation is a
+finding):**
+- `services/basemap_extract.py`: `TIERS = {"world": (0, 6), "local": (7, 15), "radar": (0, 12)}`;
+  files `/etc/weewx-clearskies/basemap-{tier}.pmtiles`. `compute_local_bounds()` = union of
+  the seismic box (station from `services/station.get_station_info()`, radius
+  `settings.earthquakes.default_radius_km × 1.15`, km→deg: lat/111.32, lon/(111.32·cos lat)) and
+  the marine box (bounding box of the locations returned by
+  `companion_proxy.marine_discovery_get("/marine", {})` — the API's only marine channel — padded by
+  40 px at z15: 40 × 156543.03·cos(lat)/2^15 m); no marine service configured → seismic box
+  alone (structural, not a failure); marine service configured but unreachable → the extract
+  REFUSES loudly (rules/coding.md "a model runs on all its inputs"). `compute_radar_bounds()` =
+  `settings.radar.librewxr_bounds` when set, else `None` → the radar tier is extracted from the
+  station box (directive 14). Extraction = the existing `pmtiles extract` mechanics
+  (`services/geographic_features.py:108–160`: today/yesterday build fallback, temp file + atomic
+  move, 1800 s per tier) with `--minzoom`/`--maxzoom` per tier, run world→local→radar in ONE
+  daemon thread (`start_extract_in_background()` → `False` if already running); status carries
+  per-tier `{available, size_bytes, updated_at, bounds, minzoom, maxzoom}` plus `updating`,
+  `last_error`, `last_started_at`, `last_finished_at`. A tier whose extract fails leaves the
+  previous file in place and names the error in `last_error`.
+- `endpoints/basemap.py`: `GET /api/v1/basemap/{tier}/tiles` (tier ∉ TIERS → 404 problem;
+  file absent → 404 JSON like ADR-078's), `FileResponse` + `Accept-Ranges: bytes` +
+  `Cache-Control: public, max-age=86400`; `GET /api/v1/basemap/status`; `POST /setup/basemap/update`
+  (proxy-secret auth exactly as `endpoints/geographic_features.py:69–81, 176–187`; 202
+  `{"status": "started"}` / 409 `{"status": "already_running"}`); `wire_basemap_settings()`.
+  Wiring mirrors `app.py:54–56, 139–141, 193–205` and `__main__.py:83, 986–988`.
+- `config/settings.py`: `BasemapSettings` for `[basemap]` with ONE key, `enabled` (bool, default
+  true). No operator-typed box, no zoom knobs (directive 14; PRIME DIRECTIVE 11).
+- ADR-078's feature stays in place this round (additive build); its removal is the final Phase M
+  commit after the operator accepts the ADR-078 amendment (journal J3).
+
+**Lead mechanics — dashboard side (2026-08-27, coordinator; M1 + M3 in one round; M4 separate):**
+- NEW `src/lib/basemap.ts` — the ONE place that knows the product basemap: `BASEMAP_TIERS`
+  (`world` z0–6, `local` z7–15, `radar` z0–12) → `/api/v1/basemap/{tier}/tiles`;
+  `useBasemapStatus()` (`GET /api/v1/basemap/status` through the existing `useApiQuery`/`fetchApi`
+  layer); rule builders derived from the installed `@protomaps/basemaps` flavors (M0 (d)):
+  `darkBasePaintRules()` = `paintRules(namedFlavor('dark'), 'en')` with the `buildings`,
+  `landuse` and `pois` layers dropped (the "current sparse look") and the flavor's `roads` rules
+  REPLACED by exactly two: freeways — `kind === 'highway'` (Protomaps v4 = motorway + trunk;
+  verify the kind value against `docs/reference/pmtiles-protomaps-reference.md` and cite) drawn at
+  every zoom ≥ 7, width `exp(1.6, [[7, 0.6], [10, 1.2], [13, 2.5], [15, 4]])`, color = the DARK
+  flavor's own highway/major-road colour (read it off `namedFlavor('dark')`; cite the field);
+  primary — `kind_detail === 'primary'` from z11, width `exp(1.6, [[11, 0.8], [15, 2.5]])`, same
+  colour family one step dimmer; nothing smaller. `labelRulesFor(theme)` =
+  `labelRules(namedFlavor(theme === 'dark' ? 'dark' : 'light'), 'en')` filtered to the `places`
+  and `water` label rules (no road shields, no POIs). `SATELLITE_OUTLINE_PAINT_RULES` = the four
+  ADR-078 `LineSymbolizer` rules moved verbatim from `radar-map.tsx:480–520`.
+  `<ProtomapsLayer tier mode pane zIndex minZoom maxZoom />` — an imperative react-leaflet
+  component on the `GeoFeaturesLayer` pattern (`radar-map.tsx:522–571`): `leafletLayer({ url: new
+  PMTiles(tileUrl) as any, paintRules, labelRules, attribution: PROTOMAPS_OSM_ATTRIBUTION, pane,
+  maxDataZoom: tier max })`; `mode` ∈ `dark-base` (paint = dark base rules, labels = dark labels),
+  `labels` (paint `[]`, labels per theme), `satellite-outlines` (paint = outline rules, labels =
+  dark labels). Renders nothing when `useBasemapStatus()` says the tier is unavailable (and the
+  marine map shows its existing tile-error banner with a new i18n key `map.basemapUnavailable`,
+  13 locales); seismic/radar show nothing extra.
+- Two-tier stacking on the marine and seismic maps (dark theme): `<ProtomapsLayer tier="world"
+  mode="dark-base" />` with NO `maxZoom` (over-zoomed z6 data is the ground beyond the box) under
+  `<ProtomapsLayer tier="local" mode="dark-base" minZoom={7} />`. Labels: `world` labels layer
+  `maxZoom={6}`, `local` labels layer `minZoom={7}` — never both at one zoom.
+- `LocationMap.tsx`: dark base (`:72–75`, `:305–313`) → the two-tier stack; the CARTO label
+  overlay (`:54–59`, `:318–326`) → `ProtomapsLayer mode="labels"` per theme (both variants, both
+  tiers as above); `useTileErrorRecovery` stays on the light OSM layer only; `TILE_CONFIG` keeps
+  only `light`.
+- `seismic.tsx`: same dark swap (`:130–139`, `:293–297`); attribution string for dark =
+  `PROTOMAPS_OSM_ATTRIBUTION` + the fault attribution as today.
+- `radar-map.tsx` (M3): `TILE_CONFIG.dark` (`:397–400`) → `<ProtomapsLayer tier="radar"
+  mode="dark-base" />` when `!satelliteActive && resolvedTheme === 'dark'` (single tier — Q8);
+  light OSM unchanged; `satelliteActive` → ONE `<ProtomapsLayer tier="radar"
+  mode="satellite-outlines" zIndex={300} />` replacing BOTH the CARTO labels `TileLayer`
+  (`:1347–1353`) and `<GeoFeaturesLayer />` (`:1357`); delete `SATELLITE_LABELS_URL`,
+  `SATELLITE_OVERLAY_ATTRIBUTION`, `GEO_FEATURES_PAINT_RULES`, `GeoFeaturesLayer`, and the
+  `protomaps-leaflet`/`pmtiles` imports from that file. `MapBoundsEnforcer`/`BoundsMask`
+  untouched (directive 14).
+- `map-attribution.ts`: add `PROTOMAPS_OSM_ATTRIBUTION` = "© OpenStreetMap contributors © Protomaps"
+  (linked); delete `CARTO_OSM_ATTRIBUTION`; delete `OSM_ODBL_ATTRIBUTION` if it has no remaining
+  user (grep). `about.tsx:28` CARTO row deleted; the Protomaps row (`:29`) stays.
+- Dev-only, env-gated Vite proxy (no effect on the build or on anyone who does not set the vars):
+  `vite.config.ts` `"/api"` target = `process.env.API_DEV_ORIGIN ?? "http://localhost:8765"`
+  (`secure: false`), and a `"/api/v1/basemap"` rule targeting `process.env.BASEMAP_DEV_ORIGIN`
+  when set, rewriting `/api/v1/basemap/<tier>/tiles` → `/basemap-<tier>.pmtiles` and `/status` →
+  `/status.json`. The lead serves the M0 extracts from `scratch/basemap-dev/` with `npx http-server`
+  (Range-capable) so the round can render the real dark basemap before any deploy.
+- Docs, same round (meta repo): DASHBOARD-MANUAL §10 "Basemap swap" + "Geographic features vector
+  tile overlay" paragraphs and §12 map-layer contract rewritten to the as-built; DESIGN-MANUAL only
+  if it names CARTO (grep).
+
 **Gate rows (results-free file, stated now):** both maps render in both themes with no
 watermark and no blank inside the derived box (screenshots side-by-side vs today's light
 theme); **freeways visible on the dark seismic map at its initial zoom and on the dark marine
@@ -535,6 +620,64 @@ L4 grid then that is fine." It is: L4 is the fixed 10 m structure grid (operator
 2026-07-27) and `_TRANSECT_BAND_SPACING_M = 10` matches it. Constant documented as "one L4 cell".
 S12 is fully ruled; brief on the operator's go.
 
+**Lead mechanics (2026-08-27, coordinator; fills the design block's implementation gaps — agents
+execute these too; a deviation is a finding):**
+- **M1. Where the seaward stations come from.** `swan_runner._select_l3_handoff_position_and_spectrum()`
+  already holds every band station's PT* partitions per timestep (`pt_by_band_idx[station_idx][time_iso]`,
+  `swan_runner.py:1058`). Each published entry (`:1088–1094`) gains one additive key
+  `"band_stations"`: a list, ordered SEAWARD-most first, of
+  `{"station_index": int, "depth_m": float, "components": [...]}` for every band station strictly
+  seaward of the selected station (indices `0 .. selection.station_index-1`), each with that
+  station's own PT* components for the timestep (empty list when SWAN emitted none there). Only the
+  stations seaward of the pick are carried (rules/coding.md §12.2 — the loop can only move seaward).
+  The T4B.4 fixed-15 m L2 path (`:3981–3985`) carries no band → key absent → the loop has nowhere
+  to go → a failed acceptance test there is `handoff_restart_exhausted` immediately.
+- **M2. Plumbing.** `surf_pipeline_timestep.py` gains `resolve_band_stations_by_transect()` beside
+  `resolve_partitions_by_transect()` (same read-only shape rules) → `run_pipeline(band_stations_by_transect=)`
+  (new kw-only, default `None` = today) → `_run_pipeline_per_transect(band_stations_for_transect=,
+  bathy_full_for_transect=)`. `run_pipeline` keeps the UNTRUNCATED profile per transect
+  (`_bathy_full`, `surf_1d_pipeline.py:2963`) in a parallel list so the loop can re-truncate.
+- **M3. The loop lives in `_run_pipeline_per_transect`** around the `run_1d_analytical()` call
+  (`:2242–2264`). Attempt 0 = today's inputs. Acceptance test after each run, both parts:
+  (i) `not result.onset_at_node0` — a new additive `Analytical1DResult` field set by
+  `_ddd_breaking_march` from its node-0 onset branch (`surf_1d_analytical.py:1042–1046`); and
+  (ii) if `result.break_points` is non-empty, `bathy[0, 0] - result.break_points[0].distance_m >=
+  HANDOFF_BREAK_CLEARANCE_M` (distance from shore of the profile's first node minus the outermost
+  marker's distance). Failure → next candidate = next entry of `band_stations` walking seaward
+  (index `selection.station_index-1`, then `-2`, …).
+- **M4. Which partition at the new station.** SWAN-sourced partitions are matched by period: the
+  new station's component with the smallest `|Tp − Tp_partition|`, accepted only when ≤ 2 s (tie →
+  nearest direction). No match → that station is skipped for this partition (one WARNING per
+  transect-hour-partition, with the count) and the walk continues seaward. An F5-synthesized
+  wind-sea partition (`is_wind_sea`, seeded at `height 0`) has no station component: it restarts
+  with the same seed, its growth recomputed from the new station's fetch and depth exactly as the
+  first attempt did (`:2230–2234`).
+- **M5. Re-truncation.** `_truncate_bathy_at_handoff(bathy_full, new_station.depth_m, t_idx)`;
+  `None` → treat as a skipped station (WARNING) and continue seaward.
+- **M6. Termination.** Candidates exhausted (or none) → `p_results.append(None)`, WARNING naming
+  `handoff_restart_exhausted`, transect/partition/hour, attempts; nothing from the last attempt is
+  kept. Attempt cap = `len(band_stations) + 1` (never exceeds the band; the ≤ 150 station clamp
+  already bounds the band).
+- **M7. Published handoff.** The transect-hour's published `handoff_depth_m` = the DEEPEST settled
+  station across its partitions (the profile the transect effectively starts from);
+  `handoff_for_transect[t_idx]` is replaced by that settled tuple before the wire/trace/invariant-4
+  reads (`:3007–3011`, `:3491`). Trace stage `handoff_selection` gains `restart_attempts` (max over
+  partitions) and `restart_reason` (`None` | `"onset_at_node0"` | `"clearance"` |
+  `"handoff_restart_exhausted"`).
+- **M8. Health count.** `state.py` gains `record_handoff_restart_outcome(*, attempts: int,
+  exhausted: bool)` keeping in-memory counters since service start — `runs`, `restartedRuns`,
+  `exhausted`, `attemptsHistogram` (dict attempts→count, keys ≤ 151), `lastExhaustedAt` — and
+  `/health` gains a `handoffRestart` block reporting them (count only; no status change).
+- **M9. Invariant 1 both sites** (`surf_1d_pipeline.py:2255–2264` and `:3330–3336`): compare
+  UNTIDED (`break_points[0].depth_m - tide_level`) against the SETTLED handoff depth, AND require
+  the clearance test (ii) — the loop's own test, so a post-S12 firing means the loop failed.
+  `HANDOFF_BREAK_CLEARANCE_M = 10.0` lives in `services/transect_handoff.py` beside the other
+  handoff constants, documented "one L4 cell (10 m); `_TRANSECT_BAND_SPACING_M` matches".
+- **M10. ADR-093 amendment** is written as Amendment 5, status Proposed, quoting the Q11 ruling
+  verbatim as its basis; the operator accepts the text (rules/clearskies-process.md ADR discipline).
+- **Tests run locally** (`.venv_local`) because librewxr's checkout cannot see unpushed code; the
+  host run is owed after the push (journal J5).
+
 ### S4 — Test-debt triage (C13)
 
 Scope (re-verified 2026-08-27, Windows run: 18 failed / 36 passed across the four named
@@ -683,6 +826,21 @@ authorization from commit.
 ---
 
 ## OPEN OPERATOR QUESTIONS
+
+### Q12 (2026-08-27) — NON-BLOCKING (work continues as designed): the local basemap extract measures 514 MB against the plan's 400 MB ceiling
+
+Plain English. The dark-theme map data for the area around the station is one file. The plan said,
+before measuring, that this file should be at most 400 MB. M0 measured it: **513.6 MB** (the box is
+the earthquake map's box — 200 km around the station × 1.15 — from zoom 7 to zoom 15, the marine
+map's street-level zoom). The world file is 42.8 MB (under its 100 MB ceiling) and the radar file
+is 195 MB (no ceiling was stated). Disk on the API host has 397 GB free, so nothing breaks; the
+extract takes 11 seconds. The plan says a larger measurement is a finding for you, not a reason to
+change the gate quietly. **I am building it as designed (one local file, zoom 7–15) and reporting
+the number.** Options if you want it smaller: (a) accept 514 MB; (b) cap the local file at zoom 14
+(coarser than street level everywhere — the marine map's z15 view would be rendered from z14 data,
+which Protomaps does by over-zooming; expect roughly a quarter of the size); (c) keep zoom 15 only
+for the marine box (3 MB measured) and zoom 7–14 for the rest — a fourth file, so a design change.
+**Recommendation: (a)** — 0.05 % of the disk, and the operator-visible cost is one admin action.
 
 ### Q11 (2026-08-27) — ✅ RULED by the operator's own design, superseding options A/B/C:
 
