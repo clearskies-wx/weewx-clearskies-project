@@ -50,7 +50,7 @@ predecessor's Q1–Q18 are cited as `EVO-Q#`).
 |---|---|---|
 | S0 | **Q17 push + live gate** — GFS far-window fetch f096→f108 so the daily 96 h WW3 horizon march finally runs | 🔄 CODE DONE (marine `2a05856`, meta `b7142574`; 31/1-known tests) — **awaiting operator "push"**; live gate at the next 00Z cycle after deploy (rows in S0) |
 | M0 | Map extent inventory + extract-size measurements (read-only) | ⬜ NEXT — no ruling needed (read-only) |
-| M1 | **CS-BASEMAP** — Clear Skies product basemap for EVERY Clear Skies map box (marine, seismic, radar/satellite, surf height map): OSM light kept, Protomaps dark + labels layer from a self-served extract, CARTO removed | ⏸ RULED 2026-08-27 (EVO-Q18 Round 1; scope widened by Q6 + Q5 rulings, same day) — design block below; brief after M0 **and Q8** (review #12) |
+| M1 | **CS-BASEMAP** — Clear Skies product basemap for EVERY Clear Skies map box (marine, seismic, radar/satellite, surf height map): OSM light kept, Protomaps dark + labels layer from a self-served extract, CARTO removed | ⬜ RULED 2026-08-27 (EVO-Q18 Round 1; scope widened by Q6 + Q5 rulings; Q8 closed same day: radar basemap = provider coverage box, z0–12) — design block below; brief after M0 |
 | M2 | ~~LIBREWXR-BASEMAP~~ **CANCELLED 2026-08-27 (Q6 ruling)** — LibreWxR, RainViewer and every radar provider are overlay-only; the client brings the basemap AND its labels, so nothing moves into the fork. Kept as a row so the reversal is on record | ✅ closed-no-work |
 | M3 | ~~RADAR-STRIP~~ → **RADAR-REBASE** — the radar/satellite box keeps a Clear Skies basemap; only its SOURCE changes: CARTO dark → product basemap dark; CARTO satellite labels + ADR-078 outlines → the product basemap's labels/outlines layer; the standalone ADR-078 feature is absorbed into M1's basemap machinery (one extract family, one endpoint family) | ⬜ RULED 2026-08-27 (Q6) — part of the M1 build |
 | M4 | **SURF-MAP-BASEMAP** — the surf height map's background becomes the product basemap (light OSM / dark Protomaps); Esri World Topo (IMAGERY-MAP) and NAIP removed from every user-facing surface; the wizard's Esri satellite toggle STAYS (operator-only, not user-facing) | ⬜ RULED 2026-08-27 (Q5) — after M1 |
@@ -141,9 +141,11 @@ cross-inferred); (11) no generic model setup, zero model-setup controls on produ
     window's pan limits, minimum zoom and outside-mask come from the provider's declared
     coverage box (`[radar] librewxr_bounds` → capability `bounds` → `radar-map.tsx`
     `MapBoundsEnforcer`/`BoundsMask`) — that is the provider saying where its own overlay has
-    data, and it stays. Consequence, accepted: the dark basemap is detailed only inside the
-    derived box; the radar view beyond it shows the coarse world baseline (Q8 decides how
-    coarse).
+    data, and it stays. **And the radar map's basemap is sized to that same coverage box**
+    (Q8 closed 2026-08-27): the radar view cannot pan or zoom beyond the box, so the box IS the
+    extent the basemap under it must cover, at the radar's own zoom range (provider max zoom 12).
+    A provider with no coverage box (RainViewer) falls back to the station box. The
+    marine/seismic/surf maps keep the config-derived station box.
 15. **No Esri, no aerial photography, on any USER-FACING surface** (compliance + caching
     restrictions; the low-tide NAIP finding). The surf height map's background becomes the
     product basemap (Q5). The wizard's Esri satellite toggle stays — operator-only, not
@@ -233,8 +235,8 @@ operator's ruling, Q10-10 "worthless".)
 
 ## PHASE M — maps (operator-ruled 2026-08-27; repos: dashboard, api, stack — NOT the librewxr fork)
 
-**Order:** M0 → (Q8 ruled) → M1, with M3 and M4 as rounds inside M1's build. **M1 and M3 are
-BLOCKED on Q8** (whether the radar box's dark view is served by the M1 extract at all).
+**Order:** M0 → M1, with M3 and M4 as rounds inside M1's build. Q8 closed 2026-08-27 — nothing
+in Phase M is blocked on a ruling.
 **Owner:** coordinator designs; `clearskies-dashboard-dev` (dashboard) / `clearskies-api-dev`
 (API endpoints + the stack admin page: `admin/routes.py`, `templates/admin/geographic_features.html`,
 locale files) implement; `clearskies-auditor` gates. Every brief carries the three mandatory
@@ -243,12 +245,13 @@ blocks and PRIME DIRECTIVE 13–15 verbatim.
 ### M0 — Extent inventory + measurements (read-only, no ruling needed)
 
 Deliverable `scratch/M0-MAP-EXTENTS.md`: (a) for each Clear Skies map surface, the extent
-source and zoom range **as coded** (marine `LocationMap.tsx`, seismic `seismic.tsx`; the radar
-box is excluded by directive 13); (b) for this install, the derived boxes from live config
-(station 33.657/−117.983, quake radius 200 km, the marine locations from `/api/v1/marine`);
-(c) measured `pmtiles extract` sizes and tile counts for: the union box at z7–15, the marine
-box at z15, the world at z0–6 — run on weewx where the CLI already lives, into a named scratch
-dir; (d) the `protomaps-leaflet` 5.x theme API (which built-in themes exist, how label-only
+source and zoom range **as coded** (marine `LocationMap.tsx`, seismic `seismic.tsx`, radar
+`radar-map.tsx` + the capability `bounds`); (b) for this install, the derived boxes from live
+config (station 33.657/−117.983, quake radius 200 km, the marine locations from
+`/api/v1/marine`) and the radar coverage box from `/api/v1/capabilities`; (c) measured
+`pmtiles extract` sizes and tile counts for: the union box at z7–15, the marine box at z15,
+the world at z0–6, the radar coverage box at z0–12 — run on weewx where the CLI already lives,
+into a named scratch dir; (d) the `protomaps-leaflet` 5.x theme API (which built-in themes exist, how label-only
 rules are expressed) verified from the installed package, not from memory.
 
 ### M1 — CS-BASEMAP (design block; implement after M0)
@@ -256,8 +259,12 @@ rules are expressed) verified from the installed package, not from memory.
 **Extent derivation (API, config-time):** a new `services/basemap_extract.py` computes
 `bounds = union(seismic_box, marine_box)` from `api.conf` + the marine locations the API
 already holds; no operator-typed box; recomputed by the same admin action that runs the
-extract. Two files, both under `/etc/weewx-clearskies/`: `basemap-world.pmtiles` (z0–6,
-global) and `basemap-local.pmtiles` (z7–15, the union box). Served by one endpoint family
+extract. **Radar map (Q8 closed 2026-08-27):** its basemap extent is the radar provider's
+declared coverage box (`[radar] librewxr_bounds` → capability `bounds`), at z0–12 (the radar's
+own zoom range); when the provider declares no box, the station box above. Files under
+`/etc/weewx-clearskies/`: `basemap-world.pmtiles` (z0–6, global — the fallback ground for any
+pan outside the boxes on the non-radar maps), `basemap-local.pmtiles` (z7–15, the union box),
+and `basemap-radar.pmtiles` (z0–12, the radar coverage box). M0 measures all three. Served by one endpoint family
 `/api/v1/basemap/{world,local}/tiles` (Range requests, same mechanism ADR-078's endpoint uses
 today) + `/api/v1/basemap/status`. Admin page: one "update basemap" action + status.
 `pmtiles` CLI stays a documented API-host prerequisite (OPERATIONS-MANUAL).
@@ -761,7 +768,9 @@ Each item is one decision. Plain English; the letter in brackets is the review f
 
 *(Plain English, self-contained, newest at top. Answered items keep their ruling here.)*
 
-### Q8 (2026-08-27) — the radar box spans SoCal to New Mexico; the derived basemap box is ~230 km. How do we cover the dark radar view without reading the radar provider's extent?
+### Q8 (2026-08-27) — ✅ CLOSED by Q6 + Q10-4 (the lead kept re-asking an answered question; operator: "YOU CANNOT FUCKING ZOOM OUT BEYOND THE EXTENTS OF THE BBOX!"). The radar map is hard-limited to the provider's coverage box (`MapBoundsEnforcer` + `BoundsMask`), so its basemap is sized to exactly that box — the provider's declared coverage IS the radar view, and Clear Skies is responsible for the basemap under it. There is no "basic/world" tier for the radar map. A provider with no coverage box (RainViewer, worldwide) gets the station box under Clear Skies' own config, same as every other map — that is the only case the earlier "size from our own config" wording ever applied to. Directive 14 and M1 amended accordingly; the "coarse world beyond the box" consequence text is struck for the radar map.
+
+### ~~Q8 (original)~~ — the radar box spans SoCal to New Mexico; the derived basemap box is ~230 km. How do we cover the dark radar view without reading the radar provider's extent?
 
 Operator: "the radar box will blow all of our other sizings out the window as it covers most of
 the SW well into New Mexico." Directive 14 forbids sizing anything from the provider. Options:
