@@ -6,9 +6,16 @@ Auditor: `clearskies-auditor`, results-free gate `scratch/GATE-M4-DEFINITION.md`
 **Dispatch condition:** after M1-DASH's dev closeout is accepted (`src/lib/basemap.ts` exists) AND
 M4-API has landed (the `/imagery/config` shape).
 
-**Pre-round verification (lead, fill at dispatch):** dashboard HEAD `<hash>`, clean; `npx tsc --noEmit`
-zero; `npx vitest run src/components/marine/tabs/HeatMapCard.test.tsx src/hooks/useImageryConfig.test.ts`
-→ `<n passed>`.
+**Pre-round verification (lead, 2026-08-27):** dashboard HEAD `43afaee` (M1-DASH + M3 landed), clean;
+`npx tsc --noEmit` exit 0; `npx vitest run src/components/marine/tabs/HeatMapCard.test.tsx src/hooks/useImageryConfig.test.ts`
+→ `2 files, 63 passed`. M4-API landed (API `f4a42a7`, `87924c9`, `07e0322`; meta openapi `897a79b3` —
+`/imagery/config` now answers `provider:"basemap"`, `light{tileUrl}`, `dark{pmtilesUrl:"/api/v1/basemap/local/tiles", maxDataZoom}`,
+`zoomMin 0`, `zoomMax 19`; read the meta contract `docs/contracts/` openapi Imagery paths for the exact field names before
+editing `types.ts`). **Ordering constraint for this round:** the adversarial Gate M1-DASH auditor is reading
+the dashboard tree at HEAD `43afaee` and rendering with http-server on `:8799` + Vite on `:5174` — do
+`src/lib/basemap.ts` LAST (after every other file is committed) and use DIFFERENT ports for your own
+render (http-server `-p 8798`, `BASEMAP_DEV_ORIGIN=http://localhost:8798`, `npx vite --port 5175`).
+`scratch/basemap-dev/` is read-only shared render data — never modify it.
 
 ## The design — read it at the source
 `docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md` §"M4 — SURF-MAP-BASEMAP … lead mechanics" (the
@@ -81,9 +88,14 @@ Plan §M4 (+ mechanics), PA9, Q5, directive 15; `src/components/marine/tabs/Heat
 
 ## Mandatory blocks
 **Git restrictions:** You must NOT run `git pull`, `git push`, `git fetch`, `git rebase`, `git merge`,
-or `git checkout` of remote branches. You may only `git add <explicit paths>`, `git commit`, `git status`,
-`git log`, `git diff`. If the remote is ahead or behind, STOP and report via SendMessage. Do not resolve
-it yourself. Edit and commit ONLY on the local machine; SSH to containers is read-only.
+`git stash`, `git checkout`/`git restore`/`git clean` of any path, or `git checkout` of remote
+branches. You may only `git add <explicit paths>`, `git commit`, `git status`, `git log`, `git diff`,
+`git show`. Never move, rename or delete a file outside your allowlist by any means (no `mv`, no
+`rm`) — including files your own tests or tools produce. Pre-change evidence comes from
+`git show <base>:<file>` into scratch or from running tests BEFORE the dev lands — never from moving
+another agent's work. Before `git add` of a file another agent may be editing, `git diff -- <file>`
+and confirm every hunk is yours. If the remote is ahead or behind, STOP and report via SendMessage.
+Edit and commit ONLY on the local machine; SSH to containers is read-only.
 
 **Architectural changes — STOP, do not proceed.** You may not make an architectural change. If your
 task requires one, STOP and report via SendMessage — do not implement it, do not work around it, do
