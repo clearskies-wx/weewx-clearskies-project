@@ -1246,6 +1246,53 @@ sudo systemctl enable --now weewx-clearskies-marine
 
 SWAN 41.51AB must be compiled and on PATH (`/usr/local/bin/swan`) on whichever host runs the marine service. Use `scripts/install_swan.sh` or the Docker image. The API startup check that verifies the SWAN binary moves to the marine service in the target state.
 
+#### First install — WW3 warm start
+
+The WW3 leg (ADR-109 D10) starts every cycle from the restart file the *previous* cycle
+saved, and refuses any restart file it did not itself write — it will not trust a restart
+file with no recorded generating cycle in its own state. On a brand-new install there is no
+previous cycle, so a hand-installed restart file (from a warm-up march, run the same way the
+buoy-validated one was) is otherwise refused forever with `ww3_restart_missing`: "restart
+file found but no recorded generating cycle -- untrusted, refusing."
+
+The first real install of this chain (2026-08-19) hit exactly this and was unblocked by a
+one-time, by-hand state edit rather than this procedure (EVO-Q9 ruling, operator: "THAT IS
+NOT ARCHITECTURAL, THAT IS JUST PROCEDURAL") — quoted here for the record: *"Seed record:
+`state_snapshot.json` `ww3_leg.lastSuccessCycleTime` = `2026-08-19T00:00:00Z` (the minted
+restart's real generating march; backup `.bak-preseed-20260819T085347Z`), service
+stop/edit/start, state verified reloaded."* That was ruled procedural because its content was
+true (the warm-up run really happened) — but it is a by-hand edit of the service's saved
+state, and it was ruled "parked as a pre-ship row" pending a durable mechanism. **Every
+install from here forward uses the procedure below instead** — no service stop/edit/start,
+no hand-editing `state_snapshot.json`.
+
+**Procedure.** After copying the warm-up run's ending restart file into
+`level0/restart_<token>.ww3` (`<token>` is the `%Y%m%d.%H%M%S` UTC timestamp of the cycle the
+chain's *first* production cycle will start from — the same stamp WW3 itself uses for every
+restart file it writes), drop a provenance note beside it, same directory, same `<token>`:
+
+```bash
+cat > /path/to/level0/restart_<token>.provenance.json <<'EOF'
+{
+  "generating_cycle": "<ISO-8601 UTC, e.g. 2026-09-01T00:00:00Z, matching <token>>",
+  "source": "bootstrap",
+  "created_at": "<ISO-8601 UTC, when this note was written>",
+  "note": "First-install warm start: <describe the warm-up run this restart file came from>"
+}
+EOF
+```
+
+`generating_cycle` must parse as ISO-8601 UTC and equal the cycle the `<token>` in the
+restart file's own name encodes — anything else is a mismatch, refused with today's
+`ww3_restart_missing` reason (the note's contents are quoted in the service's ERROR log so
+the mismatch is diagnosable). The service accepts a matching note exactly ONCE: it logs a
+WARNING naming the note, runs that first cycle using the note's `generating_cycle` as the
+restart's provenance (so the D11 staleness-age gate — `WW3_RESTART_MAX_AGE_H = 9` — still
+applies to it), and deletes the note file the moment that cycle succeeds. Every cycle after
+that chains normally from its own restart output. A second fresh install (or a rebuild of
+`level0/`) needs a new note — the mechanism is consumed, not reusable. No note present is
+byte-identical to the refusal behaviour above.
+
 #### Configuration
 
 **In `api.conf [providers]` on the weewx host:**

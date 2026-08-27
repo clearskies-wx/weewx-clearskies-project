@@ -897,3 +897,58 @@ wind-only forcing split itself (only its fetch depth changes); D11's
   input to this ADR's boundary-assembly path (D5/D6).
 - WW3 manual: `docs/reference/ww3-user-manual-v6.07.txt` (committed at DOC-W.4) — line
   cites throughout D13's catalog, authoritative per D2.
+
+## Amendment (2026-08-27): D10 — first-install WW3 warm-start bootstrap (S5, C17, EVO-Q9 option 2)
+
+**Status: Proposed.** Recorded per the plan's EVO-Q9 ruling
+(`docs/planning/MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.md`, Q9 "✅ RULED 2026-08-19
+(operator, in chat): 'THAT IS NOT ARCHITECTURAL, THAT IS JUST PROCEDURAL' ... The durable
+first-install bootstrap mechanism is PARKED as a pre-ship row (design + gate + ADR-109
+amendment) — needed before any fresh install exists, not for this test install.") and
+`docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md` §S5/"S5 lead mechanics". Pointer +
+addendum only — no D10 ruling above is re-opened; D10's restart-chaining mechanism and
+trap-23 stamping are unchanged. This amendment closes the gap D10 itself never addressed:
+D10 accepted restart-chaining as the initial-state mechanism, but a chain that only ever
+trusts a restart file it wrote itself has no way to run its very first cycle on a fresh
+install.
+
+**The defect this closes.** The chain's first live install (2026-08-19) hit exactly this:
+a hand-made, buoy-validated warm-state file was rejected as "untrusted: no recorded
+generating cycle," and the chain could never have run its first cycle anywhere, ever,
+without intervention. EVO-Q9 unblocked that one install with a one-time, by-hand edit of
+the service's own saved state (`state_snapshot.json` `ww3_leg.lastSuccessCycleTime`,
+service stop/edit/start) — honest content (the warm-up run really happened,
+hash-verified), but not a repeatable mechanism, and ruled "parked as a pre-ship row" at the
+time. This amendment is that durable mechanism.
+
+**Design.** `_run_ww3_leg()` (`weewx_clearskies_marine/service.py`): when the restart file
+for the current cycle exists but the service's own saved state has no recorded
+`lastSuccessCycleTime` for it (D10's existing "untrusted, refusing" branch), the leg now
+also looks for a provenance note beside the restart file, same `level0/` directory, same
+filename token: `restart_<token>.provenance.json`, shape
+`{"generating_cycle": "<ISO-8601 UTC>", "source": "bootstrap", "created_at": "<ISO-8601
+UTC>", "note": "<free text>"}`. If the note is present, its JSON parses, and its
+`generating_cycle` parses and equals the cycle the restart file's own `<token>` encodes,
+the leg accepts it **exactly once**: a WARNING is logged naming the note, the note's
+`generating_cycle` is used as that cycle's restart provenance (so D11's
+`WW3_RESTART_MAX_AGE_H = 9` staleness gate still evaluates against it, unchanged), and the
+note file is deleted the moment that leg cycle completes successfully — consumed, not
+reusable; a second fresh install (or a rebuilt `level0/`) must write a new one. Any
+mismatch (note absent, unreadable, or `generating_cycle` not equal to the restart's own
+cycle) falls straight through to D10's existing `ww3_restart_missing` refusal, with the
+note's contents quoted in the ERROR log for diagnosis. No note present is byte-identical to
+D10's refusal behaviour as accepted 2026-08-17 — this amendment adds a narrow, one-shot
+acceptance path; it does not weaken the refuse-loudly default in any other case.
+
+**Operator-facing procedure.** `docs/manuals/OPERATIONS-MANUAL.md` "Marine service
+deployment" § "First install — WW3 warm start" gives the exact `cat > …provenance.json`
+snippet and quotes the EVO-Q9 seed procedure for the record; every install from that
+section forward uses this note-drop procedure instead of the by-hand
+`state_snapshot.json` edit EVO-Q9 used once.
+
+**UNCHANGED by this amendment:** D10's restart-chaining mechanism and trap-23 stamping;
+D11's `WW3_RESTART_MAX_AGE_H = 9` staleness gate (still evaluated, now possibly seeded
+from an accepted note instead of a prior success record); D12's file/dir layout and
+cadence; no new config key, health field, or module — `service.py`'s `_run_ww3_leg()`
+only, plus the note file itself (a new, transient, self-deleting persisted artifact under
+the existing `level0/` directory).
