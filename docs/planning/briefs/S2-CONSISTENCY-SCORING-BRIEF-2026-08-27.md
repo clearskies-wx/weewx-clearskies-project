@@ -5,10 +5,17 @@
 (KATs). Auditor: `clearskies-auditor`, results-free gate `scratch/GATE-S2-DEFINITION.md`.
 **Dispatch condition:** after S12's dev closeout is accepted (both rounds edit `swan_runner.py`).
 
-**Pre-round verification (lead, fill at dispatch):** marine HEAD `<hash>`, clean; baseline
-`.venv_local\Scripts\python.exe -m pytest tests/enrichment tests/test_rw1_cards_from_model.py -q -p no:cacheprovider` → `<n passed>`;
-`scipy` importable in `.venv_local` (the Kimura integrals need `scipy.integrate.dblquad`,
-`scipy.special.i0e`) — scipy is ALREADY a marine dependency (grep `pyproject.toml`), not a new one.
+**Pre-round verification (lead, 2026-08-27):** marine HEAD `c19da47` (S12/S4/S4b/S5/S1/S3c and
+S8.1-A test commits landed); the ONLY uncommitted file is `weewx_clearskies_marine/services/grid_sizing_chain.py`
+(the S8.1-A dev's in-flight wiring — not yours, never add/stash/restore it). Baseline
+`.venv_local\Scripts\python.exe -m pytest tests/enrichment tests/test_rw1_cards_from_model.py -q -p no:cacheprovider` → `13 passed, 1 warning`.
+`scipy 1.18.0` imports in `.venv_local` and is pinned at `pyproject.toml:104` (`scipy==1.18.0`) —
+the Kimura integrals need `scipy.integrate.dblquad`, `scipy.special.i0e`; scipy is ALREADY a marine
+dependency, not a new one. `swan_runner.py` is free (S1 closed); concurrent agent S8.1-A (dev) edits
+`grid_sizing_chain.py` / `service.py` and its docs — disjoint from your allowlist.
+**Shared-file rule:** before `git add` of any file another agent may be editing (marine `CHANGELOG.md`,
+meta docs), run `git diff -- <file>` and confirm every hunk is yours; if a foreign hunk is present,
+wait 5 minutes and re-check — never commit another agent's hunks.
 
 ## The design — read it at the source (binding, in this order)
 1. `docs/decisions/ADR-101-surf-score-geometric-mean.md` → "Amendment 1 (2026-08-27) — Consistency
@@ -105,9 +112,13 @@ weights), `:320–360`, `:680–720` (`_swell_dominance`), `:860–890`, `:940�
 
 ## Mandatory blocks
 **Git restrictions:** You must NOT run `git pull`, `git push`, `git fetch`, `git rebase`, `git merge`,
-or `git checkout` of remote branches. You may only `git add <explicit paths>`, `git commit`, `git status`,
-`git log`, `git diff`. If the remote is ahead or behind, STOP and report via SendMessage. Do not resolve
-it yourself. Edit and commit ONLY on the local machine; SSH to containers is read-only.
+`git stash`, `git checkout`/`git restore`/`git clean` of any path, or `git checkout` of remote
+branches. You may only `git add <explicit paths>`, `git commit`, `git status`, `git log`, `git diff`,
+`git show`. Never move, rename or delete a file outside your allowlist by any means (no `mv`, no
+`rm`). Pre-change evidence comes from `git show <base>:<file>` into scratch or from running tests
+BEFORE the dev lands — never from moving another agent's work. If the remote is ahead or behind,
+STOP and report via SendMessage. Edit and commit ONLY on the local machine; SSH to containers is
+read-only.
 
 **Architectural changes — STOP, do not proceed.** You may not make an architectural change. If your
 task requires one, STOP and report via SendMessage — do not implement it, do not work around it, do
