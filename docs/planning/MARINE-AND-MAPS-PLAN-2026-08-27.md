@@ -342,8 +342,10 @@ finding):**
   `landuse` and `pois` layers dropped (the "current sparse look") and the flavor's `roads` rules
   REPLACED by exactly two: freeways — `kind === 'highway'` (Protomaps v4 = motorway + trunk;
   verify the kind value against `docs/reference/pmtiles-protomaps-reference.md` and cite) drawn at
-  every zoom ≥ 7, width `exp(1.6, [[7, 0.6], [10, 1.2], [13, 2.5], [15, 4]])`, color = the DARK
-  flavor's own highway/major-road colour (read it off `namedFlavor('dark')`; cite the field);
+  every zoom ≥ 6 (RESTYLED 2026-08-27 after the lead's render review — the first stops, 0.6 px in
+  `DARK.highway` #474747 at z7, were unreadable on the dark seismic/radar maps), width
+  `exp(1.6, [[6, 1.4], [8, 2.0], [10, 2.6], [13, 3.4], [15, 4.5]])`, colour `#a0a0a0` (contrast
+  vs the dark ground ≥ 3:1, measured);
   second tier — `kind === 'major_road'` from z11 (CORRECTED 2026-08-27 by the dashboard-dev's
   schema verification: the Protomaps `roads` layer has no `kind_detail === 'primary'`; its kinds are
   highway/major_road/medium_road/minor_road/other/path/rail — `@protomaps/basemaps/src/base_layers.ts`),
