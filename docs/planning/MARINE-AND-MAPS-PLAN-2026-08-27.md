@@ -347,8 +347,8 @@ finding):**
   second tier — `kind === 'major_road'` from z11 (CORRECTED 2026-08-27 by the dashboard-dev's
   schema verification: the Protomaps `roads` layer has no `kind_detail === 'primary'`; its kinds are
   highway/major_road/medium_road/minor_road/other/path/rail — `@protomaps/basemaps/src/base_layers.ts`),
-  width `exp(1.6, [[11, 0.8], [15, 2.5]])`, colour `DARK.major` (one step dimmer than
-  `DARK.highway`); nothing smaller. `labelRulesFor(theme)` =
+  width `exp(1.6, [[11, 1.0], [15, 2.6]])` (restyled 2026-08-27), colour `#6f6f6f` (one step
+  dimmer than the freeway grey); nothing smaller. `labelRulesFor(theme)` =
   `labelRules(namedFlavor(theme === 'dark' ? 'dark' : 'light'), 'en')` filtered to the `places`
   and `water` label rules (no road shields, no POIs). `SATELLITE_OUTLINE_PAINT_RULES` = the four
   ADR-078 `LineSymbolizer` rules moved verbatim from `radar-map.tsx:480–520`.
