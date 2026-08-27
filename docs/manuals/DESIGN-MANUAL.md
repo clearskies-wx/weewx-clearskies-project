@@ -1170,7 +1170,7 @@ The radar card uses the standard card anatomy (§6) with a Leaflet map filling t
 - Nowcast indicator: the FrameProgressBar uses accent color for nowcast/forecast frames vs. muted foreground for past frames, with a vertical tick mark at the boundary.
 
 **Dark/light theme:**
-- Base map tiles switch between light and dark variants (OSM Carto light/dark or equivalent).
+- Base map tiles switch between light and dark variants — **as-built (M3 RADAR-REBASE, 2026-08-27): OSM raster in light, the Clear Skies product basemap's `radar` tier (self-served Protomaps, `dark-base` mode) in dark — CARTO removed, see ARCHITECTURE.md "Basemap" and DASHBOARD-MANUAL §12.**
 - Card glass, header, legend use standard theme tokens.
 
 ### Expanded radar overlay
