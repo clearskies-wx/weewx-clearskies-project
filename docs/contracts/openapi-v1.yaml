@@ -106,6 +106,16 @@ tags:
       zoom tiers) for every map surface — replaces CARTO. Generalises
       ADR-078's geographic-features overlay (ADR-078 Amendment 2,
       Proposed — both features live side by side until accepted).
+  - name: Imagery
+    description: |
+      `/imagery/config` answers with the Clear Skies product basemap
+      (`provider: "basemap"`) for the surf height map — orthophotography
+      (NAIP/Esri/Esri-Topo) was retired from user-facing use by
+      SURF-MAP-BASEMAP (PA9, Q5, plan `MARINE-AND-MAPS-PLAN-2026-08-27.md`
+      §M4, 2026-08-27). `/imagery/tiles` remains the NAIP tile proxy,
+      unreferenced by any user-facing surface after that round (Q10-6
+      open on removing the `[imagery]` config/modules/admin/wizard
+      themselves).
 
 security:
   - {}                       # Default: no auth required (browser SPA case).
@@ -1441,6 +1451,91 @@ paths:
           description: Missing or invalid X-Clearskies-Proxy-Auth header
         '503':
           description: Proxy secret not configured -- admin operations unavailable
+        default: { $ref: '#/components/responses/Problem' }
+
+  # -------------------------------------------------------------------
+  # Imagery (Phase LM, 2026-08-03; /imagery/config rewritten to the
+  # product basemap by SURF-MAP-BASEMAP, PA9/Q5, §M4, 2026-08-27.
+  # Closes a pre-existing doc-code gap: neither /imagery path was ever
+  # added to this contract in the Phase LM or IMAGERY-MAP rounds --
+  # documented here for the first time, as-built.)
+  # -------------------------------------------------------------------
+
+  /imagery/config:
+    get:
+      tags: [Imagery]
+      summary: Surf height map basemap config
+      description: |
+        Always answers 200 with the product basemap
+        (`provider: "basemap"`) -- never 404s, and does not vary by
+        coordinates. `lat`/`lon` are still validated (422 outside
+        range) but no longer select a provider; `[imagery] provider`
+        (naip/esri/map/auto) is no longer read by this endpoint (PA9).
+        `dark.pmtilesUrl` is the **local** basemap tier (`/basemap/{tier}/tiles`,
+        `tier=local`) -- the surf map lives inside the local box by
+        construction. Top-level `tileUrl`/`attribution` are legacy
+        fields carrying the `light` values, for old-client
+        compatibility. Flat response shape -- NOT the usual
+        data+envelope wrapper (intentional deviation, unchanged from
+        Phase LM).
+      operationId: getImageryConfig
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema: { type: number, minimum: -90, maximum: 90 }
+        - name: lon
+          in: query
+          required: true
+          schema: { type: number, minimum: -180, maximum: 180 }
+      responses:
+        '200':
+          description: Product basemap config
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImageryConfigResponse' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /imagery/tiles/{z}/{x}/{y}:
+    get:
+      tags: [Imagery]
+      summary: NAIP orthophoto tile proxy
+      description: |
+        Server-side proxy + cache for NAIP imagery tiles. Unchanged by
+        SURF-MAP-BASEMAP -- unreferenced by any user-facing surface
+        after that round (Q10-6 open on removing the `[imagery]`
+        machinery itself). `[imagery] provider` absent, or pinned to
+        `esri`/`map`, -> 404 (those providers never transit the API).
+        Amplification-surface guard (lead ruling 2026-08-03): `z` is
+        Path-constrained; `x`/`y` are validated against `[0, 2**z)`.
+      operationId: getImageryTile
+      parameters:
+        - name: z
+          in: path
+          required: true
+          description: Slippy-map zoom level.
+          schema: { type: integer, minimum: 0, maximum: 20 }
+        - name: x
+          in: path
+          required: true
+          description: Slippy-map tile X.
+          schema: { type: integer, minimum: 0 }
+        - name: y
+          in: path
+          required: true
+          description: Slippy-map tile Y.
+          schema: { type: integer, minimum: 0 }
+      responses:
+        '200':
+          description: Tile image bytes
+          content:
+            image/png: { schema: { type: string, format: binary } }
+        '400':
+          description: x/y out of range for the given zoom
+        '404':
+          description: Not configured for NAIP, or upstream out-of-domain bbox
+        '502': { $ref: '#/components/responses/ProviderError' }
+        '503': { $ref: '#/components/responses/ProviderUnavailable' }
         default: { $ref: '#/components/responses/Problem' }
 
   # -------------------------------------------------------------------
@@ -3142,6 +3237,56 @@ components:
         last_started_at: { type: string, format: date-time, nullable: true }
         last_finished_at: { type: string, format: date-time, nullable: true }
       required: [tiers, updating, last_error, last_started_at, last_finished_at]
+
+    ImageryLightSource:
+      type: object
+      description: Light-theme tile source for the surf height map's product basemap (§M4).
+      properties:
+        tileUrl: { type: string }
+        attribution: { type: string }
+      required: [tileUrl, attribution]
+
+    ImageryDarkSource:
+      type: object
+      description: |
+        Dark-theme tile source for the surf height map's product basemap
+        (§M4). pmtilesUrl is the LOCAL basemap tier
+        (`/basemap/local/tiles`); maxDataZoom is the local tier's vector
+        data ceiling (z15) -- zoom above that is client-side vector
+        magnification, not additional data.
+      properties:
+        pmtilesUrl: { type: string }
+        maxDataZoom: { type: integer }
+        attribution: { type: string }
+      required: [pmtilesUrl, maxDataZoom, attribution]
+
+    ImageryConfigResponse:
+      type: object
+      description: |
+        GET /imagery/config response. Flat shape -- NOT the usual
+        data+envelope wrapper. provider is always "basemap" as of §M4
+        (SURF-MAP-BASEMAP, PA9) -- naip/esri/map/auto retired from
+        user-facing use. Top-level tileUrl/attribution are legacy
+        fields carrying the light theme's values, for old-client
+        compatibility.
+      properties:
+        provider: { type: string, enum: [basemap] }
+        tileUrl: { type: string }
+        attribution: { type: string }
+        proxyMode: { type: string, enum: [direct] }
+        bounds:
+          type: object
+          nullable: true
+          properties:
+            south: { type: number }
+            west: { type: number }
+            north: { type: number }
+            east: { type: number }
+        light: { $ref: '#/components/schemas/ImageryLightSource' }
+        dark: { $ref: '#/components/schemas/ImageryDarkSource' }
+        zoomMin: { type: integer }
+        zoomMax: { type: integer }
+      required: [provider, tileUrl, attribution, proxyMode]
 
     AlmanacPlanetsResponse:
       type: object

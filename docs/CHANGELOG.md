@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-27 — SURF-MAP-BASEMAP (M4, API side): the surf height map's background stops being orthophotography
+
+- **`GET /api/v1/imagery/config` now always answers with the Clear Skies product basemap
+  (`provider: "basemap"`), never 404s, and no longer varies by coordinates.** NAIP/Esri/Esri-Topo
+  orthophotography (`[imagery] provider = naip|esri|map|auto`) is retired from every user-facing
+  surface (PA9, operator ruling Q5: "get rid of the orthophotography for the surf height map and
+  replace it with a regular basemap"). Response gains `light: {tileUrl, attribution}` (OSM raster)
+  and `dark: {pmtilesUrl: "/api/v1/basemap/local/tiles", maxDataZoom: 15, attribution}` (the local
+  Protomaps tier from the M1 basemap work) plus `zoomMin`/`zoomMax`; legacy top-level
+  `tileUrl`/`attribution` carry the light values for old-client compatibility. One startup WARNING
+  names an ignored `[imagery] provider` value, if set.
+- **`GET /api/v1/imagery/tiles/{z}/{x}/{y}` (NAIP proxy) is unchanged** — unreferenced by any
+  user-facing surface after this round. The `[imagery]` config section, its provider modules
+  (`naip`/`esri`/`esri_topo`), the admin section, and the wizard's Esri satellite toggle all stay
+  (Q10-6 open).
+- Docs: `docs/contracts/openapi-v1.yaml` gains a fresh `Imagery` tag with `/imagery/config` and
+  `/imagery/tiles/{z}/{x}/{y}` — this closes a pre-existing doc-code gap (neither path was ever
+  added to the contract in Phase LM or the IMAGERY-MAP round); API-MANUAL.md §12a rewritten to the
+  as-built.
+- Not yet in this entry: dashboard consumption (`useImageryConfig.ts`, `HeatMapCard.tsx` dark-theme
+  rasterization) — separate round (M4-DASH), tracked in
+  `docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md` Phase M.
+
 ### 2026-08-27 — CS-BASEMAP (M1): Clear Skies product basemap, API side (CARTO retirement in progress)
 
 - **CARTO, the free dark-theme tile provider every map surface used, began watermarking tiles
