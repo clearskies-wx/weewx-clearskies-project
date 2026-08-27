@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-26 — Surf height map: photography replaced by map tiles (IMAGERY-MAP)
+
+- **Orthophoto background retired from the surf height map.** The NAIP aerial photography behind the heat map was flown at an extremely abnormal low tide, so the surf almost always rendered on what looks like dry land (operator finding). New `[imagery] provider = map` option serves Esri's World Topo Map tiles instead — a fixed cartographic coastline with the pier and streets, immune to the tide at photo time. The dashboard's mosaic/placement machinery is unchanged; only the tile source config differs. Live-verified: cached tile pyramid to zoom 23 (map uses 14–19); service is in Esri "mature support" (successor noted in PROVIDER-MANUAL §16.3 in case of future sunset). API `a5e45a9`; live config flipped from `auto` to `map`.
+
 ### 2026-08-26 — Surf shape score unstuck: segmented peel angle + graded closeout (PEEL-SEGMENTS)
 
 - **Shape score was pinned at 10% every hour.** Cause found: peel angle was computed as ONE beach-wide number — swell obliqueness minus the *average* break-line angle over all transects — which at Huntington's geometry can never clear the closeout threshold (served peel 0.3°–10.1°), and the scorer's closeout ruin clamp then pinned the shape blend at 0.10 permanently. Averaging erases exactly the local bar corners (peaks) that produce rideable peel.

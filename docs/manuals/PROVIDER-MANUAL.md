@@ -3241,13 +3241,24 @@ All NOAA marine data sources are public domain — attribution is recommended bu
 
 ---
 
-## §16 Imagery Providers (Phase LM, 2026-08-03)
+## §16 Imagery Providers (Phase LM, 2026-08-03; extended IMAGERY-MAP round, 2026-08-26)
 
-General-purpose orthophoto imagery for display backgrounds (first consumer: the marine heatmap's
-geographic-context underlay, MARINE-FORWARD-PLAN Phase LM). **HARD RULE: imagery is DISPLAY-ONLY —
-nothing in this domain may feed SWAN, the 1D model, transect selection, or any physics path.**
+General-purpose orthophoto/map imagery for display backgrounds (first consumer: the marine
+heatmap's geographic-context underlay, MARINE-FORWARD-PLAN Phase LM). **HARD RULE: imagery is
+DISPLAY-ONLY — nothing in this domain may feed SWAN, the 1D model, transect selection, or any
+physics path.**
 
-Two providers, deliberately asymmetric in data flow (operator-directed design 2026-08-02):
+**Operator ruling 2026-08-26 (why a third, map-style provider exists):** the orthophotography
+backgrounds (naip, esri — both aerial photos) were found unusable for the surf height map — NAIP
+was flown at an extremely abnormal low tide, so the surf almost always renders on what looks like
+dry land. The operator's ruling: "I think the best option will be to use the map view instead."
+`esri_topo.py` (provider id `"map"`) adds a map-style (streets/contours/shaded relief, not
+photography) tile base as an operator-selectable alternative to the photo backgrounds. It does not
+replace naip/esri — both stay available — and it is never selected by `"auto"` (auto remains
+naip-vs-esri only; `"map"` requires an explicit operator override).
+
+Three providers, deliberately asymmetric in data flow (operator-directed design 2026-08-02,
+extended 2026-08-26):
 
 ### §16.1 NAIP (US orthophotos — API proxies + caches)
 
@@ -3278,12 +3289,36 @@ and the GIS User Community"). The browser fetches ESRI tiles directly; they neve
 API (terms-of-service posture: no proxying, no caching, attribution required and served on the
 config wire for the dashboard to render).
 
-### §16.3 Selection, endpoints, config
+### §16.3 Esri World Topo Map (global — config-only, browser-direct, map-style)
+
+**Module identity:** `providers/imagery/esri_topo.py`, `PROVIDER_ID = "map"`, `DOMAIN = "imagery"`.
+**CAPABILITY:** `geographic_coverage = "global"`, `auth_required = []` (non-commercial use).
+**The module has NO HTTP client at all** — same config-only shape as `esri.py`: it only returns
+configuration, the XYZ template
+`https://services.arcgisonline.com/arcgis/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}`
+(live-verified 2026-08-26 `tileInfo`: cached pyramid, 256 px, JPEG, Web Mercator wkid 102100/3857,
+`lods` spanning zoom 0–23 — covers the heat map's 14–19 zoom range with margin), and the
+attribution string taken verbatim from the live service `copyrightText` ("Sources: Esri, HERE,
+Garmin, Intermap, increment P Corp., GEBCO, USGS, FAO, NPS, NRCAN, GeoBase, IGN, Kadaster NL,
+Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), (c) OpenStreetMap contributors, and the
+GIS User Community" — distinct from World_Imagery's copyrightText; the two must not be conflated).
+The browser fetches tiles directly; they never transit the API — same browser-direct, no-proxy,
+no-cache posture as `esri.py`, including at the tile-proxy endpoint (`/imagery/tiles/{z}/{x}/{y}`
+404s when `[imagery] provider` is pinned to `"map"`, identical to `"esri"`).
+
+**Service status (operator-flagged, 2026-08-26):** the live metadata's `documentInfo.Subject`
+reads "In mature support; no longer updated." Esri has not announced a sunset date and the service
+is fully live/cached today. If Esri ever retires this raster service, the documented successor is
+Esri's vector basemap service — a different API shape (vector tiles, not XYZ raster) that would
+require mosaic-side rework, not a drop-in URL swap. Recorded here so a future outage isn't a
+mystery.
+
+### §16.4 Selection, endpoints, config
 
 Per-request auto-selection (NOT an operator single-pick like other domains): `[imagery]
-provider = auto` → NAIP when the requested lat/lon is inside `CONUS_BOUNDS`, else ESRI;
-`naip`/`esri` force one; key absent → domain disabled (`/imagery/config` 404s). `api_key` is
-stored-and-passed future-proofing only (unused at v1). Both modules ARE registered in
-`providers/_common/dispatch.py` and the capability registry (the flat dispatch dict accommodated
-the two-module auto-selected domain without distortion — §1's convention holds; no exception
-needed). Endpoint wire detail: API-MANUAL §12a.
+provider = auto` → NAIP when the requested lat/lon is inside `CONUS_BOUNDS`, else ESRI (`"auto"`
+never selects `"map"` — unchanged by the IMAGERY-MAP round); `naip`/`esri`/`map` force one; key
+absent → domain disabled (`/imagery/config` 404s). `api_key` is stored-and-passed future-proofing
+only (unused at v1). All three modules ARE registered in `providers/_common/dispatch.py` and the
+capability registry (the flat dispatch dict accommodated the multi-module selected domain without
+distortion — §1's convention holds; no exception needed). Endpoint wire detail: API-MANUAL §12a.
