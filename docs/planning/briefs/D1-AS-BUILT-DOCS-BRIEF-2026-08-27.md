@@ -27,7 +27,7 @@ Allowlist: `docs/ARCHITECTURE.md`, `docs/manuals/{API,PROVIDER,OPERATIONS,DASHBO
 `docs/contracts/openapi-v1.yaml` (only if a landed endpoint/field is missing from it), `docs/INDEX.md`.
 Method: for each landed round (M0, M1-API/DASH/STACK/DOCS, M3, M4-API/DASH, M4-B, S12, S1, S2, S3(a)(b)(c),
 S4/S4b, S5, S8.1-A/B) read the plan row's commit hashes, `git show --stat` each, and diff the doc's claims
-against the code. Known items to close (from this session's journal): J12 — the dashboard's local
+against the code. Known items to close (Gate M sweep F2/F3, 2026-08-27 — MUST be fixed): `docs/ARCHITECTURE.md:12` and `:384` still say dashboard basemap consumption is "not yet shipped"/"pending" — it shipped (dashboard `b307797`); `docs/manuals/OPERATIONS-MANUAL.md:658–661` says the stack admin Basemap page "has not shipped" — it shipped (stack `065ac62`). Also (from this session's journal): J12 — the dashboard's local
 `src/api/openapi-v1.yaml` drifted ~1,200 lines from the meta contract before this plan: REPORT the drift
 (do not resync the dashboard copy — that is code, a separate round); J15 — the API repo's dead
 `SpectralWaveComponent` Pydantic model: REPORT, do not delete; the `level1` label now reads `deep_water`
