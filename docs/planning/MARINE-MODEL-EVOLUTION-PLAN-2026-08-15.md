@@ -1,5 +1,12 @@
 # Marine Model Evolution Plan — WW3 deep-water leg, evidence-driven strengthening, hybrid LUT (2026-08-15)
 
+> **CLOSED 2026-08-27 — superseded by [MARINE-AND-MAPS-PLAN-2026-08-27.md](MARINE-AND-MAPS-PLAN-2026-08-27.md)**
+> (operator order: "a new plan that has all of this crap, as well as the changes that still
+> needed to be made to the surf system"). Every open row here was carried into that plan's
+> CARRY-OVER REGISTER with its premise citation; the design sections (WW3 MODEL DESIGN,
+> SYNTAX PRESCRIPTIONS, W DESIGN v1), the Phase F/DOC-W/W/CHAIN-SERVES records, the failure
+> report and Q1–Q18 stay here as the historical record. Do not add work rows to this file.
+
 ## START HERE — what this plan is and how to read it
 
 **What we're doing, one paragraph:** We are adding our own deep-ocean wave model
