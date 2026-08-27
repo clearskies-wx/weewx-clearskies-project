@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-27 — S2: CONSISTENCY-SCORING — Consistency factor rebuilt on spectral group statistics (ADR-101 Amendment 1)
+
+- **The Consistency scoring factor (0.10 weight, `SurfScoringBreakdown.consistency`) is no longer the
+  interim swell-dominance bucketing.** `consistency = 0.6 × timing + 0.4 × amplitude`, read off the
+  dominant `multiSwell` partition's spectral group statistics — a new `services/wave_groups.py`
+  (marine repo) computes Longuet-Higgins spectral width (ν), Goda peakedness (Qp), the Battjes & van
+  Vledder (1984) successive-height correlation (κ), and Kimura (1980) bivariate-Rayleigh run-length
+  statistics (N_rep, T_set) per partition, attached as scalars at parse time (`services/
+  swan_runner.py`'s L2 DWR entry build) — no 2-D array ever attached (M-0b memory rule). Falls back to
+  the pre-S2 swell-dominance bucketing, byte-identical, whenever the dominant partition carries no
+  group statistics.
+- **`SpectralWaveComponent` (marine `models/responses.py`, API-MANUAL §16/§17) gains seven optional
+  fields** on `multiSwell` entries: `nu`, `qp`, `kappa`, `tm02S`, `nRep`, `tSetS`, `bandHz`. The API's
+  companion-proxy conversion layer (`marine_response_conversion.py`) passes unknown component fields
+  through unconverted by design (verified, no API-repo change needed — same treatment already given to
+  the existing `energy`/`frequencyRange` fields on the same container).
+- API-MANUAL §17 `SurfScoringBreakdown.consistency` row and `SpectralWaveComponent` field table
+  updated; DESIGN-MANUAL gains the ADR-101 Amendment 1 Consistency explainer wording.
+- ADR-101 Amendment 1 ("Consistency (row 5)") — design source; `docs/planning/briefs/
+  SET-TIMING-AND-AMPLITUDE-BRIEF-2026-08-23.md`, `WAVE-GROUP-FORMULAS-VERIFICATION-2026-08-23.md`,
+  `PARTITION-NARROWNESS-SURVEY-2026-08-23.md` — supporting research and KAT reference values.
+
+MARINE-AND-MAPS-PLAN-2026-08-27 §S2, PA6; Q3 sub-decisions A–E; Q10 item 1.
+
 ### 2026-08-27 — S3: doc corrections (wrong no-op/vestigial claims) + swellSource/closeoutFraction documented + ww3_boundary input recorded
 
 - **Docs only (part a).** An adversarial plan review found ARCHITECTURE.md wrongly called

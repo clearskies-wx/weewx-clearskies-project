@@ -2095,6 +2095,13 @@ Single swell system from NDBC spectral decomposition.
 | `energy` | float | — | No | Zeroth spectral moment m₀ (m²) |
 | `frequencyRange` | list[float] | — | No | [min_hz, max_hz] bounds of this spectral partition. For NDBC (`spectralComponents`), real bounds from that partition's local-maxima boundaries. **For SWAN (`multiSwell`), always `[0.0, 0.0]`** — SWAN's TABLE PT* bulk output (T4B.2) carries no per-partition frequency-bin bounds, so this field is not derivable on the SWAN path and is emitted as `[0.0, 0.0]` rather than a real value. Do not read the zeros as meaningful, and do not rely on this field for SWAN-sourced components. |
 | `classification` | str | — | No | (locale) `"groundswell"` (period ≥ 12s), `"swell"` (8–12s), `"wind_swell"` (< 8s) |
+| `nu` | float | — | Yes | **Added S2 (2026-08-27, ADR-101 Amendment 1).** Longuet-Higgins spectral width parameter (`sqrt(m0*m2/m1² - 1)`) over this partition's half-way band. `null` when no band could be computed for this partition this hour (no spectrum, no PT partitions, or this partition's own period was unavailable). |
+| `qp` | float | — | Yes | **Added S2.** Goda (1970) spectral peakedness over this partition's band. `null` under the same conditions as `nu`. |
+| `kappa` | float | — | Yes | **Added S2.** Battjes & van Vledder (1984) successive-height correlation — the modulus of the partition band's spectral autocorrelation at lag `tm02S`, divided by m0. `null` under the same conditions as `nu`. |
+| `tm02S` | float | `group_wave_period` | Yes | **Added S2.** Mean zero-up-crossing period (Tm02 = sqrt(m0/m2)) over this partition's band. `null` under the same conditions as `nu`. |
+| `nRep` | float | — | Yes | **Added S2.** Kimura (1980) mean total run length (waves; eq. 19), from the bivariate-Rayleigh transition probabilities at threshold H > H1/10 (ρ = 1.80). `null` under the same conditions as `nu`. |
+| `tSetS` | float | `group_wave_period` | Yes | **Added S2.** Set interval, `T_set = nRep * tm02S`, seconds. Feeds the Consistency factor's timing term (`f_int(T_set/60)`). `null` under the same conditions as `nu`. |
+| `bandHz` | list[float] | — | Yes | **Added S2.** `[f_lo, f_hi]` half-way band edges (ADR-101 Amendment 1 ruling C) used to compute this partition's group statistics. `null` under the same conditions as `nu`. |
 
 #### TidePrediction
 
@@ -2233,7 +2240,7 @@ Surf quality forecast for one spot at one timestep.
 | `shape` | int | Wave Shape (0–100). Peel-angle bands (0.6) + Iribarren breaker type (0.4) + jacking bonus (S-GAP-1, unwired); closeout clamp min(blend, 0.10) below 15°. |
 | `conditions` | int | Conditions (0–100). Wind brackets capped at 1.0 (0.6) + DSPR buckets (0.25) + cross-swell (0.15); blown-out clamp 0.05. |
 | `power` | int | Swell Power (0–100). Dominant `multiSwell` partition period table (0.7) + dominant partition's SHARE of total partition energy, bucketed (0.3). Never Tm01. `multiSwell` null → 0.5 neutral (logged). Dominant partition and "total partition energy" both use the `Hs² · Tp` proxy, not the partition's raw `energy` field (corrected 2026-08-07, ADR-096 Amendment 2 — see the dominant-swell-selection callout in §17 above). |
-| `consistency` | int | Consistency (0–100). Swell-dominance bucket mapping (≥0.8 → 0.9, 0.5–0.8 → 0.7, <0.5 → 0.4, null → 0.5) — interim since SurfBeat was removed 2026-08-23; the set-timing/set-amplitude definition (SET-TIMING-AND-AMPLITUDE brief) is pending operator ruling. |
+| `consistency` | int | **Rebuilt S2 (2026-08-27, ADR-101 Amendment 1 "Consistency (row 5)").** Consistency (0–100) = `0.6 × timing + 0.4 × amplitude`, read off the dominant `multiSwell` partition's group statistics (`nu`/`qp`/`kappa`/`tm02S`/`nRep`/`tSetS`/`bandHz`, §17 `SpectralWaveComponent`). **Timing** = a piecewise-linear interval curve on `T_set = tSetS/60` minutes (2–6 min → 1.0, tapering to 0.25 at ≥ 30 min; sets arrive too fast to feel a rhythm below 1 min → 0.8), with a two-swell beat override when a non-dominant partition holds ≥ 25% of total partition energy and the beat period (`1/\|1/Tp₁ − 1/Tp₂\|`) falls between 60–1800 s. **Amplitude** = a piecewise-linear curve on a set-strength index `S = 0.4 × C′ + 0.6 × κ_dom` (`C′` the normalized contrast between the main-break-zone set-wave and between-set face heights, from `perPartitionBreaks`; `κ_dom` alone when no main-zone face-height data exists). **Fallback (byte-identical to the pre-S2 interim behaviour):** whenever the dominant partition carries no group statistics (no spectrum/PT partitions this hour, or the dominant-eligibility floor found nothing) — swell-dominance bucket mapping (≥0.8 → 0.9, 0.5–0.8 → 0.7, <0.5 → 0.4, null → 0.5). Full formula and curve citations: `docs/decisions/ADR-101-surf-score-geometric-mean.md` Amendment 1; `docs/planning/briefs/SET-TIMING-AND-AMPLITUDE-BRIEF-2026-08-23.md` §3.2/§3.3/§4.3; `docs/planning/briefs/WAVE-GROUP-FORMULAS-VERIFICATION-2026-08-23.md`. |
 | `weights` | object | The five effective (normalized) weights actually used, keys `size`/`shape`/`conditions`/`power`/`consistency`, floats. |
 
 #### FishingForecast
@@ -2592,12 +2599,15 @@ Each partition × each transect → independent SwellTrack run (handoff to shore
 
 SurfBeat strip — REMOVED 2026-08-23 (operator ruling "surfbeat is gone"): no
   SurfBeat model run, precompute, cache key, API field or config key exists.
-  Set timing / set strength for the score's consistency factor are to come
-  from the wave spectrum + SwellTrack (docs/planning/briefs/
-  SET-TIMING-AND-AMPLITUDE-BRIEF-2026-08-23.md, pending operator ruling);
-  until then consistency = the swell-dominance bucketing. Historical record
-  of the deleted design: ARCHITECTURE.md SurfBeat paragraph,
-  PROVIDER-MANUAL §14 "SurfBeat strip — REMOVED".
+  Set timing / set strength for the score's consistency factor come from the
+  wave spectrum + SwellTrack (S2, 2026-08-27, ADR-101 Amendment 1 —
+  docs/planning/briefs/SET-TIMING-AND-AMPLITUDE-BRIEF-2026-08-23.md,
+  WAVE-GROUP-FORMULAS-VERIFICATION-2026-08-23.md); consistency falls back to
+  the swell-dominance bucketing only when the dominant partition carries no
+  group statistics. See the `consistency` row of the SurfScoringBreakdown
+  table above for the full formula. Historical record of the deleted
+  SurfBeat design: ARCHITECTURE.md SurfBeat paragraph, PROVIDER-MANUAL §14
+  "SurfBeat strip — REMOVED".
 
 At each transect point: Hs_total = sqrt(sum(Hs_partition_i²))
   → combined saturation check: Hs_total ≤ γd
