@@ -404,8 +404,10 @@ finding):**
 **Gate rows (results-free file, stated now):** both maps render in both themes with no
 watermark and no blank inside the derived box (screenshots side-by-side vs today's light
 theme); **freeways visible on the dark seismic map at its initial zoom and on the dark marine
-map at z14** (named roads checked against the light OSM map at the same view — I-405/I-5/
-SR-55 for this install); a pan outside the box shows the world baseline, not blank; `grep -r cartocdn`
+map at its full/fitBounds view** (named roads checked against the light OSM map at the same view —
+I-405/I-5/SR-55 for this install; *re-worded 2026-08-27 after the Gate M sweep: at the hero z14 view
+those freeways are out of frame for both configured locations, so "at z14" was never a testable claim
+here — the road rule itself is verified road-for-road against OSM at the wider views*); a pan outside the box shows the world baseline, not blank; `grep -r cartocdn`
 across dashboard/api/stack = 0; extract sizes **≤ 100 MB world + ≤ 400 MB local (ceiling
 stated before M0 measures; a larger measurement is a Q8 finding, not a gate re-fit)**; attribution
 string present on both maps; dashboard `tsc` zero errors; vitest for the two components.
