@@ -482,11 +482,17 @@ until the break is genuinely inside its domain.
 **Design (executes verbatim; a deviation is a finding):**
 1. **Restart loop, per transect × partition × hour, inside the cycle.** Start from the station
    `select_hourly_handoff()` picks today. Run the 1-D. **Acceptance test:** the outermost break
-   marker (`break_points[0]`) lies strictly interior — its node index ≥ `N_INTERIOR` (named
-   constant, proposed 3 = 30 m of profile at 10 m spacing) — AND the wave at node 0 is below the
-   onset criterion (`Qb(node 0) < Q_B_VISIBLE`). If either fails, take the next station seaward
-   in the band (its own `PTHSIGN/PTRTP/PTDIR` for this partition, its own depth as the new
-   handoff), re-truncate the profile, re-run. Repeat until the test passes.
+   marker (`break_points[0]`) lies at least `HANDOFF_BREAK_CLEARANCE_M` shoreward of the handoff
+   station (named constant, proposed 10 m = one SWAN band station, `_TRANSECT_BAND_SPACING_M`,
+   so the settled handoff is always ≥ one station seaward of the break) — AND the wave at the
+   profile's first node is below the onset criterion (`Qb(node 0) < Q_B_VISIBLE`). If either
+   fails, take the next station seaward in the band (its own `PTHSIGN/PTRTP/PTDIR` for this
+   partition, its own depth as the new handoff), re-truncate the profile, re-run. Repeat until
+   the test passes. **Two spacings, not to be confused (lead error 2026-08-27):** the SWAN band
+   stations the handoff moves between are 10 m apart; the beach model's own profile is the
+   variable-resolution PCHIP profile from the 3 m bathymetry download — ~1.5 m nodes in the
+   fine/breaking zone, ~4 m in the shoaling zone, native points beyond 15 m
+   (`enrichment/bathymetry.py:1129–1132`). The clearance is a DISTANCE, never a node count.
 2. **Termination.** The band's deep end reached without passing → that transect-hour-partition
    is REFUSED with a named reason (`handoff_restart_exhausted`), counted in health, never served
    from the last attempt (PRIME DIRECTIVE 8, "a model runs on all its inputs or it does not run").
@@ -496,8 +502,9 @@ until the break is genuinely inside its domain.
    `restart_attempts` and `restart_reason`). The formula's station remains the FIRST attempt only.
 4. **Invariant 1 re-defined on one basis:** compare the break depth and the handoff depth both
    UNTIDED (subtract `tide_level` from `break_points[0].depth_m`, or carry the node's chart-datum
-   depth on `BreakPoint`), and require the outermost marker's node index ≥ `N_INTERIOR` — the same
-   test the loop enforces, so a firing after S12 means the loop failed, not the tide.
+   depth on `BreakPoint`), and require the outermost marker ≥ `HANDOFF_BREAK_CLEARANCE_M`
+   shoreward of the handoff — the same test the loop enforces, so a firing after S12 means the
+   loop failed, not the tide.
 5. **KATs:** (a) Huntington transect 4, 2026-08-27T05Z, from the journal firing (break 2.15 m
    tided / handoff 1.98 m / tide from the STOFS record of that cycle): with the loop, the settled
    station is seaward of the first, the marker is interior, invariant 1 is quiet; (b) a synthetic
@@ -514,7 +521,8 @@ until the break is genuinely inside its domain.
    selected by restart, not by the formula alone), PROVIDER-MANUAL §14.15, API-MANUAL §17
    (`handoff_depth_m` semantics), invariants docstring, CHANGELOG.
 
-**Open for the operator before briefing:** `N_INTERIOR = 3` (30 m) — confirm or give a number.
+**Open for the operator before briefing:** `HANDOFF_BREAK_CLEARANCE_M = 10` (one SWAN band
+station) — confirm or give a number.
 
 ### S4 — Test-debt triage (C13)
 
