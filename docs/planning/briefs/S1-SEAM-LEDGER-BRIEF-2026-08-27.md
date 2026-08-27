@@ -5,8 +5,11 @@ Lead: coordinator. Teammates: `clearskies-api-dev` (code, marine repo) + `clears
 (KATs). Auditor: `clearskies-auditor`, results-free gate file `scratch/GATE-S1-DEFINITION.md`.
 **Dispatch condition:** after S12's dev closeout is accepted (both rounds edit `swan_runner.py`).
 
-**Pre-round verification (lead, fill at dispatch):** marine HEAD `<hash>`, clean; baseline
-`.venv_local\Scripts\python.exe -m pytest tests/test_vchain_swan_seam.py tests/services -q -p no:cacheprovider` → `<n passed>`.
+**Pre-round verification (lead, 2026-08-27):** marine HEAD `fca09ec` (S12 landed), clean; baseline
+`.venv_local\Scripts\python.exe -m pytest tests/test_vchain_swan_seam.py tests/services -q --tb=no -p no:cacheprovider`
+→ **14 failed (all pre-existing, listed in `docs/planning/briefs/S4B-TEST-DEBT-BRIEF-2026-08-27.md` — an S4b
+agent may repair them concurrently; a change in that list is a finding), 320 passed**. Other agents
+active in this repo: S4b (tests/services test files only), S5 (`service.py`) — none touch your files.
 
 ## The design — read it at the source
 `docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md` §"S1 — C6 seam-fidelity ledger row" (the design
