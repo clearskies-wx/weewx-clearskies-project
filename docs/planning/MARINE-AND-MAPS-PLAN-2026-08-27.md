@@ -331,8 +331,11 @@ finding):**
   verify the kind value against `docs/reference/pmtiles-protomaps-reference.md` and cite) drawn at
   every zoom ≥ 7, width `exp(1.6, [[7, 0.6], [10, 1.2], [13, 2.5], [15, 4]])`, color = the DARK
   flavor's own highway/major-road colour (read it off `namedFlavor('dark')`; cite the field);
-  primary — `kind_detail === 'primary'` from z11, width `exp(1.6, [[11, 0.8], [15, 2.5]])`, same
-  colour family one step dimmer; nothing smaller. `labelRulesFor(theme)` =
+  second tier — `kind === 'major_road'` from z11 (CORRECTED 2026-08-27 by the dashboard-dev's
+  schema verification: the Protomaps `roads` layer has no `kind_detail === 'primary'`; its kinds are
+  highway/major_road/medium_road/minor_road/other/path/rail — `@protomaps/basemaps/src/base_layers.ts`),
+  width `exp(1.6, [[11, 0.8], [15, 2.5]])`, colour `DARK.major` (one step dimmer than
+  `DARK.highway`); nothing smaller. `labelRulesFor(theme)` =
   `labelRules(namedFlavor(theme === 'dark' ? 'dark' : 'light'), 'en')` filtered to the `places`
   and `water` label rules (no road shields, no POIs). `SATELLITE_OUTLINE_PAINT_RULES` = the four
   ADR-078 `LineSymbolizer` rules moved verbatim from `radar-map.tsx:480–520`.
@@ -557,6 +560,67 @@ OPERATIONS-MANUAL monitoring. Gate: row present every cycle; band agreement with
 tolerance stated before looking (recommend ±10 % Hs per band, the interpolation error class
 of BOUNDNEST3); a deliberate mirrored-boundary mutation in a scratch run is CAUGHT by the row.
 
+**S1 lead mechanics (2026-08-27, coordinator; dispatch after S12 closes — same `swan_runner.py`):**
+- **The seam point.** The WW3 leg already emits its transfer spectra at the L2 boundary points
+  (`WW3SetupDerivation.l2_boundary_points`, persisted in `swan_grid_sizing.json`'s `ww3_leg` block;
+  each transfer point carries a name and lat/lon — `vchain.parse_transfer_file()`). The WW3-handed
+  side = the transfer point with the largest projection onto the open-water bearing from the L2
+  centre (the most seaward boundary point). The SWAN-absorbed side = ONE new L2 output point
+  `SEAM`, placed one L2 cell (100 m) inward from that transfer point along the bearing (toward the
+  L2 centre), written into the L2 deck's existing DWR block (`swan_runner.py:3600–3790`, the
+  `_dwr_lines` insertion before COMPUTE) as `POINTS 'SEAM' x y` + `SPECOUT 'SEAM' SPEC2D ABS
+  'SPEC_SEAM.txt'` with the same OUTPUT clause the DWR points use; UTM via the same transform
+  `_tx,_ty` use. Both coordinates and the transfer point's name go into the ledger row.
+- **Bands.** `SEAM_BAND_EDGES_HZ = (0.09, 0.20)` (NAMED CONSTANT: < 0.09 / 0.09–0.20 / > 0.20 Hz),
+  `SEAM_HS_TOLERANCE = 0.10` (±10 % Hs per band, stated before looking), in `vchain.py`.
+  `integrate_spectrum()` gains an optional `f_lo_hz`/`f_hi_hz` mask (additive kw-only; default =
+  today's whole-spectrum result, byte-identical). The SWAN SPECOUT (`swan_spectral.parse_specout_file`)
+  is converted to the transfer file's density basis (per-radian, "going-to" radians) BEFORE
+  integration — the agent verifies both units from the two parsers' docstrings and cites them.
+- **The row.** In `record_chain_cycle_ledger_row()` success path (after `row["ww3"]`): read
+  `swan/level2/SPEC_SEAM.txt`; for the first timestep common to the transfer records and the
+  SPECOUT, `row["seam"] = {"label": "model-vs-model (WW3 handed vs SWAN absorbed), NOT a truth
+  check", "transfer_point": {name, lat, lon}, "swan_point": {lat, lon}, "time", "bands": {"lt_0p09":
+  {"ww3": {hs, tp, dir}, "swan": {…}, "hs_ratio"}, "0p09_to_0p20": {…}, "gt_0p20": {…}},
+  "within_tolerance": bool, "error": null}`; any parse/alignment failure → `"error": "<named>"`
+  and the other keys `null` — the row is written EITHER way (never skipped), and `error` is
+  logged at WARNING. Never raises (the ledger's own contract).
+- **KATs.** (a) a synthetic transfer spectrum + the same spectrum scaled 0.8 in energy per band
+  → `hs_ratio` ≈ 0.894 (√0.8) per band, `within_tolerance` False; (b) identical spectra → ratios
+  1.0, True; (c) the mutation drill the plan names: mirror the transfer directions (θ → θ+180°)
+  and assert the row's per-band `dir` differs by ~180° while Hs ratios stay 1.0 — the row must
+  CATCH it (a direction-difference field `dir_diff_deg` per band, flagged when > 30°); (d) the
+  masked `integrate_spectrum` with no mask equals the unmasked result byte-for-byte.
+- **Docs.** OPERATIONS-MANUAL monitoring (the `seam` row, its label, the two constants);
+  PROVIDER-MANUAL §14.15 (the SEAM output point); CHANGELOG.
+
+**S3 lead mechanics (2026-08-27):** (a) doc round = docs-author, meta repo only, the exact
+lines listed above plus ARCHITECTURE Known-gaps #12–#16 re-stated (12: built — `service.py:831`;
+13: the point list exists — `WW3SetupDerivation.l2_boundary_points`; 14: unbuilt, moves to S8.1;
+15: note stays; 16: closed — Phase V dropped, Q1, the buoy ledger is the standing instrument);
+(b) `level1` label rename is DEFERRED until S8.1 closes (170 occurrences across the same files
+S12/S1/S8.1 edit — a rename round in the middle of three concurrent code rounds is how merges go
+wrong; it is the last marine code round of the plan, cosmetic by the plan's own word); (c) the
+`ww3_boundary` recorder: `state.record_input("ww3_boundary", available=True)` immediately after
+`boundary_reconstruction.ww3_boundary_files_and_deck()` succeeds at `service.py:899–901` and in
+the horizon march's twin at `:1359–1361`; `available=False` in both `except BoundaryNotViableError`
+branches (`:902–911`, and the march's) — nothing else; guard test: the leg's boundary failure path
+records `ww3_boundary` unavailable and `/health` lists it, pre-change transcript pasted; (d)
+hotstart-age gate: dropped (Q10-5) — C7 closed, no code.
+
+**S5 lead mechanics (2026-08-27; EVO-Q9 option 2):** `service.py:798–810` — when the restart file
+exists but `lastSuccessCycleTime` is absent (today: "untrusted, refusing"), look for a provenance
+note `restart_<token>.provenance.json` beside it: `{"generating_cycle": "<ISO Z>", "source":
+"bootstrap", "created_at": "<ISO Z>", "note": "<free text>"}`; if present AND its
+`generating_cycle` parses AND equals the restart token's cycle → accept ONCE: log WARNING naming
+the note, set `last_success_dt` from it (so the D11 age gate still applies), and DELETE the note
+after the leg's successful completion (consumed — a second cold install writes a new one). Any
+mismatch → today's refusal, with the note's contents quoted in the ERROR. Install procedure
+(OPERATIONS-MANUAL "Marine service deployment": a "First install — WW3 warm start" step giving the
+exact `cat > …provenance.json` snippet); ADR-109 D10 amendment (Proposed). Guard tests: note
+present+matching → leg proceeds and the note is gone afterwards; note mismatching → refusal
+`ww3_restart_missing` with the quoted note; no note → today's behaviour byte-identical.
+
 ### S2 — CONSISTENCY-SCORING (PA6; blocked on Q3)
 
 Inputs on record: brief `docs/planning/briefs/SET-TIMING-AND-AMPLITUDE-BRIEF-2026-08-23.md`
@@ -678,6 +742,20 @@ execute these too; a deviation is a finding):**
   (new kw-only, default `None` = today) → `_run_pipeline_per_transect(band_stations_for_transect=,
   bathy_full_for_transect=)`. `run_pipeline` keeps the UNTRUNCATED profile per transect
   (`_bathy_full`, `surf_1d_pipeline.py:2963`) in a parallel list so the loop can re-truncate.
+- **RULING 2026-08-27 (lead, on the dev's finding): the loop is per TRANSECT-hour, not per
+  partition.** Partitions restarted independently settle at different stations → different
+  truncated profiles → different post-refine grid lengths → the (untouched) RSS-combination step
+  drops any partition whose profile length differs from the first (`surf_1d_pipeline.py`
+  "length mismatch — treating as None") — the mainline restart outcome, not a corner case. So:
+  ONE handoff per transect-hour (also the physically faithful reading of Q11 — SWAN hands the
+  whole spectrum over at one station). Every surfable partition (Tp ≥ 5 s floor) runs from the
+  shared station/profile; the transect PASSES only when every run passes the test below; any
+  failure steps the transect one station seaward, re-truncates the shared profile once, and
+  re-runs all surfable partitions with their period-matched components (M4) — a partition with
+  no match at that station is absent there (one WARNING per transect-hour with the count) and
+  does not block the transect. Exhaustion refuses the WHOLE transect-hour (every partition
+  `None`). Published handoff = the settled station. M6/M7/M8 below read with "transect-hour" in
+  place of "transect-hour-partition" and without the "deepest across partitions" rule.
 - **M3. The loop lives in `_run_pipeline_per_transect`** around the `run_1d_analytical()` call
   (`:2242–2264`). Attempt 0 = today's inputs. Acceptance test after each run, both parts:
   (i) `not result.onset_at_node0` — a new additive `Analytical1DResult` field set by
