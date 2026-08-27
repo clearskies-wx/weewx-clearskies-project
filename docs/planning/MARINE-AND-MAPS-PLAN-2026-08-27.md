@@ -241,12 +241,23 @@ string present on both maps; dashboard `tsc` zero errors; vitest for the two com
 build time), the fork's BBOX/zoom range, and the memory budget on librewxr (5.7 GB box,
 radar container ~3.2 GB resident). Output: a design block appended here as an amendment
 BEFORE M2.1 dispatches (directive 12).
-**M2.1 (implement in the fork):** ground + place labels + outlines from a Protomaps extract
-of `LIBREWXR_BBOX`, under the radar tiles and under/into the satellite tiles; not CARTO,
-not Esri. Gate: the fork serves labelled tiles for both radar and satellite at every zoom
+**M2.1 (implement in the fork) — the companion to M3: everything M3 deletes from Clear Skies
+is re-created here, as LibreWxR's own output.** Mapping, item by item:
+
+| Deleted from Clear Skies by M3 | Re-created in the LibreWxR fork by M2.1 |
+|---|---|
+| OSM light / CARTO dark base under the radar (`radar-map.tsx` `TILE_CONFIG`) | a ground layer (land, water, coastline, boundaries, freeways) rendered by the fork under its radar tiles, light and dark variants selected by the same `?…` query the dashboard already sends for colour scheme |
+| CARTO `voyager_only_labels` overlay on the satellite view | place-name labels rendered by the fork into/over its satellite tiles |
+| ADR-078 outlines (`GeoFeaturesLayer`: coastlines, boundaries, roads, water) on the satellite view | the same outlines rendered by the fork into/over its satellite tiles |
+| `[geographic_features] bounds` + admin extract action (API host) | the fork's own Protomaps extract of `LIBREWXR_BBOX`, refreshed by the fork's existing ingest/warm cycle — no operator action in Clear Skies |
+
+Source data: a Protomaps extract of `LIBREWXR_BBOX` (OSM), rendered server-side; not CARTO,
+not Esri. The dashboard keeps sending exactly the tile requests it sends today — the radar
+provider contract (`tileUrlTemplate`, `satelliteTileUrlTemplate`, colour-scheme query) does
+not change; only what the returned pictures contain changes. Gate: the fork serves labelled tiles for both radar and satellite at every zoom
 the dashboard requests; memory within budget; C12's seam untouched.
 
-### M3 — RADAR-STRIP (after M2 is live)
+### M3 — RADAR-STRIP (after M2 is live; M2.1 is this task's companion — its table lists what replaces each deletion)
 
 Delete from Clear Skies: `TILE_CONFIG` base under the radar map, `SATELLITE_LABELS_URL` +
 its TileLayer, `GeoFeaturesLayer` + the `protomaps-leaflet`/`pmtiles` import IN THAT FILE
