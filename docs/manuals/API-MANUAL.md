@@ -1751,11 +1751,15 @@ box alone is the correct — not a degraded — extent.
 **`api.conf [basemap]`:** `enabled` (bool, default `true`) — the only key. No operator-typed box,
 no zoom knobs (PRIME DIRECTIVE 14; PRIME DIRECTIVE 11, no product-facing model-setup controls).
 
-**Dashboard consumption:** as of this section, not yet shipped (M1-DASH round pending). Contract
-per the plan's "Lead mechanics — dashboard side": `src/lib/basemap.ts` will be the one place that
-knows the tier→URL mapping and `useBasemapStatus()`; a `ProtomapsLayer` component renders each
-tier in `dark-base`, `labels`, or `satellite-outlines` mode. Not documented here as shipped
-behavior — see the plan for the design.
+**Dashboard consumption — SHIPPED (D1 as-built re-sync, 2026-08-27; dashboard `eb7c915`…`43afaee`,
+M3 radar rebase `ec27bfd`, M4 rasterization `ba00a35`…`b307797`).** `src/lib/basemap.ts` is the one
+place that knows the tier→URL mapping (`BASEMAP_TIERS`) and exposes `useBasemapStatus()`; a
+`ProtomapsLayer` component (`ProtomapsLayerMode = 'dark-base' | 'labels' | 'satellite-outlines'`)
+renders each tier in the mode its map surface needs — `local`+`world` in `dark-base`/`labels` on
+the marine and seismic maps, `radar` in `dark-base`/`satellite-outlines` on the radar/satellite
+map. The surf height map (M4) does not use `ProtomapsLayer` at all — it rasterizes `local`-tier
+tiles client-side into PNG data URLs via `rasterizeBasemapTile()` for its own SVG mosaic mechanism
+(see `/imagery/config`, §12a).
 
 ---
 
