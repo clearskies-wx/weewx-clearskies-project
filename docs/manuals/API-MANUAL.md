@@ -3583,6 +3583,12 @@ The marine service exposes a health check endpoint that the API polls every 60 s
 | `inputs` | Per required input (`ww3_boundary`, `wind`, `bathymetry`, `tide`): `{"available": bool, "age_s": int \| null}`. An input never recorded reports `{"available": false, "age_s": null}`. |
 | `invariants` | `{"fired_total": int, "last_fired_at": str \| null, "last_fired_names": [str]}` from the B2 runtime invariant registry, scoped to firings at or after `last_run`. |
 
+**Additive `/health` keys beyond this table (opaque pass-through, `weewx_clearskies_marine/endpoints/health.py`; the API does not model these — see the `GET /setup/marine/health` note below).** Two landed under the MARINE-AND-MAPS-PLAN (2026-08-27), count-only, never affecting `status`/`reasons`:
+- **`handoffRestart`** (S12 HANDOFF-RESTART, M8): `{"runs": int, "restartedRuns": int, "exhausted": int, "attemptsHistogram": {"<attempts>": int}, "lastExhaustedAt": str \| null}` — in-memory counters since service start (not persisted to disk), one update per transect-hour's handoff-restart-loop resolution (`state.record_handoff_restart_outcome()`). See PROVIDER-MANUAL §14.15 for the loop this reports on.
+- **`ww3.gridRebuiltAt` / `gridRebuildReason` / `gridDerivationSha256` / `gridRebuildCycleTime` / `restartRefusedReason`** (S8.1-B, the G10 grid-rebuild hook): additive fields on the existing `ww3` block. `gridRebuildReason` ∈ `"provenance_missing" | "derivation_changed"`; `restartRefusedReason == "ww3_grid_rebuilt_cold_start"` marks a cycle that rebuilt `mod_def.ww3` and therefore cold-started rather than chaining its restart. See OPERATIONS-MANUAL "WW3 grid rebuild" for the full procedure and every slug.
+
+Other additive keys present in the live response (`fullRun`, `ww3Horizon`, `l1NestAge`, `currentsTailHeld`, `windGatherer`, the vchain buoy-ledger block) predate this plan and are not individually enumerated here — the pass-through is deliberately unmodeled (see below); read `state.py`'s own module comments for the authoritative field list.
+
 **`status` resolution (precedence: `failed` > `degraded` > `ok`):**
 
 - `failed` — `last_run` is `null` (no cycle has ever completed — nothing has been published), or a required input is unavailable. All four inputs are required (rules/coding.md §1, C-77): a missing/failed fetch aborts the SWAN run rather than substituting a default, so an unavailable required input means nothing was published this cycle.
