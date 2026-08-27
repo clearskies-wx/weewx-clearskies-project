@@ -154,9 +154,11 @@ amendment is accepted.
   basemap endpoints, `services/basemap_extract.py`, and `[basemap]` settings **additively** — this
   ADR's own endpoints, service, and config section are untouched and still serving. No removal has
   happened yet.
-- M1-DASH (not yet shipped as of this amendment) will replace `radar-map.tsx`'s `GeoFeaturesLayer`
-  + `SATELLITE_LABELS_URL` CARTO `TileLayer` with the single `ProtomapsLayer` `satellite-outlines`
-  mode described above.
+- M1-DASH + M3 SHIPPED (D1 as-built re-sync, 2026-08-27; dashboard `eb7c915`…`43afaee`, M3 radar
+  rebase `ec27bfd`): `radar-map.tsx`'s `GeoFeaturesLayer` component and `SATELLITE_LABELS_URL`
+  CARTO `TileLayer` are deleted (verified — neither identifier exists as code in `radar-map.tsx`
+  any more, only in explanatory comments); replaced by the single `ProtomapsLayer`
+  `satellite-outlines` mode described above.
 - Once the operator accepts this amendment (status → Accepted), the removal commit deletes:
   `endpoints/geographic_features.py`, `services/geographic_features.py`, the `[geographic_features]`
   settings section, the stack repo's "Geographic Features" admin page/route, the
