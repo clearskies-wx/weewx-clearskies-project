@@ -3075,6 +3075,50 @@ lead's own gate ran 140 targeted tests including the Round-1 guard files, in its
 **Live verification pending (Round 2).** A full SWAN test run against this Round-2 implementation was being
 pushed/deployed at the time of this doc-sync pass. No run/convergence/reality-gate result is claimed here.
 
+#### §14.15 Amendment: C6 seam-fidelity ledger row (S1, 2026-08-27, PA5, EVO-Q16 C6)
+
+**One additive L2 output point, `SEAM`.** The L2 deck's existing DWR block (`swan_runner.py`'s `run_3level()`,
+the `_dwr_lines` insertion before `COMPUTE`) gains one extra `POINTS`/`SPECOUT` pair beyond the per-spot DWR
+points it already emits: `POINTS 'SEAM' x y` + `SPECOUT 'SEAM' SPEC2D ABS 'SPEC_SEAM.txt'`, same `OUTPUT`-clause
+convention (per-hour when the deck's own nonstationary/stationary-sequence output is enabled) and the same UTM
+transform (`lonlat_to_utm`, the deployment's locked zone) the per-spot DWR points use. This is monitoring
+instrumentation, not a new model input or handoff point — it changes nothing about what any surf spot's own
+DWR/TABLE points compute or where L3/L4 nest.
+
+**Where `SEAM` sits.** The WW3-handed side is the transfer file's own most-seaward L2 boundary/seam point — among
+the `L2P####`-named points the WW3 march deck's Type-2 point list emits (Gap G8, §14.18), the one with the
+largest projection onto the deployment's `open_water_bearing_deg` from the L2 grid's centre
+(`services/vchain.py`'s `locate_seam_point()`). The SWAN-absorbed side, `SEAM` itself, sits exactly one L2 cell
+(the deployment's live `resolution_m`, always 100 m today) inward from that same boundary point along the same
+bearing, toward the L2 centre — **never AT a boundary cell** (ADR-095 Amendment 2: SWAN does not compute usable
+energy at its own boundary row). Both point identities (the transfer point's name/lat/lon and the `SEAM`
+point's lat/lon) are carried into the ledger row, not just the number.
+
+**Failure posture.** `locate_seam_point()` and the deck-emission call site never raise — a missing WW3 transfer
+file, an absent `open_water_bearing_deg` (a boxed-in deployment with no open direction, or a pre-G2 grid-sizing
+cache), or a transfer file with no `L2P`-named point logs ERROR/WARNING and skips `SEAM` emission for that
+cycle only; every surf spot's own DWR/TABLE output is computed exactly as it would be without this addition.
+
+**The ledger comparison.** `services/vchain.py`'s `record_chain_cycle_ledger_row()` reads `swan/level2/
+SPEC_SEAM.txt` (via the SAME `swan_spectral.parse_specout_file()` the per-spot DWR points use) and compares it,
+per `SEAM_BAND_EDGES_HZ` frequency band, against the WW3 transfer spectrum already parsed for the row's `ww3`
+block (never a second transfer-file read) — see OPERATIONS-MANUAL.md's "Seam-fidelity row" for the full row
+shape, tolerance, and named-error contract. **Unit/basis conversion**, cited from both parsers' own docstrings:
+SWAN's `SPECOUT ... SPEC2D ABS` density is m²/Hz/deg (SWAN manual Appendix D, p.141) on a NAUTICAL "coming FROM"
+direction axis in degrees — the deck carries an explicit `SET NAUTICAL` line (`swan_formats.py`), matching
+`swan_spectral.parse_specout_file()`'s own docstring. The WW3 transfer format (`vchain.parse_transfer_file()` /
+`ww3_formats.py`) is m²/Hz/rad on a "going TO" axis in radians. `vchain._swan_specout_to_going_to_per_radian()`
+converts the SWAN side to the WW3 side's basis before either side is integrated — direction via the exact
+inverse of `integrate_spectrum()`'s own `dir_from_deg` conversion, density via the standard per-degree →
+per-radian rescale (`× 180/π`).
+
+**A measured noise floor, not a defect.** The WW3 transfer-file writer stores its frequency axis at 4
+significant figures (`%0.3E`); the SWAN SPECOUT writer stores the SAME nominal axis at 6 (`%.5E`). Re-parsed
+back, the two sides' own bin-width calculations differ by a few tenths of a percent, propagating into each
+side's Hs via `4×√m0` — a real property of the two file formats' differing text precision, not a bug in either
+parser or in the comparison logic (each side correctly uses its own parsed axis; assuming the two files share
+an unrounded axis would be the actual defect). `SEAM_HS_TOLERANCE` (±10%) is sized well above this floor.
+
 ### §14.16 GFS wind provider (Phase 7 — supplements HRRR for 72-hour forecast)
 
 **Module identity:** `providers/wind/gfs.py`, `PROVIDER_ID = "gfs"`, `DOMAIN = "wind"`.
