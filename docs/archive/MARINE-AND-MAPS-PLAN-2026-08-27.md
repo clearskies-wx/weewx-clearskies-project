@@ -1,4 +1,6 @@
 > **ARCHIVED 2026-08-27 (Phase D1 closed).** Every checklist row is done and gated; the round briefs moved with it to `docs/archive/briefs/`. What is NOT done: the push/deploy and the live gate rows held until the operator says "push" (deploy order J1; first post-deploy step J11); the four Proposed ADR amendments awaiting acceptance; the journal/lessons digest in `scratch/MM-OPERATOR-DIGEST.md`. Relative links inside this file still say `docs/planning/briefs/` — read them as `docs/archive/briefs/`.
+>
+> **Post-archive, same day:** operator said "yes" to the push → all 17 code cuts deployed in order with a health check each (`scratch/deploy-2026-08-27/DEPLOY-LOG.md`); the five ADR amendments were marked Accepted (the plan was the approval); the rules files took the lessons; follow-up round **M5** (brief `docs/planning/briefs/M5-ADR078-REMOVAL-BRIEF-2026-08-27.md`) deleted the ADR-078 single-file geographic-features feature (API `1b4a20a`…`33d4f53`, stack `02401cc`…`ba0c64a`, Gate M5 10/10) and was deployed.
 
 # Marine & Maps Plan — finish the surf system, fix the maps (2026-08-27)
 
