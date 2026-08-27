@@ -914,13 +914,30 @@ multiply. Regular grids only (ours is). No compile switch — grid-preprocessor 
    vs the standing 0.56–0.60×; the cliff-KAT seam aggregate vs 0.578 m; direction unchanged
    within ±5°. Improvement expected but NOT assumed — the lobe-width and diffraction items in
    S8 remain separate.
-**Lead mechanics (2026-08-27, provisional until the pre-flight lands — `scratch/S8.1-PREFLIGHT.md`,
-brief `docs/planning/briefs/S8.1-PREFLIGHT-BRIEF-2026-08-27.md`, dispatched read-only):**
-- Sequence: S8.1-PRE (read-only: fine DEM source, samples per cell, WW3 grammar quotes, today's
-  dry/wet/partial counts) → S8.1-A (marine: `derive_ww3_setup()` gains `open_water_fraction`,
-  `depths`, `status`, `transparency` arrays; the fine-DEM fetch persisted as
-  `/etc/weewx-clearskies/swan_bathymetry_G1_fine.json` beside the other caches, same dict shape,
-  refuse loudly if unfetchable; `write_ww3_grid_name_files(derivation, dir)` writing
+**Pre-flight LANDED 2026-08-27 (`scratch/S8.1-PREFLIGHT.md`; read-only):** (1) no shipped NCEI
+regional DEM contains the G1 box; (2) **NOAA NCEI CRM Vol. 6 — Southern California** (3 arc-second
+≈ 90 m, public domain, THREDDS/OPeNDAP `…/thredds/dodsC/crm/crm_vol6.nc`) fully covers it — a new
+catalog path (`bathymetry_resolver._OPENDAP_BASE_URL` is pinned to the `regional/` collection);
+(3) samples per 1 km cell: ETOPO ≈ 5.6 (fraction step ≈ 18 % — fails KAT (b)'s 2 %), CRM ≈ 139
+(step ≈ 0.7 % — meets it); (4) the LIVE mask today: 3,433 dry / 21,020 wet of 24,453 cells, and the
+L1 ETOPO cache's resolution equals G1's 1:1 — **one sample per cell, no sub-cell information at all**
+(the "nearest sample at the centre" rule is literally the whole mask); (5) WW3 `FLAGTR = 2` grammar
+and IDLA/IDFM quotes captured from the local manual; (6) nothing writes `G1_bottom.txt`/`G1_status.txt`
+today (confirmed). Datum note (journal J10): CRM is MLLW/NAVD88 while the ETOPO L1 cache is LMSL —
+the wet/dry sign test at the ±0.5 m intertidal margin will move a few coastline cells; KAT (d)
+reports the flip count.
+
+**Lead mechanics (2026-08-27; now firm — the pre-flight settled the source):**
+- Sequence: S8.1-PRE (done) → S8.1-A (marine: `derive_ww3_setup()` gains `open_water_fraction`,
+  `depths`, `status`, `transparency` arrays; the fine-DEM fetch = CRM Vol. 6 via OPeNDAP through a
+  new `bathymetry_resolver.fetch_crm_grid(bbox)` (native 3″, no coarsening; a second base-URL
+  constant for the `crm/` collection; the volume name/bounds/datum/var as a small named table in
+  the module, provenance-logged) persisted as `/etc/weewx-clearskies/swan_bathymetry_G1_fine.npz`
+  (`numpy.savez_compressed`: `lat`, `lon` axes + `elev` int16/float32 array + a JSON metadata
+  string — NOT a monolithic JSON of ~3 M floats, rules/coding.md §12.1) beside the other caches;
+  refuse loudly if unfetchable (no ETOPO substitution — the pre-flight proved ETOPO cannot meet
+  the KAT); `f` per cell = share of fine samples with elevation < 0 inside the cell footprint
+  (centre ± half a cell; vectorised binning, no Python loops over 3 M samples); `write_ww3_grid_name_files(derivation, dir)` writing
   `G1_bottom.txt`, `G1_status.txt`, `G1_obstr.txt` in the manual's IDLA/IDFM convention; deck gains
   `FLAGTR = 2` + the obstruction read line; KATs a–d) → S8.1-B (marine `service.py`: the G10 hook —
   at the WW3 leg's start, if `level0/mod_def.provenance.json` is missing or its `derivation_sha256`
