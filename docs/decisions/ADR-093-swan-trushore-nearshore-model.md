@@ -730,7 +730,7 @@ this ADR governs are unaffected.
 
 ### Amendment 9 (2026-08-27): HANDOFF-RESTART — the per-hour handoff is selected by restart, not by the formula alone
 
-**Status: Proposed.**
+**Status: Accepted (2026-08-27).** The plan's PRE-APPROVAL register was the approval (operator, 2026-08-27 in chat, on being asked to accept: "that was in the plan, why do i need to approve what i already approved"); code shipped the same day (see the plan's row).
 
 **Context.** Amendment 2 §2 defined the per-hour handoff depth as `1.3 × Hs(hour) / gamma` — a single
 formula lookup against the transect's own station set (Amendment 3's L4/L3/L2 first-match-wins rule for

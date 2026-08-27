@@ -904,7 +904,7 @@ wind-only forcing split itself (only its fetch depth changes); D11's
 
 ## Amendment (2026-08-27): D10 — first-install WW3 warm-start bootstrap (S5, C17, EVO-Q9 option 2)
 
-**Status: Proposed.** Recorded per the plan's EVO-Q9 ruling
+**Status: Accepted (2026-08-27 — the plan was the approval; operator in chat: "that was in the plan").** Recorded per the plan's EVO-Q9 ruling
 (`docs/planning/MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.md`, Q9 "✅ RULED 2026-08-19
 (operator, in chat): 'THAT IS NOT ARCHITECTURAL, THAT IS JUST PROCEDURAL' ... The durable
 first-install bootstrap mechanism is PARKED as a pre-ship row (design + gate + ADR-109
@@ -959,7 +959,7 @@ the existing `level0/` directory).
 
 ## Amendment (2026-08-27): D3/D13 Group2 — G1 partially-land cells: fraction-based wet/dry mask, FLAGTR=2 transparency field (S8.1-A)
 
-**Status: Proposed.** Recorded per `docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md`
+**Status: Accepted (2026-08-27 — the plan's PA8 was the approval; operator in chat: "that was in the plan").** Recorded per `docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md`
 §"S8.1 — Partially-land cells", PA8; operator direction 2026-08-27 (chat): "it should also
 apply to cells that are not 100 percent island … so you are not OVERCOUNTING an island when
 you may only have the tip in the grid"; Q10 "2. yes" (F_DRY=0.05) and "3. ok" (the DEM

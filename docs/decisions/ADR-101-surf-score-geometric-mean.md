@@ -126,7 +126,7 @@ factors — they average together, but one very poor factor sinks the whole scor
 7. Out of scope, explicitly: skill-level lenses, spot-relative calibration, crowding, section
    length (peel angle covers it), any tide-based scoring.
 
-## Amendment 1 (2026-08-27) — Consistency (row 5) rebuilt on spectral group statistics — **Status: Proposed**
+## Amendment 1 (2026-08-27) — Consistency (row 5) rebuilt on spectral group statistics — **Status: Accepted (2026-08-27 — the plan's PA6 was the approval; operator in chat: "that was in the plan, why do i need to approve what i already approved"; the three §4.5 single-use rulings stand as written)**
 
 **Basis.** Operator rulings recorded in `docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md`: EVO-Q14
 (2026-08-23, "q14 recommendation is fine"), Q3 (2026-08-27, sub-decisions A–E "yes"; the lead's

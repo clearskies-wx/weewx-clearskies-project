@@ -86,11 +86,9 @@ The current approach uses a CSS blend-mode hack: CartoDB `dark_nolabels` tiles a
 - PMTiles daily builds: https://docs.protomaps.com/basemaps/downloads
 - Go pmtiles CLI: https://docs.protomaps.com/pmtiles/cli
 
-## Amendment 2 (2026-08-27) — superseded by the product basemap (Proposed)
+## Amendment 2 (2026-08-27) — superseded by the product basemap (Accepted)
 
-**Status: Proposed — takes effect on the operator's acceptance in chat; the removal commit of the
-old feature waits for it (plan journal J3).** This amendment does not change the header `status:`
-field above (still `Accepted` for the original 2026-06-29 decision) until the operator accepts it.
+**Status: Accepted (2026-08-27).** The plan's PRE-APPROVAL register was the approval (operator, 2026-08-27 in chat, on being asked to accept: "that was in the plan, why do i need to approve what i already approved"); code shipped the same day (see the plan's row). The removal commit of the old feature (API `geographic_features` endpoints/service/config, stack admin section) follows as its own round.
 
 ### Context
 
@@ -172,5 +170,4 @@ amendment is accepted.
 
 ### Acceptance line
 
-**Status: Proposed — takes effect on the operator's acceptance in chat; the removal commit of the
-old feature waits for it (plan journal J3).**
+**Status: Accepted (2026-08-27).** The plan's PRE-APPROVAL register was the approval (operator, 2026-08-27 in chat, on being asked to accept: "that was in the plan, why do i need to approve what i already approved"); code shipped the same day (see the plan's row).
