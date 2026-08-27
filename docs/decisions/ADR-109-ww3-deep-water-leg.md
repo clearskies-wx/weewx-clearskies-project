@@ -1065,3 +1065,18 @@ convention (still the base value, only conditionally overridden per item 4 above
 formula; D10's restart-chaining mechanism; D12's file/dir layout and cadence; every other
 D13 catalog row not named above; the `fine_dem=None` derivation path (byte-identical to
 pre-round, KAT c).
+
+**Gap G10 closed (S8.1-B, 2026-08-27).** The production `ww3_grid` execution hook named as
+"not built this round" above is now built: `service.py::_run_ww3_leg()` runs it once, at the
+very start of every cycle, before restart chaining — it reconstructs the current derivation
+from the sizing cache (`swan_domain.ww3_setup_derivation_from_dict()`, the inverse of
+`ww3_setup_derivation_to_dict()`), hashes the rendered deck + the three NAME files
+(`ww3_grid_files.derivation_grid_sha256()`), and compares that hash to
+`level0/mod_def.provenance.json`. A mismatch (or a missing/unreadable note) triggers
+`WW3Runner.run_grid()`, keeps the superseded artifact as `mod_def.ww3.prev-<token>`, writes
+the provenance note atomically, and cold-starts that cycle (`ww3_grid_rebuilt_cold_start` —
+not a leg refusal, the cycle still runs). A sizing cache still missing the S8.1-A arrays
+refuses the cycle (`ww3_grid_rebuild_inputs_missing`) unless a readable provenance note
+already exists, in which case it proceeds unchanged. See OPERATIONS-MANUAL.md's "WW3 grid
+rebuild (G10 hook)" subsection for the operator-visible baseline/diff/force-rebuild
+procedure. G10's catalog-row status above is now closed by this round.

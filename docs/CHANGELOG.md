@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-27 — S8.1-B: WW3 `ww3_grid` production rebuild hook (ADR-109 Gap G10, closed)
+
+- **`mod_def.ww3` (WW3's G1 grid build artifact) is no longer a hand-minted, never-rebuilt
+  file.** `service.py::_run_ww3_leg()` (marine repo) gains the production `ww3_grid`
+  execution hook (ADR-109 Gap G10, previously unbuilt — `WW3Runner.run_grid()` existed
+  standalone since Phase W but nothing called it): once per cycle, before restart chaining,
+  it reconstructs the current WW3 setup derivation from the grid-sizing cache
+  (`swan_domain.ww3_setup_derivation_from_dict()`, new, the inverse of
+  `ww3_setup_derivation_to_dict()`), renders the deck + the three NAME files, hashes them
+  (`ww3_grid_files.derivation_grid_sha256()`, new), and compares against
+  `level0/mod_def.provenance.json`. A hash mismatch (or missing/unreadable note) triggers a
+  rebuild: the superseded artifact is kept as `mod_def.ww3.prev-<token>` (retained
+  indefinitely — rebuilds are rare), the new one promoted, the provenance note written
+  atomically, and that cycle cold-starts (`ww3_grid_rebuilt_cold_start` — not a leg refusal,
+  the cycle still runs). A sizing cache still missing the S8.1-A transparency arrays trusts
+  an existing readable provenance note or refuses (`ww3_grid_rebuild_inputs_missing`) — no
+  ETOPO substitution, no on-the-fly derivation.
+- New named refuse/health slugs: `ww3_grid_rebuild_inputs_missing`, `ww3_grid_rebuild_failed`,
+  `ww3_grid_rebuilt_cold_start`. `/health`'s `ww3` block gains `gridRebuiltAt`,
+  `gridRebuildReason`, `gridDerivationSha256`, `gridRebuildCycleTime`, `restartRefusedReason`
+  (additive, `state.py`'s new `record_ww3_grid_rebuild()`).
+- OPERATIONS-MANUAL.md gains a "WW3 grid rebuild (G10 hook)" subsection: triggers, files
+  written, the cold start that follows, baseline/diff commands, and the sanctioned
+  force-rebuild procedure (delete the provenance note). ADR-109's S8.1-A amendment gains a
+  closing paragraph marking Gap G10 closed. ARCHITECTURE.md's ⚓ WW3 paragraph updated.
+
+MARINE-AND-MAPS-PLAN-2026-08-27.md §S8.1 Lead mechanics "S8.1-B"; ADR-109 Gap G10.
+
 ### 2026-08-27 — S2: CONSISTENCY-SCORING — Consistency factor rebuilt on spectral group statistics (ADR-101 Amendment 1)
 
 - **The Consistency scoring factor (0.10 weight, `SurfScoringBreakdown.consistency`) is no longer the
