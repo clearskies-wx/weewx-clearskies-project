@@ -1461,6 +1461,91 @@ paths:
   # /imagery path was ever added to this contract in the Phase LM or
   # IMAGERY-MAP rounds.)
   # -------------------------------------------------------------------
+  # Geographic features (ADR-078, LEGACY — Amendment 2 Proposed 2026-08-27).
+  # Still MOUNTED at API 811fe88 (endpoints/geographic_features.py; app.py
+  # includes both routers) and live side by side with the Basemap endpoints
+  # above until the operator accepts ADR-078 Amendment 2, after which the
+  # removal commit deletes them. Gate D1 X9 (2026-08-27): routes without
+  # contract paths — added from the code, terse, deprecated.
+  # -------------------------------------------------------------------
+  /geographic-features/tiles:
+    get:
+      tags: [Basemap]
+      deprecated: true
+      summary: (LEGACY, ADR-078) Serve the single geographic-features PMTiles file
+      description: |
+        Range-capable file response (206 on a Range header) of the old
+        single-file Protomaps extract at the API's persisted path. 404 with
+        a JSON `detail` when the file has not been downloaded. Superseded by
+        `/basemap/{tier}/tiles`; no dashboard code reads it as of b307797.
+      operationId: getGeographicFeaturesTilesLegacy
+      responses:
+        '200':
+          description: The PMTiles file (or a 206 partial range)
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '404':
+          description: Not downloaded yet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { detail: { type: string } }
+        default: { $ref: '#/components/responses/Problem' }
+  /geographic-features/status:
+    get:
+      tags: [Basemap]
+      deprecated: true
+      summary: (LEGACY, ADR-078) Availability of the single geographic-features file
+      operationId: getGeographicFeaturesStatusLegacy
+      responses:
+        '200':
+          description: Availability
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [available, size_bytes, updated_at]
+                properties:
+                  available: { type: boolean }
+                  size_bytes: { type: integer, nullable: true }
+                  updated_at: { type: string, format: date-time, nullable: true }
+        default: { $ref: '#/components/responses/Problem' }
+  /setup/geographic-features/update:
+    post:
+      tags: [Basemap]
+      deprecated: true
+      summary: (LEGACY, ADR-078) Download + extract the single geographic-features file (synchronous)
+      description: |
+        NOT under `/api/v1` (setup channel, ADR-038). Synchronous — blocks
+        for the pmtiles CLI run (typically 30–120 s). Uses `[geographic_features]`
+        bounds/maxzoom from api.conf (global extent when bounds is unset).
+      operationId: postGeographicFeaturesUpdateLegacy
+      security:
+        - proxySecret: []
+      servers:
+        - url: /
+      responses:
+        '200':
+          description: Extraction finished
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok] }
+                  size_bytes: { type: integer }
+                  updated_at: { type: string, format: date-time }
+        '401':
+          description: Missing or invalid X-Clearskies-Proxy-Auth header
+        '500':
+          description: pmtiles CLI missing, extraction failed, or filesystem error
+        '503':
+          description: Proxy secret not configured -- admin operations unavailable
+        default: { $ref: '#/components/responses/Problem' }
+
+  # -------------------------------------------------------------------
 
   /imagery/config:
     get:

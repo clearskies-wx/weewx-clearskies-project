@@ -1763,6 +1763,20 @@ tiles client-side into PNG data URLs via `rasterizeBasemapTile()` for its own SV
 
 ---
 
+## §12c Geographic-features endpoints (LEGACY — ADR-078 Amendment 2 Proposed, 2026-08-27)
+
+Three routes from the original ADR-078 single-file overlay are still mounted at API `811fe88`
+(`endpoints/geographic_features.py`; `app.py` includes both routers) and run side by side with
+§12b until the operator accepts ADR-078 Amendment 2, whose removal commit deletes them. No
+dashboard code reads them as of `b307797`. Recorded here (and in the contract, `deprecated: true`)
+because they are live and one is an authenticated write — Gate D1 X9, 2026-08-27.
+
+| Route | Behaviour (from code) |
+| --- | --- |
+| `GET /api/v1/geographic-features/tiles` | Range-capable `FileResponse` of the single PMTiles file (206 on `Range`); 404 + JSON `detail` when not downloaded |
+| `GET /api/v1/geographic-features/status` | `{available, size_bytes, updated_at}` (nulls when absent) |
+| `POST /setup/geographic-features/update` | Synchronous pmtiles download/extract (30–120 s) using `[geographic_features]` bounds/maxzoom; `X-Clearskies-Proxy-Auth` required (401), 503 when no proxy secret, 500 on CLI/extraction failure; returns `{status:"ok", size_bytes, updated_at}` |
+
 ## §13 Anti-Patterns
 
 Never do any of the following.
