@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-27 — S3: doc corrections (wrong no-op/vestigial claims) + swellSource/closeoutFraction documented + ww3_boundary input recorded
+
+- **Docs only (part a).** An adversarial plan review found ARCHITECTURE.md wrongly called
+  two live production dependencies "no-op"/"vestigial": the `ww3_chain_enabled` flag (still
+  gates both buoy-ledger writers, `vchain.py:914`/`:978`) and
+  `_reused_l1_boundary_command_lines()` (called every production chain cycle from
+  `vchain._stage_l2_boundary()`, `vchain.py:727`). Both corrected — nothing live is deleted
+  by this round. ARCHITECTURE.md Known-gaps rows #12/#13 (WW3 wind regrid, L2 boundary
+  point list) verified BUILT and closed; #14 (`ww3_grid` geometry hook) confirmed still
+  unbuilt, moved to Phase S8.1; #16 (seam AGG question) CLOSED — Phase V dropped (Q1), the
+  per-cycle buoy ledger is the standing instrument. ADR-109 G7 struck as built; D14 item 2
+  re-homed to the same Phase-V-dropped finding; items 1/3 unchanged. PROVIDER-MANUAL.md's
+  swell-card bullet corrected — the L2 ~15 m SPECOUT feeds the card only via fallback since
+  Q16 Round B (2026-08-25), not unconditionally.
+- **API-MANUAL.md §17 gains `swellSource` (`"deep_reference" | "nearshore_table" | null`)
+  and `closeoutFraction` (`float | null`, 0.0-1.0) field rows** — both already served
+  (Q16 C3 2026-08-25 / PEEL-SEGMENTS 2026-08-26) but previously undocumented.
+- **Code (part c, separate commits): `state.record_input("ww3_boundary", ...)` now records
+  the NOAA boundary fetch outcome on both the leg and horizon-march paths** — `GET /health`'s
+  existing required-input reporting for `ww3_boundary` reflects real fetch outcomes instead
+  of the never-recorded default (Q10-7 "record it"). No new field, endpoint, or config key.
+
+MARINE-AND-MAPS-PLAN-2026-08-27 §S3, "S3 lead mechanics" (a)/(c); C19/C20; Q10 items 5/7.
+
 ### 2026-08-27 — SURF-MAP-BASEMAP (M4, API side): the surf height map's background stops being orthophotography
 
 - **`GET /api/v1/imagery/config` now always answers with the Clear Skies product basemap
