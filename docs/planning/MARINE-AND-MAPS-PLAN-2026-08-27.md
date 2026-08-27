@@ -364,6 +364,13 @@ finding):**
   mode="dark-base" />` with NO `maxZoom` (over-zoomed z6 data is the ground beyond the box) under
   `<ProtomapsLayer tier="local" mode="dark-base" minZoom={7} />`. Labels: `world` labels layer
   `maxZoom={6}`, `local` labels layer `minZoom={7}` — never both at one zoom.
+  **AS BUILT (dashboard-dev finding 2026-08-27, accepted):** the zoom windows are NOT passed as
+  Leaflet `GridLayer` `minZoom`/`maxZoom` options — Leaflet's `Map._addZoomLimit`/`_updateZoomLevels`
+  (leaflet-src.js `:7012–7055`) aggregates every layer's `maxZoom` and force-overrides the map's
+  current zoom, which collapsed the marine map's `fitBounds` from z12 to z6. The windows are applied
+  per rule instead (`withZoomWindow()` in `basemap.ts` sets `minzoom`/`maxzoom` on each
+  PaintRule/LabelRule; evaluated inside the canvas paint, no map-level side effect). The
+  labels-once invariant (world ≤ 6, local ≥ 7) holds on the rule sets.
 - `LocationMap.tsx`: dark base (`:72–75`, `:305–313`) → the two-tier stack; the CARTO label
   overlay (`:54–59`, `:318–326`) → `ProtomapsLayer mode="labels"` per theme (both variants, both
   tiers as above); `useTileErrorRecovery` stays on the light OSM layer only; `TILE_CONFIG` keeps
