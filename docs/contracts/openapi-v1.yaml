@@ -100,6 +100,12 @@ tags:
     description: Operator branding configuration (site title, logo, favicon, social links).
   - name: Health
     description: Health and readiness probes per ADR-030.
+  - name: Basemap
+    description: |
+      Clear Skies product basemap (Protomaps-derived PMTiles, three
+      zoom tiers) for every map surface — replaces CARTO. Generalises
+      ADR-078's geographic-features overlay (ADR-078 Amendment 2,
+      Proposed — both features live side by side until accepted).
 
 security:
   - {}                       # Default: no auth required (browser SPA case).
@@ -1334,6 +1340,107 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RadarFramesResponse' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # -------------------------------------------------------------------
+  # Basemap (CS-BASEMAP, plan MARINE-AND-MAPS-PLAN-2026-08-27 §M1;
+  # generalises ADR-078's geographic-features overlay into three
+  # zoom-tiered PMTiles files -- ADR-078 Amendment 2, Proposed)
+  # -------------------------------------------------------------------
+
+  /basemap/{tier}/tiles:
+    get:
+      tags: [Basemap]
+      summary: Serve one basemap tier's PMTiles file
+      description: |
+        Public, unauthenticated. `tier` selects one of three zoom-tiered
+        Protomaps-derived PMTiles archives covering every Clear Skies map
+        surface (marine, seismic, radar/satellite, surf height map):
+        `world` (z0-6, global fallback), `local` (z7-15, station +
+        earthquake radius + marine locations), `radar` (z0-12, the radar
+        provider's declared coverage box, or the station box if none).
+        Served via HTTP Range requests (206 Partial Content), same
+        mechanism ADR-078's geographic-features tiles endpoint uses.
+      operationId: getBasemapTile
+      security: []
+      parameters:
+        - name: tier
+          in: path
+          required: true
+          description: One of `world`, `local`, `radar`.
+          schema: { type: string, enum: [world, local, radar] }
+      responses:
+        '200':
+          description: PMTiles archive bytes (or a 206 partial range)
+          headers:
+            Accept-Ranges: { schema: { type: string, example: bytes } }
+            Cache-Control: { schema: { type: string, example: 'public, max-age=86400' } }
+          content:
+            application/octet-stream: { schema: { type: string, format: binary } }
+        '404':
+          description: |
+            Unknown tier (RFC 9457 problem+json), OR a known tier not yet
+            extracted / `[basemap] enabled=false` (plain JSON
+            `{"detail": "..."}`, ADR-078's own shape — not problem+json).
+        default: { $ref: '#/components/responses/Problem' }
+
+  /basemap/status:
+    get:
+      tags: [Basemap]
+      summary: Per-tier basemap availability + extraction state
+      description: |
+        Public, unauthenticated. Availability/size/mtime are read fresh
+        from disk on every call; `bounds`/`minzoom`/`maxzoom` come from
+        the in-memory record of the last successful extraction (or the
+        tier's static minzoom/maxzoom before any extraction has run).
+      operationId: getBasemapStatus
+      security: []
+      responses:
+        '200':
+          description: Per-tier status + overall extraction-run state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BasemapStatusResponse' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /setup/basemap/update:
+    post:
+      tags: [Basemap]
+      summary: Start a background basemap extraction (world + local + radar)
+      description: |
+        NOT under the `/api/v1` prefix (setup channel, ADR-038) — see the
+        `servers` override below. Starts one background daemon thread
+        that extracts all three tiers in sequence (world -> local ->
+        radar); never two extractions at once. A failing tier leaves its
+        previous file in place and is recorded in `last_error`
+        (`GET /basemap/status`) -- the other tiers still run. Extent is
+        always derived (station + earthquake radius + marine locations
+        for `local`; the radar provider's declared coverage box, or the
+        station box, for `radar`) -- never operator-typed.
+      operationId: postBasemapUpdate
+      security:
+        - proxySecret: []
+      servers:
+        - url: /
+      responses:
+        '202':
+          description: Extraction started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { status: { type: string, enum: [started] } }
+        '409':
+          description: An extraction is already running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { status: { type: string, enum: [already_running] } }
+        '401':
+          description: Missing or invalid X-Clearskies-Proxy-Auth header
+        '503':
+          description: Proxy secret not configured -- admin operations unavailable
         default: { $ref: '#/components/responses/Problem' }
 
   # -------------------------------------------------------------------
@@ -3000,6 +3107,41 @@ components:
         data: { $ref: '#/components/schemas/RadarFrameList' }
         generatedAt: { type: string, format: date-time }
       required: [data, generatedAt]
+
+    BasemapTierStatus:
+      type: object
+      description: One tier's on-disk availability + last-extraction metadata.
+      properties:
+        available: { type: boolean }
+        size_bytes: { type: integer, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
+        bounds:
+          type: string
+          nullable: true
+          description: '"west,south,east,north" bbox used for the last successful extraction.'
+        minzoom: { type: integer }
+        maxzoom: { type: integer }
+      required: [available, size_bytes, updated_at, bounds, minzoom, maxzoom]
+
+    BasemapStatusResponse:
+      type: object
+      description: Envelope for GET /basemap/status. NOT the usual data+envelope wrapper (flat shape).
+      properties:
+        tiers:
+          type: object
+          properties:
+            world: { $ref: '#/components/schemas/BasemapTierStatus' }
+            local: { $ref: '#/components/schemas/BasemapTierStatus' }
+            radar: { $ref: '#/components/schemas/BasemapTierStatus' }
+          required: [world, local, radar]
+        updating: { type: boolean }
+        last_error:
+          type: string
+          nullable: true
+          description: '"; "-joined per-tier failure messages from the last extraction run, or null.'
+        last_started_at: { type: string, format: date-time, nullable: true }
+        last_finished_at: { type: string, format: date-time, nullable: true }
+      required: [tiers, updating, last_error, last_started_at, last_finished_at]
 
     AlmanacPlanetsResponse:
       type: object

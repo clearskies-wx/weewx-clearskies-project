@@ -1646,6 +1646,98 @@ Error mapping: upstream 429 → 503 + Retry-After; upstream 404 → 404; other u
 
 ---
 
+## §12b Basemap Endpoints (CS-BASEMAP, plan `MARINE-AND-MAPS-PLAN-2026-08-27.md` §M1, 2026-08-27)
+
+The Clear Skies product basemap — replaces CARTO (watermarked/retired 2026-08-25) on every map
+surface: marine, seismic, radar/satellite, and the surf height map. Generalises ADR-078's
+single-file geographic-features overlay into three zoom-tiered PMTiles files. **ADR-078 Amendment
+2 (Proposed)** records this as the successor to the geographic-features feature — both features
+run side by side until the operator accepts the amendment; nothing is removed by this section.
+Three endpoints, `endpoints/basemap.py`, service `services/basemap_extract.py`, wired via
+`wire_basemap_settings()`:
+
+**`GET /api/v1/basemap/{tier}/tiles`** → PMTiles file (public, no auth). `tier` ∈ `world` (z0–6,
+global), `local` (z7–15, the detail box), `radar` (z0–12, the radar coverage box) — an unknown
+tier is a 404 problem+json (RFC 9457, ADR-018). A known tier whose file has not yet been extracted,
+or `[basemap] enabled=false`, is a 404 plain-JSON body (ADR-078's own shape, not problem+json):
+`{"detail": "Basemap tier '<tier>' not available. Use the admin panel to update the basemap."}`.
+Served via Starlette `FileResponse` — `Accept-Ranges: bytes`, `Cache-Control: public, max-age=86400`
+— same Range-request mechanism (206 Partial Content) ADR-078's tiles endpoint uses.
+
+**`GET /api/v1/basemap/status`** → 200 (public, no auth):
+```json
+{
+  "tiers": {
+    "world": {"available": true, "size_bytes": 44839642, "updated_at": "2026-08-27T01:02:28Z",
+               "bounds": "-180,-85,180,85", "minzoom": 0, "maxzoom": 6},
+    "local": {"available": true, "size_bytes": 538511177, "updated_at": "...", "bounds": "...",
+               "minzoom": 7, "maxzoom": 15},
+    "radar": {"available": false, "size_bytes": null, "updated_at": null,
+               "bounds": null, "minzoom": 0, "maxzoom": 12}
+  },
+  "updating": false,
+  "last_error": null,
+  "last_started_at": null,
+  "last_finished_at": null
+}
+```
+Availability/size/mtime are read fresh from disk on every call; `bounds`/`minzoom`/`maxzoom` come
+from the in-memory record of the last successful extraction (or the tier's static minzoom/maxzoom
+before any extraction has run). A tier whose extraction failed keeps its previous file (if any) in
+place — `available` reflects what's on disk, `last_error` names which tier(s) failed and why.
+
+**`POST /setup/basemap/update`** → starts a background extraction of all three tiers, one daemon
+thread, world → local → radar in sequence. Auth: `X-Clearskies-Proxy-Auth` shared-secret header
+(same pattern as `POST /setup/geographic-features/update`) — 503 if the proxy secret isn't
+configured, 401 if the header is missing/wrong. **202** `{"status": "started"}` when a new
+extraction begins; **409** `{"status": "already_running"}` when one is already in flight — never
+two threads at once. A tier's own extraction failure does not stop the others; each failure is
+appended to `last_error` (`"<tier>: <message>"`, `; `-joined) and the previous file for that tier
+is left in place.
+
+**Extent-derivation rule** (`services/basemap_extract.py`, no operator-typed box for `local`;
+`world` is a fixed global box):
+- **`local`** = union of the seismic box (station lat/lon from `services/station.get_station_info()`,
+  radius = `settings.earthquakes.default_radius_km × 1.15`, km→deg via `/111.32` for latitude and
+  `/(111.32·cos(lat))` for longitude) and the marine box (bounding box of the locations from
+  `companion_proxy.marine_discovery_get("/marine", {})` — the API's only marine channel — padded
+  40 px at z15: `40 × 156543.03·cos(lat)/2^15` meters, same km→deg conversion, at the station's
+  latitude). No marine service configured → seismic box alone (structural, not a failure — caught
+  as `MarineDiscoveryUnconfiguredError`). Marine service configured but unreachable
+  (`MarineDiscoveryUnavailableError`) → **propagates uncaught; the `local` tier's extraction
+  refuses** rather than silently falling back to the seismic box alone (rules/coding.md §1 "A model runs on all its inputs
+  or it does not run — never substitute, never omit") — the other two tiers still run.
+- **`radar`** = `settings.radar.librewxr_bounds` (`[radar] librewxr_bounds` config, CSV
+  "south,west,north,east") when set; `None` (unset, or malformed — logged, not raised) → falls
+  back to the seismic (station) box, per PRIME DIRECTIVE 14. Never derived from any other
+  provider field.
+- **`world`** = the fixed global box `-180,-85,180,85`, z0–6 — not derived from config.
+
+**Three-tier zoom table:**
+
+| Tier | Zoom | Extent | Serves | Measured size (this install, M0) |
+|---|---|---|---|---|
+| `world` | 0–6 | Global (fixed) | Fallback ground for panning outside the local/radar boxes on the non-radar maps | 42.8 MB |
+| `local` | 7–15 | union(seismic box, marine locations bbox +40px@z15) | Marine + seismic maps' dark-theme detail | 513.6 MB (exceeds the plan's 400 MB ceiling — Q12 finding, accepted as-designed by the operator; not a gate re-fit) |
+| `radar` | 0–12 | Radar provider's declared coverage box, or the seismic box if none declared | Radar/satellite map's dark-theme base + labels/outlines layer | 195.1 MB |
+
+**Refusal rule:** a marine service that is *configured* but *unreachable* at extraction time is
+never silently downgraded to "seismic box only" for the `local` tier — the extraction for that
+tier refuses loudly (raises), consistent with the "no silent fallbacks" standing rule. A marine
+service that is *not configured at all* is a structural absence, not a failure, and the seismic
+box alone is the correct — not a degraded — extent.
+
+**`api.conf [basemap]`:** `enabled` (bool, default `true`) — the only key. No operator-typed box,
+no zoom knobs (PRIME DIRECTIVE 14; PRIME DIRECTIVE 11, no product-facing model-setup controls).
+
+**Dashboard consumption:** as of this section, not yet shipped (M1-DASH round pending). Contract
+per the plan's "Lead mechanics — dashboard side": `src/lib/basemap.ts` will be the one place that
+knows the tier→URL mapping and `useBasemapStatus()`; a `ProtomapsLayer` component renders each
+tier in `dark-base`, `labels`, or `satellite-outlines` mode. Not documented here as shipped
+behavior — see the plan for the design.
+
+---
+
 ## §13 Anti-Patterns
 
 Never do any of the following.
