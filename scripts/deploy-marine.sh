@@ -207,6 +207,65 @@ else
 fi
 run_root "ls -l ${SECRETS}"
 
+# --- Step 4b: WW3 binary pins (J24, operator order 2026-08-27) ---
+# The WW3-leg runner refuses to run any ww3_* program whose sha256 does not
+# match a configured pin (services/ww3_runner.py _verify_binaries, refuse
+# slug ww3_binaries_invalid). Until 2026-08-27 those pins lived ONLY in a
+# hand-placed `ww3` block inside marine.conf -- and every API config push
+# rewrites marine.conf from a payload that has no `ww3` block, so the pins
+# vanished on the first push and the 18Z leg refused. Operator order: "THIS
+# ENTIRE SETUP HAS TO BE AUTOMATIC!" So this step hashes the installed
+# programs on EVERY deploy and writes a host-local file the config push never
+# touches; the marine config loader lays it over the pushed `ww3` block
+# (config/__init__.py load_ww3_binaries, marine_config.py load_ww3_config).
+# A missing program is a hard prerequisite failure, same standing as the SWAN
+# binary check in step 0 -- the WW3 leg is part of the production chain.
+echo "--- [4b] WW3 binary pins ---"
+WW3_BIN_DIR="/var/lib/weewx-clearskies/ww3/bin"
+WW3_PROGRAMS="ww3_bound ww3_grid ww3_outp ww3_prep ww3_shel"
+WW3_PINS_FILE="${CONF_DIR}/ww3-binaries.json"
+for prog in ${WW3_PROGRAMS}; do
+    # /var/lib/weewx-clearskies is not traversable by the claude SSH user;
+    # the existence check has to run as root like the hashing below.
+    if ! run_root "test -x ${WW3_BIN_DIR}/${prog}" >/dev/null 2>&1; then
+        echo "WW3 program ${prog} not found at ${WW3_BIN_DIR} on librewxr." >&2
+        echo "The WW3 deep-water leg cannot run without all five programs" >&2
+        echo "(ww3_grid ww3_prep ww3_bound ww3_shel ww3_outp). See" >&2
+        echo "docs/manuals/OPERATIONS-MANUAL.md 'WW3 deep-water leg' Build/install." >&2
+        exit 1
+    fi
+done
+# Staged through a local temp file and scp, like the unit below: run_root
+# wraps its argument in single quotes, so JSON with quotes cannot be echoed
+# through it. Hashes come back one per program; only the first field is kept.
+PINS_TMP="$(mktemp)"
+trap 'rm -f "${PINS_TMP}"' EXIT
+{
+    echo "{"
+    echo "  \"generated_by\": \"scripts/deploy-marine.sh\","
+    echo "  \"generated_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
+    echo "  \"binary_dir\": \"${WW3_BIN_DIR}\","
+    echo "  \"binary_sha256\": {"
+    sep=""
+    for prog in ${WW3_PROGRAMS}; do
+        line="$(run_root "sha256sum ${WW3_BIN_DIR}/${prog}")"
+        hash="${line%% *}"
+        if ! [[ "${hash}" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "sha256sum of ${prog} returned '${line}' -- not a sha256 hex digest." >&2
+            exit 1
+        fi
+        echo "${sep}    \"${prog}\": \"${hash}\""
+        sep=","
+        echo "[pins] ${prog} ${hash}" >&2
+    done
+    echo "  }"
+    echo "}"
+} > "${PINS_TMP}"
+scp -F "${SSH_CONFIG}" -q "${PINS_TMP}" "librewxr:/tmp/ww3-binaries.json"
+run_root "install -o ubuntu -g ubuntu -m 0640 /tmp/ww3-binaries.json ${WW3_PINS_FILE} && rm -f /tmp/ww3-binaries.json"
+run_root "ls -l ${WW3_PINS_FILE}"
+echo "[pins] ${WW3_PINS_FILE} written (5 programs)"
+
 # --- Step 5: systemd unit ---
 echo "--- [5/6] systemd unit ---"
 # Staged through a local file and scp, NOT a remote heredoc. run_root wraps
@@ -214,7 +273,7 @@ echo "--- [5/6] systemd unit ---"
 # on its own quotes and the rest of the unit is executed as shell commands.
 # deploy-compute.sh carries the same latent bug in its unit-install step.
 UNIT_TMP="$(mktemp)"
-trap 'rm -f "${UNIT_TMP}"' EXIT
+trap 'rm -f "${UNIT_TMP}" "${PINS_TMP}"' EXIT
 cat > "${UNIT_TMP}" << UNIT
 [Unit]
 Description=Clear Skies Marine Companion Service (SWAN/SwellTrack/SurfBeat, tides, buoy, marine weather)
