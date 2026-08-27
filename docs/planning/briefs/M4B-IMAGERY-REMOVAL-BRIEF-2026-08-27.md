@@ -7,8 +7,7 @@ Teammates: `clearskies-api-dev` ×2 — one for the API repo (`m4b-api`), one fo
 
 **Pre-round verification (lead, 2026-08-27):** API HEAD `39cd51a`, clean (M4-API landed: `/imagery/config`
 always answers `provider:"basemap"`). API baseline (`.venv\Scripts\python.exe -m pytest tests/providers/imagery tests/test_config_settings_imagery_validation.py tests/test_current_config_imagery_prefill.py tests/test_wire_imagery_settings.py tests/test_endpoints_imagery_integration.py tests/test_imagery_config_basemap.py tests/test_endpoints_basemap.py tests/test_basemap_extract.py -q --tb=no -p no:cacheprovider`) → `123 passed`.
-Stack HEAD `065ac62`, clean; the stack `.venv` has no pytest — use `uv run --frozen pytest …` from the stack
-root (as M1-STACK did) and paste the baseline for `tests/test_admin_imagery.py tests/test_wizard_imagery.py tests/test_wizard_marine_roundtrip.py tests/test_admin_basemap.py tests/test_wizard_providers.py`
+Stack HEAD `065ac62`, clean. **Test runner (lead, 2026-08-27): `uv run` does not work in the stack repo (no lockfile; `weewx-clearskies-api` is a registry dep). The lead built `.venv_local` (API from its local path + `weewx-clearskies-config[dev]`); use `.venv_local\Scripts\python.exe -m pytest … -q --tb=no -p no:cacheprovider` from the stack root.** Lead baseline `46 passed, 1 warning` for `tests/test_admin_imagery.py tests/test_wizard_imagery.py tests/test_wizard_marine_roundtrip.py tests/test_admin_basemap.py tests/test_wizard_providers.py`
 FIRST. No other agent is active in either repo. The dashboard side (About-page rows, `HeatMapCard`) is
 M4-DASH's — not this round.
 
@@ -44,7 +43,8 @@ sections that describe them. **STAYS:** the marine-step satellite toggle `templa
    "ignoring legacy [imagery] section" and nothing else). KAT: a conf with `[imagery]` loads.
    OPERATIONS-MANUAL migration note: the section is inert and may be deleted by the operator.
 2. **`/imagery/config`** stays byte-identical in its response (M4-API's tests `test_imagery_config_basemap.py`
-   keep passing untouched). `/imagery/tiles/...` returns 404 (route gone) — KAT.
+   keep their ASSERTIONS untouched; ruled 2026-08-27: that file's setup constructs `ImagerySettings` and calls
+   `wire_imagery_settings()`, both deleted — the test-author amends the setup only, allowlist extension). `/imagery/tiles/...` returns 404 (route gone) — KAT.
 3. **Contract + docs (meta, separate commit):** `docs/contracts/openapi-v1.yaml` — remove the
    `/imagery/tiles/{z}/{x}/{y}` path and `ImageryTileQueryParams`-shaped schema if present (leave the
    config path); API-MANUAL §12a rewritten (no provider table, no NAIP proxy, the `[imagery]` key gone);
