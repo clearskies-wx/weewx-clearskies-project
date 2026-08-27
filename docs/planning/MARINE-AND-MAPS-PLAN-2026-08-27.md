@@ -98,7 +98,9 @@ the service for failures (the old monitor died with its chat session) → Q10.
 
 **Local, unpushed:** marine `2a05856` (Q17); API `96bec7b` + `cf0318d` (S10 fog revert; 68 fog
 tests pass on Windows, host run owed post-deploy, CHANGELOG entry not yet written); meta plan
-commits.
+commits. **Operator 2026-08-27: "nothing needs pushed, there are plenty of changes this plan
+will make everything can wait."** → S0's push + live gate and S10's deploy are DEFERRED; they
+ride the plan's later push. Nothing is pushed or deployed until the operator says "push".
 
 **Session 2026-08-27 (UTC; 08-26 evening PDT):** Q17 traced, ruled (a), coded lead-direct,
 doc-synced. CARTO break traced to the source; rulings taken in chat (no Esri; OSM light stays;
