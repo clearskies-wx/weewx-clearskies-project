@@ -1618,20 +1618,22 @@ The API-side dataclass (`ProviderAttribution`) lives in `providers/_common/capab
 
 ---
 
-## §12a Imagery Endpoints (Phase LM, 2026-08-03; `/imagery/config` rewritten to the product
-basemap by SURF-MAP-BASEMAP, PA9/Q5, plan `MARINE-AND-MAPS-PLAN-2026-08-27.md` §M4, 2026-08-27)
+## §12a Imagery Endpoint (Phase LM, 2026-08-03; `/imagery/config` rewritten to the product
+basemap by SURF-MAP-BASEMAP, PA9/Q5, plan `MARINE-AND-MAPS-PLAN-2026-08-27.md` §M4, 2026-08-27;
+provider-selection machinery removed by Q10-6, 2026-08-27, "if we dont need it then get rid of
+it")
 
-Two endpoints, `endpoints/imagery.py`, wired via `wire_imagery_settings()` (radar mirror).
-`/imagery/tiles` remains an orthophoto proxy (PROVIDER-MANUAL §16 for the provider modules and
-the DISPLAY-ONLY hard rule); `/imagery/config` no longer serves orthophotography — it answers
-with the Clear Skies product basemap (§12b) for the surf height map.
+One endpoint, `endpoints/imagery.py`. `/imagery/config` answers with the Clear Skies product
+basemap (§12b) for the surf height map; it never served orthophotography after SURF-MAP-BASEMAP,
+and the machinery that used to select an orthophoto/map provider (the `/imagery/tiles` NAIP tile
+proxy, `[imagery]` config, its provider modules, the admin section, and the wizard's satellite
+toggle) was removed entirely by Q10-6 — see PROVIDER-MANUAL §16 for the one-line pointer to the
+removed section.
 
 **`GET /api/v1/imagery/config?lat=&lon=`** → 200, ALWAYS — never 404s (the surf height map must
-always get a basemap). lat/lon are still validated (`ImageryConfigQueryParams`: ±90/±180,
-`extra="forbid"`, 422 outside range) but no longer select a provider; the answer does not vary by
-coordinates. `[imagery] provider` (naip/esri/map/auto) is no longer read by this endpoint — PA9
-retired NAIP/Esri/Esri-Topo orthophotography from every user-facing surface (operator, Q5: "get
-rid of the orthophotography for the surf height map and replace it with a regular basemap").
+always get a basemap). lat/lon are still required and validated (`ImageryConfigQueryParams`:
+±90/±180, `extra="forbid"`, 422 outside range) — removing a required param is a wire change and
+was not authorized by Q10-6 — but are not used; the answer does not vary by coordinates.
 Response (`ImageryConfigResponse`, still a **flat shape, not the usual data+envelope wrapper** —
 intentional deviation per the plan's pinned contract sketch, noted in the model docstring):
 ```json
@@ -1652,29 +1654,16 @@ intentional deviation per the plan's pinned contract sketch, noted in the model 
 The top-level `tileUrl`/`attribution` are legacy fields carrying the `light` values, kept so an
 old client still renders. `dark.pmtilesUrl` is the **local** basemap tier (§12b) — the surf
 height map lives inside the local box's extraction area by construction. `zoomMax: 19` is the
-surf map's own ceiling, distinct from the tile proxy's `_MAX_ZOOM = 20` below. `light`/`dark`/
-`zoomMin`/`zoomMax` are additive optional fields on `ImageryConfigResponse`
-(`ImageryLightSource`, `ImageryDarkSource` in `models/responses.py`).
+surf map's own ceiling. `light`/`dark`/`zoomMin`/`zoomMax` are additive optional fields on
+`ImageryConfigResponse` (`ImageryLightSource`, `ImageryDarkSource` in `models/responses.py`).
 
-`wire_imagery_settings()` logs one startup WARNING if `[imagery] provider` is set, naming the
-ignored value — not per request. The `[imagery]` config section, its provider modules
-(`naip`/`esri`/`esri_topo`), the admin section, and the wizard's Esri satellite toggle all remain
-in place — removing them is a separate, not-yet-ruled decision (Q10-6). `_select_provider()`
-remains in the endpoint module, unused by `/imagery/config`.
+**`GET /api/v1/imagery/tiles/{z}/{x}/{y}`** — removed (Q10-6, 2026-08-27); the route no longer
+exists and 404s.
 
-**`GET /api/v1/imagery/tiles/{z}/{x}/{y}`** → binary tile (Content-Type from upstream,
-`image/png`). Unchanged by SURF-MAP-BASEMAP — still NAIP only. `[imagery] provider` absent, or
-pinned to `esri`/`map` → 404 (Esri/Esri-Topo tiles never transit the API). Input validation
-(amplification-surface guard, lead-ruled 2026-08-03): `z` Path-constrained [0, 20] → 422 outside;
-`x`/`y` validated against `[0, 2**z)` → 400 outside; the upstream host/path is a constant — only
-validated integers feed the bbox math. Error mapping: upstream 429 → 503 + Retry-After; upstream
-404 → 404; other upstream 4xx/5xx → 502. Unreferenced by any user-facing surface after this
-round (Q10-6).
-
-**`api.conf [imagery]`:** `provider` (`auto` | `naip` | `esri` | `map`; absent = domain
-disabled) — no longer read by `/imagery/config` (PA9); still read by `/imagery/tiles` and logged
-once (WARNING) at wiring time if set. `api_key` (future-proofing, unused v1),
-`tile_cache_ttl_seconds` (default 604800).
+**`api.conf [imagery]`:** no longer read by anything. An existing `[imagery]` section on a host's
+`api.conf` is silently ignored by the config loader (nothing in `config/settings.py` reads
+`cfg["imagery"]` any more) — no crash, no warning. Operators may delete the section; it has no
+effect either way. See OPERATIONS-MANUAL §4 for the migration note.
 
 ---
 

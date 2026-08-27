@@ -110,12 +110,11 @@ tags:
     description: |
       `/imagery/config` answers with the Clear Skies product basemap
       (`provider: "basemap"`) for the surf height map — orthophotography
-      (NAIP/Esri/Esri-Topo) was retired from user-facing use by
-      SURF-MAP-BASEMAP (PA9, Q5, plan `MARINE-AND-MAPS-PLAN-2026-08-27.md`
-      §M4, 2026-08-27). `/imagery/tiles` remains the NAIP tile proxy,
-      unreferenced by any user-facing surface after that round (Q10-6
-      open on removing the `[imagery]` config/modules/admin/wizard
-      themselves).
+      was retired from user-facing use by SURF-MAP-BASEMAP (PA9, Q5, plan
+      `MARINE-AND-MAPS-PLAN-2026-08-27.md` §M4, 2026-08-27). The prior
+      provider-selection machinery (the orthophoto tile proxy, its
+      `[imagery]` config/modules/admin/wizard) was removed entirely by
+      Q10-6, 2026-08-27 ("if we dont need it then get rid of it").
 
 security:
   - {}                       # Default: no auth required (browser SPA case).
@@ -1455,10 +1454,12 @@ paths:
 
   # -------------------------------------------------------------------
   # Imagery (Phase LM, 2026-08-03; /imagery/config rewritten to the
-  # product basemap by SURF-MAP-BASEMAP, PA9/Q5, §M4, 2026-08-27.
-  # Closes a pre-existing doc-code gap: neither /imagery path was ever
-  # added to this contract in the Phase LM or IMAGERY-MAP rounds --
-  # documented here for the first time, as-built.)
+  # product basemap by SURF-MAP-BASEMAP, PA9/Q5, §M4, 2026-08-27; the
+  # /imagery/tiles NAIP proxy and its provider-selection machinery were
+  # removed by Q10-6, 2026-08-27 -- "if we dont need it then get rid of
+  # it". Closed a pre-existing doc-code gap when first documented: neither
+  # /imagery path was ever added to this contract in the Phase LM or
+  # IMAGERY-MAP rounds.)
   # -------------------------------------------------------------------
 
   /imagery/config:
@@ -1494,48 +1495,6 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ImageryConfigResponse' }
-        default: { $ref: '#/components/responses/Problem' }
-
-  /imagery/tiles/{z}/{x}/{y}:
-    get:
-      tags: [Imagery]
-      summary: NAIP orthophoto tile proxy
-      description: |
-        Server-side proxy + cache for NAIP imagery tiles. Unchanged by
-        SURF-MAP-BASEMAP -- unreferenced by any user-facing surface
-        after that round (Q10-6 open on removing the `[imagery]`
-        machinery itself). `[imagery] provider` absent, or pinned to
-        `esri`/`map`, -> 404 (those providers never transit the API).
-        Amplification-surface guard (lead ruling 2026-08-03): `z` is
-        Path-constrained; `x`/`y` are validated against `[0, 2**z)`.
-      operationId: getImageryTile
-      parameters:
-        - name: z
-          in: path
-          required: true
-          description: Slippy-map zoom level.
-          schema: { type: integer, minimum: 0, maximum: 20 }
-        - name: x
-          in: path
-          required: true
-          description: Slippy-map tile X.
-          schema: { type: integer, minimum: 0 }
-        - name: y
-          in: path
-          required: true
-          description: Slippy-map tile Y.
-          schema: { type: integer, minimum: 0 }
-      responses:
-        '200':
-          description: Tile image bytes
-          content:
-            image/png: { schema: { type: string, format: binary } }
-        '400':
-          description: x/y out of range for the given zoom
-        '404':
-          description: Not configured for NAIP, or upstream out-of-domain bbox
-        '502': { $ref: '#/components/responses/ProviderError' }
-        '503': { $ref: '#/components/responses/ProviderUnavailable' }
         default: { $ref: '#/components/responses/Problem' }
 
   # -------------------------------------------------------------------

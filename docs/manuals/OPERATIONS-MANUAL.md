@@ -513,6 +513,13 @@ Hand-rolled Python settings classes, parsed from ConfigObj. Do not use Pydantic 
 | `[input]` | `InputSettings` |
 | `[units]` | `UnitsSettings` |
 
+**Migration note — legacy `[imagery]` section (Q10-6, 2026-08-27):** the imagery provider
+machinery (`naip`/`esri`/`esri_topo` modules, `ImagerySettings`, the `/imagery/tiles` proxy, the
+admin section, the wizard selector) was removed. An existing `api.conf` with an `[imagery]`
+section (e.g. `provider = auto`) loads without error — the config loader no longer reads that
+section at all, so it is silently ignored. The section is inert and may be deleted by the
+operator; leaving it in place has no effect.
+
 #### ConditionsSettings keys
 
 | Key | Type | Default | Description |

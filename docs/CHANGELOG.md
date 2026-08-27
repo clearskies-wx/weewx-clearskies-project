@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-27 — M4-B: Imagery provider machinery removed (Q10-6)
+
+- **The Esri/NAIP orthophoto imagery providers are gone.** Operator ruling, plan Q10-6,
+  2026-08-27: "if we dont need it then get rid of it." Nothing user-facing had read the
+  `[imagery]` provider since M4's SURF-MAP-BASEMAP change made `GET /imagery/config` always
+  answer the product basemap (PA9, Q5).
+- **API:** `git rm` on `providers/imagery/{esri,esri_topo,naip}.py` + `__init__.py`; the three
+  `("imagery", ...)` rows removed from `providers/_common/dispatch.py`; `ImagerySettings` deleted
+  from `config/settings.py` (an existing `[imagery]` section in `api.conf` now loads silently
+  ignored — no crash, no warning); startup dispatch checks and `wire_imagery_settings()` removed
+  from `__main__.py`; `wire_imagery_settings`/`reset_imagery_settings_for_tests`/
+  `_select_provider`/module globals/`GET /imagery/tiles/{z}/{x}/{y}` removed from
+  `endpoints/imagery.py` (that route now 404s); `ImageryTileQueryParams` removed from
+  `models/params.py`; `"imagery"` dropped from `endpoints/setup.py`'s `_PROVIDER_DOMAINS`.
+  `GET /imagery/config` is unchanged (byte-identical response, `lat`/`lon` still required params).
+- **Stack:** admin Imagery section, wizard step-6 imagery fieldset, `imagery_api_key`, and the
+  `help.admin.imagery-provider.*`/`help.wizard.imagery.*` locale keys removed. The marine-step
+  satellite toggle (`step_marine.html`) stays — it is operator-only, a direct browser URL, per
+  the Q10-6 text.
+- **Contract + docs:** `docs/contracts/openapi-v1.yaml` — `/imagery/tiles/{z}/{x}/{y}` path
+  removed (`/imagery/config` unchanged); API-MANUAL §12a rewritten; OPERATIONS-MANUAL gains a
+  legacy-`[imagery]`-section migration note; PROVIDER-MANUAL §16 replaced with a one-line removal
+  pointer; stack OPERATOR-MANUAL admin/wizard imagery sections removed.
+
+MARINE-AND-MAPS-PLAN-2026-08-27.md §Q10 item 6; PA9 (extended); brief
+`docs/planning/briefs/M4B-IMAGERY-REMOVAL-BRIEF-2026-08-27.md`.
+
 ### 2026-08-27 — S8.1-B: WW3 `ww3_grid` production rebuild hook (ADR-109 Gap G10, closed)
 
 - **`mod_def.ww3` (WW3's G1 grid build artifact) is no longer a hand-minted, never-rebuilt
