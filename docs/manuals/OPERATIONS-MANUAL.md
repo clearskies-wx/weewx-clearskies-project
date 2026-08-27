@@ -518,7 +518,9 @@ machinery (`naip`/`esri`/`esri_topo` modules, `ImagerySettings`, the `/imagery/t
 admin section, the wizard selector) was removed. An existing `api.conf` with an `[imagery]`
 section (e.g. `provider = auto`) loads without error — the config loader no longer reads that
 section at all, so it is silently ignored. The section is inert and may be deleted by the
-operator; leaving it in place has no effect.
+operator; leaving it in place has no effect. An in-place `git pull` deploy may leave the now-empty
+`providers/imagery/` directory behind on disk — it is inert (nothing imports it) and may be
+deleted.
 
 #### ConditionsSettings keys
 
