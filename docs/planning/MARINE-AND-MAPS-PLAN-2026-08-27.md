@@ -59,7 +59,7 @@ predecessor's Q1–Q18 are cited as `EVO-Q#`).
 | S2 | **CONSISTENCY-SCORING** — code the Q14-approved set-timing/set-amplitude definitions into the surf score (ADR-101 row-5 amendment first). NOT in code today — the scorer still runs the interim swell-dominance bucketing | ⏸ APPROVED 2026-08-23 (EVO-Q14); sub-decisions A–E **NOT ruled** — the Q3 "yes" rested on a false "it's in code" premise (review #4); re-asked as Q10 item 1 |
 | S3 | **Substitution cleanup** — CORRECTED after the adversarial review: `_reused_l1_boundary_command_lines()`, the `swan/level1/` directory and `ww3_chain_enabled` are LIVE dependencies (production L2 scaffold; buoy-ledger gate) and are NOT deleted. Remaining: `level1` label rename (cosmetic), the health `ww3_boundary` entry (record it or remove it — Q10), doc corrections (ARCHITECTURE.md:130/132 wrong "no-op"/"vestigial" claims + gap rows #12–#16, PROVIDER-MANUAL:2529 swell-card bullet, API-MANUAL §17 `swellSource` + `closeoutFraction`, ADR-109 G7 struck, D14 item 2 disposition), hotstart-age gate (Q10: drop or own row) | ⬜ doc round + rename only; nothing live deleted |
 | S10 | **FOG-REVERT** (API) — revert the 2026-08-24 fog cross-check narrowing (API `1ad6e74` + `f2c5ecd`): two nights of live testing showed the night-time standalone ≤ 1 °F rule cries wolf (conditions right, fog rarely formed); the provider cross-check returns at every level, as before. The uncommitted API-MANUAL edit documenting the narrowing is discarded | 🔄 CODE DONE (API `96bec7b` + `cf0318d`, local `git revert`s; `tests/test_fog_provider_crosscheck.py` 68 passed on Windows — host run owed after deploy; CHANGELOG entry NOT yet written) — **awaiting operator "push"** |
-| S11 | **INVARIANT-1** — health is `degraded` since the BREAK-REFORM deploy (08-26 09Z; ~7,600 firings): (1) read-only look at where BREAK-REFORM now places the outermost break marker relative to the per-transect handoff (untided terms), and what in `57af5d6` moved it; (2) then fix the check to compare like with like (tided break depth vs tided handoff, or both untided) with a guard test that fails pre-change | ⬜ RULED 2026-08-27 (Q10-8 "ok"); (1) in progress lead-direct, read-only |
+| S11 | **INVARIANT-1** — health is `degraded` since the BREAK-REFORM deploy (08-26 09Z; ~7,600 firings): (1) read-only look at where BREAK-REFORM now places the outermost break marker relative to the per-transect handoff (untided terms), and what in `57af5d6` moved it; (2) then fix the check to compare like with like (tided break depth vs tided handoff, or both untided) with a guard test that fails pre-change | 🔄 (1) DONE 2026-08-27 — `scratch/inv1/S11-FINDINGS.md`: firings began at the `57af5d6` deploy hour (0/day before); the check adds tide to one side only (bug); AND the primary marker now sits at the beach model's first node in 37 % of transect-hours (10.7 % before), median distance from handoff 0.90 → 0.41 m — the roller-based cessation keeps a boundary-started zone alive so its first dissipation step becomes the marker. Options A/B/C → **Q11**; (2) waits on Q11 |
 | S4 | **Test-debt triage** — two test files, 18 failing tests (`test_serve_nothing_on_failure` 8, `test_service_full_run_trigger` 10; re-verified 2026-08-27), one ruling per class (repair harness / delete stale pin / keep) | ⬜ |
 | S5 | **First-install WW3 warm-start bootstrap** — the durable mechanism EVO-Q9 parked as a pre-ship row | ⬜ pre-ship; not needed for this install |
 | S6 | ~~ADR-109 gap closure~~ **DISSOLVED 2026-08-27 (Q9)** — G7 is built (one-line ADR edit → S3); G10 (`ww3_grid` rebuild hook) is part of S8.1; D14 stays a note | ✅ closed-no-work |
@@ -604,6 +604,22 @@ authorization from commit.
 ---
 
 ## OPEN OPERATOR QUESTIONS
+
+### Q11 (2026-08-27) — OPEN: the degraded-health alarm has two causes; which do we fix?
+
+Plain English (full evidence `scratch/inv1/S11-FINDINGS.md`). The alarm compares "how deep the
+wave breaks" against "how deep the ocean model hands the wave to the beach model". Two things:
+(1) the alarm adds the tide to the first number and not the second — a bug in the alarm.
+(2) Since Tuesday's surf change (BREAK-REFORM), the beach model reports the main break AT its own
+starting line about a third of the time (was a tenth), and the typical break sits 0.4 m from that
+line instead of 0.9 m. A break "at the starting line" means the wave was already breaking when it
+was handed over — the handoff is placed 30 % seaward of breaking precisely so that cannot happen.
+**Options:** A — fix the alarm only (compare like with like). B — also stop publishing a marker on
+the starting line itself: a zone that begins at the boundary takes its marker from the first
+interior point instead (changes the break-detection rule — trigger 1). C — instead/also move the
+handoff deeper (changes the `1.3` margin constant — trigger 1). *Recommend: A now; B next, with a
+known-answer test built from Huntington transect 4 at 2026-08-27T05Z; C only if B leaves the
+"arrives breaking" fraction high, measured.*
 
 ### Q10 (2026-08-27) — PARTLY RULED: the rulings the adversarial plan review showed are missing (`scratch/ADVERSARIAL-PLAN-REVIEW-2026-08-28.md`; lead re-verified #1, #2, #14, #18 at the code/live service before recording)
 
