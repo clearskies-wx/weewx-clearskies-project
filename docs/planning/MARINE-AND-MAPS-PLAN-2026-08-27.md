@@ -5,18 +5,21 @@
 **What we're doing, one paragraph:** Two threads, one document. **Maps:** CARTO, the company
 whose free map tiles every dark-theme map in the product used, started watermarking them
 "API KEY REQUIRED" on ~2026-08-25 and is retiring the product. The fix is three rounds, all
-ruled by the operator in chat on 2026-08-27: Clear Skies gets its own basemap (OSM light kept,
-Protomaps dark from an extract we serve ourselves) for the **marine and seismic maps only**;
-the radar/satellite box stops being decorated by Clear Skies at all (an empty Leaflet box plus
-whatever the provider sends); and the labels that were wrongly coded into Clear Skies move to
-the LibreWxR fork where they belonged. **Surf:** the WW3 → SWAN → SwellTrack chain is live and
-serving, but a list of things is still owed — the forecast beyond +6 h only becomes real once
-the Q17 fix deploys and its gate passes; the seam-fidelity ledger row (C6); the consistency
-score the operator approved in Q14 but that was never coded; dead keys and stale docs left by
-the L1 → WW3 substitution; test debt; the buoy-validation campaign the previous plan designed
-for a shadow chain that is now the production chain; the first-install warm-start mechanism;
-and — **operator-ordered LAST** — the island-shadowing energy deficit. The lookup-table phase
-(Phase L) stays last, unchanged.
+ruled by the operator in chat on 2026-08-27: Clear Skies gets its own product basemap (OSM
+light kept, Protomaps dark from an extract we serve ourselves) for **every Clear Skies map box
+— marine, seismic, radar/satellite, and the surf height map** (Q6: radar providers are
+overlay-only, so the radar box keeps a Clear Skies basemap AND labels, sourced from the product
+basemap instead of CARTO; nothing moves into the LibreWxR fork; Q5: Esri/NAIP leave every
+user-facing surface). **Surf:** the WW3 → SWAN → SwellTrack chain is live and serving, but a
+list of things is still owed — the forecast beyond +6 h only becomes real once the Q17 fix
+deploys and its gate passes; the seam-fidelity ledger row (C6); the consistency score the
+operator approved in Q14 but that was never coded (Q3 re-ask pending, Q10); stale docs and
+naming left by the L1 → WW3 substitution; test debt; the first-install warm-start mechanism;
+and — **operator-ordered LAST** — the island-shadowing energy deficit, whose first mechanical
+piece (S8.1) the operator ordered run now. No validation campaign (Q1). The lookup-table phase
+(Phase L) stays last, unchanged. **Adversarially reviewed 2026-08-27
+(`scratch/ADVERSARIAL-PLAN-REVIEW-2026-08-28.md`, 26 findings) — corrections applied the same
+hour; the items needing an operator ruling are collected in Q10.**
 
 **THE ACTUAL WORK is the `## PHASE …` sections, in file order:** M (maps) and S (surf) run
 CONCURRENTLY — they touch different repos — with Phase D (as-built docs) and Phase L (LUT) after.
@@ -47,20 +50,20 @@ predecessor's Q1–Q18 are cited as `EVO-Q#`).
 |---|---|---|
 | S0 | **Q17 push + live gate** — GFS far-window fetch f096→f108 so the daily 96 h WW3 horizon march finally runs | 🔄 CODE DONE (marine `2a05856`, meta `b7142574`; 31/1-known tests) — **awaiting operator "push"**; live gate at the next 00Z cycle after deploy (rows in S0) |
 | M0 | Map extent inventory + extract-size measurements (read-only) | ⬜ NEXT — no ruling needed (read-only) |
-| M1 | **CS-BASEMAP** — Clear Skies product basemap for EVERY Clear Skies map box (marine, seismic, radar/satellite, surf height map): OSM light kept, Protomaps dark + labels layer from a self-served extract, CARTO removed | ⬜ RULED 2026-08-27 (EVO-Q18 Round 1; scope widened by Q6 + Q5 rulings, same day) — design block below; brief after M0 |
+| M1 | **CS-BASEMAP** — Clear Skies product basemap for EVERY Clear Skies map box (marine, seismic, radar/satellite, surf height map): OSM light kept, Protomaps dark + labels layer from a self-served extract, CARTO removed | ⏸ RULED 2026-08-27 (EVO-Q18 Round 1; scope widened by Q6 + Q5 rulings, same day) — design block below; brief after M0 **and Q8** (review #12) |
 | M2 | ~~LIBREWXR-BASEMAP~~ **CANCELLED 2026-08-27 (Q6 ruling)** — LibreWxR, RainViewer and every radar provider are overlay-only; the client brings the basemap AND its labels, so nothing moves into the fork. Kept as a row so the reversal is on record | ✅ closed-no-work |
 | M3 | ~~RADAR-STRIP~~ → **RADAR-REBASE** — the radar/satellite box keeps a Clear Skies basemap; only its SOURCE changes: CARTO dark → product basemap dark; CARTO satellite labels + ADR-078 outlines → the product basemap's labels/outlines layer; the standalone ADR-078 feature is absorbed into M1's basemap machinery (one extract family, one endpoint family) | ⬜ RULED 2026-08-27 (Q6) — part of the M1 build |
 | M4 | **SURF-MAP-BASEMAP** — the surf height map's background becomes the product basemap (light OSM / dark Protomaps); Esri World Topo (IMAGERY-MAP) and NAIP removed from every user-facing surface; the wizard's Esri satellite toggle STAYS (operator-only, not user-facing) | ⬜ RULED 2026-08-27 (Q5) — after M1 |
 | Gate M | Adversarial gate per round + one end-to-end row (every map surface rendered in both themes, screenshots side-by-side) | ⬜ |
 | S1 | **C6 seam-fidelity ledger row** — WW3-handed vs SWAN-absorbed at the L2 boundary, every cycle | ⬜ APPROVED 2026-08-25 (EVO-Q16 C6) — after S0's gate passes |
-| S2 | **CONSISTENCY-SCORING** — code the Q14-approved set-timing/set-amplitude definitions into the surf score (ADR-101 row-5 amendment first). NOT in code today — the scorer still runs the interim swell-dominance bucketing | ⬜ APPROVED 2026-08-23 (EVO-Q14); sub-decisions A–E RULED 2026-08-27 (Q3 "yes") — ready to brief after S8.1 |
-| S3 | **Substitution cleanup** — dead `ww3_chain_enabled` key, `level1` label rename, stale `inputs.ww3_boundary` health entry, vestigial `_reused_l1_boundary_command_lines()` + the on-disk `swan/level1/` directory, hotstart-age gate (C7 survivor), PROVIDER-MANUAL §14.15 swell-card bullet, API-MANUAL §17 `swellSource` + `closeoutFraction`, ADR-109 G7 "unbuilt" note struck | ⬜ methodology (dead code / doc drift). Register re-audited 2026-08-28 (Q9) |
-| S10 | **FOG-REVERT** (API) — revert the 2026-08-24 fog cross-check narrowing (API `1ad6e74` + `f2c5ecd`): two nights of live testing showed the night-time standalone ≤ 1 °F rule cries wolf (conditions right, fog rarely formed); the provider cross-check returns at every level, as before. The uncommitted API-MANUAL edit documenting the narrowing is discarded | ⬜ RULED 2026-08-27 (Q4 "we actually need to revert the change") — lead-direct `git revert` + fog tests on weewx + CHANGELOG; deploy on "push" |
-| S4 | **Test-debt triage** — two test files, 18 failing tests (`test_serve_nothing_on_failure` 8, `test_service_full_run_trigger` 10; re-verified 2026-08-28), one ruling per class (repair harness / delete stale pin / keep) | ⬜ |
+| S2 | **CONSISTENCY-SCORING** — code the Q14-approved set-timing/set-amplitude definitions into the surf score (ADR-101 row-5 amendment first). NOT in code today — the scorer still runs the interim swell-dominance bucketing | ⏸ APPROVED 2026-08-23 (EVO-Q14); sub-decisions A–E **NOT ruled** — the Q3 "yes" rested on a false "it's in code" premise (review #4); re-asked as Q10 item 1 |
+| S3 | **Substitution cleanup** — CORRECTED after the adversarial review: `_reused_l1_boundary_command_lines()`, the `swan/level1/` directory and `ww3_chain_enabled` are LIVE dependencies (production L2 scaffold; buoy-ledger gate) and are NOT deleted. Remaining: `level1` label rename (cosmetic), the health `ww3_boundary` entry (record it or remove it — Q10), doc corrections (ARCHITECTURE.md:130/132 wrong "no-op"/"vestigial" claims + gap rows #12–#16, PROVIDER-MANUAL:2529 swell-card bullet, API-MANUAL §17 `swellSource` + `closeoutFraction`, ADR-109 G7 struck, D14 item 2 disposition), hotstart-age gate (Q10: drop or own row) | ⬜ doc round + rename only; nothing live deleted |
+| S10 | **FOG-REVERT** (API) — revert the 2026-08-24 fog cross-check narrowing (API `1ad6e74` + `f2c5ecd`): two nights of live testing showed the night-time standalone ≤ 1 °F rule cries wolf (conditions right, fog rarely formed); the provider cross-check returns at every level, as before. The uncommitted API-MANUAL edit documenting the narrowing is discarded | 🔄 CODE DONE (API `96bec7b` + `cf0318d`, local `git revert`s; `tests/test_fog_provider_crosscheck.py` 68 passed on Windows — host run owed after deploy; CHANGELOG entry NOT yet written) — **awaiting operator "push"** |
+| S4 | **Test-debt triage** — two test files, 18 failing tests (`test_serve_nothing_on_failure` 8, `test_service_full_run_trigger` 10; re-verified 2026-08-27), one ruling per class (repair harness / delete stale pin / keep) | ⬜ |
 | S5 | **First-install WW3 warm-start bootstrap** — the durable mechanism EVO-Q9 parked as a pre-ship row | ⬜ pre-ship; not needed for this install |
-| S6 | ~~ADR-109 gap closure~~ **DISSOLVED 2026-08-28 (Q9)** — G7 is built (one-line ADR edit → S3); G10 (`ww3_grid` rebuild hook) is part of S8.1; D14 stays a note | ✅ closed-no-work |
+| S6 | ~~ADR-109 gap closure~~ **DISSOLVED 2026-08-27 (Q9)** — G7 is built (one-line ADR edit → S3); G10 (`ww3_grid` rebuild hook) is part of S8.1; D14 stays a note | ✅ closed-no-work |
 | S7 | ~~Live-chain validation campaign~~ **DROPPED 2026-08-27 (Q1: "THIS IS ALL TESTING... NO ONE IS ACTUALLY VISITING THE SITE")** — no formal campaign, no ceremony gate. The per-cycle buoy ledger keeps running as the standing instrument; the operator checks the site as they see fit; when Phase L opens is the operator's call, not a gate this plan computes | ✅ closed-no-work |
-| S8 | **Island shadowing** — the S-swell <0.1 Hz 0.56–0.60× deficit (narrow reconstruction lobe σθ 15° vs measured 27–31°, no diffraction, Catalina lee). **S8.1 (transparency field) RUNS NOW (Q7 "run now")**; the rest (lobe width, diffraction) stays LAST | 🔄 S8.1 briefing now; S8 research LAST |
+| S8 | **Island shadowing** — the S-swell <0.1 Hz 0.56–0.60× deficit (narrow reconstruction lobe σθ 15° vs measured 27–31°, no diffraction, Catalina lee). **S8.1 (transparency field) ordered first (Q7 "run now")**; the rest (lobe width, diffraction) stays LAST | ⏸ S8.1 **BLOCKED on Q10 items 2–3** (F_DRY number; the DEM download, grid-file writers and rebuild hook it needs); operator 2026-08-27 "woah no implementation yet" — nothing dispatched |
 | S9 | ~~Inherited-queue reconciliation~~ **OUT OF THIS PLAN (Q2: "keep that crap out of here. Let's chat separately")** — the other plans' open rows are NOT tracked here | ✅ removed |
 | D1 | As-built doc re-sync + zero-drift audit (the predecessor's DOC-W-FINAL) | ⬜ after M and S close |
 | L0+ | Lookup-table system (design round + ADR-110) | ⬜ LAST — opens only on the operator's "accurate and defensible" (unchanged) |
@@ -84,12 +87,23 @@ cycle (`fullRun.lastSuccessCycle` 2026-08-27T00Z). **Known-broken right now:** (
 CARTO-tiled map surface is watermarked in both themes; (2) the WW3 horizon march has never
 run (`ww3Horizon.lastSuccessCycleTime: null`, `ww3_horizon_wind_short`), so
 `fullRun.l2BoundaryExhausted` is still TRUE — the forecast beyond +6 h is a frozen ocean.
-Q17 fixes (2) and is committed locally, awaiting "push".
+Q17 fixes (2) and is committed locally, awaiting "push". (3) **Health is `degraded`:**
+`invariant fired: 1:break_depth_le_handoff_depth` — 130 firings, last 2026-08-27T05:38Z,
+Huntington transects 4–7: "break depth 2.15–2.20 m > handoff depth 1.98–2.17 m for partition 0
+(11.9 s 205°)". Found by the adversarial review; began after the BREAK-REFORM / PEEL-SEGMENTS
+deploy. Disposition owed → Q10 (not a task until the operator rules). (4) Nothing is watching
+the service for failures (the old monitor died with its chat session) → Q10.
 
-**Session 2026-08-27:** Q17 traced, ruled (a), coded lead-direct, doc-synced. CARTO break
-traced to the source; four rulings taken in chat (no Esri; OSM light stays; Protomaps for
-dark; radar box is provider-only and the satellite labels move to the LibreWxR fork). This
-plan created; predecessor closed.
+**Local, unpushed:** marine `2a05856` (Q17); API `96bec7b` + `cf0318d` (S10 fog revert; 68 fog
+tests pass on Windows, host run owed post-deploy, CHANGELOG entry not yet written); meta plan
+commits.
+
+**Session 2026-08-27 (UTC; 08-26 evening PDT):** Q17 traced, ruled (a), coded lead-direct,
+doc-synced. CARTO break traced to the source; rulings taken in chat (no Esri; OSM light stays;
+Protomaps for dark; Q6 — radar providers are overlay-only, Clear Skies keeps basemap + labels
+from the product basemap, nothing moves into the fork; Q5 — surf map gets the product basemap).
+This plan created; predecessor closed. Carry-over register re-audited (Q9). Adversarial plan
+review run; corrections applied; Q10 opened.
 
 ---
 
@@ -138,13 +152,14 @@ cross-inferred); (11) no generic model setup, zero model-setup controls on produ
 | PA9 | **SURF-MAP-BASEMAP** (M4): the surf height map's background switches from Esri World Topo / NAIP to the product basemap; `providers/imagery/{naip,esri,esri_topo}.py` and the `[imagery] provider` selection are removed from user-facing use (the wizard's own Esri satellite toggle is untouched) | 2, 7 | Operator 2026-08-27 in chat (Q5): "get rid of the orthophotography for the surf height map and replace it with a regular basemap ... eliminates [NAIP] completely from user facing work" |
 | PA10 | **FOG-REVERT** (S10): revert API `1ad6e74` + `f2c5ecd` (night-time standalone ≤ 1 °F fog rule) to the prior provider-cross-checked behaviour | 1 (a threshold inside a criterion) | Operator 2026-08-27 in chat (Q4): "we actually need to revert the change ... we are crying wolf most of the time" |
 | PA5 | **C6 seam-fidelity ledger row**: one SWAN L2 output point just inside its boundary + a per-cycle ledger field comparing WW3-handed vs SWAN-absorbed spectra | 7 | Operator 2026-08-25, chat "ok" on EVO-Q16 (C6 named there; "droppable on request") |
-| PA6 | **CONSISTENCY-SCORING**: ADR-101 row-5 amendment + parse-time attachment of per-partition group statistics (ν, Qp, κ, Tm02, T_set) to the DWR spectral entries (a data-contract change inside the marine service), scorer reads them | 1, 4 | Operator 2026-08-23, chat "q14 recommendation is fine" (EVO-Q14 record); the per-partition data path was disclosed in that row as covered by the Q14 approval. Open sub-decisions → Q3 |
-| PA8 | **WW3 G1 transparency field for partially-land cells** (S8.1): fraction-based land/sea mask + `FLAGTR = 2` cell-centre transparencies derived at setup from the finest cached DEM; `F_DRY = 0.05` | 1, 3 | Operator 2026-08-27, chat: "it should also apply to cells that are not 100 percent island … so you are not OVERCOUNTING an island"; Q7 "run now"; 5 % floor accepted by silence on the stated default |
-| PA7 | **Substitution cleanup** (S3): deletion of provably-dead keys/code left by the L1 → WW3 substitution | none (methodology: nothing was being done; nothing stops being done — CLAUDE.md table) | Standing rule; each deletion still gets the pre-deletion grep + post-deletion green accept (rules/coding.md "Never keep dead code") |
+| PA6 | **CONSISTENCY-SCORING**: ADR-101 row-5 amendment + parse-time attachment of per-partition group statistics (ν, Qp, κ, Tm02, T_set) to the DWR spectral entries (a data-contract change inside the marine service), scorer reads them | 1, 4 | Operator 2026-08-23, chat "q14 recommendation is fine" (EVO-Q14 record). **Sub-decisions A–E: NOT yet ruled** — the Q3 "yes" was conditioned on "that is what is in code correct?", which was false; re-asked in Q10. S2 blocked until then |
+| PA8 | **WW3 G1 transparency field for partially-land cells** (S8.1): fraction-based land/sea mask + `FLAGTR = 2` cell-centre transparencies derived at setup from a fine DEM; `F_DRY` | 1, 3, **7** (new obstruction NAME file + deck block; the grid-file writers and the regional DEM download S8.1 turns out to need — see S8.1 design) | Operator 2026-08-27, chat: "it should also apply to cells that are not 100 percent island … so you are not OVERCOUNTING an island"; Q7 "run now". **`F_DRY` NOT confirmed** — Q7 asked for the number and the ruling answered only the scheduling; re-asked in Q10. The trigger-7 items are also in Q10. **S8.1 does not dispatch until both are ruled** |
+| PA7 | **Substitution cleanup** (S3): doc corrections + the `level1` label rename + removal of the health `ww3_boundary` entry OR its recorder (Q10) | none for the doc/rename parts. **The adversarial review (finding #1, BLOCKER) showed the register's "dead code" claims were WRONG:** `_reused_l1_boundary_command_lines()` and the `level1/` directory are a live per-cycle production dependency (`vchain.py:727`, `CHAIN_SCAFFOLD_MISSING` → no publish), and `ww3_chain_enabled` gates the buoy-ledger writers (`vchain.py:914, :978`; live config `true`). NONE of those three is deleted under this row | Standing rule for the doc/rename parts; anything touching the three live items needs its own design block and ruling |
 
 Withheld: model-physics changes of any kind (island shadowing S8 included — research and
-ruling first); anything in the frozen-core lists; Esri removal from imagery/wizard (Q5);
-Phase L entirely (ADR-110 first).
+ruling first); anything in the frozen-core lists; removal of the `[imagery]` config key and
+provider modules from the API (Q10 — PA9 only un-wires them from the surf map); Phase L
+entirely (ADR-110 first).
 
 ---
 
@@ -154,7 +169,7 @@ Per rules/verification.md "Carried-over items must cite an operator-validated pr
 without a citation enters tagged **UNVALIDATED — surface before any work** and is worked only
 after the operator confirms it in Q2.
 
-**RE-AUDITED 2026-08-28 (Q9 — operator: "i am very nervous about all of the carry over tasks
+**RE-AUDITED 2026-08-27 (Q9 — operator: "i am very nervous about all of the carry over tasks
 without going through each one and assessing what has been done and if it is still needed").**
 Every row was checked against marine HEAD, the live service, and the predecessor's own close
 records. Result: three rows were ALREADY DONE when this plan was created (C7 ×2/3, C8, C18 —
@@ -167,26 +182,26 @@ predecessor's CLOSE record, not its OPEN row.
 
 | # | Item | Premise citation | Lands in |
 |---|---|---|---|
-| ~~C1~~ | ~~Operator eyeballs owed (multiSwell trains, surf card, cam + knob drill, dry-beach re-accept)~~ | operator 2026-08-28 "c1 drop" | DROPPED — the operator looks at the site nightly; no formal sign-off rows |
-| ~~C2~~ | ~~Fresh buoy apples-to-apples for the 18 s SSW event~~ | operator 2026-08-28 "c2 drop" | DROPPED — the per-cycle buoy ledger is the same comparison, continuously |
-| ~~C3~~ | ~~~181 stale `B_*.txt` on librewxr~~ | verified 2026-08-28: the service work root holds 88 `B_*.txt`, all 2026-08-19, all referenced by the live L2 INPUT — not stale; the 176 under `/home/claude/ww3-baselines/e1e2/` are the PRESERVED research baselines (EVO-F0) — never delete | MOOT. Residue: `swan/level1/` (34 files, 08-19) is the removed L1 level's directory — folded into C19 (the stationary fill still reads its INPUT) |
-| ~~C4~~ | ~~Currents tail-hold never live-exercised~~ | verified 2026-08-28: live health `currentsTailHeld: {hours: 21, reachUntil: 2026-08-29T03Z, recorded_at: 2026-08-27T03:26Z}` | DONE — exercised live |
-| ~~C5~~ | ~~Parked physics candidates (L4/1-D deep-ledge handoff loss; 5° nearshore directional bins)~~ | operator 2026-08-28: "these were discussed" — settled in chat earlier, never recorded as closed | DROPPED. If the island work (S8) does not close the deficit they return WITH evidence, not as guesses |
-| ~~C6~~ | ~~Phase T (tide coherence) close acknowledgment~~ | deployed 2026-08-11; operator 2026-08-28 "if this was done why did you not mark it complete?" | CLOSED |
+| ~~C1~~ | ~~Operator eyeballs owed (multiSwell trains, surf card, cam + knob drill, dry-beach re-accept)~~ | operator 2026-08-27 "c1 drop" | DROPPED — the operator looks at the site nightly; no formal sign-off rows |
+| ~~C2~~ | ~~Fresh buoy apples-to-apples for the 18 s SSW event~~ | operator 2026-08-27 "c2 drop" | DROPPED — the per-cycle buoy ledger is the same comparison, continuously |
+| ~~C3~~ | ~~~181 stale `B_*.txt` on librewxr~~ | verified 2026-08-27: the service work root holds 88 `B_*.txt`, all 2026-08-19, all referenced by the live L2 INPUT — not stale; the 176 under `/home/claude/ww3-baselines/e1e2/` are the PRESERVED research baselines (EVO-F0) — never delete | MOOT. Residue: `swan/level1/` (34 files, 08-19) is the removed L1 level's directory — folded into C19 (the stationary fill still reads its INPUT) |
+| ~~C4~~ | ~~Currents tail-hold never live-exercised~~ | verified 2026-08-27: live health `currentsTailHeld: {hours: 21, reachUntil: 2026-08-29T03Z, recorded_at: 2026-08-27T03:26Z}` | DONE — exercised live |
+| ~~C5~~ | ~~Parked physics candidates (L4/1-D deep-ledge handoff loss; 5° nearshore directional bins)~~ | operator 2026-08-27: "these were discussed" — settled in chat earlier, never recorded as closed | DROPPED. If the island work (S8) does not close the deficit they return WITH evidence, not as guesses |
+| ~~C6~~ | ~~Phase T (tide coherence) close acknowledgment~~ | deployed 2026-08-11; operator 2026-08-27 "if this was done why did you not mark it complete?" | CLOSED |
 | C7 | V14 residuals — **two of three FIXED 2026-08-16** (marine `43744de` bounded lock, `de2738f` cooldown persistence; both in HEAD). Surviving: **no hotstart-age gate** (nothing checks the warm-start file's age before reuse) | EVO-Q6 ruled 2026-08-16; the age gate was ruled "fold into the health/refuse design" | S3 (one item) |
 | ~~C8~~ | ~~`model_wave_source.py` bare `swells[0]`~~ | FIXED 2026-08-16 marine `09c0a1b` (floor at `model_wave_source.py:543–547`, in HEAD) | DONE |
 | C9 | L1-BOUNDARY-REBUILD-PLAN deferred queue: Gate S wlevel (blind audit) → S1+S4a currents ladder → S-Accept currents rows → Phase A (A1/A2 service-area/setup report) → Gate A → Gate C (C1–C3 rows) → V1/V3/V4 | That plan is operator-approved 2026-08-08 ("the plan serves as permission") and its status block says "Remaining: …"; several items have since landed by other rounds (STOFS wlevel live, currents ladder live per ARCHITECTURE, `currentsTailHeld` live) — **state not re-verified since 2026-08-09** | **OUT OF THIS PLAN** (Q2 ruling 2026-08-27) — separate operator conversation |
 | C10 | SURF-REMEDIATION-PLAN R1–R4 (min/max range served; reform/second break; fixed chart scale + `/var/lib` work root; R4 parallel report) | Operator-approved 2026-08-08; R2's subject was re-done by BREAK-REFORM 2026-08-26; `/var/lib/weewx-clearskies/swan` is live (health `ledgerPath`) | **OUT OF THIS PLAN** (Q2 ruling 2026-08-27) — separate operator conversation |
 | C11 | SURF-PHYSICS-REMODEL-PLAN rounds Y/X/Z + DOC-0/DOC-1 debts; MARINE-FORWARD-PLAN open rows; EYEBALL-FIX residuals (subsumed into the remodel plan per its own header) | Operator-approved 2026-08-06 / 2026-08-02 / 2026-08-04 | **OUT OF THIS PLAN** (Q2 ruling 2026-08-27) — separate operator conversation |
-| ~~C12~~ | ~~LIBREWXR-SATELLITE-SEAM~~ | operator 2026-08-28: "c12 has nothing to do with this plan" | REMOVED — a LibreWxR item; its pin (2026-08-08) is the fork's record, not this plan's |
-| C13 | Pre-existing test failures — **re-run 2026-08-28 (Windows)**: `test_serve_nothing_on_failure` 8 FAIL and `test_service_full_run_trigger` 10 FAIL, identical to baseline; `test_h4_chunked_json` and `test_double_break_transect55_kat` PASSED this run (the first was always a wall-clock flake); `test_wind_gatherer::TestColdStartReconcile` is Windows-path only. 18 failing tests in the model's own suite | Each recorded in an EVO checklist row with the lead's checkout-verified reproduction | S4 (two test files) |
-| ~~C14~~ | ~~Marine failure monitor armed~~ | operator 2026-08-28 "c14 no" | DROPPED. Fact: the old monitor was a previous chat session's watch and died with it — nothing watches the marine service now |
-| ~~C15~~ | ~~Island-shadowing deficit~~ | operator 2026-08-28: "why c15 is needed if we replaced it with a new task" | FOLDED — S8 IS this item; no separate row |
-| ~~C16~~ | ~~ADR-109 gaps G7/G10, D14~~ | verified 2026-08-28: **G7 (wind onto the WW3 grid) is BUILT** — the horizon march's wind path (`service.py:831`); **G10 (`ww3_grid` rebuild on geometry change) is NOT** — `service.py:938–947` refuses, and the live `mod_def.ww3` was hand-minted 2026-08-18; **D14** is a note about a test that could not be run, not a defect in the running model | DISSOLVED (operator 2026-08-28): G7 → one-line ADR-109 edit (S3 doc round); G10 → part of S8.1 (the island round rebuilds the grid and needs this hook); D14 → stays a note in ADR-109, no task |
+| ~~C12~~ | ~~LIBREWXR-SATELLITE-SEAM~~ | operator 2026-08-27: "c12 has nothing to do with this plan" | REMOVED — a LibreWxR item; its pin (2026-08-08) is the fork's record, not this plan's |
+| C13 | Pre-existing test failures — **re-run 2026-08-27 (Windows)**: `test_serve_nothing_on_failure` 8 FAIL and `test_service_full_run_trigger` 10 FAIL, identical to baseline; `test_h4_chunked_json` and `test_double_break_transect55_kat` PASSED this run (the first was always a wall-clock flake); `test_wind_gatherer::TestColdStartReconcile` is Windows-path only. 18 failing tests in the model's own suite | Each recorded in an EVO checklist row with the lead's checkout-verified reproduction | S4 (two test files) |
+| ~~C14~~ | ~~Marine failure monitor armed~~ | operator 2026-08-27 "c14 no" | DROPPED. Fact: the old monitor was a previous chat session's watch and died with it — nothing watches the marine service now |
+| ~~C15~~ | ~~Island-shadowing deficit~~ | operator 2026-08-27: "why c15 is needed if we replaced it with a new task" | FOLDED — S8 IS this item; no separate row |
+| ~~C16~~ | ~~ADR-109 gaps G7/G10, D14~~ | verified 2026-08-27: **G7 (wind onto the WW3 grid) is BUILT** — the horizon march's wind path (`service.py:831`); **G10 (`ww3_grid` rebuild on geometry change) is NOT** — `service.py:938–947` refuses, and the live `mod_def.ww3` was hand-minted 2026-08-18; **D14** is a note about a test that could not be run, not a defect in the running model | DISSOLVED 2026-08-27 — lead's reading after the plain-English explanation; the operator's next message raised no objection (no verbatim "yes" on record — review #22): G7 → one-line ADR-109 edit (S3 doc round); G10 → part of S8.1 (the island round rebuilds the grid and needs this hook); D14 items 1/3 → notes in ADR-109; D14 item 2 (WW3-leg vs SWAN-path quality, "for Phase V") → S3 doc round re-homes or closes it since Phase V is dropped (review #15) |
 | C17 | First-install warm-start bootstrap | EVO-Q9 ruling 2026-08-19: seed executed; durable mechanism "PARKED as a pre-ship row" | S5 (parked; not needed for this install) |
 | ~~C18~~ | ~~Uncommitted API-MANUAL fog-section edit~~ | discarded (`git checkout`) 2026-08-27 under Q4 | DONE |
-| C19 | Leftovers of the SWAN-L1 removal, all CONFIRMED 2026-08-28: `ww3_chain_enabled` is a no-op (`service.py:668`); `level1` naming — 170 occurrences in 11 files; `_reused_l1_boundary_command_lines()` still runs in the stationary-fill path (`swan_runner.py:4686`, `vchain.py:727`) reading the dead `level1/INPUT`; health lists `ww3_boundary` as a REQUIRED input that nothing records (live: `inputs.ww3_boundary.available: false`; only exempt from turning the status red because never-recorded inputs are skipped, `health.py:446–458`); plus the `swan/level1/` directory on disk (from C3) | ARCHITECTURE.md records the first three as tracked follow-ups; the fourth found 2026-08-27 in `/health` | S3 |
-| C20 | Doc drift, CONFIRMED 2026-08-28: PROVIDER-MANUAL:2529 "Feeds the swell display card" (true only via fallback since Q16-B); API-MANUAL §17 lacks `swellSource` + `closeoutFraction` | EVO Q16-ROUND-B row; PEEL-SEGMENTS CHANGELOG entry | S3 (doc round; Q4 is ruled so the file is unblocked) |
+| C19 | Leftovers of the SWAN-L1 removal — **CORRECTED 2026-08-27 by the adversarial review (findings #1/#2/#20/#26), lead re-verified:** `ww3_chain_enabled` is a no-op ONLY for the WW3-leg gate (`service.py:668`); it still gates the buoy-ledger writers (`vchain.py:914`, `:978`) and is `true` in live config — NOT dead. `_reused_l1_boundary_command_lines()` is a LIVE per-cycle production dependency (`vchain.py:727` → `CHAIN_SCAFFOLD_MISSING` → no publish) and `swan/level1/INPUT` + its 22 `B_*.txt` are what it reads — NOT dead, NOT deletable. Still real: `level1` naming (170 occurrences, cosmetic); health lists `ww3_boundary` as a REQUIRED input nothing records (live `available: false`; exempt from red only because never-recorded inputs are skipped, `health.py:446–458`) — record it or remove it (Q10). ARCHITECTURE.md:130/132 carry the same wrong "no-op"/"vestigial" claims and are corrected in S3 | ARCHITECTURE.md follow-ups (two of them wrong); `/health` 2026-08-27 | S3 (docs + rename; no deletions) |
+| C20 | Doc drift, CONFIRMED 2026-08-27: PROVIDER-MANUAL:2529 "Feeds the swell display card" (true only via fallback since Q16-B); API-MANUAL §17 lacks `swellSource` + `closeoutFraction` | EVO Q16-ROUND-B row; PEEL-SEGMENTS CHANGELOG entry | S3 (doc round; Q4 is ruled so the file is unblocked) |
 
 ---
 
@@ -207,12 +222,14 @@ predecessor's CLOSE record, not its OPEN row.
 
 ---
 
-## PHASE M — maps (operator-ruled 2026-08-27; repos: dashboard, api, stack, librewxr fork)
+## PHASE M — maps (operator-ruled 2026-08-27; repos: dashboard, api, stack — NOT the librewxr fork)
 
-**Order:** M0 → M1 and M2 in parallel (different repos) → M3 only after M2 is serving.
-**Owner:** coordinator designs; `clearskies-dashboard-dev` / `clearskies-api-dev` implement;
-`clearskies-auditor` gates. Every brief carries the three mandatory blocks and PRIME DIRECTIVE
-13–15 verbatim.
+**Order:** M0 → (Q8 ruled) → M1, with M3 and M4 as rounds inside M1's build. **M1 and M3 are
+BLOCKED on Q8** (whether the radar box's dark view is served by the M1 extract at all).
+**Owner:** coordinator designs; `clearskies-dashboard-dev` (dashboard) / `clearskies-api-dev`
+(API endpoints + the stack admin page: `admin/routes.py`, `templates/admin/geographic_features.html`,
+locale files) implement; `clearskies-auditor` gates. Every brief carries the three mandatory
+blocks and PRIME DIRECTIVE 13–15 verbatim.
 
 ### M0 — Extent inventory + measurements (read-only, no ruling needed)
 
@@ -236,13 +253,17 @@ global) and `basemap-local.pmtiles` (z7–15, the union box). Served by one endp
 today) + `/api/v1/basemap/status`. Admin page: one "update basemap" action + status.
 `pmtiles` CLI stays a documented API-host prerequisite (OPERATIONS-MANUAL).
 **Dashboard:** marine and seismic maps — light theme unchanged (OSM raster); dark theme =
-`protomaps-leaflet` `leafletLayer` over the tiered sources (world under regional under
-local), Protomaps dark theme tuned to the current sparse look. **Required content of the dark
+`protomaps-leaflet` `leafletLayer` over the two tiered sources (world z0–6 under local
+z7–15; there is no separate "regional" file — the local file's z7–10 levels ARE the regional
+view), Protomaps dark theme tuned to the current sparse look. **Required content of the dark
 basemap (operator, 2026-08-27): water, land/coastline, admin boundaries, place labels, and
 FREEWAYS** — the Protomaps `roads` layer's motorway + trunk classes drawn at every zoom of
-the regional and local tiers (visible from z7, so the seismic view shows the interstate
-network, not just at street zooms); primary roads from z11 in the local tier; nothing
-smaller. Marine label overlay (both themes) = a labels-only rule set from the same sources. `CARTO_OSM_ATTRIBUTION` deleted; attribution becomes
+the local tier (visible from z7, so the seismic view shows the interstate network, not just
+at street zooms); primary roads from z11; nothing smaller. **ADR-078 (geographic features):**
+a plan cannot change an ADR's status — M1's first deliverable is a Proposed ADR-078 amendment
+("superseded by the product basemap"), accepted by the operator before the feature's extract/
+endpoint/config key are replaced; `docs/decisions/INDEX.md:151` still carries the stale
+"OSM via Overpass API" title and is fixed in the same edit. Marine label overlay (both themes) = a labels-only rule set from the same sources. `CARTO_OSM_ATTRIBUTION` deleted; attribution becomes
 "© OpenStreetMap contributors © Protomaps" (About page row already exists). Tile-error
 banner logic (M1 fixit constants) kept.
 **Also served by this basemap (Q6 + Q5 rulings, 2026-08-27):** the radar/satellite box (M3
@@ -256,7 +277,8 @@ watermark and no blank inside the derived box (screenshots side-by-side vs today
 theme); **freeways visible on the dark seismic map at its initial zoom and on the dark marine
 map at z14** (named roads checked against the light OSM map at the same view — I-405/I-5/
 SR-55 for this install); a pan outside the box shows the world baseline, not blank; `grep -r cartocdn`
-across dashboard/api/stack = 0; extract sizes within the M0-measured envelope; attribution
+across dashboard/api/stack = 0; extract sizes **≤ 100 MB world + ≤ 400 MB local (ceiling
+stated before M0 measures; a larger measurement is a Q8 finding, not a gate re-fit)**; attribution
 string present on both maps; dashboard `tsc` zero errors; vitest for the two components.
 
 ### M2 — ~~LIBREWXR-BASEMAP~~ CANCELLED 2026-08-27 (Q6). Text below kept as the record of what was verified in the fork and why the reversal followed.
@@ -356,8 +378,10 @@ works (its own transparent radar over an empty box is the operator-accepted stat
 ### Gate M
 
 Per round + a phase-close sweep: every map surface, both themes, screenshots side-by-side;
-directive 13 grep (no basemap/label/outline code path reachable from the radar component);
-attribution audit; DASHBOARD-MANUAL §12 rewritten to the as-built.
+directive 13/14 check (the radar box renders the PRODUCT basemap + labels layer — no
+provider-specific basemap; no basemap extent derived from any provider field; the radar
+VIEW-bounds coupling disposition per Q10); attribution audit; DASHBOARD-MANUAL §12 rewritten
+to the as-built.
 
 ---
 
@@ -369,7 +393,12 @@ On the operator's "push": push marine + meta → `scripts/deploy-marine.sh` → 
 journal sweep. **Gate (stated before looking):** the first 00Z cycle after the gatherer has
 fetched a GFS cycle to f108 — `ww3Horizon.lastSuccessCycleTime` = that cycle,
 `coverageEndTime` = cycle + 96 h, `wallClockS` ≤ 5 h, no overlap with the 06Z production
-run (`ExecMainStartTimestamp` and run timestamps pasted); the following full cycle shows
+run (`ExecMainStartTimestamp` and run timestamps pasted — **the guard is one-directional:
+the march skips if a full run is in flight (`service.py:2216`) but the full-run trigger
+(`:2074`) does not check the march; arithmetic says a ~4.3 h march starting ~03:36Z ends
+~07:54Z, right when the 06Z extended wind completes (~07:51Z). An observed overlap = gate
+FAIL, reported to the operator with the timings; the reciprocal guard is a code change that
+gets its own ruling, not a same-round fix**); the following full cycle shows
 `fullRun.l2BoundaryExhausted: false` and zero "data on boundary file exhausted" lines in
 SWAN L2's PRINT; the served dominant partition varies beyond ±0.02 m / ±0.05 s across
 hours 7–72 when NOAA's forecast varies (EVO-Q16 acceptance (ii)); +24 h / +48 h reality
@@ -395,19 +424,33 @@ per partition in `swan_runner.py` ~:3900–3974; scorer reads scalars) → KATs 
 V1 worked numbers → firewalled gate → deploy → reality row (a groundswell day and a windsea
 day ranked as the operator expects).
 
-### S3 — Substitution cleanup (PA7; C7 survivor, C19, C20)
+### S3 — Substitution cleanup (PA7; C7 survivor, C19, C20) — CORRECTED 2026-08-27 after the adversarial review
 
-One deletion round in the marine repo (dead-key grep proofs in the brief): `ww3_chain_enabled`,
-`level1` rename, `_reused_l1_boundary_command_lines()` + the stationary-fill dependence on
-`level1/INPUT`, the `ww3_boundary` required-input entry in health, the on-disk `swan/level1/`
-directory (operator-visible before deletion), and the hotstart-age gate (the health/refuse
-design's last V14 item). One doc round: PROVIDER-MANUAL:2529 swell-card bullet, API-MANUAL
-§17 `swellSource` + `closeoutFraction`, ADR-109 G7 row struck as built. C7's other two items
-and C8 are already in HEAD (`43744de`, `de2738f`, `09c0a1b`) — nothing to do.
+**What the review found (finding #1, BLOCKER; #2, HIGH) and the lead re-verified at the code:**
+`_reused_l1_boundary_command_lines()` is called EVERY production chain cycle from
+`vchain._stage_l2_boundary()` (`vchain.py:727`) — it reads the BOUNDSPEC scaffold out of
+`swan/level1/INPUT` and copies the 22 spectrum files it references into level2; `None` →
+`CHAIN_SCAFFOLD_MISSING` → "no SWAN run, no publish". `ww3_chain_enabled` (live `true`) gates
+both buoy-ledger writers (`vchain.py:914`, `:978`) — removing it silently stops the ledger.
+The register's "vestigial" / "no-op" wording (and ARCHITECTURE.md:130/132, which say the same)
+was wrong. **Nothing live is deleted under this task.** Retiring the L1 scaffold would be a
+change to how the L2 deck's boundary commands are produced — a design block with its own
+ruling, if ever wanted.
+
+**Remaining scope:** (a) doc round — ARCHITECTURE.md:130/132 corrected to the above; ARCHITECTURE
+Known-gaps rows #12–#16 (still "unbuilt"/"Phase V") re-stated; PROVIDER-MANUAL:2529 swell-card
+bullet; API-MANUAL §17 `swellSource` + `closeoutFraction`; ADR-109 G7 row struck as built;
+ADR-109 D14 item 2 (WW3-leg vs SWAN-path served quality "for Phase V") re-homed or closed since
+Phase V/S7 is dropped. (b) `level1` label rename in code/cache names (170 occurrences, cosmetic;
+cache-file rename needs a migration note — do NOT rename the on-disk `swan/level1/` directory).
+(c) health `ww3_boundary` required-input entry: Q10 — record the input (the NOAA boundary IS an
+input; PRIME DIRECTIVE 8 prefers visibility) or delete the entry. (d) hotstart-age gate: Q10 —
+EVO-Q6 folded it into the W5 health/refuse design, which shipped without it; recommend drop.
+C7's other two items and C8 are already in HEAD (`43744de`, `de2738f`, `09c0a1b`).
 
 ### S4 — Test-debt triage (C13)
 
-Scope (re-verified 2026-08-28, Windows run: 18 failed / 36 passed across the four named
+Scope (re-verified 2026-08-27, Windows run: 18 failed / 36 passed across the four named
 files): `test_serve_nothing_on_failure.py` (8 — L4-nesting harness class) and
 `test_service_full_run_trigger.py` (10 — the WW3-chain-unconditional change). `test_h4_chunked_json`
 and `test_double_break_transect55_kat` passed and leave the row; the wind-gatherer cold-start
@@ -422,7 +465,7 @@ Design (EVO-Q9 option 2): the install procedure drops a provenance note beside t
 restart file; the service accepts it once; ADR-109 D10 amendment. Not needed for this
 install; required before any fresh install.
 
-### S6 — ~~ADR-109 gap closure~~ DISSOLVED 2026-08-28 (Q9)
+### S6 — ~~ADR-109 gap closure~~ DISSOLVED 2026-08-27 (Q9)
 
 Plain English record: ADR-109 (the decision record for our own deep-water model) listed three
 unfinished things when it was accepted. (1) Putting the gathered wind onto the model's grid —
@@ -476,16 +519,30 @@ multiply. Regular grids only (ours is). No compile switch — grid-preprocessor 
 **Design (executes S8.1's block verbatim; a deviation is a finding):**
 1. At WW3 setup derivation (`derive_ww3_setup()`, config-time, PRIME DIRECTIVE 11), compute
    per G1 cell the **open-water fraction** `f ∈ [0,1]` = share of fine-source samples inside
-   the cell's footprint with depth < 0. Fine source = the finest regional DEM already cached
-   for the region (NCEI ~90 m CRM / ~10 m regional DEM where present; ETOPO 15″ only as the
-   fallback — at ~460 m it yields ≤ 4–5 samples per cell, i.e. steps of ~0.2, disclosed).
+   the cell's footprint with depth < 0. **Fine source — CORRECTED (pre-flight 2026-08-27 +
+   review finding #19):** no fine DEM covering the G1 box is cached. The L2/L3/L4 caches cover
+   only the spot's nested boxes (L2 ≈ 7.6 × 8.3 km), not Catalina / San Clemente; the only
+   G1-wide grid is the ETOPO 15″ L1 cache (~460 m → ≤ 4–5 samples per 1 km cell, steps of
+   ~0.2). Meeting KAT (b) needs a ONE-TIME regional DEM download of the G1 box (NCEI CRM ~90 m
+   or equivalent) persisted beside the other bathymetry caches — **a new persisted file + fetch
+   (trigger 7), ruled in Q10 before dispatch.** If refused, KAT (b)'s tolerance is re-derived
+   from the ETOPO sample density and stated before looking.
 2. Land/sea mask becomes fraction-based: cell is DRY iff `f ≤ F_DRY` (named constant,
-   proposed 0.05 — operator to confirm), WET otherwise; wet cells carry transparency `τ = f`
-   (F_DRY < f < 1 → partial; f = 1 → 1.0). The S-row/W-column boundary-cell wet test reads
-   the same mask (no second criterion).
+   proposed 0.05 — **NOT yet confirmed; Q10**), WET otherwise; wet cells carry transparency
+   `τ = f` (F_DRY < f < 1 → partial; f = 1 → 1.0). The S-row/W-column boundary-cell wet test
+   reads the same mask (no second criterion).
 3. `ww3_grid.inp` gains `FLAGTR = 2` in `&MISC` and the transparency field block (scale
    factor 1.0, same IDLA/IDFM conventions as the depth block, SYNTAX row 6a); `mod_def.ww3`
-   rebuilt (geometry-change trigger — S6's G10 gets exercised for real here).
+   rebuilt. **Components that do NOT exist and S8.1 must build (pre-flight 2026-08-27 + review
+   finding #6):** (i) writers for the NAME files the deck references — `G1_bottom.txt`,
+   `G1_status.txt` and the new obstruction file (`build_ww3_grid_deck`, `swan_domain.py:3439–3506`,
+   names them; nothing in the service writes them — the live `level0/mod_def.ww3` was
+   hand-minted 2026-08-18); (ii) the production `ww3_grid` execution hook on geometry change
+   (Gap G10 — `service.py:938–947` refuses today; `WW3Runner.run_grid`, `ww3_runner.py:326`,
+   exists standalone); (iii) an operator-visible procedure for replacing the live `mod_def.ww3`
+   (baseline copy, diff, restart-chain consequence stated — the restart file was generated
+   against the old grid file). (i) and (ii) add persisted files/lifecycle steps → trigger 7/5,
+   in Q10.
 4. KATs: (a) a hand-built 3×3 fine grid with a known tip → exact f per cell; (b) a synthetic
    island whose true area is known → summed f × cell area reproduces it to < 2 % while the
    old nearest-sample mask errs by its measured amount; (c) transfer-file byte-identity for a
@@ -514,14 +571,16 @@ with the survivors only. Those plans are then marked CLOSED with a pointer here.
 
 ## PHASE D — as-built docs (after M and S)
 
-D1: ARCHITECTURE.md, the four manuals, ADR-078 (Superseded), ADR-101 (row-5), ADR-109
-(gaps closed, D10 bootstrap), CHANGELOG — re-synced to the as-built state; zero-drift audit
-by a firewalled auditor; the `docs/planning/` directory reduced to this plan + briefs.
+D1: ARCHITECTURE.md, the four manuals, ADR-078 (per the operator-accepted amendment from M1),
+ADR-101 (row-5), ADR-109 (gaps closed, D10 bootstrap), CHANGELOG — re-synced to the as-built
+state; zero-drift audit by a firewalled auditor; **this plan's own** artefacts archived. The
+C9–C11 plans are NOT touched by D1 (Q2 — they are the separate conversation's).
 
 ## PHASE L — lookup tables (LAST, unchanged)
 
-Opens only on the operator's "accurate and defensible" ruling from S7. Mandatory reading
-before ADR-110: `docs/reference/LUT-INTEGRATION-RESEARCH-2026-08-17.md`.
+Opens only on the operator's "accurate and defensible" ruling, given whenever the operator
+chooses (Q1: no campaign computes it). Mandatory reading before ADR-110:
+`docs/reference/LUT-INTEGRATION-RESEARCH-2026-08-17.md`.
 
 ---
 
@@ -538,7 +597,45 @@ authorization from commit.
 
 ## OPEN OPERATOR QUESTIONS
 
-### Q9 (2026-08-28) — ✅ RULED: carry-over register re-audit. Operator: "i am very nervous about all of the carry over tasks without going through each one and assessing what has been done and if it is still needed." Rulings, verbatim: "c1 drop c2 drop c5 again these were discussed, the fact that you did not mark that is disconcerting c6 if this was done why did you not mark it complete? geesh." / "c14 no" / "c12 has nothing to do with this plan" / "why c15 is needed if we replaced it with a new task" / C16 dissolved after a plain-English explanation. Lead findings the same pass: C7 ×2/3, C8, C18 already done; C3, C4 moot; C13 re-verified at 18 failures in two files; C19/C20 confirmed live. Register rewritten; S6 dissolved; S3/S4 rows corrected. Also disclosed: nothing is watching the marine service for failures now (the old monitor died with its chat session).
+### Q10 (2026-08-27) — OPEN: the rulings the adversarial plan review showed are missing (`scratch/ADVERSARIAL-PLAN-REVIEW-2026-08-28.md`; lead re-verified #1, #2, #14, #18 at the code/live service before recording)
+
+Each item is one decision. Plain English; the letter in brackets is the review finding.
+
+1. **[#4] Consistency score, sub-decisions A–E.** Your "q3 yes" was given on the belief it was
+   already in code. It is not. Same recommendation as before (A–E as written in Q3): do you
+   accept them knowing it is a new coding round? *Recommend: yes.*
+2. **[#5] Island transparency — the dry threshold.** A cell counts as land when less than
+   `F_DRY` of it is water. Proposed 5 %. Confirm 0.05 or give a number. *Recommend: 0.05.*
+3. **[#19, #6] Island transparency — three things that must be built or fetched first**, each a
+   new persisted file or lifecycle step: (i) a one-time finer seabed download of the WW3 box
+   (~90 m; the cached data is 1 km); (ii) the writers for the grid-file inputs the deck names
+   (nothing in the service writes them today — the live grid file was hand-made 08-18); (iii) the
+   rebuild-on-geometry-change hook. *Recommend: approve all three as part of S8.1; without them
+   S8.1 cannot run on the service.*
+4. **[#7] Radar box view bounds.** Today the radar box's pan limits, minimum zoom and grey
+   outside-mask come from the provider's declared coverage box (LibreWxR's, via the API
+   capability). Directive 14 as written forbids reading any provider extent. Two readings:
+   (a) carve-out — the provider may constrain the radar VIEW (it is its own overlay's coverage),
+   never the basemap extract; (b) remove the coupling too. *Recommend (a).*
+5. **[#8] Warm-start file age check** (the last V14 leftover). Drop it (the health/refuse round it
+   was folded into shipped without it, and SWAN warm-start mechanics are frozen core) or give it
+   its own row. *Recommend: drop.*
+6. **[#11] Esri/NAIP in the API.** M4 un-wires them from the surf map. Remove the `[imagery]`
+   config key and the three provider modules from the API entirely (so no operator can put Esri
+   back on a user-facing map), or leave them installed but unused? *Recommend: remove (trigger 7).*
+7. **[#26] Health's `ww3_boundary` "required input".** Nothing records it, so health shows it as
+   unavailable forever. Record it (the NOAA boundary IS an input — more visibility) or delete the
+   entry? *Recommend: record it.*
+8. **[#14] Health is `degraded` right now** — invariant 1 (break depth deeper than the 1-D handoff
+   depth) has fired 130 times since the BREAK-REFORM/PEEL-SEGMENTS deploy, Huntington transects
+   4–7, ~2.2 m vs ~2.0 m. Investigate as a task, or accept as a known post-BREAK-REFORM state
+   for now? *Recommend: investigate (read-only first), separate row.*
+9. **[#14] Monitoring.** Nothing watches the marine service for failures. Arm a session watch
+   (dies with the session), or leave it? *Your call.*
+10. **[#23] The rule corollary** written into `rules/verification.md` ("carry the close record,
+    not the open row") was committed before you saw it. Keep, edit, or remove?
+
+### Q9 (2026-08-27) — ✅ RULED: carry-over register re-audit. Operator: "i am very nervous about all of the carry over tasks without going through each one and assessing what has been done and if it is still needed." Rulings, verbatim: "c1 drop c2 drop c5 again these were discussed, the fact that you did not mark that is disconcerting c6 if this was done why did you not mark it complete? geesh." / "c14 no" / "c12 has nothing to do with this plan" / "why c15 is needed if we replaced it with a new task" / C16 dissolved after a plain-English explanation. Lead findings the same pass: C7 ×2/3, C8, C18 already done; C3, C4 moot; C13 re-verified at 18 failures in two files; C19/C20 confirmed live. Register rewritten; S6 dissolved; S3/S4 rows corrected. Also disclosed: nothing is watching the marine service for failures now (the old monitor died with its chat session).
 
 *(Plain English, self-contained, newest at top. Answered items keep their ruling here.)*
 
@@ -573,7 +670,7 @@ fraction as transparency. It's mechanical and manual-native, but it is part of t
 problem you ordered LAST. **Ruling needed:** (a) run S8.1 now as its own round (after the Q17
 push), or (b) hold it inside S8. Also confirm `F_DRY = 0.05` or give a number.
 
-### Q6 (2026-08-27) — ✅ RULED: "Ok wait, so you did not do it wrong, i apologize. So we needed to bring our own basemap. Did we need to bring our own legends too or do those need to move into librewxr?" — Answer recorded: yes, labels too — a radar provider's contract is overlay-only, labels are a basemap layer, so both stay in Clear Skies from the product basemap. M2 cancelled, M3 becomes RADAR-REBASE, directive 13 amended, the two capability fields are NOT added.
+### Q6 (2026-08-27) — ✅ RULED: "Ok wait, so you did not do it wrong, i apologize. So we needed to bring our own basemap. Did we need to bring our own legends too or do those need to move into librewxr?" — Answer given: yes, labels too — a radar provider's contract is overlay-only, labels are a basemap layer, so both stay in Clear Skies from the product basemap. **Operator's acceptance of that answer, next message: "q6 correct... but the radar box will blow all of our other sizings out the window as it covers most of the SW well into New Mexico"** (the second half opened Q8). M2 cancelled, M3 becomes RADAR-REBASE, directive 13 amended, the two capability fields are NOT added. (Review finding #3 flagged the missing acceptance quote; it existed in chat and is now recorded.)
 
 *(original question)*
 
