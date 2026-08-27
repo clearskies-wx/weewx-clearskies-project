@@ -129,11 +129,19 @@ cross-inferred); (11) no generic model setup, zero model-setup controls on produ
     anything derived from the provider — and nothing of ours is moved into LibreWxR. (Earlier
     same-day wording "Clear Skies provides NOTHING for the radar box" was withdrawn by the
     operator once the provider contract was verified: "you did not do it wrong, i apologize.")
-14. **External providers' extents are not inputs.** LibreWxR is an external provider like
-    RainViewer. Its BBOX, tiles and satellite imagery are never read by anything Clear Skies
-    derives (basemap extents included). Most installs will not run LibreWxR at all. Consequence,
-    accepted: the dark basemap is detailed only inside the box derived from Clear Skies' own
-    config; a radar view dragged far outside it shows the coarse world baseline.
+14. **The basemap is sized from Clear Skies' own config, never from a radar provider.**
+    (Reworded 2026-08-27 after the operator's Q10-4 ruling: the first wording — "pretend the
+    provider's information does not exist" — came from the pre-research ruling that Q6
+    reversed once the fork's docs showed LibreWxR serves only radar + satellite and Clear
+    Skies is responsible for the basemap.) What stands: the basemap extract's extent comes
+    from station + earthquake radius + marine locations, never from any provider field, because
+    most installs will not run LibreWxR at all. What is ALLOWED and already in code: the radar
+    window's pan limits, minimum zoom and outside-mask come from the provider's declared
+    coverage box (`[radar] librewxr_bounds` → capability `bounds` → `radar-map.tsx`
+    `MapBoundsEnforcer`/`BoundsMask`) — that is the provider saying where its own overlay has
+    data, and it stays. Consequence, accepted: the dark basemap is detailed only inside the
+    derived box; the radar view beyond it shows the coarse world baseline (Q8 decides how
+    coarse).
 15. **No Esri, no aerial photography, on any USER-FACING surface** (compliance + caching
     restrictions; the low-tide NAIP finding). The surf height map's background becomes the
     product basemap (Q5). The wizard's Esri satellite toggle stays — operator-only, not
@@ -612,11 +620,12 @@ Each item is one decision. Plain English; the letter in brackets is the review f
    (nothing in the service writes them today — the live grid file was hand-made 08-18); (iii) the
    rebuild-on-geometry-change hook. *Recommend: approve all three as part of S8.1; without them
    S8.1 cannot run on the service.*
-4. **[#7] Radar box view bounds.** Today the radar box's pan limits, minimum zoom and grey
-   outside-mask come from the provider's declared coverage box (LibreWxR's, via the API
-   capability). Directive 14 as written forbids reading any provider extent. Two readings:
-   (a) carve-out — the provider may constrain the radar VIEW (it is its own overlay's coverage),
-   never the basemap extract; (b) remove the coupling too. *Recommend (a).*
+4. ~~**[#7] Radar box view bounds.**~~ ✅ RULED (a) 2026-08-27 — operator: "Yes, but then when
+   you did the research on the librewxr code, that reverse that as we found out that librewxr
+   does NOT provide anything but the radar and satellite data and that we ARE responsible for
+   the basemap." The provider's coverage box may shape the radar VIEW (pan limits, min zoom,
+   mask — existing code, untouched); the basemap extract is sized from our own config only.
+   Directive 14 reworded to say exactly that.
 5. **[#8] Warm-start file age check** (the last V14 leftover). Drop it (the health/refuse round it
    was folded into shipped without it, and SWAN warm-start mechanics are frozen core) or give it
    its own row. *Recommend: drop.*
