@@ -780,9 +780,11 @@ execute these too; a deviation is a finding):**
   (`:2242–2264`). Attempt 0 = today's inputs. Acceptance test after each run, both parts:
   (i) `not result.onset_at_node0` — a new additive `Analytical1DResult` field set by
   `_ddd_breaking_march` from its node-0 onset branch (`surf_1d_analytical.py:1042–1046`); and
-  (ii) if `result.break_points` is non-empty, `bathy[0, 0] - result.break_points[0].distance_m >=
-  HANDOFF_BREAK_CLEARANCE_M` (distance from shore of the profile's first node minus the outermost
-  marker's distance). Failure → next candidate = next entry of `band_stations` walking seaward
+  (ii) if `result.break_points` is non-empty, `bathy[:, 0].max() - result.break_points[0].distance_m >=
+  HANDOFF_BREAK_CLEARANCE_M` (distance from shore of the profile's seaward node minus the outermost
+  marker's distance — AS BUILT: `.max()`, because `_refine_bathy_profile()` returns the profile in
+  ASCENDING distance order so `bathy[0, 0]` would read the shoreward-most node; dev finding, folded
+  into `fca09ec`; gate G2 verified). Failure → next candidate = next entry of `band_stations` walking seaward
   (index `selection.station_index-1`, then `-2`, …).
 - **M4. Which partition at the new station.** SWAN-sourced partitions are matched by period: the
   new station's component with the smallest `|Tp − Tp_partition|`, accepted only when ≤ 2 s (tie →
