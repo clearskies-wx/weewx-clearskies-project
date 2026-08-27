@@ -85,3 +85,90 @@ The current approach uses a CSS blend-mode hack: CartoDB `dark_nolabels` tiles a
 - protomaps-leaflet: https://github.com/protomaps/protomaps-leaflet
 - PMTiles daily builds: https://docs.protomaps.com/basemaps/downloads
 - Go pmtiles CLI: https://docs.protomaps.com/pmtiles/cli
+
+## Amendment 2 (2026-08-27) — superseded by the product basemap (Proposed)
+
+**Status: Proposed — takes effect on the operator's acceptance in chat; the removal commit of the
+old feature waits for it (plan journal J3).** This amendment does not change the header `status:`
+field above (still `Accepted` for the original 2026-06-29 decision) until the operator accepts it.
+
+### Context
+
+CARTO, the free-tile provider every dark-theme Clear Skies map used (including this ADR's own
+satellite-view label overlay, `voyager_only_labels`, and `dark_all` base tiles elsewhere in the
+product), began watermarking its tiles "API KEY REQUIRED" around 2026-08-25 and is retiring the
+free product. `docs/planning/MARINE-AND-MAPS-PLAN-2026-08-27.md` (Phase M) was opened to replace
+it with a Clear Skies-served product basemap (Protomaps-derived) for every map surface. That plan
+absorbs this ADR's geographic-features feature rather than standing up a second, parallel PMTiles
+extract-and-serve mechanism, because the two are the same shape of problem — a self-served OSM
+vector-tile extract, one Go `pmtiles` CLI, one Range-request endpoint family — just generalised
+from one file/box to three tiers.
+
+Operator rulings 2026-08-27 (verbatim, from the plan's Q5/Q6/Q8 and PRIME DIRECTIVE 13–15):
+
+- **Q5:** surf height map background → "a regular basemap" (the product basemap); NAIP
+  "eliminated completely from user facing work"; the wizard's Esri satellite toggle stays ("I
+  just do not want to use it in user facing situations when we do not have to").
+- **Q6:** "Ok wait, so you did not do it wrong, i apologize. So we needed to bring our own
+  basemap. Did we need to bring our own legends too or do those need to move into librewxr?" —
+  answered yes, labels too: a radar provider's contract is overlay-only, labels are a basemap
+  layer, so both stay in Clear Skies from the product basemap (nothing of this ADR's feature
+  moves into the LibreWxR fork).
+- **Q8:** "YOU CANNOT FUCKING ZOOM OUT BEYOND THE EXTENTS OF THE BBOX!" — closed: the radar map is
+  hard-limited to the radar provider's declared coverage box, so its basemap tier is sized to
+  exactly that box, at the radar's own zoom range (z0–12); a provider with no coverage box
+  (RainViewer) falls back to the station box.
+- **Directive 13:** radar providers (LibreWxR, RainViewer, any other) are overlay-only — transparent
+  radar, opaque satellite, nothing else. Clear Skies supplies the basemap AND its labels under
+  every radar/satellite view, sourced from the product basemap, never from the provider.
+- **Directive 14:** the basemap is sized from Clear Skies' own config (station + earthquake radius
+  + marine locations) for the marine/seismic/surf maps; the radar map's basemap is sized to the
+  radar provider's own declared coverage box (a provider field is allowed to shape the radar
+  VIEW's bounds/min-zoom/mask, which is unrelated to and unchanged by this amendment) — never any
+  other provider field.
+- **Directive 15:** no Esri, no aerial photography, on any user-facing surface.
+
+### Decision
+
+The geographic-features feature this ADR accepted is **replaced by** the basemap family built in
+plan task M1 (CS-BASEMAP). Old item → new item, side by side:
+
+| Old (this ADR, 2026-06-29) | New (M1 basemap family) |
+|---|---|
+| `GET /api/v1/geographic-features/tiles` (one PMTiles file) | `GET /api/v1/basemap/{tier}/tiles` — `tier` ∈ `world` (z0–6), `local` (z7–15), `radar` (z0–12) |
+| `GET /api/v1/geographic-features/status` → `{available, size_bytes, updated_at}` | `GET /api/v1/basemap/status` → per-tier `{available, size_bytes, updated_at, bounds, minzoom, maxzoom}` plus `updating`, `last_error`, `last_started_at`, `last_finished_at` |
+| `POST /setup/geographic-features/update` (proxy-secret; one BBOX extract) | `POST /setup/basemap/update` (proxy-secret; one background extract of all three tiers, world → local → radar, one daemon thread) |
+| `services/geographic_features.py` | `services/basemap_extract.py` |
+| `[geographic_features]` config: `enabled` (bool), `bounds` (operator-typed CSV BBOX) | `[basemap]` config: `enabled` (bool) only — no operator-typed box; the local tier's extent is derived (station + `earthquakes.default_radius_km` × 1.15, unioned with the marine locations bbox padded 40 px at z15), the radar tier's extent is the radar provider's declared coverage box or, absent one, the same station box |
+| `geographic-features.pmtiles` (one file, operator BBOX, `/etc/weewx-clearskies/`) | `basemap-world.pmtiles`, `basemap-local.pmtiles`, `basemap-radar.pmtiles` (three files, `/etc/weewx-clearskies/`) |
+| Admin "Geographic Features" section, "Update Map Data" action | Admin "Basemap" section, one "update basemap" action + per-tier status |
+| Satellite view: `GeoFeaturesLayer` (this ADR's own component, `radar-map.tsx`) drawing this ADR's 4 `LineSymbolizer` paint rules, PLUS a separate CARTO `voyager_only_labels` `TileLayer` for labels | One `ProtomapsLayer` in `satellite-outlines` mode: the same 4 `LineSymbolizer` rules (`earth`, `boundaries`, `roads`, `water` — moved verbatim, unchanged colors/widths/filters) drawn together with the product basemap's own dark labels layer, over the `radar` tier |
+
+**The four outline `LineSymbolizer` rules survive verbatim** as the satellite outlines layer — no
+color, width, opacity, or filter changes. Everything else in the left column is retired once this
+amendment is accepted.
+
+### Consequences
+
+- M1-API (already shipped, `weewx-clearskies-api` `45d1b63`/`94e9437`/`ecdd3d4`) added the three
+  basemap endpoints, `services/basemap_extract.py`, and `[basemap]` settings **additively** — this
+  ADR's own endpoints, service, and config section are untouched and still serving. No removal has
+  happened yet.
+- M1-DASH (not yet shipped as of this amendment) will replace `radar-map.tsx`'s `GeoFeaturesLayer`
+  + `SATELLITE_LABELS_URL` CARTO `TileLayer` with the single `ProtomapsLayer` `satellite-outlines`
+  mode described above.
+- Once the operator accepts this amendment (status → Accepted), the removal commit deletes:
+  `endpoints/geographic_features.py`, `services/geographic_features.py`, the `[geographic_features]`
+  settings section, the stack repo's "Geographic Features" admin page/route, the
+  `geographic-features.pmtiles` file/path, and the dashboard's `GeoFeaturesLayer` component —
+  per plan journal J3. Until then, both features run side by side.
+- License/attribution unchanged: OpenStreetMap contributors, ODbL, via Protomaps — attribution
+  string becomes "© OpenStreetMap contributors © Protomaps" project-wide (M1), not specific to
+  this feature.
+- This ADR's header `status:` stays `Accepted` (the original decision — PMTiles over Overpass —
+  is not being revisited); only the geographic-features *feature* built under it is superseded.
+
+### Acceptance line
+
+**Status: Proposed — takes effect on the operator's acceptance in chat; the removal commit of the
+old feature waits for it (plan journal J3).**

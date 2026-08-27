@@ -148,7 +148,7 @@ had not happened. Dates are each ADR's own acceptance date, not its draft date.)
 
 | ADR | Title | Accepted |
 |---|---|---|
-| [ADR-078](ADR-078-geographic-features-overlay.md) | Geographic features overlay (OSM via Overpass API) | 2026-06-29 |
+| [ADR-078](ADR-078-geographic-features-overlay.md) | Geographic Features Overlay (PMTiles Vector Tiles) — the Overpass approach it replaced never shipped past the rejected option (Option C, see Context). **Amendment 2 (2026-08-27, Proposed): superseded by the product basemap family built in plan task M1 — awaiting operator acceptance; the original decision (PMTiles over Overpass) is unaffected.** | 2026-06-29 |
 | [ADR-079](ADR-079-forecast-correction-engine.md) | Forecast correction engine — provider-agnostic Random Forest bias correction (MOS methodology), predicts bias not absolute temp, applied after cache/before response, SQLite-backed, scikit-learn required dependency | 2026-06-30 |
 | [ADR-080](ADR-080-provider-attribution-architecture.md) | Provider attribution architecture | 2026-07-01 |
 | [ADR-081](ADR-081-license-change-polyform.md) | License change — PolyForm Noncommercial 1.0.0 (supersedes ADR-003) | 2026-07-09 |
