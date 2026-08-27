@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-27 — S3(b): `level1` label rename to `deep_water` (marine, cosmetic)
+
+- **Marine repo, code/cache label only — no formula, grid, or wire field changed.** `level1`
+  named the deep-water domain's *geometry extent* (consumed by WW3's own grid sizing), not a
+  running SWAN level — SWAN's own L1 compute was removed 2026-08-23. `DomainSizing.level1` →
+  `DomainSizing.deep_water`; `_compute_level1()` → `_compute_deep_water()`;
+  `compute_level1_domain()` → `compute_deep_water_domain()`; all
+  `domains.level1`/`sizing.level1`/`stage1.level1` → `.deep_water`; in-memory bathymetry dict
+  key `"level1"` → `"deep_water"` — verified nothing reads it back by the old key.
+- **Persisted `swan_grid_sizing.json` key (migration, no operator action):**
+  `domain_sizing_to_dict()` now writes `deep_water` only; `domain_sizing_from_dict()` and
+  `grid_sizing_chain._domain_geometry_signature()` read `deep_water`, falling back to the
+  legacy `level1` key (one INFO log per load) for a cache written before this change. The
+  next sizing-chain run rewrites the file with the new key automatically.
+- **Unchanged by design:** the on-disk `swan/level1/` run directory, the ETOPO cache filename
+  `swan_bathymetry_L1.json`, and the 22 `B_*.txt` boundary scaffold files keep their existing
+  on-disk names — only the code-side label changed. New named constants
+  (`SWAN_LEVEL1_DIRNAME`/`_SWAN_LEVEL1_DIRNAME`) document the surviving on-disk literal.
+- **Docs:** ARCHITECTURE.md `:107` follow-up sentence (rename tracked as done); PROVIDER-MANUAL
+  updated wherever it named the `level1` sizing block/function; OPERATIONS-MANUAL gains the
+  migration note above; marine `CHANGELOG.md`.
+
+MARINE-AND-MAPS-PLAN-2026-08-27.md §S3 (b); brief
+`docs/planning/briefs/S3B-LEVEL1-RENAME-BRIEF-2026-08-27.md`.
+
 ### 2026-08-27 — M4-B: Imagery provider machinery removed (Q10-6)
 
 - **The Esri/NAIP orthophoto imagery providers are gone.** Operator ruling, plan Q10-6,

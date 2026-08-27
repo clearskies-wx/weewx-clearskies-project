@@ -2248,7 +2248,7 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 
 | Grid level | Config key | Resolution | Typical domain | Runs when |
 |---|---|---|---|---|
-| WW3 (deep-water leg, formerly "L1") | `outer_grid_resolution_km`; code/config label `level1` | ~1 km | ~145km × 167km (contains the Channel Islands, ADR-108 D1 containment) | Always — WW3, not SWAN (SWAN's own L1 compute removed 2026-08-23, marine `3c550ae`/`c29266d`) |
+| WW3 (deep-water leg, formerly "L1") | `outer_grid_resolution_km`; code/config label `deep_water` (renamed from `level1` 2026-08-27, marine `c57bb8e`, plan §S3 (b); the on-disk `swan/level1/` directory and `swan_bathymetry_L1.json` filename are unchanged) | ~1 km | ~145km × 167km (contains the Channel Islands, ADR-108 D1 containment) | Always — WW3, not SWAN (SWAN's own L1 compute removed 2026-08-23, marine `3c550ae`/`c29266d`) |
 | L2 (inner) | `inner_nest_resolution_m` | ~100 m | ~20–30km × 10–15km (tight around surf spots, from `swan_domain_bbox`) | Always |
 | L3 (coarse nest / refraction) | — (`_L3_RESOLUTION_M`, `services/swan_domain.py`) | 40 m | ~1,500m × 1,300m ≈ ~1,400 cells at HB (contains L4 + clearance); *not* the 30 m contour | Structure present (nests L4) OR classified point break/headland/bay break — never otherwise (ADR-093 Amendment 3, D2) |
 | L4 (structure grid) | — (`_STRUCTURE_GRID_DX_FLOOR_M`, `services/swan_domain.py`) | 10 m, fixed (operator ruling 2026-07-27) | Rotated rectangle in the **beach frame** (rotation = resolved beach facing, not a structure axis) — the union of every eligible structure's footprint + the handoff points of every transect it shadows (marine `4e79d21`, 2026-08-01); measured HB regen 2026-08-01: 46×137 = 6,302 cells, u_span 450 m, v_span 1358 m, rot 216.4° | Eligible structure (pier/jetty/groin/breakwater) present AND it shadows ≥1 surf-area transect |
@@ -2797,12 +2797,12 @@ priority override > grid > scalar) for both the served SWAN CURVE emission and t
 **value-only** change into the existing emission — no SWAN command syntax changes. A cache lacking the fields falls
 back cleanly to the segment-perpendicular. The served effect is validated live at Gate GR.
 
-**L1 (deep-water domain) aim + WW3 boundary sides — the open-water fetch fan (AD-3, ADR-100, Phase G2). IMPLEMENTED + DEPLOYED.** "L1" below is the deep-water domain's geometry name (`level1` in code/config) — the domain WW3 now computes over; it is not a SWAN compute level (SWAN's own L1 was removed 2026-08-23, marine `3c550ae`/`c29266d`).
-(marine `51543b1`, 2026-08-01 — confirmed against current code, not just the commit message: `_compute_level1()`
+**L1 (deep-water domain) aim + WW3 boundary sides — the open-water fetch fan (AD-3, ADR-100, Phase G2). IMPLEMENTED + DEPLOYED.** "L1" below is the deep-water domain's geometry name (`deep_water` in code/config, renamed from `level1` 2026-08-27, marine `c57bb8e`, plan §S3 (b)) — the domain WW3 now computes over; it is not a SWAN compute level (SWAN's own L1 was removed 2026-08-23, marine `3c550ae`/`c29266d`).
+(marine `51543b1`, 2026-08-01 — confirmed against current code, not just the commit message: `_compute_deep_water()`
 takes `open_water_bearing_deg`/`regime`/`fetch_value_km`/`rays`/`horizon_km`, `services/grid_sizing_chain.py`
 passes all five from `geography_result` at apply time, and `providers/nearshore/swan.py` passes
 `offshore_bearing_deg=domains.open_water_bearing_deg` into `select_boundary_stations_with_cycle_fallback()` at
-runtime). `_compute_level1` (`services/swan_domain.py`) aims the L1 offshore extension along the **open-water
+runtime). `_compute_deep_water` (`services/swan_domain.py`) aims the L1 offshore extension along the **open-water
 bearing** from the fetch fan (`services/geography.py`, ADR-100), not `mean_offshore_bearing_deg`;
 `ww3_station_selection`'s offshore-side selection reads the same open-water bearing — see §14.3b above for the
 runtime-wiring defect this fixed (the runtime call previously omitted the argument and silently fell back to
