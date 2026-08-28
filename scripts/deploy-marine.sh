@@ -416,7 +416,10 @@ WAIT_POLL_S=60
 WAIT_CEILING_S=23400
 busy_reason() {
     local body
-    body=$($SSH_CMD librewxr "curl -sk --max-time 10 https://localhost:${PORT}/health" 2>/dev/null || true)
+    # ConnectTimeout bounds the SSH hop itself (gate-j28 F2): the 6.5 h
+    # ceiling below assumes every poll returns; curl's --max-time only
+    # bounds the remote curl once the session is up.
+    body=$($SSH_CMD -o ConnectTimeout=20 librewxr "curl -sk --max-time 10 https://localhost:${PORT}/health" 2>/dev/null || true)
     if printf '%s' "$body" | grep -Eq '"inFlight": ?true'; then
         printf '%s' "$body" | grep -Eo '"inFlightCycleTime": ?"[^"]*"' | head -1 | sed 's/^/horizon march in flight /'
         return 0
