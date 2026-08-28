@@ -1388,7 +1388,14 @@ mechanism), one file per cycle bundling many hourly steps (live-verified ≥150 
 extracted per-hour via `grib_processor.read_grib_fields(target_step=hour)`. Product routing by L1-centre region
 (`classify_region`, the same rule the station path used). Reuses `providers/_common/http.py`'s client/rate
 limiter, `grib_processor.py`'s eccodes backend, and the existing ≥9998 missing-value guard (PROVIDER-MANUAL
-§14.3 conventions). Any missing field in a successfully-downloaded file raises (`BoundaryNotViableError`,
+§14.3 conventions). **Rate limit — waits, never fails (J26, 2026-08-28):** this module's 2-per-second NOMADS
+courtesy limiter is taken with `RateLimiter.acquire_blocking(max_wait_seconds=10)` (a marine-only divergence
+from the API's verbatim limiter mirror; the limiter's deque is also lock-protected because the runner thread's
+WW3 leg and a config push's grid-sizing chain share this instance). Why: the NOAA cycle fallback (newest cycle
+not posted yet → previous cycle) issues its next request within the same second, and the non-blocking
+`acquire()` raised the service's own `QuotaExhausted` — at 02:59:58Z on 2026-08-28 that aborted a config
+push's whole grid-sizing chain, leaving the previous sizing cache in place with nothing surfaced. Every other
+provider still uses the non-blocking `acquire()`; only this fetcher blocks. Any missing field in a successfully-downloaded file raises (`BoundaryNotViableError`,
 retained as the exception type, new message) — never a partial fetch; a not-yet-published cycle is a distinct,
 retryable condition (`fetch_partition_corridor_with_cycle_fallback()`, the bounded cycle-fallback idiom carried
 over from the deleted station path).
