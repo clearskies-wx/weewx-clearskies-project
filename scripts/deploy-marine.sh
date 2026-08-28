@@ -422,7 +422,11 @@ busy_reason() {
         return 0
     fi
     if printf '%s' "$body" | grep -Eq '"run_in_progress": ?true'; then
-        printf '%s' "$body" | grep -Eo '"last_cycle_started_at": ?"[^"]*"' | head -1 | sed 's/^/SWAN cycle in progress /'
+        # /health has no last_cycle_started_at key at top level (first live
+        # run of this guard, 06:43Z 2026-08-28, printed an empty reason);
+        # last_run is the top-level stamp of the previous completed cycle.
+        printf 'SWAN cycle in progress (previous cycle completed %s)' \
+            "$(printf '%s' "$body" | grep -Eo '"last_run": ?"[^"]*"' | head -1 | sed -E 's/.*: ?"//; s/"$//')"
         return 0
     fi
     return 1
