@@ -1026,6 +1026,18 @@ cells (KAT (d) records the flip count as the recorded before/after).
    isotropic cell-centre field twice. Pinned by
    `tests/services/test_s81_ww3_grid_live_grammar.py`. With both fixed the live G1 built:
    143×171, 21,081 sea / 3,238 land / 134 excluded / 313 boundary points.
+   *Second as-built correction (2026-08-28, reality gate):* **the file holds fractional
+   OBSTRUCTION, `1 − τ`, not `τ`.** The manual's input is "a field of fractional
+   obstructions" (:15931, :15939; its example is 0 in open water and 0.8–1.0 on an island);
+   FLAGTR=2's "Transp." names WW3's internal transmission (§3.4.7: 0 = closed, 1 = open).
+   Written as `τ`, every open-water cell (τ = 1) was a full wall: the first rebuilt-grid leg
+   (18Z 2026-08-27) produced a transfer with exactly 0.0 m at all 171 points for all 7 hours
+   (measured with `vchain.ww3_buoy_summary()`; the old-grid 12Z transfer had 0.99–1.08 m at
+   the buoys against 1.0–1.3 m observed) and the published surf forecast carried a 0.06 m /
+   1.3 s ripple against a 1.0 m / 11 s buoy. Fixed in `write_ww3_grid_name_files()` (marine,
+   same day); because the provenance hash covers the NAME files, the next leg rebuilt and
+   cold-started on its own (`derivation_changed`). The transparency *value* `τ = f` and the
+   mask rule are unchanged — only the file's sign convention.
 4. **Depth values.** `G1_bottom.txt` keeps the ETOPO L1-cache nearest-sample elevation for
    every cell (D3's existing convention) EXCEPT a cell that is wet by fraction (`f > F_DRY`)
    while its centre ETOPO sample is land (≥ 0) — that cell needs a real water depth to be a
