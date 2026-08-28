@@ -25,6 +25,7 @@
 #   ./scripts/deploy-marine.sh                # full deploy
 #   ./scripts/deploy-marine.sh --skip-pull    # skip the git pull step
 #   ./scripts/deploy-marine.sh --no-restart   # install only, no restart
+#   ./scripts/deploy-marine.sh --force-restart # restart even over an in-flight WW3 march/SWAN run
 #   ./scripts/deploy-marine.sh --show-secret  # print MARINE_SERVICE_SECRET and exit
 #
 # ---------------------------------------------------------------------------
@@ -101,14 +102,16 @@ SSH_CMD="ssh -F ${SSH_CONFIG}"
 skip_pull="0"
 no_restart="0"
 show_secret="0"
+force_restart="0"
 for arg in "$@"; do
     case "$arg" in
-        --skip-pull)   skip_pull="1" ;;
-        --no-restart)  no_restart="1" ;;
-        --show-secret) show_secret="1" ;;
+        --skip-pull)     skip_pull="1" ;;
+        --no-restart)    no_restart="1" ;;
+        --force-restart) force_restart="1" ;;
+        --show-secret)   show_secret="1" ;;
         *)
             echo "Unknown argument: '${arg}'" >&2
-            echo "Usage: $0 [--skip-pull] [--no-restart] [--show-secret]" >&2
+            echo "Usage: $0 [--skip-pull] [--no-restart] [--force-restart] [--show-secret]" >&2
             exit 1
             ;;
     esac
@@ -398,6 +401,50 @@ if [ "$no_restart" = "1" ]; then
 fi
 
 echo "--- [6/6] restart + verify ---"
+# --- J28 guard (2026-08-28, operator order): never restart over an in-flight
+# WW3 horizon march or SWAN run. The 96 h horizon march is a ww3_shel CHILD of
+# the service: `systemctl restart` at 03:10:43Z on 2026-08-28 killed it
+# (rc=-15) 631 s in, and with the march gone every full run that day staged
+# the 6 h nowcast alone -- SWAN L2 held the +6 h ocean frozen for hours 7-72
+# (the flat 72 h forecast). /health is unauthenticated; two keys are read:
+#   ww3Horizon.inFlight  -- the march is running (state.record_ww3_horizon_started)
+#   run_in_progress      -- a SWAN full/fast cycle is running
+# Poll every 60 s up to WAIT_CEILING_S (the march's own 6 h ceiling + slack),
+# then give up loudly. --force-restart skips the wait (operator's call, never
+# the default). An unreachable /health (service down) counts as idle.
+WAIT_POLL_S=60
+WAIT_CEILING_S=23400
+busy_reason() {
+    local body
+    body=$($SSH_CMD librewxr "curl -sk --max-time 10 https://localhost:${PORT}/health" 2>/dev/null || true)
+    if printf '%s' "$body" | grep -Eq '"inFlight": ?true'; then
+        printf '%s' "$body" | grep -Eo '"inFlightCycleTime": ?"[^"]*"' | head -1 | sed 's/^/horizon march in flight /'
+        return 0
+    fi
+    if printf '%s' "$body" | grep -Eq '"run_in_progress": ?true'; then
+        printf '%s' "$body" | grep -Eo '"last_cycle_started_at": ?"[^"]*"' | head -1 | sed 's/^/SWAN cycle in progress /'
+        return 0
+    fi
+    return 1
+}
+if [ "$force_restart" = "1" ]; then
+    echo "[guard] --force-restart: skipping the in-flight WW3 march / SWAN run wait"
+else
+    waited=0
+    while reason=$(busy_reason); do
+        if [ "$waited" -ge "$WAIT_CEILING_S" ]; then
+            echo "[guard] still busy after ${waited}s (${reason}) -- refusing to restart." >&2
+            echo "[guard] re-run with --force-restart to kill it deliberately." >&2
+            exit 1
+        fi
+        if [ $((waited % 300)) -eq 0 ]; then
+            echo "[guard] service busy: ${reason} -- waiting (${waited}s elapsed, ceiling ${WAIT_CEILING_S}s)"
+        fi
+        sleep "$WAIT_POLL_S"
+        waited=$((waited + WAIT_POLL_S))
+    done
+    echo "[guard] service idle (no WW3 march or SWAN cycle in flight) -- restarting"
+fi
 run_root "systemctl restart ${SERVICE}"
 echo "[svc] restart issued, waiting ${STARTUP_WAIT}s..."
 sleep "$STARTUP_WAIT"

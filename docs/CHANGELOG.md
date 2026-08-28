@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-28 — J28: the 72 h surf forecast was frozen past +6 h — the WW3 horizon march is now retried, deploys wait for it, and health says so
+
+Operator report: "my surf forecast is flat over 72 hours ... wave height varies by 1–2 inches
+total." Measured: the staged SWAN L2 boundary file held exactly 7 time records (00Z–06Z) for a
+73-hour deck; SWAN's PRINT carried "data on boundary file exhausted"; the published payload showed
+one 0.80 m / 10.5 s / 196° partition from hour 7 to hour 72 with only the tide moving. The daily
+96 h WW3 continuation march that exists to fill hours 7–72 had NEVER succeeded on librewxr
+(08-27: wind short, since fixed by Q17; 08-28 03:10:43Z: `ww3_shel` killed rc=-15 by the
+`systemctl restart` of the J22 deploy) and fired once a day after the 00Z publish with no retry.
+`fullRun.l2BoundaryExhausted` was `true` throughout and nothing visible said so — including the
+previous night's reality gate, which read hours 4–6 only.
+
+- **marine** (`weewx-clearskies-marine`) — `service.py`: `ww3_horizon_wrong_cycle` refusal
+  deleted (any cycle hour marches); `_ww3_horizon_march_due()` / `_ww3_horizon_march_attempt()` /
+  `_ww3_horizon_catch_up_cycle()` — attempted after any publish and from the loop tick whenever
+  the newest horizon transfer cannot cover the last published cycle's 72 h window, 3 attempts per
+  cycle 30 min apart, in-memory counter; `state.py` `ww3Horizon.inFlight` (+ attempt keys, forced
+  false on restore); `endpoints/health.py` floors `status` at `degraded` on
+  `l2BoundaryExhausted`. KATs `tests/test_j28_horizon_retry.py` (fail on `008b6e3`).
+- **meta** — `scripts/deploy-marine.sh` restart guard (waits up to 6.5 h on `ww3Horizon.inFlight`
+  / `run_in_progress`; `--force-restart`); ARCHITECTURE.md ⚓ WW3 paragraph; OPERATIONS-MANUAL
+  (retry, guard, health); PROVIDER-MANUAL §14.18 "Retry"; ADR-109 amendment 2026-08-28.
+
 ### 2026-08-27 — M5: ADR-078 geographic-features removal (Amendment 2 Accepted)
 
 ADR-078 Amendment 2 was accepted (operator, 2026-08-27: "that was in the plan, why do i need to

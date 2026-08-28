@@ -813,6 +813,38 @@ cover (Q16.1's coverage-arithmetic correction to the original Q16 text's 73 h/+7
 figures). Failure-isolated by design: any horizon-march failure logs a named refusal
 and can never delay, block, or alter a production publish.
 
+**Amendment (2026-08-28, J28 — operator order "the 72 hours never fired ... FIX IT"):
+the march is retried, and any cycle hour may march.** Live record: the production host
+never had a `level0/horizon_*` transfer. 08-27 03:36Z refused `ww3_horizon_wind_short`
+(closed by Q17); 08-28 03:10:43Z the march's `ww3_shel` child was killed (rc=-15, 631 s
+in) by the `systemctl restart` of a deploy; with "once after the 00Z publish, no retry"
+nothing tried again until the next day, and every full run in between staged the 6 h
+nowcast alone — SWAN L2 printed "data on boundary file exhausted" and hours 7–72 of
+every published forecast were one frozen ocean (a single 0.80 m / 10.5 s / 196°
+partition for 66 straight hours; only the tide moved). `fullRun.l2BoundaryExhausted`
+was `true` throughout, feeding nothing visible. Changes, all in `service.py` and
+`state.py` (mechanics unchanged: same march, same restart COPY, same pin, same merge):
+(1) the `ww3_horizon_wrong_cycle` refusal is deleted — a 06/12/18Z cycle persists the
+same `restart_<cycle+6h>.ww3` and `boundary_cycle_<cycle>.txt` the march needs; (2)
+`_ww3_horizon_march_due()`: due once after the designated 00Z publish (as before) OR
+whenever the newest horizon transfer on disk cannot cover the last published cycle's
+72 h L2 window (`vchain._L2_RUN_COVERAGE_H`), capped at 3 attempts per cycle
+(`_WW3_HORIZON_MAX_ATTEMPTS_PER_CYCLE`) 30 min apart (`_WW3_HORIZON_RETRY_BACKOFF_S`),
+counter in-memory so a restart — the thing that killed the last attempt — starts fresh;
+(3) the runner loop's tick runs a **catch-up** attempt (`_ww3_horizon_catch_up_cycle()`:
+`fullRun.lastSuccessCycle`, restored from disk, with both leg artifacts present) when
+nothing production-critical is queued or in progress; (4) `ww3Horizon.inFlight` (+
+`inFlightCycleTime`, `lastAttemptCycleTime`, `lastAttemptAt`) in `state.py`, forced
+false on restore, read by `scripts/deploy-marine.sh`'s new restart guard (waits up to
+6.5 h; `--force-restart` overrides); (5) `endpoints/health.py`: `l2BoundaryExhausted =
+true` floors `status` at `degraded` with a reason naming the march's state. The
+failure-isolation requirement above is unchanged — a march still never delays, blocks or
+alters a production publish (a catch-up yields to any pending full run, forced run or
+hourly fill). The "designated 00Z" wording below stands as the daily baseline; it is no
+longer the ONLY time a march can run. KATs: `tests/test_j28_horizon_retry.py`,
+`tests/test_ww3_horizon_march.py::TestHorizonMarchAnyCycleMarches` (pre-change: the old
+`test_non_00z_cycle_refuses` asserted the refusal this amendment removes).
+
 **D12 compute-budget delta.** Q16's original text estimated the long march at ~3.3 h
 (73 h span); Q16.1 corrected this to **96 h span, ≈4.3 h wall-clock**, still a single
 background march at D12's standing contention budget (`OMP_NUM_THREADS ≤ 4`, `nice 15`,
