@@ -281,7 +281,10 @@ valid raw horizon's retry budget. Retention cannot prune the selected path/hash.
 ### R3 — fail-closed boundary
 
 Inject missing, short, incompatible and L2-exhausted boundaries. Each must preserve cache, marker,
-selected boundary and every hotstart byte. Before R11 there is no intent/exit; after R11 exactly one
+selected boundary and every hotstart byte that was usable when the exhaustion branch was reached.
+R3 itself performs no hotstart save or deletion. The pre-existing hotstart-crash retry may still
+remove a hotstart that first proved it crashes SWAN before a later cold retry reports exhaustion;
+R3 does not restore poisoned state. Before R11 there is no intent/exit; after R11 exactly one
 intent/restart occurs per identity. Each fixture produces exactly one refusal; health and admin name
 it without fresh model claims. Clean-install bootstrap waits/retries to a complete boundary.
 
