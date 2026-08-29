@@ -151,11 +151,11 @@ guard_classify() {
             health="malformed"
         else
             http_status="${health_response##*$'\n'}"
-            if [[ "$http_status" =~ ^[0-9]{3}$ ]]; then
+            if [[ "$health_response" == *$'\n'* ]] && [[ "$http_status" =~ ^[0-9]{3}$ ]]; then
                 health_body="${health_response%$'\n'*}"
                 if [ "$http_status" != "200" ]; then
                     health="malformed"
-                elif health=$(printf '%s' "$health_body" | $SSH_CMD -o ConnectTimeout=20 librewxr "python3 -c 'import json,sys; data=json.load(sys.stdin); in_flight=data[\"ww3Horizon\"][\"inFlight\"]; run_in_progress=data[\"run_in_progress\"]; assert type(in_flight) is bool and type(run_in_progress) is bool; print(\"busy\" if in_flight or run_in_progress else \"idle\")'" 2>/dev/null); then
+                elif health=$(printf '%s' "$health_body" | $SSH_CMD -o ConnectTimeout=20 librewxr "python3 -c 'import json,sys; data=json.load(sys.stdin); in_flight=data[\"ww3Horizon\"][\"inFlight\"]; run_in_progress=data[\"run_in_progress\"]; (type(in_flight) is bool and type(run_in_progress) is bool) or sys.exit(2); print(\"busy\" if in_flight or run_in_progress else \"idle\")'" 2>/dev/null); then
                     case "$health" in
                         busy|idle) ;;
                         *) health="malformed" ;;
@@ -163,11 +163,6 @@ guard_classify() {
                 else
                     health="malformed"
                 fi
-            elif health=$(printf '%s' "$health_response" | $SSH_CMD -o ConnectTimeout=20 librewxr "python3 -c 'import json,sys; data=json.load(sys.stdin); in_flight=data[\"ww3Horizon\"][\"inFlight\"]; run_in_progress=data[\"run_in_progress\"]; assert type(in_flight) is bool and type(run_in_progress) is bool; print(\"busy\" if in_flight or run_in_progress else \"idle\")'" 2>/dev/null); then
-                case "$health" in
-                    busy|idle) ;;
-                    *) health="malformed" ;;
-                esac
             else
                 health="malformed"
             fi
