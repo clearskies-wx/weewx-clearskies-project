@@ -1,7 +1,7 @@
 """Results-free R0 feasibility harness for the approved thread-to-main exit path.
 
-This is deliberately self-contained: it models the locked lifecycle boundary without
-importing or changing the marine service.  It does not create files or contact a service.
+This standard-library harness uses a running asyncio loop. It models the locked
+lifecycle boundary without importing or changing the marine service.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ import asyncio
 import threading
 import unittest
 from dataclasses import dataclass
+from typing import Callable
 
 
 RECOVERY_EXIT = 75
@@ -23,271 +24,309 @@ class RecoveryIdentity:
     runtime_generation: str
 
 
-class ThreadBoundEvent:
-    """Event whose mutation is legal only on the main coroutine's thread."""
+class ThreadBoundAsyncEvent:
+    """An asyncio event which may be mutated only by its owning loop thread."""
 
-    def __init__(self, owner_ident: int) -> None:
-        self.owner_ident = owner_ident
+    def __init__(self) -> None:
+        self.owner_ident = threading.get_ident()
+        self.event = asyncio.Event()
         self.set_by: int | None = None
 
     def set(self) -> None:
         if threading.get_ident() != self.owner_ident:
-            raise AssertionError("recovery event mutated outside the main thread")
+            raise AssertionError("event mutated outside the main loop thread")
         self.set_by = threading.get_ident()
+        self.event.set()
+
+    async def wait(self) -> None:
+        await self.event.wait()
 
     def is_set(self) -> bool:
-        return self.set_by is not None
-
-
-class FakeMainLoop:
-    """Minimal loop seam that records cross-thread scheduling and main delivery."""
-
-    def __init__(self) -> None:
-        self.main_ident = threading.get_ident()
-        self.calls: list[tuple[int, object]] = []
-
-    def call_soon_threadsafe(self, callback: object) -> None:
-        self.calls.append((threading.get_ident(), callback))
-
-    def drain(self) -> None:
-        if threading.get_ident() != self.main_ident:
-            raise AssertionError("scheduled callbacks must be delivered on main thread")
-        for _, callback in self.calls:
-            callback()  # type: ignore[operator]
+        return self.event.is_set()
 
 
 class FakeServer:
-    def __init__(self, main_ident: int) -> None:
-        self.main_ident = main_ident
+    """Uvicorn-shaped server: should_exit is requested, then completion awaited."""
+
+    def __init__(self, owner_ident: int) -> None:
+        self.owner_ident = owner_ident
         self.should_exit = False
         self.requested_by: int | None = None
+        self.awaited = False
+        self.completed = False
+        self._completion = asyncio.Event()
 
     def request_exit(self) -> None:
-        if threading.get_ident() != self.main_ident:
-            raise AssertionError("uvicorn server stopped outside the main thread")
+        if threading.get_ident() != self.owner_ident:
+            raise AssertionError("uvicorn server stopped outside the main loop thread")
         self.should_exit = True
         self.requested_by = threading.get_ident()
+        self._completion.set()
 
-    async def wait_until_stopped(self) -> None:
-        if not self.should_exit:
-            raise AssertionError("uvicorn server was awaited without should_exit")
+    async def wait_completed(self) -> None:
+        await self._completion.wait()
+        self.awaited = True
+        self.completed = self._completion.is_set()
 
 
 class FakeWindTask:
-    def __init__(self, main_ident: int) -> None:
-        self.main_ident = main_ident
+    def __init__(self, owner_ident: int) -> None:
+        self.owner_ident = owner_ident
         self.cancelled = False
         self.awaited = False
+        self.completed = False
         self.cancel_by: int | None = None
+        self._completion = asyncio.Event()
 
     def cancel(self) -> None:
-        if threading.get_ident() != self.main_ident:
-            raise AssertionError("wind task cancelled outside the main thread")
+        if threading.get_ident() != self.owner_ident:
+            raise AssertionError("wind task cancelled outside the main loop thread")
         self.cancelled = True
         self.cancel_by = threading.get_ident()
+        self._completion.set()
 
-    async def wait(self) -> None:
+    async def wait_completed(self) -> None:
         if not self.cancelled:
             raise AssertionError("wind task was awaited without cancellation")
+        await self._completion.wait()
         self.awaited = True
+        self.completed = self._completion.is_set()
+
+
+class RecoveryRequested(Exception):
+    """Named runner outcome that is allowed to request the recovery exit."""
 
 
 class RecoveryController:
-    """Approved R0 boundary: one thread-safe recovery signal per identity."""
+    """Approved R0 boundary: one real thread-safe signal per identity."""
 
-    def __init__(self, loop: FakeMainLoop, recovery_event: ThreadBoundEvent) -> None:
+    def __init__(self, loop: asyncio.AbstractEventLoop) -> None:
         self.loop = loop
-        self.recovery_event = recovery_event
+        self.recovery_event = ThreadBoundAsyncEvent()
+        self.operator_event = ThreadBoundAsyncEvent()
         self.requested: set[RecoveryIdentity] = set()
         self.blocked: list[RecoveryIdentity] = []
+        self.recovery_posts = 0
+        self.generic_runner_errors: list[str] = []
 
     def request_from_runner(self, identity: RecoveryIdentity) -> None:
         if identity in self.requested:
             self.blocked.append(identity)
             return
         self.requested.add(identity)
+        self.recovery_posts += 1
         self.loop.call_soon_threadsafe(self.recovery_event.set)
 
+    def dispatch_operator_signal(self, signame: str) -> None:
+        if signame not in {"SIGTERM", "SIGINT"}:
+            raise AssertionError(f"unexpected operator signal: {signame}")
+        self.operator_event.set()
 
-async def _shutdown(
-    servers: list[FakeServer], wind_task: FakeWindTask, exit_code: int
+    async def serve_until_stop(
+        self, servers: list[FakeServer], wind_task: FakeWindTask
+    ) -> int:
+        recovery_wait = asyncio.create_task(self.recovery_event.wait())
+        operator_wait = asyncio.create_task(self.operator_event.wait())
+        _, pending = await asyncio.wait(
+            {recovery_wait, operator_wait}, return_when=asyncio.FIRST_COMPLETED
+        )
+        recovery = recovery_wait.done()
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+
+        for server in servers:
+            server.request_exit()
+        wind_task.cancel()
+        await asyncio.gather(*(server.wait_completed() for server in servers))
+        await wind_task.wait_completed()
+        return RECOVERY_EXIT if recovery else NORMAL_EXIT
+
+
+def runner_boundary(
+    controller: RecoveryController,
+    identity: RecoveryIdentity,
+    operation: Callable[[], None],
+) -> None:
+    """Runner boundary: named recovery posts; generic errors remain contained."""
+    try:
+        operation()
+    except RecoveryRequested:
+        controller.request_from_runner(identity)
+    except Exception as exc:
+        controller.generic_runner_errors.append(type(exc).__name__)
+
+
+async def _mutant_omits_server_gather(
+    servers: list[FakeServer], wind_task: FakeWindTask
 ) -> int:
-    """Main-coroutine cleanup shape pinned by R0: stop, cancel, await, then exit."""
+    """Negative control: cleanup requests exit but omits server completion await."""
     for server in servers:
         server.request_exit()
     wind_task.cancel()
-    await asyncio.gather(*(server.wait_until_stopped() for server in servers))
-    await wind_task.wait()
-    return exit_code
-
-
-async def _mutant_shutdown_omits_servers(
-    servers: list[FakeServer], wind_task: FakeWindTask
-) -> int:
-    """Negative control: intentionally omits the required uvicorn stop."""
-    del servers
-    wind_task.cancel()
-    await wind_task.wait()
+    await wind_task.wait_completed()
     return RECOVERY_EXIT
 
 
-async def _mutant_shutdown_omits_wind_cancel(
+async def _mutant_omits_wind_cancel(
     servers: list[FakeServer], wind_task: FakeWindTask
 ) -> int:
-    """Negative control: intentionally omits required wind cancellation."""
+    """Negative control: cleanup awaits wind completion without cancelling it."""
     for server in servers:
         server.request_exit()
-    await asyncio.gather(*(server.wait_until_stopped() for server in servers))
-    await wind_task.wait()
+    await asyncio.gather(*(server.wait_completed() for server in servers))
+    await wind_task.wait_completed()
     return RECOVERY_EXIT
 
 
-class RecoveryControllerHarnessTests(unittest.TestCase):
-    def setUp(self) -> None:
+class RecoveryControllerHarnessTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self) -> None:
         self.main_ident = threading.get_ident()
+        self.loop = asyncio.get_running_loop()
         self.identity = RecoveryIdentity("2026-08-29T12:00Z", "inputs-a", "runtime-a")
 
-    def _recovery_fixture(
+    def _fixture(
         self,
-    ) -> tuple[FakeMainLoop, ThreadBoundEvent, RecoveryController, list[FakeServer], FakeWindTask]:
-        loop = FakeMainLoop()
-        event = ThreadBoundEvent(loop.main_ident)
-        controller = RecoveryController(loop, event)
-        return loop, event, controller, [FakeServer(loop.main_ident), FakeServer(loop.main_ident)], FakeWindTask(loop.main_ident)
+    ) -> tuple[RecoveryController, list[FakeServer], FakeWindTask]:
+        controller = RecoveryController(self.loop)
+        servers = [FakeServer(self.main_ident), FakeServer(self.main_ident)]
+        return controller, servers, FakeWindTask(self.main_ident)
 
-    def _request_on_runner_thread(
-        self, controller: RecoveryController, identity: RecoveryIdentity
+    async def _run_runner(
+        self, controller: RecoveryController, operation: Callable[[], None]
     ) -> int:
         runner_ident: list[int] = []
 
         def runner() -> None:
             runner_ident.append(threading.get_ident())
-            controller.request_from_runner(identity)
+            runner_boundary(controller, self.identity, operation)
 
         thread = threading.Thread(target=runner, name="marine-runner")
         thread.start()
-        thread.join()
+        await asyncio.to_thread(thread.join)
         self.assertFalse(thread.is_alive())
         return runner_ident[0]
 
-    def test_runner_request_is_delivered_by_call_soon_threadsafe_on_main_thread(self) -> None:
-        loop, event, controller, _, _ = self._recovery_fixture()
-
-        runner_ident = self._request_on_runner_thread(controller, self.identity)
-
-        self.assertEqual(1, len(loop.calls))
-        self.assertNotEqual(loop.main_ident, runner_ident)
-        self.assertEqual(runner_ident, loop.calls[0][0])
-        self.assertFalse(event.is_set())
-        loop.drain()
-        self.assertTrue(event.is_set())
-        self.assertEqual(loop.main_ident, event.set_by)
-
-    def test_recovery_event_stops_every_server_cancels_and_awaits_wind_then_exits_75(self) -> None:
-        loop, event, controller, servers, wind_task = self._recovery_fixture()
-
-        self._request_on_runner_thread(controller, self.identity)
-        loop.drain()
-        exit_code = asyncio.run(_shutdown(servers, wind_task, RECOVERY_EXIT))
-
-        self.assertTrue(event.is_set())
-        self.assertEqual(RECOVERY_EXIT, exit_code)
+    def _assert_cleaned(self, servers: list[FakeServer], wind_task: FakeWindTask) -> None:
         self.assertTrue(all(server.should_exit for server in servers))
+        self.assertTrue(all(server.awaited and server.completed for server in servers))
         self.assertTrue(all(server.requested_by == self.main_ident for server in servers))
         self.assertTrue(wind_task.cancelled)
         self.assertTrue(wind_task.awaited)
+        self.assertTrue(wind_task.completed)
         self.assertEqual(self.main_ident, wind_task.cancel_by)
 
-    def test_sigterm_or_sigint_normal_stop_uses_zero_exit(self) -> None:
+    async def test_runner_request_uses_actual_call_soon_threadsafe_and_main_exits_75(self) -> None:
+        controller, servers, wind_task = self._fixture()
+        main_task = asyncio.create_task(controller.serve_until_stop(servers, wind_task))
+        await asyncio.sleep(0)
+
+        runner_ident = await self._run_runner(
+            controller, lambda: (_ for _ in ()).throw(RecoveryRequested())
+        )
+        exit_code = await main_task
+
+        self.assertNotEqual(self.main_ident, runner_ident)
+        self.assertTrue(controller.recovery_event.is_set())
+        self.assertEqual(self.main_ident, controller.recovery_event.set_by)
+        self.assertEqual(1, controller.recovery_posts)
+        self.assertEqual(RECOVERY_EXIT, exit_code)
+        self._assert_cleaned(servers, wind_task)
+
+    async def test_sigterm_or_sigint_dispatch_wakes_main_and_exits_zero(self) -> None:
         for signame in ("SIGTERM", "SIGINT"):
             with self.subTest(signame=signame):
-                _, _, _, servers, wind_task = self._recovery_fixture()
-                exit_code = asyncio.run(_shutdown(servers, wind_task, NORMAL_EXIT))
+                controller, servers, wind_task = self._fixture()
+                main_task = asyncio.create_task(controller.serve_until_stop(servers, wind_task))
+                await asyncio.sleep(0)
+                self.loop.call_soon(controller.dispatch_operator_signal, signame)
+                exit_code = await main_task
+                self.assertTrue(controller.operator_event.is_set())
+                self.assertEqual(self.main_ident, controller.operator_event.set_by)
                 self.assertEqual(NORMAL_EXIT, exit_code)
-                self.assertTrue(all(server.should_exit for server in servers))
-                self.assertTrue(wind_task.cancelled)
-                self.assertTrue(wind_task.awaited)
+                self._assert_cleaned(servers, wind_task)
 
-    def test_generic_runner_exception_is_contained_without_recovery_exit(self) -> None:
-        loop, event, controller, servers, wind_task = self._recovery_fixture()
+    async def test_generic_runner_exception_stays_waiting_until_operator_stop(self) -> None:
+        controller, servers, wind_task = self._fixture()
+        main_task = asyncio.create_task(controller.serve_until_stop(servers, wind_task))
+        await asyncio.sleep(0)
 
-        def generic_runner() -> None:
-            try:
-                raise RuntimeError("ordinary runner failure")
-            except RuntimeError:
-                pass
+        await self._run_runner(
+            controller, lambda: (_ for _ in ()).throw(RuntimeError("ordinary runner failure"))
+        )
+        await asyncio.sleep(0)
+        self.assertFalse(main_task.done())
+        self.assertFalse(controller.recovery_event.is_set())
+        self.assertEqual(["RuntimeError"], controller.generic_runner_errors)
 
-        thread = threading.Thread(target=generic_runner, name="marine-runner")
-        thread.start()
-        thread.join()
-        exit_code = asyncio.run(_shutdown(servers, wind_task, NORMAL_EXIT))
+        self.loop.call_soon(controller.dispatch_operator_signal, "SIGTERM")
+        self.assertEqual(NORMAL_EXIT, await main_task)
+        self._assert_cleaned(servers, wind_task)
 
-        self.assertEqual([], loop.calls)
-        self.assertFalse(event.is_set())
-        self.assertEqual([], controller.blocked)
-        self.assertEqual(NORMAL_EXIT, exit_code)
+    async def test_duplicate_identity_blocks_without_second_signal_or_exit(self) -> None:
+        controller, _, _ = self._fixture()
 
-    def test_duplicate_identity_blocks_without_second_signal_or_exit(self) -> None:
-        loop, event, controller, _, _ = self._recovery_fixture()
+        await self._run_runner(controller, lambda: (_ for _ in ()).throw(RecoveryRequested()))
+        await asyncio.sleep(0)
+        await self._run_runner(controller, lambda: (_ for _ in ()).throw(RecoveryRequested()))
+        await asyncio.sleep(0)
 
-        self._request_on_runner_thread(controller, self.identity)
-        loop.drain()
-        self._request_on_runner_thread(controller, self.identity)
-
-        self.assertTrue(event.is_set())
+        self.assertTrue(controller.recovery_event.is_set())
         self.assertEqual([self.identity], controller.blocked)
-        self.assertEqual(1, len(loop.calls))
+        self.assertEqual({self.identity}, controller.requested)
+        self.assertEqual(1, controller.recovery_posts)
 
-    def test_negative_control_direct_cross_thread_event_mutation_fails(self) -> None:
-        loop = FakeMainLoop()
-        event = ThreadBoundEvent(loop.main_ident)
-        error: list[BaseException] = []
+    async def test_negative_control_direct_cross_thread_event_mutation_fails(self) -> None:
+        controller, _, _ = self._fixture()
+        errors: list[BaseException] = []
 
         def direct_mutant() -> None:
             try:
-                event.set()
-            except BaseException as exc:  # retain the assertion for the main thread
-                error.append(exc)
+                controller.recovery_event.set()
+            except AssertionError as exc:
+                errors.append(exc)
 
         thread = threading.Thread(target=direct_mutant, name="mutant-runner")
         thread.start()
-        thread.join()
-        self.assertEqual(1, len(error))
-        self.assertIsInstance(error[0], AssertionError)
-        self.assertFalse(event.is_set())
+        await asyncio.to_thread(thread.join)
+        self.assertEqual(1, len(errors))
+        self.assertIsInstance(errors[0], AssertionError)
+        self.assertFalse(controller.recovery_event.is_set())
 
-    def test_negative_control_omitted_server_stop_fails(self) -> None:
-        _, _, _, servers, wind_task = self._recovery_fixture()
+    async def test_negative_control_omitted_server_gather_fails(self) -> None:
+        _, servers, wind_task = self._fixture()
 
-        exit_code = asyncio.run(_mutant_shutdown_omits_servers(servers, wind_task))
-
-        self.assertEqual(RECOVERY_EXIT, exit_code)
+        self.assertEqual(RECOVERY_EXIT, await _mutant_omits_server_gather(servers, wind_task))
         with self.assertRaises(AssertionError):
-            self.assertTrue(all(server.should_exit for server in servers))
+            self.assertTrue(all(server.awaited and server.completed for server in servers))
 
-    def test_negative_control_omitted_wind_cancel_fails(self) -> None:
-        _, _, _, servers, wind_task = self._recovery_fixture()
+    async def test_negative_control_omitted_wind_cancel_fails(self) -> None:
+        _, servers, wind_task = self._fixture()
 
         with self.assertRaisesRegex(AssertionError, "without cancellation"):
-            asyncio.run(_mutant_shutdown_omits_wind_cancel(servers, wind_task))
+            await _mutant_omits_wind_cancel(servers, wind_task)
 
-    def test_negative_control_recovery_exit_zero_fails(self) -> None:
-        _, _, _, servers, wind_task = self._recovery_fixture()
+    async def test_negative_control_recovery_exit_zero_fails(self) -> None:
+        controller, servers, wind_task = self._fixture()
+        main_task = asyncio.create_task(controller.serve_until_stop(servers, wind_task))
+        await asyncio.sleep(0)
+        await self._run_runner(controller, lambda: (_ for _ in ()).throw(RecoveryRequested()))
 
-        mutant_exit = asyncio.run(_shutdown(servers, wind_task, NORMAL_EXIT))
-
+        mutant_exit = await main_task
         with self.assertRaises(AssertionError):
-            self.assertEqual(RECOVERY_EXIT, mutant_exit)
+            self.assertEqual(NORMAL_EXIT, mutant_exit)
 
-    def test_negative_control_duplicate_second_signal_fails(self) -> None:
-        loop, _, controller, _, _ = self._recovery_fixture()
+    async def test_negative_control_duplicate_second_signal_fails(self) -> None:
+        controller, _, _ = self._fixture()
 
-        self._request_on_runner_thread(controller, self.identity)
+        await self._run_runner(controller, lambda: (_ for _ in ()).throw(RecoveryRequested()))
+        await asyncio.sleep(0)
         controller.requested.clear()  # deliberate mutant: loses deduplication state
-        self._request_on_runner_thread(controller, self.identity)
+        await self._run_runner(controller, lambda: (_ for _ in ()).throw(RecoveryRequested()))
+        await asyncio.sleep(0)
 
         with self.assertRaises(AssertionError):
-            self.assertEqual(1, len(loop.calls))
+            self.assertEqual(1, controller.recovery_posts)
 
 
 if __name__ == "__main__":
