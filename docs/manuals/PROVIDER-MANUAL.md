@@ -1304,7 +1304,7 @@ CO-OPS Data API returns JSON. Base URL: `https://api.tidesandcurrents.noaa.gov/a
 
 **Rate limiting:** 2 req/s (NOMADS is shared NOAA infrastructure), paced with a 0.55s sleep between per-forecast-hour requests — same pattern as §14.14/§14.16.
 
-**RW-1 (register ruling 13, "ONE source of offshore truth", 2026-08-06): this provider is no longer called for surf-spot locations.** `endpoints/marine.py`'s 3 card call sites now branch on `location.id in marine_config.surf_spots` — a surf-spot location's wave fields come from `services/model_wave_source.py` (the wave model's own SWAN watershed partitions, §14.15) instead, with no fallback to this module even when the model has no cached data yet. This module still serves every non-surf marine location, and still feeds the L1 SWAN boundary (a different code path — see §14.3a).
+**RW-1 (register ruling 13, "ONE source of offshore truth", 2026-08-06): this provider is no longer called for surf-spot locations.** A surf-spot location's wave fields come from `services/model_wave_source.py`, with no WaveWatch fallback when the model has no cached data. WaveWatch continues to serve non-surf marine locations. The project WW3 leg (§14.18), not WaveWatch, owns the deep-water model boundary.
 
 ### §14.3a WW3 station spectral boundary fetch (T8.10b) — SUPERSEDED, deleted 2026-08-09 (Phase B, ADR-104 D3/D4)
 
@@ -2208,9 +2208,7 @@ uniform tide, or missing currents.
 
 - `SWANRunner.__init__`: takes config (per-level grid bboxes, surf spot coordinates, bathymetry data, SWAN binary path)
 - Production full runs call `swan._run_all_spots_locked()` and then `SWANRunner.run_3level()`. SWAN skips L1, accepts the project WW3 transfer at L2 through BOUNDNEST3, and runs L2–L4 as each cluster requires.
-- ~~`_run_level1(...)`: runs Level 1 (1 km) SWAN~~ — REMOVED 2026-08-23; WW3 computes the deep-water leg instead (§14.18)
-- `_run_level2(tmpdir, blended_wind, cudem_bathymetry, wlevel, current)`: runs Level 2 (100 m) SWAN with WLEVEL/CURRENT inputs, writes `NESTOUT` boundary files for Level 3
-- `_run_level3(tmpdir, blended_wind, cudem_bathymetry, wlevel, current, obstacles)`: runs Level 3 (40 m) SWAN with WLEVEL/CURRENT/OBSTACLE inputs, outputs CURVE transect TABLE and the **handoff** SPECOUT/`TABLE PT*` at each unique per-transect handoff cell. *Previously described as "SPECOUT at ~10m depth points"; void — ADR-095 Amendment 2 states the ~10 m reference point does not exist in the current architecture. The deep-water-reference SPECOUT is written by `_run_level2()`, not here.*
+- `run_3level()` writes and executes active L2–L4 inputs, applies WLEVEL and CURRENT forcing, emits L2 NESTOUT for L3 when needed, and produces the deep-water-reference and handoff output channels. The handoff is not a fixed 10 m-depth point.
 - `_stitch_wind(hrrr_wind_field, gfs_wind_field)`: blends HRRR (hours 0–48) and GFS (hours 48–72) into a single 72-hour wind input. **Z3 migration step 3:** the SWAN input writer (`services/swan_formats.hrrr_to_swan_wind()`) now hard-validates the stitched series' cadence — a non-uniform/gapped result raises `WindCadenceError` (caught as `no-publish: wind_cadence_non_uniform`) rather than being passed through unchecked. Since migration step 3, the wind gatherer's assembled store (below) also refuses a gapped window at the source (`wind_series_gap`), so a gapped stitch is structurally unreachable in the store-driven run path; the writer's own validation remains as a second, independent check.
 - `_write_input_files(tmpdir, wind_field, boundary, bathymetry, grid_level, swan_level="L2")`: writes SWAN INPUT, BOTTOM.txt, WIND.txt, BOUND_SPEC.txt for a given grid level. **`swan_level`** (WC-D1) selects the physics package: `"L1"` would emit GEN3 ST6 + SSWELL ZIEGER + NEGATINP (that branch is now unreachable — no caller passes `"L1"` since SWAN's own L1 run was removed 2026-08-23); the default `"L2"` emits GEN3 WESTHUYSEN. Returns grid_info dict
 - `_spawn_swan(tmpdir)`: subprocess `swan < INPUT`, captures stdout/stderr, raises `SWANRunError` on non-zero exit or severe errors in Errfile
@@ -2229,9 +2227,10 @@ uniform tide, or missing currents.
 
 The `~10,000–20,000` grid-point / `≤400 MB` total that this table previously cited was the pre-Phase-E three-level (L1+L2+L3-always) figure and no longer applies uniformly — an open-beach spot with neither trigger runs only WW3+L2 (well under that figure); a structure spot additionally runs L3+L4 (L2+L3+L4 ≈ 12,600 cells at HB, ADR-093 Amendment 3 D8). WW3 hands its spectrum to SWAN's L2 boundary via **BOUNDNEST3** (ADR-109 D6) — a different mechanism from SWAN's own `NESTOUT`/`NGRID` chain that the rest of this paragraph describes for L2→L3→L4. L2 reads L3's boundary needs via SWAN's `NGRID` command and writes its own `NESTOUT`; when L3 runs, it reads L2's `NESTOUT`; when L3 nests L4 (structure case), L3 itself writes a further `NESTOUT` sized to L4, which L4 reads. Multiple surf spots on the same coastline share the WW3 leg and L2; each cluster gets its own L3/L4 nest when triggered. The runner copies boundary files between level subdirs: WW3's transfer file (`level0/`) → `level2/nest_in.dat` (via BOUNDNEST3, not a file copy), `level2/nest_out.dat` → `level3_{idx}/nest_in.dat`, and (structure case) `level3_{idx}/nest_out.dat` → `level4_{idx}/nest_in.dat`. The `level1/` directory name persists in code/config as the legacy geometry label for the deep-water domain WW3 now sizes itself over — it no longer holds a SWAN L1 nest.
 
-Time step: 10 minutes (SWAN default non-stationary). Output timestep: 1 hour. Forecast span: 72 hours (HRRR hours 0–48, GFS hours 48–72).
+Full-run mode is a stationary sequence: one `COMPUTE STAT` per forecast hour.
+Output timestep and forecast span remain one hour and 72 hours, respectively.
 
-**Output:** `dict[spot_id, list[MarineForecastPoint]]` — 72 forecast hours per spot. Each `MarineForecastPoint` carries `waveHeight=Hs`, `wavePeriod=Tm01`, `waveDirection=MWD`, and `time` (ISO-8601). Source attribution ("swan") is set at the `SwanProvider` response level, not inside `MarineForecastPoint` (which has no `source` field). **Validation:** SWAN INPUT files set `QUANTITY HSIGN TM01 DIR excv=-9.` (explicit no-data sentinel per SWAN user manual §3.5). The TABLE parser rejects rows with values ≤ -9 (exception value) or extreme upper bounds (Hs > 25m, Tm01 > 35s). NaN values are also rejected. Sub-1s Tm01 and near-zero Hs are physically valid SWAN output for weak wind-sea and are NOT rejected.
+**Output:** `dict[spot_id, list[MarineForecastPoint]]` — 72 forecast hours per spot. Each `MarineForecastPoint` carries `waveHeight=Hs`, `wavePeriod=Tm01`, `waveDirection=MWD`, and `time` (ISO-8601). Source attribution is applied at the marine endpoint response boundary, not inside `MarineForecastPoint`. **Validation:** SWAN INPUT files set `QUANTITY HSIGN TM01 DIR excv=-9.` (explicit no-data sentinel per SWAN user manual §3.5). The TABLE parser rejects rows with values ≤ -9 (exception value) or extreme upper bounds (Hs > 25m, Tm01 > 35s). NaN values are also rejected. Sub-1s Tm01 and near-zero Hs are physically valid SWAN output for weak wind-sea and are NOT rejected.
 
 **SWAN INPUT file conventions (per SWAN 41.51 user manual):**
 
@@ -2309,12 +2308,10 @@ When a structure config has `bearing_degrees`, `length_m`, and `distance_m` but 
 The stationary quick update includes spatial STOFS-2D-Global WLEVEL input, the
 same model water-level source as the full path.
 
-**Hotstart:** Each nonstationary SWAN run writes a hotstart file (`HOTFILE`
-after `COMPUTE`). Active hotstarts persist at
-`/var/lib/weewx-clearskies/swan/level2_hotstart.dat`,
-`level3_{idx}_hotstart.dat`, and `level4_{idx}_hotstart.dat` where those
-levels run. There is no SWAN L1 hotstart. Stationary quick updates do not write
-hotstarts.
+**Hotstart:** Active SWAN levels persist per-hour, tokened hotstarts matching
+`level2_hotstart_*.dat`, `level3_*_hotstart_*.dat`, and
+`level4_*_hotstart_*.dat`. There is no SWAN L1 hotstart. Stationary quick
+updates do not write hotstarts.
 
 **SWAN error detection:** `_spawn_swan()` checks both exit code AND stderr/Errfile content. SWAN (Fortran) can exit 0 despite writing "Severe error" to its Errfile. When severe errors are detected, `SWANRunError` is raised so the failure is visible and the run_marker is not stored.
 
@@ -2332,8 +2329,8 @@ completion marker.
 | `transect` | `dict[str, list[dict]]` | Full cross-shore transect per timestep, keyed by ISO-8601 time string (T3.4). Each list entry: `{distanceFromShore, depth, waveHeight, swellHeight, breakingFraction, breakingDissipation}` for one transect point. Used by the beach profile endpoint (T5.1). |
 | `swelltrack` | `dict[str, dict]` | Precomputed 1D (SwellTrack) pipeline result per forecast timestep, keyed by ISO-8601 time string (T4B). See "Precomputed SwellTrack cache" below. |
 | `wind_for_display` | `dict[str, dict]` | Per-timestep wind at the spot pin (not the coastline anchor), keyed by ISO-8601 time string. Each value: `{"windSpeed": float, "windDirection": float}` or `null`. Added H5 2026-08-02. **Q3 ruling (2026-08-11) — PERMANENT hybrid, supersedes the Z3.2 "TRANSITION fallback" framing:** the surf endpoint's display wind reads `services/wind_timeline_store.py`'s `get_present_hours()` (a tolerant sibling of `get_wind_series()` that never refuses on a gap) PRIMARILY, per hour, at request time; this field is the PERMANENT fallback for every hour the store does not cover — aged-out past hours, 3-hourly far-window off-slot hours, or a store-absent/cold read. It is **NOT deleted** in migration step 5: production evidence (16/16 requests falling back post-restart, `docs/planning/MARINE-PAGE-FIXIT-PLAN-2026-08-10.md` Z3.5 STATUS) showed the store's self-bounding design (age-out at wall-clock now + native 3-hourly far window) means it can never cover the served timeline's full range by construction, so this fallback is a structural, permanent need, not a transition artifact. |
-| `spectral_dwr` | `list[dict]` | Per-timestep deep-water-reference SPECOUT spectra (L2 at ~15m, SURF-23). Same shape as `spectral`. |
-| `swelltrack_tide_predictions` | `list[dict]` | STOFS-derived water-level series used by the SwellTrack pipeline this cycle. |
+| `spectral_dwr` | `list[dict]` | Persisted deep-water-reference entries shaped as `{time, components}`. This is not the same persisted shape as `spectral`. |
+| `swelltrack_tide_predictions` | `list[dict]` | STOFS-derived series persisted by the full-run/on-demand-fallback path. A fast update leaves this series unchanged while it merges updated entries. |
 | `run_time` | `str` | ISO-8601 UTC timestamp when the SWAN run completed. |
 | `hrrr_cycle_time` | `str` | HRRR cycle time that forced this SWAN run. |
 
@@ -2371,10 +2368,12 @@ last-good data before the next model run.
 
 | Tier | Trigger | Grids | Mode | Forecast span | Runtime | Interval |
 |---|---|---|---|---|---|---|
-| Full run | `wind_gatherer`'s `extended_cycle_assembled` event, or a geometry-changing config push (`force_full_run_signal`) — both converge on `providers.nearshore.swan.run_full_swan_cycle_from_store()` | Project WW3, then SWAN L2 (+ L3 + L4 where triggered) | Nonstationary (72h time-stepping) | 72 hours | ~7–12 min | ~4×/day (00/06/12/18Z, one per HRRR extended cycle) |
+| Full run | `wind_gatherer`'s `extended_cycle_assembled` event, or a geometry-changing config push (`force_full_run_signal`) — both converge on `providers.nearshore.swan.run_full_swan_cycle_from_store()` | Project WW3, then SWAN L2 (+ L3 + L4 where triggered) | Stationary sequence: one `COMPUTE STAT` per forecast hour | 72 hours | ~7–12 min | ~4×/day (00/06/12/18Z, one per HRRR extended cycle) |
 | Hourly fast cycle | `wind_gatherer`'s `hourly_cycle_assembled` event — converges on `providers.nearshore.swan.run_quick_update_from_store()` | SWAN L2 (+ L3 + L4 where triggered) from the persisted WW3 boundary | Stationary sequence (12 stationary snapshots, hours 0-11) | 12 hourly timesteps (hours 0-11) | not yet re-measured post-Z3.4 | Every hour (per `hourly_cycle_assembled` event) |
 
-**Full runs** produce the 72-hour forecast. All active grid levels must complete within 15 minutes total. Peak memory: ≤400 MB (all grids run sequentially, not simultaneously).
+**Full runs** produce the 72-hour forecast. The 15-minute and 400-MB values
+are performance targets and historical budget figures, not enforced runtime
+guarantees. The current SWAN timeout is 7200 seconds.
 
 **Full-run wind input (Z3 migration step 3).** `run_full_swan_cycle_from_store()` reads `services/wind_timeline_store.py`'s `get_wind_records()` over the run's own 0–72h window — native HRRR-hourly 0–48h, native GFS-3-hourly 48–72h (a regime-aware sibling of `get_wind_series()`, which enforces a single uniform-hourly contract the far window's native cadence cannot satisfy) — instead of `run_all_spots()`'s own inline HRRR/GFS fetch. `SWANRunner._stitch_wind()` interpolates the far window to uniform hourly exactly as before (unchanged; only the raw-hour source moved). A gap in either regime refuses the run (`state.record_no_publish("wind_series_gap", ...)`, named reason, no last-good cache overwritten) rather than publishing a shortened or time-shifted field. The SWAN input writer (`services/swan_formats.hrrr_to_swan_wind()`) also gained a hard validation of its own: a non-uniform-hourly blended series raises `WindCadenceError` (caught in `providers/nearshore/swan.py` as `no-publish: wind_cadence_non_uniform`) — closes the mid-forecast-hole time-shift defect class (`docs/planning/briefs/V3-F1-WIND-HOLE-INVESTIGATION-2026-08-03.md` §3b) structurally, independent of the store switch.
 
@@ -2394,12 +2393,21 @@ and merges new forecast and SwellTrack entries into the existing cache. Hours
 12–72 remain until the next full run. It warms from, but never saves, the full
 run's hotstart chain.
 
-**Working directory:** SWAN runs in `/var/lib/weewx-clearskies/swan/` (fixed path, not tempfile; historical: `/var/run/weewx-clearskies/swan/`, RAM-backed tmpfs, corrected 2026-08-08 Phase R4 — cgroup memory accounting was charging the tmpfs pages to the service, measured 5.1G memory peak against a 6G container cap). **CORRECTED 2026-08-27 (D1 as-built re-sync — this paragraph predated the SWAN L1 removal/CHAIN-SERVES round and described a SWAN L1 subprocess that no longer exists; see the "SWAN runner" caveat above):** subdirectories `level2/` and `level3_{idx}/` (one per cluster) are cleaned at the start of each run and hold live SWAN nesting output; the `level1/` subdirectory is NOT a running SWAN level's working directory any more — SWAN L1 is SKIPPED ENTIRELY (no `_write_input_files()` call, no SWAN subprocess, no convergence check, no hotstart save, no nest archive; `swan_runner.py`'s `run_3level()` docstring, `l1_nest_source` parameter). `level1/` on disk holds only the legacy BOUNDSPEC scaffold (`INPUT` + the 22 `B_*.txt` files) that `_reused_l1_boundary_command_lines()` still reads every production cycle (`vchain.py`'s `_stage_l2_boundary()`) — a live dependency, not dead, but a scaffold read, not a running level. There is no `level1_hotstart.dat` (nothing to warm-start — L1 never runs); `level2_hotstart.dat`/`level3_{idx}_hotstart.dat` persist between runs as before. Nesting file flow: L2's BOUNDNEST1 input for L3 is copied from `level2/nest_out.dat` to `level3_{idx}/nest_in.dat` as before — L2's own boundary comes from WW3 via **BOUNDNEST3** (§14.18), not from a `level1/nest_out.dat` file. The fixed path is visible from SSH (unlike `tempfile.mkdtemp` which was hidden by systemd's `PrivateTmp=yes`) and survives service restarts.
+**Working directory:** SWAN runs in `/var/lib/weewx-clearskies/swan/`
+(historical path: `/var/run/weewx-clearskies/swan/`). Live SWAN work uses
+`level2/`, `level3_{idx}/`, and `level4_{idx}/` where the corresponding nests
+run. The legacy `level1/` directory is a scaffold, not a SWAN L1 runtime.
+Active hotstarts use tokened filenames: `level2_hotstart_*.dat`,
+`level3_*_hotstart_*.dat`, and `level4_*_hotstart_*.dat`. L2 receives the
+WW3 boundary through BOUNDNEST3 and emits NESTOUT for L3; L3 emits NESTOUT for
+L4 when the structure nest runs.
 
 **2-D bathymetry grid:** Downloaded and sized on marine config receipt, not
-lazily by the API. The marine grid-sizing chain writes the L2 cache plus hashed
+lazily by the API. The marine grid-sizing chain writes the legacy-named L1
+cache for WW3/deep-water geometry, the L2 cache, and hashed
 `swan_bathymetry_L3_{hash}.json` and `swan_bathymetry_L4_{hash}.json` caches
-(180-day TTL). Runtime calls use `allow_download=False`: a missing or corrupt
+(180-day TTL). The L1 filename is not evidence of a SWAN L1 runtime. Runtime
+calls use `allow_download=False`: a missing or corrupt
 required cache raises and refuses the run; an existing stale cache is used with
 a warning. There is no runtime download or uniform-depth substitute.
 `cudem_to_swan_bottom()` interpolates the source grid onto SWAN dimensions.
