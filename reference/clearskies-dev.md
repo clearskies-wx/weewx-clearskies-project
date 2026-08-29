@@ -139,8 +139,8 @@ host or weather-dev.**
 |---|---|---|---|
 | `weewx-clearskies-marine.service` | 8780 | `weewx_clearskies_marine` (`__main__.py`, default `--port 8780`) | WW3 (our own deep-water model) + 3-level SWAN nest (L2-L3-L4) + SwellTrack — all in one process. No SWAN L1 compute level (removed 2026-08-23, marine `3c550ae`/`c29266d`); WW3 feeds SWAN L2 via BOUNDNEST3. SurfBeat removed 2026-08-23 (operator ruling). |
 
-**Port 8780 serves TLS** (verified live 2026-08-03): `curl http://127.0.0.1:8780/health` gets an
-empty reply; use `curl -sk https://127.0.0.1:8780/health`. The unit name for journal reads is
+**Port 8780 serves TLS** (verified live 2026-08-03): `curl http://localhost:8780/health` gets an
+empty reply; use `curl -sk https://localhost:8780/health`. The unit name for journal reads is
 `weewx-clearskies-marine` (NOT `clearskies-marine` — that returns "-- No entries --" and
 `systemctl is-active` reports `inactive`, which reads like an outage but is just a wrong name).
 
@@ -222,7 +222,10 @@ Keys and config live in `.local/ssh/` (project directory, replicates via Nextclo
 
 ## Deploy scripts
 
-All three scripts live in `scripts/`. Always use them — never run manual `git pull`, `npm build`, `rsync`, `systemctl restart`, or `chown`/`chmod` on containers. See `AGENTS.md` "Filesystem permissions on containers" for why.
+Deployment scripts live in `scripts/`, including `deploy-marine.sh`. Always use
+them — never run manual `git pull`, `npm build`, `rsync`, `systemctl restart`,
+or `chown`/`chmod` on containers. See `AGENTS.md` "Filesystem permissions on
+containers" for why.
 
 ### Dashboard + config UI → weather-dev
 

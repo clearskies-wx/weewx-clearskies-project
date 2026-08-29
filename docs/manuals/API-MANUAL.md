@@ -3173,11 +3173,12 @@ SWAN is designed to produce multi-timestep output, but the timestep range is bou
 
 **This subsection was rewritten, not incrementally patched.** The previous text
 (a flat `transect`/`breakPoints` shape, "distance and depth are always in
-meters") described a stale response. The current marine-service response nests
-everything under the standard envelope (`data`/`stationClock`/`freshness`/
-`units`/`generatedAt`, §2), includes the per-transect fields documented below,
-and supports the `transect_index` query parameter (`best`/`all`/integer).
-Distance and depth follow the operator's configured display unit.
+meters") described a stale response. The native marine-service response is an
+SI payload. The API converts and enriches that payload, then wraps the public
+`/api/v1/...` response in the standard envelope
+(`data`/`stationClock`/`freshness`/`units`/`generatedAt`, §2). The fields below
+describe that public, display-unit-aware contract, including the
+`transect_index` query parameter (`best`/`all`/integer).
 
 `GET /api/v1/surf/{location_id}/profile` returns the 1D (SwellTrack) pipeline's cross-shore output for the forecast timestep closest to now.
 
@@ -3286,7 +3287,7 @@ API implementation.
 | Situation | Response |
 |---|---|
 | Marine service unreachable (network failure, non-JSON body, or any HTTP status other than 200/404) and no cached response exists for the route | The proxy's own **503**, with a `detail` naming the unreachable route. Never dressed up as a `modelStatus` value. |
-| Marine service answers HTTP 200, including a null payload with `modelStatus: "unavailable"` | Passed through **untouched** as 200 — a successful proxied response, cached like any other 200. There is no `modelStatus`-specific branch in the proxy; it does not inspect the body to decide how to respond. |
+| Marine service answers HTTP 200, including a null payload with `modelStatus: "unavailable"` | Remains a successful **200** and is cached like any other 200 after API conversion, enrichment, and standard-envelope wrapping. There is no `modelStatus`-specific error branch in the proxy. |
 | Unknown location / bad parameter | The marine service's own **404**, passed through untouched, never cached. |
 
 If the marine service is reachable but returns something other than 200/404 (5xx, or 401/403 from a misconfigured `MARINE_SERVICE_SECRET`), the proxy treats it the same as "unreachable": serve the last cached response if one exists, else its own 503.
@@ -3389,7 +3390,7 @@ brevity; they are present in the manifest.
 | State | HTTP status | Meaning | Cached? |
 |---|---|---|---|
 | Marine service unreachable (network failure, non-JSON body, or any HTTP status other than 200/404 — including 5xx and an auth failure from a misconfigured secret) and no prior successful response is cached for this route | **503** (the proxy's own) | The system is broken | No — this is the failure state itself |
-| Marine service answers HTTP 200 (including a null payload carrying `modelStatus: "unavailable"`) | **200**, passed through untouched | The system works; the model has no answer for this hour | Yes |
+| Marine service answers HTTP 200 (including a null payload carrying `modelStatus: "unavailable"`) | **200**, after API conversion, enrichment, and standard-envelope wrapping | The system works; the model has no answer for this hour | Yes |
 | Unknown `location_id` or bad parameter | **404**, passed through untouched | You asked for something that does not exist | No |
 
 A 200 carrying `modelStatus: "unavailable"` is a successful proxied response — it is never rewritten to 503, never treated as a cache miss, and is cached like any other 200. The proxy's own 503 is likewise never dressed up as a `modelStatus` value. When the marine service is reachable but returns something other than 200 or 404 (5xx, a stale/expired secret, etc.), the proxy falls back to the last successfully-cached response for that route if one exists, and only returns 503 when no such fallback exists — "stale preferred to no data," the same principle applied elsewhere in this manual to provider outages.

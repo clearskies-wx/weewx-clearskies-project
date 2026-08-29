@@ -1450,8 +1450,8 @@ Operators can check marine service health directly:
 # Same-host
 curl https://localhost:8780/health
 
-# Separate-host (IPv4)
-curl https://192.0.2.10:8780/health
+# Separate-host
+curl https://librewxr.shaneburkhardt.com:8780/health
 
 # Separate-host (IPv6)
 curl https://[2001:db8::1]:8780/health
