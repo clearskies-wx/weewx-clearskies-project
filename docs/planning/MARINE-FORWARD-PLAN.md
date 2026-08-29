@@ -1506,17 +1506,19 @@ pier line on the heatmap) could be added later as a supplement, but are not in s
 
 ### 2026-08-28 — The current WW3-to-SWAN handoff cannot rebuild one required file set
 
-**What was found.** Every production cycle runs the project WW3 model and then prepares SWAN
-Level 2. That preparation still reads an inherited set of files under `swan/level1/`:
-`INPUT` plus the referenced `B_*.txt` boundary files. SWAN Level 1 was deleted, so nothing in
-the current service, configuration push, grid-sizing chain, or deploy script creates those
-files anymore. They survive only because this installation already has them.
+**What was found.** Every full production cycle runs the project WW3 model and then prepares
+SWAN Level 2; hourly fills reuse the persisted WW3 transfer instead of launching a new WW3
+march. Both paths still depend on an inherited usable scaffold under `swan/level1/`: `INPUT`
+plus the referenced `B_*.txt` boundary files. SWAN Level 1 was deleted. The runner creates the
+legacy directory during setup, but no current service, configuration push, grid-sizing chain,
+or deploy path can bootstrap the complete usable scaffold. It survives only because this
+installation already has it.
 
 **Failure if they are lost or absent.** A clean installation, damaged file set, or incomplete
-migration refuses every full and hourly run with `chain_scaffold_missing`. WW3 may finish, but
-SWAN does not start and no new forecast is published. A forced run or configuration push repeats
-the same refusal. The former Operations Manual advice to "run a legacy full cycle" was impossible
-and has been removed.
+migration makes full runs refuse with `chain_scaffold_missing`. Hourly fills warn and no-op without
+publishing an updated forecast, but do not expose that named slug. WW3 may finish while SWAN never
+starts. A forced run or configuration push repeats the full-run refusal. The former Operations
+Manual advice to "run a legacy full cycle" was impossible and has been removed.
 
 **Options.**
 
