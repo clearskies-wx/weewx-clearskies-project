@@ -1508,3 +1508,143 @@ pier line on the heatmap) could be added later as a supplement, but are not in s
   `stationary_sequence` path. 3 production files changed, 4 KATs + 39 regression tests pass.
   Adversarial audit dispatched. Doc-code sync residual: PROVIDER-MANUAL.md §"Two-tier schedule"
   still describes fill as "single snapshot."
+
+---
+
+## Production health assessment — 2026-08-29
+
+Read-only source, runtime, artifact, matched-buoy, and targeted-test review found the production
+surf chain unhealthy. These are distinct defects with interacting runtime effects; correcting one
+does not establish that the others are resolved.
+
+1. **Full runs always crash after SWAN Level 2.** A valid single-frequency-bin partition produces
+   wave-group correlation κ=1. The Kimura integration divides by `1−κ²`, raises
+   `ZeroDivisionError`, and aborts before L3/L4, SwellTrack, and cache publication. Twenty-four
+   identical failures were observed across four model cycles; existing tests pin κ=1 upstream
+   but never exercise the singular endpoint through the full statistics chain.
+2. **The 96-hour WW3 continuation is computed but cannot merge.** The validator's helper returns
+   each complete first-time-record point line and compares it byte-for-byte while describing it as
+   name/latitude/longitude identity. The WW3 transfer format and live files show the same line also
+   carries time-varying wind/current metadata. It rejects compatible nowcast/horizon files on those
+   changing fields and stages the seven-record (+0…+6 h) nowcast alone. Full-run
+   hours +7…+72 therefore hold the +6-hour ocean state. Hourly fills bypass merging and read the
+   raw seven-record archive directly. Health marks the unusable horizon successful and suppresses
+   retry. The in-memory splice also has multi-gigabyte copy amplification at production size.
+3. **Required currents are silently absent.** WCOFS/OFS returns fields named `u`/`v`; the SWAN
+   writer reads only `u_grid`/`v_grid`, emits no CURRENT file/commands, and health does not report
+   the missing input. Once the schema seam is repaired, current-cycle selection still cannot cover
+   a 00Z→+72 h run without either a held tail, a missing head, or cross-cycle composition.
+4. **The seven-day last-good fallback lasts only 24 hours.** The default memory backend wraps every
+   entry in a hard 86,400-second outer TTL, overriding the SWAN entry's 604,800-second TTL. Disk
+   restore is one-shot. After 24 hours of failures the native and public API forecasts become empty
+   even though the 116 MB disk cache remains.
+5. **Published provenance is too coarse.** A 73-hour cache can look complete when the offshore
+   boundary froze after +6 hours. A fast fill refreshes only h0–h11 but overwrites the bundle-level
+   `run_time`, making the untouched h12–h72 tail look equally fresh. The API freshness timestamp is
+   proxy-response freshness, not model-data freshness.
+6. **Deployment/run visibility is incomplete.** `run_in_progress` starts after the ordinary WW3
+   production leg, so the guarded deploy script can still restart over that leg. The 4½-hour
+   continuation march runs synchronously in the only runner thread and can defer/coalesce forecast
+   triggers. Failed SWAN retries unnecessarily rerun the already-successful same-cycle WW3 leg.
+
+**Existing targeted-test baseline:** 79 passed / 1 failed. The passing horizon and wave-group tests
+use synthetic inputs that omit the production failure cases. The one existing failure is a quick-
+update wind-coverage test pre-empted by the archived-boundary gate; no assessment change caused it.
+
+**Matched-time offshore reality sample.** At 2026-08-27 12Z, WW3 versus NDBC was: 46222 Hs
+0.994 versus 1.0 m (0.6% low), peak period 10.73 versus 11.0 s (0.27 s low), direction 188.4°
+versus 163° (25.4° offset); 46253 Hs 1.079 versus 1.3 m (17.0% low), period 10.73 versus
+11.0 s (0.27 s low), direction 188.0° versus 171° (17.0° offset). At 2026-08-28 06Z, WW3 Hs
+was 23.9% low at 46222 and 24.1% low at 46253. The WW3 leg is imperfect but is not the
+immediate no-publish cause.
+
+**Evidence and commands.**
+
+- Full-run trace and failure count: read-only `journalctl -u weewx-clearskies-marine` around
+  `2026-08-29 03:58:10Z…03:58:30Z`, plus the timestamped `vchain/ledger/row_*.json` refusal rows.
+- Horizon/merge: journal traceback at `2026-08-29 06:28:21Z`; live files
+  `level0/cycle_20260829.000000/ww3_outp/ww3_l2_transfer.ww3` (33,688,517 bytes, seven records)
+  and `level0/horizon_20260828.000000/ww3_horizon_transfer.ww3` (433,123,444 bytes); local WW3
+  manual lines 21712–21726 define the complete point-record fields.
+- Currents/WLEVEL/bathymetry: live `level2/INPUT`, absence of `level2/CURRENT.txt`, and provider
+  fetch logs from the `2026-08-29T00Z` attempts; source seam `ofs.py` output versus
+  `swan_runner.py::_write_current_txt()` input names.
+- Cache/publication: `stat`/`jq` on `/var/lib/weewx-clearskies/swan/forecast_cache.json`, service
+  restore log at `2026-08-28 06:48:47Z`, first native cache-miss log at
+  `2026-08-29 06:56:47Z`, and public API sample at `2026-08-29 07:39Z`.
+- Targeted baseline at deployed marine revision `534bac2`:
+  `ssh -F .local/ssh/config librewxr "sudo -u ubuntu bash -c 'cd /home/ubuntu/repos/weewx-clearskies-marine && .venv/bin/python -m pytest tests/services/test_wave_groups_kat.py tests/test_transfer_merge.py tests/test_vchain_module.py tests/test_w5_wind_current_coverage.py -q --tb=short'"`
+  → 79 passed / 1 failed in 1.20 s.
+- Matched reality rows: `vchain/ledger/row_20260827.120000.json` and
+  `row_20260828.060000.json` (WW3 buoy points plus matched NDBC observations).
+- Real-clock current coverage: WCOFS 03Z valid-time ranges recorded by the provider/journal for
+  the early and later retries; arithmetic is against the fixed `2026-08-29T00Z…+72 h` SWAN window.
+
+## OPEN OPERATOR QUESTIONS
+
+### 2026-08-29 — Q1: What should happen when the full offshore horizon is unavailable?
+
+The accepted WW3 decision currently permits serving the +0…+6 h boundary and holding its last
+value through +72 h. Health now surfaces this as degraded, but the frozen boundary is still used
+rather than preventing publication. The project-wide scientific-model rule says a model missing a
+required input must publish nothing and preserve last-good data. Those instructions conflict.
+
+**Architectural approval required:** refusal changes the publish trigger/cadence (trigger 6);
+publishing a shorter horizon changes the served contract (trigger 4). No implementation is
+authorized until the operator selects an option.
+
+- **Refuse the new cycle and preserve last-good until a verified 73-record boundary is available
+  (recommended).** Correct-data-first; needs a clean-install/bootstrap design so a new system can
+  obtain its first complete horizon.
+- Publish only the truly covered hours. Honest, but changes the response horizon/shape.
+- Keep the current fallback. Maximum availability, knowingly wrong hours +7…+72; not recommended.
+
+**Question:** Approve refusal + last-good preservation as the governing safety behavior?
+
+### 2026-08-29 — Q2: How should a perfectly coherent κ=1 partition be represented?
+
+The approved Kimura relation has an exact κ→1 limit: transition probabilities approach 1 and run
+length/set interval becomes unbounded. The response fields are nullable floats; JSON cannot safely
+carry infinity.
+
+- **Compute the exact mathematical limit, retain κ=1, and publish the non-finite run-length/set-
+  interval fields as null so the existing scorer uses its documented fallback (recommended).**
+- Treat the whole degenerate partition's group statistics as unavailable. Simpler, but discards
+  finite width/κ information too.
+- Clamp κ below 1. Adds an arbitrary scientific constant; not recommended.
+
+**Question:** Approve the exact-limit + nullable non-finite representation?
+
+### 2026-08-29 — Q3: How should WCOFS currents cover a 00Z→+72 h SWAN run?
+
+One WCOFS cycle cannot cover the whole window under its real 03Z publication clock: choosing the
+prior cycle requires a 21-hour held tail; choosing the current cycle leaves the first four hours
+uncovered.
+
+- **Compose by valid time across consecutive WCOFS cycles, choosing the freshest available field
+  for each required hour and refusing any remaining interior/head gap (recommended).** Preserve
+  per-hour provenance and allow only the already-approved tail hold when no later cycle exists.
+- Always use the prior cycle and hold its final field for 21 hours.
+- Require one cycle to cover everything, which makes 00Z runs structurally impossible.
+
+**Question:** Approve valid-time composition across WCOFS cycles?
+
+This approval covers internal per-hour source/provenance tracking only. Persisting or serving a new
+provenance field would require a separate persisted-file or data-contract approval (triggers 7/4).
+
+### 2026-08-29 — Q4: May the long WW3 horizon march move off the sole runner thread?
+
+The continuation takes about 4½ hours. While it runs synchronously, later hourly/full triggers wait
+and single-slot callbacks can coalesce intermediate work. The deploy guard protects the horizon
+itself but not the ordinary production WW3 leg.
+
+**Architectural approval required:** a dedicated worker changes the computation lifecycle and
+trigger/priority behavior (triggers 5 and 6). No implementation is authorized until the operator
+selects an option.
+
+- **Run the continuation in one dedicated, single-flight background worker; production full/fast
+  work has priority, and the deploy guard covers both horizon and production WW3 processes
+  (recommended).**
+- Keep synchronous execution and accept delayed/coalesced fills.
+
+**Question:** Approve the dedicated-worker/production-priority lifecycle change?
