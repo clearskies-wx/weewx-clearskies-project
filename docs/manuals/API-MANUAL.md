@@ -3278,7 +3278,7 @@ route-specific API implementation.
 
 If the marine service is reachable but returns something other than 200/404 (5xx, or 401/403 from a misconfigured `MARINE_SERVICE_SECRET`), the proxy treats it the same as "unreachable": serve the last cached response if one exists, else its own 503.
 
-**Gap reporting client (C-10).** `POST {marine_service_url}/report/gap` is intentionally **not** in the manifest — it is a fire-and-forget POST with no cacheable resource and no TTL, so the manifest schema (path/method/upstream/cache_ttl) has nothing to describe for it. `services/companion_proxy.py`'s `report_gap()` calls it directly, with the same bounded dedup/queue/single-worker semantics as the legacy `providers/nearshore/swan.py` client it succeeds. `swan.py` itself is unaffected; T6.6 removes it later in Phase 6 and its call sites move to `companion_proxy.report_gap()` at that point — nothing calls the new function yet.
+**Gap reporting client (C-10).** `POST {marine_service_url}/report/gap` is intentionally **not** in the manifest — it is a fire-and-forget POST with no cacheable resource and no TTL, so the manifest schema (path/method/upstream/cache_ttl) has nothing to describe for it. `services/companion_proxy.py`'s `report_gap()` calls it directly, with bounded deduplication, a queue, and a single worker. `_report_model_gaps_from_response()` calls it for fresh proxied surf and profile responses that report an unavailable model result. The API no longer contains `providers/nearshore/swan.py`; this is the API-side gap-reporting path.
 
 ### §19.1 Manifest registration
 

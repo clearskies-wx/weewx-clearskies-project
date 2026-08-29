@@ -3244,7 +3244,7 @@ Supporting components in the marine service:
 |-----------|-----------------|-------|
 | CUDEM bathymetry | `enrichment/bathymetry.py` | Profile extraction for surf/fishing spots |
 | Bathymetry resolver | `services/bathymetry_resolver.py` | 2-D grid resolution for SWAN |
-| NWS zone discovery utility | `providers/_common/nws_zones.py` | Shared by nws_marine and nws_srf |
+| NWS zone discovery utility | `providers/_common/nws_zones.py` | Marine service copy shared by `nws_marine` and `nws_srf`; the API intentionally retains its own copy for unified alert, configuration, and setup work. |
 | Ocean data resolver | `services/ocean_data_resolver.py` | OFS → ERDDAP fallback chain |
 | Water level compositor | `services/water_level_compositor.py` | CO-OPS predictions + OFS residual |
 | SWAN runner service | `services/swan_runner.py` | Three-level nested SWAN execution |
@@ -3297,7 +3297,7 @@ The following marine-adjacent components remain in the API:
 | Marine location setup endpoints (`/setup/marine/*`) | Yes | Wizard-facing endpoints; API validates and pushes config to marine service |
 | `/api/v1/capabilities` marine capability entries | Yes (merged from manifest) | API owns the capabilities endpoint; marine entries arrive via manifest |
 | Marine endpoint proxy handlers | Yes | Thin HTTP proxy; no marine domain logic |
-| `GET /api/v1/marine` list route | Yes | Location list aggregation stays in API |
+| `GET /api/v1/marine` list route | No | The marine service owns the native list handler; the API dynamically proxies its manifest route. |
 | Alert rate limiting and deduplication | Yes | Alert system is unified; all providers run in API process |
 
 ### §15.5 Module authoring in the marine service

@@ -23,8 +23,9 @@ and development reference material for local paths and host-specific commands.
 
 The API owns station data, configuration, conversion, and enrichment. The
 Dashboard owns presentation. The Config UI collects and administers operator
-configuration. The marine service owns every marine provider and the marine
-model chain. Caddy owns browser ingress and routing.
+configuration. The marine service owns marine data and model providers and the
+marine model chain. The API retains unified alerts and its boundary
+responsibilities. Caddy owns browser ingress and routing.
 
 ## Current service inventory
 
