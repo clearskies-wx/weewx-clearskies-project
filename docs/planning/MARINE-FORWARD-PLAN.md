@@ -1499,3 +1499,37 @@ pier line on the heatmap) could be added later as a supplement, but are not in s
   `stationary_sequence` path. 3 production files changed, 4 KATs + 39 regression tests pass.
   Adversarial audit dispatched. Doc-code sync residual: PROVIDER-MANUAL.md §"Two-tier schedule"
   still describes fill as "single snapshot."
+
+---
+
+## OPEN OPERATOR QUESTIONS
+
+### 2026-08-28 — The current WW3-to-SWAN handoff cannot rebuild one required file set
+
+**What was found.** Every production cycle runs the project WW3 model and then prepares SWAN
+Level 2. That preparation still reads an inherited set of files under `swan/level1/`:
+`INPUT` plus the referenced `B_*.txt` boundary files. SWAN Level 1 was deleted, so nothing in
+the current service, configuration push, grid-sizing chain, or deploy script creates those
+files anymore. They survive only because this installation already has them.
+
+**Failure if they are lost or absent.** A clean installation, damaged file set, or incomplete
+migration refuses every full and hourly run with `chain_scaffold_missing`. WW3 may finish, but
+SWAN does not start and no new forecast is published. A forced run or configuration push repeats
+the same refusal. The former Operations Manual advice to "run a legacy full cycle" was impossible
+and has been removed.
+
+**Options.**
+
+1. **Generate the Level-2 boundary commands from the current WW3 handoff (recommended).** Make
+   the live WW3-to-SWAN staging path produce everything SWAN Level 2 needs, so it no longer reads
+   artifacts left by the deleted SWAN Level 1. This is the cleanest ownership boundary, but it
+   rewires handoff preparation and persisted artifacts and therefore needs explicit architectural
+   approval before implementation.
+2. **Generate the retained scaffold during configuration/deployment.** Keep the existing runtime
+   reader, but add a supported producer and recovery action outside the forecast cycle. This is a
+   smaller runtime change but preserves a dependency named after a model level that no longer runs.
+3. **Continue provisioning inherited files by hand.** Lowest immediate code cost, but clean installs
+   and disaster recovery remain fragile. Not recommended.
+
+**Question.** Approve option 1 for a source-backed design and implementation round, or choose a
+different option? Until the operator answers, no scaffold-generation or handoff change is authorized.
