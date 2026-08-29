@@ -69,15 +69,25 @@ Do not create endpoint paths named after a chart type (e.g., `/charts/wind-rose`
 
 ### Setup mode
 
-When `settings.configured = False`, the API starts in setup mode. In setup mode:
+When configuration discovery finds no `api.conf`, the API starts in setup mode
+with `settings.configured = False`; this is not a fatal settings-load error. In
+setup mode:
 
-- Only setup endpoints under `/setup/*` are active.
-- `/api/v1/status` returns `{"configured": false}` and is always active regardless of mode.
-- All other `/api/v1/*` endpoints return HTTP 503 with an RFC 9457 problem body: `{"type": "urn:clearskies:not-configured", "title": "Station not configured", "status": 503}`.
+- Public `/health`, `/api/v1/status`, setup routes under `/setup/*`, and the
+  FastAPI docs and OpenAPI endpoints remain available.
+- `/api/v1/status` returns `{"configured": false}` and is always active
+  regardless of mode.
+- Other data routes under `/api/v1/*` return HTTP 503 with an RFC 9457 problem
+  body: `{"type": "urn:clearskies:not-configured", "title": "Clear Skies is not configured", "status": 503}`.
 - No database connection is established. No provider modules load. No data routers run.
 - The SSE stream is not available.
 
-After the operator completes the setup wizard and the API receives `POST /setup/apply`, the API writes its config files and restarts into normal mode. `[marine]` is written replace-whole-section, with a narrow preserve-list exception for fields with no form round-trip — see "Surf-field apply semantics (preserve-list)" under §19.5.
+`POST /setup/apply` writes configuration files and issues a one-time restart
+token. A separate `POST /setup/restart` uses that token, or normal proxy
+authentication, to schedule the graceful restart that loads the new
+configuration. `[marine]` is written replace-whole-section, with a narrow
+preserve-list exception for fields with no form round-trip — see "Surf-field
+apply semantics (preserve-list)" under §19.5.
 
 ### Startup sequence
 
@@ -85,7 +95,7 @@ The API startup executes in the following ordered steps. Steps marked **fatal** 
 
 | Step | Action | Error handling |
 |------|--------|----------------|
-| 1 | Load and validate `settings` from `api.conf` and `secrets.env` | Fatal |
+| 1 | Discover and load `settings` from `api.conf` and `secrets.env` | Missing discovered config enters setup mode; invalid configured values are fatal |
 | 2 | Initialize structured JSON logging (stdout, stdlib `logging`) | Fatal |
 | 3 | Initialize TLS (load or generate Ed25519 self-signed certificate) | Fatal |
 | 4 | Initialize trust manager (load pinned fingerprints and session store) | Fatal |
