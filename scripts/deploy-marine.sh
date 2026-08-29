@@ -170,8 +170,13 @@ guard_classify() {
         *) service="query-failure" ;;
     esac
 
-    if descendants_raw=$(run_root "main_pid=\$(systemctl show ${SERVICE} -p MainPID --value) || exit 1; control_group=\$(systemctl show ${SERVICE} -p ControlGroup --value) || exit 1; if [ -z \"\$main_pid\" ] || [ \"\$main_pid\" = 0 ]; then exit 0; fi; [ -n \"\$control_group\" ] || exit 1; cgroup_root=/sys/fs/cgroup\$control_group; [ -d \"\$cgroup_root\" ] || exit 1; shopt -s globstar nullglob; cgroup_files=(\"\$cgroup_root\"/cgroup.procs \"\$cgroup_root\"/**/cgroup.procs); [ \${#cgroup_files[@]} -gt 0 ] || exit 1; declare -A seen_pids; for cgroup_file in \"\${cgroup_files[@]}\"; do [ -r \"\$cgroup_file\" ] || exit 1; while IFS= read -r pid; do case \"\$pid\" in ''|*[!0-9]*) exit 1 ;; esac; [ \"\$pid\" = \"\$main_pid\" ] && continue; [ \"\${seen_pids[\$pid]+present}\" = present ] && continue; seen_pids[\$pid]=1; name=\$(ps -p \"\$pid\" -o comm=) || exit 1; [ -n \"\$name\" ] || exit 1; printf '%s %s\\n' \"\$pid\" \"\$name\"; done < \"\$cgroup_file\"; done" 2>/dev/null); then
-        if [ -n "$descendants_raw" ]; then
+    if descendants_raw=$(run_root "main_pid=\$(systemctl show ${SERVICE} -p MainPID --value) || exit 1; control_group=\$(systemctl show ${SERVICE} -p ControlGroup --value) || exit 1; [ -n \"\$main_pid\" ] || exit 1; if [ \"\$main_pid\" = 0 ]; then printf \"__NO_MAIN__\\n\"; exit 0; fi; [ -n \"\$control_group\" ] || exit 1; cgroup_root=/sys/fs/cgroup\$control_group; [ -d \"\$cgroup_root\" ] || exit 1; shopt -s globstar nullglob; cgroup_files=(\"\$cgroup_root\"/cgroup.procs \"\$cgroup_root\"/**/cgroup.procs); [ \${#cgroup_files[@]} -gt 0 ] || exit 1; declare -A seen_pids; for cgroup_file in \"\${cgroup_files[@]}\"; do [ -r \"\$cgroup_file\" ] || exit 1; while IFS= read -r pid; do case \"\$pid\" in \"\"|*[!0-9]*) exit 1 ;; esac; [ \"\$pid\" = \"\$main_pid\" ] && continue; [ \"\${seen_pids[\$pid]+present}\" = present ] && continue; seen_pids[\$pid]=1; name=\$(ps -p \"\$pid\" -o comm=) || exit 1; [ -n \"\$name\" ] || exit 1; printf \"%s %s\\n\" \"\$pid\" \"\$name\"; done < \"\$cgroup_file\"; done" 2>/dev/null); then
+        if [ "$descendants_raw" = "__NO_MAIN__" ]; then
+            case "$service" in
+                inactive|failed) descendants="none" ;;
+                *) descendants="query-failure" ;;
+            esac
+        elif [ -n "$descendants_raw" ]; then
             descendants="present"
         else
             descendants="none"
