@@ -144,7 +144,7 @@ verify_librewxr_fqdn() {
 }
 
 guard_classify() {
-    local body health service descendants_raw descendant_lines classification
+    local body health service descendants_raw classification
 
     if body=$($SSH_CMD -o ConnectTimeout=20 librewxr "curl -sk --max-time 10 https://localhost:${PORT}/health" 2>/dev/null); then
         if printf '%s' "$body" | grep -Eq '"inFlight": ?true|"run_in_progress": ?true'; then
@@ -159,14 +159,19 @@ guard_classify() {
         health="unreachable"
     fi
 
-    if ! service=$($SSH_CMD -o ConnectTimeout=20 librewxr "systemctl is-active ${SERVICE}" 2>/dev/null); then
-        service="query-failure"
+    if service=$($SSH_CMD -o ConnectTimeout=20 librewxr "systemctl is-active ${SERVICE}" 2>/dev/null); then
+        :
+    else
+        :
     fi
     service="${service//$'\n'/}"
+    case "$service" in
+        active|activating|reloading|deactivating|maintenance|inactive|failed|unknown) ;;
+        *) service="query-failure" ;;
+    esac
 
-    if descendants_raw=$($SSH_CMD -o ConnectTimeout=20 librewxr "main_pid=\$(systemctl show ${SERVICE} -p MainPID --value); control_group=\$(systemctl show ${SERVICE} -p ControlGroup --value); if test -n \"\$main_pid\" && test \"\$main_pid\" -gt 0 && test -n \"\$control_group\"; then printf '%s\\n' \"\$main_pid\"; cat \"/sys/fs/cgroup\$control_group/cgroup.procs\"; else printf '0\\n'; fi" 2>/dev/null); then
-        descendant_lines=$(printf '%s\n' "$descendants_raw" | awk 'NF { count++ } END { print count + 0 }')
-        if [ "$descendant_lines" -gt 1 ]; then
+    if descendants_raw=$(run_root "main_pid=\$(systemctl show ${SERVICE} -p MainPID --value) || exit 1; control_group=\$(systemctl show ${SERVICE} -p ControlGroup --value) || exit 1; if [ -z \"\$main_pid\" ] || [ \"\$main_pid\" = 0 ]; then exit 0; fi; [ -n \"\$control_group\" ] || exit 1; cgroup_root=/sys/fs/cgroup\$control_group; [ -d \"\$cgroup_root\" ] || exit 1; shopt -s globstar nullglob; cgroup_files=(\"\$cgroup_root\"/cgroup.procs \"\$cgroup_root\"/**/cgroup.procs); [ \${#cgroup_files[@]} -gt 0 ] || exit 1; declare -A seen_pids; for cgroup_file in \"\${cgroup_files[@]}\"; do [ -r \"\$cgroup_file\" ] || exit 1; while IFS= read -r pid; do case \"\$pid\" in ''|*[!0-9]*) exit 1 ;; esac; [ \"\$pid\" = \"\$main_pid\" ] && continue; [ \"\${seen_pids[\$pid]+present}\" = present ] && continue; seen_pids[\$pid]=1; name=\$(ps -p \"\$pid\" -o comm=) || exit 1; [ -n \"\$name\" ] || exit 1; printf '%s %s\\n' \"\$pid\" \"\$name\"; done < \"\$cgroup_file\"; done" 2>/dev/null); then
+        if [ -n "$descendants_raw" ]; then
             descendants="present"
         else
             descendants="none"
