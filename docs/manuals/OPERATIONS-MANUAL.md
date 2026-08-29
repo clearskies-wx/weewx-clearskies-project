@@ -1453,8 +1453,6 @@ curl https://localhost:8780/health
 # Separate-host
 curl https://librewxr.shaneburkhardt.com:8780/health
 
-# Separate-host (IPv6)
-curl https://[2001:db8::1]:8780/health
 ```
 
 #### Supported environments

@@ -1,15 +1,19 @@
 # Clear Skies — Provider Manual
 
-Single authority for building and modifying provider modules in the Clear Skies API. ADRs explain *why*; this manual says *what to do*.
+Authority for building and modifying provider modules in Clear Skies. It covers
+the API's non-marine provider modules and the marine service's marine data and
+model provider modules. ADRs explain *why*; this manual says *what to do*.
 
-When this document conflicts with any other source, **this document wins**.
+This manual prescribes provider behavior; ARCHITECTURE.md maps current service
+topology. Investigate conflicts rather than treating either document as an
+override of verified current code.
 
 Companion documents:
 - **API-MANUAL.md** — API implementation rules (data model, units, enrichment)
 - **ARCHITECTURE.md** — system topology, provider module layout
 - **contracts/canonical-data-model.md** — per-field data catalog
 
-Last updated: 2026-07-15
+Last updated: 2026-08-28
 
 ---
 
@@ -54,7 +58,7 @@ Anything outside these five — caching, logging format, persistence, dashboard 
 
 ### Shared infrastructure vs. per-module code
 
-**Shared (`weewx_clearskies_api/providers/_common/`):**
+**Shared API infrastructure (`weewx_clearskies_api/providers/_common/`):**
 - HTTP client wrapper with TLS, timeouts, and dual-stack (IPv4/IPv6) per coding rules §1
 - Retry/backoff helper
 - Canonical error class hierarchy
@@ -67,6 +71,10 @@ Anything outside these five — caching, logging format, persistence, dashboard 
 - Module-level rate limiter instance (instantiated from the shared primitive)
 - Domain-specific helpers needed only by this provider
 
+**Shared marine infrastructure (`weewx_clearskies_marine/providers/_common/`):**
+- HTTP client wrapper, retry/backoff, canonical errors, capability primitives,
+  rate limiting, and marine-specific shared utilities.
+
 **Canonical model package (not in providers at all):**
 - Domain-wide helpers such as EPA AQI category lookup, Beaufort scale conversion, US-NWS alert-code translation
 - These belong in the canonical-model package per the data model contract — never implement them inside a provider module
@@ -74,17 +82,23 @@ Anything outside these five — caching, logging format, persistence, dashboard 
 ### Module file layout
 
 ```
-weewx_clearskies_api/providers/
+weewx_clearskies_api/providers/          # API non-marine providers
 ├── _common/         # HTTP client, retry, errors, capability, rate-limiter, nws_zones.py
 ├── forecast/        # Forecast domain modules (§4)
 ├── aqi/             # AQI domain modules (§5)
 ├── alerts/          # Alerts domain modules (§8)
 ├── earthquakes/     # Earthquakes domain modules (§9)
 ├── radar/           # Radar domain modules (§7)
-├── seeing/          # 7Timer seeing forecast (§6 exception — see below)
-├── marine/          # Marine domain modules (§14): wavewatch, nws_marine, nws_srf
-├── tides/           # Tides domain modules (§14): coops
-└── buoy/            # Buoy domain modules (§14): ndbc
+└── seeing/          # 7Timer seeing forecast (§6 exception — see below)
+
+weewx_clearskies_marine/providers/       # Marine data and model providers
+├── _common/         # Marine HTTP, retry, errors, capability, rate limiting, shared utilities
+├── buoy/            # NDBC (§14)
+├── marine/          # WaveWatch III, NWS marine text, NWS SRF (§14)
+├── nearshore/       # SWAN and marine model orchestration (§14)
+├── ocean/           # OFS and ERDDAP (§14)
+├── tides/           # CO-OPS (§14)
+└── wind/            # HRRR and GFS (§14)
 ```
 
 
@@ -2008,7 +2022,7 @@ not share a cache.
 - `_classify_surge(abs_residual_ft, signed_residual_ft)` — applies threshold table. Note: classification operates on converted values (target unit), not raw meters.
 - Persistence decay constant: `_PERSISTENCE_TAU_HOURS = 12.0`.
 - Surge threshold constants: `_SURGE_THRESHOLDS_FT = {"minor": 0.15, "moderate": 0.5, "major": 1.0}`.
-- Unit conversion via `weewx_clearskies_api.units.conversion.convert()`.
+- Unit conversion via `weewx_clearskies_marine.units.conversion.convert()`.
 
 ### §14.13a STOFS-2D-Global water-level provider + WLEVEL chain (Phase S of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D10)
 
@@ -2166,33 +2180,34 @@ Python formula approach preferred (eliminates wgrib2 binary requirement for wind
 
 | Input | Source | Cache key pattern |
 |---|---|---|
-| Wind forcing (hours 0–48) | HRRR wind provider (§14.14) — 3km resolution, extended cycles only | `(hrrr, bbox, cycle_time)` |
-| Wind forcing (hours 48–72) | GFS wind provider (§14.16) — 0.25° resolution, supplements HRRR | `(gfs, bbox, cycle_time)` |
-| Deep-water boundary | WaveWatch III (§14.3) | `(wavewatch, ...)` |
-| Bathymetry (2-D grid) | Resolver chain: operator file > NCEI regional OPeNDAP > Great Lakes > CRM fallback (§14.7) | Per-level cache: `swan_bathymetry_L{1,2,3}.json`, 180-day TTL |
-| Water level (WLEVEL) | CO-OPS tidal predictions — fetched in the DEM's native datum (not MLLW). Datum-matched to BOTTOM per ADR-098. Display endpoint stays MLLW. | Cache key includes datum |
-| Ocean currents (CURRENT) | OFS surface current U/V (§14.10) — time-varying per grid point. Omitted when unavailable (ADR-095) | `(ofs, ...)` |
+| Wind forcing | Assembled wind timeline store: HRRR then GFS (§14.14, §14.16) | Store records for the run window |
+| Deep-water boundary | Project WW3 transfer, consumed by SWAN L2 via BOUNDNEST3 (§14.18) | Retained WW3 boundary artifact |
+| Bathymetry (2-D grid) | Resolver chain: operator file > NCEI regional OPeNDAP > Great Lakes > CRM fallback (§14.7) | L2 cache plus hashed L3/L4 caches, 180-day TTL |
+| Water level (WLEVEL) | Spatial STOFS-2D-Global water-level grids for full and fast paths | Per-cycle STOFS grids |
+| Ocean currents (CURRENT) | OFS surface current U/V (§14.10) — required, time-varying per grid point | `(ofs, ...)` |
 | Coastal structures (OBSTACLE) | Wizard Overpass API discovery — native SWAN OBSTACLE command (ADR-095) | From marine location config |
 
 #### Datum matching
 
 **Rule:** SWAN requires BOTTOM (bathymetry) and WLEVEL (water level) on the same vertical datum. SWAN does not detect or report datum mismatches — a mismatch produces silently wrong depth calculations that corrupt wave breaking predictions.
 
-**Dual CO-OPS fetch:** Each SWAN run makes two separate CO-OPS tide prediction fetches:
-
-1. **Display fetch** (`datum=MLLW`): Serves the `/api/v1/tides` public endpoint. MLLW is the US chart standard. This fetch is unchanged by ADR-098 and is unaffected by any SWAN datum changes.
-2. **SWAN fetch** (`datum={DEM's vertical_datum}`): Used for WLEVEL input to SWAN. The SWAN pipeline reads the DEM's `vertical_datum` from the bathymetry cache and passes it to the CO-OPS request. CO-OPS performs the datum conversion server-side. Both fetches are cached separately; cache keys include the datum parameter.
-
-**What the pipeline does:** After downloading bathymetry, `swan.py:run_all_spots()` reads the `vertical_datum` from the bathymetry cache JSON. It then fetches CO-OPS predictions with `datum={vertical_datum}` and passes them to the SWAN runner for WLEVEL. The display endpoint (`/api/v1/tides`) continues to use `datum=MLLW` — no change to public output.
+**Current model boundary:** STOFS-2D-Global is the sole WLEVEL source for
+both full and fast model paths. CO-OPS predictions remain for display,
+configuration-time, and other non-model consumers; they are not substituted
+into model WLEVEL. The datum-match guard remains mandatory for bathymetry and
+water-level data used together by the model.
 
 **Prohibited pattern:** A single-point VDatum query applied uniformly to the entire bathymetry grid is not an acceptable alternative. Vertical datum offsets are spatially varying — tidal datums (MLLW, MHW, MHHW relative to NAVD88) vary in the cross-shore direction, exactly the direction SWAN grids extend. A single center-point offset is increasingly wrong toward the grid edges, which is where breaking and scoring occur. See `docs/planning/briefs/SWAN-DATUM-CONSISTENCY-BRIEF.md` §3.3–§3.5 for the full rationale. The match-at-source strategy avoids this class of error entirely.
 
-**Failure mode:** If the bathymetry DEM's `vertical_datum` is `"UNKNOWN"`, or if CO-OPS does not support the requested datum for the configured station, the SWAN level fails explicitly with an ERROR log. The system never proceeds with an unverified datum mismatch. There is no silent 0.0 m fallback.
+**Failure mode:** An unknown bathymetry datum fails explicitly. STOFS failure or
+a coverage gap refuses the run with a named no-publish reason; OFS-current
+failure does the same. The system never substitutes an unverified datum, a
+uniform tide, or missing currents.
 
 **SWAN runner** (`services/swan_runner.py`) — **this subsection predates ADR-108/ADR-109 and describes an older three-level-SWAN design; `_run_level1()` was deleted 2026-08-23 (marine `3c550ae`/`c29266d`) and no longer exists. The deep-water leg is WW3 (§14.18); SWAN's own chain now starts at L2, fed by WW3 via BOUNDNEST3, not by a SWAN L1 subprocess's `NESTOUT`.** Remaining bullets below describe L2/L3 unchanged:
 
 - `SWANRunner.__init__`: takes config (per-level grid bboxes, surf spot coordinates, bathymetry data, SWAN binary path)
-- `run(hrrr_wind_field, gfs_wind_field, ww3_boundary, cudem_bathymetry, tide_predictions, ofs_currents)`: orchestrates the nested SWAN run (L2 → L3, WW3-fed at L2), returns transect data per spot keyed by spot_id (ADR-095)
+- Production full runs call `swan._run_all_spots_locked()` and then `SWANRunner.run_3level()`. SWAN skips L1, accepts the project WW3 transfer at L2 through BOUNDNEST3, and runs L2–L4 as each cluster requires.
 - ~~`_run_level1(...)`: runs Level 1 (1 km) SWAN~~ — REMOVED 2026-08-23; WW3 computes the deep-water leg instead (§14.18)
 - `_run_level2(tmpdir, blended_wind, cudem_bathymetry, wlevel, current)`: runs Level 2 (100 m) SWAN with WLEVEL/CURRENT inputs, writes `NESTOUT` boundary files for Level 3
 - `_run_level3(tmpdir, blended_wind, cudem_bathymetry, wlevel, current, obstacles)`: runs Level 3 (40 m) SWAN with WLEVEL/CURRENT/OBSTACLE inputs, outputs CURVE transect TABLE and the **handoff** SPECOUT/`TABLE PT*` at each unique per-transect handoff cell. *Previously described as "SPECOUT at ~10m depth points"; void — ADR-095 Amendment 2 states the ~10 m reference point does not exist in the current architecture. The deep-water-reference SPECOUT is written by `_run_level2()`, not here.*
@@ -2265,15 +2280,21 @@ A diverged run NEVER saves a hotstart, NEVER overwrites the last-good cache, and
 
 **Why (2026-07-23):** A runtime `smart_size_l3_grid()` call in `swan_runner.py` resized the L3 grid AFTER Level 2 had already written its NESTOUT. The L3 grid extended 1,383m east and 666m north beyond the NESTOUT boundary. Only ~40% of the southern boundary received swell spectra. SWAN produced Hs=0.01m during a 6-8 ft south swell (Beach Hazards Statement active). The fix: pass structures to `compute_domains()` so L3 grids include structure shadow zones at domain computation time. The runtime override was deleted.
 
-**Wind forcing is mandatory in every SWAN INPUT file (2026-07-23):** GEN3 WESTHUYSEN activates wind generation physics including quadruplet wave-wave interactions. SWAN refuses to run quadruplets with zero-wind conditions (exit code 2: "not recommended to use quadruplets in combination with zero wind conditions"). Every SWAN INPUT file that runs GEN3 must include an INPGRID WIND + READINP WIND section with actual wind data (this note originally named the SurfBeat strip too; SurfBeat was removed from the system 2026-08-23). The SurfBeat strip uses a uniform wind field from HRRR interpolated to the spot coordinates at the forecast timestep.
+**Wind forcing is mandatory in every active SWAN INPUT file (2026-07-23):**
+GEN3 WESTHUYSEN activates wind generation physics including quadruplet
+wave-wave interactions. Every active L2–L4 INPUT therefore includes actual
+wind data. SurfBeat was removed from the system on 2026-08-23.
 
-**Why (2026-07-23):** The SurfBeat strip INPUT had GEN3 WESTHUYSEN but no wind input. SWAN exited with code 2 on every invocation. The API fell back to a local SWAN binary that didn't exist (disabled during audit), then the request timed out from repeated failures across all cadence hours.
+**Why (2026-07-23, historical):** A removed SurfBeat strip omitted wind input,
+causing SWAN failures. This rationale does not describe a current run path.
 
-**Per-level physics (WC-D1, 2026-08-07).** Level 1 runs GEN3 ST6 (Rogers et al. 2012) with SSWELL ZIEGER 0.00025 and NEGATINP 0.04 — observation-consistent wind input that actively removes boundary wind chop via negative wind-input dissipation. Levels 2, 3, and 4 run GEN3 WESTHUYSEN (unchanged). SurfBeat strips continue running GEN3 WESTHUYSEN regardless of level. BREAKING CONSTANT 1.0 0.73, FRICTION JON 0.038, and TRIAD are shared by all physics configurations. Parameters from the SWAN manual §4.5.4 first recommended calibration; compute cost: ~3-4% total increase (ST6 on L1's 1,065 cells = 5.8% of total grid cells). Nesting is physics-agnostic: BOUNDNEST1 passes a spectrum, not source terms.
+**Per-level physics (WC-D1, 2026-08-07).** Active SWAN levels L2–L4 use
+GEN3 WESTHUYSEN. SWAN L1 and SurfBeat are removed. BREAKING CONSTANT 1.0 0.73,
+FRICTION JON 0.038, and TRIAD are shared by active SWAN configurations.
 
-**Compute service data locality (2026-07-23):** The compute service on librewxr loads CUDEM bathymetric profiles from its own local filesystem at `/etc/weewx-clearskies/spot_profiles/`. The API on weewx does NOT replicate or pre-populate these profiles — it sends the `spot_id` in the SwellTrack request, and the compute service loads the profile by spot_id from its local cache. Data that exists on the compute host stays on the compute host.
-
-**Why (2026-07-23):** The CUDEM profiles are downloaded by the SWAN setup phase on librewxr. They do not exist on weewx (where the API runs). The original code tried to load profiles on weewx and stuff them into transect objects before serializing over HTTP — the directory didn't exist, all profiles were empty, SwellTrack degraded every transect to zero.
+**Historical compute-service note (2026-07-23):** The former split compute
+service is removed. The unified marine service now owns its local bathymetry
+profiles and the SwellTrack pipeline.
 
 **Hotstart isolation:**
 
@@ -2285,43 +2306,64 @@ When a structure config has `bearing_degrees`, `length_m`, and `distance_m` but 
 
 **Quick update WLEVEL:**
 
-The stationary quick update now includes a WLEVEL input (current tide at compute time). Previously, quick updates ran with no tidal water level correction — up to ±1m depth error.
+The stationary quick update includes spatial STOFS-2D-Global WLEVEL input, the
+same model water-level source as the full path.
 
-**Hotstart:** Each nonstationary SWAN run writes a hotstart file (`HOTFILE` command, placed immediately after `COMPUTE`) capturing the full spectral state at the end of computation. The next full run reads it via `INIT HOTSTART`, starting from the previous run's wave field instead of the default near-zero JONSWAP spectrum. Hotstart files persist at `/var/lib/weewx-clearskies/swan/level1_hotstart.dat`, `level2_hotstart.dat`, and `level3_{idx}_hotstart.dat` across subdir cleanup between runs (historical: `/var/run/weewx-clearskies/swan/`, RAM-backed tmpfs, corrected 2026-08-08 Phase R4). If no hotstart exists (first run ever), SWAN initializes from the default wind-derived spectrum — a one-time cold start. Stationary quick updates do not write hotstart files; see the hotstart isolation subsection above.
+**Hotstart:** Each nonstationary SWAN run writes a hotstart file (`HOTFILE`
+after `COMPUTE`). Active hotstarts persist at
+`/var/lib/weewx-clearskies/swan/level2_hotstart.dat`,
+`level3_{idx}_hotstart.dat`, and `level4_{idx}_hotstart.dat` where those
+levels run. There is no SWAN L1 hotstart. Stationary quick updates do not write
+hotstarts.
 
 **SWAN error detection:** `_spawn_swan()` checks both exit code AND stderr/Errfile content. SWAN (Fortran) can exit 0 despite writing "Severe error" to its Errfile. When severe errors are detected, `SWANRunError` is raised so the failure is visible and the run_marker is not stored.
 
-**Cache:** Key = `(provider_id, spot_domain_id, hrrr_cycle_time)`. TTL = 21600s (6 hours) — matches the extended HRRR cycle interval (4×/day at 00/06/12/18Z). On SWAN run failure: log ERROR, retain last-good cache indefinitely. Do NOT invalidate cache on failure — stale SWAN data is always preferred to no data. **Run marker:** stored only when `spots_cached > 0` — prevents a failed SWAN run (exit 0 but no valid output) from blocking future attempts for the same HRRR cycle.
+**Cache:** The per-spot last-good payload has a 7-day TTL. A separate 6-hour
+completion marker prevents duplicate completed-cycle work. On model failure the
+last-good payload remains available; failed or empty runs do not write the
+completion marker.
 
 **Cache payload shape** (per-spot, stored at `last_good_key`):
 
 | Key | Type | Description |
 |---|---|---|
 | `forecast` | `list[dict]` | Serialised `MarineForecastPoint` objects — one entry per transect point per timestep (all timesteps, all transect positions). Grouped by time in `surf.py`. |
-| `spectral` | `list[dict]` | Per-timestep SPECOUT spectra. Each entry: `{time, freqs_hz, dirs_deg, energy, components}` — `components` is SWAN's own watershed partitioning from the companion TABLE's PT* columns (T4B.2), not a decomposition of `energy`; empty when PT* data was unavailable for that point/timestep. |
+| `spectral` | `list[dict]` | Per-timestep spectral metadata and components. Persisted payloads trim the heavy `energy`, `freqs_hz`, and `dirs_deg` arrays; components remain available for partition summaries. |
 | `transect` | `dict[str, list[dict]]` | Full cross-shore transect per timestep, keyed by ISO-8601 time string (T3.4). Each list entry: `{distanceFromShore, depth, waveHeight, swellHeight, breakingFraction, breakingDissipation}` for one transect point. Used by the beach profile endpoint (T5.1). |
 | `swelltrack` | `dict[str, dict]` | Precomputed 1D (SwellTrack) pipeline result per forecast timestep, keyed by ISO-8601 time string (T4B). See "Precomputed SwellTrack cache" below. |
 | `wind_for_display` | `dict[str, dict]` | Per-timestep wind at the spot pin (not the coastline anchor), keyed by ISO-8601 time string. Each value: `{"windSpeed": float, "windDirection": float}` or `null`. Added H5 2026-08-02. **Q3 ruling (2026-08-11) — PERMANENT hybrid, supersedes the Z3.2 "TRANSITION fallback" framing:** the surf endpoint's display wind reads `services/wind_timeline_store.py`'s `get_present_hours()` (a tolerant sibling of `get_wind_series()` that never refuses on a gap) PRIMARILY, per hour, at request time; this field is the PERMANENT fallback for every hour the store does not cover — aged-out past hours, 3-hourly far-window off-slot hours, or a store-absent/cold read. It is **NOT deleted** in migration step 5: production evidence (16/16 requests falling back post-restart, `docs/planning/MARINE-PAGE-FIXIT-PLAN-2026-08-10.md` Z3.5 STATUS) showed the store's self-bounding design (age-out at wall-clock now + native 3-hourly far window) means it can never cover the served timeline's full range by construction, so this fallback is a structural, permanent need, not a transition artifact. |
 | `spectral_dwr` | `list[dict]` | Per-timestep deep-water-reference SPECOUT spectra (L2 at ~15m, SURF-23). Same shape as `spectral`. |
-| `swelltrack_tide_predictions` | `list[dict]` | Tide predictions used by the SwellTrack pipeline this cycle. |
+| `swelltrack_tide_predictions` | `list[dict]` | STOFS-derived water-level series used by the SwellTrack pipeline this cycle. |
 | `run_time` | `str` | ISO-8601 UTC timestamp when the SWAN run completed. |
 | `hrrr_cycle_time` | `str` | HRRR cycle time that forced this SWAN run. |
 
-`fetch()` (`swan.py` `:1631-1725`) returns 8 of these 9 stored keys — it never reads `hrrr_cycle_time` back out — plus `data_age_seconds`, computed live from `run_time` (not a stored key). Nothing consumes `hrrr_cycle_time` via the `fetch()` path; the key is written to the cache payload but has no reader here. **`wind_for_display`** SURVIVES migration step 5 (Q3 ruling, 2026-08-11 — see the table row above): the original design scoped it for deletion once the store became display wind's exclusive source; production evidence showed the store cannot cover the served timeline by construction, so only this one deletion was reversed — the rest of migration step 5's deletions (below) proceed unchanged. This key list is a whitelist, not a passthrough of whatever the caller stored — a key added to the stored payload that is not also added here is silently dropped on read. `_remote_health_loop()` (see "Optional separated service" below) has the identical whitelist for the separated-service sync path; both must be kept in sync with each other and with whatever keys `_run_all_spots_locked()` actually writes.
+The local cache reader returns the current payload keys plus data age from
+`run_time`. `wind_for_display` remains a permanent fallback where the wind
+timeline store does not cover a served hour. The local payload schema is
+explicit, not a passthrough of arbitrary keys.
 
 **A second consumer of `spectral_dwr` (RW-1, register ruling 13, 2026-08-06):** `services/model_wave_source.py` reads `fetch(spot_id)["spectral_dwr"]` — the same read-only, no-trigger call `endpoints/surf.py` already makes for `multiSwell` — and reshapes each timestep's `components` list into a `MarineForecastPoint`, so `endpoints/marine.py`'s 3 card call sites can source a surf-spot location's wave fields from the model instead of WaveWatch III (§14.3). `waveHeight`/`wavePeriod`/`waveDirection` combine all of a timestep's partitions (`services/swan_runner.py`'s `_bulk_params_from_components()`, reused, not reimplemented); `swellHeight`/`swell2Height`/`swell3Height` take the largest non-wind-sea partitions in order; `windWaveHeight` takes the single partition with `is_wind_sea=True`. A spot with no cached `spectral_dwr` entries yet (cold start — `fetch()` itself returns `None`) yields `None` from this reader; the caller never substitutes WaveWatch III for a surf-spot location.
 
-**A second, independent allowlist lives in the separated `weewx-clearskies-swan-swelltrack` package itself** (`weewx_clearskies_swan/service.py`'s `_FORECAST_CACHE_DEFAULTS`/`_copy_cache_entry()`), governing what that service's own HTTP-serving `_forecast_cache` accepts from its runner's cache payload before this API-side `fetch()` ever sees it. This is a distinct list from the one in the paragraph above, on the other side of the `GET /surf/{spot_id}/forecast` HTTP boundary, in a different repo — keeping it in sync with the six keys above is a separate, ongoing responsibility, not automatic. It regressed silently: `swelltrack` was added to the runner's payload (this section, above) but never added to the SWAN service's own copy allowlist, so it reached disk and Redis on the model host and never reached the API — measured live 2026-07-25 as `swelltrack present: False` on the published payload. Fixed by making that allowlist explicit and logging a WARNING when the runner's payload contains a key it doesn't recognize (SURF-PUBLISH-RESULTS-ONLY, 2026-07-25).
+**Precomputed SwellTrack cache.** The unified marine service runs
+`_precompute_swelltrack_for_spot()` at the end of a successful full cycle and
+stores results at `payload["swelltrack"][valid_time]`. Native marine endpoints
+use this cache first and retain the service's in-process fallback on a miss or
+malformed entry; both paths use the same pipeline implementation.
 
-**Precomputed SwellTrack cache (T4B, caching change).** Before this change, the 1D (SwellTrack) pipeline ran once per forecast timestep **per request** inside `endpoints/surf.py`'s per-timestep loop — ~67-72 `run_pipeline()`/`remote_swelltrack()` calls for every `GET /surf/{location_id}` request, with no caller-side caching. Evidenced 2026-07-25: ~1,260 `run_pipeline` calls logged by the compute service in 70 minutes (~18/min sustained) while a SWAN L2 run was executing on the same host.
+The cached entry uses `services/swelltrack_cache.py`'s trimmed codec, which
+drops `TransectResult`'s heavy per-transect arrays. The native surf endpoint
+needs the cached summary; the native profile endpoint retains the service's
+in-process path when full profile data is needed.
 
-The pipeline now runs once per forecast timestep **per SWAN cycle**, at the end of a successful full run in `_run_all_spots_locked()` (`_precompute_swelltrack_for_spot()`), and the result is cached under `payload["swelltrack"][valid_time]`. `endpoints/surf.py`'s per-timestep loop checks this cache first and only falls back to the on-demand call (unchanged, still fully functional) on a miss or a malformed entry. Both the precompute call and the on-demand fallback call the same reference-point-selection, handoff-selection, and pipeline-invocation functions in `services/surf_pipeline_timestep.py` — a cached result cannot silently diverge from what the on-demand path would have computed for that timestep, because it is not a second implementation.
+`_run_quick_update_locked()` merges new SwellTrack entries into the existing
+payload with its refreshed forecast points, preserving valid entries outside
+the fast-cycle window.
 
-The cached entry is encoded with a **trimmed** codec (`services/swelltrack_cache.py`) that drops `TransectResult`'s three heavy per-transect arrays (`hs_total_profile`, `distances`, `depths`). Measured (30 transects, ~594 bathymetric profile points each): a full per-timestep `PipelineResult` serializes to 558 KB — ~39 MB/spot/cycle, ~196 MB across 5 spots, an unreasonable amount of data to write to disk every ~6 hours and ship over the separated-service HTTP sync (30 s timeout). The trimmed shape serializes to 5.2 KB/timestep — ~0.37 MB/spot/cycle, ~1.84 MB for 5 spots. `endpoints/surf.py` never reads those three arrays (only checks `per_transect` truthiness); `endpoints/beach_profile.py` is the only consumer that needs them, and only for one timestep per request (closest to now), not the full forecast — it was never part of the reported problem (1 pipeline call per profile-page request, not 67-72) and **deliberately does not read this cache**; it stays on its existing on-demand `run_pipeline()`/`remote_swelltrack()` call. Do not wire `beach_profile.py` up to this cache without first re-measuring a full-fidelity cache entry's size and re-approving the growth.
-
-`run_quick_update()` does not write a `swelltrack` entry — it fetches the existing cached payload dict and mutates only `forecast`/`run_time` in place (`last_good["forecast"] = existing_forecast`), so whatever `swelltrack` data the last full run wrote is preserved untouched (slightly stale for the one timestep the quick update refreshed, same staleness the quick update already accepts for `spectral`/`transect`).
-
-**On-disk forecast cache persistence (SWAN-L3-STABILITY-PLAN Phase 8):** The in-memory cache is also persisted to `/var/lib/weewx-clearskies/swan/forecast_cache.json` (historical: `/var/run/weewx-clearskies/swan/forecast_cache.json`, RAM-backed tmpfs, corrected 2026-08-08 Phase R4) after every successful full run and quick update (atomic write via temp+rename). On API startup, `fetch()` loads the on-disk cache if it exists and is less than 12 hours old. This ensures API restarts do not lose surf forecast data — the dashboard immediately serves the last-good forecast without waiting for a new SWAN run.
+**On-disk forecast cache persistence:** The unified marine service persists its
+local cache to `/var/lib/weewx-clearskies/swan/forecast_cache.json` after
+successful full and fast updates, with atomic replacement. On service startup
+it lazily restores the on-disk cache so native marine endpoints can serve
+last-good data before the next model run.
 
 **Two-tier schedule:**
 
@@ -2329,8 +2371,8 @@ The cached entry is encoded with a **trimmed** codec (`services/swelltrack_cache
 
 | Tier | Trigger | Grids | Mode | Forecast span | Runtime | Interval |
 |---|---|---|---|---|---|---|
-| Full run | `wind_gatherer`'s `extended_cycle_assembled` event, or a geometry-changing config push (`force_full_run_signal`) — both converge on `providers.nearshore.swan.run_full_swan_cycle_from_store()` (Z3 migration step 3, WIND-PROVIDER-ARCHITECTURE-DESIGN-2026-08-03 §5); ≤300s (`check_interval_s`) latency from assembly/push to run, same bound the forced path already accepted pre-step-3 | L1 + L2 (+ L3 + L4 where triggered) | Nonstationary (72h time-stepping) | 72 hours | ~7–12 min | ~4×/day (00/06/12/18Z, one per HRRR extended cycle) |
-| Hourly fast cycle | `wind_gatherer`'s `hourly_cycle_assembled` event — converges on `providers.nearshore.swan.run_quick_update_from_store()` (Z3 migration step 4, WIND-PROVIDER-ARCHITECTURE-DESIGN-2026-08-03 §5); ≤300s (`check_interval_s`) latency from assembly to run; no forced-bypass analog exists (fires ONLY on assembled-complete, operator Q3 ruling) | Full nest — L1 + L2 (+ L3 + L4 where triggered), same as a full run | Stationary sequence (12 stationary snapshots, hours 0-11, `stationary_sequence=True`, one `COMPUTE STAT` per forecast hour, HRRR wind read from the assembled store, trimmed to its first 12 hourly grids) | 12 hourly timesteps (hours 0-11) | not yet re-measured post-Z3.4 (finding 13: the pre-Z3.4 trigger was unreachable in production, so no live measurement exists yet) | Every hour (per `hourly_cycle_assembled` event) |
+| Full run | `wind_gatherer`'s `extended_cycle_assembled` event, or a geometry-changing config push (`force_full_run_signal`) — both converge on `providers.nearshore.swan.run_full_swan_cycle_from_store()` | Project WW3, then SWAN L2 (+ L3 + L4 where triggered) | Nonstationary (72h time-stepping) | 72 hours | ~7–12 min | ~4×/day (00/06/12/18Z, one per HRRR extended cycle) |
+| Hourly fast cycle | `wind_gatherer`'s `hourly_cycle_assembled` event — converges on `providers.nearshore.swan.run_quick_update_from_store()` | SWAN L2 (+ L3 + L4 where triggered) from the persisted WW3 boundary | Stationary sequence (12 stationary snapshots, hours 0-11) | 12 hourly timesteps (hours 0-11) | not yet re-measured post-Z3.4 | Every hour (per `hourly_cycle_assembled` event) |
 
 **Full runs** produce the 72-hour forecast. All active grid levels must complete within 15 minutes total. Peak memory: ≤400 MB (all grids run sequentially, not simultaneously).
 
@@ -2344,26 +2386,33 @@ The cached entry is encoded with a **trimmed** codec (`services/swelltrack_cache
 
 **Migration step 5 (Z3.5, 2026-08-11) deletions, complete.** `_marine_runner_loop()`'s entire inline HRRR/GFS fetch + `_is_extended_hrrr_cycle()` cadence classification + `last_hrrr_cycle` change-detection bookkeeping is removed outright — both trigger paths above are event-driven ONLY now. `GET /health`'s `inputs.wind` freshness signal (previously recorded by that inline fetch) is recorded by `run_full_swan_cycle_from_store()`/`run_quick_update_from_store()` themselves now, right after their own store read — the same signal, re-sourced to the path that actually supplies production wind. The wind gatherer (`services/wind_gatherer.py`) is the sole ROUTINE NOMADS caller for wind as of this step, and its own rate limiter is restored to the full 2 req/s policy (the coexistence-window halving it ran at while the run path's inline fetch was still a concurrent caller no longer applies).
 
-**The hourly fast cycle runs the full nest stationary** (`SWANRunner.run_stationary_full_nest()`, `services/swan_runner.py`) as a 12-snapshot stationary sequence (hours 0-11, `stationary_sequence=True` — Z3.4/WIND-PROVIDER-ARCHITECTURE-DESIGN-2026-08-03 §5 step 4, operator ruling verbatim "half a day", supersedes C3's original 24-snapshot/hours-0-23 sequence) — L1 through whichever of L2/L3/L4 this cluster has, not L3 alone, not a single snapshot. L1 reuses the last full run's WW3 boundary files already on disk rather than re-fetching (deep-water swell changes slowly). The fast cycle also runs the 1D SwellTrack chain for every one of its 12 snapshots and merges every returned forecast point into the existing forecast cache: collision-aware since the 2026-08-03 remediation — the nearest-index mapping for all 12 snapshots is computed first, and any cache index ≥2 snapshots map to (a non-fully-populated-hourly cache) is resolved deterministically (closest-in-time-to-slot wins, tie → earlier snapshot) rather than silently overwritten; a WARNING is logged naming the dropped count when this occurs. So it refreshes the actual surf card at every spot — including open-beach (L2-only) spots — not just SWAN grid points. Hours 12-72 remain untouched until the next 6-hourly full run. Per SWAN user manual §4.7: "For small domains (< 100 km), a stationary computation is recommended." Warm-starts from, but never saves, the full run's hotstart chain (T4.2 isolation).
+**The hourly fast cycle runs the active SWAN nest stationary**
+(`SWANRunner.run_stationary_full_nest()`) as a 12-snapshot sequence through
+L2 and any required L3/L4 levels. It does not launch a new WW3 march; it uses
+the persisted WW3 boundary. The cycle also runs SwellTrack for its snapshots
+and merges new forecast and SwellTrack entries into the existing cache. Hours
+12–72 remain until the next full run. It warms from, but never saves, the full
+run's hotstart chain.
 
 **Working directory:** SWAN runs in `/var/lib/weewx-clearskies/swan/` (fixed path, not tempfile; historical: `/var/run/weewx-clearskies/swan/`, RAM-backed tmpfs, corrected 2026-08-08 Phase R4 — cgroup memory accounting was charging the tmpfs pages to the service, measured 5.1G memory peak against a 6G container cap). **CORRECTED 2026-08-27 (D1 as-built re-sync — this paragraph predated the SWAN L1 removal/CHAIN-SERVES round and described a SWAN L1 subprocess that no longer exists; see the "SWAN runner" caveat above):** subdirectories `level2/` and `level3_{idx}/` (one per cluster) are cleaned at the start of each run and hold live SWAN nesting output; the `level1/` subdirectory is NOT a running SWAN level's working directory any more — SWAN L1 is SKIPPED ENTIRELY (no `_write_input_files()` call, no SWAN subprocess, no convergence check, no hotstart save, no nest archive; `swan_runner.py`'s `run_3level()` docstring, `l1_nest_source` parameter). `level1/` on disk holds only the legacy BOUNDSPEC scaffold (`INPUT` + the 22 `B_*.txt` files) that `_reused_l1_boundary_command_lines()` still reads every production cycle (`vchain.py`'s `_stage_l2_boundary()`) — a live dependency, not dead, but a scaffold read, not a running level. There is no `level1_hotstart.dat` (nothing to warm-start — L1 never runs); `level2_hotstart.dat`/`level3_{idx}_hotstart.dat` persist between runs as before. Nesting file flow: L2's BOUNDNEST1 input for L3 is copied from `level2/nest_out.dat` to `level3_{idx}/nest_in.dat` as before — L2's own boundary comes from WW3 via **BOUNDNEST3** (§14.18), not from a `level1/nest_out.dat` file. The fixed path is visible from SSH (unlike `tempfile.mkdtemp` which was hidden by systemd's `PrivateTmp=yes`) and survives service restarts.
 
-**2-D bathymetry grid:** **(T4A.3, 2026-07-25; moved into the marine service by MARINE-SEP-CONCERNS.md C-41, DECIDED, same day) Downloaded and sized on marine config receipt (`POST /config`), not lazily on first SWAN run, and not by the API.** `weewx-clearskies-marine`'s `services/grid_sizing_chain.py` `run_grid_sizing_chain()` (a `BackgroundTasks` job scheduled from `endpoints/config.py`'s `POST /config` handler whenever the pushed config declares at least one surf spot) resolves the bathymetry resolver priority chain (§14.7: operator file → NCEI regional OPeNDAP → Great Lakes → CRM fallback) for each grid level and writes the per-level caches at `/etc/weewx-clearskies/swan_bathymetry_L{1,2,3}.json` (180-day TTL) via `download_bathymetry_for_level()`. Previously this ran inside the API's `endpoints/setup.py` `_run_marine_apply_chain()` at `POST /setup/apply` time — a holdover from when SWAN ran inside the API process, not a statement of whose job grid sizing is (operator ruling 2026-07-25). **At SWAN runtime, the same function is called with `allow_download=False`** — a missing cache is an ERROR (that level falls back to uniform 15m depth for the cycle) and a stale cache is used anyway with a WARNING; there is no runtime download path. `cudem_to_swan_bottom()` bilinear-interpolates the source grid onto SWAN grid dimensions. Sign convention: CUDEM (negative = ocean) → SWAN (positive = ocean). Vertical datum consistency enforced by matching CO-OPS tide prediction datum to the bathymetry DEM's native datum. No local datum conversion for the common case (ADR-098).
+**2-D bathymetry grid:** Downloaded and sized on marine config receipt, not
+lazily by the API. The marine grid-sizing chain writes the L2 cache plus hashed
+`swan_bathymetry_L3_{hash}.json` and `swan_bathymetry_L4_{hash}.json` caches
+(180-day TTL). Runtime calls use `allow_download=False`: a missing or corrupt
+required cache raises and refuses the run; an existing stale cache is used with
+a warning. There is no runtime download or uniform-depth substitute.
+`cudem_to_swan_bottom()` interpolates the source grid onto SWAN dimensions.
+Datum consistency remains mandatory; model water level is STOFS, not a CO-OPS
+substitute.
 
 **Per-spot profile and grid-sizing caches** (T4A.3, producer moved by C-41): `run_grid_sizing_chain()` also writes `/etc/weewx-clearskies/spot_profiles/{spot_id}.json` (PCHIP variable-resolution profile — API-MANUAL §17 — plus `structure_zone_depth`, `fine_zone_max_depth`, both contour distances, and the source grid's actual `vertical_datum`) and `/etc/weewx-clearskies/swan_grid_sizing.json` (the computed L1/L2/L3 `DomainSizing`, serialized via `services/swan_domain.domain_sizing_to_dict()`). Both path constants are defined once, in `providers/nearshore/swan.py`, and imported by `grid_sizing_chain.py` — producer and consumer are the same repo now, so the pre-C-41 duplicate-constant arrangement (one copy per repo, kept in sync by convention) is gone; there is exactly one definition. The SWAN runtime loads both via `load_grid_sizing_cache()` and the per-spot profile read — it never calls `compute_domains()`/`compute_level3_domains()` itself. `download_bidirectional_profile()` (§14.7) has no remaining production caller as of this change; the coordinator is verifying and routing its disposition separately.
 
-**Optional separated service:** When `[swan] service_url` is set to a remote host, `SwanProvider.fetch()` calls the remote HTTP endpoint instead of running SWAN locally. Health check polls `GET {service_url}/health` every 60 seconds, unchanged. Three consecutive failures → log ERROR, serve last-good cache.
-
-**Published forecast is a trimmed view; forecast fetch is now conditional (SURF-PUBLISH-RESULTS-ONLY, 2026-07-25).** `GET {service_url}/surf/{spot_id}/forecast` drops four heavy per-timestep `spectral` fields (`energy`, `freqs_hz`, `dirs_deg`, `handoff_by_transect`) at the model host's HTTP-serving boundary — the model host's own `_forecast_cache` and on-disk `forecast_cache.json` keep the full data (needed to answer `GET /surf/{spot_id}/profile` below, including after a restart). `_remote_health_loop()` still polls `GET {service_url}/health` every 60 seconds as above, but now only downloads the (trimmed) forecast when the health response's `last_run` differs from the `run_time` already in this host's local last-good cache — a missing cache entry always fetches (the last-good cache has a 7-day TTL and can expire). Measured 2026-07-25: ~21 MB wire payload per fetch, previously every 60 s; now ~2.4 MB roughly once per ~25-minute model cycle.
-
-**Two additional endpoints on the same separated service (SURF-PUBLISH-RESULTS-ONLY §3.2/§3.3):**
-
-- `GET {service_url}/surf/{spot_id}/profile?time=<ISO8601>` — Bearer auth (same secret as `/forecast`). Exact-match lookup of `time` against the model host's full internal spectral data (never the trimmed view), runs the 1D pipeline for that one timestep on the model host, and returns the result in SI units using the identical wire format `POST /compute/swelltrack` already produces (`compute_client.deserialize_pipeline_result`, exposed as a public alias for this reuse). HTTP 503 with a structured `{"error": "no_answer", "reason": ..., "spot_id": ..., "time": ...}` body when the timestep is absent or the pipeline yields nothing (`reason` ∈ `no_forecast_data`, `spot_not_configured`, `timestep_not_found`, `pipeline_unavailable`). Called by `endpoints/beach_profile.py` in remote mode instead of recomputing on the weewx host — see API-MANUAL §18.
-- `POST {service_url}/report/gap` — Bearer auth. Body `{spot_id, valid_time, endpoint, run_time}`. Returns 204. Logs one WARNING per distinct `(spot_id, valid_time, endpoint, run_time)` combination on the model host, deduplicated with a bounded in-memory structure (2,000 entries) so a dashboard refresh loop cannot flood the log or grow the process without limit. Called (fire-and-forget, via a single bounded-queue background worker, never inline in the request path) by `endpoints/surf.py` and `endpoints/beach_profile.py` when a timestep's `swelltrack` entry is missing/malformed in remote mode.
-
-**No recomputation on the API host in remote mode — topology-gated, bundled mode unaffected.** When `[swan] service_url` is set, `endpoints/surf.py` and `endpoints/beach_profile.py` (`is_remote_mode()` returns true) no longer run the 1D SwellTrack pipeline or round-trip spectra to the compute service on the weewx host: a missing/malformed timestep becomes `modelStatus: "unavailable"` (surf) or a 200/null response (beach profile), reported via `POST /report/gap`, never recomputed locally. **When `[swan] service_url` is unset (bundled single-host mode, no separate model host), this rule does not apply** — the existing in-process 1D pipeline / optional `surf_compute_host` offload cascade is the model in that topology and is unchanged by this brief.
-
-See ARCHITECTURE.md for the standalone `weewx-clearskies-swan-swelltrack` package (ADR-096 renamed, ADR-099 re-renamed) and its full remote-mode data-flow callout.
+**Current publication boundary:** Native marine endpoints read the unified
+service's local cache. The API exposes those endpoints through its companion
+proxy; it does not run a second SWAN or SwellTrack path. Current marine and
+API gap-reporting paths record unavailable model results without changing the
+public response contract.
 
 #### §14.15 Amendment: Multi-transect + SwellTrack architecture (2026-07-21)
 
@@ -3115,7 +3164,9 @@ an unrounded axis would be the actual defect). `SEAM_HS_TOLERANCE` (±10%) is si
 
 ### §14.17 SwellTrack — cross-shore wave transformation model
 
-**Not a network provider.** Post-SWAN cross-shore wave transformation. Runs as a Python module within the API process (or via compute offloading to a remote service when `surf_compute_host` is configured) after SWAN output is parsed and SPECOUT is decomposed.
+**Not a network provider.** Post-SWAN cross-shore wave transformation that runs
+inside the unified marine service after SWAN output is parsed and SPECOUT is
+decomposed.
 
 **Model selection (decided):** SwellTrack (analytical, pure Python — `surf_1d_analytical.py`). SWASH and XBeach are ruled out entirely — for production, LUT precomputation, and referee/benchmark use (1D-MODEL-BENCHMARK-BRIEF Round 2 results, 2026-07-21).
 
@@ -3124,7 +3175,7 @@ an unrounded axis would be the actual defect). `SEAM_HS_TOLERANCE` (±10%) is si
 **Inputs:**
 - Spectrum (from handoff SPECOUT decomposition) or bulk parameters (Hs, Tp, DIR) per partition
 - CUDEM bathymetric profile per transect (3-5m resolution)
-- Tide level (from CO-OPS predictions)
+- Water level (from the current STOFS-based model input)
 - Handoff depth per transect (from the pre-model handoff algorithm)
 
 **Outputs per transect:**
@@ -3141,9 +3192,13 @@ an unrounded axis would be the actual defect). `SEAM_HS_TOLERANCE` (±10%) is si
 
 **Computational cost:** ~1ms per transect run. Full spot: 3 partitions × 30 transects × ~1ms = ~90ms. Negligible relative to SWAN runtime.
 
-**Compute offloading:** When `surf_compute_host` is configured (in `api.conf [providers]`), SwellTrack runs on the remote compute service instead of in-process. Per-timestep granularity: `POST /compute/swelltrack` with one timestep's data, returns results in <500ms. Fallback to in-process when compute service unreachable.
+**Execution:** SwellTrack runs in the unified marine service. Full and fast
+cycles precompute cache entries; native marine endpoints use that cache first
+and retain the service's in-process path for a cache miss or malformed entry.
 
-**Error handling:** SwellTrack crash → log ERROR, fall back to SWAN CURVE data (legacy path). `degraded: true` in response. Partial failure: if SwellTrack fails on some transects, exclude those from aggregation but continue with remaining.
+**Error handling:** SwellTrack failure is logged and the marine response uses
+its documented unavailable or partial-result behavior. Partial transect failure
+does not fabricate a replacement model result.
 
 ### §14.18 WW3 deep-water leg — WW3 as OUR model (as-built; ADR-109, CHAIN-SERVES round)
 
@@ -3298,7 +3353,7 @@ The following marine-adjacent components remain in the API:
 | `/api/v1/capabilities` marine capability entries | Yes (merged from manifest) | API owns the capabilities endpoint; marine entries arrive via manifest |
 | Marine endpoint proxy handlers | Yes | Thin HTTP proxy; no marine domain logic |
 | `GET /api/v1/marine` list route | No | The marine service owns the native list handler; the API dynamically proxies its manifest route. |
-| Alert rate limiting and deduplication | Yes | Alert system is unified; all providers run in API process |
+| Alert rate limiting and deduplication | Yes | Alert system is unified; alert providers run in the API process |
 
 ### §15.5 Module authoring in the marine service
 
