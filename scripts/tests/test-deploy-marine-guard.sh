@@ -86,14 +86,17 @@ case "$command" in
             exit 1
         fi
         printf '%s\n' "${FAKE_SERVICE}"
+        if [ "${FAKE_SERVICE}" = "inactive" ] || [ "${FAKE_SERVICE}" = "failed" ]; then
+            exit 3
+        fi
         ;;
     *'MainPID'*|*'ControlGroup'*|*'cgroup.procs'*|*'/proc/'*)
         if [ "${FAKE_DESCENDANTS}" = "query-failure" ]; then
             exit 1
         fi
         case "${FAKE_DESCENDANTS}" in
-            none)    printf '%s\n' '4242' ;;
-            present) printf '%s\n' $'4242\n4711 ww3_shel\n4812 swan\n4913 ancillary-child' ;;
+            none)    : ;;
+            present) printf '4711 %s\n' "${FAKE_CHILD}" ;;
         esac
         ;;
     *'systemctl restart'*|*'systemctl daemon-reload'*|*'systemctl enable'*|*'git pull'*|*'gh repo clone'*|*'uv '*|*'install '*|*'cp -a '*|*'scp '*)
@@ -139,6 +142,7 @@ run_check_case() {
     local descendants="$3"
     local expected
     local actual
+    local child="${4:-ww3_shel}"
     expected="$(expected_exit "$health" "$service" "$descendants")"
 
     : > "${FAKE_SSH_LOG}"
@@ -150,6 +154,7 @@ run_check_case() {
         FAKE_HEALTH="$health" \
         FAKE_SERVICE="$service" \
         FAKE_DESCENDANTS="$descendants" \
+        FAKE_CHILD="$child" \
         FAKE_SSH_LOG="${FAKE_SSH_LOG}" \
         FAKE_MUTATION_LOG="${FAKE_MUTATION_LOG}" \
         FAKE_SLEEP_LOG="${FAKE_SLEEP_LOG}" \
@@ -173,6 +178,14 @@ run_check_case() {
     require_contains 'health' "${TRANSCRIPT}"
     require_contains 'service' "${TRANSCRIPT}"
     require_contains 'descendant' "${TRANSCRIPT}"
+}
+
+test_named_child_cases() {
+    local child
+    for child in ww3_shel swan ancillary-child; do
+        run_check_case idle active present "$child"
+    done
+    printf 'ok: named WW3, SWAN, and ancillary cgroup child cases\n'
 }
 
 test_cartesian_check_only_matrix() {
@@ -210,6 +223,8 @@ test_force_override() {
 test_wait_timeout() {
     : > "${FAKE_MUTATION_LOG}"
     : > "${FAKE_SLEEP_LOG}"
+    sed -i 's/^WAIT_CEILING_S=23400$/WAIT_CEILING_S=120/' "${COPY_SCRIPT}"
+    require_contains 'WAIT_CEILING_S=120' "${COPY_SCRIPT}"
     set +e
     PATH="${FAKE_BIN}:${PATH}" FAKE_HEALTH=busy FAKE_SERVICE=active FAKE_DESCENDANTS=none \
         FAKE_SSH_LOG="${FAKE_SSH_LOG}" FAKE_MUTATION_LOG="${FAKE_MUTATION_LOG}" FAKE_SLEEP_LOG="${FAKE_SLEEP_LOG}" FAKE_SCP_LOG="${FAKE_SCP_LOG}" TMPDIR="${CASE_ROOT}/tmp" \
@@ -254,6 +269,7 @@ assert_phase_guarded() {
 
 test_static_guard_ordering() {
     require_contains --check-guard "${COPY_SCRIPT}"
+    require_contains 'WAIT_CEILING_S=23400' "${SOURCE_SCRIPT}"
     assert_phase_guarded prerequisites 'Step 0: prerequisites' 'curl .*uv/install'
     assert_phase_guarded source 'Step 1: clone or pull' 'git pull|gh repo clone'
     assert_phase_guarded environment 'Step 2: venv' 'uv venv|uv pip install'
@@ -273,6 +289,7 @@ test_static_guard_ordering() {
 setup_case_root
 bash -n "${COPY_SCRIPT}"
 test_cartesian_check_only_matrix
+test_named_child_cases
 test_wait_timeout
 test_force_override
 test_static_guard_ordering
