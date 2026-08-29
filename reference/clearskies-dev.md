@@ -83,10 +83,14 @@ The production `docker-compose.yml` (Caddy + api + dashboard) is in the stack re
 
 | Machine | Role | What runs here |
 |---|---|---|
-| **DILBERT** (Windows workstation) | Editing, git, planning, orchestration | Codex desktop, VS Code, `git push`, brief-drafting |
+| **DILBERT** (Windows workstation + WSL2) | Editing, git, planning, orchestration, local Linux unit tests | Codex desktop, VS Code, `git push`, brief-drafting; WSL Python/toolchains in project `scratch/` |
 | **weather-dev** (LXD container on ratbert) | Runtime, tests, builds | `pytest`, `uv`, `docker compose`, `npm`, `vite` |
 
-Do NOT run pytest, uv, docker, or node toolchains on DILBERT. Do NOT edit source files on weather-dev (except test-author fixture captures, which are committed from weather-dev directly).
+Do not run Linux project toolchains directly in Windows. **WSL2 on DILBERT is an approved local
+Linux test environment** (operator ruling 2026-08-29): install whatever declared project/test
+dependencies are needed there, with project-specific virtual environments under the meta repo's
+gitignored `scratch/` directory. Do NOT edit source files on weather-dev (except test-author fixture
+captures, which are committed from weather-dev directly).
 
 ## Repo paths
 
@@ -274,12 +278,15 @@ report a result from it.** It was last seen at `ba3af8f`, unrelated to any curre
 
 | Change touches… | Run its **tests** on | Runs in **production** on |
 |---|---|---|
-| WW3, SWAN, SwellTrack, surf endpoint, beach profile, marine providers | **librewxr** — where the code actually runs | **librewxr** — unified marine service on port 8780 |
+| WW3, SWAN, SwellTrack, surf endpoint, beach profile, marine providers | **WSL first** for feature-branch unit/contract tests; **librewxr** only for deployed/host-specific integration | **librewxr** — unified marine service on port 8780 |
 | Condition modules (haze, calibration, sky, fog), archive/DB, general API | **weewx** | weewx — API installed natively, reads the weewx archive |
 | Dashboard, config UI | **weather-dev** | weather-dev — dashboard build + Caddy |
 
-**Test SWAN/surf code on the host it runs on — librewxr.** Testing it on weewx measures a
-host that does not execute that code in production.
+**Test SWAN/surf feature branches locally in WSL first.** This provides the required Linux runtime
+without changing the production checkout, creating remote scratch copies, or waiting for the model
+host to become idle. Use librewxr afterward for deployed integration, installed-binary behavior,
+real host paths, and live-model evidence. Testing it on weewx is still wrong: that host does not run
+the marine code in production.
 
 **Corrected 2026-07-25.** This table previously read "run its tests on **weewx** (librewxr has
 no test deps)" for the SWAN/surf row, and the section below asserted librewxr "cannot run
@@ -289,24 +296,31 @@ that does not run SWAN at all — and ran the test suite there. `pytest`, `pytes
 `pytest-timeout` were installed into librewxr's venv on 2026-07-25, so the stated blocker no
 longer exists either.
 
-### Deploy before you test — a container test proves nothing about an unpushed edit
+### Deploy before container tests — WSL tests the local feature branch directly
 
-Every deploy path pulls **from GitHub**. Local commits are invisible to every container until
-pushed. A pytest run on a container whose checkout predates your commit is measuring old code,
-and reporting it as verification is a false-clean result.
+WSL imports and tests the local feature branch directly, so it needs no push or deploy. Every
+container deploy path still pulls **from GitHub**: a pytest run on a container whose checkout
+predates your commit measures old code and is a false-clean result.
 
 ```bash
 # Get the code onto weewx WITHOUT restarting the service (safe mid-phase):
 scripts/deploy-api.sh --no-restart
 ```
 
-### Run pytest on the host that runs the code
+### Run pytest in WSL first, then on the deployed host where required
 
-- **WW3, SWAN, SwellTrack, surf endpoint, beach profile, and marine providers
-  → `librewxr`.** Use the marine repository environment and targeted tests.
+- **WW3, SWAN, SwellTrack, surf endpoint, beach profile, and marine providers:** run targeted unit/
+  contract tests in WSL against the local branch; after deploy, use librewxr for host-specific and
+  live integration evidence.
 - **Everything else (conditions, archive/DB, general API) → `weewx`.**
 
 ```bash
+# One-time/reusable local WSL environment (project scratch, gitignored):
+wsl.exe -e bash -lc 'cd /mnt/c/CODE/weather-belchertown && python3 -m venv scratch/wsl-venvs/marine && scratch/wsl-venvs/marine/bin/python -m pip install "./repos/weewx-clearskies-marine[nearshore,dev]"'
+
+# Targeted local marine tests on the current feature branch:
+wsl.exe -e bash -lc 'cd /mnt/c/CODE/weather-belchertown/repos/weewx-clearskies-marine && /mnt/c/CODE/weather-belchertown/scratch/wsl-venvs/marine/bin/python -m pytest tests/test_serve_nothing_on_failure.py -q --tb=short'
+
 # Marine tests — on librewxr, using the marine repository environment:
 ssh -F .local/ssh/config librewxr "sudo -u ubuntu bash -c 'cd /home/ubuntu/repos/weewx-clearskies-marine && .venv/bin/python -m pytest tests/test_z3_full_run_from_store.py -q'"
 ```

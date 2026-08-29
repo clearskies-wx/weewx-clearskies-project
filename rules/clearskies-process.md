@@ -133,7 +133,13 @@ Moved 2026-07-27 (task A3). "Audit rules" and "Round-close verification gate" no
 
 ## Runtime environment
 
-**Dev/test runs in `weather-dev` LXD container, not Windows.** Shell into container: `ssh weather-dev "<command>"`. File sync: push to GitHub from DILBERT, then run `scripts/sync-to-weather-dev.sh`. Browser testing: `http://192.168.2.113:<port>`. DILBERT = editing + git + planning only.
+**Use WSL for local Linux unit/contract tests; use the correct runtime host for deployed/live
+evidence** (operator ruling 2026-08-29). Do not run Linux project toolchains directly in Windows.
+Project-specific WSL environments live under the meta repo's gitignored `scratch/` directory and
+may install the declared dependencies needed for testing. `weather-dev` remains the dashboard/config
+runtime and browser-build host; weewx remains the API/DB runtime; librewxr remains the marine model
+runtime. File sync/deploy still goes through the project scripts. Browser testing:
+`http://192.168.2.113:<port>`.
 
 **The API runs on the `weewx` container (`weewx.shaneburkhardt.com`), NOT weather-dev.** The API co-locates with weewx because it reads the weewx archive DB and `weewx.conf` locally. Dashboard, config UI, tests, and builds run on weather-dev. Do not run the API on weather-dev — see `reference/clearskies-dev.md` §"There should be NO clearskies-api running on weather-dev." To deploy API changes: push to GitHub → SSH to the weewx container → `git pull --ff-only` in the API repo → `sudo systemctl restart weewx-clearskies-api`.
 

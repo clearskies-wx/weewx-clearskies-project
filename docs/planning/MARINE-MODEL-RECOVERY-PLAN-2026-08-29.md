@@ -370,7 +370,7 @@ Gate R2:
 - Same-cycle successful publish followed by a forced candidate and downstream failure leaves hourly
   selection on the first successful artifact.
 
-## 11. R3 — Horizon safety behavior and cold-recovery trigger
+## 11. R3 — Horizon safety behavior and cold-recovery trigger — 🟡 DEPLOYED, LIVE GATE RUNNING
 
 **Owner:** `clearskies-test-author` → `worker` → `clearskies-auditor`
 **Approval:** D5 through operator direction; automatic restart remains disabled until R11
@@ -397,6 +397,24 @@ Gate R3:
 - R11 restart/refetch/cold-run harness cannot loop on unchanged inputs.
 - Health and admin surface name the recovery state without claiming fresh model data.
 - Clean-install bootstrap waits/retries until a complete boundary exists.
+
+### R3 execution record — 2026-08-29
+
+- Test-first guard `ed930a1` established the missing typed refusal; later full/fast, convergence-
+  priority, restart-truth and clean-fast recovery mutations close at marine `ae551be` plus docs
+  `4deed95`. Final WSL targeted result: 80 passed, one pre-existing dependency warning.
+- Independent Sol source audit initially found four ordering/state-truth defects; all were guarded,
+  remediated, and re-audited PASS. The R3 gate was clarified at meta `08d2393f`: R3 itself never
+  deletes usable hotstarts, while the pre-existing crash cleanup still removes state proven to crash
+  SWAN and does not restore poisoned state.
+- Marine PR #1 merged to `main` as `875360e`; guarded deploy started the process at
+  `2026-08-29 14:45:52 UTC`. Health/manifest returned 200 and the unauthenticated protected route
+  returned 401. Targeted deployed tests: 80 passed, one pre-existing dependency warning.
+- Post-deploy journal review found no new R3-related warning/error class. The observed NDBC spectral
+  rate-limit warning also occurred before deployment and is unrelated.
+- Natural full attempt for cycle `2026-08-29T12:00:00Z` started at `14:50:57 UTC`. R3 remains open
+  until that attempt reaches L2 and live evidence proves exactly one exhaustion refusal, unchanged
+  cache/marker/hotstart, and truthful health. No later deployment-order row may proceed yet.
 
 ## 12. R4 — OFS/WCOFS CURRENT restoration
 
