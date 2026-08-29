@@ -1422,6 +1422,30 @@ No auth required. Response fields: `status`, `version`, `last_run`, `spots`, `ru
 
 **`reasons`** — list of short machine-readable strings explaining a non-`ok` status. Empty when `ok`.
 
+### R8a `modelHealth` ledger (schema version 1)
+
+Marine `/health` now carries additive `modelHealth`; existing top-level health keys remain unchanged. The R8a skeleton is model truth, independent of legacy liveness and transport state:
+
+```text
+modelHealth = {
+  schemaVersion,
+  overall: {state, reasonCodes},
+  serving: {state, reasonCodes, attemptId, selectedFullCycleId,
+            firstValidTime, lastValidTime, modelTime, ageSeconds, lastGoodFallback},
+  attempts: {active, latestByKind: {full, fast, horizon, recovery}},
+  stages: {providerInputs, ww3Leg, ww3Horizon, boundaryMerge, swan,
+           swellTrack, cache, publication, recovery}
+}
+```
+
+`providerInputs.children` are `noaaBoundary`, `wind`, `stofsWaterLevel`, and `wcofsCurrents`; `swan.children` are `l2`, `l3`, and `l4`. Every stage and child uses the same evidence shape: `state`, `reasonCodes`, `observedAt`, `attemptId`, `coverage` (`requiredStart`, `requiredEnd`, `actualStart`, `actualEnd`, `complete`), `provenance`, and `output` (`artifact`, `bytes`, `hash`, `published`). Attempt observations will identify one of `full`, `fast`, `horizon`, or `recovery` when R8b instruments them.
+
+State vocabulary is `failed`, `blocked`, `unknown`, `degraded`, `stale`, `running`, `ok`, plus `skipped` only for a topology-not-required stage. The reducer uses that order as worst-required-state precedence: a required failed stage wins; then blocked, unknown, degraded, stale, running, and ok. `skipped` is ignored only where the configured topology makes the stage unnecessary and supplies the exact `topology_not_required` reason. Required matrices are fixed: full requires every stage except recovery; fast requires provider inputs, boundary merge, SWAN, SwellTrack, cache, and publication; horizon requires provider inputs and the raw horizon; recovery requires all stages. Full, fast, and recovery require all provider children; horizon requires only NOAA boundary and wind. For `ok`, evidence needs an empty `reasonCodes` list, nonempty observation and attempt IDs, complete coverage (with all four bounds except recovery), nonempty provenance, and valid output evidence; model stages also require an artifact and publication requires `published: true`. Missing required evidence, incomplete coverage, missing/corrupt required artifacts, or invalid evidence cannot reduce to `ok`.
+
+`overall` describes the current surf-production/recovery generation and its required dependencies; a later raw-horizon success cannot mask a failed merge or publication. `serving` separately says what callers can receive: `valid`, `stale`, or `unavailable`, including the selected full-cycle ID, model and valid-time range, age, and whether a last-good fallback serves. A blocked attempt may therefore coexist with valid last-good serving.
+
+**Current R8a state:** no live observations, attempt summaries, persistence, or restart restoration exist yet. Every stage and child is `unknown` with `reasonCodes: ["not_instrumented"]`; `overall` is `unknown`, and `serving` is `unavailable` with `selectedFullCycleId: null`. If report computation fails, `/health` emits the same complete schema and topology with `overall.reasonCodes: ["computation_failed"]`, never a partial block. R8a adds no instrumentation, visitor-facing field or endpoint, API interpretation, operator UI, or CheckMK integration; those remain later R8b/R8c work.
+
 **H-1 reasons (SURF-PHYSICS-REMODEL-PLAN-2026-08-05, 2026-08-06) — floor status at `degraded`:**
 
 - `bulk_fallback: {spot_id}@{time_iso} {count}/{n_transects} transects` (≤3 flagged hours, one reason each) or `bulk_fallback: {N} hour(s) flagged, worst {spot_id}@{time_iso} {count}/{n_transects} transects` (>3 flagged hours, one summary reason) — a SWAN-cycle hour where the 1-D surf pipeline bulk-fell-back (synthesized a single bulk partition instead of a transect's own measured spectral data) for a number of transects at or above the H-1 threshold (`max(8, 25% of n_transects)`). What to check: journal-grep `H-1 handoff-collapse` around the same `time_iso` for the per-transect silent-exit causes (`no_hs_proxy`, `breaking_zone_exhausted`, `no_station_selected`, `no_curve_match`) that produced the collapse. This is a diagnostic flag on the underlying handoff-collapse mechanism (task H-1 item 4, a separate later fix) — it does not itself indicate a data-input problem.
