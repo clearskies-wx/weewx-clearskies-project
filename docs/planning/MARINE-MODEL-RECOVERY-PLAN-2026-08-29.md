@@ -942,7 +942,7 @@ permission to expand the design.
 
 - [x] Operator accepts §23's approval boundary and this plan — 2026-08-29.
 - [x] Old forward plan archived; redirect installed — 2026-08-29.
-- [ ] Results-free gates written before implementation.
+- [x] Results-free gates written and Sol-audited before implementation — 2026-08-29.
 - [ ] R1–R11 individually implemented, audited, documented, and live-gated.
 - [ ] R12 four-anchor/reality/health gate passes.
 - [ ] No untracked deferred item remains in narrative prose.
