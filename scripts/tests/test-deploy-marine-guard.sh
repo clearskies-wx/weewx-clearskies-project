@@ -55,6 +55,12 @@ done
 
 command="${!#}"
 case "$command" in
+    *python3*)
+        case "${FAKE_HEALTH}" in
+            busy|idle) printf '%s\n' "${FAKE_HEALTH}" ;;
+            malformed|empty|http-503) exit 1 ;;
+        esac
+        ;;
     *curl*'-w '*'/health'*)
         printf '200\n'
         ;;
@@ -68,7 +74,9 @@ case "$command" in
         case "${FAKE_HEALTH}" in
             busy)        printf '%s\n' '{"ww3Horizon":{"inFlight":true},"run_in_progress":false}' ;;
             idle)        printf '%s\n' '{"ww3Horizon":{"inFlight":false},"run_in_progress":false}' ;;
-            malformed)   printf '%s\n' '{not-json' ;;
+            malformed)   printf '%s\n' 'not-json "inFlight": false garbage "run_in_progress": false' ;;
+            empty)       : ;;
+            http-503)    printf '%s\n503\n' '{"ww3Horizon":{"inFlight":false},"run_in_progress":false}' ;;
             unreachable) exit 255 ;;
         esac
         ;;
@@ -137,14 +145,32 @@ expected_exit() {
     fi
 }
 
+expected_classification() {
+    local health="$1"
+    local service="$2"
+    local descendants="$3"
+
+    if [ "$health" = "busy" ]; then
+        printf 'busy\n'
+    elif [ "$health" = "idle" ] && [ "$service" = "active" ] && [ "$descendants" = "present" ]; then
+        printf 'busy\n'
+    elif [ "$(expected_exit "$health" "$service" "$descendants")" = "0" ]; then
+        printf 'idle\n'
+    else
+        printf 'unknown-busy\n'
+    fi
+}
+
 run_check_case() {
     local health="$1"
     local service="$2"
     local descendants="$3"
     local expected
+    local expected_label
     local actual
     local child="${4:-ww3_shel}"
     expected="$(expected_exit "$health" "$service" "$descendants")"
+    expected_label="$(expected_classification "$health" "$service" "$descendants")"
 
     : > "${FAKE_SSH_LOG}"
     : > "${FAKE_MUTATION_LOG}"
@@ -179,6 +205,14 @@ run_check_case() {
     require_contains 'health' "${TRANSCRIPT}"
     require_contains 'service' "${TRANSCRIPT}"
     require_contains 'descendant' "${TRANSCRIPT}"
+    if ! grep -Fq -- "classification=${expected_label}" "${TRANSCRIPT}"; then
+        printf 'FAIL: check-only health=%s service=%s descendants=%s: expected classification=%s\n' \
+            "$health" "$service" "$descendants" "$expected_label" >&2
+        printf '%s\n' '--- raw deploy transcript ---' >&2
+        cat "${TRANSCRIPT}" >&2
+        printf '%s\n' '--- end raw deploy transcript ---' >&2
+        exit 1
+    fi
 }
 
 test_named_child_cases() {
@@ -193,6 +227,17 @@ test_no_main_race_cases() {
     run_check_case idle active no-main
     run_check_case unreachable inactive no-main
     printf 'ok: no-main active and stopped-unit race cases\n'
+}
+
+test_http_status_and_empty_health_cases() {
+    local service
+    for service in inactive failed; do
+        run_check_case http-503 "$service" none
+        require_contains 'health=malformed' "${TRANSCRIPT}"
+    done
+    run_check_case empty inactive none
+    require_contains 'health=malformed' "${TRANSCRIPT}"
+    printf 'ok: HTTP-503 and empty-health fail-closed cases\n'
 }
 
 test_cartesian_check_only_matrix() {
@@ -301,13 +346,23 @@ test_descendant_remote_shell_quoting() {
     [[ "$remote_command" != *"'"* ]] || fail 'descendant remote command contains a literal single quote inside run_root'
 }
 
+test_no_main_child_source_ordering() {
+    local remote_command
+    remote_command="$(awk '/descendants_raw=\$\(run_root/ { print; exit }' "${SOURCE_SCRIPT}")"
+    [ -n "$remote_command" ] || fail 'descendant remote command block is absent'
+    [[ "$remote_command" == *'__NO_MAIN__'* ]] || fail 'descendant remote command has no no-main sentinel'
+    [[ "$remote_command" =~ cgroup\.procs.*__NO_MAIN__ ]] || fail 'recursive cgroup inspection does not precede the no-main sentinel decision'
+}
+
 setup_case_root
 bash -n "${COPY_SCRIPT}"
 test_cartesian_check_only_matrix
 test_named_child_cases
 test_no_main_race_cases
+test_http_status_and_empty_health_cases
 test_wait_timeout
 test_force_override
 test_static_guard_ordering
 test_descendant_remote_shell_quoting
+test_no_main_child_source_ordering
 printf 'ok: deploy-marine R0 guard tests complete\n'
