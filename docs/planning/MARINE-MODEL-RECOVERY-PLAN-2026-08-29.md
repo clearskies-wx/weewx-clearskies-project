@@ -370,7 +370,7 @@ Gate R2:
 - Same-cycle successful publish followed by a forced candidate and downstream failure leaves hourly
   selection on the first successful artifact.
 
-## 11. R3 — Horizon safety behavior and cold-recovery trigger — 🟡 DEPLOYED, LIVE GATE RUNNING
+## 11. R3 — Horizon safety behavior and cold-recovery trigger — ✅ COMPLETE 2026-08-29
 
 **Owner:** `clearskies-test-author` → `worker` → `clearskies-auditor`
 **Approval:** D5 through operator direction; automatic restart remains disabled until R11
@@ -412,9 +412,14 @@ Gate R3:
   returned 401. Targeted deployed tests: 80 passed, one pre-existing dependency warning.
 - Post-deploy journal review found no new R3-related warning/error class. The observed NDBC spectral
   rate-limit warning also occurred before deployment and is unrelated.
-- Natural full attempt for cycle `2026-08-29T12:00:00Z` started at `14:50:57 UTC`. R3 remains open
-  until that attempt reaches L2 and live evidence proves exactly one exhaustion refusal, unchanged
-  cache/marker/hotstart, and truthful health. No later deployment-order row may proceed yet.
+- Natural full attempt for cycle `2026-08-29T12:00:00Z` started at `14:50:57 UTC`. Six observed
+  attempts reached L2 and each emitted one detector WARNING, one typed
+  `no-publish: l2_boundary_exhausted` ERROR, and one matching vchain refusal; none reached L3/L4.
+  Health reports one no-publish reason, `vchain.status=refused`, and the same refusal slug.
+- Persistent evidence remained unchanged: forecast cache mtime `2026-08-28 06:48:20 UTC`, run
+  marker mtime `2026-08-28 02:57:56 UTC`, persistent L2 hotstarts no newer than
+  `2026-08-29 14:38:44 UTC` (before deploy), and L3/L4 persistent hotstarts remain from August 28.
+  The state snapshot alone advanced, as required, to store failure/flag health. R3 live gate PASS.
 
 ## 12. R4 — OFS/WCOFS CURRENT restoration
 
