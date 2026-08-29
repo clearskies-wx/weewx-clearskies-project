@@ -220,7 +220,7 @@ Every round must provide:
 - Reality comparison quantity/tolerance chosen before reading model values.
 - A rollback that restores the prior code without deleting state.
 
-## 8. R0 — Results-free gates and recovery-controller specification
+## 8. R0 — Results-free gates and recovery-controller specification — ✅ COMPLETE 2026-08-29
 
 **Owner:** coordinator design; `clearskies-test-author`; `clearskies-auditor`
 **Files:** test/gate briefs only; no production code
@@ -255,6 +255,34 @@ Gate R0:
 - No numeric recovery threshold is invented outside this plan.
 - Guard check-only harness reports busy during ordinary WW3, Python staging, SWAN, and horizon
   phases without deliberately failing the serving process.
+
+### R0 execution record
+
+- Results-free gate locked at meta `a0484f95` after four independent Sol passes; full specification:
+  `docs/planning/briefs/MARINE-RECOVERY-R0-GATES-2026-08-29.md`.
+- FQDN-valid pre-implementation artifact/hash baseline:
+  `scratch/marine-recovery-r0-baseline-fqdn-2026-08-29.md`. The earlier raw-IP-alias capture is
+  retained but explicitly invalid. Deployed marine base remained `534bac2`.
+- Guard implementation/test/doc commits span `5dbd7852` through `d5d7a2ad`, with final docs at
+  `48a2d81c`. Coordinator rerun: 108 decision-table cases plus named child, no-main, HTTP/status,
+  empty/malformed/duplicate-key, timeout, force, FQDN and mutation-order cases all passed.
+- Live read-only evidence caught both formerly invisible classes: health idle with a live
+  `ww3_shel` cgroup child returned busy/exit 2; later `run_in_progress=true` with no child returned
+  busy/exit 2; a genuinely idle sample returned idle/exit 0. Independent health/systemd/cgroup
+  reads matched each result. Sol adversarial re-audit passed without reading implementer tests.
+- Event-driven thread-to-main feasibility harness `bd05015b`: 9/9 standard-library tests passed;
+  actual asyncio cross-thread wakeup causally stopped/awaited fake servers and wind task before exit
+  75, operator SIGTERM/SIGINT exited 0, generic errors stayed contained, and unchanged identity
+  emitted one signal then blocked. Independent Sol re-audit passed; production integration remains
+  correctly deferred to R11.
+- Non-production transient systemd evidence on the idle host: packaged and loaded unit both
+  `Restart=on-failure`; exit 75 produced exactly two `Started`/two exit-75 journal rows (initial plus
+  one executed restart) before start-limit rejected the next request; exit 0 produced zero restarts.
+  Both uniquely named transient units were removed (`LoadState=not-found`). Marine service/model
+  state was untouched.
+- The feature branch was pushed under the operator's testing authorization. The guard is a local
+  deployment entry point, so live verification used the pushed script directly and required no
+  marine-service restart.
 
 ## 9. R1 — Direct SWAN L2 boundary generation (approved D1)
 
