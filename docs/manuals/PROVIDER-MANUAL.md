@@ -3340,7 +3340,7 @@ fetches from these sources directly:
 | NOAA NWS API (marine zone text, SRF) | `nws_marine`, `nws_srf` | HTTPS REST + text products | No |
 | NOAA HRRR (wind GRIB2 via NOMADS) | `hrrr` | HTTPS or S3 | No |
 | NOAA GFS (wind GRIB2 via NOMADS) | `gfs` | HTTPS or S3 | No |
-| NOAA WaveWatch III (via ERDDAP/PacIOOS) | `wavewatch` | HTTPS ERDDAP griddap JSON | No |
+| NOAA WaveWatch III | `wavewatch` | NOAA NOMADS `filter_gfswave.pl` + GRIB2 | No |
 | NOAA OFS (ocean currents, temp via THREDDS/OPeNDAP) | `ofs` | OPeNDAP/xarray | No |
 | ERDDAP ocean datasets (MUR SST, RTOFS, PacIOOS, CARICOOS) | `erddap_ocean` | HTTPS ERDDAP griddap JSON | No |
 | NCEI coastal DEMs (bathymetry) | bathymetry resolver | HTTPS OPeNDAP/xarray | No |
@@ -3349,7 +3349,9 @@ fetches from these sources directly:
 | OpenStreetMap Overpass (structure discovery) | setup-time utility | HTTPS POST | No |
 | SWAN subprocess (local) | swan runner | Local subprocess | N/A |
 
-All v1 marine data sources are NOAA sources — free, keyless, US-only (except ERDDAP RTOFS and MUR SST which are global). No operator-supplied API keys are required for any marine data source.
+Most v1 marine environmental sources are NOAA and keyless. OpenStreetMap
+Overpass supplies structure discovery, and SWAN is a local model subprocess.
+No source in this table requires an operator-supplied API key.
 
 ### §15.4 What remains in the API
 
@@ -3372,15 +3374,22 @@ New marine provider modules are written in `weewx_clearskies_marine/providers/` 
 1. Write the provider module in `providers/{domain}/{provider_id}.py` inside `weewx_clearskies-marine`.
 2. Register it in `MARINE_PROVIDER_MODULES`.
 3. Add its endpoint(s) to `GET /manifest`.
-4. Restart the marine service.
+4. Deploy with `scripts/deploy-marine.sh` after the intended source is available to the deployment workflow.
 
-No changes to the API codebase are required. The API dynamically picks up the new endpoint from the updated manifest on the next `/setup/apply` call or on API restart.
+No route-specific API code change is required. The API fetches the manifest at
+startup and refreshes it every five minutes.
 
 ### §15.6 Provider attribution in the marine service
 
-The marine service declares attribution for each provider module in its own CAPABILITY objects (same `ProviderAttribution` dataclass shape as §12). The marine service includes attribution data in its manifest (`/manifest` → `capabilities[].attribution`). The API merges these into the capabilities response so the dashboard's About page and in-context card footers receive attribution data for marine providers via the same channel as non-marine providers.
+The marine service declares attribution for each provider module in its own
+CAPABILITY objects (same `ProviderAttribution` dataclass shape as §12). The
+current manifest exposes a flat list of capability ID strings; it does not
+carry provider-attribution objects. Do not claim that the API or dashboard
+receives marine attribution through the manifest unless that contract changes.
 
-All NOAA marine data sources are public domain — attribution is recommended but not mandated by the data provider. Attribution is still included in CAPABILITY declarations as `attributionRequired = false` with the NOAA credit text, so it renders on the About page.
+NOAA marine data is public domain; provider CAPABILITY declarations retain
+their local credit metadata even though the current manifest does not transmit
+that metadata.
 
 ### Source ADR
 
