@@ -57,8 +57,19 @@ command="${!#}"
 case "$command" in
     *python3*)
         case "${FAKE_HEALTH}" in
-            busy|idle) printf '%s\n' "${FAKE_HEALTH}" ;;
+            busy|idle|no-status) printf '%s\n' "${FAKE_HEALTH/no-status/idle}" ;;
             malformed|empty|http-503) exit 1 ;;
+        esac
+        ;;
+    *curl*'--write-out'*health*)
+        case "${FAKE_HEALTH}" in
+            busy)       printf '%s\n200\n' '{"ww3Horizon":{"inFlight":true},"run_in_progress":false}' ;;
+            idle)       printf '%s\n200\n' '{"ww3Horizon":{"inFlight":false},"run_in_progress":false}' ;;
+            malformed)  printf '%s\n200\n' 'not-json "inFlight": false garbage "run_in_progress": false' ;;
+            empty)      printf '\n200\n' ;;
+            http-503)   printf '%s\n503\n' '{"ww3Horizon":{"inFlight":false},"run_in_progress":false}' ;;
+            no-status)  printf '%s\n' '{"ww3Horizon":{"inFlight":false},"run_in_progress":false}' ;;
+            unreachable) exit 255 ;;
         esac
         ;;
     *curl*'-w '*'/health'*)
@@ -77,6 +88,7 @@ case "$command" in
             malformed)   printf '%s\n' 'not-json "inFlight": false garbage "run_in_progress": false' ;;
             empty)       : ;;
             http-503)    printf '%s\n503\n' '{"ww3Horizon":{"inFlight":false},"run_in_progress":false}' ;;
+            no-status)   printf '%s\n' '{"ww3Horizon":{"inFlight":false},"run_in_progress":false}' ;;
             unreachable) exit 255 ;;
         esac
         ;;
@@ -231,6 +243,8 @@ test_no_main_race_cases() {
 
 test_http_status_and_empty_health_cases() {
     local service
+    run_check_case no-status active none
+    require_contains 'health=malformed' "${TRANSCRIPT}"
     for service in inactive failed; do
         run_check_case http-503 "$service" none
         require_contains 'health=malformed' "${TRANSCRIPT}"
