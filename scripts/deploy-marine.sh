@@ -144,16 +144,33 @@ verify_librewxr_fqdn() {
 }
 
 guard_classify() {
-    local body health service descendants_raw classification
+    local health_response health_body http_status health service descendants_raw classification
 
-    if body=$($SSH_CMD -o ConnectTimeout=20 librewxr "curl -sk --max-time 10 https://localhost:${PORT}/health" 2>/dev/null); then
-        if printf '%s' "$body" | grep -Eq '"inFlight": ?true|"run_in_progress": ?true'; then
-            health="busy"
-        elif printf '%s' "$body" | grep -Eq '"inFlight": ?false' \
-            && printf '%s' "$body" | grep -Eq '"run_in_progress": ?false'; then
-            health="idle"
-        else
+    if health_response=$($SSH_CMD -o ConnectTimeout=20 librewxr "curl -sk --max-time 10 --write-out \"\\n%{http_code}\" https://localhost:${PORT}/health" 2>/dev/null); then
+        if [ -z "$health_response" ]; then
             health="malformed"
+        else
+            http_status="${health_response##*$'\n'}"
+            if [[ "$http_status" =~ ^[0-9]{3}$ ]]; then
+                health_body="${health_response%$'\n'*}"
+                if [ "$http_status" != "200" ]; then
+                    health="malformed"
+                elif health=$(printf '%s' "$health_body" | $SSH_CMD -o ConnectTimeout=20 librewxr "python3 -c 'import json,sys; data=json.load(sys.stdin); in_flight=data[\"ww3Horizon\"][\"inFlight\"]; run_in_progress=data[\"run_in_progress\"]; assert type(in_flight) is bool and type(run_in_progress) is bool; print(\"busy\" if in_flight or run_in_progress else \"idle\")'" 2>/dev/null); then
+                    case "$health" in
+                        busy|idle) ;;
+                        *) health="malformed" ;;
+                    esac
+                else
+                    health="malformed"
+                fi
+            elif health=$(printf '%s' "$health_response" | $SSH_CMD -o ConnectTimeout=20 librewxr "python3 -c 'import json,sys; data=json.load(sys.stdin); in_flight=data[\"ww3Horizon\"][\"inFlight\"]; run_in_progress=data[\"run_in_progress\"]; assert type(in_flight) is bool and type(run_in_progress) is bool; print(\"busy\" if in_flight or run_in_progress else \"idle\")'" 2>/dev/null); then
+                case "$health" in
+                    busy|idle) ;;
+                    *) health="malformed" ;;
+                esac
+            else
+                health="malformed"
+            fi
         fi
     else
         health="unreachable"
@@ -170,7 +187,7 @@ guard_classify() {
         *) service="query-failure" ;;
     esac
 
-    if descendants_raw=$(run_root "main_pid=\$(systemctl show ${SERVICE} -p MainPID --value) || exit 1; control_group=\$(systemctl show ${SERVICE} -p ControlGroup --value) || exit 1; [ -n \"\$main_pid\" ] || exit 1; if [ \"\$main_pid\" = 0 ]; then printf \"__NO_MAIN__\\n\"; exit 0; fi; [ -n \"\$control_group\" ] || exit 1; cgroup_root=/sys/fs/cgroup\$control_group; [ -d \"\$cgroup_root\" ] || exit 1; shopt -s globstar nullglob; cgroup_files=(\"\$cgroup_root\"/cgroup.procs \"\$cgroup_root\"/**/cgroup.procs); [ \${#cgroup_files[@]} -gt 0 ] || exit 1; declare -A seen_pids; for cgroup_file in \"\${cgroup_files[@]}\"; do [ -r \"\$cgroup_file\" ] || exit 1; while IFS= read -r pid; do case \"\$pid\" in \"\"|*[!0-9]*) exit 1 ;; esac; [ \"\$pid\" = \"\$main_pid\" ] && continue; [ \"\${seen_pids[\$pid]+present}\" = present ] && continue; seen_pids[\$pid]=1; name=\$(ps -p \"\$pid\" -o comm=) || exit 1; [ -n \"\$name\" ] || exit 1; printf \"%s %s\\n\" \"\$pid\" \"\$name\"; done < \"\$cgroup_file\"; done" 2>/dev/null); then
+    if descendants_raw=$(run_root "main_pid=\$(systemctl show ${SERVICE} -p MainPID --value) || exit 1; control_group=\$(systemctl show ${SERVICE} -p ControlGroup --value) || exit 1; [ -n \"\$main_pid\" ] || exit 1; child_found=0; if [ -n \"\$control_group\" ]; then cgroup_root=/sys/fs/cgroup\$control_group; [ -d \"\$cgroup_root\" ] || exit 1; shopt -s globstar nullglob; cgroup_files=(\"\$cgroup_root\"/cgroup.procs \"\$cgroup_root\"/**/cgroup.procs); [ \${#cgroup_files[@]} -gt 0 ] || exit 1; declare -A seen_pids; for cgroup_file in \"\${cgroup_files[@]}\"; do [ -r \"\$cgroup_file\" ] || exit 1; while IFS= read -r pid; do case \"\$pid\" in \"\"|*[!0-9]*) exit 1 ;; esac; [ \"\$pid\" = \"\$main_pid\" ] && continue; [ \"\${seen_pids[\$pid]+present}\" = present ] && continue; seen_pids[\$pid]=1; name=\$(ps -p \"\$pid\" -o comm=) || exit 1; [ -n \"\$name\" ] || exit 1; child_found=1; printf \"%s %s\\n\" \"\$pid\" \"\$name\"; done < \"\$cgroup_file\"; done; elif [ \"\$main_pid\" != 0 ]; then exit 1; fi; if [ \"\$main_pid\" = 0 ] && [ \"\$child_found\" = 0 ]; then printf \"__NO_MAIN__\\n\"; fi" 2>/dev/null); then
         if [ "$descendants_raw" = "__NO_MAIN__" ]; then
             case "$service" in
                 inactive|failed) descendants="none" ;;
@@ -186,6 +203,8 @@ guard_classify() {
     fi
 
     if [ "$health" = "busy" ]; then
+        classification="busy"
+    elif [ "$health" = "idle" ] && [ "$service" = "active" ] && [ "$descendants" = "present" ]; then
         classification="busy"
     elif [ "$service" = "query-failure" ] || [ "$descendants" = "query-failure" ]; then
         classification="unknown-busy"
