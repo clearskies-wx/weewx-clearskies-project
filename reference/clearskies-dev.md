@@ -357,12 +357,17 @@ bootstrap/migration mutation—and immediately before restart—the script
 requires the local `librewxr` SSH alias to resolve to
 `librewxr.shaneburkhardt.com`, then classifies the remote loopback health,
 systemd state, and every non-main process found by recursively walking the
-service cgroup. A true `inFlight` or `run_in_progress` health flag is busy.
-False flags are idle only with an active service and no descendant. Unreachable
-health is idle only when systemd is inactive or failed and there are no
-descendants; empty or malformed health is `unknown-busy`, as is an active
-unreachable service. Transition states, query failures, descendants, and every
-other inconsistent combination are `unknown-busy`.
+service cgroup. It accepts health only when the loopback response is HTTP 200
+with valid duplicate-free JSON and actual Boolean `ww3Horizon.inFlight` and
+`run_in_progress` fields; non-200, statusless, empty, malformed, or
+duplicate-key responses are malformed and `unknown-busy`. A true busy field is
+busy. False fields are idle only with an active service and no descendant. A
+confirmed descendant with reachable idle health and an active service is busy;
+a descendant in every other inconsistent state is `unknown-busy`, unless health
+itself is busy. Unreachable health is idle only when systemd is inactive or
+failed and there are no descendants; an active unreachable service is
+`unknown-busy`. Transition states, query failures, and every other inconsistent
+combination are `unknown-busy`.
 
 Use the read-only check before a deploy decision:
 
