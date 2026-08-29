@@ -26,6 +26,7 @@
 #   ./scripts/deploy-marine.sh --skip-pull    # skip the git pull step
 #   ./scripts/deploy-marine.sh --no-restart   # install only, no restart
 #   ./scripts/deploy-marine.sh --force-restart # restart even over an in-flight WW3 march/SWAN run
+#   ./scripts/deploy-marine.sh --check-guard  # classify the service without mutation
 #   ./scripts/deploy-marine.sh --show-secret  # print MARINE_SERVICE_SECRET and exit
 #
 # ---------------------------------------------------------------------------
@@ -103,15 +104,17 @@ skip_pull="0"
 no_restart="0"
 show_secret="0"
 force_restart="0"
+check_guard="0"
 for arg in "$@"; do
     case "$arg" in
         --skip-pull)     skip_pull="1" ;;
         --no-restart)    no_restart="1" ;;
         --force-restart) force_restart="1" ;;
+        --check-guard)   check_guard="1" ;;
         --show-secret)   show_secret="1" ;;
         *)
             echo "Unknown argument: '${arg}'" >&2
-            echo "Usage: $0 [--skip-pull] [--no-restart] [--force-restart] [--show-secret]" >&2
+            echo "Usage: $0 [--skip-pull] [--no-restart] [--force-restart] [--check-guard] [--show-secret]" >&2
             exit 1
             ;;
     esac
@@ -124,6 +127,117 @@ run_ubuntu() {
     $SSH_CMD librewxr "sudo -u ubuntu bash -lc '$1'"
 }
 
+# R0 deploy guard: no mutation may begin unless the service is proven idle.
+# Health alone is insufficient because its in-process flags can be unavailable
+# while WW3/SWAN descendants still occupy the service cgroup.
+verify_librewxr_fqdn() {
+    local configured_host
+
+    if ! configured_host=$($SSH_CMD -G librewxr 2>/dev/null | awk '$1 == "hostname" { print $2; exit }'); then
+        echo "[guard] FQDN check failed: could not read SSH configuration for librewxr" >&2
+        return 1
+    fi
+    if [ "$configured_host" != "librewxr.shaneburkhardt.com" ]; then
+        echo "[guard] FQDN check failed: librewxr resolves to '${configured_host:-missing}', expected librewxr.shaneburkhardt.com" >&2
+        return 1
+    fi
+}
+
+guard_classify() {
+    local body health service descendants_raw descendant_lines classification
+
+    if body=$($SSH_CMD -o ConnectTimeout=20 librewxr "curl -sk --max-time 10 https://localhost:${PORT}/health" 2>/dev/null); then
+        if printf '%s' "$body" | grep -Eq '"inFlight": ?true|"run_in_progress": ?true'; then
+            health="busy"
+        elif printf '%s' "$body" | grep -Eq '"inFlight": ?false' \
+            && printf '%s' "$body" | grep -Eq '"run_in_progress": ?false'; then
+            health="idle"
+        else
+            health="malformed"
+        fi
+    else
+        health="unreachable"
+    fi
+
+    if ! service=$($SSH_CMD -o ConnectTimeout=20 librewxr "systemctl is-active ${SERVICE}" 2>/dev/null); then
+        service="query-failure"
+    fi
+    service="${service//$'\n'/}"
+
+    if descendants_raw=$($SSH_CMD -o ConnectTimeout=20 librewxr "main_pid=\$(systemctl show ${SERVICE} -p MainPID --value); control_group=\$(systemctl show ${SERVICE} -p ControlGroup --value); if test -n \"\$main_pid\" && test \"\$main_pid\" -gt 0 && test -n \"\$control_group\"; then printf '%s\\n' \"\$main_pid\"; cat \"/sys/fs/cgroup\$control_group/cgroup.procs\"; else printf '0\\n'; fi" 2>/dev/null); then
+        descendant_lines=$(printf '%s\n' "$descendants_raw" | awk 'NF { count++ } END { print count + 0 }')
+        if [ "$descendant_lines" -gt 1 ]; then
+            descendants="present"
+        else
+            descendants="none"
+        fi
+    else
+        descendants="query-failure"
+    fi
+
+    if [ "$health" = "busy" ]; then
+        classification="busy"
+    elif [ "$service" = "query-failure" ] || [ "$descendants" = "query-failure" ]; then
+        classification="unknown-busy"
+    elif [ "$health" = "idle" ] && [ "$service" = "active" ] && [ "$descendants" = "none" ]; then
+        classification="idle"
+    elif [ "$health" = "unreachable" ] \
+        && { [ "$service" = "inactive" ] || [ "$service" = "failed" ]; } \
+        && [ "$descendants" = "none" ]; then
+        classification="idle"
+    else
+        classification="unknown-busy"
+    fi
+
+    echo "[guard] health=${health}; service=${service}; descendants=${descendants}; classification=${classification}"
+    if [ "$classification" = "idle" ]; then
+        return 0
+    fi
+    return 2
+}
+
+WAIT_POLL_S=60
+WAIT_CEILING_S=23400
+
+guard_before_mutation() {
+    local status waited=0
+
+    if [ "$force_restart" = "1" ]; then
+        echo "[guard] --force-restart: bypassing deploy guard"
+        return 0
+    fi
+
+    while true; do
+        if guard_classify; then
+            return 0
+        else
+            status=$?
+        fi
+        if [ "$status" -ne 2 ]; then
+            return "$status"
+        fi
+        if [ "$waited" -ge "$WAIT_CEILING_S" ]; then
+            echo "[guard] still busy or unknown after ${waited}s -- refusing the next mutation." >&2
+            echo "[guard] re-run with --force-restart to bypass deliberately." >&2
+            return 1
+        fi
+        if [ $((waited % 300)) -eq 0 ]; then
+            echo "[guard] service is busy or unknown -- waiting (${waited}s elapsed, ceiling ${WAIT_CEILING_S}s)"
+        fi
+        sleep "$WAIT_POLL_S"
+        waited=$((waited + WAIT_POLL_S))
+    done
+}
+
+if ! verify_librewxr_fqdn; then
+    exit 1
+fi
+
+if [ "$check_guard" = "1" ]; then
+    guard_classify
+    exit $?
+fi
+
 # --show-secret is a read-only query — handle it before anything else.
 if [ "$show_secret" = "1" ]; then
     # No inner single quotes: run_root already wraps its argument in them.
@@ -135,6 +249,7 @@ echo "=== Clear Skies Marine Service deploy → librewxr:${PORT} ==="
 
 # --- Step 0: prerequisites ---
 echo "--- [0/6] prerequisites ---"
+guard_before_mutation
 if ! $SSH_CMD librewxr "test -x ${SWAN_BINARY}"; then
     echo "SWAN binary not found at ${SWAN_BINARY} on librewxr." >&2
     echo "The nearshore wave model cannot run without it. See the marine repo's" >&2
@@ -155,6 +270,7 @@ if [ "$skip_pull" = "1" ]; then
     echo "--- [1/6] git pull: SKIPPED (--skip-pull) ---"
 else
     echo "--- [1/6] git clone/pull ---"
+    guard_before_mutation
     # The check MUST run as ubuntu: /home/ubuntu/repos is not readable by the
     # `claude` SSH user, so a bare `test -d` always fails and the script would
     # fall through to a clone that then aborts on "already exists".
@@ -175,6 +291,7 @@ fi
 
 # --- Step 2: venv + dependencies ---
 echo "--- [2/6] venv + dependencies ---"
+guard_before_mutation
 if ! $SSH_CMD librewxr "sudo -u ubuntu test -x ${VENV}/bin/python" 2>/dev/null; then
     echo "[deps] creating venv..."
     run_ubuntu "cd ${REPO_PATH} && uv venv --python 3.12"
@@ -195,6 +312,7 @@ echo "[deps] import surface verified (core + nearshore + SWAN pipeline)"
 
 # --- Step 4: config dir + secret ---
 echo "--- [4/6] config dir + secret ---"
+guard_before_mutation
 run_root "install -d -o ubuntu -g ubuntu -m 0750 ${CONF_DIR}"
 # Generate MARINE_SERVICE_SECRET once and never regenerate: rotating it here
 # would silently break the API's Bearer auth on every redeploy. The API host
@@ -224,6 +342,7 @@ run_root "ls -l ${SECRETS}"
 # A missing program is a hard prerequisite failure, same standing as the SWAN
 # binary check in step 0 -- the WW3 leg is part of the production chain.
 echo "--- [4b] WW3 binary pins ---"
+guard_before_mutation
 WW3_BIN_DIR="/var/lib/weewx-clearskies/ww3/bin"
 WW3_PROGRAMS="ww3_bound ww3_grid ww3_outp ww3_prep ww3_shel"
 WW3_PINS_FILE="${CONF_DIR}/ww3-binaries.json"
@@ -271,6 +390,7 @@ echo "[pins] ${WW3_PINS_FILE} written (5 programs)"
 
 # --- Step 5: systemd unit ---
 echo "--- [5/6] systemd unit ---"
+guard_before_mutation
 # Staged through a local file and scp, NOT a remote heredoc. run_root wraps
 # its argument in single quotes, so `cat > file << 'UNIT'` closes that wrapper
 # on its own quotes and the rest of the unit is executed as shell commands.
@@ -359,6 +479,7 @@ echo "[svc] unit installed and enabled"
 # bans chown on existing content). Idempotent: install -d no-ops if the
 # directory already exists with the right owner/mode.
 echo "--- bootstrap: /var/lib/weewx-clearskies/swan ---"
+guard_before_mutation
 run_root "install -d -o ubuntu -g ubuntu -m 0750 /var/lib/weewx-clearskies/swan"
 echo "[bootstrap] /var/lib/weewx-clearskies/swan ready"
 
@@ -370,6 +491,7 @@ echo "[bootstrap] /var/lib/weewx-clearskies/swan ready"
 # avoids the D-1a forecast-gap lesson: moving the cache aside cost a
 # forecast gap; copying does not.
 echo "--- migrate: SWAN state /var/run -> /var/lib (Phase R4, one-time) ---"
+guard_before_mutation
 OLD_SWAN_ROOT=/var/run/weewx-clearskies/swan
 NEW_SWAN_ROOT=/var/lib/weewx-clearskies/swan
 if $SSH_CMD librewxr "sudo -u ubuntu test -f ${OLD_SWAN_ROOT}/forecast_cache.json" 2>/dev/null \
@@ -401,57 +523,7 @@ if [ "$no_restart" = "1" ]; then
 fi
 
 echo "--- [6/6] restart + verify ---"
-# --- J28 guard (2026-08-28, operator order): never restart over an in-flight
-# WW3 horizon march or SWAN run. The 96 h horizon march is a ww3_shel CHILD of
-# the service: `systemctl restart` at 03:10:43Z on 2026-08-28 killed it
-# (rc=-15) 631 s in, and with the march gone every full run that day staged
-# the 6 h nowcast alone -- SWAN L2 held the +6 h ocean frozen for hours 7-72
-# (the flat 72 h forecast). /health is unauthenticated; two keys are read:
-#   ww3Horizon.inFlight  -- the march is running (state.record_ww3_horizon_started)
-#   run_in_progress      -- a SWAN full/fast cycle is running
-# Poll every 60 s up to WAIT_CEILING_S (the march's own 6 h ceiling + slack),
-# then give up loudly. --force-restart skips the wait (operator's call, never
-# the default). An unreachable /health (service down) counts as idle.
-WAIT_POLL_S=60
-WAIT_CEILING_S=23400
-busy_reason() {
-    local body
-    # ConnectTimeout bounds the SSH hop itself (gate-j28 F2): the 6.5 h
-    # ceiling below assumes every poll returns; curl's --max-time only
-    # bounds the remote curl once the session is up.
-    body=$($SSH_CMD -o ConnectTimeout=20 librewxr "curl -sk --max-time 10 https://localhost:${PORT}/health" 2>/dev/null || true)
-    if printf '%s' "$body" | grep -Eq '"inFlight": ?true'; then
-        printf '%s' "$body" | grep -Eo '"inFlightCycleTime": ?"[^"]*"' | head -1 | sed 's/^/horizon march in flight /'
-        return 0
-    fi
-    if printf '%s' "$body" | grep -Eq '"run_in_progress": ?true'; then
-        # /health has no last_cycle_started_at key at top level (first live
-        # run of this guard, 06:43Z 2026-08-28, printed an empty reason);
-        # last_run is the top-level stamp of the previous completed cycle.
-        printf 'SWAN cycle in progress (previous cycle completed %s)' \
-            "$(printf '%s' "$body" | grep -Eo '"last_run": ?"[^"]*"' | head -1 | sed -E 's/.*: ?"//; s/"$//')"
-        return 0
-    fi
-    return 1
-}
-if [ "$force_restart" = "1" ]; then
-    echo "[guard] --force-restart: skipping the in-flight WW3 march / SWAN run wait"
-else
-    waited=0
-    while reason=$(busy_reason); do
-        if [ "$waited" -ge "$WAIT_CEILING_S" ]; then
-            echo "[guard] still busy after ${waited}s (${reason}) -- refusing to restart." >&2
-            echo "[guard] re-run with --force-restart to kill it deliberately." >&2
-            exit 1
-        fi
-        if [ $((waited % 300)) -eq 0 ]; then
-            echo "[guard] service busy: ${reason} -- waiting (${waited}s elapsed, ceiling ${WAIT_CEILING_S}s)"
-        fi
-        sleep "$WAIT_POLL_S"
-        waited=$((waited + WAIT_POLL_S))
-    done
-    echo "[guard] service idle (no WW3 march or SWAN cycle in flight) -- restarting"
-fi
+guard_before_mutation
 run_root "systemctl restart ${SERVICE}"
 echo "[svc] restart issued, waiting ${STARTUP_WAIT}s..."
 sleep "$STARTUP_WAIT"
