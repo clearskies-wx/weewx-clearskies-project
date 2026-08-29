@@ -143,7 +143,7 @@ Moved 2026-07-27 (task A3). "Audit rules" and "Round-close verification gate" no
 
 **Why (2026-06-06):** `webcam.json` was placed in the web root by the wizard and deleted by `rsync --delete` during a dashboard redeploy. This happened repeatedly because the wizard wrote to `_dashboard_root` and no deployment script could exclude every possible config file. Moving all config to `/etc/weewx-clearskies/` eliminates the category of bug.
 
-**PowerShell multi-line commits: use `git commit -F`.** Write message to `c:\tmp\<task>-msg.txt`, then `git commit -s -F c:\tmp\<task>-msg.txt`. PowerShell heredocs break on parens/quotes.
+**PowerShell multi-line commits: use `git commit -F`.** Write the temporary message to `scratch/<task>-msg.txt`, then run `git commit -s -F scratch/<task>-msg.txt` and remove the scratch file after verification. PowerShell heredocs break on parentheses and quotes.
 
 ## Plan and documentation discipline
 
@@ -151,13 +151,13 @@ Moved 2026-07-27 (task A3). "Audit rules" and "Round-close verification gate" no
 
 **Don't hold things across turns.** Comparison tables, open decisions, investigation findings → write to a file immediately. The cost of writing is negligible; the cost of losing context mid-session is high.
 
-**Live scratchpad during multi-agent rounds.** Maintain `c:\tmp\<phase-task>-scratch.md`. Append continuously after every commit, lead-call, audit finding, state change. Not reconstructed retroactively.
+**Live scratchpad during multi-agent rounds.** Maintain `scratch/<phase-task>-scratch.md` inside this repository. Append continuously after every commit, coordinator call, audit finding, and state change. Do not reconstruct it retroactively; delete it when the round closes unless the task explicitly promotes its contents into governed documentation.
 
-**Round briefs land in `docs/planning/briefs/`.** Not in `c:\tmp\` or other ephemeral locations.
+**Round briefs land in `docs/planning/briefs/`.** Drafts may start under `scratch/`, but approved briefs do not remain in an ephemeral location.
 
 **No decision log.** Don't maintain a round-by-round decision log in the plan or in per-domain files — git history is the build trail and the ADRs are the decision record. The decision log went unused and was dropped 2026-05-28.
 
-**`.claude/` stays private.** Agent definitions, settings, MCP config are gitignored. Don't propose tracking them or exposing multi-agent orchestration in public repos.
+**Codex configuration is project-native.** Track active project configuration and agent definitions under `.codex/`. Keep credential values out of it. `.claude/` is preserved only as a compatibility layer and is not authoritative for Codex.
 
 ## Provider module rules
 
@@ -199,7 +199,7 @@ Moved 2026-07-27 (task A3). "Audit rules" and "Round-close verification gate" no
 
 **Why (2026-05-25):** Aeris `client_id` and `client_secret` were returned correctly by the API's `/setup/current-config` endpoint but silently dropped by the wizard's `_merge_from_api_current_config()` because `_FIELD_REMAP` had no entries for them. The operator was forced to re-enter keys that were already configured. Separately, `populate_from_config()` used a domain-scoped env var prefix (`WEEWX_CLEARSKIES_FORECAST_AERIS_`) instead of the actual provider-scoped prefix (`WEEWX_CLEARSKIES_AERIS_`), so the local fallback also failed.
 
-**Verify default branch name before writing it into briefs.** api repo = `main`, meta repo = `master`. Brief errors propagate when reused as templates.
+**Verify default branch name before writing it into briefs.** The API and meta repositories currently use `main`; verify every other repository from Git before naming its default. Brief errors propagate when reused as templates.
 
 ## UI implementation quality gates
 
@@ -299,7 +299,7 @@ These are pattern matches, not judgment calls. FAIL if any violation is found.
 
 **All SWAN grid geometry is fixed at setup time — no runtime overrides.** L1, L2, and L3 bounding boxes and the L2 NESTOUT targeting area are computed together in `compute_domains()` once, before any SWAN level runs. No code may resize, reposition, or override `cluster.grid` after `compute_domains()` returns. All inputs that affect grid sizing (structures, depth profiles, spot positions) must be passed to `compute_domains()` — not applied later. If the NESTOUT doesn't cover the L3 grid, swell energy is silently blocked at the uncovered boundary segments. SWAN will "succeed" with near-zero wave heights and no errors.
 
-**Why (2026-07-23):** A Sonnet agent couldn't get structures passed to `compute_domains()` at the right time, so instead of fixing the caller, it added a second `smart_size_l3_grid()` call at runtime that overrode `cluster.grid` AFTER Level 2 had already written its NESTOUT. The L3 grid extended beyond the NESTOUT. Result: 0.01m Hs during a 6-8 ft south swell. The coordinator accepted "data is flowing" without checking whether the values made physical sense.
+**Why (2026-07-23):** An implementation agent couldn't get structures passed to `compute_domains()` at the right time, so instead of fixing the caller, it added a second `smart_size_l3_grid()` call at runtime that overrode `cluster.grid` AFTER Level 2 had already written its NESTOUT. The L3 grid extended beyond the NESTOUT. Result: 0.01m Hs during a 6-8 ft south swell. The coordinator accepted "data is flowing" without checking whether the values made physical sense.
 
 **Every SWAN INPUT file requires wind forcing.** GEN3 WESTHUYSEN enables wind generation physics including quadruplet interactions. SWAN refuses to run quadruplets without a wind field (exit code 2). This applies to every SWAN configuration — main 3-level runs, quick updates, AND SurfBeat strips. "Swell-only" is not an excuse to omit wind — the HRRR wind at the spot coordinates is always available and must always be provided.
 
@@ -361,7 +361,7 @@ then escalate the *conflict*, with both citations, not the underlying question.
    a service needs a new interface — a design choice. It does **not** govern applying an
    already-settled pattern to the next case. Counting endpoints, config keys or dependencies is not
    the test; whether the responsibility is settled is the test.
-2. **Does the code in question still do anything?** CLAUDE.md's own table says removing code that
+2. **Does the code in question still do anything?** `AGENTS.md` says removing code that
    provably never executes is methodology, not architecture — *nothing was being done; nothing stops
    being done*. Trigger 2 asks whether a responsibility moves or vanishes. A control whose only job
    was revealing a field that is being deleted has no responsibility left to lose. "Provably" means
@@ -452,4 +452,3 @@ answer wearing a valid response's clothes.
 ## Validate against reality, never against the model's own output → `rules/verification.md`
 
 Moved 2026-07-27 (task A3). See [rules/verification.md](verification.md). Not duplicated here.
-

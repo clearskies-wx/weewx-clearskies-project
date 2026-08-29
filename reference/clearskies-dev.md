@@ -83,7 +83,7 @@ The production `docker-compose.yml` (Caddy + api + dashboard) is in the stack re
 
 | Machine | Role | What runs here |
 |---|---|---|
-| **DILBERT** (Windows workstation) | Editing, git, planning, orchestration | VS Code, Claude Code, `git push`, brief-drafting |
+| **DILBERT** (Windows workstation) | Editing, git, planning, orchestration | Codex desktop, VS Code, `git push`, brief-drafting |
 | **weather-dev** (LXD container on ratbert) | Runtime, tests, builds | `pytest`, `uv`, `docker compose`, `npm`, `vite` |
 
 Do NOT run pytest, uv, docker, or node toolchains on DILBERT. Do NOT edit source files on weather-dev (except test-author fixture captures, which are committed from weather-dev directly).
@@ -104,7 +104,7 @@ c:\CODE\weather-belchertown\repos\
   weewx-clearskies-swan-swelltrack\    # default branch: master — standalone SWAN + SwellTrack service (librewxr)
 ```
 
-Meta repo (`c:\CODE\weather-belchertown\`) default branch: **master**.
+Meta repo (`c:\CODE\weather-belchertown\`) default branch: **main** (verified 2026-08-28).
 
 ### weather-dev (runtime clones)
 
@@ -173,7 +173,7 @@ Project SWAN usage and measured deviations of the deployed binary from the manua
 `docs/manuals/PROVIDER-MANUAL.md` §14.15, not in the extract.
 
 - To read manual text, extract it **locally**: `pdftotext -layout docs/reference/swan-user-manual.pdf <out.txt>` then grep. `pdftotext` is available in this environment.
-- **Do NOT `WebFetch` / download the SWAN manual, `swanmodel.sourceforge.io`, or any SWAN official
+- **Do NOT fetch from the web or download the SWAN manual, `swanmodel.sourceforge.io`, or any SWAN official
   documentation.** We already have it. Web research is only for *third-party* material the repo does
   not contain (other modelers' best practices, papers, USACE CEM) — never for the manual itself.
 - Any agent brief that touches SWAN **must** point the agent at these two local files and forbid
@@ -233,7 +233,7 @@ Keys and config live in `.local/ssh/` (project directory, replicates via Nextclo
 
 ## Deploy scripts
 
-All three scripts live in `scripts/`. Always use them — never run manual `git pull`, `npm build`, `rsync`, `systemctl restart`, or `chown`/`chmod` on containers. See CLAUDE.md "Filesystem permissions on containers" for why.
+All three scripts live in `scripts/`. Always use them — never run manual `git pull`, `npm build`, `rsync`, `systemctl restart`, or `chown`/`chmod` on containers. See `AGENTS.md` "Filesystem permissions on containers" for why.
 
 ### Dashboard + config UI → weather-dev
 

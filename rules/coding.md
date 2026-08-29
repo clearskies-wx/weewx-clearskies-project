@@ -392,7 +392,7 @@ When a function, branch, import, or variable becomes unused, delete it in the sa
 - No speculative helpers without a current caller.
 - Renaming a variable to `_unused` or prefixing with `_` to silence linter warnings is not deletion. Delete it.
 
-If you spot dead code adjacent to your change but unrelated to it, mention it in your reply and ask whether to remove — don't silently expand scope ([Simple means simple](../CLAUDE.md)).
+If you spot dead code adjacent to your change but unrelated to it, mention it in your reply and ask whether to remove — don't silently expand scope ([Simple means simple](../AGENTS.md)).
 
 ---
 
@@ -403,7 +403,7 @@ Before saying "done":
 1. Re-read the diff. Treat it as a code review of someone else's work.
 2. Check for: debug prints, commented-out blocks, leftover TODO notes, unused imports, hardcoded test values.
 3. Run the linter / type-checker / tests if they exist in the repo.
-4. For UI changes, actually load the page in a browser. Type-checking is not feature-checking — see [CLAUDE.md](../CLAUDE.md) "For UI or frontend changes" rule.
+4. For UI changes, actually load the page in a browser. Type-checking is not feature-checking — see [AGENTS.md](../AGENTS.md) and `rules/verification.md`.
 5. **For UI changes, run the Section 5 accessibility audit checklist below before declaring done.** Not optional. The user has explicitly flagged WCAG compliance as load-bearing, not Phase 4 polish.
 
 If you can't test the change (no dev server, no fixture data), say so explicitly — don't claim success on something you couldn't exercise.
@@ -412,7 +412,7 @@ If you can't test the change (no dev server, no fixture data), say so explicitly
 
 **You cannot review a visual change by reading its markup.** A 2026-05-31 session burned ~2 hours and many agent rounds shipping broken renders — a card rendered at half its intended height (a CSS specificity bug), the temperature block collapsed and clipped out of view (`flex:1` + `overflow:hidden` + an `auto`-height SVG), a chart scaled to overflow the whole card — every one of them invisible while reading the HTML/CSS, and every one obvious the instant the page was actually rendered. Reading code, type-checking, and `axe` passing are **not** visual verification.
 
-**Every change to a mockup or any UI surface must be rendered to an image and visually inspected before it is shown to the user or called done.** For a static mockup no dev server is needed — render with headless Edge and open the PNG (the Read tool displays images):
+**Every change to a mockup or any UI surface must be rendered to an image and visually inspected before it is shown to the user or called done.** For a static mockup no dev server is needed — render with headless Edge and inspect the PNG with the available image viewer:
 
 ```
 & "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --headless=new --disable-gpu `
@@ -641,15 +641,15 @@ The Clear Skies dashboard uses Recharts v3.x for all chart components. Recharts 
 
 ## 8. Documentation — save locally, read before fetching
 
-**All third-party documentation for libraries used in this project MUST be saved in `docs/reference/` and read from there before any web fetch.** Do not use WebFetch or WebSearch for documentation that should already be local. If a reference doc doesn't exist yet, fetch it ONCE, save it to `docs/reference/<library>-reference.md`, and read from the local copy going forward.
+**All third-party documentation for libraries used in this project MUST be saved in `docs/reference/` and read from there before any web fetch.** Do not search for or fetch documentation that should already be local. If a reference doc doesn't exist yet, fetch it ONCE, save it to `docs/reference/<library>-reference.md`, and read from the local copy going forward.
 
-**Why (2026-06-07):** Multiple sessions wasted time WebFetching Recharts and Belchertown documentation that should have been saved locally after the first fetch. The user has asked for this repeatedly. Documentation for our dependencies is a project asset — it belongs in the repo, not re-fetched every session.
+**Why (2026-06-07):** Multiple sessions repeatedly fetched Recharts and Belchertown documentation that should have been saved locally after the first fetch. The user has asked for this repeatedly. Documentation for our dependencies is a project asset — it belongs in the repo, not re-fetched every session.
 
 **How to apply:** Before any work that touches a third-party library (Recharts, Leaflet, Tailwind, shadcn, etc.):
 1. Check `docs/reference/` for an existing reference doc.
-2. If it exists, read it with the Read tool.
+2. If it exists, read the local file.
 3. If it doesn't exist, fetch it, save it, THEN read the local copy.
-4. Never WebFetch documentation that already has a local copy.
+4. Never fetch documentation that already has a local copy.
 
 ## 9. Build verification — zero TS errors before deploy
 
@@ -677,7 +677,7 @@ Before modifying code in any Clear Skies repo, read the governing manual for tha
 - Dashboard technical behavior (hooks, data flow, routing, i18n) → read `docs/manuals/DASHBOARD-MANUAL.md`
 - UI visual code (design tokens, components, styling) → read `docs/manuals/DESIGN-MANUAL.md` (already in §9)
 
-Manual rules are prescriptive. If the code doesn't match the manual, the code is wrong unless the manual is explicitly marked as pending implementation. When a code change affects manual rules, update the manual in the same commit (see CLAUDE.md doc-code sync rule).
+Manual rules are prescriptive. If the code doesn't match the manual, the code is wrong unless the manual is explicitly marked as pending implementation. When a code change affects manual rules, update the manual in the same commit (see `AGENTS.md` doc-code sync rule).
 
 ## 12. Memory management — keep the footprint honest
 

@@ -4,7 +4,7 @@ Load whenever you are about to declare something done, close a round, audit some
 run a QC gate. Companion files: [rules/agents.md](agents.md) and [rules/coordinator.md](coordinator.md).
 
 These rules were collected here on 2026-07-27 from five locations — three sections of
-`rules/clearskies-process.md` and two of `CLAUDE.md`. They were moved, not rewritten; each origin
+`rules/clearskies-process.md` and two sections of the root instructions. They were moved, not rewritten; each origin
 carries a pointer here. The three-layer model and the known-answer test mandate are new, added by
 task A3 of the Marine Model Restoration Plan.
 

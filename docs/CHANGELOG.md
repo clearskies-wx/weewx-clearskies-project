@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-08-28 — Codex-native project environment
+
+- Added tracked project-local Codex configuration for `gpt-5.6-sol` coordination, an 872,000-token installed context maximum, compaction at 800,000 total tokens, and at most three concurrent supporting agents.
+- Added general worker, reviewer, troubleshooter, and mechanical-worker roles; converted all six Clear Skies repository roles to explicit Codex models, reasoning levels, and sandboxes while preserving their scopes and closeout contracts.
+- Made `AGENTS.md` the active root authority, moved active model/tool assumptions to Codex terminology, corrected scratch and meta-branch guidance, and reduced `CLAUDE.md` to a compatibility pointer without deleting `.claude/`.
+- Documented project trust, the absence of project MCP servers to migrate, environment-variable-only credential forwarding, and the restart/new-task requirement for the extended context window.
+
 ### 2026-08-28 — J28: the 72 h surf forecast was frozen past +6 h — the WW3 horizon march is now retried, deploys wait for it, and health says so
 
 Operator report: "my surf forecast is flat over 72 hours ... wave height varies by 1–2 inches

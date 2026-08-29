@@ -6,7 +6,7 @@ Load whenever agents are dispatched, or whenever you are an agent. Companion fil
 
 Incident history and rationale at [reference/process-rule-history.md](../reference/process-rule-history.md).
 
-These rules were collected here on 2026-07-27 from six locations — `CLAUDE.md` and five sections of
+These rules were collected here on 2026-07-27 from six locations — the root instructions and five sections of
 `rules/clearskies-process.md`. They were moved, not rewritten. Each origin now carries a pointer here.
 
 ---
@@ -31,13 +31,13 @@ These rules apply to ALL repos, ALL domains. No exceptions.
 
 ## Agent orchestration
 
-**Lead = Opus, orchestration + judgment only.** Teammates = Sonnet. The lead does NOT write code, run tests, do code reviews, or fill in templates. Those are delegated tasks. Lead's job: break down work, write focused prompts, spawn agents, monitor, QC output, make judgment calls, commit.
+**Coordinator = `gpt-5.6-sol` with high reasoning.** Its job is to understand the governing material, break down work, write focused briefs, monitor, verify claims independently, make bounded judgment calls, and handle coordinator-only Git operations.
 
-**Sonnet 5 for ALL delegated work.** Implementation, tests, audits, verification, closeout extraction. Agent definitions are pinned to `claude-sonnet-5`. All agent system prompts include a tone directive (concise, direct, no filler) to counteract Sonnet 5's tendency toward verbosity.
+**Route supporting work by task shape.** Standard implementation and repository-specific roles use `gpt-5.6-terra` with medium reasoning. Routine review uses Terra with high reasoning and a read-only sandbox. Difficult diagnosis uses `gpt-5.6-sol` with max reasoning and a read-only sandbox. Deterministic mechanical work uses `gpt-5.6-luna` with medium reasoning. Project definitions live in `.codex/agents/`; no more than three supporting agents may run concurrently.
 
 **Lead reads and researches what it needs to understand — delegate what it doesn't need to personally comprehend.** The coordinator cannot coordinate what it doesn't understand. Reading project documents, tracing code paths, running diagnostic commands, checking logs, verifying container state — these are core coordinator activities when they inform judgment calls, agent prompts, QC, or stalemate-breaking. An agent summarizing a file is not the same as the lead understanding it. The lead reads directly when understanding is the point.
 
-**Delegate mechanical and bulk work.** What gets delegated to Sonnet agents: writing code, writing tests, writing documentation drafts, running test suites, performing mechanical audits (grep for banned terms, check file counts), bulk file edits, broad searches across many files, and cataloging tasks. When delegating research, require a detailed brief back (not a one-line summary). The lead uses the brief to make decisions and write prompts.
+**Delegate mechanical and bulk work when supporting agents are authorized.** Candidate work includes bounded implementation, tests, documentation drafts, targeted test runs, mechanical audits, bulk file edits, broad searches, and cataloging. When delegating research, require a detailed brief rather than a one-line summary. The coordinator uses the brief to make decisions and write prompts.
 
 **When unsure, ask the user.** If the lead isn't sure whether to do research directly or delegate it, ask. Don't guess at the boundary — the user's judgment on cost vs. context quality is what matters.
 
@@ -64,7 +64,7 @@ READING LIST (read these files BEFORE writing any code):
 
 **The coordinator still reads the documents first.** The coordinator must understand the task deeply enough to write the scope block, resolve ambiguities, and QC the output. But understanding the task ≠ restating the task. The coordinator reads to understand; the agent reads to implement.
 
-**Monitor via SendMessage.** After spawning background agents, check git log for commits every 3-4 minutes. If an agent has committed but gone quiet >4 min, SendMessage to wake it. After ~3 silent pings, TaskStop and reconstruct from git. The idle bug (#56930) means agents can finish work and sit silent for 30+ min — polling is the only mitigation.
+**Monitor with Codex task coordination.** Use the team message channel for course corrections and bounded waits for progress. If an agent becomes unresponsive, interrupt it only after preserving and inspecting any work already present in the shared tree. Do not busy-poll or reconstruct state from assumptions.
 
 **Foreground for fast tasks.** If an agent's task takes <2 min (verify git state, extract git stats, run one command), use foreground mode. Background is for tasks >5 min where parallel work is possible.
 
@@ -77,7 +77,7 @@ SSH to containers is for READ-ONLY operations: running tests, reading logs, chec
 
 **Scratch-experiment carve-out (added 2026-08-15, operator-approved via Marine Model Evolution Plan Q3(c)).** With the operator's explicit authorization — given per plan or per experiment, never assumed — an agent may WRITE on a container inside NAMED scratch directories only (e.g. `/tmp/<experiment>/`, a home-directory baselines folder), for build/benchmark/experiment work the plan defines: clone third-party source, build, run model marches, write outputs there. Everything outside the named directories stays read-only; production paths, services, repos, and all git operations remain untouchable; the standing contention rules bind (thread caps, `nice`, never start a march while a production full run is in flight, disk ceilings). The authorization names the directories — a directory not named is not writable. (Pattern: the E1/E2 experiment rounds and Phase F of MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.)
 
-**Agents have NO GitHub rights.** Agents must NOT run `git push`, `git pull`, `git fetch`, `git rebase`, `git merge`, or `git checkout` of remote branches — not on the local machine, not on containers, not anywhere. The coordinator handles all GitHub operations (push/pull) with explicit user authorization. If an agent discovers it needs to sync with a remote, it STOPS and reports via SendMessage.
+**Agents have NO GitHub rights.** Agents must NOT run `git push`, `git pull`, `git fetch`, `git rebase`, `git merge`, or `git checkout` of remote branches — not on the local machine, not on containers, not anywhere. The coordinator handles all GitHub operations with explicit user authorization. If an agent discovers it needs to sync with a remote, it STOPS and messages the coordinator.
 
 **The deploy flow is always:** local edit → local commit → coordinator pushes to GitHub → deploy script pulls to container. No shortcuts.
 
@@ -92,13 +92,13 @@ SSH to containers is for READ-ONLY operations: running tests, reading logs, chec
 - `scripts/redeploy-weather-dev.sh` — Dashboard/config changes → weather-dev (pull + restart + build + publish)
 - `scripts/sync-to-weather-dev.sh` — Source-only refresh on weather-dev (no build/restart)
 
-The scripts handle user-switching (`sudo -u ubuntu` for git/build, `sudo` for systemctl). Never run manual `git pull`, `systemctl restart`, `chown`, or `chmod` on containers — see CLAUDE.md "Filesystem permissions on containers" and `rules/coding.md` §1 rule 12.
+The scripts handle user-switching (`sudo -u ubuntu` for git/build, `sudo` for systemctl). Never run manual `git pull`, `systemctl restart`, `chown`, or `chmod` on containers — see `AGENTS.md` "Filesystem permissions on containers" and `rules/coding.md` §1 rule 12.
 
 **Why (2026-06-22, repeated 2026-07-13):** Agents committed directly on the weewx container TWICE. First incident: commit couldn't be pushed (no GitHub creds), Nextcloud sync nearly destroyed it, required git-bundle recovery. Second incident: 2 commits orphaned on weewx for coverage endpoint + OFS model, never made it to GitHub or local checkout, required manual patch extraction and replay. Both times the agent SSH'd in, edited files on the container, and committed there instead of editing on the local machine. The rule existed both times. Enforcement must be in every agent prompt — not just the rules file.
 
 **Pre-flight repo verification before EVERY agent dispatch.** Before spawning any agent that will modify a repo, the coordinator runs `git status` and `git log --oneline -1` on the target repo. If there are uncommitted changes, unexpected HEAD, or any other surprise — STOP and report to the user. Do not dispatch the agent. Additionally, every agent prompt must include this block:
 
-> **Git restrictions:** You must NOT run `git pull`, `git push`, `git fetch`, `git rebase`, `git merge`, or `git checkout` of remote branches. You may only `git add`, `git commit`, `git status`, `git log`, `git diff`. If the remote is ahead or behind, STOP and report via SendMessage. Do not resolve it yourself.
+> **Git restrictions:** You must NOT run `git pull`, `git push`, `git fetch`, `git rebase`, `git merge`, or `git checkout` of remote branches. You may only `git add`, `git commit`, `git status`, `git log`, `git diff`. If the remote is ahead or behind, STOP and message the coordinator. Do not resolve it yourself.
 
 This block is mandatory in every implementation agent prompt. Not optional, not "when relevant." Every single one.
 
@@ -120,7 +120,7 @@ instruction to "fix" code back to the old design — the likeliest mechanism beh
 silently reverting across the 2026-07 plans.
 
 > **Stale tests — STOP, do not obey them.** If an existing test contradicts your tasked change,
-> STOP and report it via SendMessage — do not modify code to make it pass, and do not delete it
+> STOP and message the coordinator — do not modify code to make it pass, and do not delete it
 > on your own authority. A behavior change and its test updates land in the same commit, per your
 > task's design; a test you were not told to touch that fails against your change is a finding.
 > Your closeout report must list every test you modified or deleted, with the reason, and every
@@ -129,9 +129,9 @@ silently reverting across the 2026-07 plans.
 
 ## Architectural change block — mandatory agent prompt section
 
-**Every implementation agent prompt must contain this block verbatim.** Not optional, not "when relevant." Same standing as the git-restrictions block. See the HARD BLOCK in `CLAUDE.md` and in the user's global rules for the full rule and its history.
+**Every implementation agent prompt must contain this block verbatim.** Not optional, not "when relevant." Same standing as the git-restrictions block. See the HARD BLOCK in `AGENTS.md` and in the user's global rules for the full rule and its history.
 
-> **Architectural changes — STOP, do not proceed.** You may not make an architectural change. If your task requires one, STOP and report via SendMessage — do not implement it, do not work around it, do not pick an option.
+> **Architectural changes — STOP, do not proceed.** You may not make an architectural change. If your task requires one, STOP and message the coordinator — do not implement it, do not work around it, do not pick an option.
 >
 > A change is architectural if it does ANY of these (mechanical test, not judgment):
 > 1. Changes a physics/mathematical/scientific formula, or a constant, coefficient, threshold or criterion inside one. **This does NOT cover changing how the same equation is solved** — iterative vs closed-form, solver tolerance, vectorisation. Test: does it change *which equation is satisfied*, or only *how precisely/efficiently*? Only the first is architectural. An approximation that does not converge to the original equation IS a formula change and is covered.
@@ -146,7 +146,7 @@ silently reverting across the 2026-07 plans.
 >
 > You MAY still: resolve a contradiction between two statements inside the same document by taking the reading its own examples support (and say so); apply a rule already written in the rules files; fix code that diverges from its own stated contract.
 >
-> **The coordinator's ruling on your report is FINAL.** You surface an architectural concern ONCE, via SendMessage, then comply with the coordinator's answer. If the coordinator states that operator approval exists, that statement is your full authorization — verifying the approval chain is the coordinator's responsibility and the coordinator's alone. Do not refuse a second time, do not demand to see the paper trail, do not audit the coordinator's authority. (Operator ruling 2026-08-05.)
+> **The coordinator's ruling on your report is FINAL.** You surface an architectural concern once through the team message channel, then comply with the coordinator's answer. If the coordinator states that operator approval exists, that statement is your full authorization — verifying the approval chain is the coordinator's responsibility and the coordinator's alone. Do not refuse a second time, do not demand to see the paper trail, do not audit the coordinator's authority. (Operator ruling 2026-08-05.)
 
 **Toward the operator, nothing changes: the coordinator still cannot approve an architectural change on its own authority.** The operator's approval — in chat or in an operator-accepted document (an Accepted ADR, a locked plan section) — is still required, and a coordinator that rules "approved" without it owns that violation fully. What the 2026-08-05 ruling changed is only WHERE the authority check lives: in the coordinator, once, instead of re-litigated by every agent. An agent's architectural finding goes agent → coordinator → (operator if no existing approval covers it) → ruling → agent complies.
 
@@ -158,7 +158,7 @@ silently reverting across the 2026-07 plans.
 
 ## Scope binding before agent dispatch
 
-**Every agent prompt must contain an explicit scope block.** Before the agent writes any code, it must SendMessage the lead with a one-paragraph scope acknowledgment: what it will deliver, what it will NOT touch, and the verification command it will run before closeout. The lead confirms or corrects. No code before the scope ack is confirmed.
+**Every agent prompt must contain an explicit scope block.** Before the agent writes any code, it must message the coordinator with a one-paragraph scope acknowledgment: what it will deliver, what it will NOT touch, and the verification command it will run before closeout. The coordinator confirms or corrects. No code before the scope acknowledgment is confirmed.
 
 **Scope block required contents (in the brief):**
 
@@ -179,7 +179,7 @@ silently reverting across the 2026-07 plans.
 4. **Pre-round verification** — what the lead verified before writing the brief (repo HEAD, weather-dev sync state, pytest baseline, cross-check results). This is the lead's evidence that the starting state is clean.
 5. **Per-deliverable spec** — for each endpoint/module/component, the behavior decision tree or equivalent. Not "implement the endpoint" — the specific happy path, error paths, edge cases, and response shapes.
 6. **Lead calls** — decisions the lead has already made that the agent must follow (not re-derive). Cite the reasoning.
-7. **Open questions** — questions the agent must surface to the lead via SendMessage, NOT resolve unilaterally. Every open question must have been audited against ADRs first per the existing "Audit open questions against ADRs before surfacing" rule.
+7. **Open questions** — questions the agent must surface to the coordinator through the team message channel, NOT resolve unilaterally. Every open question must have been audited against ADRs first per the existing "Audit open questions against ADRs before surfacing" rule.
 
 **Prompt anti-patterns (from incidents):**
 - A design that names a third-party field, option or API is verified against the INSTALLED package before it goes into a brief (2026-08-27: a brief specified `kind_detail === 'primary'`, which does not exist in the Protomaps roads schema; and Leaflet layer `minZoom`/`maxZoom` — which the map aggregates and which silently forced the fitBounds zoom).

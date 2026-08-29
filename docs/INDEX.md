@@ -5,7 +5,8 @@ This repo started as a Belchertown skin evaluation and pivoted to the Clear Skie
 ## Quick links
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — **System architecture: services, containers, endpoints, routing, config** (read before any architecture work)
-- [CLAUDE.md](../CLAUDE.md) — Operating rules & domain routing
+- [AGENTS.md](../AGENTS.md) — Root operating authority, hard gates, domain routing, and model routing
+- [.codex/README.md](../.codex/README.md) — Codex project configuration, agents, context, trust, MCP, and credential handling
 - [CHANGELOG.md](CHANGELOG.md) — Version history & changes
 - [archive/CLEAR-SKIES-PLAN.md](archive/CLEAR-SKIES-PLAN.md) — Active project plan (Phase 2 in progress; Phase 1 closed 2026-05-05; Phase 2 task 1 closed 2026-05-06)
 - [decisions/INDEX.md](decisions/INDEX.md) — All 40 Architecture Decision Records (Accepted)
