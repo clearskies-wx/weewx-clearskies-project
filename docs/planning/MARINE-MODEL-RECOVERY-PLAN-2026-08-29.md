@@ -1,11 +1,10 @@
 # Marine Model Recovery Plan — 2026-08-29
 
-**Status:** PROPOSED — operator review required before execution
+**Status:** ACTIVE — APPROVED by operator in chat, 2026-08-29
 **Scope:** Restore a truthful, complete WW3 → SWAN L2–L4 → SwellTrack production chain, make
 automatic cold recovery deterministic, and make one health query report every required stage.
-**Supersession:** On acceptance, this plan becomes the sole active marine recovery plan. The
-2026-08-02 `MARINE-FORWARD-PLAN.md` is archived as historical, with a small redirect left at its
-old path for existing links.
+**Supersession:** This is the sole active marine recovery plan. The 2026-08-02 forward plan is
+archived as historical, with a small redirect at `MARINE-FORWARD-PLAN.md` for existing links.
 **No code authorization by existence:** only the operator-approved rows in the decision register
 may be implemented. Open rows remain blocked.
 
@@ -84,14 +83,14 @@ Unless an operator-approved decision below says otherwise:
 | D3b κ=1 finite representation | **APPROVED 2026-08-29** (`"ok"`) | Retain finite fields; null unbounded nRep/nSet/tSet; existing scorer fallback | scientific scoring criterion |
 | D4 WCOFS multi-cycle valid-time resolver | **APPROVED DIRECTION 2026-08-29** | Use prior/current same-model cycles by valid time; recovery waits when a required issue is absent | provider→model selection contract |
 | D5 Missing/short horizon publication policy | **APPROVED DIRECTION 2026-08-29** | Refuse cycle, preserve verified last-good, start cold recovery | trigger 6 |
-| D6 Per-hour provenance and existing age semantics | **PENDING PLAN APPROVAL** | Change the internal runner→endpoint cache payload; keep `lastRunTime/dataAge` tied to the selected complete full run; add no public field | trigger 4 |
-| D7 Near-zero invariant publication gate | **PENDING PLAN APPROVAL** | Keep timestamp, return `modelStatus=unavailable`, null wave result | served null semantics |
-| D8 Current-forcing health metadata | **PENDING PLAN APPROVAL** | Add `inputs.currents` + compact `currentForcing`; retain old key | trigger 4; persists in existing snapshot |
+| D6 Per-hour provenance and existing age semantics | **APPROVED 2026-08-29** | Change the internal runner→endpoint cache payload; keep `lastRunTime/dataAge` tied to the selected complete full run; add no public field | trigger 4 |
+| D7 Near-zero invariant publication gate | **APPROVED 2026-08-29** | Keep timestamp, return `modelStatus=unavailable`, null wave result | served null semantics |
+| D8 Current-forcing health metadata | **APPROVED 2026-08-29** | Add `inputs.currents` + compact `currentForcing`; retain old key | trigger 4; persists in existing snapshot |
 | D9 Horizon worker evidence | **APPROVED EVIDENCE ROUND 2026-08-29** | Benchmark checkpointed/yielding vs controlled concurrency; no worker choice yet | later triggers 5/6/7 |
-| D10 Same-cycle successful WW3 reuse on SWAN retry | **PENDING PLAN APPROVAL** | Reuse only same-process, fingerprint-matching artifacts | trigger 6 |
-| D11 SWAN hotstart quarantine before first repaired publish | **PENDING PLAN APPROVAL** | Transactionally quarantine tokened L2/L3/L4 hotstarts; never touch WW3 restart | recoverable state mutation |
-| D12 Recovery intent + runtime generation | **PENDING PLAN APPROVAL** | One atomic intent under existing work root; fingerprint includes deployed revision/binary/config hashes | triggers 5/6/7 |
-| D13 Unified Model Health | **OPERATOR-REQUESTED 2026-08-29; design in §16** | Stage-by-stage required health, deployed revision, API/admin reporting | triggers 4/7 |
+| D10 Same-cycle successful WW3 reuse on SWAN retry | **APPROVED 2026-08-29** | Reuse only same-process, fingerprint-matching artifacts | trigger 6 |
+| D11 SWAN hotstart quarantine before first repaired publish | **APPROVED 2026-08-29** | Transactionally quarantine tokened L2/L3/L4 hotstarts; never touch WW3 restart | recoverable state mutation |
+| D12 Recovery intent + runtime generation | **APPROVED 2026-08-29** | One atomic intent under existing work root; fingerprint includes deployed revision/binary/config hashes | triggers 5/6/7 |
+| D13 Unified Model Health | **APPROVED 2026-08-29; design in §16** | Stage-by-stage required health, deployed revision, API/admin reporting | triggers 4/7 |
 
 Acceptance of this plan approves D6–D8 and D10–D13 as written. D9 remains evidence-only; worker
 placement requires a later explicit choice after the benchmark gate.
@@ -941,8 +940,8 @@ permission to expand the design.
 
 ## 24. Acceptance checklist
 
-- [ ] Operator accepts §23's approval boundary and this plan.
-- [ ] Old forward plan archived; redirect installed.
+- [x] Operator accepts §23's approval boundary and this plan — 2026-08-29.
+- [x] Old forward plan archived; redirect installed — 2026-08-29.
 - [ ] Results-free gates written before implementation.
 - [ ] R1–R11 individually implemented, audited, documented, and live-gated.
 - [ ] R12 four-anchor/reality/health gate passes.
