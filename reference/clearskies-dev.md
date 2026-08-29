@@ -53,10 +53,10 @@ API address is remote   → MQTT mode (broker bridges loop packets between hosts
 
 ### Our test infrastructure = cross-host topology
 
-| Host | IP | Role | Services |
+| Host | FQDN | Role | Services |
 |---|---|---|---|
 | **weewx** (LXD container) | `weewx.shaneburkhardt.com` (VLAN2, dual-stack) | weewx + API | weewx, weewx-clearskies-api (port 8765 TLS), Redis (port 6379 loopback) |
-| **weather-dev** (LXD container) | 192.168.2.113 | Dashboard + config host | weewx-clearskies-config (9876), dashboard static files, Caddy (ports 80/443) |
+| **weather-dev** (LXD container) | `weather-dev.shaneburkhardt.com` | Dashboard + config host | weewx-clearskies-config (9876), dashboard static files, Caddy (ports 80/443) |
 
 ### One-door reverse proxy (ADR-037)
 
@@ -97,11 +97,10 @@ All repos live under the meta repo:
 ```
 c:\CODE\weather-belchertown\repos\
   weewx-clearskies-api\                # default branch: main
-  weewx-clearskies-realtime\           # default branch: main
   weewx-clearskies-dashboard\          # default branch: main
   weewx-clearskies-stack\              # default branch: main
   weewx-clearskies-design-tokens\      # default branch: main
-  weewx-clearskies-swan-swelltrack\    # default branch: master — standalone SWAN + SwellTrack service (librewxr)
+  weewx-clearskies-marine\             # default branch: main — unified marine service
 ```
 
 Meta repo (`c:\CODE\weather-belchertown\`) default branch: **main** (verified 2026-08-28).
@@ -111,33 +110,30 @@ Meta repo (`c:\CODE\weather-belchertown\`) default branch: **main** (verified 20
 ```
 /home/ubuntu/repos/
   weewx-clearskies-api/
-  weewx-clearskies-realtime/
   weewx-clearskies-dashboard/
   weewx-clearskies-stack/
   weewx-clearskies-design-tokens/
 ```
 
-Owner: `ubuntu`. Container IP: `192.168.2.113` (DHCP/SLAAC on `br-vlan2`).
+Owner: `ubuntu`. FQDN: `weather-dev.shaneburkhardt.com` (DHCP/SLAAC on
+`br-vlan2`).
 
 ### librewxr (compute host) — **this is where SWAN runs**
 
 ```
 /home/ubuntu/repos/
-  weewx-clearskies-api/                # API repo — provides the venv BOTH services run from,
-                                       # and the compute service's own code
-  weewx-clearskies-swan-swelltrack/    # SWAN standalone service package
+  weewx-clearskies-marine/             # unified marine service
 ```
 
-Owner: `ubuntu`. Host IP: `192.168.7.22`. SSH: `ssh -F .local/ssh/config librewxr`.
+Owner: `ubuntu`. FQDN: `librewxr.shaneburkhardt.com`. SSH:
+`ssh -F .local/ssh/config librewxr`.
 
 **`journalctl -u weewx-clearskies-marine` requires `sudo` on librewxr** — without it the claude
 user gets an EMPTY stream (not an error), so an unsudo'd journal watch silently sees nothing
 (2026-08-03: a monitor watched an empty stream for hours; silence looked like health).
 
-**SWAN runs inside the unified marine service. It does not run on the weewx host and it does
-not run on weather-dev.** Corrected 2026-08-02 — this section previously described a split
-`weewx-clearskies-swan.service` (8767) + `weewx-clearskies-compute.service` (8770) topology
-that has been superseded by a single unified service:
+**SWAN runs inside the unified marine service. It does not run on the weewx
+host or weather-dev.**
 
 | systemd unit | Port | ExecStart module | What it computes |
 |---|---|---|---|
@@ -152,16 +148,9 @@ The interpreter, SWAN binary path, and secrets/config file locations for the uni
 were not independently re-verified as part of this correction — confirm at `librewxr` before
 citing them if this section is extended.
 
-One consequence that still applies: **the marine repo checkout on librewxr is the one that
-matters for any SWAN, SwellTrack, SurfBeat, or surf-endpoint change** — test there, not on the
+The marine checkout on librewxr is the one that matters for WW3, SWAN,
+SwellTrack, marine-provider, and surf-endpoint changes. Test there, not on the
 weewx host or weather-dev.
-
-> **Known residual staleness (flagged 2026-08-02, not fixed in this pass — scoped to the
-> services/port table only):** the repo-directory listings above (this file's
-> `weewx-clearskies-swan-swelltrack` entries) and `docs/ARCHITECTURE.md`'s "Current deployment"
-> paragraph both still describe the same superseded split-service topology this table just
-> corrected. Both need their own verified pass — not corrected here to avoid rewriting repo
-> topology without dedicated verification.
 
 ### SWAN documentation is committed to this repo — NEVER download it
 
@@ -282,7 +271,7 @@ report a result from it.** It was last seen at `ba3af8f`, unrelated to any curre
 
 | Change touches… | Run its **tests** on | Runs in **production** on |
 |---|---|---|
-| SWAN, SwellTrack, SurfBeat, surf endpoint, beach profile, marine providers | **librewxr** — where the code actually runs | **librewxr** — SWAN service 8767, compute service 8770 |
+| WW3, SWAN, SwellTrack, surf endpoint, beach profile, marine providers | **librewxr** — where the code actually runs | **librewxr** — unified marine service on port 8780 |
 | Condition modules (haze, calibration, sky, fog), archive/DB, general API | **weewx** | weewx — API installed natively, reads the weewx archive |
 | Dashboard, config UI | **weather-dev** | weather-dev — dashboard build + Caddy |
 
@@ -310,21 +299,20 @@ scripts/deploy-api.sh --no-restart
 
 ### Run pytest on the host that runs the code
 
-- **SWAN, SwellTrack, SurfBeat, surf endpoint, beach profile, marine providers → `librewxr`.**
-  `pytest`, `pytest-asyncio` and `pytest-timeout` are installed in
-  `/home/ubuntu/repos/weewx-clearskies-api/.venv` (added 2026-07-25).
+- **WW3, SWAN, SwellTrack, surf endpoint, beach profile, and marine providers
+  → `librewxr`.** Use the marine repository environment and targeted tests.
 - **Everything else (conditions, archive/DB, general API) → `weewx`.**
 
 ```bash
-# SWAN / surf tests — on librewxr, using the venv python directly:
-ssh -F .local/ssh/config librewxr "sudo -u ubuntu /home/ubuntu/repos/weewx-clearskies-api/.venv/bin/python -m pytest /home/ubuntu/repos/weewx-clearskies-api/tests/services/test_swan_runner.py -q"
+# Marine tests — on librewxr, using the marine repository environment:
+ssh -F .local/ssh/config librewxr "sudo -u ubuntu bash -c 'cd /home/ubuntu/repos/weewx-clearskies-marine && .venv/bin/python -m pytest tests/test_z3_full_run_from_store.py -q'"
 ```
 
 **Never run pytest on librewxr while a SWAN cycle is in progress.** A full cycle is 15–30
 minutes and the box has ~1.7 GB free after the radar container's 3.2 GB. Test load during a
 run competes for memory with SWAN and both distorts the run's wall-clock and risks pushing it
 into swap. Check first:
-`ssh -F .local/ssh/config librewxr "systemctl is-active weewx-clearskies-swan; pgrep -x swan"`
+`ssh -F .local/ssh/config librewxr "systemctl is-active weewx-clearskies-marine; pgrep -x swan"`
 
 Three things all container test runs need, or they fail in confusing ways:
 
@@ -354,16 +342,16 @@ new test file passed on Windows and failed on Linux, because the code under test
 Linux it hits the real directory and raises `PermissionError`. Any test touching a config path
 must be isolated to `tmp_path`, and a green Windows run proves nothing about Linux.
 
-### Restart the librewxr compute services
+### Restart the librewxr marine service
 
 ```bash
-ssh -F .local/ssh/config librewxr "sudo systemctl restart weewx-clearskies-swan weewx-clearskies-compute && systemctl is-active weewx-clearskies-swan weewx-clearskies-compute"
+ssh -F .local/ssh/config librewxr "sudo systemctl restart weewx-clearskies-marine && systemctl is-active weewx-clearskies-marine"
 ```
 
 ### Read SWAN run history on librewxr
 
 ```bash
-ssh -F .local/ssh/config librewxr "sudo journalctl -u weewx-clearskies-swan --since '5 days ago' --no-pager | grep -E 'cached|nan_detected|low_valid_fraction'"
+ssh -F .local/ssh/config librewxr "sudo journalctl -u weewx-clearskies-marine --since '5 days ago' --no-pager | grep -E 'cached|nan_detected|low_valid_fraction'"
 ```
 
 Get the **whole timeline** before concluding anything systemic from a single log line — a

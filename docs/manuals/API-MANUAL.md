@@ -3241,15 +3241,22 @@ A missing profile used to raise HTTP 404 for all of the above, which read as "wr
 
 ---
 
-## §19 Marine Service Companion Pattern (target — pending ADR-099 acceptance)
+## §19 Marine Service Companion Pattern (current as-built)
 
-This section documents the target-state architecture for the marine service (`weewx-clearskies-marine`). The patterns described here take effect when the marine service is extracted from the API into a standalone companion service per ADR-099. The current state (SWAN runner, SwellTrack, all marine providers embedded in the API) continues to apply until ADR-099 is accepted and the migration executed.
+This section documents the current boundary between the API and the standalone
+marine companion service (`weewx-clearskies-marine`). ADR-099 was accepted on
+2026-07-26 and the API uses the companion proxy for marine routes.
 
-**Current state:** All marine logic — SWAN runner, SwellTrack (SurfBeat removed 2026-08-23), and all provider modules listed in PROVIDER-MANUAL §14 — runs inside the API process. Marine endpoints (`/surf`, `/marine`, `/tides`, `/fishing`, `/beach-safety`) are hardcoded routes in `endpoints/`.
+**Current state:** The marine service owns SWAN, SwellTrack (SurfBeat was
+removed), and the marine provider modules listed in PROVIDER-MANUAL §14. The
+API fetches the service manifest and mounts companion-proxy routes under
+`/api/v1/`; it does not retain native marine provider modules or hardcoded
+marine routes.
 
-**Target state:** Marine logic moves to a standalone FastAPI service (`weewx-clearskies-marine`) on port 8780. The API communicates with it over HTTP (authenticated, TLS). Marine endpoints are dynamically mounted from the service's manifest. Zero API code changes are needed to add or modify a marine endpoint after the separation.
-
-**Implementation status (Phase 6 re-merge round, 2026-07-25):** `services/companion_proxy.py` is implemented — manifest fetch at startup, dynamic route mounting under `/api/v1/`, 5-minute manifest refresh (same clock as the startup-unreachable retry), and the three-state rule below. The API's hardcoded marine routers described in "Current state" above are still mounted (T6.5–T6.8 delete them later in Phase 6); until then, an operator who configures `marine_service_url` has both a native route and a companion-proxy route registered for the same overlapping paths, and FastAPI resolves to whichever was registered first (the native router — it is registered before `register_companion_proxy()` runs). §19.3 (response envelope wrapping + unit conversion, T6.2) and §19.8 (post-conversion enrichment, the re-merge round) are both implemented. One item remains open — surf t=0 station wind restoration — see §19.8.
+The API communicates with the marine service over authenticated TLS. The
+manifest is fetched at startup, refreshed periodically, and refreshed on each
+configuration apply. Adding or changing a declared marine route requires no
+route-specific API implementation.
 
 **The three-state rule (proxy failure vs. model gap vs. missing resource).** These three situations must stay distinguishable end to end — collapsing any two of them reintroduces the ambiguity SURF-PUBLISH-RESULTS-ONLY (§18 above) removed:
 
@@ -3338,7 +3345,9 @@ The marine service exposes `GET /manifest` (no auth required). The API fetches t
 
 Adding a new marine endpoint requires a manifest update in the marine service only — zero API code changes.
 
-**When marine service is not configured** (`marine_service_url` absent from `api.conf`): no manifest is fetched, no marine routes are mounted, and the API behaves identically to a non-marine installation. The marine endpoint inventory in §18 remains accurate for the current embedded state.
+**When marine service is not configured** (`marine_service_url` absent from
+`api.conf`): no manifest is fetched, no marine routes are mounted, and the API
+behaves as a non-marine installation.
 
 **List routes are also in the manifest.** The example above shows the six `{location_id}`-scoped detail/profile routes; the marine service's actual manifest carries eleven entries — one additional list route per family with no `location_id` (`/surf`, `/marine`, `/tides`, `/fishing`, `/beach-safety`), each returning the configured locations for that activity as metadata (no live provider fetch), cached at the same TTL as its family's detail route. These back the dashboard's marine location-card grids. Omitted from the example JSON above for brevity, not omitted from the manifest itself.
 

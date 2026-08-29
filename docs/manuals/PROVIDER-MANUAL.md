@@ -3208,37 +3208,42 @@ an unrounded axis would be the actual defect). `SEAM_HS_TOLERANCE` (±10%) is si
 
 ---
 
-## §15 Marine Service Provider Architecture (target — pending ADR-099 acceptance)
+## §15 Marine Service Provider Architecture (current as-built)
 
-This section documents the target-state provider architecture for the standalone marine service (`weewx-clearskies-marine`). It describes how the provider modules listed in §14 move from the API codebase into the marine service, and what the boundary between the two services looks like after the separation.
+This section documents the provider architecture of the standalone marine
+service (`weewx-clearskies-marine`) and its boundary with the API.
 
-**Current state:** All provider modules in §14 (`ndbc`, `coops`, `wavewatch`, `nws_marine`, `nws_srf`, `hrrr`, `gfs`, `ofs`, `erddap_ocean`, `swan`), all supporting components (bathymetry resolver, NWS zone discovery, ocean data resolver, water level compositor, SwellTrack; SurfBeat removed 2026-08-23), and all DOMAIN registrations (`"marine"`, `"tides"`, `"buoy"`, `"wind"`, `"nearshore"`, `"ocean"`) live inside `weewx_clearskies_api/`. The `PROVIDER_MODULES` registry in the API dispatches to them.
+**Current state:** The §14 provider modules (`ndbc`, `coops`, `wavewatch`,
+`nws_marine`, `nws_srf`, `hrrr`, `gfs`, `ofs`, `erddap_ocean`, and `swan`)
+and their supporting marine components live in `weewx_clearskies_marine/`.
+The API's `PROVIDER_MODULES` registry has zero marine entries and the API
+does not import marine provider modules. Marine data crosses this boundary
+only through the HTTP interface described in API-MANUAL §19.
 
-**Target state:** The modules and components listed above move to `weewx_clearskies_marine/`. The API's `PROVIDER_MODULES` registry has zero marine entries. The API never directly imports any marine provider module. All marine data flows through the HTTP interface described in API-MANUAL §19.
+### §15.1 Provider modules in the marine service
 
-### §15.1 Provider modules that move to the marine service
+The following modules are internal to `weewx_clearskies_marine/providers/`
+and are not registered in the API dispatch registry:
 
-The following modules (currently in `weewx_clearskies_api/providers/`) become internal to `weewx_clearskies_marine/providers/` and are no longer registered in the API's dispatch registry:
+| Module | Marine service path | Domain |
+|--------|---------------------|--------|
+| NDBC buoy observations | `providers/buoy/ndbc.py` | `buoy` |
+| CO-OPS tides & water levels | `providers/tides/coops.py` | `tides` |
+| WaveWatch III forecasts | `providers/marine/wavewatch.py` | `marine` |
+| NWS marine zone text | `providers/marine/nws_marine.py` | `marine` |
+| NWS Surf Zone Forecast (SRF) | `providers/marine/nws_srf.py` | `marine` |
+| HRRR wind | `providers/wind/hrrr.py` | `wind` |
+| GFS wind | `providers/wind/gfs.py` | `wind` |
+| SWAN runner | `providers/nearshore/swan.py` | `nearshore` |
+| OFS ocean model data | `providers/ocean/ofs.py` | `ocean` |
+| ERDDAP ocean data | `providers/ocean/erddap_ocean.py` | `ocean` |
 
-| Module | Current API path | Marine service path | Domain |
-|--------|-----------------|---------------------|--------|
-| NDBC buoy observations | `providers/buoy/ndbc.py` | `providers/buoy/ndbc.py` | `buoy` |
-| CO-OPS tides & water levels | `providers/tides/coops.py` | `providers/tides/coops.py` | `tides` |
-| WaveWatch III forecasts | `providers/marine/wavewatch.py` | `providers/marine/wavewatch.py` | `marine` |
-| NWS marine zone text | `providers/marine/nws_marine.py` | `providers/marine/nws_marine.py` | `marine` |
-| NWS Surf Zone Forecast (SRF) | `providers/marine/nws_srf.py` | `providers/marine/nws_srf.py` | `marine` |
-| HRRR wind | `providers/wind/hrrr.py` | `providers/wind/hrrr.py` | `wind` |
-| GFS wind | `providers/wind/gfs.py` | `providers/wind/gfs.py` | `wind` |
-| SWAN runner | `providers/nearshore/swan.py` | `providers/nearshore/swan.py` | `nearshore` |
-| OFS ocean model data | `providers/ocean/ofs.py` | `providers/ocean/ofs.py` | `ocean` |
-| ERDDAP ocean data | `providers/ocean/erddap_ocean.py` | `providers/ocean/erddap_ocean.py` | `ocean` |
+Supporting components in the marine service:
 
-Supporting components that also move:
-
-| Component | Current API path | Notes |
+| Component | Marine service path or ownership | Notes |
 |-----------|-----------------|-------|
 | CUDEM bathymetry | `enrichment/bathymetry.py` | Profile extraction for surf/fishing spots |
-| Bathymetry resolver | `services/bathymetry_resolver.py` | 2-D grid resolution for SWAN (moved — Phase 7, C-48) |
+| Bathymetry resolver | `services/bathymetry_resolver.py` | 2-D grid resolution for SWAN |
 | NWS zone discovery utility | `providers/_common/nws_zones.py` | Shared by nws_marine and nws_srf |
 | Ocean data resolver | `services/ocean_data_resolver.py` | OFS → ERDDAP fallback chain |
 | Water level compositor | `services/water_level_compositor.py` | CO-OPS predictions + OFS residual |
@@ -3246,7 +3251,7 @@ Supporting components that also move:
 | SwellTrack | `services/surf_1d_analytical.py` | Cross-shore wave transformation |
 | SurfBeat strip | REMOVED 2026-08-23 (operator ruling) | — |
 | Wave setup service | `services/wave_setup.py` | Radiation-stress-balance setup estimate |
-| OSM Overpass structure discovery | `endpoints/setup.py` (setup-time only) | Remains callable via API `/setup/marine/discover-structures` proxy |
+| OSM Overpass structure discovery | marine service discovery handler | Reached through an API setup proxy |
 
 ### §15.2 The §1 Module Contract applies unchanged
 
@@ -3260,7 +3265,8 @@ Every provider module in the marine service follows the same §1 Module Contract
 
 ### §15.3 Data sources fetched directly by the marine service
 
-In the target state, the marine service makes all outbound data fetches listed below. The API never fetches from these sources directly:
+The marine service makes all outbound data fetches listed below. The API never
+fetches from these sources directly:
 
 | Data source | Provider module | Protocol | Auth required |
 |-------------|----------------|----------|---------------|
@@ -3280,9 +3286,9 @@ In the target state, the marine service makes all outbound data fetches listed b
 
 All v1 marine data sources are NOAA sources — free, keyless, US-only (except ERDDAP RTOFS and MUR SST which are global). No operator-supplied API keys are required for any marine data source.
 
-### §15.4 What remains in the API after separation
+### §15.4 What remains in the API
 
-The following marine-adjacent components are NOT moved to the marine service:
+The following marine-adjacent components remain in the API:
 
 | Component | Stays in API | Reason |
 |-----------|-------------|--------|
@@ -3313,7 +3319,10 @@ All NOAA marine data sources are public domain — attribution is recommended bu
 
 ### Source ADR
 
-§15 is governed by ADR-099 (marine service separation — pending user acceptance as of 2026-07-22). The module-level implementation details (fetch interfaces, error taxonomy, cache rules, test patterns) are unchanged from §14 and continue to be governed by the ADRs listed in §14's "Source ADRs" section.
+§15 is governed by ADR-099 (marine service separation, Accepted 2026-07-26).
+The module-level implementation details (fetch interfaces, error taxonomy,
+cache rules, and test patterns) are unchanged from §14 and continue to be
+governed by the ADRs listed in §14's "Source ADRs" section.
 
 ---
 

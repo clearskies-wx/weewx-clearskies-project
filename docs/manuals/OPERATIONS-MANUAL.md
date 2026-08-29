@@ -1196,17 +1196,23 @@ Accepted datums for operator uploads: **NAVD88, MLLW, MHW, MHHW, MSL**. These ar
 
 The standalone compute-offload service described in earlier revisions of this manual (`surf_compute_host`/`surf_compute_verify_tls` in `api.conf [providers]`, `SURF_COMPUTE_SECRET` in `secrets.env`, a service on port 8770 running `python -m weewx_clearskies_api.services.compute_service`) **no longer exists.** `ApplyRequest` and `CurrentConfigResponse` stopped accepting `surf_compute_host`/`surf_compute_secret`/`surf_compute_verify_tls` in Phase 6 (T6.8); the API has no code path left that reads or writes them, and `services/compute_service.py`/`services/compute_client.py` were deleted from the API repo in the same phase.
 
-All marine computation — including what this service used to offload — now runs in the standalone `weewx-clearskies-marine` service, configured via `marine_service_url` in `api.conf [providers]` and `MARINE_SERVICE_SECRET` in `secrets.env`. See "Marine service deployment" below for the current connection, secret, and deployment topology; this replaces the compute-offload section that previously appeared here. This is not marked "target — pending ADR-099 acceptance" like the rest of that section's heading — the removal of `surf_compute_host` itself is already executed and does not depend on ADR-099's status; only the further collapse of `[swan]` into `marine_service_url` alone is still pending.
+All marine computation — including what this service used to offload — now runs
+in the standalone `weewx-clearskies-marine` service, configured via
+`marine_service_url` in `api.conf [providers]` and `MARINE_SERVICE_SECRET` in
+`secrets.env`. See "Marine service deployment" below for the current
+connection, secret, and deployment topology.
 
 Accepted formats for upload: GeoTIFF, NetCDF, ASCII XYZ.
 
-### Marine service deployment (target — pending ADR-099 acceptance)
+### Marine service deployment (current as-built)
 
-This section documents the target-state deployment model for the standalone marine service (`weewx-clearskies-marine`). The deployment described here takes effect when the marine service is extracted from the API per ADR-099. The current deployment (SwellTrack, SWAN runner, and all marine providers running inside the API process; SurfBeat removed 2026-08-23) remains in effect until ADR-099 is accepted.
+This section documents the deployed standalone marine service
+(`weewx-clearskies-marine`). ADR-099 was accepted on 2026-07-26.
 
-**Current state:** All marine computation runs inside the `weewx-clearskies-api` process on the weewx host. The optional compute offload (`surf_compute_host`, port 8770) handles only SwellTrack calculations (SurfBeat removed 2026-08-23). SWAN runs on the weewx host in all configurations.
-
-**Target state:** All marine computation (SWAN, SwellTrack, all marine provider fetches; SurfBeat removed 2026-08-23) runs in a separate `weewx-clearskies-marine` service on port 8780. The API communicates with it over authenticated HTTPS.
+**Current state:** All marine computation — WW3, SWAN, SwellTrack, and
+marine-provider fetches — runs in `weewx-clearskies-marine` on port 8780. The
+API communicates with it over authenticated HTTPS. The old compute-offload
+service and its port are not part of the deployed architecture.
 
 #### Deployment topologies
 
@@ -1235,9 +1241,9 @@ compute host
 | Service | Port | Notes |
 |---------|------|-------|
 | `weewx-clearskies-api` | 8765 | Unchanged |
-| `weewx-clearskies-marine` | 8780 | New port, replaces port 8770 (compute service) |
+| `weewx-clearskies-marine` | 8780 | Current marine service port |
 
-Port 8780 is registered in ARCHITECTURE.md. Port 8770 (the previous compute service) is eliminated in the target state.
+Port 8780 is registered in ARCHITECTURE.md.
 
 #### Installation
 
@@ -1257,7 +1263,9 @@ pip install weewx-clearskies-marine
 sudo systemctl enable --now weewx-clearskies-marine
 ```
 
-SWAN 41.51AB must be compiled and on PATH (`/usr/local/bin/swan`) on whichever host runs the marine service. Use `scripts/install_swan.sh` or the Docker image. The API startup check that verifies the SWAN binary moves to the marine service in the target state.
+SWAN 41.51AB must be compiled and on PATH (`/usr/local/bin/swan`) on
+whichever host runs the marine service. Use `scripts/install_swan.sh` or the
+Docker image. The marine service verifies its own SWAN binary.
 
 #### First install — WW3 warm start
 
