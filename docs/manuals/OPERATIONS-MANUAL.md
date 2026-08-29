@@ -1247,21 +1247,16 @@ Port 8780 is registered in ARCHITECTURE.md.
 
 #### Installation
 
-**Same-host:**
+Deploy the marine service with the project workflow:
 
 ```bash
-# On the weewx host (Debian/Ubuntu native or LXD container)
-pip install weewx-clearskies-marine
-sudo systemctl enable --now weewx-clearskies-marine
+scripts/deploy-marine.sh
 ```
 
-**Separate-host:**
-
-```bash
-# On the compute host
-pip install weewx-clearskies-marine
-sudo systemctl enable --now weewx-clearskies-marine
-```
+Run it from the local repository after the intended source is available to the
+deployment workflow. The script provisions the package and service, applies
+the guarded restart policy, and verifies the result. Its package and service
+commands are deployment internals, not manual operator procedure.
 
 SWAN 41.51AB must be compiled and on PATH (`/usr/local/bin/swan`) on
 whichever host runs the marine service. Use `scripts/install_swan.sh` or the

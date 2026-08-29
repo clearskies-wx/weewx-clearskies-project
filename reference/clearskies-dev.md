@@ -342,11 +342,15 @@ new test file passed on Windows and failed on Linux, because the code under test
 Linux it hits the real directory and raises `PermissionError`. Any test touching a config path
 must be isolated to `tmp_path`, and a green Windows run proves nothing about Linux.
 
-### Restart the librewxr marine service
+### Redeploy already-synced marine source
 
 ```bash
-ssh -F .local/ssh/config librewxr "sudo systemctl restart weewx-clearskies-marine && systemctl is-active weewx-clearskies-marine"
+scripts/deploy-marine.sh --skip-pull
 ```
+
+This guarded workflow reinstalls and verifies the service without pulling
+source. It waits for an in-flight WW3 march or SWAN cycle before restarting.
+Use `--force-restart` only under an operator-directed decision.
 
 ### Read SWAN run history on librewxr
 

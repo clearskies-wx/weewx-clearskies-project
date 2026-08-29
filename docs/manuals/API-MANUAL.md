@@ -2987,12 +2987,19 @@ English (`en.json`) is the authoritative source. All 12 other locale files must 
 
 ## §18 Marine Endpoints
 
-Marine endpoints follow existing patterns: capability gating, unit conversion, freshness block, stationClock. Each of the five activity endpoints (`/marine`, `/tides`, `/surf`, `/fishing`, `/beach-safety`) is actually **two routes**:
+Marine endpoints follow existing patterns: capability gating, unit conversion,
+freshness block, and stationClock. The marine service owns the native list,
+detail, and profile handlers. The API dynamically exposes their manifest
+routes under `/api/v1/`. Each of the five activity endpoints (`/marine`,
+`/tides`, `/surf`, `/fishing`, `/beach-safety`) is actually **two routes**:
 
 - `GET /api/v1/{endpoint}` (no `locationId`) — returns a list: one summary/card entry per configured location that qualifies for that endpoint's capability gate. This is what the dashboard's location-card grid (§12) renders. 404 (`"<Feature> not configured"` / `"No <activity> locations configured"`) when zero locations qualify.
 - `GET /api/v1/{endpoint}/{locationId}` — returns the full bundle for one location. 404 when `locationId` does not match a configured, capability-qualifying location.
 
-**There is no "first configured location" fallback.** An earlier draft of this manual said the no-`locationId` route returns data for the first configured location; the implemented behavior is the list above (confirmed against `endpoints/marine.py`, `endpoints/tides.py`, `endpoints/surf.py`, `endpoints/fishing.py`, `endpoints/beach_safety.py` — each has an explicit list-vs-detail route pair).
+**There is no "first configured location" fallback.** An earlier draft of this
+manual said the no-`locationId` route returns data for the first configured
+location; the marine service's native handlers return the list above and the
+API proxies that response.
 
 ### Endpoint inventory
 
@@ -3139,18 +3146,18 @@ The NWS SRF text product's `waterTemp` field (a manually-entered forecaster valu
 | `forecast[].peelAngle` | float \| null | **Added 2026-08-02 — was missing from this table.** Break line angle relative to wave crest, degrees. See the fuller height-fields table above for the computation basis (all successful transects since BD-8). |
 | `forecast[].peelClassification` | str \| null | **Added 2026-08-02 — was missing from this table.** `"closeout"` (<30°) / `"fast"` (30-45°) / `"good"` (45-66°) / `"mellow"` (>66°), with a `_right`/`_left`/`_a_frame` direction suffix appended when direction is determined and the class is not `closeout`. `"closeout"` is ALWAYS plain, never suffixed. See the fuller height-fields table above (§17) for the full corrected semantics. |
 | `forecast[].peelDirection` | `"right" \| "left" \| "a_frame" \| null` | **Added 2026-08-02 — was missing from this table (D8 added it to the §17 table 2026-08-02; also served here, previously undocumented in this table).** Break direction, computed INDEPENDENTLY of `peelClassification` — served even on closeout hours. See §17's row for the closed-enum detail and the "does not encode peel quality" caveat. |
-| `forecast[].closeoutFraction` | float \| null | **Added S3 (2026-08-27, `endpoints/surf.py:1479`) — PEEL-SEGMENTS, operator-approved 2026-08-26; was missing from this table.** `0.0`–`1.0`, rounded 2dp, fraction of the PEEL-SEGMENTS sliding windows whose own peel angle is below 30° (`_PEEL_CLOSEOUT_MAX_DEG`) — how much of the beach closes out this hour, alongside `peelAngle`'s report of the BEST window. `null` when peel is unavailable, or the whole-beach fallback ran (< 2 valid windows). See §17's fuller height-fields table above for the full semantics. |
+| `forecast[].closeoutFraction` | float \| null | **Added S3 (2026-08-27) — PEEL-SEGMENTS, operator-approved 2026-08-26; was missing from this table.** `0.0`–`1.0`, rounded 2dp, fraction of the PEEL-SEGMENTS sliding windows whose own peel angle is below 30° (`_PEEL_CLOSEOUT_MAX_DEG`) — how much of the beach closes out this hour, alongside `peelAngle`'s report of the BEST window. `null` when peel is unavailable, or the whole-beach fallback ran (< 2 valid windows). See §17's fuller height-fields table above for the full semantics. |
 | `forecast[].period` | float | Dominant period in seconds |
 | `forecast[].direction` | float | Swell direction in degrees |
 | `forecast[].multiSwell` | list[object] \| null | Swell partitions at the deep-water reference per timestep (not NDBC — ADR-095/096); `null` when no deep-water reference exists for that timestep |
-| `forecast[].swellSource` | `"deep_reference" \| "nearshore_table" \| null` | **Added S3 (2026-08-27, `endpoints/surf.py:1388`) — was already served (Q16 C3, 2026-08-25); missing from this table.** Which channel served this hour's `multiSwell`/`swellHeight`: the true deep-water (≥200 m) WW3 catalog, or the 15 m SWAN L2 DWR-table fallback for hours the WW3 leg's staged transfer does not cover. See §17's fuller row above for the full semantics. |
+| `forecast[].swellSource` | `"deep_reference" \| "nearshore_table" \| null` | **Added S3 (2026-08-27) — was already served (Q16 C3, 2026-08-25); missing from this table.** Which channel served this hour's `multiSwell`/`swellHeight`: the true deep-water (≥200 m) WW3 catalog, or the 15 m SWAN L2 DWR-table fallback for hours the WW3 leg's staged transfer does not cover. See §17's fuller row above for the full semantics. |
 | `forecast[].directionalSpread` | float | DSPR at the cross-shore transect reference point, in degrees (ADR-095; not a fixed ~10 m depth) |
 | `forecast[].setup` | float \| null | Wave-induced setup. Currently always `null` — SWAN SETUP command removed. Field retained for API contract stability. |
 | `forecast[].breakPoints` | list[object] \| null | **Re-sourced 2026-08-02 (V3-F4-IMPL).** Break points on the representative transect (`representativeTransectIndex`), from the SwellTrack 1D pipeline — same producer family and same transect §18's `breakPoints` reads, narrower per-point schema (`{distance, depth, hs}` only). `null` iff `representativeTransectIndex` is `null` or that transect has no break points. See §17's full row above for detail. |
 | `forecast[].shadowFaceHeight` | float \| null | **NEW 2026-08-04 (D10.2, restores the T7.3 deferred field).** Secondary (non-headline) readout, in display units: mean face height over transects where `isStructureAffected` is true this hour — "what is the surf like in the shadow" (lead-recorded design call: MEAN, not max, mirroring `spotAverageFaceHeight`'s mean-over-population pattern). `null` when no transect this hour is structure-affected — deliberately distinct from `0.0` ("flat in the shadow"). Never feeds `bestPeakFaceHeight`/`spotAverageFaceHeight`/`mainBreakZoneFaceHeight` (BD-8's metadata-only demotion of `isStructureAffected` stands — this is explicitly a secondary consumer, not a headline one). |
 | `forecast[].perPartitionBreaks` | list[object] \| null | **NEW 2026-08-04 (D10.2, restores the T5.4/T7 deferred reuse).** Same shape and serializer as `/surf/{id}/profile`'s `perPartitionBreaks` (§ above) — one entry per swell partition with mean break stats (`partitionIndex`, `meanFaceHeightM`, `meanBreakDistanceM`, `periodS`, `directionDeg`, `classification`, `dominantBreakerType`), sub-fields in display units. `null` when the 1D pipeline result is unavailable this hour OR the underlying list would be empty — the server never emits `[]`. |
 | `forecast[].scoring` | object | 3-factor + 3-penalty scoring breakdown (ADR-096) |
-| `forecast[].modelStatus` | str | `"ok"`, `"no_breaking"`, `"partial"`, `"degraded_bulk"`, or `"unavailable"` (`_determine_model_status()`). Replaces the old boolean `degraded` field. **Graded rule LANDED 2026-08-03 (C4/G7.5/TA-C22, operator-ruled 2026-08-02, marine `0946ed8`).** The graded quantity is the per-transect **bulk-parameter fallback** (a transect with no measured PT* spectral partitions at its handoff point runs on three bulk scalars Hs/Tp/Dir) — NOT handoff-level routing (a transect using L2/L3/L4 is legitimate routing, never degradation; operator reaffirmed 2026-08-02, and an earlier draft of this row that said "fall back to L2" was wrong on exactly that point). Rule: `ok`/`no_breaking` = 0 bulk-fallback transects (unchanged semantics between them); `partial` = ≥1 but **<25%** of successful transects bulk-fallback AND no main-break-zone QUALIFYING transect among them; `degraded_bulk` = **≥25%** (boundary: exactly 25% degrades) OR any qualifying-zone transect is bulk-fallback — the headline is averaged from qualifying transects, so their degradation degrades the headline regardless of percentage. Percentage base = successful transects only. Marine logs one WARNING per `partial`/`degraded_bulk` hour naming n_bulk/n_success/qualifying-hit. `"unavailable"` means this timestep's 1D pipeline result could not be produced — in remote SWAN mode (`[swan] service_url` set) this happens when the `swelltrack` cache entry for that timestep is missing or malformed, and the endpoint does NOT recompute locally: it logs, reports the gap via `POST /report/gap` on the model host, and reports `"unavailable"` (SURF-PUBLISH-RESULTS-ONLY §3.5). In bundled single-host mode (`[swan] service_url` unset, SWAN in-process), the same statuses come from the on-demand 1D pipeline call, unchanged. |
+| `forecast[].modelStatus` | str | `"ok"`, `"no_breaking"`, `"partial"`, `"degraded_bulk"`, or `"unavailable"` (`_determine_model_status()`). Replaces the old boolean `degraded` field. **Graded rule LANDED 2026-08-03 (C4/G7.5/TA-C22, operator-ruled 2026-08-02, marine `0946ed8`).** The graded quantity is the per-transect **bulk-parameter fallback** (a transect with no measured PT* spectral partitions at its handoff point runs on three bulk scalars Hs/Tp/Dir) — NOT handoff-level routing (a transect using L2/L3/L4 is legitimate routing, never degradation; operator reaffirmed 2026-08-02, and an earlier draft of this row that said "fall back to L2" was wrong on exactly that point). Rule: `ok`/`no_breaking` = 0 bulk-fallback transects (unchanged semantics between them); `partial` = ≥1 but **<25%** of successful transects bulk-fallback AND no main-break-zone QUALIFYING transect among them; `degraded_bulk` = **≥25%** (boundary: exactly 25% degrades) OR any qualifying-zone transect is bulk-fallback — the headline is averaged from qualifying transects, so their degradation degrades the headline regardless of percentage. Percentage base = successful transects only. Marine logs one WARNING per `partial`/`degraded_bulk` hour naming n_bulk/n_success/qualifying-hit. `"unavailable"` means the marine service could not produce a usable 1D result for that timestep. The API passes the proxied status through and reports the gap through its companion-proxy path. |
 | `nearshoreModel` | str | `"SWAN + SwellTrack"` (ADR-093/096) |
 | `lastRunTime` | ISO 8601 | When the SWAN run completed |
 | `dataAge` | int | Age of SWAN output in seconds |
@@ -3164,7 +3171,13 @@ SWAN is designed to produce multi-timestep output, but the timestep range is bou
 
 ### Beach profile endpoint (ADR-097, corrected 2026-07-25)
 
-**This subsection was rewritten, not incrementally patched.** The previous text (a flat `transect`/`breakPoints` shape, "distance and depth are always in meters") described a response the endpoint has never returned in its current form — confirmed stale against `endpoints/beach_profile.py` independently of the SURF-PUBLISH-RESULTS-ONLY changes below. Specifically wrong: (1) the actual response nests everything under the standard envelope (`data`/`stationClock`/`freshness`/`units`/`generatedAt`, §2) and `data` itself, which the old text never mentioned; (2) the real per-transect fields are `transectIndex`/`isStructureAffected`/`transectBearingDeg`/`transect`(an Hs envelope, not the six-field point list documented)/`breakPoints`(different shape)/`waveShapes`/`surfZones`/`jackingFactors`/`handoffDepthM`/`handoffSourceLevel` — none of which the old table listed; (3) the `transect_index` query parameter (`best`/`all`/integer) was undocumented entirely, including the `all`-mode `profiles` array; (4) distance and depth are NOT always meters — they follow the operator's configured display unit (`_distance_unit()`: foot for a `US` operator, meter otherwise), exactly like `waveHeight`.
+**This subsection was rewritten, not incrementally patched.** The previous text
+(a flat `transect`/`breakPoints` shape, "distance and depth are always in
+meters") described a stale response. The current marine-service response nests
+everything under the standard envelope (`data`/`stationClock`/`freshness`/
+`units`/`generatedAt`, §2), includes the per-transect fields documented below,
+and supports the `transect_index` query parameter (`best`/`all`/integer).
+Distance and depth follow the operator's configured display unit.
 
 `GET /api/v1/surf/{location_id}/profile` returns the 1D (SwellTrack) pipeline's cross-shore output for the forecast timestep closest to now.
 
@@ -3221,7 +3234,7 @@ A handoff partition that matches no canonical partition still has its break poin
 | Field | Type | Description |
 |---|---|---|
 | `axisUnits` | object | `{"x": <distance symbol>, "y": <distance symbol>}` |
-| `verticalDatum` | str \| null | **Corrected 2026-08-02 — the prior "always null" claim was FALSE, not just stale.** `_read_vertical_datum()` (`endpoints/beach_profile.py`) reads the real `vertical_datum` key from the per-spot profile cache and returns it as-is; `null` only when the cache is missing/unreadable, the key is absent, or the key is the `"UNKNOWN"` sentinel — never a hardcoded default. Live-confirmed serving `"LMSL"` (coordinator verification, 2026-08-02). A `null` here means the cache genuinely has no resolved datum for this spot, not that the field is wired-but-inert. |
+| `verticalDatum` | str \| null | **Corrected 2026-08-02 — the prior "always null" claim was FALSE, not just stale.** The marine service reads the real `vertical_datum` key from the per-spot profile cache and returns it as-is; `null` only when the cache is missing/unreadable, the key is absent, or the key is the `"UNKNOWN"` sentinel — never a hardcoded default. Live-confirmed serving `"LMSL"` (coordinator verification, 2026-08-02). A `null` here means the cache genuinely has no resolved datum for this spot, not that the field is wired-but-inert. |
 | `transectCount` | int \| null | Total transects computed for this spot |
 | `openTransectCount` | int \| null | Transects not crossing any OBSTACLE. **Since 2026-08-01 (BD-8 rescinded, ADR-093 Amendment 7): metadata/map-UI count only** — plays no role in transect selection on this endpoint (see `transect_index=best` above) or in the `/surf` aggregation fields. |
 | `handoffDepthM` | float \| null | Representative handoff depth (the "best" transect's). **S12 HANDOFF-RESTART:** that transect's own SETTLED depth — see the per-transect field's own note above. |
@@ -3240,14 +3253,13 @@ A handoff partition that matches no canonical partition still has its break poin
 **HTTP 200 with `modelStatus: "unavailable"` and a null payload (SURF-PUBLISH-RESULTS-ONLY §3.6) — model gap, NOT a configuration error:**
 - No SWAN data has been cached for the location yet.
 - No forecast timesteps are available.
-- The 1D pipeline produced no usable output for the requested timestep (degraded, no bathymetric profile loaded yet, or — in remote mode — the model host has no answer for that hour).
+- The 1D pipeline produced no usable output for the requested timestep.
 
 A missing profile used to raise HTTP 404 for all of the above, which read as "wrong URL" when the truth was "the model has no answer for this hour." The 200/null response keeps the exact key set a success response for the requested `transect_index` mode would have used (nulled), so a client branches on `modelStatus` alone, never on which keys are present.
 
-**Remote vs. bundled mode (SURF-PUBLISH-RESULTS-ONLY §3.2/§3.5) — the topology condition that changes what this endpoint does at the model-gap boundary:**
-
-- **Remote mode** (`[swan] service_url` set — a separate model host exists, e.g. `librewxr`): this endpoint calls that host's own `GET /surf/{spot_id}/profile?time=<timestep>` (PROVIDER-MANUAL §14.15) instead of running the 1D pipeline here. The model host runs the pipeline against its own full internal spectral data (never the trimmed published forecast view) and returns SI units; **this host performs zero unit conversion input processing beyond what it already does for the response** — it converts and shapes the model host's result, it does not build `specout_data`/`handoff_by_transect` or POST them anywhere. A `None` result (no cached data, 503 from the model host, network error, or a malformed body) becomes the 200/null response above, and a `POST /report/gap` is sent to the model host.
-- **Bundled mode** (`[swan] service_url` unset — no separate model host): the existing in-process 1D pipeline / optional `surf_compute_host` offload cascade runs exactly as before this brief — **this IS the model in this topology, not a fallback**, and this case is unaffected by the remote-mode changes above. It can still yield the same 200/null response on a genuine local pipeline failure (degraded, no bathymetric profile).
+The API does not recompute a marine profile. It proxies the marine-service
+response, applies its normal response handling, and uses the companion proxy to
+report an unavailable model result.
 
 ---
 
@@ -3264,9 +3276,10 @@ API fetches the service manifest and mounts companion-proxy routes under
 marine routes.
 
 The API communicates with the marine service over authenticated TLS. The
-manifest is fetched at startup, refreshed periodically, and refreshed on each
-configuration apply. Adding or changing a declared marine route requires no
-route-specific API implementation.
+manifest is fetched at startup and refreshed every five minutes by a background
+thread. Configuration apply and marine-config push are separate from manifest
+refresh. Adding or changing a declared marine route requires no route-specific
+API implementation.
 
 **The three-state rule (proxy failure vs. model gap vs. missing resource).** These three situations must stay distinguishable end to end — collapsing any two of them reintroduces the ambiguity SURF-PUBLISH-RESULTS-ONLY (§18 above) removed:
 
@@ -3282,7 +3295,11 @@ If the marine service is reachable but returns something other than 200/404 (5xx
 
 ### §19.1 Manifest registration
 
-The marine service exposes `GET /manifest` (no auth required). The API fetches this manifest at startup, refreshes it periodically (every 5 minutes), and re-fetches on each `/setup/apply` call. Declared routes are mounted dynamically under `/api/v1/`. Endpoint additions in the marine service take effect within 5 minutes without an API restart; endpoint removals de-register the route on the next refresh.
+The marine service exposes `GET /manifest` (no auth required). The API fetches
+this manifest at startup and refreshes it every five minutes. Declared routes
+are mounted dynamically under `/api/v1/`. Endpoint additions in the marine
+service take effect within five minutes without an API restart; endpoint
+removals de-register on the next refresh.
 
 **Manifest response shape:**
 
@@ -3359,7 +3376,13 @@ Adding a new marine endpoint requires a manifest update in the marine service on
 `api.conf`): no manifest is fetched, no marine routes are mounted, and the API
 behaves as a non-marine installation.
 
-**List routes are also in the manifest.** The example above shows the six `{location_id}`-scoped detail/profile routes; the marine service's actual manifest carries eleven entries — one additional list route per family with no `location_id` (`/surf`, `/marine`, `/tides`, `/fishing`, `/beach-safety`), each returning the configured locations for that activity as metadata (no live provider fetch), cached at the same TTL as its family's detail route. These back the dashboard's marine location-card grids. Omitted from the example JSON above for brevity, not omitted from the manifest itself.
+**Manifest inventory.** The example above shows six activity detail/profile
+routes. The current manifest has 18 entries: 11 activity list/detail/profile
+routes (five list/detail pairs plus the surf profile route) and seven discovery
+routes. Each activity list route has no `location_id`, returns configured
+location metadata, and is cached at its family's detail TTL. The discovery
+routes support setup and administration. The example omits those entries for
+brevity; they are present in the manifest.
 
 **The three-state rule.** A proxy handler's response falls into exactly one of three states, and they must never be conflated:
 
