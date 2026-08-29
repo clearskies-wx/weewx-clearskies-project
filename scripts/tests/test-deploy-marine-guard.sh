@@ -96,6 +96,7 @@ case "$command" in
         fi
         case "${FAKE_DESCENDANTS}" in
             none)    : ;;
+            no-main) printf '%s\n' '__NO_MAIN__' ;;
             present) printf '4711 %s\n' "${FAKE_CHILD}" ;;
         esac
         ;;
@@ -129,7 +130,7 @@ expected_exit() {
         printf '0\n'
     elif [ "$health" = "unreachable" ] \
         && { [ "$service" = "inactive" ] || [ "$service" = "failed" ]; } \
-        && [ "$descendants" = "none" ]; then
+        && { [ "$descendants" = "none" ] || [ "$descendants" = "no-main" ]; }; then
         printf '0\n'
     else
         printf '2\n'
@@ -186,6 +187,12 @@ test_named_child_cases() {
         run_check_case idle active present "$child"
     done
     printf 'ok: named WW3, SWAN, and ancillary cgroup child cases\n'
+}
+
+test_no_main_race_cases() {
+    run_check_case idle active no-main
+    run_check_case unreachable inactive no-main
+    printf 'ok: no-main active and stopped-unit race cases\n'
 }
 
 test_cartesian_check_only_matrix() {
@@ -287,11 +294,20 @@ test_static_guard_ordering() {
     is_guard_invocation "$preceding_line" || fail 'restart is not immediately preceded by a guard invocation'
 }
 
+test_descendant_remote_shell_quoting() {
+    local remote_command
+    remote_command="$(awk '/descendants_raw=\$\(run_root/ { print; exit }' "${SOURCE_SCRIPT}")"
+    [ -n "$remote_command" ] || fail 'descendant remote command block is absent'
+    [[ "$remote_command" != *"'"* ]] || fail 'descendant remote command contains a literal single quote inside run_root'
+}
+
 setup_case_root
 bash -n "${COPY_SCRIPT}"
 test_cartesian_check_only_matrix
 test_named_child_cases
+test_no_main_race_cases
 test_wait_timeout
 test_force_override
 test_static_guard_ordering
+test_descendant_remote_shell_quoting
 printf 'ok: deploy-marine R0 guard tests complete\n'
