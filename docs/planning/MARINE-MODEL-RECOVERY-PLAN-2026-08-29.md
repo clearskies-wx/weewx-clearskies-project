@@ -630,7 +630,7 @@ deployments after R6; all three changes remain separately attributable.
 dashboard/stack renders operator status; each reports its deployed revision where an existing
 authoritative revision source is available
 
-### R8a — Contract and reducer
+### R8a — Contract and reducer — ✅ COMPLETE 2026-08-29
 
 Add one versioned, additive `modelHealth` ledger to the marine service's existing `/health`
 response. Retain existing top-level fields during migration. The API's existing authenticated
@@ -698,6 +698,14 @@ when that stage is not required for the configured spot. Overall health is the w
 state. A healthy raw horizon can never mask a failed merge; a reachable API can never mask failed
 model data. Each stage owns its existing freshness/coverage criterion—this round invents no new
 scientific or timing threshold.
+
+**R8a execution record.** Marine PR #2 merged as `f2abf1b` after Terra test/implementation rounds
+and repeated Sol adversarial review. Final WSL and deployed targeted result: 129 passed, one
+pre-existing dependency warning. Guarded deploy started the process at `2026-08-29 21:25:16 UTC`;
+health/manifest returned 200 and auth remained enforced. Live `/health.modelHealth` is schema 1,
+`overall=unknown` with `not_instrumented`, `serving=unavailable`, provider children
+`noaaBoundary/wind/stofsWaterLevel/wcofsCurrents`, and SWAN children `l2/l3/l4`; existing legacy
+health remains independent. This is the required conservative skeleton, not R8b instrumentation.
 
 ### R8b — Marine instrumentation and restart truth
 
