@@ -59,6 +59,10 @@ case "$command" in
         case "${FAKE_HEALTH}" in
             busy|idle|no-status) printf '%s\n' "${FAKE_HEALTH/no-status/idle}" ;;
             malformed|empty|http-503) exit 1 ;;
+            duplicate-inflight|duplicate-run)
+                [[ "$command" == *object_pairs_hook* ]] && exit 1
+                printf 'idle\n'
+                ;;
         esac
         ;;
     *curl*'--write-out'*health*)
@@ -69,6 +73,8 @@ case "$command" in
             empty)      printf '\n200\n' ;;
             http-503)   printf '%s\n503\n' '{"ww3Horizon":{"inFlight":false},"run_in_progress":false}' ;;
             no-status)  printf '%s\n' '{"ww3Horizon":{"inFlight":false},"run_in_progress":false}' ;;
+            duplicate-inflight) printf '%s\n200\n' '{"ww3Horizon":{"inFlight":true,"inFlight":false},"run_in_progress":false}' ;;
+            duplicate-run) printf '%s\n200\n' '{"ww3Horizon":{"inFlight":false},"run_in_progress":true,"run_in_progress":false}' ;;
             unreachable) exit 255 ;;
         esac
         ;;
@@ -89,6 +95,8 @@ case "$command" in
             empty)       : ;;
             http-503)    printf '%s\n503\n' '{"ww3Horizon":{"inFlight":false},"run_in_progress":false}' ;;
             no-status)   printf '%s\n' '{"ww3Horizon":{"inFlight":false},"run_in_progress":false}' ;;
+            duplicate-inflight) printf '%s\n' '{"ww3Horizon":{"inFlight":true,"inFlight":false},"run_in_progress":false}' ;;
+            duplicate-run) printf '%s\n' '{"ww3Horizon":{"inFlight":false},"run_in_progress":true,"run_in_progress":false}' ;;
             unreachable) exit 255 ;;
         esac
         ;;
@@ -243,6 +251,10 @@ test_no_main_race_cases() {
 
 test_http_status_and_empty_health_cases() {
     local service
+    run_check_case duplicate-inflight active none
+    require_contains 'health=malformed' "${TRANSCRIPT}"
+    run_check_case duplicate-run active none
+    require_contains 'health=malformed' "${TRANSCRIPT}"
     run_check_case no-status active none
     require_contains 'health=malformed' "${TRANSCRIPT}"
     for service in inactive failed; do
