@@ -1406,6 +1406,15 @@ pier line on the heatmap) could be added later as a supplement, but are not in s
 
 ## Decision log
 
+- **2026-08-29 (operator approval — WW3-to-SWAN scaffold recovery, Option 1).** Operator:
+  *"i agree with your recommendation."* Approved direction: the live WW3-to-SWAN staging path
+  will generate the complete boundary-command/file set SWAN Level 2 needs, eliminating its
+  dependency on inherited `swan/level1/INPUT` + `B_*.txt` artifacts from the deleted SWAN L1.
+  This approval is limited to that handoff-preparation and recovery change; it does not authorize
+  changing model formulas, grids, handoff location, forecast cadence, or served contracts. The
+  implementation is sequenced as a discrete functional change after the current production-health
+  assessment so its effects remain attributable.
+
 - **2026-08-02 (operator Q&A, 9 pending items + 2 extras resolved).** (1) Firewall: resolved
   by operator. (2) D1/D10.2: delete `partitionBreakInfo` + `shadowFaceHeight` render code +
   OpenAPI entries; `waveShapeClassification` is a REAL BUG (API not serving data the
@@ -1499,39 +1508,3 @@ pier line on the heatmap) could be added later as a supplement, but are not in s
   `stationary_sequence` path. 3 production files changed, 4 KATs + 39 regression tests pass.
   Adversarial audit dispatched. Doc-code sync residual: PROVIDER-MANUAL.md §"Two-tier schedule"
   still describes fill as "single snapshot."
-
----
-
-## OPEN OPERATOR QUESTIONS
-
-### 2026-08-28 — The current WW3-to-SWAN handoff cannot rebuild one required file set
-
-**What was found.** Every full production cycle runs the project WW3 model and then prepares
-SWAN Level 2; hourly fills reuse the persisted WW3 transfer instead of launching a new WW3
-march. Both paths still depend on an inherited usable scaffold under `swan/level1/`: `INPUT`
-plus the referenced `B_*.txt` boundary files. SWAN Level 1 was deleted. The runner creates the
-legacy directory during setup, but no current service, configuration push, grid-sizing chain,
-or deploy path can bootstrap the complete usable scaffold. It survives only because this
-installation already has it.
-
-**Failure if they are lost or absent.** A clean installation, damaged file set, or incomplete
-migration makes full runs refuse with `chain_scaffold_missing`. Hourly fills warn and no-op without
-publishing an updated forecast, but do not expose that named slug. WW3 may finish while SWAN never
-starts. A forced run or configuration push repeats the full-run refusal. The former Operations
-Manual advice to "run a legacy full cycle" was impossible and has been removed.
-
-**Options.**
-
-1. **Generate the Level-2 boundary commands from the current WW3 handoff (recommended).** Make
-   the live WW3-to-SWAN staging path produce everything SWAN Level 2 needs, so it no longer reads
-   artifacts left by the deleted SWAN Level 1. This is the cleanest ownership boundary, but it
-   rewires handoff preparation and persisted artifacts and therefore needs explicit architectural
-   approval before implementation.
-2. **Generate the retained scaffold during configuration/deployment.** Keep the existing runtime
-   reader, but add a supported producer and recovery action outside the forecast cycle. This is a
-   smaller runtime change but preserves a dependency named after a model level that no longer runs.
-3. **Continue provisioning inherited files by hand.** Lowest immediate code cost, but clean installs
-   and disaster recovery remain fragile. Not recommended.
-
-**Question.** Approve option 1 for a source-backed design and implementation round, or choose a
-different option? Until the operator answers, no scaffold-generation or handoff change is authorized.
