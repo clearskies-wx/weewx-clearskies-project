@@ -217,7 +217,8 @@ test_force_override() {
     set -e
     [ "$actual" -eq 0 ] || fail "force override expected exit 0, got ${actual}: $(<"${TRANSCRIPT}")"
     require_contains 'systemctl restart' "${FAKE_MUTATION_LOG}"
-    [ ! -s "${FAKE_SLEEP_LOG}" ] || fail 'force override waited instead of bypassing the guard'
+    grep -Fxq '15' "${FAKE_SLEEP_LOG}" || fail 'force override skipped the normal startup verification wait'
+    ! grep -Fxq '60' "${FAKE_SLEEP_LOG}" || fail 'force override performed a 60-second guard poll'
 }
 
 test_wait_timeout() {
@@ -248,7 +249,7 @@ first_mutation_after() {
     local mutation_pattern="$2"
     awk -v phase="$phase_pattern" -v mutation="$mutation_pattern" '
         !started && $0 ~ phase { started=1; next }
-        started && $0 !~ /^[[:space:]]*#/ && $0 ~ mutation { print NR; exit }
+        started && $0 !~ /^[[:space:]]*#/ && $0 !~ /^[[:space:]]*(echo|printf)[[:space:]]/ && $0 ~ mutation { print NR; exit }
     ' "${COPY_SCRIPT}"
 }
 
