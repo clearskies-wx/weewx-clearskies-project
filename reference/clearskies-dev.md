@@ -352,8 +352,29 @@ scripts/deploy-marine.sh --skip-pull
 ```
 
 This guarded workflow reinstalls and verifies the service without pulling
-source. It waits for an in-flight WW3 march or SWAN cycle before restarting.
-Use `--force-restart` only under an operator-directed decision.
+source. Before every source, environment/config, WW3-pin, unit, and
+bootstrap/migration mutation—and immediately before restart—the script
+requires the local `librewxr` SSH alias to resolve to
+`librewxr.shaneburkhardt.com`, then classifies the remote loopback health,
+systemd state, and every non-main process found by recursively walking the
+service cgroup. A true `inFlight` or `run_in_progress` health flag is busy.
+False flags are idle only with an active service and no descendant. Unreachable
+health is idle only when systemd is inactive or failed and there are no
+descendants; empty or malformed health is `unknown-busy`, as is an active
+unreachable service. Transition states, query failures, descendants, and every
+other inconsistent combination are `unknown-busy`.
+
+Use the read-only check before a deploy decision:
+
+```bash
+scripts/deploy-marine.sh --check-guard
+```
+
+It prints the health/service/descendant evidence, makes no mutation, exits 0
+for idle, and exits 2 for busy or `unknown-busy`. A normal deploy rechecks at
+60-second intervals for at most 23,400 seconds (6.5 h), then refuses the next
+mutation. `--force-restart` is the sole bypass and requires an operator-directed
+decision.
 
 ### Read SWAN run history on librewxr
 
