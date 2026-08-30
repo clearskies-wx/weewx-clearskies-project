@@ -46,6 +46,8 @@ looking forecast. It enters the cold-recovery sequence in §5.
 | GI-2 | Blocker | WW3→SWAN output points are independently hard-coded south/west, discontinuously ordered, and mixed with buoy/deep-reference points | `BOUNDNEST3 ... CLOSED` receives neither a closed rectangle nor one valid open boundary curve |
 | GI-3 | Critical | NOAA reconstruction can select N/E/S/W from one open-water bearing while the WW3 status map can activate only S/W | Boundary spectra and active WW3 boundary cells can contradict each other at non-Huntington installations |
 | GI-4 | Blocker | Mandatory fine-fraction DEM catalog contains only Southern California CRM Vol. 6 | Atlantic/Great-Lakes installs can omit `ww3_leg` before topology is evaluated |
+| GI-5 | Blocker | Setup queries OSM `natural=coastline` for every regime; current Great Lakes geometry is `natural=water` + `water=lake` multipolygons | Great Lakes occupancy/fetch geometry can be empty, incomplete or semantically wrong |
+| GI-6 | Blocker | Newly wet CRM cells can insert MLLW depths into an ETOPO/LMSL bottom field without conversion | One WW3 grid mixes vertical datums and invalidates wet/depth interpretation |
 | WG-1 | Blocker | κ=1 enters Kimura denominator `1−κ²=0` | Every full cycle aborts after L2 |
 | CU-1 | Critical | OFS emits `u/v`; SWAN reads `u_grid/v_grid` | CURRENT omitted silently |
 | CU-2 | Critical | OFS grid and SWAN grids differ; writer does no geographic resampling | A key rename alone is invalid |
@@ -95,7 +97,8 @@ Unless an operator-approved decision below says otherwise:
 | D11 SWAN hotstart quarantine before first repaired publish | **APPROVED 2026-08-29** | Transactionally quarantine tokened L2/L3/L4 hotstarts; never touch WW3 restart | recoverable state mutation |
 | D12 Recovery intent + runtime generation | **APPROVED 2026-08-29** | One atomic intent under existing work root; fingerprint includes deployed revision/binary/config hashes | triggers 5/6/7 |
 | D13 Unified Model Health | **APPROVED 2026-08-29; design in §16** | Stage-by-stage required health, deployed revision, API/admin reporting | triggers 4/7 |
-| D14 WW3 automatic setup parity | **A0 EVIDENCE/PROTOTYPE APPROVED 2026-08-30; A1 IMPLEMENTATION BLOCKED pending complete O/H/D/G, dependency/rollback and initialization/bootstrap ruling** | Make WW3 consume the installation-derived geography/bathymetry setup at both boundaries; no fixed cardinal sides | triggers 3/4/5/6, possibly 1/2/7 |
+| D14 WW3 automatic setup parity | **A0 EVIDENCE/PROTOTYPE APPROVED 2026-08-30; A1 IMPLEMENTATION BLOCKED pending complete O/H/D, dependency/rollback and initialization/bootstrap ruling plus G evidence confirmation** | Make WW3 consume the installation-derived geography/bathymetry setup at both boundaries; no fixed cardinal sides | triggers 3/4/5/6, possibly 1/2/7 |
+| D15 OSM-only horizontal occupancy and regular-depth separation | **APPROVED DIRECTION 2026-08-30; exact implementation gated in A0-G** | OSM is the sole horizontal provider; ocean uses `natural=coastline`, Great Lakes/inland water uses `natural=water` + `water=lake`; regular datum-converted bathymetry supplies every depth; `τ=water_fraction`, obstruction=`1−τ`; no GSHHG/fallback/fine-depth substitution | triggers 1/4/7 approved as scoped; no new provider |
 
 Acceptance of this plan approves D6–D8 and D10–D13 as written. D9 remains evidence-only; worker
 placement requires a later explicit choice after the benchmark gate.
@@ -292,8 +295,9 @@ Gate R0:
 ## 8A. PROPOSED AMENDMENT A — WW3 automatic setup parity
 
 **Status:** A0 EVIDENCE/PROTOTYPE APPROVED by operator in chat 2026-08-30;
-**A1 IMPLEMENTATION NOT APPROVED** pending A0 evidence and the operator's complete O/H/D/G,
-dependency/rollback and initialization/bootstrap ruling.
+**A1 IMPLEMENTATION NOT APPROVED** pending A0 evidence and the operator's complete O/H/D,
+dependency/rollback and initialization/bootstrap ruling plus confirmation that D15's OSM G policy
+passes its locked evidence.
 **Effect on queue:** R1 and R2 are blocked. The locally green R1 scaffold-removal branch is neither
 merged nor deployed. R3 remains the production exhaustion guard; it does not validate topology.
 **Owner sequence for A0:** `troubleshooter` manual/source inventory → `clearskies-test-author`
@@ -453,11 +457,25 @@ series. The later operator ruling separately selects D. A new/changed consumer c
 4. A dependency, port, endpoint, config key or persisted file is trigger 7; a temporary filename or
 source-code file is not trigger 7 merely because it exists.
 
-**Global-source axis G.** Inventory fine wetness/bathymetry sources, resolution, datum, longitude
-handling and coverage for Pacific, Atlantic, Gulf, Great Lakes, islands and high latitudes. The
-current SoCal-only CRM path is a negative control. If no existing approved source can support a
-region, A0 stops and presents the provider/source decision; it does not call a synthetic fixture
-global coverage.
+**Global-source axis G — operator-selected OSM policy, evidence still required.** OSM/Overpass is
+the sole horizontal occupancy provider; no GSHHG or source fallback is evaluated for implementation.
+The query layer follows OSM semantics, not a one-size-fits-all tag:
+
+- ocean/coastal regimes use directed `natural=coastline` ways at OSM's mean-high-water shoreline;
+- Great Lakes and other supported inland-water regimes use complete `natural=water` + `water=lake`
+  multipolygons, including outer/inner rings and islands; the model regime remains Great Lakes—OSM
+  tagging does not reclassify its physics;
+- regular installation-selected bathymetry, converted to the model datum, supplies every depth;
+  OSM supplies no elevation and never overrides a depth;
+- partial-cell transparency is `τ = water_area / cell_area`, and the obstruction file stores
+  `1−τ`; this is an occupancy rule, not diffraction;
+- missing, malformed, incomplete, stale/unhashable or bbox-clipped geometry refuses setup. There is
+  no fallback provider or fallback OSM layer.
+
+A0 validates the regime-specific query, polygon/ring completeness, local fraction method, snapshot
+hash/provenance, longitude handling and performance for Pacific, Atlantic, Gulf, Great Lakes,
+islands and high latitudes. The current SoCal CRM/fine-depth path and Great-Lakes coastline query are
+negative controls. If D15 cannot pass, A0 returns to the operator; it does not pick another source.
 
 The A0 report must establish, without pre-answering:
 
@@ -483,9 +501,9 @@ Myrtle-Beach-shaped partial land with three wet incident sides, islands/headland
 wet segments, and a **real source-backed Great Lakes setup/binary case**. O3 must fail cardinal
 rotation, east-facing and three-side controls.
 
-**A0 terminal gate:** the operator separately selects O, H, D, G/source policy, artifact dependency/
-rollback policy and WW3 initialization/bootstrap method. No production implementation begins before
-that complete ruling.
+**A0 terminal gate:** the operator separately selects O, H, D, artifact dependency/rollback policy
+and WW3 initialization/bootstrap method, and confirms D15 after reviewing G evidence. No production
+implementation begins before that complete ruling.
 
 ### 8A.5 Implementation design — A1 (blocked until A0 ruling)
 
@@ -520,11 +538,14 @@ Tasks after approval:
    merge, fast fill and vchain. R8b/R8c later add the final unified-health propagation.
 10. Preserve R3 exhaustion behavior and add A1-owned structural refusals; no cache, marker or
     persistent SWAN hotstart advances on any derivation/transfer mismatch.
-11. Implement the approved global G/source policy, including datum/coverage refusal. No SoCal-only
-    fine-source requirement may masquerade as a global setup path.
-12. Update ADR-100, explicitly amend ADR-109, reconcile the Evolution Plan conflict, and update
-    Provider/Operations Manuals plus this plan before deployment. The frozen SWAN/WW3 reference
-    manuals are never edited.
+11. Implement D15 exactly: regime-correct OSM queries/fractions only, regular datum-converted
+    bathymetry for every depth, no fine-depth substitution or fallback provider, and structural
+    refusal on incomplete geometry. No SoCal-only source or universal coastline tag may masquerade
+    as a global setup path.
+12. Before deployment, update Root Architecture, ADR-100, explicitly amend ADR-109, reconcile the
+    Evolution Plan conflict, and update Provider/Operations Manuals, config/operator help,
+    changelog, ODbL/third-party notice and this plan. The frozen SWAN/WW3 reference manuals are
+    never edited.
 
 ### 8A.6 Results-free QC gates
 
@@ -536,8 +557,9 @@ Tasks after approval:
 - Mutating any output back to fixed S/W, whole-side land exclusion or two-nearest-side selection
   fails.
 - No surf-point-local break type, pier or Huntington buoy ID affects regional setup.
-- Real source-backed Myrtle Beach and Great Lakes setup reaches WW3 derivation with declared
-  bathymetry resolution/datum/provenance, or A0 stops with the exact provider/source decision.
+- Real source-backed Myrtle Beach and Great Lakes setup reaches WW3 derivation with the correct OSM
+  layer/tag/ring contract, frozen geometry hash, and separately declared bathymetry datum/provenance;
+  the wrong-layer and mixed-datum controls refuse.
 
 **A0 Gate 2 — separate O/H native-binary behavior**
 
@@ -563,7 +585,8 @@ Tasks after approval:
 
 **A0 Gate 4 — operator decision packet**
 
-- Results are reported separately for O, H, D, G/source, dependency/rollback and initialization.
+- Results are reported separately for O, H, D, D15-G confirmation, dependency/rollback and
+  initialization.
 - Each option names manual support, scientific assumptions, trigger set, files/contracts, cost,
   failure mode and unknowns. No combined A/B/C shorthand hides a seam-specific choice.
 - The operator can select every required policy without inferring an unstated default.
@@ -572,7 +595,7 @@ Tasks after approval:
 
 - Approved global fixtures and 90-degree metamorphic rotations pass against the production code.
 - NOAA source/status mapping exactly matches O; SWAN boundary-only transfer exactly matches H;
-  diagnostics exactly match D; real Atlantic/Great-Lakes setup matches G.
+  diagnostics exactly match D; real Atlantic/Great-Lakes setup matches D15-G.
 - All A0 mutations refuse before WW3/SWAN publication.
 
 **A1 Gate B — transition, diagnostics and rollback**
@@ -599,8 +622,8 @@ recovery; R12 owns multi-anchor global reality/operational closeout.
 
 1. A0 manual/source inventory, results-free gate lock, non-production prototype and Sol audit; no
    deploy and no production mutation.
-2. Operator separately selects O, H, D, G/source, dependency/rollback and initialization/bootstrap;
-   that ruling activates A1.
+2. Operator separately selects O, H, D, dependency/rollback and initialization/bootstrap and
+   confirms D15-G against its evidence; that ruling activates A1.
 3. A1 test-first automatic-setup integration lands locally as one coherent contract replacement.
    Do not create a half-state where NOAA→G1 and G1→L2 consume contradictory setup generations.
 4. ADR-100/ADR-109/Evolution-Plan reconciliation, Provider/Operations Manual and changelog update
@@ -617,13 +640,13 @@ recovery; R12 owns multi-anchor global reality/operational closeout.
 ### 8A.8 Approval boundary
 
 The operator approved §8A's A0 evidence/prototype round in chat on 2026-08-30. That approval does
-not select O/H/D/G, compatibility/rollback or initialization policy and does not authorize A1
+not select O/H/D, compatibility/rollback or initialization policy and does not authorize A1
 implementation. The later A1 approval must explicitly name:
 
 - the selected O outer active-cell/source-mapping policy;
 - the selected H WW3→L2 curve policy and exact `OPEN`/`CLOSED` derivation;
 - the selected D diagnostic-output mechanism and its consumer/retention contract;
-- the selected G global wetness/bathymetry source and datum policy;
+- confirmation or reopening of D15's OSM-only fraction/regular-depth policy after G evidence;
 - the artifact dependency/invalidation table, atomic generation promotion and rollback;
 - the evidence-backed WW3 initialization/bootstrap method needed before A1 deploy;
 - explicit amendment of ADR-109 and the two boundary contract changes (triggers 3/4, and trigger 2
@@ -1324,21 +1347,36 @@ model/tests in its API commit, dashboard/help in its repository commit, and ADR/
 documents in coordinated meta commits:
 
 - Provider Manual §§14.3/14.10/14.15/14.18: reconcile former automatic L1 side selection with the
-  accepted WW3 automatic setup, current composition, direct boundary, and exact-limit semantics.
+  accepted WW3 automatic setup; document the OSM ocean `natural=coastline` versus Great Lakes/
+  inland `natural=water` + `water=lake` layer contract, water-fraction-only semantics, regular
+  bathymetry depth authority, no fallback, current composition, direct boundary, and exact-limit
+  semantics.
 - Operations Manual: setup generations/topology fingerprints, atomic rollback/bootstrap, recovery
-  controller, cache retention, guard, artifacts, and health interpretation.
+  controller, cache retention, guard, artifacts, OSM snapshot/hash/cache lifecycle, Overpass failure
+  and offline behavior, ODbL attribution/notice, and health interpretation.
 - API Manual §17–19 and OpenAPI: nullable group fields and existing model-status semantics.
 - API/Operations manuals and operator help: unified health schema, reducer, reason codes, stage
   ownership, transport-versus-model freshness, and optional CheckMK status.
 - ADR-101: κ=1 exact-limit/null ruling.
 - ADR-100 + ADR-109: explicitly reconcile automatic geography consumption against S/W-only rows;
-  record selected O/H/D/G policies, initialization and artifact dependency/rollback. ADR-109 also
-  records horizon safety/shared artifact and, later, worker lifecycle.
+  record selected O/H/D policies, D15's OSM-only/regular-depth contract, initialization and artifact
+  dependency/rollback; remove CRM mixed-datum/fine-depth authority. ADR-109 also records horizon
+  safety/shared artifact and, later, worker lifecycle.
 - Marine Model Evolution Plan W3/W4 and Q4/PW7: annotate the accepted successor decision; do not
   leave the historical S/W/CLOSED design readable as current authority.
+- Root Architecture marine configuration/chain section: state that configuration-time automatic
+  geography is the sole boundary-setup authority and that OSM supplies horizontal occupancy only;
+  no Huntington/cardinal/provider fallback rule. This is required even though service placement is
+  unchanged.
+- Config/operator help and API pass-through documentation: explain automatic regime-correct OSM
+  layer selection, no source selector knob, setup refusal/action, derivation identity and datum-
+  converted bathymetry authority. Add no public field unless separately approved.
+- Marine changelog and licensing/third-party notices: source URL/layer semantics, ODbL attribution,
+  snapshot/version/hash behavior, and removal of the CRM/fine-depth mixed-datum path.
 - ADR-104 or successor: WCOFS same-model valid-time composition/tail policy.
 - Marine/API changelogs and tests/comments with stale 24-hour terminology.
-- Root `ARCHITECTURE.md` only if D9 eventually changes service/process placement.
+- Root `ARCHITECTURE.md` additionally changes for §8A's automatic-setup authority as listed above;
+  D9 still controls any later service/process placement change.
 
 No SWAN or WW3 reference-manual file is edited.
 
@@ -1358,8 +1396,9 @@ Acceptance of this plan activates D6–D8 and D10–D13 exactly as scoped. It do
 - CheckMK integration, which is optional and separately approvable later.
 
 The operator's 2026-08-30 approval activates D14's A0 manual/source inventory, results-free gate
-lock and non-production prototypes only. It does not authorize A1 or select O/H/D/G, artifact/
-rollback, initialization or new-source policy. R1/R2 stop until that complete later ruling. A failed
+lock and non-production prototypes only. D15 fixes the sole-provider/source-separation direction,
+but A1 remains unauthorized until G evidence confirms it and the operator selects O/H/D, artifact/
+rollback and initialization. R1/R2 stop until that complete later ruling. A failed
 cold-start KAT, missing authoritative revision source, or need for a new health/recovery artifact
 remains a stop-and-surface event, not implied permission to expand the design.
 
@@ -1371,8 +1410,9 @@ remains a stop-and-surface event, not implied permission to expand the design.
 - [x] Old forward plan archived; redirect installed — 2026-08-29.
 - [x] Original recovery results-free gates written and Sol-audited before original implementation — 2026-08-29.
 - [x] Operator approves §8A A0 evidence/prototype round — 2026-08-30.
+- [x] Operator selects D15 OSM-only occupancy + regular datum-converted bathymetry depth direction — 2026-08-30.
 - [ ] A0 results-free gate/fixture file is locked and independently Sol-audited before prototype results.
-- [ ] A0 completes and operator selects O/H/D/G, dependency/rollback and initialization/bootstrap.
+- [ ] A0 completes and operator selects O/H/D, dependency/rollback and initialization/bootstrap and confirms D15-G.
 - [ ] Operator accepts D14 implementation scope before any automatic-setup code lands.
 - [ ] A1 is implemented, documented, Sol-audited, atomically rollback-gated and live-verified.
 - [ ] R1–R11 individually implemented, audited, documented, and live-gated.
