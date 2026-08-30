@@ -81,7 +81,7 @@ y=0  W W L L W W
      0 1 2 3 4 5   x
 ```
 
-Expected wet outer-perimeter segments are `A=(C10,C00,C01,C02)` and `B=(C40,C50,C51,C52)`. There is no legal hidden segment between `C02` and `C52`, and no implicit last-to-first connection. H must record native-binary evidence for a one-curve representation or refuse for an operator decision.
+Expected wet outer-perimeter segments are `A=(C02,C01,C00,C10)` and `B=(C40,C50,C51,C52)`. There is no legal hidden segment between `C02` and `C52`, and no implicit last-to-first connection. H must record native-binary evidence for a one-curve representation or refuse for an operator decision.
 
 ```text
 segment A:  C02              C52 :segment B
