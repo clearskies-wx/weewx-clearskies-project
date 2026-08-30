@@ -40,6 +40,7 @@ No A0 participant may select O/H/D/G/I/B, merge axes under a combined label, cho
 | Evolution Plan W3/W4 and Q4/PW7 | historical `CLOSED` and S/W/east-land rationale is SoCal-specific and cannot govern a global implementation | Sol audit; later documentation owner |
 | Local SWAN manual §2.6.3 and `BOUNDNEST3` | water-boundary omission is an error source; land absorbs energy; curve/order/corners/location rules govern H | Native SWAN prototype / Sol audit |
 | Local WW3 v6.07 manual | active-boundary status, output-boundary lines, Type-2 point output, and transfer output govern O/D | Native WW3 prototype / Sol audit |
+| Provider Manual §14.18 | its partially-land paragraph still calls the ADR-109 amendment “Proposed” and describes the former fine-DEM depth override/unbuilt-hook history; that stale account conflicts with accepted ADR/source and cannot select A1 behavior | Sol audit; later documentation owner |
 
 ### 2.3 Gate ownership
 
@@ -115,7 +116,7 @@ For every H candidate, verify from real output and local SWAN 41.51AB execution 
 6. the transfer contains no buoy, seam, `DREF*`, or other off-boundary diagnostic point; and
 7. land coverage, partial-land sides and disconnected wet segments are tested against the actual binary rather than inferred from grammar prose.
 
-Required mutations: off-boundary diagnostic insertion, point permutation, duplicate, missing required corner, missing segment, discontinuity, wrong keyword, location moved off the boundary, and spacing violation. The run record includes the exact SWAN command, input, version, output/PRINT warnings, exit state, and the predeclared §12 verdict form. A binary acceptance that fails a structural check is a refusal; structural acceptance alone is not a scientific-quality claim.
+The H input record must also lock and exercise `FREE` versus `UNFORMATTED`, the required Cartesian `[xgc] [ygc]` origin, and longitude-before-latitude order. Required mutations: off-boundary diagnostic insertion, point permutation, duplicate, missing required corner, missing segment, discontinuity, wrong keyword, location moved off the boundary, spacing violation, formatted/binary keyword swap, stale origin, swapped origin, omitted origin, and lat/lon-order inversion. The run record includes the exact SWAN command, input, version, output/PRINT warnings, exit state, and the predeclared §12 verdict form. A binary acceptance that fails a structural check is a refusal; structural acceptance alone is not a scientific-quality claim.
 
 ### 5.2 Lateral-boundary safety method
 
@@ -123,7 +124,7 @@ For H2/H3, the prototype records the manual §2.6.3 affected-region geometry and
 
 ## 6. D axis — diagnostic continuity separate from boundary transfer
 
-The prototype compares native WW3 output arrangements that leave the canonical H transfer boundary-only while retaining the existing actual-coordinate buoy, seam and `DREF*` series. It must inspect the existing `model_wave_source` and `vchain` consumers and record their current transfer parsing, filenames, retention, valid-time axis and fingerprints; it must not change them.
+The prototype compares native WW3 output arrangements that leave the canonical H transfer boundary-only while retaining the fixed actual-coordinate buoy, seam and `DREF*` records in the companion fixture manifest. `WW3-AUTOMATIC-SETUP-A0-FIXTURES-2026-08-30.md` §5 locks their IDs, coordinates, depth tokens, time axis, spectral axes, and canonical per-point printed energy tokens before any output is inspected. It must inspect the existing `model_wave_source` and `vchain` consumers and record their current transfer parsing, filenames, retention, valid-time axis and fingerprints; it must not change them.
 
 For each D candidate, prove or refuse with native files and parsers:
 
@@ -138,7 +139,9 @@ Required mutations: append a diagnostic point to the H transfer, remove a diagno
 
 ## 7. G axis — global wetness/bathymetry source evidence
 
-For every candidate source already available to the project, record coverage, resolution at the target geometry, native coordinate convention, horizontal datum, vertical datum, wet/dry sign/fraction semantics, cache/provenance behavior, and longitude normalization. Do not merge a source inventory into a chosen policy.
+The operator has fixed the horizontal occupancy source: existing OSM/Overpass only. Ocean occupancy is `natural=coastline` at mean high water, with directed land-left/water-right geometry. Great Lakes retain their Great Lakes physical regime but use the lake relation layer—not coastline fallback—where the snapshot has `natural=water`, `water=lake`, `type=multipolygon`, and `tidal=no`. Regular installation-selected bathymetry, converted to the model datum, supplies every depth. OSM supplies horizontal water fraction only; there is no fine-DEM depth override.
+
+The OSM gate verifies structural/topology/snapshot/provenance validity, rather than multi-provider fallback accuracy: required tags/layer, complete outer and inner relation rings, island holes, directed coastline geometry, bbox-clipping behavior, coordinate normalization, query/snapshot SHA-256 freezing, and a refusal for missing, malformed or incomplete geometry. There is no GSHHG, secondary occupancy provider, or silent fallback.
 
 Mandatory setup evidence:
 
@@ -147,70 +150,34 @@ Mandatory setup evidence:
 - source/datum/resolution/provenance records for both; and
 - explicit refusal where an existing source cannot supply the stated derivation.
 
-The current Southern-California-only CRM catalog/path is a **negative control**. It must demonstrate that treating it as a global source fails the Myrtle Beach and Great Lakes setup requirements. A coarse source, source fallback, datum conversion, fractional-wetness rule, or new provider needed to repair that coverage is not selected in A0; it is named in the G packet with the exact architectural trigger.
+The current Southern-California-only CRM path is a negative control for the former design only. It must not be used as an occupancy fallback or a depth override in the fixed policy. Any absence/malformed topology/incomplete OSM snapshot is a setup refusal.
 
 ### 7.1 Fine-resolution data causal gate
 
-Fine-resolution bathymetry is not presumed globally required. Before a later decision claims it is needed, the prototype separates these four claimed roles and tests each causal link independently:
+Fine-resolution bathymetry is not presumed globally required. The fixed-policy causal variants hold grid, NOAA boundary spectra, wind, binary, physics switches, time window, restart state, output points, and O/H/D topology identical:
 
-| Claimed role | Required comparison | Prohibited inference |
-| --- | --- | --- |
-| Depth accuracy | Existing regional fine DEM versus existing global/coarse bathymetry at the same declared cells/coordinates, datum-aware | a sharper coastline proves a better depth field |
-| Wet/land perimeter classification | Perimeter wet/dry classification from each candidate source at the same G1/L2 geometry | a side-wide classification is sufficient because most of the side is land |
-| Partial-cell open-water fraction / `FLAGTR` obstruction | Existing regional fine DEM; global coarse bathymetry plus global coastline geometry for fraction; and no fine-fraction mechanism where the manual-valid path permits it | a fractional mask is automatically more physically faithful than a binary mask |
-| Claimed compensation for WW3 lacking diffraction | Island/headland cases with the same O/H/D contracts, then a declared WW3-to-SWAN comparison quantity | sharper island geometry can stand in for unmodelled diffraction, shadowing, or energy physics |
+1. **C0:** center classification with the manifest's fixed synthetic depth field and `FLAGTR=0`.
+2. **C1:** OSM-fraction-derived classification with the identical fixed depth field and `FLAGTR=0`.
+3. **C2:** identical C1 status and depth grid, with `FLAGTR=2`, `tau = water area fraction`, and obstruction file `1-tau`.
 
-The causal model variants hold grid, NOAA boundary spectra, wind, binary, physics switches, time
-window, warm restart, output points and O/H/D topology identical:
+`C1−C0` isolates horizontal occupancy classification. `C2−C1` isolates the operator-confirmed fractional transmission representation. C2 is **not diffraction**, a diffraction surrogate, or an energy-attenuation candidate. Island interiors remain land. Any directional map, diffraction compensation, new fraction threshold, depth override, or new formula is a mutation/research refusal, not a candidate.
 
-1. **C0 legacy:** center-sample wet/dry with `FLAGTR=0`.
-2. **C1 geometry/depth only:** fraction-derived wet/dry plus corrected wet depths, with every wet
-   cell fully transparent (`FLAGTR=0` or the source-verified native equivalent).
-3. **C2 transmission:** exactly C1's status/depth grid plus `FLAGTR=2` and the current isotropic
-   coefficient mapping.
-4. **C3 directional native obstruction:** run only if a manual-supported existing generator supplies
-   x/y coefficients without a new formula; otherwise record `REFUSE: transmission criterion unbound`.
+The manifest locks the synthetic depth field and occupancy polygons so neither depth nor fixture geometry can move between C0/C1/C2. Required mutations: center classification restored under C1/C2; `tau` written in place of `1-tau`; all partial coefficients set to zero or one while status/depth remain C1-identical; spatially permuted fraction with total area preserved; omitted island hole; clipped/unfinished ring; rotated geometry with unrotated occupancy; and malformed/missing OSM snapshot. Every survivor is a finding.
 
-`C1−C0` isolates classification/depth. `C2−C1` isolates the transmission mapping. The fixture set
-must separately include an island-free coast negative control, one hand-derived partial-cell barrier,
-a partial-cell headland, and a many-cell resolved island lee. A partial-barrier pass cannot establish
-resolved-island diffraction accuracy.
-
-Datum guard: current evidence says newly wet cells may take CRM wet-mean depths whose water datum is
-MLLW inside an otherwise ETOPO/LMSL bottom grid. The prototype records the datum of every overridden
-depth and refuses any mixed/unconverted field. It does not assume an override count or silently
-equate MLLW, NAVD88 and LMSL.
-
-Candidate source/mechanism families are therefore: (a) currently available regional DEMs, (b) global coarse bathymetry combined with global coastline geometry to derive fraction, and (c) a no-fine-fraction path as a negative/control where the local manuals and selected native setup allow it. A0 does not choose among them, supply a new fraction threshold/formula, or assume any candidate is usable outside its evidenced coverage/datum range.
-
-Global coastline geometry is not presumed ready for area fractions: record whether the source is a
-closed land polygon or clipped/directed linework, its nearest-segment land/water convention, island
-closure, dateline/high-latitude behavior, and the rasterization/sampling criterion that would be
-needed. An unapproved polygonization/fraction rule is an operator decision, not an implementation
-detail.
-
-For the island/headland fixture, the worker predeclares one WW3-to-SWAN quantity, its independent reference/comparison method, and its tolerance authority before examining outputs. The quantity must expose whether changed island mapping improves the handoff/nearshore result rather than only producing a visually sharper but physically wrong shadow. If no existing manual/ADR-bound quantity and tolerance can do that, record `REFUSE: fine-resolution causal quantity/criterion unbound` for the operator; do not create a diffraction proxy or an attenuation rule.
-
-The evidence record for each role names the source, resolution, datum, coordinate/fraction derivation, changed cells, native WW3/SWAN artifacts, and the §12 verdict. A result that changes geometry without proving the declared causal quantity is inconclusive for that role, not evidence for a global fine-data requirement.
-
-Required causal mutations: write open-water fraction instead of obstruction `1−fraction`; set all
-partial coefficients to one and then zero while retaining C1 geometry; spatially permute fractions
-while preserving total area; swap/rotate x/y maps; downsample the source; perturb datum/zero-line
-metadata; restore center classification; rotate geometry without rotating derived coefficients; and
-drop one edge source strip. Every survivor is a finding.
+The causal evidence names the model datum and the regular selected bathymetry input used for all cells; it confirms that no fine DEM supplied a replacement depth. It reports only the locked structural/native evidence. No finer-island result may be described as improving diffraction, island shadow physics, or global accuracy.
 
 ## 8. Artifact dependency, compatibility, promotion and rollback experiment
 
 The worker builds a dependency matrix from controlled non-production generation changes. It must enumerate, without pre-deciding outcomes, whether each change requires reuse, regeneration, refusal, cold initialization, invalidation, or a later operator policy for each artifact/state.
 
-| Changed input/identity | `mod_def.ww3` | WW3 restart | raw horizon | merged transfer | SWAN state/hotstarts | cache selection | marker | Required evidence |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| O outer active-cell/source mapping only | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | controlled generation experiment + native logs/hashes |
-| H L2 curve only | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | controlled generation experiment + SWAN input/output evidence |
-| D diagnostics only | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | parser/consumer and retention evidence |
-| domain or grid identity | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | deck/hash/native initialization evidence |
-| G wetness/bathymetry source/datum | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | source provenance plus compatibility experiment |
-| WW3/SWAN binary or model config | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | binary/config hashes and native compatibility evidence |
+| Changed input/identity | `swan_grid_sizing.json` / `ww3_leg` derivation | OSM geometry cache/snapshot | `mod_def.ww3` | WW3 restart | raw horizon | merged transfer | SWAN state/hotstarts | cache selection | marker | Required evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| O outer active-cell/source mapping only | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | controlled generation experiment + native logs/hashes |
+| H L2 curve only | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | controlled generation experiment + SWAN input/output evidence |
+| D diagnostics only | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | parser/consumer and retention evidence |
+| domain or grid identity | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | deck/hash/native initialization evidence |
+| G occupancy snapshot or bathymetry datum/source | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | snapshot/source provenance plus compatibility experiment |
+| WW3/SWAN binary or model config | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | `[UNSET]` | binary/config hashes and native compatibility evidence |
 
 Each experiment records complete old/new generation identities, artifact hashes, process inputs, observed/expected evidence form, and whether mixed generations remain unavailable. Do not assume that restart deletion is valid. Do not infer that every topology-only change invalidates `mod_def.ww3`, or that it preserves a restart/horizon/SWAN state: each matrix cell needs evidence or stays `[UNSET]` for the operator.
 
@@ -229,7 +196,7 @@ The experiment must not make a restart disappear and call the resulting behavior
 
 ## 10. Resource and native-process accounting
 
-Use the already locked R0 ceilings and baseline inputs as the total ceiling authority. The worker cites the exact R0 gate row/ceiling before launch; A0 adds no number and does not relax any ceiling.
+Use the already locked R0 ceilings and baseline inputs as the total ceiling authority. The worker cites the exact R0 gate row/ceiling before launch; A0 adds no number and does not relax any ceiling. In addition, before prototype output is read: the existing Overpass request retains its configured absolute **25 s** timeout; local OSM fraction derivation is **≤30 s**, incremental RSS **≤512 MiB**, swap growth **0**; and any extra native `ww3_outp` pass is **≤10 s**, incremental RSS **≤128 MiB**, swap growth **0**.
 
 For each extra native WW3 post-processing pass, separately record wall time, peak RSS, swap delta, disk growth, input/output byte counts, process command/version, and overlap/concurrency state. Measure additional work separately from the existing leg/horizon process so a D mechanism cannot hide cost in a combined number. Exceeding or lacking an R0 measurement form is a refusal, not a revised limit.
 
