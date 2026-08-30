@@ -97,7 +97,7 @@ Unless an operator-approved decision below says otherwise:
 | D11 SWAN hotstart quarantine before first repaired publish | **APPROVED 2026-08-29** | Transactionally quarantine tokened L2/L3/L4 hotstarts; never touch WW3 restart | recoverable state mutation |
 | D12 Recovery intent + runtime generation | **APPROVED 2026-08-29** | One atomic intent under existing work root; fingerprint includes deployed revision/binary/config hashes | triggers 5/6/7 |
 | D13 Unified Model Health | **APPROVED 2026-08-29; design in §16** | Stage-by-stage required health, deployed revision, API/admin reporting | triggers 4/7 |
-| D14 WW3 automatic setup parity | **APPROVED 2026-08-30 for A1 local implementation; A0 remains a merge/deployment gate** | O1: every wet G1 perimeter cell is active and NOAA-supplied. H1: one ordered, complete rectangular `CLOSED` L2 boundary, including land-covered portions; the mask/bathymetry still controls land. Boundary transfer is boundary-only; buoy/`DREF*` diagnostics are separate. The minimal durable setup-generation envelope is authorized only to group approved artifacts, atomically select one complete current generation, and retain one hash-matched predecessor; A0-I must name its exact path/files/schema before durable implementation. | triggers 2/3/4/5/6 approved; narrowly scoped trigger 7 only for the durable generation envelope; all other artifact/dependency/config authority remains prohibited |
+| D14 WW3 automatic setup parity | **APPROVED 2026-08-30 for A1 local implementation and residual H/D ruling; A0 remains a merge/deployment gate** | O1: every wet G1 perimeter cell is active and NOAA-supplied. H1 retains the existing grids and formatted `FREE` transfer: one ordered, complete rectangular `CLOSED` L2 boundary, including land-covered portions; the mask/bathymetry still controls land. After `ww3_shel`, an ephemeral native `ww3_outp ITYPE=0` inventory captures post-land-filter registered names/effective ordinals, validates contiguous effective ordinals and an ordered/unique `L2P*` subsequence whose gaps exactly match shel land-filter evidence, then builds the final H selector in memory only; it is never persisted, published, or spectral input. D1 is a second formatted native `ww3_outp` pass selecting every ordered diagnostic from `diagnostic_output_contract` in its native source-inventory order; H remains boundary-only. The minimal durable setup-generation envelope is authorized only to group approved artifacts, atomically select one complete current generation, and retain one hash-matched predecessor. | trigger 5 approved for the H inventory and D1 second pass inline in the existing leg/horizon producer transaction, with no schedule/cadence/trigger change; narrow triggers 4/7 approved for the versioned diagnostic contract and exactly its two named persisted transfer artifacts; no dependency, config, endpoint, port, grid, format, or other artifact authority |
 | D15 OSM-only horizontal occupancy and regular-depth separation | **APPROVED DIRECTION 2026-08-30; exact implementation gated in A0-G** | OSM is the sole horizontal provider; ocean uses `natural=coastline`, Great Lakes/inland water uses `natural=water` + `water=lake`; regular datum-converted bathymetry supplies every depth; `τ=water_fraction`, obstruction=`1−τ`; no GSHHG/fallback/fine-depth substitution | triggers 1/4/7 approved as scoped; no new provider |
 
 Acceptance of this plan approves D6–D8 and D10–D13 as written. D9 remains evidence-only; worker
@@ -377,12 +377,16 @@ The following are manual requirements, not selectable project preferences:
 The operator selected O1 (every wet G1 perimeter cell active and NOAA-supplied), H1 (one complete
 ordered rectangular `CLOSED` L2 boundary, including land-covered locations where the manual permits),
 and the D invariant that boundary and diagnostics remain separate. The existing bathymetry/mask still
-controls land. A0 reports the native D arrangement and H-only/D-only compatibility policy for an
-explicit residual operator ruling before merge/deployment. An implementation agent may not add a
-scientific reachability criterion, a custom spectral-transfer rewriter, or a persisted artifact
-outside the approved minimal durable generation envelope; durable envelope implementation waits until
-A0-I names its exact path/files/schema. Other new dependency, schema-field, port, endpoint, or
-config-key authority remains prohibited.
+controls land. The residual H/D ruling is approved: H keeps the complete rectangular `CLOSED`
+topology, existing grids and formatted `FREE` transfer. Immediately after `ww3_shel`, a native
+ephemeral `ww3_outp ITYPE=0` inventory records post-land-filter names/effective ordinals and
+validates contiguous effective native ordinals plus an ordered, unique `L2P*` subsequence; every
+name gap must exactly match shel land-filter evidence. It is consumed in memory solely to build the
+final H selector, never persisted, published or spectral input, and remains inside the locked resource
+ceiling. D1 is a separate formatted native `ww3_outp` pass selecting every ordered diagnostic in the
+versioned `diagnostic_output_contract`'s native source-inventory order; it writes only the approved
+cycle/horizon diagnostic transfers. No binary format change, custom spectral-transfer rewriter, scientific reachability
+criterion, grid change, dependency, config key, endpoint or port is authorized.
 
 ### 8A.3 Target invariants
 
@@ -469,8 +473,9 @@ candidate forces the same-numbered H candidate.
 
 **Diagnostic axis D — boundary versus validation output.** Compare native WW3 mechanisms that keep
 buoy and `DREF*` spectra out of the SWAN curve while preserving their actual-coordinate time
-series. Native `L2P####` seam continuity remains H/vchain-owned in the boundary transfer. The later
-operator ruling separately selects D. A new/changed consumer contract is trigger
+series. Native `L2P####` seam continuity remains H/vchain-owned in the boundary transfer. The
+approved ruling selects D1's second formatted native pass; A0 still verifies its locked native method
+and compatibility evidence. A new/changed consumer contract is trigger
 4. A dependency, port, endpoint, config key or persisted file is trigger 7; a temporary filename or
 source-code file is not trigger 7 merely because it exists.
 
@@ -499,9 +504,10 @@ The A0 report must establish, without pre-answering:
 - whether WW3 explicit point-index selection preserves request order or source order;
 - whether all proposed `BOUNDNEST3` locations satisfy the manual's WW3 computational/output-location
   requirement at the actual G1/L2 resolutions;
-- whether one native `ww3_outp` pass can satisfy both boundary and diagnostic consumers;
-- whether a second native `ww3_outp` pass can reuse existing filenames/contracts with no new
-  persisted artifact;
+- whether the approved separate H and D1 native `ww3_outp` passes preserve their boundary-only and
+  diagnostic-only contracts;
+- whether D1's two exactly approved persisted paths preserve the required setup/generation identity
+  without a third artifact;
 - how land-separated wet segments can be represented by the actual SWAN 41.51AB binary;
 - preserved diagnostic spectra/time coverage, energy equivalence, retention, fingerprints and
   consumer wiring for `model_wave_source` and vchain;
@@ -519,9 +525,9 @@ wet segments, and a **real source-backed Great Lakes setup/binary case**. O3 mus
 rotation, east-facing and three-side controls.
 
 **A0 terminal gate:** A0 supplies merge/deployment evidence for the approved A1 contracts. It may
-stop or revise an implementation candidate, including D's native-output mechanism, but it does not
-block local test/code work. Before merge/deployment, the operator explicitly rules on the reported
-native D arrangement and H-only/D-only compatibility policy. D15 remains fixed pending its global
+stop or revise an implementation candidate, including the approved H inventory or D1 native-output
+mechanism, but it does not block local test/code work. Before merge/deployment, H-only/D-only
+compatibility must be evidenced against the approved mechanism. D15 remains fixed pending its global
 implementation evidence; a failed G gate refuses setup rather than selecting another provider.
 
 ### 8A.5 Implementation design — A1 (local implementation approved)
@@ -549,15 +555,29 @@ Approved design and tasks:
    maps to the selected active set.
 4. Make WW3 grid status and boundary assembly refuse any cell/file mismatch.
 5. Serialize and test H1's one ordered, complete rectangular `CLOSED` L2 topology, including its
-   required corners and permitted land-covered portions. Keep bathymetry/mask control of land. A1 may
-   test the serialized topology/keyword fixture, but R1 alone wires the live `BOUNDNEST3` deck and
-   boundary transfer file.
-6. Keep buoy/`DREF*` diagnostics separate from the boundary transfer. Report candidate native D
-   arrangements from implementation evidence, with no custom spectral-transfer rewriter or new
-   dependency; the residual operator ruling selects or refuses the arrangement before merge/deployment.
-   A consumer-contract change remains separately gated; preserve existing
-   buoy/`DREF*` valid-time coverage, retention, fingerprinting and spectra at actual coordinates and
-   preserve `L2P####` seam continuity in H.
+   required corners and permitted land-covered portions. Retain existing grids and formatted `FREE`
+   transfer. Immediately after `ww3_shel`, run an ephemeral native `ww3_outp ITYPE=0` inventory;
+   capture actual post-land-filter registered names/effective ordinals; refuse unless effective native
+   ordinals are contiguous and the `L2P*` subsequence is ordered/unique, with each skipped name
+   exactly matching shel land-filter evidence. Consume it in memory solely to build selectors; never
+   persist, publish or use it as spectral input. Construct the coarse-to-fine H curve by max-overlap
+   parent mapping, collapse consecutive same-parent runs, preserve corners and land transitions, and
+   prove actual F7.2 uniqueness plus the 0.1 corridor for every wet SWAN perimeter node. Keep
+   bathymetry/mask control of land. A1 may test producer topology/selector fixtures,
+   but R1 alone wires the live `BOUNDNEST3` deck and boundary transfer file.
+6. Keep buoy/`DREF*` diagnostics separate from the boundary transfer. D1 is a second formatted native
+   `ww3_outp` pass selecting every ordered diagnostic from the versioned
+   `diagnostic_output_contract` in native source-inventory order, with atomic pre-promotion and
+   setup/generation identity. It persists exactly
+   `level0/cycle_<token>/ww3_outp/ww3_diagnostic_transfer.ww3` and
+   `level0/horizon_<token>/ww3_horizon_diagnostic_transfer.ww3`. `model_wave_source` reads D;
+   vchain uses D for buoy validation and H for the `L2P####` seam. Missing/mismatched D or H fails
+   closed with structural validation/refusal/logs; R8b alone owns canonical `modelHealth`.
+   Preserve buoy/`DREF*` valid-time coverage, fingerprinting and spectra at actual coordinates.
+   Promotion remains blocked until A0-I names and the operator approves exact cycle-directory
+   retention; current approval covers the two files, not their deletion policy. The
+   locked 2×4 fixture remains unchanged as an expected native-refusal control; a separately named
+   production-axis positive fixture is added, not a binary alternative.
 7. Build the authorized minimal durable setup-generation envelope and promote or roll it back
    atomically as one complete, hash-matched current generation plus one hash-matched predecessor. A0-I
    must first identify its exact path/files/schema. No mixed/partial generation may publish.
@@ -565,8 +585,9 @@ Approved design and tasks:
    O active-cell/status, or G occupancy/bathymetry source/datum/depth change, then perform the
    historical cold rebuild. H-only and D-only preservation remain A0-I native-compatibility candidates;
    until decided, they fail closed. Do not infer preservation or invalidation from topology alone.
-9. A1 owns producer derivation and identities only. R1 owns live `BOUNDNEST3` deck wiring and scaffold
-   removal; R2 owns the 73-record merge/selection and full/fast/vchain consumption.
+9. A1 owns producer derivation, the ephemeral H inventory/final selector, and separate H/D artifacts
+   and identities only. R1 owns live `BOUNDNEST3` deck wiring and scaffold removal; R2 owns the
+   73-record merge/selection and full/fast/vchain consumption.
 10. Preserve R3 exhaustion behavior and add A1-owned structural refusals; no cache, marker or
     persistent SWAN hotstart advances on any derivation/transfer mismatch.
 11. Implement D15 exactly: regime-correct OSM queries/fractions only, regular datum-converted
@@ -602,6 +623,13 @@ Approved design and tasks:
   warning/error/tolerance gates.
 - Mutations for fixed S/W, missing active-cell source, off-boundary diagnostic insertion, point
   permutation, duplicate, missing corner/segment, wrong `OPEN`/`CLOSED`, and spacing violation fail.
+- H keeps the existing formatted `FREE` transfer and grids. Native `ww3_outp ITYPE=0` inventory run
+  after `ww3_shel` proves contiguous effective native ordinals and an ordered/unique `L2P*`
+  subsequence; each name gap must exactly match shel land-filter evidence. It is consumed in memory
+  only for selector construction, never published/persisted/spectral input, and remains within the
+  locked resource ceiling. The coarse-to-fine max-overlap mapping collapses consecutive same-parent
+  runs while preserving corners/land transitions; actual F7.2 uniqueness and the 0.1 corridor for
+  every wet SWAN perimeter node pass.
 
 **A0 Gate 3 — diagnostic continuity, compatibility and rollback evidence**
 
@@ -613,24 +641,33 @@ Approved design and tasks:
   generations are unavailable, never publishable.
 - Any automatic cold-recovery behavior remains owned by R11; A0 proves only the initialization and
   rollback method A1 would require.
+- D1's second formatted native `ww3_outp` pass selects all and only the
+  `diagnostic_output_contract` points in native source-inventory order. It proves atomic
+  pre-promotion and setup/generation identity for exactly the cycle and horizon D paths;
+  missing/mismatched H or D structurally refuses and logs. Exact cycle-directory retention remains
+  promotion/merge-blocked until A0-I names it and the operator approves it; current approval covers
+  files, not deletion policy. The locked 2×4 native fixture remains unchanged as an
+  expected refusal; a separately named positive native test uses production axes.
 
-**A0 Gate 4 — evidence review and residual operator-decision packet**
+**A0 Gate 4 — evidence review and approved H/D implementation packet**
 
 - Results are reported separately for O, H, D, D15-G confirmation, dependency/rollback and
-  initialization, against the approved A1 constraints. It identifies the native D arrangement and
-  H-only/D-only compatibility policy requiring the residual operator ruling before merge/deployment.
+  initialization, against the approved A1 constraints. It verifies the approved H inventory/coarse-to-
+  fine construction and D1 mechanism, including the reported H-only/D-only compatibility policy,
+  before merge/deployment.
 - Each option names manual support, scientific assumptions, trigger set, files/contracts, cost,
   failure mode and unknowns. No combined A/B/C shorthand hides a seam-specific choice.
-- The operator selects or refuses those residual D/H-only/D-only choices before merge/deployment;
-  until then the candidate remains fail-closed. The evidence also identifies whether a candidate must
-  be stopped or revised.
+- The operator approved the residual H/D mechanism on 2026-08-30. A failed inventory, D-contract,
+  compatibility or resource gate still stops or revises the candidate and keeps it fail-closed.
 
 **A1 Gate A — implemented automatic derivation and producer contracts**
 
 - Approved global fixtures and 90-degree metamorphic rotations pass against the production code.
 - NOAA source/status mapping exactly matches O; the serialized H topology/keyword fixture is
-  boundary-only; diagnostics exactly match D; real Atlantic/Great-Lakes setup matches D15-G. R1 owns
-  live SWAN boundary wiring and R2 owns consumer transfer assembly/consumption.
+  boundary-only; the ephemeral H inventory/final selector and coarse-to-fine F7.2/corridor checks
+  satisfy the registered-point gate; diagnostics exactly match D1's versioned contract, native order
+  and two exact paths; real Atlantic/Great-Lakes setup matches D15-G. R1 owns live SWAN boundary
+  wiring and R2 owns consumer transfer assembly/consumption.
 - All A0 mutations refuse before WW3/SWAN publication.
 
 **A1 Gate B — transition, diagnostics and rollback**
@@ -640,7 +677,10 @@ Approved design and tasks:
   rebuild. H-only and D-only preservation remain A0-I native-compatibility candidates and fail closed
   until decided.
 - Atomic generation promotion and rollback are kill-tested at every write/promotion boundary.
-- Diagnostic consumers retain time coverage, spectra and retention across the transition.
+- D1 diagnostic consumers retain time coverage, spectra and setup/generation identity across the
+  transition; missing/mismatched H or D remains structurally non-promotable and unavailable. Exact
+  cycle-directory retention remains promotion/merge-blocked until A0-I names it and the operator
+  approves it; current approval covers files, not deletion policy. R8b owns canonical `modelHealth`.
 - A mandatory historical cold rebuild produces a new compatible restart, discards historical outputs
   before h0, then completes +0…+96 without relying on unimplemented R11 automation.
 
@@ -667,8 +707,8 @@ reality/operational closeout.
    decks, remove scaffolding, or assemble/consume the 73-record transfer.
 4. ADR-100/ADR-109/Evolution-Plan reconciliation, Provider/Operations Manual and changelog update
    land with A1 before deployment.
-5. Independent Sol source/manual/contract audit, global fixture/native-binary gates, atomic rollback,
-   the mandatory historical cold-run gate, and the residual D/H-only/D-only operator ruling pass.
+5. Independent Sol source/manual/contract audit, global fixture/native-binary gates, H inventory and
+   D1 contract/resource gates, atomic rollback and the mandatory historical cold-run gate pass.
 6. One guarded A1 setup-evidence deployment is permitted only after those gates pass. It performs the
    required full historical cold rebuild, creates a new compatible restart, then runs +0…+96; no
    incompatible WW3 restart or SWAN hotstart is reused. It remains non-publishing/fail-closed until
@@ -681,15 +721,19 @@ reality/operational closeout.
 ### 8A.8 Approval boundary
 
 The operator approved A1 local implementation in chat on 2026-08-30, including O1, H1, the separate
-boundary/diagnostic D invariant, D15, the minimal durable setup-generation envelope, and the full
-historical cold rebuild. The envelope may
+boundary/diagnostic D invariant, D15, the minimal durable setup-generation envelope, the full
+historical cold rebuild, and the residual H/D mechanism. The envelope may
 only group approved artifacts, atomically select one complete current generation, and retain one
 hash-matched predecessor; A0-I must name its exact path/files/schema before durable implementation.
 H1 uses `CLOSED` because it is one complete rectangular curve; land-covered locations remain
 mask/bathymetry-controlled. Boundary transfer is boundary-only and buoy/`DREF*` diagnostics are
-separate. A0 reports the native D arrangement and H-only/D-only compatibility policy for an explicit
-residual operator ruling before merge/deployment; local candidate work remains fail-closed. A
-consumer-contract change remains gated.
+separate. H retains the existing grids and formatted `FREE` transfer and uses the ephemeral native
+post-`ww3_shel` inventory before final-selector generation. D1 is the second formatted native
+`ww3_outp` pass with the exact cycle/horizon paths and versioned diagnostic contract. H-only/D-only
+compatibility evidence remains a merge/deployment gate; local candidate work remains fail-closed.
+
+**Precedence:** the later H/D ruling supersedes only the locked brief's pre-ruling selection and
+terminal wording. Frozen methods, fixtures, and limits remain authoritative.
 
 Domain/grid, O active-cell/status, and G occupancy/bathymetry source/datum/depth changes invalidate
 `mod_def.ww3`, WW3 restart, dependent transfers and SWAN state and require the historical cold
@@ -698,8 +742,10 @@ until decided. A1 owns derivation, identities, WW3 producer setup, generation/co
 historical WW3 rebuild only; R1 owns live `BOUNDNEST3` wiring/scaffold removal and R2 owns the
 73-record merge/selection/full-fast-vchain consumption.
 
-This approval does not authorize any persisted artifact outside that minimum envelope; durable
-envelope implementation waits until A0-I names its exact path/files/schema. It also does not authorize
+This approval does not authorize any persisted artifact outside that minimum envelope, **except**
+D1's exactly approved `level0/cycle_<token>/ww3_outp/ww3_diagnostic_transfer.ww3` and
+`level0/horizon_<token>/ww3_horizon_diagnostic_transfer.ww3`; durable envelope implementation waits
+until A0-I names its exact path/files/schema. It also does not authorize
 a new dependency, port, endpoint, config key, scientific threshold/reachability criterion, or custom
 spectral-transfer rewriter. A0 remains required before merge/deployment and can stop or revise a
 candidate methodology. A1 setup evidence remains non-publishing/fail-closed until R1/R2. Production
@@ -743,8 +789,10 @@ Gate R1:
 - Legacy physical rollback files remain unchanged through geometry setup/cleanup.
 
 R1's scaffold-removal mechanics are locally green, but independent Sol QC failed the boundary
-contract described in §8A. The branch remains unmerged/undeployed. After §8A is approved and
-implemented, rebase/reconcile R1 onto the accepted topology and repeat every local/source/live gate.
+contract described in §8A. The branch remains unmerged/undeployed. After §8A is implemented,
+rebase/reconcile R1 onto the accepted H producer contract and repeat every local/source/live gate.
+R1 consumes the A1-produced final H transfer and alone wires it into the live `BOUNDNEST3` deck; it
+does not build the inventory, select D diagnostics, or consume diagnostic validation output.
 Until R2 is present, any incomplete/frozen boundary must refuse before hotstart or publication;
 removing the scaffold alone must not open a publish path.
 
@@ -763,12 +811,16 @@ Design:
 - Full and fast paths consume the same verified hstage artifact. Raw seven-record archives are never
   a production fallback.
 - Merger reads/writes bounded records; no full-file `read_text()/splitlines()/join()`.
+- R2 consumes A1's accepted identities: H for the 73-record boundary merge and vchain seam, D for
+  buoy validation and `model_wave_source`. Its diagnostic view is cycle D h0…h6 plus horizon D
+  h7…h72, with exact setup/D identity and hourly adjacency; it creates no third persisted artifact.
+  It does not generate the H inventory or either H/D producer artifact.
 
 Tasks:
 
 1. Streaming preamble/record reader and atomic temp+fsync+replace writer.
 2. Exact lower/upper bounds, duplicate/gap/order checks, actual-file coverage authority.
-3. Concise static mismatch logs; never dump 171 complete point records.
+3. Concise static mismatch logs; never dump contract-derived complete H or D point records.
 4. Full `ChainSpec` carries hstage path.
 5. Fast resolver uses the hstage for `fullRun.lastSuccessCycle` and retains the nine-hour age gate.
 6. Treat a newly merged hstage file as an attempt candidate. The artifact selected for hourly use
@@ -1335,9 +1387,10 @@ The plan does not close on unit tests. Required live evidence:
 
 1. One successful full cycle at each 00/06/12/18 UTC anchor.
 2. One successful fast fill after a full cycle.
-3. Full and fast consume the same verified 73-record +0…+72 boundary with 171 ordered points,
-   35 frequencies and 72 directions; changing wind/current point metadata is preserved and no
-   exhaustion warning occurs.
+3. Full and fast consume the same verified 73-record +0…+72 H boundary with its contract-derived
+   boundary-only ordered-point count, 35 frequencies and 72 directions; D is separately validated
+   against its contract-derived ordered diagnostic count and identity. Changing wind/current point
+   metadata is preserved and no exhaustion warning occurs.
 4. Project WW3 decks contain their required wind forcing; every active SWAN deck contains WIND,
    WLEVEL, CURRENT and valid bathymetry. For the current 76×84 L2 grid, full CURRENT has 73×168 =
    12,264 U/V rows and fast has 12×168 = 2,016 rows, each with 76 values; generalized count is
@@ -1371,13 +1424,17 @@ says evidence/decision only:
 3. R8a schema/reducer skeleton; uninstrumented evidence remains `unknown`.
 4. §8A A0 separate O/H/D/G/dependency/bootstrap evidence and Sol audit; **no deployment**. It runs
    alongside A1 local implementation and gates merge/deployment.
-5. §8A A1 producer setup under the 2026-08-30 approval: O1, H1 serialized topology, separate
-   diagnostics, D15, the minimal durable generation envelope, and mandatory historical cold rebuild.
-   It is non-publishing/fail-closed until R1/R2. Merge/deploy waits for global fixtures, native
-   binaries, A0-I compatibility/rollback evidence, the cold-run gate, and the residual operator
-   ruling.
-6. R1 direct scaffold removal plus rollback-file/comment truth cleanup on A1's accepted contracts.
-7. R2 verified streaming boundary + full/fast shared artifact bound to A1 identities.
+5. §8A A1 producer setup under the 2026-08-30 approval: O1, H1 serialized topology/coarse-to-fine
+   construction, separate diagnostics, the approved ephemeral H inventory/final selector, approved D1
+   formatted diagnostic transfer paths, D15, the minimal durable generation envelope, and mandatory
+   historical cold rebuild. The H inventory and D1 second pass run inline in the existing leg/horizon
+   producer transaction, without schedule/cadence/trigger change. It is non-publishing/fail-closed
+   until R1/R2. Merge/deploy waits for global fixtures, native binaries, H/D contract/resource and
+   A0-I compatibility/rollback evidence, and the cold-run gate.
+6. R1 direct scaffold removal plus rollback-file/comment truth cleanup; it wires A1's H transfer into
+   live `BOUNDNEST3`.
+7. R2 verified streaming H boundary + full/fast shared artifact; it consumes D for buoy validation
+   and `model_wave_source`, and H for the vchain seam.
 8. R4a CURRENT schema/containment/resampling/full+fast wiring.
 9. R4b approved same-model valid-time composition and wait/tail policy.
 10. R4c CURRENT provenance/health.
@@ -1448,24 +1505,36 @@ Acceptance of this plan activates D6–D8 and D10–D13 exactly as scoped. It do
   endpoint, or config-key change;
 - any R10B worker/process/cadence choice before R10A evidence and a later explicit operator ruling;
 - any new persisted artifact beyond the accepted recovery intent and additions to the existing
-  state/cache contracts;
+  state/cache contracts, **except** D1's exactly approved
+  `level0/cycle_<token>/ww3_outp/ww3_diagnostic_transfer.ww3` and
+  `level0/horizon_<token>/ww3_horizon_diagnostic_transfer.ww3`;
 - CheckMK integration, which is optional and separately approvable later.
 
 The operator's 2026-08-30 approval activates D14 A1 local producer-setup implementation and fixes O1
 (every wet G1 perimeter cell active and NOAA-supplied), H1 (one ordered complete rectangular `CLOSED`
 L2 topology, including permitted land-covered portions), the separate boundary/diagnostic D invariant,
-D15, the minimum durable generation envelope, and mandatory historical cold rebuild. Domain/grid, O
+D15, the minimum durable generation envelope, mandatory historical cold rebuild, and the residual
+H/D mechanism: existing grids/formatted `FREE` H transfer; ephemeral native post-`ww3_shel`
+`ww3_outp ITYPE=0` inventory/final selector; and D1's second formatted native `ww3_outp` with a
+versioned native-order `diagnostic_output_contract` and exactly the approved cycle/horizon D paths.
+The inventory and D1 second pass run inline in the existing leg/horizon producer transaction, with no
+schedule/cadence/trigger change. Domain/grid, O
 active-cell/status, and G occupancy/bathymetry source/datum/depth changes invalidate `mod_def.ww3`,
 WW3 restart, dependent transfers and SWAN state; H-only/D-only preservation remains A0-I evidence
 work and fails closed until decided. A0 remains a merge/deployment gate, not a coding gate. A1 cannot
 merge/deploy until global fixtures, native binary evidence, A0-I rollback/compatibility and the
 cold-run gate pass; production stays fail-closed and non-publishing until R1/R2.
 
-D reports its native arrangement, plus H-only/D-only compatibility policy, for the residual operator
-ruling before merge/deployment; candidates remain fail-closed until then. A consumer-contract change
-still needs its own gate. A failed A0/cold-run gate, missing authoritative revision source, or need
-for a persisted artifact outside the approved envelope remains a stop-and-surface event, not implied
-permission to expand the design.
+D1 consumes every ordered diagnostic in native source-inventory order and refuses/logs a
+missing/mismatched H or D. Its producer passes structural validation, atomic pre-promotion and
+setup/generation identity gates; exact cycle-directory retention remains promotion/merge-blocked
+until A0-I names it and the operator approves it; current approval covers files, not deletion policy.
+R8b owns canonical `modelHealth`. The locked 2×4 fixture remains unchanged as an expected
+native-refusal control; a separately named positive native fixture uses production-compatible axes,
+not a binary alternative. A failed A0/H/D/cold-run gate, missing
+authoritative revision source, or need for a dependency, config key, endpoint, port or persisted
+artifact outside the approved scope remains a stop-and-surface event, not implied permission to
+expand the design.
 
 ---
 
@@ -1480,10 +1549,15 @@ permission to expand the design.
 - [x] Operator approves D14 A1 local implementation scope and sequencing change — 2026-08-30.
 - [x] Operator selects O1, H1 topology, separate diagnostics, D15, the minimal durable generation
       envelope, and mandatory historical cold rebuild — 2026-08-30.
+- [x] Operator approves the residual H/D mechanism: ephemeral post-`ww3_shel` H inventory/final
+      selector with existing grids/formatted `FREE`, plus D1's separate formatted native diagnostic
+      transfers and versioned contract — 2026-08-30.
 - [ ] A0 global G/fixture/native-binary, A0-I compatibility/rollback and historical-cold-run gates
       pass before A1 merge/deployment; H-only/D-only preservation fails closed until then.
-- [ ] Operator selects or refuses A0's reported native D arrangement and H-only/D-only compatibility
-      policy before A1 merge/deployment.
+- [ ] A0 proves the approved H inventory and D1 contract/resource gates, including H-only/D-only
+      compatibility policy, before A1 merge/deployment.
+- [ ] A0-I names, and the operator approves, D1's exact cycle-directory retention before D1
+      promotion or A1 merge; the existing file-path approval is not deletion-policy approval.
 - [ ] A1 matrix row is complete: its §7 document-impact declaration is evidenced, every applicable
       authority is updated in the same functional change (or evidenced `N/A`), and source/manual Sol
       QC passes before atomic rollback gate or deployment.
