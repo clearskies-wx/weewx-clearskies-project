@@ -202,10 +202,14 @@ Every repair round is sequential in the shared marine repo:
 1. **`clearskies-test-author`** starts first on the pinned base, writes a guard that fails before
    the implementation, and records the real transcript.
 2. **`clearskies-api-dev`** or bounded **`worker`** implements only the named files.
-3. Coordinator independently reruns targeted + adjacent tests and inspects every hunk.
-4. **`clearskies-auditor`** receives the governing design and expected observations—not the
+3. **`clearskies-docs-author`** works in the same repair round: it declares the round's document
+   impact, verifies every proposed claim against the landed source, and updates every applicable
+   manual, contract, help surface, ADR, notice, and changelog before source audit, acceptance, or
+   deployment. A documented `N/A` is permitted only with the evidence required by §7.
+4. Coordinator independently reruns targeted + adjacent tests and inspects every hunk, including
+   the documentation/source correspondence.
+5. **`clearskies-auditor`** receives the governing design and expected observations—not the
    implementer's report—and tries to disprove the repair.
-5. **`clearskies-docs-author`** updates manuals/contracts/help after behavior is accepted.
 6. Coordinator alone commits across repos, pushes only after the operator says **push**, and deploys
    only with `scripts/deploy-marine.sh`.
 
@@ -220,6 +224,13 @@ Every round must provide:
 - Targeted tests for changed files plus adjacent seam suite; never repo-wide pytest.
 - At least one mutation drill that makes the new guard fail.
 - Production-shaped geometry, mixed cycles, nonzero forcing, and non-exact-hour fixtures.
+- A document-impact declaration naming the exact affected root architecture/manual sections, operator
+  help, contracts/OpenAPI, ADRs/Evolution Plan, changelog, and licensing/third-party notice; every
+  named authority is updated in the same functional change or marked `N/A` with a source citation
+  showing why it cannot describe the repair.
+- Source/manual Sol QC after the documentation update: inspect each declared claim against the landed
+  source and the applicable authority, and fail the round for a stale, omitted, or contradicted
+  document. A clean code audit cannot waive this gate.
 - Source-only audit against this plan, manuals, accepted ADRs, and local model manuals.
 - `git diff --check`, changed-file allowlist, and doc-code sync.
 - Live deploy uses the guarded script, records deployed commit/process start, and checks the journal
@@ -1230,7 +1241,9 @@ mismatched checkpoints never resume.
 After R10A evidence, the operator selects monolith, checkpointed worker, concurrency, or hybrid.
 R10B implements and live-gates that explicit choice. If monolith is retained, record it as the D9
 decision; it is not an untracked deferral. Any checkpoint manifest or worker placement is an
-architectural/persisted-artifact decision and receives its own accepted amendment before code.
+architectural/persisted-artifact decision and receives its own accepted amendment before code. A
+later approval of a worker or artifact does not approve service/process placement; that remains a
+separate D9 architectural decision.
 
 ## 19. R11 — Automatic cold recovery implementation
 
@@ -1344,43 +1357,41 @@ proceeds on an unverified predecessor.
 
 ## 22. Documentation and contracts
 
-Update in the same repair round before deployment: marine code/changelog in its marine commit, API
-model/tests in its API commit, dashboard/help in its repository commit, and ADR/manual/OpenAPI/plan
-documents in coordinated meta commits:
+Documentation is part of every repair, not a post-acceptance cleanup step. Before source audit or
+deployment, the round owner records its §7 declaration and completes the applicable row below.
+"Likely authorities" is an explicit review list, not permission to invent a field, endpoint, config
+key, artifact, or architectural decision. Any authority not affected is marked `N/A` with source
+evidence in the round record.
 
-- Provider Manual §§14.3/14.10/14.15/14.18: reconcile former automatic L1 side selection with the
-  accepted WW3 automatic setup; document the OSM ocean `natural=coastline` versus Great Lakes/
-  inland `natural=water` + `water=lake` layer contract, water-fraction-only semantics, regular
-  bathymetry depth authority, no fallback, current composition, direct boundary, and exact-limit
-  semantics.
-- Operations Manual: setup generations/topology fingerprints, atomic rollback/bootstrap, recovery
-  controller, cache retention, guard, artifacts, OSM snapshot/hash/cache lifecycle, Overpass failure
-  and offline behavior, ODbL attribution/notice, and health interpretation.
-- API Manual §17–19 and OpenAPI: nullable group fields and existing model-status semantics.
-- API/Operations manuals and operator help: unified health schema, reducer, reason codes, stage
-  ownership, transport-versus-model freshness, and optional CheckMK status.
-- ADR-101: κ=1 exact-limit/null ruling.
-- ADR-100 + ADR-109: explicitly reconcile automatic geography consumption against S/W-only rows;
-  record selected O/H/D policies, D15's OSM-only/regular-depth contract, initialization and artifact
-  dependency/rollback; remove CRM mixed-datum/fine-depth authority. ADR-109 also records horizon
-  safety/shared artifact and, later, worker lifecycle.
-- Marine Model Evolution Plan W3/W4 and Q4/PW7: annotate the accepted successor decision; do not
-  leave the historical S/W/CLOSED design readable as current authority.
-- Root Architecture marine configuration/chain section: state that configuration-time automatic
-  geography is the sole boundary-setup authority and that OSM supplies horizontal occupancy only;
-  no Huntington/cardinal/provider fallback rule. This is required even though service placement is
-  unchanged.
-- Config/operator help and API pass-through documentation: explain automatic regime-correct OSM
-  layer selection, no source selector knob, setup refusal/action, derivation identity and datum-
-  converted bathymetry authority. Add no public field unless separately approved.
-- Marine changelog and licensing/third-party notices: source URL/layer semantics, ODbL attribution,
-  snapshot/version/hash behavior, and removal of the CRM/fine-depth mixed-datum path.
-- ADR-104 or successor: WCOFS same-model valid-time composition/tail policy.
-- Marine/API changelogs and tests/comments with stale 24-hour terminology.
-- Root `ARCHITECTURE.md` additionally changes for §8A's automatic-setup authority as listed above;
-  D9 still controls any later service/process placement change.
+| Repair | Likely authorities to declare, update, or evidence as `N/A` before audit/deploy |
+| --- | --- |
+| A1 | Root `ARCHITECTURE.md` marine chain/configuration; Provider Manual §§14.3/14.10/14.15/14.18; Operations Manual setup, refusal/action, rollback, OSM operations, and ODbL guidance; API Manual §19 and OpenAPI update or evidenced `N/A`; distinct stack Operator Manual; localized wizard/admin help documenting automatic setup, refusal/action, derivation identity, and no selector knob; ADR-100 and ADR-109; Evolution Plan W3/W4 and Q4/PW7; marine changelog and ODbL/third-party notice. |
+| R1 | Provider Manual direct-boundary behavior; Root Architecture chain only if its current description changes; ADR-109; Evolution Plan successor note; marine changelog and stale comments/tests terminology. |
+| R2 | Provider Manual boundary-streaming/full-fast artifact behavior; Operations Manual artifact/rollback handling; ADR-109; exact stale `24-hour` terminology cleanup across tests/comments and both marine/API changelogs. |
+| R3 | Operations Manual refusal/serving-state operations; Provider Manual model-validity behavior; API Manual/OpenAPI and operator help only if existing status semantics require clarification; marine changelog. |
+| R4a | Provider Manual current ingestion/resampling and full/fast behavior; Operations Manual source-failure operation; ADR-104 or accepted successor; marine changelog. |
+| R4b | Provider Manual valid-time composition/tail behavior; Operations Manual wait/blocked-state operation; ADR-104 or accepted successor; API Manual/OpenAPI and operator help only if existing status semantics change; marine changelog. |
+| R4c | Provider Manual current provenance; Operations Manual health/provenance interpretation; API Manual/OpenAPI and operator help for existing model-status pass-through; marine/API changelogs. |
+| R4d | Provider Manual SWAN hotstart eligibility; Operations Manual hotstart quarantine/rollback; ADR-109 if accepted artifact policy changes; marine changelog. |
+| R5 | Provider Manual exact-limit semantics; API Manual/OpenAPI and operator help for nullable existing group fields; ADR-101; marine/API changelogs. |
+| R6 | Operations Manual cache retention/last-good behavior; Provider Manual serving validity; API Manual/OpenAPI and operator help for existing freshness/status semantics; marine/API changelogs. |
+| R7a | Provider Manual internal provenance; Operations Manual provenance/revision interpretation; API Manual/OpenAPI and operator help only for existing status pass-through; marine/API changelogs. |
+| R7b | Operations Manual serving identity/model age; API Manual/OpenAPI and operator help for existing-field age honesty; marine/API changelogs. |
+| R7c | Provider Manual near-zero validity gate; Operations Manual refusal/health interpretation; API Manual/OpenAPI and operator help only if existing status text changes; marine/API changelogs. |
+| R8a | Operations Manual health schema/reducer and `unknown`-evidence interpretation; Provider Manual model-stage ownership; API Manual §19/OpenAPI update or evidenced `N/A` for existing opaque pass-through; marine/API changelogs. |
+| R8b | Operations Manual stage instrumentation, reason-code, and health interpretation; Provider Manual model-stage/provenance ownership; API Manual §19/OpenAPI update or evidenced `N/A` for existing opaque pass-through; marine/API changelogs. |
+| R8c | API Manual §19 and OpenAPI for authenticated opaque pass-through; distinct stack Operator Manual and localized operator/admin help for model-versus-transport freshness and reason/action display; Operations Manual cross-surface health interpretation; Root Architecture only if it describes health routing; optional CheckMK remains documented as unimplemented; marine/API/stack changelogs. |
+| R9 | Operations Manual guarded deployment and reuse interpretation; Provider Manual same-cycle reuse constraints; ADR-109 if accepted lifecycle/artifact policy changes; marine changelog. |
+| R10A | Operations Manual evidence procedure and no-deploy decision record; ADR-109 and Evolution Plan only for the operator-selected result; marine changelog only if shipped behavior changes. |
+| R10B | Root Architecture, Operations Manual, Provider Manual, ADR-109, Evolution Plan, API Manual/OpenAPI/operator help, changelogs, and licensing/notice only to the exact extent of the later approved worker/artifact decision. |
+| R11 | Operations Manual recovery controller, recovery intent, source refresh, rollback, and health; Provider Manual cold-recovery validity; API Manual/OpenAPI and operator help for existing health/status semantics; ADR-109 and ADR-104/successor where their accepted policies are implemented; marine/API changelogs. |
+| R12 | Operations Manual end-to-end acceptance/reality/rollback procedure; Provider Manual chain validity; API Manual/OpenAPI/operator help for verified existing health semantics; changelogs and plan close record. |
 
-No SWAN or WW3 reference-manual file is edited.
+Across applicable rows, A1 documents the OSM ocean `natural=coastline` and Great Lakes/inland
+`natural=water` + `water=lake` layer contract, horizontal water-fraction-only semantics, regular
+datum-converted bathymetry depth authority, no fallback, ODbL attribution, and removal of the CRM/
+fine-depth mixed-datum path. Frozen SWAN and WW3 reference-manual files are read-only citations and
+are never edited.
 
 ## 23. Approval boundary for operator review
 
@@ -1416,8 +1427,13 @@ remains a stop-and-surface event, not implied permission to expand the design.
 - [x] A0 results-free gate/fixture file locked and independently Sol-audited before prototype results — 2026-08-30 (`0aa27635`).
 - [ ] A0 completes and operator selects O/H/D, dependency/rollback and initialization/bootstrap and confirms D15-G.
 - [ ] Operator accepts D14 implementation scope before any automatic-setup code lands.
-- [ ] A1 is implemented, documented, Sol-audited, atomically rollback-gated and live-verified.
-- [ ] R1–R11 individually implemented, audited, documented, and live-gated.
+- [ ] A1 matrix row is complete: its §7 document-impact declaration is evidenced, every applicable
+      authority is updated in the same functional change (or evidenced `N/A`), and source/manual Sol
+      QC passes before atomic rollback gate or deployment.
+- [ ] Each of R1–R12 has its own completed §22 matrix row and §7 declaration; no repair closes or
+      deploys with a stale, omitted, or contradicted governing document.
+- [ ] A1 and every R1–R12 repair pass source/manual Sol QC after the document update, in addition to
+      their targeted/adjacent tests, independent source audit, live gate, and rollback evidence.
 - [ ] R12 four-anchor/reality/health gate passes.
 - [ ] No untracked deferred item remains in narrative prose.
 - [ ] Coordinator walks the original operator request line by line before close.
