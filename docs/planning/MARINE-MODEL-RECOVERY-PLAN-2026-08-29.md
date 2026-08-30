@@ -1413,7 +1413,7 @@ remains a stop-and-surface event, not implied permission to expand the design.
 - [x] Original recovery results-free gates written and Sol-audited before original implementation — 2026-08-29.
 - [x] Operator approves §8A A0 evidence/prototype round — 2026-08-30.
 - [x] Operator selects D15 OSM-only occupancy + regular datum-converted bathymetry depth direction — 2026-08-30.
-- [ ] A0 results-free gate/fixture file is locked and independently Sol-audited before prototype results.
+- [x] A0 results-free gate/fixture file locked and independently Sol-audited before prototype results — 2026-08-30 (`0aa27635`).
 - [ ] A0 completes and operator selects O/H/D, dependency/rollback and initialization/bootstrap and confirms D15-G.
 - [ ] Operator accepts D14 implementation scope before any automatic-setup code lands.
 - [ ] A1 is implemented, documented, Sol-audited, atomically rollback-gated and live-verified.
