@@ -97,7 +97,7 @@ Unless an operator-approved decision below says otherwise:
 | D11 SWAN hotstart quarantine before first repaired publish | **APPROVED 2026-08-29** | Transactionally quarantine tokened L2/L3/L4 hotstarts; never touch WW3 restart | recoverable state mutation |
 | D12 Recovery intent + runtime generation | **APPROVED 2026-08-29** | One atomic intent under existing work root; fingerprint includes deployed revision/binary/config hashes | triggers 5/6/7 |
 | D13 Unified Model Health | **APPROVED 2026-08-29; design in §16** | Stage-by-stage required health, deployed revision, API/admin reporting | triggers 4/7 |
-| D14 WW3 automatic setup parity | **A0 EVIDENCE/PROTOTYPE APPROVED 2026-08-30; A1 IMPLEMENTATION BLOCKED pending complete O/H/D, dependency/rollback and initialization/bootstrap ruling plus G evidence confirmation** | Make WW3 consume the installation-derived geography/bathymetry setup at both boundaries; no fixed cardinal sides | triggers 3/4/5/6, possibly 1/2/7 |
+| D14 WW3 automatic setup parity | **APPROVED 2026-08-30 for A1 local implementation; A0 remains a merge/deployment gate** | O1: every wet G1 perimeter cell is active and NOAA-supplied. H1: one ordered, complete rectangular `CLOSED` L2 boundary, including land-covered portions; the mask/bathymetry still controls land. Boundary transfer is boundary-only; buoy/`DREF*` diagnostics are separate. The minimal durable setup-generation envelope is authorized only to group approved artifacts, atomically select one complete current generation, and retain one hash-matched predecessor; A0-I must name its exact path/files/schema before durable implementation. | triggers 2/3/4/5/6 approved; narrowly scoped trigger 7 only for the durable generation envelope; all other artifact/dependency/config authority remains prohibited |
 | D15 OSM-only horizontal occupancy and regular-depth separation | **APPROVED DIRECTION 2026-08-30; exact implementation gated in A0-G** | OSM is the sole horizontal provider; ocean uses `natural=coastline`, Great Lakes/inland water uses `natural=water` + `water=lake`; regular datum-converted bathymetry supplies every depth; `τ=water_fraction`, obstruction=`1−τ`; no GSHHG/fallback/fine-depth substitution | triggers 1/4/7 approved as scoped; no new provider |
 
 Acceptance of this plan approves D6–D8 and D10–D13 as written. D9 remains evidence-only; worker
@@ -163,15 +163,21 @@ by configuration; restarting does not gratuitously redownload static geometry.
   unique quarantine, hashes are verified and fsynced, and an atomic manifest marks completion.
   Only then may originals become ineligible. Partial quarantine never authorizes deletion,
   restoration, or cold publication; rollback restores only hash-matching original names.
-- WW3 cold-start semantics require a dedicated KAT/benchmark before implementation. The repair may
-  not simply delete/ignore a WW3 restart if the resulting six-hour leg lacks the model spin-up
-  needed for a valid boundary.
+- A domain/grid, O active-cell/status, or G occupancy/bathymetry source/datum/depth change invalidates
+  `mod_def.ww3`, the WW3 restart, dependent transfers and SWAN state, and requires a full historical
+  WW3 cold rebuild:
+  acquire the complete historical boundary and forcing window, initialize without any incompatible
+  WW3 restart, discard the historical march before forecast hour zero, create a new compatible
+  restart, then run +0…+96. No incompatible WW3 restart or SWAN hotstart is reused. This is a
+  required deployment procedure, not a separately invented numeric look-back duration.
 - No quarantine or recovery action touches forecast cache, grid sizing, bathymetry, or WW3 restart
   until the corresponding task's exact allowlist and rollback are approved.
 
 ### 5.4 Clean-install/bootstrap order
 
-With no verified last-good boundary, recovery does not wait for a prior successful SWAN publish:
+With no verified last-good boundary, recovery does not wait for a prior successful SWAN publish.
+Where the setup generation changed incompatibly, it first performs §5.3's mandatory historical
+cold rebuild; its historical outputs are discarded before h0. Then it proceeds:
 
 1. Run the six-hour WW3 production leg.
 2. Run the +6…+96 continuation from its restart.
@@ -303,17 +309,18 @@ Gate R0:
   deployment entry point, so live verification used the pushed script directly and required no
   marine-service restart.
 
-## 8A. PROPOSED AMENDMENT A — WW3 automatic setup parity
+## 8A. APPROVED AMENDMENT A — WW3 automatic setup parity
 
-**Status:** A0 EVIDENCE/PROTOTYPE APPROVED by operator in chat 2026-08-30;
-**A1 IMPLEMENTATION NOT APPROVED** pending A0 evidence and the operator's complete O/H/D,
-dependency/rollback and initialization/bootstrap ruling plus confirmation that D15's OSM G policy
-passes its locked evidence.
-**Effect on queue:** R1 and R2 are blocked. The locally green R1 scaffold-removal branch is neither
-merged nor deployed. R3 remains the production exhaustion guard; it does not validate topology.
+**Status:** Operator approved A1 local implementation in chat 2026-08-30. A0 evidence remains a
+mandatory merge/deployment gate and may stop or revise a candidate methodology; it no longer blocks
+writing local tests or code. Production remains fail-closed. No A1 merge or deployment occurs until
+the global-fixture, native-binary, atomic-rollback and historical-cold-run gates pass.
+**Effect on queue:** R1 and R2 remain blocked from merge/deployment until A1 is accepted. The locally
+green R1 scaffold-removal branch is neither merged nor deployed. R3 remains the production exhaustion
+guard; it does not validate topology.
 **Owner sequence for A0:** `troubleshooter` manual/source inventory → `clearskies-test-author`
 results-free gate lock → `worker` non-production prototype → independent Sol adversarial QC →
-operator policy ruling. **A1 after that ruling:** test author → worker → docs author → Sol QC →
+evidence review. **A1 local implementation:** test author → worker → docs author → Sol QC →
 coordinator live gate.
 
 ### 8A.1 Why this amendment exists
@@ -345,7 +352,7 @@ This is a true integration failure. It makes Myrtle Beach and any east-/north-fa
 partially-land or three-wet-side installation unsafe. It also exposes a conflict between accepted
 authorities: ADR-100's 2026-08-17 amendment requires the setup geography subsystem to derive WW3
 extent and boundary placement, while ADR-109 D13 freezes S/W-only status/placement. Neither side is
-silently discarded. The later A1 operator ruling must explicitly amend ADR-109 and reconcile every
+silently discarded. The A1 documentation round must explicitly amend ADR-109 and reconcile every
 dependent manual/plan statement.
 
 A separate global-coverage failure also blocks implementation evidence: the mandatory fine-fraction
@@ -367,18 +374,15 @@ The following are manual requirements, not selectable project preferences:
 - `CLOSED` describes a closed rectangular transfer curve; `OPEN` describes one unclosed curve.
   Neither keyword is an accuracy mode.
 
-These remain project design decisions and cannot be selected by an implementation agent:
-
-- which wet perimeter cells must receive NOAA forcing into project WW3;
-- whether SWAN's canonical handoff is a full closed rectangle or a proved open curve;
-- how multiple wet segments separated by land are represented without violating one-curve grammar;
-- whether the existing ray classifications are sufficient as-is or a new scientific reachability
-  criterion is needed;
-- how NOAA source spectra map/interpolate to WW3 status-2 active cells and what identity/provenance
-  must be shared at that outer seam;
-- how outer active-cell identity, inner SWAN-curve identity and diagnostic-point identity are
-  versioned together without falsely treating them as one topology;
-- whether any additional persisted artifact or schema field is required.
+The operator selected O1 (every wet G1 perimeter cell active and NOAA-supplied), H1 (one complete
+ordered rectangular `CLOSED` L2 boundary, including land-covered locations where the manual permits),
+and the D invariant that boundary and diagnostics remain separate. The existing bathymetry/mask still
+controls land. A0 reports the native D arrangement and H-only/D-only compatibility policy for an
+explicit residual operator ruling before merge/deployment. An implementation agent may not add a
+scientific reachability criterion, a custom spectral-transfer rewriter, or a persisted artifact
+outside the approved minimal durable generation envelope; durable envelope implementation waits until
+A0-I names its exact path/files/schema. Other new dependency, schema-field, port, endpoint, or
+config-key authority remains prohibited.
 
 ### 8A.3 Target invariants
 
@@ -514,48 +518,62 @@ Myrtle-Beach-shaped partial land with three wet incident sides, islands/headland
 wet segments, and a **real source-backed Great Lakes setup/binary case**. O3 must fail cardinal
 rotation, east-facing and three-side controls.
 
-**A0 terminal gate:** the operator separately selects O, H, D, artifact dependency/rollback policy
-and WW3 initialization/bootstrap method, and confirms D15 after reviewing G evidence. No production
-implementation begins before that complete ruling.
+**A0 terminal gate:** A0 supplies merge/deployment evidence for the approved A1 contracts. It may
+stop or revise an implementation candidate, including D's native-output mechanism, but it does not
+block local test/code work. Before merge/deployment, the operator explicitly rules on the reported
+native D arrangement and H-only/D-only compatibility policy. D15 remains fixed pending its global
+implementation evidence; a failed G gate refuses setup rather than selecting another provider.
 
-### 8A.5 Implementation design — A1 (blocked until A0 ruling)
+### 8A.5 Implementation design — A1 (local implementation approved)
 
 **Owner:** `clearskies-test-author` → `worker` (Terra) → docs author → Sol adversarial auditor
 **Likely primary files:** `services/geography.py` (authority; change only if evidence requires),
 `services/swan_domain.py`, `services/grid_sizing_chain.py`, `services/boundary_reconstruction.py`,
-`service.py`, `services/ww3_formats.py`, `services/ww3_runner.py`, `services/vchain.py`,
-`services/model_wave_source.py`, `services/swan_formats.py`, `services/swan_runner.py`,
-`providers/nearshore/swan.py`, focused state/health and tests.
+`service.py`, `services/ww3_formats.py`, `services/ww3_runner.py`, focused state/health and tests.
+A1 does not wire live SWAN decks, scaffold removal, 73-record merge/selection, or full/fast/vchain
+consumption; those remain R1 and R2 ownership.
 
-Tasks after approval:
+Approved design and tasks:
 
 1. Define one immutable setup derivation containing shared domain/grid/bathymetry provenance plus
    separate versioned contracts for NOAA→G1 active-cell/source mapping, G1→L2 ordered SWAN curve,
    and diagnostic point output.
-2. Prefer extending the existing `ww3_leg` block and grid-derivation fingerprint. A new/changed
-   consumer contract requires trigger-4 approval; any new dependency, port, endpoint, config key or
-   persisted file requires trigger-7 approval.
-3. Make NOAA boundary reconstruction and the WW3 status map consume the selected O policy. Prove
-   every active cell is supplied and every supplied boundary file maps to the selected active set.
+2. Prefer extending the existing `ww3_leg` block and grid-derivation fingerprint. Trigger 7 is
+   authorized only for the minimal durable setup-generation envelope needed to group approved
+   artifacts, atomically select one complete current generation, and retain one hash-matched
+   predecessor. A0-I must name the exact path, files and schema before durable implementation. Any
+   other dependency, port, endpoint, config key, persisted file, or consumer-contract change remains
+   prohibited or separately gated.
+3. Make NOAA boundary reconstruction and the WW3 status map consume O1: every wet G1 perimeter cell
+   is active and NOAA-supplied. Prove every active cell is supplied and every supplied boundary file
+   maps to the selected active set.
 4. Make WW3 grid status and boundary assembly refuse any cell/file mismatch.
-5. Generate WW3 L2-boundary output points from the selected H policy, including required corners,
-   output-location validity and continuous order.
-6. Implement the selected D mechanism. Preserve buoy/DREF valid-time coverage, retention,
-   fingerprinting and spectra at their actual coordinates; preserve `L2P####` seam continuity in H;
-   update `model_wave_source` and vchain atomically with the producer contracts. Do not maintain a
-   custom spectral-transfer rewriter unless separately approved.
-7. Emit the final `BOUNDNEST3` command from the derivation's actual topology.
-8. Implement exactly A0's approved artifact dependency and generation/rollback table. Do not
-   invalidate or preserve `mod_def`, restart, horizon, transfer or SWAN state by blanket assumption.
-9. Thread the separate verified outer/inner/diagnostic identities through production full, horizon
-   merge, fast fill and vchain. R8b/R8c later add the final unified-health propagation.
+5. Serialize and test H1's one ordered, complete rectangular `CLOSED` L2 topology, including its
+   required corners and permitted land-covered portions. Keep bathymetry/mask control of land. A1 may
+   test the serialized topology/keyword fixture, but R1 alone wires the live `BOUNDNEST3` deck and
+   boundary transfer file.
+6. Keep buoy/`DREF*` diagnostics separate from the boundary transfer. Report candidate native D
+   arrangements from implementation evidence, with no custom spectral-transfer rewriter or new
+   dependency; the residual operator ruling selects or refuses the arrangement before merge/deployment.
+   A consumer-contract change remains separately gated; preserve existing
+   buoy/`DREF*` valid-time coverage, retention, fingerprinting and spectra at actual coordinates and
+   preserve `L2P####` seam continuity in H.
+7. Build the authorized minimal durable setup-generation envelope and promote or roll it back
+   atomically as one complete, hash-matched current generation plus one hash-matched predecessor. A0-I
+   must first identify its exact path/files/schema. No mixed/partial generation may publish.
+8. Invalidate `mod_def.ww3`, the WW3 restart, dependent transfers and SWAN state on every domain/grid,
+   O active-cell/status, or G occupancy/bathymetry source/datum/depth change, then perform the
+   historical cold rebuild. H-only and D-only preservation remain A0-I native-compatibility candidates;
+   until decided, they fail closed. Do not infer preservation or invalidation from topology alone.
+9. A1 owns producer derivation and identities only. R1 owns live `BOUNDNEST3` deck wiring and scaffold
+   removal; R2 owns the 73-record merge/selection and full/fast/vchain consumption.
 10. Preserve R3 exhaustion behavior and add A1-owned structural refusals; no cache, marker or
     persistent SWAN hotstart advances on any derivation/transfer mismatch.
 11. Implement D15 exactly: regime-correct OSM queries/fractions only, regular datum-converted
     bathymetry for every depth, no fine-depth substitution or fallback provider, and structural
     refusal on incomplete geometry. No SoCal-only source or universal coastline tag may masquerade
     as a global setup path.
-12. Before deployment, update Root Architecture, ADR-100, explicitly amend ADR-109, reconcile the
+12. Before merge/deployment, update Root Architecture, ADR-100, explicitly amend ADR-109, reconcile the
     Evolution Plan conflict, and update Provider/Operations Manuals, config/operator help,
     changelog, ODbL/third-party notice and this plan. The frozen SWAN/WW3 reference manuals are
     never edited.
@@ -596,55 +614,65 @@ Tasks after approval:
 - Any automatic cold-recovery behavior remains owned by R11; A0 proves only the initialization and
   rollback method A1 would require.
 
-**A0 Gate 4 — operator decision packet**
+**A0 Gate 4 — evidence review and residual operator-decision packet**
 
 - Results are reported separately for O, H, D, D15-G confirmation, dependency/rollback and
-  initialization.
+  initialization, against the approved A1 constraints. It identifies the native D arrangement and
+  H-only/D-only compatibility policy requiring the residual operator ruling before merge/deployment.
 - Each option names manual support, scientific assumptions, trigger set, files/contracts, cost,
   failure mode and unknowns. No combined A/B/C shorthand hides a seam-specific choice.
-- The operator can select every required policy without inferring an unstated default.
+- The operator selects or refuses those residual D/H-only/D-only choices before merge/deployment;
+  until then the candidate remains fail-closed. The evidence also identifies whether a candidate must
+  be stopped or revised.
 
-**A1 Gate A — implemented automatic derivation and boundary contracts**
+**A1 Gate A — implemented automatic derivation and producer contracts**
 
 - Approved global fixtures and 90-degree metamorphic rotations pass against the production code.
-- NOAA source/status mapping exactly matches O; SWAN boundary-only transfer exactly matches H;
-  diagnostics exactly match D; real Atlantic/Great-Lakes setup matches D15-G.
+- NOAA source/status mapping exactly matches O; the serialized H topology/keyword fixture is
+  boundary-only; diagnostics exactly match D; real Atlantic/Great-Lakes setup matches D15-G. R1 owns
+  live SWAN boundary wiring and R2 owns consumer transfer assembly/consumption.
 - All A0 mutations refuse before WW3/SWAN publication.
 
 **A1 Gate B — transition, diagnostics and rollback**
 
-- Approved dependency table governs reuse/invalidation exactly; unchanged generations reuse only
-  what A0 authorized.
+- Domain/grid, O active-cell/status, and G occupancy/bathymetry source/datum/depth changes invalidate
+  `mod_def.ww3`, WW3 restart, dependent transfers and SWAN state and require the historical cold
+  rebuild. H-only and D-only preservation remain A0-I native-compatibility candidates and fail closed
+  until decided.
 - Atomic generation promotion and rollback are kill-tested at every write/promotion boundary.
 - Diagnostic consumers retain time coverage, spectra and retention across the transition.
-- A1's approved bootstrap method completes without relying on unimplemented R11 automation.
+- A mandatory historical cold rebuild produces a new compatible restart, discards historical outputs
+  before h0, then completes +0…+96 without relying on unimplemented R11 automation.
 
-**A1 Gate C — bounded live fail-closed integration**
+**A1 Gate C — bounded live fail-closed setup evidence**
 
 - Guarded deploy never interrupts active Python/WW3/SWAN work.
-- One configuration-derived generation proves O/H/D/G identities and structural refusals. A1 does
-  not claim R2's 73-record, R8b/R8c's unified health or R11's automatic recovery gates.
-- Cache, marker and persistent SWAN state remain unchanged on any A1 refusal; rollback is exercised
-  before continuing to R1.
+- One configuration-derived generation proves O/H/D/G identities and structural refusals without
+  publishing. A1 does not wire live SWAN, claim R2's 73-record/full-fast-vchain consumption,
+  R8b/R8c's unified health, or R11's automatic recovery gates.
+- Cache, marker and persistent SWAN state remain unchanged; rollback is exercised before R1/R2.
 
 **Deferred ownership, not A1 gates:** R2 owns 73-record full/fast/horizon identity; R8b/R8c own final
-marine/API/admin health agreement; the WW3 cold-start benchmark plus R11 own automatic cold
-recovery; R12 owns multi-anchor global reality/operational closeout.
+marine/API/admin health agreement; R11 owns automatic recovery; R12 owns multi-anchor global
+reality/operational closeout.
 
 ### 8A.7 Deployment order if approved
 
-1. A0 manual/source inventory, results-free gate lock, non-production prototype and Sol audit; no
-   deploy and no production mutation.
-2. Operator separately selects O, H, D, dependency/rollback and initialization/bootstrap and
-   confirms D15-G against its evidence; that ruling activates A1.
-3. A1 test-first automatic-setup integration lands locally as one coherent contract replacement.
-   Do not create a half-state where NOAA→G1 and G1→L2 consume contradictory setup generations.
+1. A0 manual/source inventory, results-free gate lock, non-production prototype and Sol audit run as
+   evidence work; no deploy and no production mutation.
+2. The 2026-08-30 operator ruling activates A1 local test-first implementation. A0 can run alongside
+   it and may stop or revise a candidate methodology before merge/deployment.
+3. A1 automatic producer-setup integration lands locally as one coherent derivation/identity
+   replacement. It may test serialized H topology/keyword fixtures, but does not wire live SWAN
+   decks, remove scaffolding, or assemble/consume the 73-record transfer.
 4. ADR-100/ADR-109/Evolution-Plan reconciliation, Provider/Operations Manual and changelog update
    land with A1 before deployment.
-5. Independent Sol source/manual/contract audit and global mutation gates pass.
-6. One guarded A1 deployment is permitted only if A0's approved bootstrap and atomic rollback are
-   executable. If an outer-boundary/grid change still lacks evidence-backed initialization, deploy
-   waits for that benchmark/procedure; it does not skip ahead to or pretend R11 exists.
+5. Independent Sol source/manual/contract audit, global fixture/native-binary gates, atomic rollback,
+   the mandatory historical cold-run gate, and the residual D/H-only/D-only operator ruling pass.
+6. One guarded A1 setup-evidence deployment is permitted only after those gates pass. It performs the
+   required full historical cold rebuild, creates a new compatible restart, then runs +0…+96; no
+   incompatible WW3 restart or SWAN hotstart is reused. It remains non-publishing/fail-closed until
+   R1 wires live SWAN and R2 supplies merge/selection/consumption.
 7. Re-run R1 scaffold-removal tests/source audit on the accepted A1 contracts, include legacy
    `level1/` rollback-file preservation and the production comment/log truth sweep, then deploy R1
    as its own functional change.
@@ -652,23 +680,31 @@ recovery; R12 owns multi-anchor global reality/operational closeout.
 
 ### 8A.8 Approval boundary
 
-The operator approved §8A's A0 evidence/prototype round in chat on 2026-08-30. That approval does
-not select O/H/D, compatibility/rollback or initialization policy and does not authorize A1
-implementation. The later A1 approval must explicitly name:
+The operator approved A1 local implementation in chat on 2026-08-30, including O1, H1, the separate
+boundary/diagnostic D invariant, D15, the minimal durable setup-generation envelope, and the full
+historical cold rebuild. The envelope may
+only group approved artifacts, atomically select one complete current generation, and retain one
+hash-matched predecessor; A0-I must name its exact path/files/schema before durable implementation.
+H1 uses `CLOSED` because it is one complete rectangular curve; land-covered locations remain
+mask/bathymetry-controlled. Boundary transfer is boundary-only and buoy/`DREF*` diagnostics are
+separate. A0 reports the native D arrangement and H-only/D-only compatibility policy for an explicit
+residual operator ruling before merge/deployment; local candidate work remains fail-closed. A
+consumer-contract change remains gated.
 
-- the selected O outer active-cell/source-mapping policy;
-- the selected H WW3→L2 curve policy and exact `OPEN`/`CLOSED` derivation;
-- the selected D diagnostic-output mechanism and its consumer/retention contract;
-- confirmation or reopening of D15's OSM-only fraction/regular-depth policy after G evidence;
-- the artifact dependency/invalidation table, atomic generation promotion and rollback;
-- the evidence-backed WW3 initialization/bootstrap method needed before A1 deploy;
-- explicit amendment of ADR-109 and the two boundary contract changes (triggers 3/4, and trigger 2
-  if ownership moves);
-- any new dependency, port, endpoint, config key or persisted file (trigger 7);
-- any new scientific threshold or ray/reachability criterion (trigger 1).
+Domain/grid, O active-cell/status, and G occupancy/bathymetry source/datum/depth changes invalidate
+`mod_def.ww3`, WW3 restart, dependent transfers and SWAN state and require the historical cold
+rebuild. H-only and D-only preservation remain A0-I native-compatibility candidates and fail closed
+until decided. A1 owns derivation, identities, WW3 producer setup, generation/compatibility and the
+historical WW3 rebuild only; R1 owns live `BOUNDNEST3` wiring/scaffold removal and R2 owns the
+73-record merge/selection/full-fast-vchain consumption.
 
-Until that later ruling, R1/R2 remain blocked. Production retains R3's exhaustion refusal, but R3
-is not a GI-1/GI-2 topology validator and must not be described as making the current boundary safe.
+This approval does not authorize any persisted artifact outside that minimum envelope; durable
+envelope implementation waits until A0-I names its exact path/files/schema. It also does not authorize
+a new dependency, port, endpoint, config key, scientific threshold/reachability criterion, or custom
+spectral-transfer rewriter. A0 remains required before merge/deployment and can stop or revise a
+candidate methodology. A1 setup evidence remains non-publishing/fail-closed until R1/R2. Production
+retains R3's exhaustion refusal, but R3 is not a GI-1/GI-2 topology validator and must not be
+described as making the current boundary safe.
 
 ## 9. R1 — Direct SWAN L2 boundary generation (approved D1; BLOCKED by §8A)
 
@@ -1248,7 +1284,8 @@ separate D9 architectural decision.
 ## 19. R11 — Automatic cold recovery implementation
 
 **Owner:** `clearskies-test-author` → `worker` → `clearskies-auditor` → docs author
-**Dependency:** R1–R9 locally green; WW3 cold-start benchmark complete
+**Dependency:** R1–R9 locally green; A1 historical cold-rebuild/bootstrap method and compatibility
+gate complete
 **Primary files:** marine `__main__.py`, `service.py`, `state.py`, `services/vchain.py`,
 `services/ww3_runner.py`, `providers/nearshore/swan.py`, the existing NOAA/wind/STOFS/WCOFS
 provider seams, focused recovery/restart tests; no new service or endpoint
@@ -1265,10 +1302,11 @@ Tasks:
 4. Apply approved same-model current composition. For zero-tail cold recovery, health reports the
    awaited issue and next retry; approximate worst waits are 00Z 3 h, 06Z 21 h, 12Z 15 h and 18Z
    9 h. Waiting is `blocked`, not success or a restart loop.
-5. Make all pre-existing SWAN hotstarts and WW3 restarts ineligible. The only WW3 +6 restart allowed
-   is the one created by the current recovery's own six-hour production leg; it then seeds that
-   recovery's +6…+96 continuation. Any different initialization need discovered by the cold-start
-   KAT stops for operator review.
+5. Invalidate only incompatible prior state. Where no compatible WW3 restart exists, acquire the
+   complete A1-proven historical boundary and forcing window, march it to h0 and discard that
+   historical output, create the h0 restart, run +0…+6, then use that run's +6 restart for the
+   +6…+96 continuation. No numeric historical look-back is invented. SWAN hotstart eligibility
+   remains governed by its existing approved quarantine policy.
 6. Validate complete inputs, 73-record boundary, every required SWAN level, SwellTrack, provenance,
    non-empty output and unified health before publishing and clearing intent.
 7. Recovery failure remains unavailable/last-good and cannot flap systemd.
@@ -1282,9 +1320,10 @@ Gate R11:
 - Exactly one restart for unchanged fingerprint; new source generation allows another attempt.
 - All time-varying providers show fresh, recovery-generation fetch evidence and exact valid-time
   coverage; static geometry is validated and no routine cache entry was partially overwritten.
-- Cold-start output passes predeclared machine-verifiable comparison against a warm valid reference
-  before becoming production-authoritative. Independent buoy/cam review occurs immediately after
-  the first publish as the deployment acceptance/rollback gate.
+- The A1 historical cold-rebuild/bootstrap method and compatibility gate are re-exercised before
+  recovery becomes production-authoritative; incompatible prior state is not reused. Independent
+  buoy/cam review occurs immediately after the first publish as the deployment acceptance/rollback
+  gate.
 - Host reboot/service restart mid-recovery resumes safely from intent or restarts recovery; never
   publishes partial state.
 - Unified health exposes the trigger, source generation, awaited prerequisite, attempt count, every
@@ -1323,16 +1362,20 @@ The plan does not close on unit tests. Required live evidence:
 
 ## 21. Deployment order
 
-Each row is one attribution gate; A0 is evidence-only with no deployment. Every other row is one
-functional deployment unless its text explicitly says evidence/decision only:
+Each row is one attribution gate; A0 is evidence-only with no deployment and gates A1 merge/deploy,
+not A1 local test/code work. Every other row is one functional deployment unless its text explicitly
+says evidence/decision only:
 
 1. R0 guarded deploy preflight.
 2. R3 fail-closed refusal behavior; no recovery intent, exit, or restart yet.
 3. R8a schema/reducer skeleton; uninstrumented evidence remains `unknown`.
-4. §8A A0 separate O/H/D/G/dependency/bootstrap evidence, Sol audit and operator ruling; **no
-   deployment**.
-5. §8A A1 automatic setup integration only after the complete later operator ruling and executable
-   initialization/atomic rollback gate.
+4. §8A A0 separate O/H/D/G/dependency/bootstrap evidence and Sol audit; **no deployment**. It runs
+   alongside A1 local implementation and gates merge/deployment.
+5. §8A A1 producer setup under the 2026-08-30 approval: O1, H1 serialized topology, separate
+   diagnostics, D15, the minimal durable generation envelope, and mandatory historical cold rebuild.
+   It is non-publishing/fail-closed until R1/R2. Merge/deploy waits for global fixtures, native
+   binaries, A0-I compatibility/rollback evidence, the cold-run gate, and the residual operator
+   ruling.
 6. R1 direct scaffold removal plus rollback-file/comment truth cleanup on A1's accepted contracts.
 7. R2 verified streaming boundary + full/fast shared artifact bound to A1 identities.
 8. R4a CURRENT schema/containment/resampling/full+fast wiring.
@@ -1408,12 +1451,21 @@ Acceptance of this plan activates D6–D8 and D10–D13 exactly as scoped. It do
   state/cache contracts;
 - CheckMK integration, which is optional and separately approvable later.
 
-The operator's 2026-08-30 approval activates D14's A0 manual/source inventory, results-free gate
-lock and non-production prototypes only. D15 fixes the sole-provider/source-separation direction,
-but A1 remains unauthorized until G evidence confirms it and the operator selects O/H/D, artifact/
-rollback and initialization. R1/R2 stop until that complete later ruling. A failed
-cold-start KAT, missing authoritative revision source, or need for a new health/recovery artifact
-remains a stop-and-surface event, not implied permission to expand the design.
+The operator's 2026-08-30 approval activates D14 A1 local producer-setup implementation and fixes O1
+(every wet G1 perimeter cell active and NOAA-supplied), H1 (one ordered complete rectangular `CLOSED`
+L2 topology, including permitted land-covered portions), the separate boundary/diagnostic D invariant,
+D15, the minimum durable generation envelope, and mandatory historical cold rebuild. Domain/grid, O
+active-cell/status, and G occupancy/bathymetry source/datum/depth changes invalidate `mod_def.ww3`,
+WW3 restart, dependent transfers and SWAN state; H-only/D-only preservation remains A0-I evidence
+work and fails closed until decided. A0 remains a merge/deployment gate, not a coding gate. A1 cannot
+merge/deploy until global fixtures, native binary evidence, A0-I rollback/compatibility and the
+cold-run gate pass; production stays fail-closed and non-publishing until R1/R2.
+
+D reports its native arrangement, plus H-only/D-only compatibility policy, for the residual operator
+ruling before merge/deployment; candidates remain fail-closed until then. A consumer-contract change
+still needs its own gate. A failed A0/cold-run gate, missing authoritative revision source, or need
+for a persisted artifact outside the approved envelope remains a stop-and-surface event, not implied
+permission to expand the design.
 
 ---
 
@@ -1425,8 +1477,13 @@ remains a stop-and-surface event, not implied permission to expand the design.
 - [x] Operator approves §8A A0 evidence/prototype round — 2026-08-30.
 - [x] Operator selects D15 OSM-only occupancy + regular datum-converted bathymetry depth direction — 2026-08-30.
 - [x] A0 results-free gate/fixture file locked and independently Sol-audited before prototype results — 2026-08-30 (`0aa27635`).
-- [ ] A0 completes and operator selects O/H/D, dependency/rollback and initialization/bootstrap and confirms D15-G.
-- [ ] Operator accepts D14 implementation scope before any automatic-setup code lands.
+- [x] Operator approves D14 A1 local implementation scope and sequencing change — 2026-08-30.
+- [x] Operator selects O1, H1 topology, separate diagnostics, D15, the minimal durable generation
+      envelope, and mandatory historical cold rebuild — 2026-08-30.
+- [ ] A0 global G/fixture/native-binary, A0-I compatibility/rollback and historical-cold-run gates
+      pass before A1 merge/deployment; H-only/D-only preservation fails closed until then.
+- [ ] Operator selects or refuses A0's reported native D arrangement and H-only/D-only compatibility
+      policy before A1 merge/deployment.
 - [ ] A1 matrix row is complete: its §7 document-impact declaration is evidenced, every applicable
       authority is updated in the same functional change (or evidenced `N/A`), and source/manual Sol
       QC passes before atomic rollback gate or deployment.
