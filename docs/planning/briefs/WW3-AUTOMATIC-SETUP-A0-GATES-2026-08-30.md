@@ -131,7 +131,7 @@ For each D candidate, prove or refuse with native files and parsers:
 1. actual-coordinate coverage for every buoy and `DREF*` point is retained;
 2. valid-time coverage and retention are unchanged unless a later operator ruling says otherwise;
 3. metadata/point fingerprints distinguish boundary and diagnostic identities;
-4. spectra/energy or byte equivalence is checked where the candidate promises preservation; where a representation legitimately differs, declare the independent comparison method before inspection;
+4. spectra/energy preservation uses only the manifest's locked literal/native canonicalization; no worker-declared alternate comparison method is permitted;
 5. the selected existing `model_wave_source` and vchain read paths identify the intended diagnostic source, including trigger-4 consumer-contract evidence; and
 6. one native `ww3_outp` pass versus a separate native post-processing pass is compared only as a D mechanism, with all file/contract additions surfaced as trigger-7 decisions.
 

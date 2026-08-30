@@ -389,8 +389,9 @@ Any approved design must satisfy all of these:
    contracts. NOAA reconstruction cannot contradict the G1 status map; the L2 curve cannot come
    from a second fixed-cardinal list. Their cells/topologies need not be identical.
 6. **Boundary-only canonical transfer.** `ww3_l2_transfer.ww3` contains only ordered L2-boundary
-   output points. Buoy, seam and `DREF*` diagnostics remain separate point-output consumers and
-   never participate in SWAN boundary interpolation.
+   output points, including its native `L2P####` seam locations. Vchain seam continuity reads those
+   boundary points as an H concern. Buoy and `DREF*` diagnostics use the separate D output and never
+   participate in SWAN boundary interpolation.
 7. **Topology is explicit and verified.** The derivation records ordered point identity and actual
    topology. The emitted `OPEN`/`CLOSED` keyword must match the serialized curve exactly; no jumps,
    duplicates, hidden last→first segment or off-boundary point is legal.
@@ -452,8 +453,9 @@ cells. Test O/H pairs that are physically and mechanically compatible; do not im
 candidate forces the same-numbered H candidate.
 
 **Diagnostic axis D — boundary versus validation output.** Compare native WW3 mechanisms that keep
-buoy, seam and `DREF*` spectra out of the SWAN curve while preserving their actual-coordinate time
-series. The later operator ruling separately selects D. A new/changed consumer contract is trigger
+buoy and `DREF*` spectra out of the SWAN curve while preserving their actual-coordinate time
+series. Native `L2P####` seam continuity remains H/vchain-owned in the boundary transfer. The later
+operator ruling separately selects D. A new/changed consumer contract is trigger
 4. A dependency, port, endpoint, config key or persisted file is trigger 7; a temporary filename or
 source-code file is not trigger 7 merely because it exists.
 
@@ -527,10 +529,10 @@ Tasks after approval:
 4. Make WW3 grid status and boundary assembly refuse any cell/file mismatch.
 5. Generate WW3 L2-boundary output points from the selected H policy, including required corners,
    output-location validity and continuous order.
-6. Implement the selected D mechanism. Preserve buoy/seam/DREF valid-time coverage, retention,
-   fingerprinting and spectra at their actual coordinates; update `model_wave_source` and vchain
-   atomically with the producer contract. Do not maintain a custom spectral-transfer rewriter unless
-   separately approved.
+6. Implement the selected D mechanism. Preserve buoy/DREF valid-time coverage, retention,
+   fingerprinting and spectra at their actual coordinates; preserve `L2P####` seam continuity in H;
+   update `model_wave_source` and vchain atomically with the producer contracts. Do not maintain a
+   custom spectral-transfer rewriter unless separately approved.
 7. Emit the final `BOUNDNEST3` command from the derivation's actual topology.
 8. Implement exactly A0's approved artifact dependency and generation/rollback table. Do not
    invalidate or preserve `mod_def`, restart, horizon, transfer or SWAN state by blanket assumption.

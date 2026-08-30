@@ -9,7 +9,7 @@
 - `W`, `L`, and `H` mean water fraction `1`, `0`, and `0.5`, respectively. Wet means fraction `>0` for the fixture occupancy gate; this is not a new production threshold.
 - Synthetic depth field is fixed at `-20.000 m` for every synthetic cell in C0/C1/C2. It is model-datum-normalized by fixture declaration and never replaced by OSM or a fine DEM.
 - The obstruction value for C2 is exactly `1-tau`; `tau` is the locked horizontal water-area fraction. `FLAGTR=2` is an occupancy/transmission representation only, not diffraction.
-- Outer perimeter means only cells where `x=0`, `x=xmax`, `y=0`, or `y=ymax`. Perimeter lists are clockwise from the southwest corner and de-duplicate a corner shared by two sides. `N/E/S/W` in a fixture name describes geometry only, not a candidate policy.
+- Outer perimeter means only cells where `x=0`, `x=xmax`, `y=0`, or `y=ymax`. Perimeter lists are counter-clockwise from the southwest corner and de-duplicate a corner shared by two sides. `N/E/S/W` in a fixture name describes geometry only, not a candidate policy.
 - Every synthetic OSM ocean segment is directed so land is left and water is right. Every synthetic lake is a closed multipolygon with outer rings and inner island holes explicitly listed.
 
 ## 2. Rotational and Myrtle occupancy fixtures
@@ -42,7 +42,7 @@ y=0  W W W W W
      0 1 2 3 4   x
 ```
 
-Exact directed ocean input is the expanded setup-bbox ring `(0,0) (5,0) (5,4) (0,4) (0,0)` plus merged directed coastline `(0,3) (4.5,3) (4.5,2)`: the eastward first segment has top land on its left; the southward second segment has east land on its left. Expected fractions are the displayed matrix. Expected wet outer-perimeter cells: `C00,C10,C20,C30,C40,C41,C42,C02,C01`. Expected dry outer-perimeter cells: `C03,C13,C23,C33,C43`. This is exactly three wet sides—south, east, west—with a partial-water east cell. The upper, dry side may not be inferred wet from a full rectangular H curve, and the partial east cell may not be excluded as a whole side.
+Exact directed ocean input is the expanded setup-bbox ring `(0,0) (5,0) (5,4) (0,4) (0,0)` plus merged directed coastline `(0,3) (4.5,3) (4.5,2) (5,2)`: the eastward first segment has top land on its left; the southward second segment has east land on its left; the final eastward segment reaches the bbox ring with land north and water south. Expected fractions are the displayed matrix. Expected wet outer-perimeter cells: `C00,C10,C20,C30,C40,C41,C42,C02,C01`. Expected dry outer-perimeter cells: `C03,C13,C23,C33,C43`. This is exactly three wet sides—south, east, west—with a partial-water east cell. The upper, dry side may not be inferred wet from a full rectangular H curve, and the partial east cell may not be excluded as a whole side.
 
 Locked topology diagram (occupancy only; it does not select H1/H2/H3):
 
@@ -93,7 +93,7 @@ segment A:  C02              C52 :segment B
 
 ## 4. Real OSM snapshot fixtures
 
-All requests use the existing configured absolute Overpass timeout of **25 s**. A frozen response is accepted only with request text, bbox, UTC capture time, HTTP status, complete relation/way/node closure, and SHA-256. A clipped result must carry the query bbox and a clipping flag; clipping that removes a required outer-ring segment or island hole is `REFUSE: incomplete OSM geometry`.
+All requests use the existing Overpass **server query** `[timeout:25]`; this is not the total client/retry ceiling. Section 7 separately locks 35-second read attempts, six total attempts and the 226-second request-chain ceiling. A frozen response is accepted only with request text, bbox, UTC capture time, HTTP status, complete relation/way/node closure, and SHA-256. A clipped result must carry the query bbox and a clipping flag; clipping that removes a required outer-ring segment or island hole is `REFUSE: incomplete OSM geometry`.
 
 | ID | Exact bbox `(west,south,east,north)` | Required OSM layer/tags | Expected snapshot assertion |
 | --- | --- | --- | --- |
@@ -104,13 +104,13 @@ All requests use the existing configured absolute Overpass timeout of **25 s**. 
 | R-ERIE | `(-83.700000,41.200000,-78.500000,42.900000)` | same lake relation selector | selected relation has `name=Lake Erie`, a closed outer ring, and retained inner rings |
 | R-ONT | `(-79.900000,43.000000,-76.100000,44.200000)` | same lake relation selector | selected relation has `name=Lake Ontario`, a closed outer ring, and retained inner rings |
 | R-GULF | `(-97.900000,26.000000,-97.000000,27.000000)` | ocean: `way["natural"="coastline"]`; directed land-left/water-right | complete directed coastline way intersects the bbox; it follows the same projected line-to-fraction procedure as R-HB/R-MB |
-| R-HILAT | `(-150.000000,59.000000,-148.000000,61.000000)` | ocean: `way["natural"="coastline"]`; directed land-left/water-right | existing installation local projected CRS is available; projected fraction and inverse-normalized geometry retain all required vertices |
-| R-WRAP-E | `(179.600000,51.000000,180.000000,52.000000)` | ocean: `way["natural"="coastline"]`; directed land-left/water-right | normalized representation is split at `+180` only, never numerically stretched across the globe |
-| R-WRAP-W | `(-180.000000,51.000000,-179.600000,52.000000)` | ocean: `way["natural"="coastline"]`; directed land-left/water-right | normalized representation is split at `-180` only and is equivalent to R-WRAP-E under locked wrap normalization |
+| R-HILAT | `(-150.000000,59.000000,-148.000000,61.000000)` | ocean: `way["natural"="coastline"]`; directed land-left/water-right | locked local CRS is `EPSG:32606`; projected fraction and inverse-normalized geometry retain all required vertices |
+| R-WRAP-E | `(179.800000,51.000000,180.000000,52.000000)` | ocean: `way["natural"="coastline"]`; directed land-left/water-right | normalized representation is split at `+180` only, never numerically stretched across the globe |
+| R-WRAP-W | `(-180.000000,51.000000,-179.800000,52.000000)` | ocean: `way["natural"="coastline"]`; directed land-left/water-right | normalized representation is split at `-180` only and is equivalent to R-WRAP-E under locked wrap normalization |
 
 Great Lakes keep the Great Lakes physical model regime. Their occupancy query must use the required `natural=water`, `water=lake`, `type=multipolygon`, `tidal=no` relation contract; a `natural=coastline` request, missing relation, missing member way, unclosed ring, missing inner island, malformed member role, snapshot hash mismatch, or geometry that cannot be clipped without losing a required ring is a refusal. The selected relation ID is recorded from the frozen snapshot; no worker may select an alternate relation by visual preference.
 
-The exact synthetic wrap control uses the normalized split coastline segments `(179.800000,51.250000) (180.000000,51.250000)` and `(-180.000000,51.250000) (-179.800000,51.250000)`, each eastward with land north/left and water south/right. Its equivalent unsplit representation is `(179.800000,51.250000) (180.200000,51.250000)` before normalization. Both representations must produce the same normalized rings, water polygons, cell fractions, perimeter classification, O mapping and H point order. The high-latitude fixture remains within the existing installation-selected `pyproj` CRS support; unavailable CRS transformation is `REFUSE: projected CRS unavailable`, not a fallback.
+The exact synthetic wrap control is a `4 × 2` normalized local grid on `[0,4] × [0,2]`, with directed coastline `(0,1) (4,1)`, land in the top row and water in the bottom row. Map local `x=0..2` linearly to `179.8..180.0` and `x=2..4` linearly to `-180.0..-179.8`. Thus the split segments terminate on their respective bbox rings and the exact fractions are `1` for `y=0`, `0` for `y=1`. Its unwrapped equivalent is the single segment `(179.800000,51.500000) (180.200000,51.500000)` in bbox `(179.8,51.0,180.2,52.0)` before normalization. Both representations must produce the same normalized rings, water polygons, fractions, perimeter classification, O mapping and H point order. The high-latitude fixture uses locked `EPSG:32606`; unavailable transformation is `REFUSE: projected CRS unavailable`, not a fallback.
 
 ## 5. D-axis exact comparison record
 
