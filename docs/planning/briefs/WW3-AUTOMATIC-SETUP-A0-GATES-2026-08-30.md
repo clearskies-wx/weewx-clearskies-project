@@ -160,11 +160,44 @@ Fine-resolution bathymetry is not presumed globally required. Before a later dec
 | Partial-cell open-water fraction / `FLAGTR` obstruction | Existing regional fine DEM; global coarse bathymetry plus global coastline geometry for fraction; and no fine-fraction mechanism where the manual-valid path permits it | a fractional mask is automatically more physically faithful than a binary mask |
 | Claimed compensation for WW3 lacking diffraction | Island/headland cases with the same O/H/D contracts, then a declared WW3-to-SWAN comparison quantity | sharper island geometry can stand in for unmodelled diffraction, shadowing, or energy physics |
 
+The causal model variants hold grid, NOAA boundary spectra, wind, binary, physics switches, time
+window, warm restart, output points and O/H/D topology identical:
+
+1. **C0 legacy:** center-sample wet/dry with `FLAGTR=0`.
+2. **C1 geometry/depth only:** fraction-derived wet/dry plus corrected wet depths, with every wet
+   cell fully transparent (`FLAGTR=0` or the source-verified native equivalent).
+3. **C2 transmission:** exactly C1's status/depth grid plus `FLAGTR=2` and the current isotropic
+   coefficient mapping.
+4. **C3 directional native obstruction:** run only if a manual-supported existing generator supplies
+   x/y coefficients without a new formula; otherwise record `REFUSE: transmission criterion unbound`.
+
+`C1−C0` isolates classification/depth. `C2−C1` isolates the transmission mapping. The fixture set
+must separately include an island-free coast negative control, one hand-derived partial-cell barrier,
+a partial-cell headland, and a many-cell resolved island lee. A partial-barrier pass cannot establish
+resolved-island diffraction accuracy.
+
+Datum guard: current evidence says newly wet cells may take CRM wet-mean depths whose water datum is
+MLLW inside an otherwise ETOPO/LMSL bottom grid. The prototype records the datum of every overridden
+depth and refuses any mixed/unconverted field. It does not assume an override count or silently
+equate MLLW, NAVD88 and LMSL.
+
 Candidate source/mechanism families are therefore: (a) currently available regional DEMs, (b) global coarse bathymetry combined with global coastline geometry to derive fraction, and (c) a no-fine-fraction path as a negative/control where the local manuals and selected native setup allow it. A0 does not choose among them, supply a new fraction threshold/formula, or assume any candidate is usable outside its evidenced coverage/datum range.
+
+Global coastline geometry is not presumed ready for area fractions: record whether the source is a
+closed land polygon or clipped/directed linework, its nearest-segment land/water convention, island
+closure, dateline/high-latitude behavior, and the rasterization/sampling criterion that would be
+needed. An unapproved polygonization/fraction rule is an operator decision, not an implementation
+detail.
 
 For the island/headland fixture, the worker predeclares one WW3-to-SWAN quantity, its independent reference/comparison method, and its tolerance authority before examining outputs. The quantity must expose whether changed island mapping improves the handoff/nearshore result rather than only producing a visually sharper but physically wrong shadow. If no existing manual/ADR-bound quantity and tolerance can do that, record `REFUSE: fine-resolution causal quantity/criterion unbound` for the operator; do not create a diffraction proxy or an attenuation rule.
 
 The evidence record for each role names the source, resolution, datum, coordinate/fraction derivation, changed cells, native WW3/SWAN artifacts, and the §12 verdict. A result that changes geometry without proving the declared causal quantity is inconclusive for that role, not evidence for a global fine-data requirement.
+
+Required causal mutations: write open-water fraction instead of obstruction `1−fraction`; set all
+partial coefficients to one and then zero while retaining C1 geometry; spatially permute fractions
+while preserving total area; swap/rotate x/y maps; downsample the source; perturb datum/zero-line
+metadata; restore center classification; rotate geometry without rotating derived coefficients; and
+drop one edge source strip. Every survivor is a finding.
 
 ## 8. Artifact dependency, compatibility, promotion and rollback experiment
 
@@ -253,6 +286,7 @@ Follow-up owner: [Sol audit | operator | R2 | R8 | R11 | R12 | other named owner
 | H1/H2/H3 across applicable fixtures | `[NOT RUN]` | §5 SWAN 41.51AB evidence and mutations |
 | D native output arrangements | `[NOT RUN]` | §6 continuity/consumer evidence |
 | G source inventory and real Myrtle/Great Lakes setup | `[NOT RUN]` | §7 source/datum/coverage evidence |
+| G fine-data causal variants C0/C1/C2/C3 | `[NOT RUN]` | §7.1 mask/depth/transmission/diffraction evidence and mutations |
 | I dependency/atomicity/rollback matrix | `[NOT RUN]` | §8 controlled-generation evidence |
 | B warm/cold/bootstrap | `[NOT RUN]` | §9 native initialization evidence |
 | Resource overhead | `[NOT RUN]` | §10 R0-comparable separate measurements |
