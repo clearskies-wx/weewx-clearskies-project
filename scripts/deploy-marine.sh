@@ -368,15 +368,15 @@ run_root "ls -l ${SECRETS}"
 echo "--- [4b] WW3 binary pins ---"
 guard_before_mutation
 WW3_BIN_DIR="/var/lib/weewx-clearskies/ww3/bin"
-WW3_PROGRAMS="ww3_bound ww3_grid ww3_outp ww3_prep ww3_shel ww3_strt"
+WW3_PROGRAMS="ww3_bound ww3_grid ww3_outp ww3_prep ww3_shel"
 WW3_PINS_FILE="${CONF_DIR}/ww3-binaries.json"
 for prog in ${WW3_PROGRAMS}; do
     # /var/lib/weewx-clearskies is not traversable by the claude SSH user;
     # the existence check has to run as root like the hashing below.
     if ! run_root "test -x ${WW3_BIN_DIR}/${prog}" >/dev/null 2>&1; then
         echo "WW3 program ${prog} not found at ${WW3_BIN_DIR} on librewxr." >&2
-        echo "The WW3 deep-water leg cannot run without all six programs" >&2
-        echo "(ww3_grid ww3_strt ww3_prep ww3_bound ww3_shel ww3_outp). See" >&2
+        echo "The WW3 deep-water leg cannot run without all five programs" >&2
+        echo "(ww3_grid ww3_prep ww3_bound ww3_shel ww3_outp). See" >&2
         echo "docs/manuals/OPERATIONS-MANUAL.md 'WW3 deep-water leg' Build/install." >&2
         exit 1
     fi
@@ -410,7 +410,7 @@ trap 'rm -f "${PINS_TMP}"' EXIT
 scp -F "${SSH_CONFIG}" -q "${PINS_TMP}" "librewxr:/tmp/ww3-binaries.json"
 run_root "install -o ubuntu -g ubuntu -m 0640 /tmp/ww3-binaries.json ${WW3_PINS_FILE} && rm -f /tmp/ww3-binaries.json"
 run_root "ls -l ${WW3_PINS_FILE}"
-echo "[pins] ${WW3_PINS_FILE} written (6 programs)"
+echo "[pins] ${WW3_PINS_FILE} written (5 programs)"
 
 # --- Step 5: systemd unit ---
 echo "--- [5/6] systemd unit ---"
