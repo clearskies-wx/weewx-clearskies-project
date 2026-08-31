@@ -911,6 +911,21 @@ wind-only forcing split itself (only its fetch depth changes); D11's
 `WW3_RESTART_MAX_AGE_H = 9` staleness gate; `get_wind_series()`'s strict contract; the
 1-D pipeline, scoring, and boundary_reconstruction physics downstream of this leg.
 
+## Amendment (2026-08-30): A1 paired boundary and diagnostics candidate
+
+**Status: approved for local implementation only; merge and deployment blocked by recovery-plan
+§8A A0 evidence.** The WW3 producer candidate uses one frozen setup derivation to make the outer
+active-cell mapping, L2 boundary curve, and diagnostic-point contract independently checkable.
+It runs an ephemeral post-`ww3_shel` native inventory before making the ordered boundary selector,
+then generates a boundary-only and a diagnostic-only formatted transfer in separate native output
+passes. They are structurally validated and promoted as one pair. This amendment does not alter
+the grid, physics, WW3 transfer format, runtime cadence, live SWAN `BOUNDNEST3` deck, or the R2
+merge/consumer path.
+
+Retention is semantic rather than time-only: an H/D pair is retained together while selected,
+referenced, or the complete rollback predecessor. A0-I must still name the durable generation
+identity and reference-tracking mechanism before any deletion or promotion policy is implemented.
+
 ## References
 
 - Plan: `docs/planning/MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.md` — §WW3 MODEL DESIGN

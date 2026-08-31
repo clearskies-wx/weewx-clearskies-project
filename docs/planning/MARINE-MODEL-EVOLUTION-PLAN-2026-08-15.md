@@ -117,6 +117,11 @@ Ctrl-F the exact heading text:
 
 ## 📍 CURRENT STATE — updated every working session (last: 2026-08-22)
 
+**Supersession note (2026-08-30):** active recovery work is governed by
+`MARINE-MODEL-RECOVERY-PLAN-2026-08-29.md` §8A. Its A1 local producer candidate preserves this
+plan's WW3/SWAN responsibility split, but replaces neither the model grids nor the live handoff
+until its independent A0 evidence and deployment gates pass.
+
 **Status 2026-08-27: Q16 A+B and the four 08-26 rounds (INV11-RETIRE, BREAK-REFORM,
 DREF-MERGE-FIX, PEEL-SEGMENTS; IMAGERY-MAP on the API) are PUSHED + DEPLOYED (marine `b62008f`
 running on librewxr since 02:26Z). Operator-reported: the daily 96 h horizon march has NEVER run

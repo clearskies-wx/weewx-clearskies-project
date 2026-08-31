@@ -696,6 +696,27 @@ Approved design and tasks:
 marine/API/admin health agreement; R11 owns automatic recovery; R12 owns multi-anchor global
 reality/operational closeout.
 
+### A1 local implementation record — P0 H/D producer transaction (2026-08-30)
+
+The local marine branch implements the approved post-`ww3_shel` inventory, separate native
+boundary/diagnostic passes, strict diagnostic identity validation, and atomic paired promotion.
+The independent WSL regression set passed **193 tests with one expected native-fixture refusal**.
+This is local, non-deployed implementation evidence only: it does not close A0, alter the live
+SWAN deck, assemble the R2 73-record transfer, publish a model result, or authorize merge.
+
+**Retention direction (operator, 2026-08-30):** retain an H/D pair together while it is active,
+referenced, or the complete rollback predecessor. An older pair becomes deletion-eligible only
+after a newer pair is fully validated and it is no longer needed for forecast coverage or rollback.
+Never delete one member of a pair, a partial pair, or a pair in use. A0-I must still name the
+exact durable generation identity and reference-tracking mechanism before implementing promotion
+or deletion behavior.
+
+**§7 document-impact declaration for this local record:** Root Architecture, Provider Manual,
+Operations Manual, ADR-100, ADR-109, this plan, the Evolution Plan, and the marine changelog are
+affected. API Manual/OpenAPI, stack Operator Manual/localized help, and ODbL notice are **N/A to
+P0**: it adds no endpoint, operator field, UI behavior, or active OSM data path. D15's OSM and
+datum implementation remains an A0/A1 gate and will require those documents before merge.
+
 ### 8A.7 Deployment order if approved
 
 1. A0 manual/source inventory, results-free gate lock, non-production prototype and Sol audit run as

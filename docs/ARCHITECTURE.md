@@ -100,6 +100,16 @@ defines provider and model behavior; the [API Manual](manuals/API-MANUAL.md)
 defines the API boundary; the [Operations Manual](manuals/OPERATIONS-MANUAL.md)
 defines deployment and health procedures.
 
+**A1 recovery candidate (local only, 2026-08-30).** The unmerged automatic-setup
+implementation derives three separate producer contracts from one frozen setup:
+the NOAA-to-WW3 active-cell mapping, the WW3-to-SWAN L2 boundary curve, and
+diagnostic output points. Its WW3 runner produces the boundary and diagnostic
+transfers as an atomic pair after the WW3 march. It does not alter the live SWAN
+deck, the production transfer assembly, model-health surface, or publication.
+Those remain blocked until the recovery plan's A0 evidence, rollback, historical
+cold-run, and deployment gates pass. The source of truth for the exact contracts
+and the retention invariant is the recovery plan §8A.
+
 ## Configuration boundary
 
 The API is the operator-configuration source of truth. It validates and stores

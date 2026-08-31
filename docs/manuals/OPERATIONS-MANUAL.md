@@ -1566,6 +1566,16 @@ cmp level0/mod_def.ww3 level0/mod_def.ww3.prev-<token>   # (expect: differ, afte
 
 **Seam-fidelity row (S1, PA5, EVO-Q16 C6, schema 3 — additive, 2026-08-27).** Every chain-enabled cycle's ledger row (success path) additionally carries `row["seam"]`: a per-cycle comparison of the WW3 spectrum HANDED to SWAN at the most-seaward WW3 L2-boundary transfer point (`L2P####`) against the spectrum SWAN itself reports ABSORBING at a new dedicated output point, `SEAM` — one L2 cell inward from that same boundary point, toward the L2 centre (ADR-095 Amendment 2: never AT a boundary cell). Labelled explicitly `"model-vs-model (WW3 handed vs SWAN absorbed), NOT a truth check"` — this is a boundary-transfer-fidelity instrument, not a validation-against-observation instrument (that remains the buoy-scorecard rows above). Compared per frequency band (`SEAM_BAND_EDGES_HZ = (0.09, 0.20)` Hz, i.e. `< 0.09` / `0.09–0.20` / `> 0.20` Hz) as Hs ratio (`SEAM_HS_TOLERANCE = ±10%`, the interpolation-error class of BOUNDNEST3) and direction agreement (`SEAM_DIR_DIFF_FLAG_DEG = 30°` — an Hs-only check is blind to a mirrored-direction defect class since Hs is direction-independent; `dir_diff_deg` exists specifically to catch that). `within_tolerance` is `True` only when every band is within BOTH thresholds. **`hs_ratio` carries a real ≈0.3% noise floor** even for a perfectly-transmitted spectrum: the WW3 transfer-file writer stores its frequency axis at 4 significant figures (`%0.3E`) while the SWAN SPECOUT writer stores the SAME axis at 6 (`%.5E`); re-parsed back, the two sides' bin-width (`df`) calculations differ by a fraction of a percent, propagating into Hs via `4*sqrt(m0)`. `SEAM_HS_TOLERANCE = ±10%` is sized well above this floor — it is the meaningful threshold, not the floor itself. A parse/alignment failure at any step (no transfer spectra this cycle, no grid-sizing cache, no `L2P`-named boundary point, `SPEC_SEAM.txt` missing/unparseable, no timestep common to both sides, or any other unexpected error) writes a named `error` (`seam_transfer_unavailable`, `seam_grid_sizing_unavailable`, `seam_no_boundary_point`, `seam_specout_missing`, `seam_specout_parse_failed`, `seam_no_common_timestep`, `seam_unexpected_error`) with `bands`/`within_tolerance` `null` — the row is written EITHER way, same never-fails-the-cycle contract as the rest of this ledger; the failure is also logged at WARNING. See PROVIDER-MANUAL.md §14.15 Amendment "C6 seam-fidelity ledger row" for the SEAM output point's deck mechanics.
 
+**A1 local paired-output candidate (2026-08-30; no deployment procedure yet).** The local
+WW3 producer implementation validates and atomically promotes a boundary transfer and its matching
+diagnostic transfer after the WW3 march. It remains outside the deployed service and does not change
+the existing restart, horizon, staging, publish, or rollback procedures above. Do not copy, remove,
+or manually prune either candidate artifact. A future approved procedure must retain the active
+complete pair and its complete rollback predecessor, and may delete an older pair only after a newer
+pair is validated and no process or reader still references the older one. The recovery plan §8A A0-I
+gate must name and test the durable generation and reference mechanism before this becomes an
+operator action.
+
 ---
 
 ### §4.1 Config Registry

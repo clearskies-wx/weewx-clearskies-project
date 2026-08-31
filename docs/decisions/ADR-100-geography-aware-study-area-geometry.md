@@ -225,6 +225,16 @@ bearing, fetch value, the `RayResult` list) are read-only-consumed by ADR-109's 
 existing shape — this amendment adds a reader, not a new output or a new computation inside this
 module.
 
+## Amendment (2026-08-30): recovery A1 local consumer contracts
+
+**Status: approved for local implementation only.** The recovery plan §8A keeps this ADR as the
+single configuration-time geography authority. A1 consumes the frozen derivation to construct
+separate NOAA-to-WW3 active-cell, WW3-to-SWAN boundary, and diagnostic-output contracts; it does
+not add a second geography calculation at forecast time. The currently local candidate is not
+evidence that the existing OSM/fraction/depth path is globally sufficient: the plan's D15 global
+source and datum gates remain required before merge or deployment. No new operator setting is
+introduced.
+
 ## References
 
 - Related: ADR-093 (SWAN nearshore model) Amendment 5 (the model-derivation changes that consume this
