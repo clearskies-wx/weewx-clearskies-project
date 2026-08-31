@@ -723,6 +723,18 @@ durably written, and only when its complete pair still hash-matches. A missing, 
 or unrecorded pair is retained. The old count-only horizon prune is no longer called. Local evidence:
 177 targeted tests passed with two existing environment warnings.
 
+**Test-system execution record (2026-08-31; librewxr):** the local paired-output work was pushed
+and deployed to the marine test system. The guarded deploy waited for an active model cycle rather
+than interrupting it, verified the five installed WaveWatch III programs, restarted successfully,
+and preserved authentication. The targeted host test set passed **181 tests** with one existing
+warning. The first configuration rebuild exposed a real boundary-edge rounding defect; marine
+commit `73598b5` corrected the check, passed 93 targeted local tests (one expected refusal), and
+was deployed. Replaying the unchanged saved configuration then completed the grid-sizing chain:
+the four-side WaveWatch III boundary smoke test passed, and the saved file now contains the outer
+boundary, L2 boundary, and diagnostic-output contracts. A forced full run is queued through the
+existing signal and is waiting only for the wind gatherer's next extended forecast cycle. This is
+live test evidence, not merge, publication, recovery, or final-acceptance evidence.
+
 **§7 document-impact declaration for this local record:** Root Architecture, Provider Manual,
 Operations Manual, ADR-100, ADR-109, this plan, the Evolution Plan, and the marine changelog are
 affected. API Manual/OpenAPI, stack Operator Manual/localized help, and ODbL notice are **N/A to
