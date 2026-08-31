@@ -701,6 +701,9 @@ reality/operational closeout.
 The local marine branch implements the approved post-`ww3_shel` inventory, separate native
 boundary/diagnostic passes, strict diagnostic identity validation, and atomic paired promotion.
 The independent WSL regression set passed **193 tests with one expected native-fixture refusal**.
+After the F1/F2/F3/F5 repairs, independent Terra source/manual QC passed. The focused WSL
+regression covering `test_ww3_setup_derivation.py`, `test_ww3_cycle_integration.py`, and
+`test_ww3_runner.py` passed **147 tests** with two existing warnings.
 This is local, non-deployed implementation evidence only: it does not close A0, alter the live
 SWAN deck, assemble the R2 73-record transfer, publish a model result, or authorize merge.
 
@@ -710,6 +713,15 @@ after a newer pair is fully validated and it is no longer needed for forecast co
 Never delete one member of a pair, a partial pair, or a pair in use. A0-I must still name the
 exact durable generation identity and reference-tracking mechanism before implementing promotion
 or deletion behavior.
+
+**A0-I local durable record (2026-08-30; not merged or deployed):** the existing atomic service
+state snapshot now stores the current and immediately preceding complete boundary/diagnostic pair
+for each leg and horizon directory. Each reference contains the directory token, setup identity,
+both filenames, and both SHA-256 file hashes. A new pair advances the record only after both files
+exist, are non-empty, and are hashed; the former predecessor is removed only after that record is
+durably written, and only when its complete pair still hash-matches. A missing, partial, changed,
+or unrecorded pair is retained. The old count-only horizon prune is no longer called. Local evidence:
+177 targeted tests passed with two existing environment warnings.
 
 **§7 document-impact declaration for this local record:** Root Architecture, Provider Manual,
 Operations Manual, ADR-100, ADR-109, this plan, the Evolution Plan, and the marine changelog are
