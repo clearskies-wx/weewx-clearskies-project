@@ -714,6 +714,43 @@ Never delete one member of a pair, a partial pair, or a pair in use. A0-I must s
 exact durable generation identity and reference-tracking mechanism before implementing promotion
 or deletion behavior.
 
+### Live recovery implementation record — 2026-08-31
+
+The marine recovery branch was pushed and deployed to the librewxr test system. The following
+implementation work is complete on `feature/ww3-automatic-setup`:
+
+- Native WW3 output was reduced from 44 to 43 requested points by retaining buoy `46253` and
+  removing buoy `46222` from the WW3 diagnostic-output axis; `46222` remains an independent
+  NDBC observation source. The successful native inventory contains 30 usable L2 boundary points
+  after three land-filtered points plus the ten diagnostic points.
+- The post-solver native `log.ww3` inventory is used for accepted L2 names; formatted native
+  coordinate rounding is accepted at its documented half-quantum tolerance.
+- A completed WW3 leg is reused when a SWAN retry targets the same cycle. This prevents a failed
+  SWAN publish from spending another full WW3 leg and then failing on an existing destination.
+- The 06Z continuation march completed: its H and D transfers cover 30 points from +7 through
+  +96 hours. The merged boundary contains 97 hourly records from the leg start through +96.
+- The transfer merger now compares the stable point name and coordinate identity, not the
+  time-varying bulk-wave summary fields written on each point header.
+- The L2 sizing code now expands the L2 bounds to the two-decimal coordinate lattice emitted by
+  formatted WW3 transfer files. It never shrinks the computed domain. Focused host regression
+  for the L2 sizing, WW3 setup/leg, and merge paths: 166 passed, one existing warning.
+- The exact coherent wave-group limit was implemented: κ=1 returns the exact unbounded internal
+  limit, while persisted/wire values use `null` for unbounded run lengths. Focused host regression:
+  58 passed, one existing warning. The marine branch exposes `nSet`; a separate API feature branch
+  `feature/wave-group-limit` adds the corresponding optional response fields.
+
+Live execution status at handoff:
+
+- Full cycle `2026-08-31T18:00:00Z` completed with WW3 and vchain marked `ok`; the 72-hour SWAN
+  publish completed, but health is `degraded` because all 162 surf transects used the existing
+  bulk fallback.
+- The observed cause is the persisted L2 generation predating the coordinate-alignment change:
+  `gridRebuiltAt` remains `2026-08-31T05:32:37Z`. Deploying source and restarting the service did
+  not regenerate the persisted sizing derivation, so the aligned grid has not yet been exercised.
+- The next required action is to regenerate the persisted sizing derivation, confirm its new
+  identity and formatted-coordinate boundary corridor before starting a new WW3 leg, and then
+  repeat the live handoff check. No generation deletion or pruning policy was implemented.
+
 **A0-I local durable record (2026-08-30; not merged or deployed):** the existing atomic service
 state snapshot now stores the current and immediately preceding complete boundary/diagnostic pair
 for each leg and horizon directory. Each reference contains the directory token, setup identity,
