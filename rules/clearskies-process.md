@@ -141,6 +141,11 @@ runtime and browser-build host; weewx remains the API/DB runtime; librewxr remai
 runtime. File sync/deploy still goes through the project scripts. Browser testing:
 `http://192.168.2.113:<port>`.
 
+**Use librewxr when marine work needs it.** librewxr is the project's test system for the marine
+software, not a production-only destination to avoid. After local WSL tests pass, move verified
+marine work there for installed-binary, host-specific, and live-model evidence using the project
+scripts and the host safeguards in `reference/clearskies-dev.md`.
+
 **The API runs on the `weewx` container (`weewx.shaneburkhardt.com`), NOT weather-dev.** The API co-locates with weewx because it reads the weewx archive DB and `weewx.conf` locally. Dashboard, config UI, tests, and builds run on weather-dev. Do not run the API on weather-dev — see `reference/clearskies-dev.md` §"There should be NO clearskies-api running on weather-dev." To deploy API changes: push to GitHub → SSH to the weewx container → `git pull --ff-only` in the API repo → `sudo systemctl restart weewx-clearskies-api`.
 
 **API startup takes ~2 minutes.** After `systemctl restart weewx-clearskies-api`, the cache warmer makes outbound provider API calls (Aeris, NWS, etc.) before uvicorn binds to port 8765. Any deployment script or verification step that restarts the API must wait at least 120 seconds before hitting endpoints. `sleep 10` will get connection refused.

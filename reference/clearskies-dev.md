@@ -156,6 +156,12 @@ The marine checkout on librewxr is the one that matters for WW3, SWAN,
 SwellTrack, marine-provider, and surf-endpoint changes. Test there, not on the
 weewx host or weather-dev.
 
+**Operator direction (2026-08-30):** librewxr runs the marine service and is
+the marine test system. weewx runs the API, and weather-dev runs the dashboard.
+Move verified marine work to librewxr when installed-binary, host-specific, or
+live-model evidence is needed; it is not a production-only destination to avoid
+during normal recovery work.
+
 ### SWAN documentation is committed to this repo — NEVER download it
 
 The SWAN user manual is at **`docs/reference/swan-user-manual.pdf`** (v41.51). A frozen pure
