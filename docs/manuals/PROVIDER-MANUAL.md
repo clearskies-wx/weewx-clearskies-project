@@ -3225,8 +3225,8 @@ does not fabricate a replacement model result.
 
 **Binary pins (J24, 2026-08-27).** Before any step the runner hashes each `ww3_*` program and refuses `ww3_binaries_invalid` on a missing or mismatched pin. The expected values are NOT operator config: `scripts/deploy-marine.sh` generates `/etc/weewx-clearskies/marine/ww3-binaries.json` from the installed binaries on every deploy, and the marine config loader lays that file's `binary_dir`/`binary_sha256` over the pushed `ww3` block (which a config push may rewrite at any time). See OPERATIONS-MANUAL.md "Binary checksum pins" and ADR-109's J24 amendment.
 
-**A1 automatic-setup and paired-output candidate (local only, 2026-08-30).**
-The recovery plan's approved local implementation separates three setup-time
+**A1 automatic setup and paired output (deployed; recovery evidence remains open,
+2026-08-31).** The recovery plan's approved implementation separates three setup-time
 contracts: (1) every wet WW3 outer-perimeter cell and its NOAA source mapping;
 (2) one ordered, complete rectangular WW3-to-SWAN L2 boundary curve; and (3)
 the ordered buoy/deep-reference diagnostic locations. After `ww3_shel`, the
@@ -3235,15 +3235,19 @@ only in memory to validate effective native point order and build the boundary
 selector. It then performs two formatted native `ww3_outp` passes: one
 boundary-only transfer and one diagnostic-only transfer. The two outputs are
 validated together and promoted atomically; a missing, mismatched, partial, or
-malformed partner refuses the producer transaction.
+malformed partner refuses the producer transaction. The deployed L2 path reads the
+boundary transfer directly through `BOUNDNEST3`; a fresh configuration rebuild
+does not need retired L1 spectrum files as temporary scaffolding.
 
-The candidate is not deployed and does **not** yet change `BOUNDNEST3`, the
-73-record full/fast transfer assembly, vchain consumption, model health, or
-publication. It therefore does not make the current boundary safe. Each complete
-boundary/diagnostic pair must remain together while selected, used, or retained
-as rollback. A later complete, validated pair may replace it; the exact durable
-generation identity, reference tracking, and deletion procedure remain A0-I
-evidence and deployment gates, not a best-effort prune rule.
+On 2026-08-31, live L2 accepted a regenerated direct boundary and retained an
+approximately 1.0 m component. The run did not publish because no +7 through +72
+hour continuation transfer was available. That result verifies neither the
+73-record full/fast assembly nor the remaining A0, A0-I, A1, R1, R2, health,
+publication, rollback, or retention gates. Each complete boundary/diagnostic pair
+must remain together while selected, used, or retained as rollback. A later
+complete, validated pair may replace it; the exact durable generation identity,
+reference tracking, and deletion procedure remain evidence gates, not a
+best-effort prune rule.
 
 **Refuse semantics — no silent fallback (PRIME DIRECTIVE 8):** a build/run failure on the WW3 leg refuses, never degrades to a fabricated or stale-but-unflagged boundary — the same refuse-not-degrade posture every input in this chain follows (rules/coding.md §1). The restart-chaining staleness gate is `WW3_RESTART_MAX_AGE_H = 9` (ADR-109 D11, by analogy to the legacy `L1_NEST_MAX_AGE_H` constant name — a proposed value, not a WW3-specific measurement; the name is now shared/repurposed as the WW3-chain archive staleness gate, marine `3c550ae`): when the WW3 leg's most recent restart exceeds this age, the WW3-leg cycle refuses to publish its artifacts and health reports the named reason (see OPERATIONS-MANUAL.md for the full monitoring-key list).
 

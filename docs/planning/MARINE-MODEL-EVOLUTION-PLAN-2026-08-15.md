@@ -1373,6 +1373,14 @@ round-trip KAT — a known cell partition set → emitted file → ingest by the
 ADR-109-picked assembly program succeeds; bin-sum identity preserved.
 
 ### W3 — WW3→SWAN L2 handoff (PW3, mechanism per ADR-109)
+
+**Supersession note (2026-08-31).** This section records the historical Phase W design and
+acceptance sequence. The current production chain is WW3 directly to SWAN L2 through
+`BOUNDNEST3`; it no longer requires the retired L1 spectrum scaffold after a configuration
+rebuild. The current recovery plan, `MARINE-MODEL-RECOVERY-PLAN-2026-08-29.md` §8A and its
+later R1/R2 rows, governs unresolved work. This note does not mark A0, A0-I, A1, R1, R2, or
+recovery complete and does not rewrite the historical record below.
+
 **Files:** `services/swan_formats.py` (L2 deck boundary-source block ONLY) +
 `services/swan_runner.py` (handoff call site).
 Produce L2's boundary from WW3 output (all sites at target state; shadow-only until a

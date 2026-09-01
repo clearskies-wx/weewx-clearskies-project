@@ -100,15 +100,18 @@ defines provider and model behavior; the [API Manual](manuals/API-MANUAL.md)
 defines the API boundary; the [Operations Manual](manuals/OPERATIONS-MANUAL.md)
 defines deployment and health procedures.
 
-**A1 recovery candidate (local only, 2026-08-30).** The unmerged automatic-setup
-implementation derives three separate producer contracts from one frozen setup:
-the NOAA-to-WW3 active-cell mapping, the WW3-to-SWAN L2 boundary curve, and
-diagnostic output points. Its WW3 runner produces the boundary and diagnostic
-transfers as an atomic pair after the WW3 march. It does not alter the live SWAN
-deck, the production transfer assembly, model-health surface, or publication.
-Those remain blocked until the recovery plan's A0 evidence, rollback, historical
-cold-run, and deployment gates pass. The source of truth for the exact contracts
-and the retention invariant is the recovery plan §8A.
+**A1 producer and direct handoff (deployed; live recovery still in progress,
+2026-08-31).** One frozen setup derives three separate producer contracts: the
+NOAA-to-WW3 active-cell mapping, the WW3-to-SWAN L2 boundary curve, and diagnostic
+output points. After the WW3 march, the runner uses a native point inventory only
+while the run is active, then validates and promotes boundary and diagnostic
+transfers as one pair. The production L2 input uses the direct WW3 boundary; it
+does not require retired L1 spectrum files after a configuration rebuild. A live
+L2 run accepted the regenerated boundary and retained an approximately 1.0 m
+component. Publication was refused only because the required +7 through +72 hour
+continuation transfer was absent. This is not completion of A0, A0-I, A1, R1, R2,
+or the recovery plan. The source of truth for the exact contracts, remaining
+evidence, and retention limits is the recovery plan §8A.
 
 ## Configuration boundary
 

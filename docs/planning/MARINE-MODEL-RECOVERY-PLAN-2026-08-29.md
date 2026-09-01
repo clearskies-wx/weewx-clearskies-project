@@ -696,16 +696,16 @@ Approved design and tasks:
 marine/API/admin health agreement; R11 owns automatic recovery; R12 owns multi-anchor global
 reality/operational closeout.
 
-### A1 local implementation record — P0 H/D producer transaction (2026-08-30)
+### A1 producer implementation record — P0 H/D transaction (2026-08-30; deployed 2026-08-31)
 
-The local marine branch implements the approved post-`ww3_shel` inventory, separate native
+The marine branch implements the approved post-`ww3_shel` inventory, separate native
 boundary/diagnostic passes, strict diagnostic identity validation, and atomic paired promotion.
 The independent WSL regression set passed **193 tests with one expected native-fixture refusal**.
 After the F1/F2/F3/F5 repairs, independent Terra source/manual QC passed. The focused WSL
 regression covering `test_ww3_setup_derivation.py`, `test_ww3_cycle_integration.py`, and
 `test_ww3_runner.py` passed **147 tests** with two existing warnings.
-This is local, non-deployed implementation evidence only: it does not close A0, alter the live
-SWAN deck, assemble the R2 73-record transfer, publish a model result, or authorize merge.
+The producer and direct WW3-to-SWAN L2 handoff are deployed. This evidence does not close A0,
+A0-I, A1, R1, R2, the 73-record transfer, publication, or recovery.
 
 **Retention direction (operator, 2026-08-30):** retain an H/D pair together while it is active,
 referenced, or the complete rollback predecessor. An older pair becomes deletion-eligible only
@@ -751,7 +751,7 @@ Live execution status at handoff:
   identity and formatted-coordinate boundary corridor before starting a new WW3 leg, and then
   repeat the live handoff check. No generation deletion or pruning policy was implemented.
 
-**A0-I local durable record (2026-08-30; not merged or deployed):** the existing atomic service
+**A0-I durable record (2026-08-30; deployed behavior, evidence gate remains open):** the existing atomic service
 state snapshot now stores the current and immediately preceding complete boundary/diagnostic pair
 for each leg and horizon directory. Each reference contains the directory token, setup identity,
 both filenames, and both SHA-256 file hashes. A new pair advances the record only after both files
@@ -771,6 +771,12 @@ the four-side WaveWatch III boundary smoke test passed, and the saved file now c
 boundary, L2 boundary, and diagnostic-output contracts. A forced full run is queued through the
 existing signal and is waiting only for the wind gatherer's next extended forecast cycle. This is
 live test evidence, not merge, publication, recovery, or final-acceptance evidence.
+
+**Direct-boundary live checkpoint (2026-08-31):** after the sizing derivation was regenerated,
+the direct WW3-to-SWAN L2 handoff accepted the regenerated boundary and retained an approximately
+1.0 m component. Publication refused only because the required +7 through +72 hour continuation
+transfer was absent. This verifies neither the raw-horizon producer nor R2's consumer merge, and
+does not complete A0, A0-I, A1, R1, R2, or full recovery.
 
 **§7 document-impact declaration for this local record:** Root Architecture, Provider Manual,
 Operations Manual, ADR-100, ADR-109, this plan, the Evolution Plan, and the marine changelog are

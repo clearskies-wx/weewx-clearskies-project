@@ -913,14 +913,17 @@ wind-only forcing split itself (only its fetch depth changes); D11's
 
 ## Amendment (2026-08-30): A1 paired boundary and diagnostics candidate
 
-**Status: approved for local implementation only; merge and deployment blocked by recovery-plan
-§8A A0 evidence.** The WW3 producer candidate uses one frozen setup derivation to make the outer
+**Status: deployed producer behavior; remaining recovery gates stay open.** The WW3 producer uses
+one frozen setup derivation to make the outer
 active-cell mapping, L2 boundary curve, and diagnostic-point contract independently checkable.
 It runs an ephemeral post-`ww3_shel` native inventory before making the ordered boundary selector,
 then generates a boundary-only and a diagnostic-only formatted transfer in separate native output
 passes. They are structurally validated and promoted as one pair. This amendment does not alter
-the grid, physics, WW3 transfer format, runtime cadence, live SWAN `BOUNDNEST3` deck, or the R2
-merge/consumer path.
+the grid, physics, WW3 transfer format, or runtime cadence. The direct `BOUNDNEST3` L2 handoff is
+deployed; it does not require retired L1 spectrum files after a configuration rebuild. On
+2026-08-31, L2 accepted the regenerated boundary and retained an approximately 1.0 m component.
+Publication refused only because the +7 through +72 hour continuation transfer was absent. That
+result does not complete A0, A0-I, A1, R1, R2, the R2 merge/consumer work, or full recovery.
 
 Retention is semantic rather than time-only: an H/D pair is retained together while selected,
 referenced, or the complete rollback predecessor. A0-I must still name the durable generation

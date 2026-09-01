@@ -227,13 +227,15 @@ module.
 
 ## Amendment (2026-08-30): recovery A1 local consumer contracts
 
-**Status: approved for local implementation only.** The recovery plan §8A keeps this ADR as the
+**Status: deployed producer behavior; completion remains gated.** The recovery plan §8A keeps this ADR as the
 single configuration-time geography authority. A1 consumes the frozen derivation to construct
 separate NOAA-to-WW3 active-cell, WW3-to-SWAN boundary, and diagnostic-output contracts; it does
-not add a second geography calculation at forecast time. The currently local candidate is not
+not add a second geography calculation at forecast time. The deployed producer behavior is not
 evidence that the existing OSM/fraction/depth path is globally sufficient: the plan's D15 global
-source and datum gates remain required before merge or deployment. No new operator setting is
-introduced.
+source and datum gates remain required. The 2026-08-31 live L2 handoff accepted the regenerated
+boundary and retained an approximately 1.0 m component, but publication refused because the +7
+through +72 hour continuation transfer was absent. This does not complete A0, A0-I, A1, R1, R2, or
+full recovery. No new operator setting is introduced.
 
 ## References
 
