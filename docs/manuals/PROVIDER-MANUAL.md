@@ -3273,6 +3273,17 @@ best-effort prune rule.
 
 **UNCHANGED by this round:** the 6 h leg and its restart chaining (trap-23 stamping), all deck grammar (builder bodies zero-diff), SWAN physics/decks, the 1-D pipeline, scoring, boundary_reconstruction physics (a 9-line signature-only diff), and `get_wind_series()`'s strict contract. See ADR-109's amendment note for the full ruling record.
 
+**Recovery-order correction (2026-09-01).** The earlier daily-march and retry
+paragraphs in this section preserve the history of an unauthorized order and are
+superseded for cold and wiped recovery. The service runs the six-hour WW3 leg, uses
+that leg's +6-hour restart to build its own +6 through +96 hour continuation, and
+validates the same-cycle +0 through +72 hour merged boundary before it starts SWAN.
+It does not wait for a SWAN publish to make the continuation. If the continuation is
+missing, short, corrupt, or belongs to another cycle, the new cycle refuses before
+SWAN and retains verified last-good output if one exists. The seven-record leg
+transfer is never a production fallback. This restores the recovery plan §§5.3–5.4;
+it does not close A0, A0-I, R1, R2, R11, or their evidence and acceptance gates.
+
 ### §14.19 Swell-card deep-water reference points (Q16 Round B, 2026-08-25)
 
 **What this is.** The swell display card's catalog (`multiSwell`, `swellHeight`, `swellHeightMinFt`/`MaxFt`, `periodMinS`/`MaxS`, `spectralComponents`) is now sourced primarily from watershed partitions of the WW3 deep-water leg's own spectra (§14.18), read at a small fan of **deep-water reference points** — deep water (≥ 200 m), post-island-shadowing, PRE-refraction (the industry-convention, Surfline-style deep-water swell reading). The 15 m SWAN L2 deep-water-reference table described in §14.15's "Multi-SPECOUT extraction" above is unchanged and keeps every job it had except naming the card's swells — see "Fallback" below. **NOT changed by this round:** the 1-D surf pipeline's `canonical_partitions`, `score_surf()`'s cross-swell input, SwellTrack, `perPartitionBreaks`, the 15 m DWR SPECOUT/TABLE outputs, and all surf-score scoring criteria — all still read the 15 m machinery exactly as §14.15/§14.17 describe.

@@ -113,6 +113,13 @@ continuation transfer was absent. This is not completion of A0, A0-I, A1, R1, R2
 or the recovery plan. The source of truth for the exact contracts, remaining
 evidence, and retention limits is the recovery plan §8A.
 
+**Recovery order correction (2026-09-01).** A cold or wiped run first completes its
+six-hour WW3 leg, then builds that same cycle's +6 through +96 hour continuation
+from the leg restart and verifies the complete +0 through +72 hour boundary. Only
+then may SWAN start. Missing, short, corrupt, or wrong-cycle continuation data
+refuses the new cycle before SWAN; the six-hour transfer is never used alone as a
+production boundary. Open A0, A0-I, R1, R2, and recovery evidence gates remain open.
+
 ## Configuration boundary
 
 The API is the operator-configuration source of truth. It validates and stores

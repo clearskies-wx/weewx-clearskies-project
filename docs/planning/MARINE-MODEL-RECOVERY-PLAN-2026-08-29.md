@@ -201,6 +201,19 @@ The human NDBC/Surfline/webcam reality comparison is a post-publish deployment a
 an automated runtime prerequisite. If it fails, the deployment fails and the coordinator follows
 the rollback/diagnosis procedure.
 
+### 5.6 Recovery-order correction — 2026-09-01
+
+This note corrects an unauthorized implementation that had reversed the order above. A cold or
+wiped recovery must not run SWAN after only the six-hour WW3 leg and must not wait for a SWAN
+publish before making the continuation. After the leg, it builds the same-cycle +6 through +96
+hour continuation from that leg's +6-hour restart, validates the complete +0 through +72 hour
+boundary, and only then starts SWAN. A missing, short, corrupt, or wrong-cycle continuation
+refuses the new cycle before SWAN; it preserves any verified last-good output and waits for usable
+source data. It never substitutes the six-hour boundary as a production fallback.
+
+This correction restores §§5.3–5.4. It does not close A0, A0-I, R1, R2, R11, or any required
+historical-cold-run, native-binary, compatibility, retention, or live acceptance gate.
+
 ## 6. Universal round workflow and agents
 
 Every repair round is sequential in the shared marine repo:
