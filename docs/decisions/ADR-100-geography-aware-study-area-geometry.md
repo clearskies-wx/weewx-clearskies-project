@@ -237,6 +237,17 @@ boundary and retained an approximately 1.0 m component, but publication refused 
 through +72 hour continuation transfer was absent. This does not complete A0, A0-I, A1, R1, R2, or
 full recovery. No new operator setting is introduced.
 
+The current source realizes the two-stage basis without a forecast-time
+geography re-derivation: `grid_sizing_chain.py` freezes the OSM-derived
+geography and regular datum-converted bathymetry before writing `ww3_leg`,
+while `swan_domain.py` serializes the separate O/H/D contracts. Ocean setup
+uses directed `natural=coastline` ways; Great Lakes setup uses complete
+`natural=water` + `water=lake` geometry. OSM supplies horizontal occupancy
+only; regular bathymetry supplies depth. An incomplete occupancy response or
+missing regular depth fails the WW3 setup derivation rather than selecting a
+fine-depth or geometry fallback. These are implementation facts; the global A0/A0-I
+evidence gates remain open.
+
 ## References
 
 - Related: ADR-093 (SWAN nearshore model) Amendment 5 (the model-derivation changes that consume this

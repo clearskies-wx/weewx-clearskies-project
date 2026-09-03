@@ -168,6 +168,15 @@ threshold Hs; the KAT ALSO states the H1/10-threshold values computed by the sam
 integration before looking at the implementation) and fixed synthetic spectra → exact T_set, C, S,
 factor value.
 
+## Amendment 2 (2026-09-03): Marine recovery documentation scope
+
+**N/A for the recovery coding wave.** The accepted weighted-geometric-mean
+formula and its five weights were not changed by A1/R1/R2, R4, R6/R7, R8b/R8c,
+or R9. The current marine source changes are in provider, orchestration, state,
+and health paths; `enrichment/surf_scorer.py` is not part of the current source
+diff. No scoring contract, weight, or public response field is altered by this
+documentation reconciliation.
+
 ## References
 
 - [SURF-SCORE-REBUILD-RESEARCH-BRIEF.md](../planning/briefs/SURF-SCORE-REBUILD-RESEARCH-BRIEF.md) — research basis and §6 operator rulings (2026-08-04)

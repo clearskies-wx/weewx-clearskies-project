@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### 2026-09-03 — Marine Model Recovery documentation reconciliation
+
+- Reconciled the Root Architecture, Provider and Operations Manuals, API health documentation, ADR-100/101/104/109, the Marine Model Evolution Plan, and component operator documentation with the current A1/R1/R2, R4, R6/R7, R8b/R8c, and R9 source behavior.
+- Documented separate automatic WW3 setup roles, native post-`ww3_shel` inventory and H/D selectors, direct `BOUNDNEST3` handoff, same-model WCOFS current containment/resampling/composition/tail/refusal behavior, seven-day serving identity and provenance rules, conservative restart truth, read-only Stack health display, and the absence of CheckMK integration.
+- Recorded `docs/contracts/openapi-v1.yaml` as N/A because the recovery wave adds no public endpoint, visitor field, or modeled API contract.
+
 ### 2026-08-28 — Codex-native project environment
 
 - Added tracked project-local Codex configuration for `gpt-5.6-sol` coordination, an 872,000-token installed context maximum, compaction at 800,000 total tokens, and at most three concurrent supporting agents.

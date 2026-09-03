@@ -113,6 +113,43 @@ continuation transfer was absent. This is not completion of A0, A0-I, A1, R1, R2
 or the recovery plan. The source of truth for the exact contracts, remaining
 evidence, and retention limits is the recovery plan §8A.
 
+**Recovery-wave source reconciliation (2026-09-03; source-complete, gates still
+open).** The configuration-time grid-sizing chain now builds one `ww3_leg`
+derivation from its OSM occupancy and regular datum-converted bathymetry
+inputs. It keeps the NOAA-to-WW3 active-cell mapping, one ordered complete
+rectangular `CLOSED` L2 transfer curve, and the diagnostic point contract
+separate; the native post-`ww3_shel`
+inventory is ephemeral, and the final boundary and diagnostic `ww3_outp`
+passes are separate. See `services/grid_sizing_chain.py` and
+`services/swan_domain.py` in `weewx-clearskies-marine`.
+
+The WW3 producer's paired outputs are selected and recorded only as a complete
+boundary/diagnostic pair. A failed or structurally mismatched pair cannot
+replace the selected pair. The same source implements direct L2 `BOUNDNEST3`
+consumption, the shared full/fast/horizon boundary artifact, and structural
+refusal before publication (`service.py`, `services/ww3_runner.py`,
+`providers/nearshore/swan.py`). This describes source behavior; A0/A0-I, R1,
+R2, and live recovery evidence remain open.
+
+The nearshore path requires one OFS surface-current model (WCOFS for the
+current recovery path) whose regular-grid domain contains the complete active
+SWAN box. It resamples the
+returned U/V fields onto each active SWAN grid, composes same-model records by
+valid time and issue cycle, and holds only the terminal WCOFS tail. An absent,
+malformed, uncovered, or preflight-failing current input refuses the run; no
+alternative provider is selected (`providers/ocean/ofs.py`,
+`services/swan_runner.py`, `providers/nearshore/swan.py`).
+
+The runtime state snapshot carries compact attempt identities, stage evidence,
+current-forcing summary, selected full-cycle identity, and complete H/D
+references without storing forcing arrays. On restart, unobserved evidence is
+`unknown`; serving remains `valid`, `stale`, or `unavailable` only when the
+selected cache artifact and publication evidence match. The 12-hour fast fill
+keeps the selected full-cycle identity while recording its changed-hour
+provenance. Same-process WW3 reuse is limited to a matching cycle/input
+identity and non-empty verified artifacts; a process restart reruns
+conservatively (`state.py`, `service.py`, `providers/nearshore/swan.py`).
+
 **Recovery order correction (2026-09-01).** A cold or wiped run first completes its
 six-hour WW3 leg, then builds that same cycle's +6 through +96 hour continuation
 from the leg restart and verifies the complete +0 through +72 hour boundary. Only

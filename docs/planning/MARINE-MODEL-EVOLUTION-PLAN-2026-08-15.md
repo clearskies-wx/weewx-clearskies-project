@@ -1655,6 +1655,46 @@ Enumerated by ADR-110 once Accepted; they enter THIS plan as an amendment (the A
 convention: amendment block + register rows + gates) so the plan remains the single
 architectural permission record.
 
+### Documentation reconciliation — Marine Model Recovery coding wave (2026-09-03)
+
+The current source pass is documented as implemented behavior, with recovery
+and live gates still separate. The automatic setup path uses one OSM
+occupancy/regular-bathymetry derivation and keeps O (NOAA active cells), H
+(one ordered complete rectangular `CLOSED` L2 boundary), and D (diagnostics)
+contracts separate. The native
+post-`ww3_shel` inventory is ephemeral; H and D are selected by separate native
+`ww3_outp` passes and retained as a complete, hash-identified pair. Direct
+`BOUNDNEST3` is the L2 handoff, and full/fast/horizon use the shared boundary
+artifact (`grid_sizing_chain.py`, `swan_domain.py`, `service.py`,
+`services/ww3_runner.py`).
+
+R4's current forcing implementation selects one OFS model (WCOFS for the
+recovery path) only when it contains the complete SWAN box, resamples U/V fields onto active grids,
+composes same-model issue cycles by valid time, holds only the terminal WCOFS
+tail, and refuses malformed, uncovered, empty, or interior-gap input. The
+compact current summary never carries arrays (`providers/ocean/ofs.py`,
+`services/swan_runner.py`, `providers/nearshore/swan.py`).
+
+R6/R7 preserve the seven-day last-good eligibility and original model/producer
+times, record full and fast per-hour provenance without adding a public
+provenance field, and reject mixed deep-water/nearshore serving identities.
+R8b persists compact attempt identities and stage observations in the existing
+state snapshot; restart restores preserve timestamps and leave unobserved
+evidence `unknown`. R8c's API pass-through and Stack read-only status display
+show model versus transport health and action reasons; CheckMK remains
+unimplemented. R9 limits WW3 reuse to matching same-process input identity and
+verified artifacts; a restart reruns it (`state.py`, `service.py`, Stack
+`admin/status` route/template).
+
+**Documentation/contract matrix reconciliation.** The allowed Root Architecture,
+Provider and Operations manuals, API Manual, ADR-100/101/104/109, marine and
+Stack changelogs, and Stack Operator Manual carry the applicable source-backed
+updates. `docs/contracts/openapi-v1.yaml` is **N/A**: the recovery source adds
+no visitor endpoint, response field, or modeled API schema; `GET
+/setup/marine/health` remains an authenticated opaque pass-through. Exact
+cycle-directory retention/deletion policy and any future R10B worker choice
+remain open questions and are not resolved here.
+
 ---
 
 ## Round-close & bookkeeping (every phase)

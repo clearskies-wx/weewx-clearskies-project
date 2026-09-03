@@ -308,6 +308,35 @@ Out-of-bounds measurement → STOP and surface, do not pick.
 Checked at Gate DOC (this document's own completeness), and at each implementing phase's own QC gate
 (W/B/G/S/A) against the specific criteria that phase lands.
 
+## Amendment (2026-09-03): R4 current-forcing source reconciliation
+
+**Status: as-built clarification.** This amendment records the implementation
+that landed in the Marine Model Recovery coding wave. It preserves the
+historical RTOFS/STOFS-3D/PacIOOS ladder text above as design history, but that
+ladder is not the current SWAN CURRENT path.
+
+The accepted recovery plan §12 R4a/R4b requires a same-model full-domain
+containment selector, same-model valid-time composition, and refusal rather
+than provider-family mixing or uncovered forcing. The current source implements
+that contract: `providers/ocean/ofs.py::find_ofs_model_for_bbox()` selects one
+OFS model only when its regular-grid domain contains the complete SWAN box;
+`fetch_surface_currents()` retains model, issue-cycle, forecast-hour,
+valid-time, and grid geometry, and `compose_current_valid_times()` selects the
+newest issue for duplicate valid times while refusing mixed model families or
+missing required times. `services/swan_runner.py` resamples U/V fields onto
+each active SWAN grid and `_write_current_txt()` holds only the terminal
+selected OFS tail (WCOFS's 72-hour reach in this recovery path); interior gaps
+and undersized grids raise `CurrentCoverageError`.
+
+`providers/nearshore/swan.py` uses this resolver for both full and 12-hour fast
+paths and runs current-file preflight before SWAN. An empty or failed fetch,
+uncovered box, malformed/non-finite field, or preflight failure records
+`currents_fetch_failed` and refuses publication. No RTOFS, STOFS-3D, PacIOOS,
+or other alternative provider is selected on containment failure. The compact
+`currentForcing` health record contains summary/provenance only, never U/V
+arrays. This amendment changes no architecture or public contract; it aligns
+the accepted R4 behavior with current source.
+
 ## Implementation guidance
 
 - **SWAN command syntax is pre-researched and pinned** — see the plan's "SWAN SYNTAX PRESCRIPTIONS" section

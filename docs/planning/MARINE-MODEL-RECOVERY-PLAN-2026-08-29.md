@@ -59,7 +59,7 @@ looking forecast. It enters the cold-recovery sequence in §5.
 | RC-2 | High | 4½ h continuation runs on sole runner thread | Full/fast triggers wait or coalesce |
 | MH-1 | Critical | Raw horizon “success,” consumer merge, L2 exhaustion and publication are reported independently without a worst-stage reducer | Upstream success hides an invalid downstream cycle and suppresses useful retry |
 | MH-2 | High | API/proxy response freshness can look current while model output is empty, old or invalid | Operators cannot tell transport health from model health |
-| TS-1 | High | Synthetic tests omit changing WW3 point wind and κ=1→Kimura seam | Broken production paths remain green |
+| TS-1 | High | Non-live verification omits changing WW3 point wind and κ=1→Kimura seam | Broken production paths appear healthy |
 
 Evidence, exact commands, artifact sizes, matched buoy rows, and the 79-pass/1-fail baseline are
 recorded in meta commit `3300f459` and are copied into each gate below where used.
@@ -216,52 +216,74 @@ historical-cold-run, native-binary, compatibility, retention, or live acceptance
 
 ## 6. Universal round workflow and agents
 
-Every repair round is sequential in the shared marine repo:
+Every repair phase is completed as one coding wave in the shared marine repo. The phase does not
+enter quality control between coding slices.
 
-1. **`clearskies-test-author`** starts first on the pinned base, writes a guard that fails before
-   the implementation, and records the real transcript.
-2. **`clearskies-api-dev`** or bounded **`worker`** implements only the named files.
-3. **`clearskies-docs-author`** works in the same repair round: it declares the round's document
-   impact, verifies every proposed claim against the landed source, and updates every applicable
-   manual, contract, help surface, ADR, notice, and changelog before source audit, acceptance, or
-   deployment. A documented `N/A` is permitted only with the evidence required by §7.
-4. Coordinator independently reruns targeted + adjacent tests and inspects every hunk, including
-   the documentation/source correspondence.
-5. **`clearskies-auditor`** receives the governing design and expected observations—not the
-   implementer's report—and tries to disprove the repair.
-6. Coordinator alone commits across repos, pushes only after the operator says **push**, and deploys
-   only with `scripts/deploy-marine.sh`.
+1. **`expert_coder`** reads the binding plan/manual material, divides only explicit implementation
+   work into non-overlapping slices, and integrates cross-service decisions. It delegates bounded
+   code-only slices to Spark **`worker`** agents. A Spark worker never resolves a design conflict,
+   selects an interface, or integrates a phase.
+2. The coding wave continues until every approved code task for that phase is implemented. A source
+   finding becomes a named coding correction only when it restores the plan's stated behavior; it
+   is not an invitation to investigate, redesign, or begin another phase.
+3. **`documentation_author`** updates the applicable governing documents from the implemented,
+   approved behavior during the coding wave. Every claim is checked against the landed source. A
+   documented `N/A` needs the source evidence required by §7.
+4. The coordinator freezes the phase's coding scope, inspects every changed hunk, and records the
+   exact next state in the §24 execution ledger. Only then may the phase enter quality control.
+5. After code and documentation are complete, **`reviewer`** audits the plan, project directive,
+   engineering practice, security practice, and governing documentation. **`test_engineer`** obtains
+   functional evidence only on the designated live host using real available input and real output.
+6. The coordinator alone commits across repos, pushes only after the operator says **push**, and
+   deploys only with `scripts/deploy-marine.sh`. A busy deployment guard pauses only deployment or
+   restart; it never pauses unblocked coding or documentation.
 
-Global prohibitions for every prompt: architecture hard block, stale-test block, file allowlist,
-no remote Git for agents, no container edits, and no test execution while a model run is active.
+No WSL, local-workstation, mock, synthetic, fixture-only, simulated, or pre-change test is valid
+for this plan. Tests and audits never choose the design or start a coding phase. Global prohibitions
+for every prompt remain: architectural hard block, file allowlist, no remote Git for supporting
+agents, no container source edits, and no deployment/restart by supporting agents.
+
+### 6.1 Execution ledger and journal
+
+Each active repair has one row in §24 with these states, in order:
+
+`Code complete` → `Documentation complete` → `QC complete` → `Deployed` → `Live evidence complete`
+→ `Closed`.
+
+Only one phase coding wave may be `In progress` at a time. Its `expert_coder` may run several
+non-overlapping Spark worker slices in parallel when their file ownership is disjoint. A non-blocking
+concern is appended to the plan journal with its phase, observed fact, impact, and next coding item;
+coding continues. A blocking architectural or external prerequisite is raised to the operator
+immediately and stops only the affected item. A review finding returns to a named coding correction,
+then repeats the post-code quality-control sequence; it never opens an unbounded analysis loop.
 
 ## 7. Global QC gate template
 
-Every round must provide:
+Every completed coding phase must provide:
 
-- Failing pre-change guard transcript.
-- Targeted tests for changed files plus adjacent seam suite; never repo-wide pytest.
-- At least one mutation drill that makes the new guard fail.
-- Production-shaped geometry, mixed cycles, nonzero forcing, and non-exact-hour fixtures.
+- A plan-to-code trace showing each approved task and its implemented source location.
 - A document-impact declaration naming the exact affected root architecture/manual sections, operator
   help, contracts/OpenAPI, ADRs/Evolution Plan, changelog, and licensing/third-party notice; every
   named authority is updated in the same functional change or marked `N/A` with a source citation
   showing why it cannot describe the repair.
-- Source/manual Sol QC after the documentation update: inspect each declared claim against the landed
-  source and the applicable authority, and fail the round for a stale, omitted, or contradicted
-  document. A clean code audit cannot waive this gate.
-- Source-only audit against this plan, manuals, accepted ADRs, and local model manuals.
+- A post-code independent `reviewer` audit answering: does the code follow this plan; advance the
+  project directive; meet engineering and security practices; and agree with the manuals and
+  documentation? A stale, omitted, or contradicted document fails the phase.
 - `git diff --check`, changed-file allowlist, and doc-code sync.
-- Live deploy uses the guarded script, records deployed commit/process start, and checks the journal
-  for new warning/error classes.
-- One full-cycle and one fast-cycle end-to-end row where relevant.
+- Guarded deployment records the deployed commit/process start and checks the journal for new
+  warning/error classes. The `test_engineer` then records real host, real input, real output, and
+  the observed result for every applicable live condition.
+- One real full cycle and one real fast cycle end-to-end row where relevant.
 - Reality comparison quantity/tolerance chosen before reading model values.
 - A rollback that restores the prior code without deleting state.
 
+Historical local checks, control cases, simulations, and prior audit claims are not acceptance evidence
+under this workflow. They may remain as dated history, but cannot close a current or future gate.
+
 ## 8. R0 — Results-free gates and recovery-controller specification — ✅ COMPLETE 2026-08-29
 
-**Owner:** coordinator design; `clearskies-test-author`; `clearskies-auditor`
-**Files:** test/gate briefs only; no production code
+**Owner:** coordinator design; `reviewer` if this completed specification is reopened
+**Files:** evidence/gate briefs only; no production code
 **Dependency:** plan acceptance
 
 Tasks:
@@ -276,7 +298,7 @@ Tasks:
    grid regeneration, one process restart, or operator intervention. Missing/short raw horizon may
    refresh; static identity mismatch may require grid reconciliation; parser bugs, disk I/O, and
    SWAN ingestion exhaustion must not blindly redownload NOAA data.
-5. Specify and test the thread-to-main nonzero recovery exit channel.
+5. Specify the thread-to-main nonzero recovery exit channel and require later live evidence.
 6. Verify the service unit's `Restart=on-failure` behavior in a non-production harness.
 7. Lock result-free resource ceilings before implementation results are visible: merge peak RSS,
    swap delta (required zero), wall time, and production-latency/convergence tolerances. Baseline
@@ -287,7 +309,7 @@ Tasks:
 
 Gate R0:
 
-- Auditor can map every recovery transition to one source function and one test.
+- Reviewer can map every recovery transition to one source function and one live-evidence condition.
 - Killing the harness during each state never promotes partial data.
 - Repeated identical failure cannot produce a restart loop.
 - No numeric recovery threshold is invented outside this plan.
@@ -296,7 +318,7 @@ Gate R0:
 
 ### R0 execution record
 
-- Results-free gate locked at meta `a0484f95` after four independent Sol passes; full specification:
+- Results-free gate locked at meta `a0484f95` after four independent specialist reviews; full specification:
   `docs/planning/briefs/MARINE-RECOVERY-R0-GATES-2026-08-29.md`.
 - FQDN-valid pre-implementation artifact/hash baseline:
   `scratch/marine-recovery-r0-baseline-fqdn-2026-08-29.md`. The earlier raw-IP-alias capture is
@@ -307,11 +329,11 @@ Gate R0:
 - Live read-only evidence caught both formerly invisible classes: health idle with a live
   `ww3_shel` cgroup child returned busy/exit 2; later `run_in_progress=true` with no child returned
   busy/exit 2; a genuinely idle sample returned idle/exit 0. Independent health/systemd/cgroup
-  reads matched each result. Sol adversarial re-audit passed without reading implementer tests.
+  reads matched each result. Independent adversarial re-audit passed without reading implementer checks.
 - Event-driven thread-to-main feasibility harness `bd05015b`: 9/9 standard-library tests passed;
   actual asyncio cross-thread wakeup causally stopped/awaited fake servers and wind task before exit
   75, operator SIGTERM/SIGINT exited 0, generic errors stayed contained, and unchanged identity
-  emitted one signal then blocked. Independent Sol re-audit passed; production integration remains
+  emitted one signal then blocked. Independent re-audit passed; production integration remains
   correctly deferred to R11.
 - Non-production transient systemd evidence on the idle host: packaged and loaded unit both
   `Restart=on-failure`; exit 75 produced exactly two `Started`/two exit-75 journal rows (initial plus
@@ -324,17 +346,18 @@ Gate R0:
 
 ## 8A. APPROVED AMENDMENT A — WW3 automatic setup parity
 
-**Status:** Operator approved A1 local implementation in chat 2026-08-30. A0 evidence remains a
-mandatory merge/deployment gate and may stop or revise a candidate methodology; it no longer blocks
-writing local tests or code. Production remains fail-closed. No A1 merge or deployment occurs until
-the global-fixture, native-binary, atomic-rollback and historical-cold-run gates pass.
+**Status:** Operator approved A1 implementation in chat 2026-08-30. A0/A0-I remain mandatory
+post-code merge/deployment gates and may reject a candidate that diverges from this approved design.
+They do not interrupt the approved A1/R1/R2 coding wave. Production remains fail-closed. No A1
+merge or deployment occurs until the global live-source/native-binary, atomic-rollback and
+historical-cold-run gates pass.
 **Effect on queue:** R1 and R2 remain blocked from merge/deployment until A1 is accepted. The locally
 green R1 scaffold-removal branch is neither merged nor deployed. R3 remains the production exhaustion
 guard; it does not validate topology.
-**Owner sequence for A0:** `troubleshooter` manual/source inventory → `clearskies-test-author`
-results-free gate lock → `worker` non-production prototype → independent Sol adversarial QC →
-evidence review. **A1 local implementation:** test author → worker → docs author → Sol QC →
-coordinator live gate.
+**Owner sequence for A0/A0-I:** `troubleshooter` real-source/manual inventory → `reviewer`
+independent evidence audit → coordinator evidence review. **A1/R1/R2 coding wave:** `expert_coder`
+→ bounded Spark `worker` slices → `documentation_author` → post-code `reviewer`/`test_engineer` →
+coordinator guarded deployment and live gate.
 
 ### 8A.1 Why this amendment exists
 
@@ -408,8 +431,8 @@ Any approved design must satisfy all of these:
 1. **One automatic setup authority.** The configuration-time geography/bathymetry pipeline derives
    both NOAA→WW3 and WW3→SWAN boundaries. Forecast cycles consume the frozen derivation; they do
    not re-derive geography at runtime.
-2. **Global and rotationally symmetric.** No side name is privileged. Rotating an otherwise
-   identical coast/fixture by 90 degrees rotates the derived result by 90 degrees.
+2. **Global and rotationally symmetric.** No side name is privileged. Equivalent real-source coast
+   geometries rotated by 90 degrees rotate the derived result by 90 degrees.
 3. **Cell/segment wetness, never whole-side folklore.** Every perimeter cell is classified from
    the installation's bathymetry/fraction mask. A partially-land side remains partially
    represented; one land cell cannot exclude the rest of that side.
@@ -444,14 +467,15 @@ Any approved design must satisfy all of these:
 
 ### 8A.4 Results-free topology evidence round — A0
 
-**Owner:** `troubleshooter` (Sol, read-only manual/source inventory) → `clearskies-test-author`
-(results-free gate/fixture lock) → `worker` (non-production prototype) → Sol auditor
-**Environment:** WSL/local scratch is preferred. No production model mutation. Any new librewxr
-scratch experiment requires its own named-directory authorization.
+**Owner:** `troubleshooter` (read-only real-source/manual inventory) → `reviewer` (independent
+evidence audit) → coordinator evidence review
+**Environment:** read-only evidence is gathered on librewxr from installed native binaries, real
+available sources, and real generated output. No WSL, local scratch, simulated input, or production
+model mutation is permitted.
 
 Before inspecting candidate results, lock:
 
-- exact global fixtures and expected rotation/metamorphic relationships;
+- exact global live-source cases and expected rotation/metamorphic relationships;
 - accepted SWAN boundary-read/interpolation warning classes (normally zero);
 - point-position/order/spacing checks from the local manual;
 - byte/energy identities outside topology changes;
@@ -481,7 +505,7 @@ O-axis concept.
   selection rules for partial land and disconnected wet segments.
 
 This axis decides ordered WW3 output locations and the SWAN keyword. It does not decide G1 status-2
-cells. Test O/H pairs that are physically and mechanically compatible; do not imply that one O
+cells. Evaluate O/H pairs that are physically and mechanically compatible; do not imply that one O
 candidate forces the same-numbered H candidate.
 
 **Diagnostic axis D — boundary versus validation output.** Compare native WW3 mechanisms that keep
@@ -532,23 +556,27 @@ The A0 report must establish, without pre-answering:
 - atomic generation promotion and rollback: what old generation is retained, hash-matched and
   restored together, and when service must remain unavailable instead.
 
-Required non-production fixtures include rotated Pacific/Atlantic/north-/south-facing coasts,
-Myrtle-Beach-shaped partial land with three wet incident sides, islands/headlands/coves, disconnected
-wet segments, and a **real source-backed Great Lakes setup/binary case**. O3 must fail cardinal
-rotation, east-facing and three-side controls.
+Required live-source cases include Pacific, Atlantic, north-/south-facing coasts, a real Myrtle
+Beach partial-land case with three wet incident sides, islands/headlands/coves, disconnected wet
+segments, and a **real source-backed Great Lakes setup/binary case**. O3 is evaluated only from
+observed real output; no simulated cardinal-rotation or injected-failure control is acceptance
+evidence.
 
-**A0 terminal gate:** A0 supplies merge/deployment evidence for the approved A1 contracts. It may
-stop or revise an implementation candidate, including the approved H inventory or D1 native-output
-mechanism, but it does not block local test/code work. Before merge/deployment, H-only/D-only
+**A0 terminal gate:** A0 supplies merge/deployment evidence for the approved A1 contracts after the
+approved coding wave is complete. It may reject an implementation candidate that diverges from the
+approved H inventory or D1 native-output mechanism, but it does not authorize redesign. Before
+merge/deployment, H-only/D-only
 compatibility must be evidenced against the approved mechanism. D15 remains fixed pending its global
 implementation evidence; a failed G gate refuses setup rather than selecting another provider.
 
-### 8A.5 Implementation design — A1 (local implementation approved)
+### 8A.5 Implementation design — A1 (implementation approved)
 
-**Owner:** `clearskies-test-author` → `worker` (Terra) → docs author → Sol adversarial auditor
+**Owner:** `expert_coder` → bounded Spark `worker` slices → `documentation_author` → post-code
+`reviewer` and `test_engineer`
 **Likely primary files:** `services/geography.py` (authority; change only if evidence requires),
 `services/swan_domain.py`, `services/grid_sizing_chain.py`, `services/boundary_reconstruction.py`,
-`service.py`, `services/ww3_formats.py`, `services/ww3_runner.py`, focused state/health and tests.
+`service.py`, `services/ww3_formats.py`, `services/ww3_runner.py`, and the required live state/health
+evidence paths.
 A1 does not wire live SWAN decks, scaffold removal, 73-record merge/selection, or full/fast/vchain
 consumption; those remain R1 and R2 ownership.
 
@@ -567,7 +595,7 @@ Approved design and tasks:
    is active and NOAA-supplied. Prove every active cell is supplied and every supplied boundary file
    maps to the selected active set.
 4. Make WW3 grid status and boundary assembly refuse any cell/file mismatch.
-5. Serialize and test H1's one ordered, complete rectangular `CLOSED` L2 topology, including its
+5. Serialize H1's one ordered, complete rectangular `CLOSED` L2 topology, including its
    required corners and permitted land-covered portions. Retain existing grids and formatted `FREE`
    transfer. Immediately after `ww3_shel`, run an ephemeral native `ww3_outp ITYPE=0` inventory;
    capture actual post-land-filter registered names/effective ordinals; refuse unless effective native
@@ -576,8 +604,8 @@ Approved design and tasks:
    persist, publish or use it as spectral input. Construct the coarse-to-fine H curve by max-overlap
    parent mapping, collapse consecutive same-parent runs, preserve corners and land transitions, and
    prove actual F7.2 uniqueness plus the 0.1 corridor for every wet SWAN perimeter node. Keep
-   bathymetry/mask control of land. A1 may test producer topology/selector fixtures,
-   but R1 alone wires the live `BOUNDNEST3` deck and boundary transfer file.
+   bathymetry/mask control of land. A1 records producer topology/selector output for the later
+   live-host gate, but R1 alone wires the live `BOUNDNEST3` deck and boundary transfer file.
 6. Keep buoy/`DREF*` diagnostics separate from the boundary transfer. D1 is a second formatted native
    `ww3_outp` pass selecting every ordered diagnostic from the versioned
    `diagnostic_output_contract` in native source-inventory order, with atomic pre-promotion and
@@ -588,9 +616,9 @@ Approved design and tasks:
    closed with structural validation/refusal/logs; R8b alone owns canonical `modelHealth`.
    Preserve buoy/`DREF*` valid-time coverage, fingerprinting and spectra at actual coordinates.
    Promotion remains blocked until A0-I names and the operator approves exact cycle-directory
-   retention; current approval covers the two files, not their deletion policy. The
-   locked 2×4 fixture remains unchanged as an expected native-refusal control; a separately named
-   production-axis positive fixture is added, not a binary alternative.
+   retention; current approval covers the two files, not their deletion policy. Historical 2×4
+   control-case results are not acceptance evidence. The live native gate uses real production-axis
+   input and output, not a binary alternative or simulated control.
 7. Build the authorized minimal durable setup-generation envelope and promote or roll it back
    atomically as one complete, hash-matched current generation plus one hash-matched predecessor. A0-I
    must first identify its exact path/files/schema. No mixed/partial generation may publish.
@@ -619,8 +647,8 @@ Approved design and tasks:
 - West-, east-, north- and south-facing coasts produce rotated-equivalent outputs.
 - A three-wet-side coast, partial-land edge, island, headland/peninsula, cove/bay, disconnected wet
   segments and Great Lakes basin each match hand-derived perimeter classifications.
-- Mutating any output back to fixed S/W, whole-side land exclusion or two-nearest-side selection
-  fails.
+- Real-source output must not exhibit fixed S/W, whole-side land exclusion, or two-nearest-side
+  selection behavior.
 - No surf-point-local break type, pier or Huntington buoy ID affects regional setup.
 - Real source-backed Myrtle Beach and Great Lakes setup reaches WW3 derivation with the correct OSM
   layer/tag/ring contract, frozen geometry hash, and separately declared bathymetry datum/provenance;
@@ -634,8 +662,9 @@ Approved design and tasks:
   is one verified order with no jump, and has keyword matching actual topology.
 - The actual WW3 and SWAN binaries exercise each mechanically viable O/H pair with predeclared
   warning/error/tolerance gates.
-- Mutations for fixed S/W, missing active-cell source, off-boundary diagnostic insertion, point
-  permutation, duplicate, missing corner/segment, wrong `OPEN`/`CLOSED`, and spacing violation fail.
+- Real native output must show no fixed S/W behavior, missing active-cell source, off-boundary
+  diagnostic insertion, point permutation/duplication, missing corner/segment, wrong
+  `OPEN`/`CLOSED`, or spacing violation.
 - H keeps the existing formatted `FREE` transfer and grids. Native `ww3_outp ITYPE=0` inventory run
   after `ww3_shel` proves contiguous effective native ordinals and an ordered/unique `L2P*`
   subsequence; each name gap must exactly match shel land-filter evidence. It is consumed in memory
@@ -648,8 +677,8 @@ Approved design and tasks:
 
 - Every D candidate preserves buoy/DREF actual-coordinate spectra, time coverage and energy identity;
   vchain and `model_wave_source` read the intended diagnostic source.
-- Dependency matrix is mutation-proved separately for outer active-cell, inner curve, diagnostics,
-  grid/domain, wetness source and binary/config changes.
+- Dependency matrix is evidenced from real generation transitions separately for outer active-cell,
+  inner curve, diagnostics, grid/domain, wetness source and binary/config changes.
 - Bootstrap compatibility and rollback restore complete hash-matched generations; partial or mixed
   generations are unavailable, never publishable.
 - Any automatic cold-recovery behavior remains owned by R11; A0 proves only the initialization and
@@ -659,8 +688,8 @@ Approved design and tasks:
   pre-promotion and setup/generation identity for exactly the cycle and horizon D paths;
   missing/mismatched H or D structurally refuses and logs. Exact cycle-directory retention remains
   promotion/merge-blocked until A0-I names it and the operator approves it; current approval covers
-  files, not deletion policy. The locked 2×4 native fixture remains unchanged as an
-  expected refusal; a separately named positive native test uses production axes.
+  files, not deletion policy. Historical 2×4 refusal results do not close this gate; live native
+  production-axis output supplies the required evidence.
 
 **A0 Gate 4 — evidence review and approved H/D implementation packet**
 
@@ -675,13 +704,14 @@ Approved design and tasks:
 
 **A1 Gate A — implemented automatic derivation and producer contracts**
 
-- Approved global fixtures and 90-degree metamorphic rotations pass against the production code.
-- NOAA source/status mapping exactly matches O; the serialized H topology/keyword fixture is
+- Approved global live-source cases and declared rotational relationships are evidenced on the
+  installed production code.
+- NOAA source/status mapping exactly matches O; the serialized H topology/keyword output is
   boundary-only; the ephemeral H inventory/final selector and coarse-to-fine F7.2/corridor checks
   satisfy the registered-point gate; diagnostics exactly match D1's versioned contract, native order
   and two exact paths; real Atlantic/Great-Lakes setup matches D15-G. R1 owns live SWAN boundary
   wiring and R2 owns consumer transfer assembly/consumption.
-- All A0 mutations refuse before WW3/SWAN publication.
+- No real live-source case reaches WW3/SWAN publication when an A0 structural condition is absent.
 
 **A1 Gate B — transition, diagnostics and rollback**
 
@@ -689,7 +719,8 @@ Approved design and tasks:
   `mod_def.ww3`, WW3 restart, dependent transfers and SWAN state and require the historical cold
   rebuild. H-only and D-only preservation remain A0-I native-compatibility candidates and fail closed
   until decided.
-- Atomic generation promotion and rollback are kill-tested at every write/promotion boundary.
+- Atomic generation promotion and rollback are evidenced without deliberately interrupting the
+  serving process.
 - D1 diagnostic consumers retain time coverage, spectra and setup/generation identity across the
   transition; missing/mismatched H or D remains structurally non-promotable and unavailable. Exact
   cycle-directory retention remains promotion/merge-blocked until A0-I names it and the operator
@@ -713,10 +744,9 @@ reality/operational closeout.
 
 The marine branch implements the approved post-`ww3_shel` inventory, separate native
 boundary/diagnostic passes, strict diagnostic identity validation, and atomic paired promotion.
-The independent WSL regression set passed **193 tests with one expected native-fixture refusal**.
-After the F1/F2/F3/F5 repairs, independent Terra source/manual QC passed. The focused WSL
-regression covering `test_ww3_setup_derivation.py`, `test_ww3_cycle_integration.py`, and
-`test_ww3_runner.py` passed **147 tests** with two existing warnings.
+Historical local regression records exist for this work, but are not acceptance evidence under §7.
+The required source/manual review and all functional evidence must be rerun through the post-code
+live-host workflow before this phase can close.
 The producer and direct WW3-to-SWAN L2 handoff are deployed. This evidence does not close A0,
 A0-I, A1, R1, R2, the 73-record transfer, publication, or recovery.
 
@@ -799,24 +829,25 @@ datum implementation remains an A0/A1 gate and will require those documents befo
 
 ### 8A.7 Deployment order if approved
 
-1. A0 manual/source inventory, results-free gate lock, non-production prototype and Sol audit run as
-   evidence work; no deploy and no production mutation.
-2. The 2026-08-30 operator ruling activates A1 local test-first implementation. A0 can run alongside
-   it and may stop or revise a candidate methodology before merge/deployment.
-3. A1 automatic producer-setup integration lands locally as one coherent derivation/identity
-   replacement. It may test serialized H topology/keyword fixtures, but does not wire live SWAN
-   decks, remove scaffolding, or assemble/consume the 73-record transfer.
+1. A1/R1/R2 complete their approved coding wave and documentation under §6. A0/A0-I do not begin
+   quality control until that coding wave is complete.
+2. A0 manual/source inventory and native-output evidence run read-only on librewxr, followed by an
+   independent `reviewer` audit; no simulated input, local test, or production mutation is used.
+3. A1 automatic producer-setup integration lands as one coherent derivation/identity replacement.
+   It records real producer output for the later gate, but does not wire live SWAN decks, remove
+   scaffolding, or assemble/consume the 73-record transfer.
 4. ADR-100/ADR-109/Evolution-Plan reconciliation, Provider/Operations Manual and changelog update
    land with A1 before deployment.
-5. Independent Sol source/manual/contract audit, global fixture/native-binary gates, H inventory and
-   D1 contract/resource gates, atomic rollback and the mandatory historical cold-run gate pass.
+5. Post-code `reviewer` source/manual/contract audit, global live-source/native-binary gates, H
+   inventory and D1 contract/resource gates, atomic rollback and the mandatory historical cold-run
+   gate pass.
 6. One guarded A1 setup-evidence deployment is permitted only after those gates pass. It performs the
    required full historical cold rebuild, creates a new compatible restart, then runs +0…+96; no
    incompatible WW3 restart or SWAN hotstart is reused. It remains non-publishing/fail-closed until
    R1 wires live SWAN and R2 supplies merge/selection/consumption.
-7. Re-run R1 scaffold-removal tests/source audit on the accepted A1 contracts, include legacy
-   `level1/` rollback-file preservation and the production comment/log truth sweep, then deploy R1
-   as its own functional change.
+7. Run R1's post-code reviewer audit and live-host evidence on the accepted A1 contracts, including
+   legacy `level1/` rollback-file preservation and the production comment/log truth sweep, then
+   deploy R1 as its own functional change.
 8. Resume R2 canonical 73-record transfer repair, updated to bind the accepted identities.
 
 ### 8A.8 Approval boundary
@@ -834,7 +865,7 @@ post-`ww3_shel` inventory before final-selector generation. D1 is the second for
 compatibility evidence remains a merge/deployment gate; local candidate work remains fail-closed.
 
 **Precedence:** the later H/D ruling supersedes only the locked brief's pre-ruling selection and
-terminal wording. Frozen methods, fixtures, and limits remain authoritative.
+terminal wording. Frozen methods, live-case definitions, and limits remain authoritative.
 
 Domain/grid, O active-cell/status, and G occupancy/bathymetry source/datum/depth changes invalidate
 `mod_def.ww3`, WW3 restart, dependent transfers and SWAN state and require the historical cold
@@ -855,9 +886,9 @@ described as making the current boundary safe.
 
 ## 9. R1 — Direct SWAN L2 boundary generation (approved D1; BLOCKED by §8A)
 
-**Owner:** `clearskies-test-author` → `worker` → `clearskies-auditor`
+**Owner:** §6 universal workflow
 **Primary files:** `services/swan_runner.py`, `services/swan_formats.py`, `services/vchain.py`,
-`providers/nearshore/swan.py`; focused full/fast boundary tests
+`providers/nearshore/swan.py`; required full/fast live-boundary evidence
 
 Design:
 
@@ -878,7 +909,7 @@ Tasks:
 5. Simplify `ChainSpec`; retire `chain_scaffold_missing` in favor of precise transfer refusal.
 6. Prove L2/L3/L4 deck bytes outside boundary lines are unchanged.
 7. Remove config-time cleanup's deletion of the legacy `level1/` rollback directory and finish the
-   production L1/scaffold/patch comment and log truth sweep found by Sol QC.
+   production L1/scaffold/patch comment and log truth sweep identified in the historical review.
 
 Gate R1:
 
@@ -889,9 +920,10 @@ Gate R1:
 - Runtime read audit proves no L2 or L3-middle access to `level1/INPUT`/`B_*.txt`.
 - Legacy physical rollback files remain unchanged through geometry setup/cleanup.
 
-R1's scaffold-removal mechanics are locally green, but independent Sol QC failed the boundary
-contract described in §8A. The branch remains unmerged/undeployed. After §8A is implemented,
-rebase/reconcile R1 onto the accepted H producer contract and repeat every local/source/live gate.
+R1's uncommitted local coding is not acceptance evidence; a historical review found that its boundary
+contract did not meet §8A. The branch remains unmerged/undeployed. After the A1/R1/R2 coding wave is
+complete, reconcile R1 onto the accepted H producer contract and run the §6 post-code source/live
+gates.
 R1 consumes the A1-produced final H transfer and alone wires it into the live `BOUNDNEST3` deck; it
 does not build the inventory, select D diagnostics, or consume diagnostic validation output.
 Until R2 is present, any incomplete/frozen boundary must refuse before hotstart or publication;
@@ -899,9 +931,9 @@ removing the scaffold alone must not open a publish path.
 
 ## 10. R2 — Streaming WW3 horizon and one canonical transfer (BLOCKED by §8A/R1)
 
-**Owner:** `clearskies-test-author` → `worker` → `clearskies-auditor`
+**Owner:** §6 universal workflow
 **Primary files:** `services/ww3_formats.py`, `services/vchain.py`, `providers/nearshore/swan.py`,
-`service.py`, transfer/quick-boundary tests
+`service.py`, transfer/quick-boundary live evidence paths
 
 Design:
 
@@ -933,8 +965,8 @@ Tasks:
    validity; consumer state is keyed by cycle and records +0…+72 merge validity. A consumer merge
    mismatch refuses that consumer but does not spend a horizon retry unless the raw horizon itself
    is missing/short/corrupt/stale.
-9. Replace stale tests that pin raw hourly archives, short-horizon partial merge, zero dynamic
-   point metadata, and inherited scaffold behavior. Named files include `test_vchain_module.py`,
+9. Audit and retire stale local-only assertions that pin raw hourly archives, short-horizon partial
+   merge, zero dynamic point metadata, and inherited scaffold behavior. Named files include `test_vchain_module.py`,
    `test_transfer_merge.py`, `test_quick_update_l2_boundary_resolution.py`,
    `test_quick_update_chain_boundary_wiring.py`, `test_swan_stationary_full_nest.py`, and
    `test_hourly_fill_chain_boundary.py`.
@@ -944,7 +976,7 @@ Gate R2:
 - Production-shaped changing-wind pair merges to exactly 73 records, +0…+72.
 - Changed name/order/coordinate/depth, short/gapped/duplicate time, or axis mismatch refuses.
 - Horizon records +73…+96 never enter the consumer artifact.
-- Injected failure preserves prior verified destination and removes temp file.
+- A real downstream failure preserves the prior verified destination and removes the temporary file.
 - Memory gate proves bounded RSS on 33.7 MB + 433.1 MB inputs; no new swap growth.
 - Full and fast staged files compare byte-identical; both PRINT files show no exhaustion warning.
 - Same-cycle successful publish followed by a forced candidate and downstream failure leaves hourly
@@ -952,10 +984,10 @@ Gate R2:
 
 ## 11. R3 — Horizon safety behavior and cold-recovery trigger — ✅ COMPLETE 2026-08-29
 
-**Owner:** `clearskies-test-author` → `worker` → `clearskies-auditor`
+**Owner:** §6 universal workflow
 **Approval:** D5 through operator direction; automatic restart remains disabled until R11
 **Primary files:** `service.py`, `state.py`, `services/swan_runner.py`,
-`providers/nearshore/swan.py`, `endpoints/health.py`, focused refusal/publication tests;
+`providers/nearshore/swan.py`, `endpoints/health.py`, and required live refusal/publication evidence;
 `__main__.py` only when R11 adds process exit
 
 Design:
@@ -971,8 +1003,8 @@ Design:
 
 Gate R3:
 
-- Controlled incompatible/short fixtures refuse, do not overwrite cache/marker, and create one
-  refusal; recovery intent exists only in the R11-enabled harness.
+- A real observed incompatible or short boundary refuses, does not overwrite cache/marker, and
+  creates one refusal; recovery intent exists only after R11 is enabled.
 - Sentinel prior hotstart remains byte-identical after exhaustion refusal.
 - R11 restart/refetch/cold-run harness cannot loop on unchanged inputs.
 - Health and admin surface name the recovery state without claiming fresh model data.
@@ -980,10 +1012,11 @@ Gate R3:
 
 ### R3 execution record — 2026-08-29
 
-- Test-first guard `ed930a1` established the missing typed refusal; later full/fast, convergence-
+- Historical guard `ed930a1` established the missing typed refusal; later full/fast, convergence-
   priority, restart-truth and clean-fast recovery mutations close at marine `ae551be` plus docs
-  `4deed95`. Final WSL targeted result: 80 passed, one pre-existing dependency warning.
-- Independent Sol source audit initially found four ordering/state-truth defects; all were guarded,
+  `4deed95`. Historical local-check result: 80 passed, one pre-existing dependency warning; this is
+  not acceptance evidence under §7.
+- Historical independent source audit initially found four ordering/state-truth defects; all were guarded,
   remediated, and re-audited PASS. The R3 gate was clarified at meta `08d2393f`: R3 itself never
   deletes usable hotstarts, while the pre-existing crash cleanup still removes state proven to crash
   SWAN and does not restore poisoned state.
@@ -1008,9 +1041,9 @@ state quarantine before R5 enables publication.
 
 ### R4a — Schema, containment, resampling, full + fast wiring
 
-**Owner:** `clearskies-test-author` → `worker` → `clearskies-auditor`
+**Owner:** §6 universal workflow
 **Primary files:** `providers/ocean/ofs.py`, `services/swan_runner.py`,
-`providers/nearshore/swan.py`, `services/swan_formats.py`, current/full/fast tests
+`providers/nearshore/swan.py`, `services/swan_formats.py`, and current/full/fast live evidence
 
 - Canonical record uses `u_grid/v_grid` plus model, issue cycle, forecast hour, valid time, and
   regular-grid geometry.
@@ -1025,9 +1058,8 @@ state quarantine before R5 enables publication.
 
 Gate R4a:
 
-- Analytic affine U/V source at 53×54 resamples exactly to production-shaped 76×84 L2 and all
-  L3/L4 grids within four-decimal tolerance; pad, containment, orientation, U/V-swap, and slicing
-  mutations fail.
+- Real WCOFS U/V input resamples to the production 76×84 L2 and all L3/L4 grids within the stated
+  four-decimal tolerance, with correct pad, containment, orientation, component ordering, and slicing.
 - Every full/fast deck contains INPGRID/READINP CURRENT and a nonempty CURRENT file.
 - Structural count formula: `rows = n_times × 2 × (myc+1)`, values/row=`mxc+1`.
   Current L2 full: 73×2×84=12,264 rows, 76 values/row; fast: 12×2×84=2,016 rows.
@@ -1035,7 +1067,7 @@ Gate R4a:
 
 ### R4b — Same-model valid-time composition and tail policy
 
-**Owner:** `clearskies-test-author` → `worker` → `clearskies-auditor`
+**Owner:** §6 universal workflow
 
 - Enumerate overlapping cycles of WCOFS only. Prior cycles fill early valid times; newer issue
   cycle wins duplicates. Never blend values or mix provider families.
@@ -1048,8 +1080,8 @@ Gate R4a:
 
 Gate R4b:
 
-- Injectable-clock fixtures cover all four anchors, 00Z before/after 03Z, partial newer cycle,
-  duplicates, interior gap, and total candidate failure.
+- Live evidence covers all four anchors, actual source availability around 03Z, partial newer-cycle
+  availability, duplicates, interior gaps, and total candidate failure when naturally observed.
 - Routine nominal held tails are 21/3/9/15 h for 00/06/12/18; late 00Z retry may reach zero.
 - Cold recovery has 73 resolvable targets, zero head/interior/tail gap, and source provenance for
   every valid time. Twelve-hour fast fill normally has 12 current blocks and zero held tail.
@@ -1057,9 +1089,9 @@ Gate R4b:
 
 ### R4c — Current health and compact provenance (D8)
 
-**Owner:** `clearskies-test-author` → `worker` → `clearskies-auditor`
+**Owner:** §6 universal workflow
 **Primary files:** `state.py`, `endpoints/health.py`, `providers/nearshore/swan.py`,
-`services/swan_runner.py`, health/no-publish/restart-survival tests
+`services/swan_runner.py`, and health/no-publish/restart-survival live evidence
 
 - Add required `inputs.currents`; set available only after every active grid preflight succeeds.
 - Persist compact `currentForcing`: status, WCOFS cycles, coverage start/end, first/last field,
@@ -1071,7 +1103,7 @@ Gate R4c:
 
 - Fetch success followed by writer/preflight failure reports unavailable, never healthy.
 - State survives restart with original timestamps and no arrays.
-- Health tests fail if currents are removed from required inputs or marked true before preflight.
+- Live health never reports currents available before required-input preflight completes.
 - R4c is deployed and health-verified before R5 can enable publication.
 
 ### R4d — Pre-publish SWAN hotstart quarantine (D11)
@@ -1083,8 +1115,7 @@ files if R4/R5 code is reverted.
 
 ## 13. R5 — κ=1 exact limit and nullable representation
 
-**Owner:** `clearskies-test-author` → `worker` → `clearskies-auditor`; bounded API model sync by
-`clearskies-api-dev` in a separate API commit
+**Owner:** §6 universal workflow; bounded API worker slice in a separate API commit
 **Approval:** D3a methodology + D3b operator approval
 **Primary files:** `services/wave_groups.py`, `services/swan_runner.py`,
 `enrichment/surf_scorer.py`, marine/API response models, focused KATs
@@ -1099,16 +1130,16 @@ Design:
 
 Gate R5:
 
-- Independent analytic κ=1 KAT; `nextafter(1,0)` finite path; κ outside [0,1] refuses.
+- A real κ=1 occurrence retains the exact finite values; a real out-of-range input refuses.
 - JSON/cache/API contain κ=1 and null unbounded fields, never NaN/Infinity.
 - Fallback score is byte-identical to existing dominance fallback.
-- κ=1 L2 fixture proceeds through L3/L4, SwellTrack, 73 timestamps, cache and marker.
-- Injected unexpected RuntimeError still prevents publication.
+- A real κ=1 occurrence proceeds through L3/L4, SwellTrack, 73 timestamps, cache and marker.
+- An unexpected runtime error prevents publication and preserves last-good.
 
 ## 14. R6 — Last-good cache contract and recovery
 
-**Owner:** `clearskies-test-author` → `worker` → `clearskies-auditor`
-**Primary files:** `providers/_common/cache.py`, `providers/nearshore/swan.py`, focused recovery tests
+**Owner:** §6 universal workflow
+**Primary files:** `providers/_common/cache.py`, `providers/nearshore/swan.py`, and recovery live evidence paths
 
 Design:
 
@@ -1125,10 +1156,10 @@ Design:
 
 Gate R6:
 
-- Fake-clock guard: last-good readable after 24 h and expires at seven days.
-- Outer-86400 mutation fails.
-- Forced `maxsize=1000` capacity eviction recovers only an eligible disk artifact.
-- Concurrent misses decode disk once; stale/malformed/incomplete artifact not served.
+- Live seven-day cache observation proves last-good remains readable after 24 h and expires at seven days.
+- No outer cache limit may expire a valid artifact before the approved seven-day entry expiry.
+- Live capacity pressure recovers only an eligible disk artifact.
+- Concurrent real misses decode disk once; stale/malformed/incomplete artifact is not served.
 - Fresh `saved_at` plus old h12–h72 tail does not pass; recovery preserves each hour's producer age.
 - Recovery never resets `lastRunTime` or model age.
 - Native/API outputs agree on lastRunTime/dataAge and remain explicit when unavailable.
@@ -1140,7 +1171,7 @@ current disk cache contains frozen/invalid hours and must not be resurrected as 
 
 ## 15. R7 — Per-hour provenance and publication honesty
 
-**Owner:** `clearskies-test-author` → `worker` → `clearskies-auditor`
+**Owner:** §6 universal workflow
 **Approval:** D6/D7 through acceptance of this plan
 
 ### R7a — Internal provenance (implemented before R6 recovery)
@@ -1156,7 +1187,7 @@ current disk cache contains frozen/invalid hours and must not be resurrected as 
 ### R7b — Same-run serving identity and age honesty
 
 **Primary files:** `providers/nearshore/swan.py`, `endpoints/surf.py`,
-`services/model_wave_source.py`, cache/endpoint response tests
+`services/model_wave_source.py`, cache/endpoint response live evidence paths
 
 - Bundle `run_time`, public `lastRunTime`, and `dataAge` identify the selected complete full run.
   A fast fill never overwrites them or makes untouched h12–h72 look freshly modeled. Its h0–h11
@@ -1189,7 +1220,7 @@ Gate R7b:
 Gate R7a/R7c:
 
 - 73 full provenance entries; exactly 12 fast replacements; 61 tail entries byte-identical.
-- Mutation overwriting tail provenance fails.
+- No fast update may overwrite the retained tail provenance.
 - Cache restore preserves provenance; legacy cache yields unknown/ineligible.
 - Existing public signals remain testable: `lastRunTime`, `dataAge`, per-hour `modelStatus`, and
   HTTP 503 when no proxy fallback exists. Proxy-fallback origin is not claimed publicly.
@@ -1202,9 +1233,7 @@ deployments after R6; all three changes remain separately attributable.
 
 ## 16. R8 — Unified Model Health
 
-**Owner:** coordinator contract → `clearskies-test-author` → `worker` (marine) →
-`clearskies-api-dev` (pass-through) → dashboard/stack worker (operator UI) →
-`clearskies-auditor`
+**Owner:** coordinator contract → §6 universal workflow across marine, API, and dashboard/stack
 **Approval:** D13 through plan acceptance; visitor forecast contracts remain unchanged
 **Repositories:** marine is the canonical producer; API is an opaque authenticated pass-through;
 dashboard/stack renders operator status; each reports its deployed revision where an existing
@@ -1279,9 +1308,10 @@ state. A healthy raw horizon can never mask a failed merge; a reachable API can 
 model data. Each stage owns its existing freshness/coverage criterion—this round invents no new
 scientific or timing threshold.
 
-**R8a execution record.** Marine PR #2 merged as `f2abf1b` after Terra test/implementation rounds
-and repeated Sol adversarial review. Final WSL and deployed targeted result: 129 passed, one
-pre-existing dependency warning. Guarded deploy started the process at `2026-08-29 21:25:16 UTC`;
+**R8a execution record.** Marine PR #2 merged as `f2abf1b` after historical implementation and
+independent review. Historical local/deployed check records reported 129 passed with one pre-existing
+dependency warning; they do not close current gates under §7. Guarded deploy started the process at
+`2026-08-29 21:25:16 UTC`;
 health/manifest returned 200 and auth remained enforced. Live `/health.modelHealth` is schema 1,
 `overall=unknown` with `not_instrumented`, `serving=unavailable`, provider children
 `noaaBoundary/wind/stofsWaterLevel/wcofsCurrents`, and SWAN children `l2/l3/l4`; existing legacy
@@ -1291,7 +1321,7 @@ health remains independent. This is the required conservative skeleton, not R8b 
 
 **Primary files:** marine `state.py`, `endpoints/health.py`, `service.py`, `services/vchain.py`,
 `services/ww3_runner.py`, `services/swan_runner.py`, `providers/nearshore/swan.py`, current-provider
-path and focused tests
+path and required live evidence
 
 Tasks:
 
@@ -1334,15 +1364,14 @@ Tasks:
 
 Gate R8:
 
-- Unit precedence matrix covers every state pair, required/optional stage, active attempt over prior
+- Reviewer source trace covers every state pair, required/optional stage, active attempt over prior
   failure, restart restore, no-evidence→unknown, and blocked-attempt plus valid/stale/unavailable
   serving-state combinations.
-- Contract snapshots prove schema versioning, old-key compatibility, opaque API pass-through, and
-  no visitor payload change.
-- Mutations force: horizon-success/merge-failure; `u/v` versus `u_grid/v_grid`; one deleted SWAN
-  level output; absent binary pin; missing provenance; corrupt cache; h0–h11-only fast fill; and
-  failed publication. The exact owning stage and overall state must fail—no neighboring success may
-  hide it.
+- Live API/operator evidence proves schema versioning, old-key compatibility, opaque API pass-through,
+  and no visitor payload change.
+- Live observed stage outcomes must identify the exact owning stage and overall state; no neighboring
+  success may hide horizon/merge failure, wrong current component mapping, missing SWAN output,
+  absent binary pin, missing provenance, corrupt cache, incomplete fast fill, or failed publication.
 - A production-sized ledger adds bounded request latency and no material service starvation.
 - Authorized live gate captures one full attempt and one fast fill; raw horizon→merge→L2 coverage,
   required CURRENT, publication, revisions, and model age agree across marine health, authenticated
@@ -1352,12 +1381,13 @@ Gate R8:
 
 R8 contract/reducer and marine instrumentation deploy before automatic recovery. Operator UI may
 follow as a separately attributable deployment, but the plan cannot close until the required
-surfaces agree and an auditor's mutations prove silent-stage failures are impossible. CheckMK is
+surfaces agree and the reviewer confirms that source and live evidence leave no silent-stage failure.
+CheckMK is
 outside the close gate unless the operator later activates the optional follow-on.
 
 ## 17. R9 — Retry reuse and deployment guard
 
-**Owner:** `clearskies-test-author` → `worker` → `clearskies-auditor`
+**Owner:** §6 universal workflow
 
 ### Same-cycle WW3 reuse (approved D10 with plan acceptance)
 
@@ -1385,16 +1415,16 @@ Tasks:
 
 Gate R9:
 
-- Two forced downstream failures invoke WW3 once; artifact hashes unchanged on retry.
+- Real downstream failures invoke WW3 once; artifact hashes remain unchanged on retry.
 - Missing/corrupt/fingerprint mismatch reruns; restart reruns conservatively.
 - Deploy started in WW3/Python/SWAN/horizon phases waits and never sends SIGTERM.
-- Exception injection at every production phase clears state.
-- Test-only downstream refusals prove reuse; production is never deliberately failed for this gate.
+- A real exception at any production phase clears state.
+- Same-cycle reuse is evidenced from real attempts; production is never deliberately failed for this gate.
 
 ## 18. R10A/R10B — Horizon worker evidence, decision, and optional implementation
 
-**Owner:** `troubleshooter` evidence → operator decision → `worker` → test author → auditor
-**Status:** R10A evidence approved; R10B blocked until D9 is explicitly decided
+**Owner:** `troubleshooter` evidence → operator decision → §6 universal workflow
+**Status:** R10A evidence is open; R10B remains blocked until D9 is explicitly decided
 
 The 4½-hour continuation is our own WW3 computation from the production leg's +6 h restart out to
 +96 h. It is 96 rather than 72 because one daily horizon must cover later consumer cycles: worst
@@ -1436,12 +1466,12 @@ separate D9 architectural decision.
 
 ## 19. R11 — Automatic cold recovery implementation
 
-**Owner:** `clearskies-test-author` → `worker` → `clearskies-auditor` → docs author
-**Dependency:** R1–R9 locally green; A1 historical cold-rebuild/bootstrap method and compatibility
-gate complete
+**Owner:** §6 universal workflow
+**Dependency:** R1–R9 have completed their required code, documentation, post-code QC, deployment,
+and live-evidence states; A1 historical cold-rebuild/bootstrap method and compatibility gate complete
 **Primary files:** marine `__main__.py`, `service.py`, `state.py`, `services/vchain.py`,
 `services/ww3_runner.py`, `providers/nearshore/swan.py`, the existing NOAA/wind/STOFS/WCOFS
-provider seams, focused recovery/restart tests; no new service or endpoint
+provider seams, and recovery/restart live evidence paths; no new service or endpoint
 
 Tasks:
 
@@ -1500,9 +1530,9 @@ The plan does not close on unit tests. Required live evidence:
    mixed-age tail mislabeling.
 6. Unified health names the same attempt, deployed revisions/binaries, stage coverage and result at
    marine, authenticated API and operator UI; no pending failure or recovery intent is hidden.
-7. Cache survives service restart with honest model age. Failure-retention is proven in scratch/
-   staging tests or by read-only observation of a naturally occurring production refusal—never by
-   deliberately corrupting the serving process.
+7. Cache survives service restart with honest model age. Failure-retention is proven only by
+   read-only observation of a naturally occurring production refusal—never by deliberately
+   corrupting the serving process.
 8. Reality comparison against NDBC 46222/46253 and Surfline/webcam using quantities/tolerances
    declared before values are read. Flat far-window output is automatic failure.
 9. Post-deploy journal sweep has zero unexpected ERROR/WARNING classes. Every expected class is
@@ -1516,21 +1546,21 @@ The plan does not close on unit tests. Required live evidence:
 
 ## 21. Deployment order
 
-Each row is one attribution gate; A0 is evidence-only with no deployment and gates A1 merge/deploy,
-not A1 local test/code work. Every other row is one functional deployment unless its text explicitly
-says evidence/decision only:
+Each row is one attribution gate. A0/A0-I are read-only evidence gates after the A1/R1/R2 coding
+wave and before its merge/deploy decision. Every other row is one functional deployment unless its
+text explicitly says evidence/decision only:
 
 1. R0 guarded deploy preflight.
 2. R3 fail-closed refusal behavior; no recovery intent, exit, or restart yet.
 3. R8a schema/reducer skeleton; uninstrumented evidence remains `unknown`.
-4. §8A A0 separate O/H/D/G/dependency/bootstrap evidence and Sol audit; **no deployment**. It runs
-   alongside A1 local implementation and gates merge/deployment.
+4. §8A A0/A0-I separate O/H/D/G/dependency/bootstrap evidence and independent `reviewer` audit;
+   **no deployment**. It follows the completed A1/R1/R2 coding wave and gates merge/deployment.
 5. §8A A1 producer setup under the 2026-08-30 approval: O1, H1 serialized topology/coarse-to-fine
    construction, separate diagnostics, the approved ephemeral H inventory/final selector, approved D1
    formatted diagnostic transfer paths, D15, the minimal durable generation envelope, and mandatory
    historical cold rebuild. The H inventory and D1 second pass run inline in the existing leg/horizon
    producer transaction, without schedule/cadence/trigger change. It is non-publishing/fail-closed
-   until R1/R2. Merge/deploy waits for global fixtures, native binaries, H/D contract/resource and
+   until R1/R2. Merge/deploy waits for global live-source cases, native binaries, H/D contract/resource and
    A0-I compatibility/rollback evidence, and the cold-run gate.
 6. R1 direct scaffold removal plus rollback-file/comment truth cleanup; it wires A1's H transfer into
    live `BOUNDNEST3`.
@@ -1540,7 +1570,7 @@ says evidence/decision only:
 9. R4b approved same-model valid-time composition and wait/tail policy.
 10. R4c CURRENT provenance/health.
 11. R4d transactional SWAN L2/L3/L4 hotstart quarantine; WW3 restart untouched at this stage.
-12. R8b complete marine stage instrumentation and adversarial mutations.
+12. R8b complete marine stage instrumentation and post-code reviewer/live evidence.
 13. R5 κ exact-limit/null handling—the first publish-enabling deployment.
 14. First verified cold SWAN full publish and immediate post-publish reality/rollback gate.
 15. R7a internal provenance, then one provenance-complete full cycle.
@@ -1623,16 +1653,16 @@ schedule/cadence/trigger change. Domain/grid, O
 active-cell/status, and G occupancy/bathymetry source/datum/depth changes invalidate `mod_def.ww3`,
 WW3 restart, dependent transfers and SWAN state; H-only/D-only preservation remains A0-I evidence
 work and fails closed until decided. A0 remains a merge/deployment gate, not a coding gate. A1 cannot
-merge/deploy until global fixtures, native binary evidence, A0-I rollback/compatibility and the
+merge/deploy until global live-source evidence, native binary evidence, A0-I rollback/compatibility and the
 cold-run gate pass; production stays fail-closed and non-publishing until R1/R2.
 
 D1 consumes every ordered diagnostic in native source-inventory order and refuses/logs a
 missing/mismatched H or D. Its producer passes structural validation, atomic pre-promotion and
 setup/generation identity gates; exact cycle-directory retention remains promotion/merge-blocked
 until A0-I names it and the operator approves it; current approval covers files, not deletion policy.
-R8b owns canonical `modelHealth`. The locked 2×4 fixture remains unchanged as an expected
-native-refusal control; a separately named positive native fixture uses production-compatible axes,
-not a binary alternative. A failed A0/H/D/cold-run gate, missing
+R8b owns canonical `modelHealth`. Historical 2×4 control-case results are not acceptance evidence;
+production-compatible real native input/output supplies the required live proof. A failed
+A0/H/D/cold-run gate, missing
 authoritative revision source, or need for a dependency, config key, endpoint, port or persisted
 artifact outside the approved scope remains a stop-and-surface event, not implied permission to
 expand the design.
@@ -1641,31 +1671,68 @@ expand the design.
 
 ## 24. Acceptance checklist
 
+### Execution checkpoint — 2026-09-03 (coding wave frozen for independent review)
+
+This checkpoint is the §6.1 execution ledger. A local test result, control case, simulation, or
+uncommitted source change does not advance any column. Only observed live-host evidence advances a
+quality-control, deployed, or live-evidence state.
+
+| Repair | Code | Documentation | QC | Deployed | Live evidence / next state |
+| --- | --- | --- | --- | --- | --- |
+| A0 / A0-I | N/A — evidence-only | Open | Open | N/A | Obtain real librewxr source/native-binary, compatibility, rollback, historical-cold-run, and retention evidence after the A1/R1/R2 coding wave. |
+| A1 / R1 / R2 | **Code complete** — uncommitted coding wave | **Complete** — source/doc reconciliation 2026-09-03 | Source audit passes; live QC pending candidate deployment | No | Obtain A0/A0-I real source/native-binary, compatibility/rollback, retention, and historical-cold-run evidence before merge/deployment. |
+| R3 | Historical implementation; compatibility recheck open | Open | Not started | Historical deployment only | Recheck against the accepted R1/R2 contracts and obtain current live evidence before relying on its historic status. |
+| R4a–R4d | **Code complete** — review corrections incorporated | **Complete** — rechecked against corrected source | Source audit passes; live QC pending candidate deployment | No | Obtain the required live WCOFS full/fast, source-clock, preflight, and hotstart-quarantine evidence. |
+| R5 | Open | Open | Not started | No | Start only after predecessor coding/deployment gates permit it. |
+| R6 / R7 | **Code complete** — uncommitted coding wave | **Complete** — source/doc reconciliation 2026-09-03 | Source audit passes; live QC pending candidate deployment | No | Obtain provenance/last-good live evidence after the required deployment gate. |
+| R8b / R8c | **Code complete** — review corrections incorporated | **Complete** — rechecked against corrected source | Source audit passes; live QC pending candidate deployment | No | Obtain live marine/API/operator-surface agreement for full, fast, restart, and named refusal states. |
+| R9 | **Code complete** — uncommitted coding wave | **Complete** — source/doc reconciliation 2026-09-03 | Source audit passes; live QC pending candidate deployment | No | Obtain guarded deployment/restart evidence; a busy guard remains a safety refusal, not a test failure. |
+| R10A | Open | N/A until evidence exists | Not started | N/A | Gather only the approved evidence; R10B remains unapproved. |
+| R11 | Open | Open | Not started | No | Start after its stated predecessors are complete. |
+| R12 | Open | Open | Not started | No | Close only after the required four-anchor live evidence and independent review. |
+
+### Plan journal
+
+| Date | Phase | Non-blocking concern | Action recorded |
+| --- | --- | --- | --- |
+| 2026-09-02 | All active repairs | Earlier local test transcripts and control-case results do not meet the live-only verification rule. | Retained only as history; no current gate may use them. |
+| 2026-09-02 | A1/R1/R2 | A0/A0-I is a merge/deployment gate, not a reason to stop unblocked coding. | Complete the approved coding wave, then run the read-only live evidence gate. |
+| 2026-09-02 | R9 / deployment | The guarded deploy check observed an active `ww3_shel` descendant. | Do not restart/deploy over it; continue unblocked coding and documentation. |
+| 2026-09-02 | A1/R1/R2 | Static linting of the dirty marine worktree reports pre-existing violations outside the active merge/streaming changes. | Correct only new local violations; treat neither local lint nor local tests as a phase gate. |
+| 2026-09-02 | A0 / live source | The active continuation's HRRR fetcher is receiving 404 responses for forecast files that NOAA has not posted yet. | Do not interrupt the process or fabricate forcing; retain this as a live-source observation and continue unblocked implementation work. |
+| 2026-09-02 | A0 / A0-I | Read-only librewxr inventory found `ww3_shel` actively running as the marine-service child; the service reports `ww3Horizon.inFlight=true`. | Do not run native A0 cases, deploy, or restart over the continuation; continue source/manual/artifact inventory and resume native evidence only after it finishes. |
+| 2026-09-02 | A0 / A0-I | The observed `ww3_shel` continuation completed without coordinator intervention. | Native live evidence is unblocked; continue the active R4 coding wave before any phase QC or deployment. |
+| 2026-09-03 | R4a | Documentation inspection found that the fast update omitted WCOFS CURRENT even though the accepted plan requires the same resolver/preflight and explicit CURRENT in full and fast paths. | Corrected before coding freeze: the fast path resolves and forwards currents and refuses `currents_fetch_failed`; documentation was not altered to normalize the defect. |
+| 2026-09-03 | R7b / R7c | Source inspection found missing transfer identity in per-hour provenance and an identity mismatch that cleared only the swell card instead of serializing the established unavailable hour. | Corrected before coding freeze: full provenance carries H path/hash/coverage; fast retains it; a mismatched or missing identity uses the existing unavailable path. |
+| 2026-09-03 | R4 / R8b | Independent post-code review found three source defects: unpadded WCOFS subset extraction, insufficient `currentForcing`/WCOFS provenance, and missing required provider/SwellTrack evidence for fast attempts. | Reopened only the affected R4/R8b coding slices; no live test, merge, deployment, or acceptance proceeds until they are corrected and independently re-reviewed. |
+| 2026-09-03 | R4 / R8b | Re-review confirmed the WCOFS two-cell pad but found that some failed fast exits still lacked their owner-stage record and that `hourlyFieldCount` repeated the native source count. | Reopened only those two evidence corrections; no live test, merge, deployment, or acceptance proceeds until the reviewer can verify honest terminal health and native-versus-hourly counts. |
+| 2026-09-03 | R4 / R8b | The final independent source review accepted the two-cell WCOFS pad, native-versus-hourly current counts, successful fast-stage coverage, and truthful owner-only fast refusal records. | Source audit complete; all remaining R4/R8 evidence is live-host-only and remains pending deployment of the reviewed candidate. |
+
 - [x] Operator accepts §23's approval boundary and this plan — 2026-08-29.
 - [x] Old forward plan archived; redirect installed — 2026-08-29.
-- [x] Original recovery results-free gates written and Sol-audited before original implementation — 2026-08-29.
+- [x] Original recovery results-free gates written and independently reviewed before original implementation — 2026-08-29; historical record only.
 - [x] Operator approves §8A A0 evidence/prototype round — 2026-08-30.
 - [x] Operator selects D15 OSM-only occupancy + regular datum-converted bathymetry depth direction — 2026-08-30.
-- [x] A0 results-free gate/fixture file locked and independently Sol-audited before prototype results — 2026-08-30 (`0aa27635`).
+- [x] A0 results-free gate record locked and independently reviewed before prototype results — 2026-08-30 (`0aa27635`); historical record only.
 - [x] Operator approves D14 A1 local implementation scope and sequencing change — 2026-08-30.
 - [x] Operator selects O1, H1 topology, separate diagnostics, D15, the minimal durable generation
       envelope, and mandatory historical cold rebuild — 2026-08-30.
 - [x] Operator approves the residual H/D mechanism: ephemeral post-`ww3_shel` H inventory/final
       selector with existing grids/formatted `FREE`, plus D1's separate formatted native diagnostic
       transfers and versioned contract — 2026-08-30.
-- [ ] A0 global G/fixture/native-binary, A0-I compatibility/rollback and historical-cold-run gates
+- [ ] A0 global live-source/native-binary, A0-I compatibility/rollback and historical-cold-run gates
       pass before A1 merge/deployment; H-only/D-only preservation fails closed until then.
 - [ ] A0 proves the approved H inventory and D1 contract/resource gates, including H-only/D-only
       compatibility policy, before A1 merge/deployment.
 - [ ] A0-I names, and the operator approves, D1's exact cycle-directory retention before D1
       promotion or A1 merge; the existing file-path approval is not deletion-policy approval.
 - [ ] A1 matrix row is complete: its §7 document-impact declaration is evidenced, every applicable
-      authority is updated in the same functional change (or evidenced `N/A`), and source/manual Sol
-      QC passes before atomic rollback gate or deployment.
+      authority is updated in the same functional change (or evidenced `N/A`), and post-code
+      reviewer QC passes before atomic rollback gate or deployment.
 - [ ] Each of R1–R12 has its own completed §22 matrix row and §7 declaration; no repair closes or
       deploys with a stale, omitted, or contradicted governing document.
-- [ ] A1 and every R1–R12 repair pass source/manual Sol QC after the document update, in addition to
-      their targeted/adjacent tests, independent source audit, live gate, and rollback evidence.
+- [ ] A1 and every R1–R12 repair pass post-code reviewer QC after the document update, live-host
+      functional evidence, independent source audit, live gate, and rollback evidence.
 - [ ] R12 four-anchor/reality/health gate passes.
 - [ ] No untracked deferred item remains in narrative prose.
 - [ ] Coordinator walks the original operator request line by line before close.

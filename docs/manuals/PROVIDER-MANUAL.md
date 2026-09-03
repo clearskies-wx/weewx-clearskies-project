@@ -1843,6 +1843,8 @@ The response's `osm_type` field carries the raw OSM tag value (e.g. `groyne`, `d
 
 **Error handling:** Any THREDDS open failure for a given file — a 404, a timeout (>60s, `_DATASET_TIMEOUT`), or any other exception — tries the NODD S3 fallback rung (above) for that same file before anything else; the code does not discriminate by failure type. Only when *both* rungs fail for a file does the existing cycle-fallback loop step back to the prior cycle. Grid point on land → null result. All per error taxonomy.
 
+**SWAN CURRENT forcing (R4a/R4b).** `fetch_surface_currents()` selects a single model only when it contains the entire active SWAN grid; a centre point inside the model while an edge lies outside is rejected as an uncovered box. Each returned field carries `u_grid`, `v_grid`, model name, issue cycle, forecast hour, valid time, and source-grid geometry. The source skips failed/non-finite individual files and returns an empty result when no usable cycle remains; `providers/nearshore/swan.py` converts an empty or raised fetch into the required `currents_fetch_failed` refusal. The existing bilinear resampler maps each source U/V field onto every active SWAN grid before `CURRENT.txt` is written and rejects a source grid that does not contain its target or yields non-finite target values. When overlapping cycles of the same model are available, the newer issue wins a duplicate valid time and the earlier issue may fill only missing early valid times. `_write_current_txt()` matches every SWAN wind timestep: an interior/head gap outside the two-hour match allowance or an undersized U/V grid raises `CurrentCoverageError`; only a terminal tail beyond the latest OFS field is held. The approved bounded final-field tail remains a separately recorded routine-cycle condition; it is not a cold-recovery substitute.
+
 **Implementation details (from code, 2026-07-13):**
 
 - `fetch(*, model: str, lat: float, lon: float) -> dict` — primary entry point. Returns dict with `source`, `surface_temp`, `column_profile`, `surface_current_speed`, `surface_current_dir`, `salinity`, `water_level_msl`, `water_level_mllw`, `seafloor_depth`. Returns `{"source": "unavailable"}` on total failure.
@@ -1857,6 +1859,44 @@ The response's `osm_type` field carries the raw OSM tag value (e.g. `groyne`, `d
 - `_thredds_to_nodd_s3_url(thredds_url)` / `_open_dataset_with_timeout(opener, url, timeout)` / `_open_regulargrid_dataset(url)` — the THREDDS-timeout + NODD S3 fallback chain (2026-08-16), see above.
 
 ### §14.10a RTOFS surface-current provider for SWAN forcing (target — Phase S of L1-BOUNDARY-REBUILD-PLAN, ADR-104 D9) **(ruled 2026-08-08; lands with Phase S of L1-BOUNDARY-REBUILD-PLAN)**
+
+**As-built R4 clarification (2026-09-03).** The RTOFS/STOFS-3D/PacIOOS
+fallback ladder described in this target section is not implemented in the
+current SWAN forcing path. `providers/ocean/ofs.py::fetch_surface_currents()`
+selects one OFS model only when `find_ofs_model_for_bbox()` confirms that its
+regular-grid domain contains the complete SWAN forcing box. Current records
+retain model, issue cycle, forecast hour, valid time, and source-grid
+geometry. `compose_current_valid_times()` receives a caller-provided record
+list, model name, and ordered `required_times` list; it rejects mixed model
+families or missing record provenance, chooses the newer issue cycle for a
+duplicate valid time, and returns records in the caller's requested order. In
+`fetch_surface_currents()`, `required_times` is derived from the valid times
+actually fetched across the candidate cycles; this helper therefore does not
+itself establish completeness for the SWAN wind window.
+
+The selected U/V grids are resampled onto each active SWAN grid by
+`services/swan_runner.py` using `resample_regular_vector_grid()`. The writer
+matches each wind timestep to the nearest current field within its allowed
+window, repeats only the terminal selected OFS field beyond the source
+forecast reach (WCOFS's 72-hour reach in this recovery path), and raises for an interior gap or undersized grid
+(`_write_current_txt()`, `CurrentCoverageError`). The full and 12-hour fast
+paths use the same current input and preflight before SWAN starts. An
+uncovered box, empty/failed fetch, malformed field, or preflight failure
+records `currents_fetch_failed` and refuses publication; no alternative
+provider is selected (`providers/nearshore/swan.py`). `currentForcing` is a
+compact health summary of status, issue cycles, coverage, first/last field,
+native/hourly field counts, held-tail hours, refusal, and update time; it
+contains no U/V arrays.
+
+In that summary, `nativeFieldCount` is the number of source records returned
+by the OFS fetch/composition step, while `hourlyFieldCount` is the number of
+hourly blocks actually emitted to SWAN `CURRENT.txt` by the runner (including
+any terminal-tail holds). They are deliberately different counts; the fast
+window uses the runner's emitted-hour count rather than treating the native
+3-hourly record count as an hourly count.
+
+The detailed target specification below is preserved as historical decision
+text; it is not an instruction to implement or select those providers.
 
 **Status: target — not yet implemented.** This section documents the S1 design verbatim from the plan. RTOFS
 is already a Clear Skies data source in a different role — `providers/ocean/erddap_ocean.py` serves
@@ -2301,6 +2341,15 @@ Hourly fast updates do NOT save hotstart files. The full stationary sequence
 writes tokened L2/L3/L4 hotstarts only after convergence. This prevents a
 diverged fast-cycle snapshot from infecting the next full run's warm-start.
 
+**R4d quarantine (as-built source behavior, 2026-09-03):** before a forced
+cold start, `services/grid_sizing_chain.py::quarantine_swan_hotstarts()` finds
+only tokened L2/L3/L4 hotstarts, copies them to a unique quarantine directory,
+checks each copy with SHA-256, fsyncs the files and manifest, and removes the
+originals only after the manifest is atomically complete. A partial or
+hash-mismatched quarantine authorizes neither deletion nor publication; WW3
+restart files, forecast cache, bathymetry, and grid-sizing data are not part
+of this quarantine.
+
 **OBSTACLE emission from bearing/length/distance:**
 
 When a structure config has `bearing_degrees`, `length_m`, and `distance_m` but no explicit `coordinates` field, the runner computes endpoint coordinates (geodesic projection from the spot pin) and emits the OBSTACLE line. Every structure is logged at INFO as emitted or WARNING as skipped — never silent.
@@ -2321,6 +2370,17 @@ updates do not write hotstarts.
 completion marker prevents duplicate completed-cycle work. On model failure the
 last-good payload remains available; failed or empty runs do not write the
 completion marker.
+
+**R6/R7 serving identity (as-built source behavior, 2026-09-03):** the
+last-good payload keeps its original full-run `run_time` and
+`hrrr_cycle_time`; eligibility expires after seven days, and a restored cache
+is not made newer by the restore operation. Full-run and fast-fill writes keep
+the selected full-cycle identity. Fast fills replace only their h0–h11
+snapshots and record per-hour `forecast_provenance`; untouched hours retain
+their existing producer metadata. A cache or deep-water identity mismatch is
+not repaired by combining runs: the endpoint returns the existing unavailable
+shape instead (`providers/nearshore/swan.py`, `services/model_wave_source.py`,
+`endpoints/surf.py`).
 
 **Cache payload shape** (per-spot, stored at `last_good_key`):
 
@@ -3249,6 +3309,24 @@ complete, validated pair may replace it; the exact durable generation identity,
 reference tracking, and deletion procedure remain evidence gates, not a
 best-effort prune rule.
 
+**Source reconciliation (2026-09-03).** The current producer derives its O/H/D
+roles from the persisted setup contract, then runs the native inventory and
+two native output selectors in `service.py` and `services/ww3_runner.py`.
+The inventory is stdout-only and is not promoted as an artifact. The H
+selector accepts the ordered unique effective `L2P*` subsequence only when
+land-filter gaps agree with native `ww3_shel` evidence; the D selector follows
+the versioned `diagnostic_output_contract` in native inventory order. Each
+leg and horizon writes separate H and D transfer files, records setup identity
+and hashes in the atomic state snapshot, and refuses an incomplete or
+mismatched pair.
+
+The full-run merge uses the cycle's +0…+6 transfer and the newest compatible
+horizon transfer to form one ordered +0…+72 boundary artifact. Full and fast
+paths consume that same selected boundary through direct `BOUNDNEST3`; the
+fast path does not build a second boundary or mix a newer deep-water transfer
+with older nearshore output. These statements are source behavior, not live
+acceptance evidence; A0/A0-I, R1, R2, and recovery gates remain open.
+
 **Refuse semantics — no silent fallback (PRIME DIRECTIVE 8):** a build/run failure on the WW3 leg refuses, never degrades to a fabricated or stale-but-unflagged boundary — the same refuse-not-degrade posture every input in this chain follows (rules/coding.md §1). The restart-chaining staleness gate is `WW3_RESTART_MAX_AGE_H = 9` (ADR-109 D11, by analogy to the legacy `L1_NEST_MAX_AGE_H` constant name — a proposed value, not a WW3-specific measurement; the name is now shared/repurposed as the WW3-chain archive staleness gate, marine `3c550ae`): when the WW3 leg's most recent restart exceeds this age, the WW3-leg cycle refuses to publish its artifacts and health reports the named reason (see OPERATIONS-MANUAL.md for the full monitoring-key list).
 
 **Full parameterization catalog — pointer only, not duplicated here.** Every WW3 configuration input (switch-file physics-package selections, `ww3_grid.inp` namelist parameters, grid definition, the four deck time steps, spectral discretization, boundary placement/point spacing, obstruction-grid generation, wind regridding, nest-output point placement) traces to a derivation rule in **ADR-109 D13's embedded F5 parameterization catalog** — the full catalog, including the 7 catalog groups and the 23 measured hands-on traps, is the single source of truth (PRIME DIRECTIVE 11: no generic model setup; a deck line with no catalog row is a defect, not a default). Do not duplicate the catalog here — see ADR-109 D13 directly.
@@ -3256,6 +3334,8 @@ best-effort prune rule.
 **Physics package:** P1 (ST6/FLX4 — ST6 is the wave-growth/decay physics package, FLX4 its paired wind-stress formulation; the same physics family as the existing SWAN deck's `GEN3 ST6 … AGROW`) — ADR-109 D4, the only candidate with real-ocean buoy validation (`scratch/F4-BUOY-VALIDATION-REPORT.md`: restart-chained G1×P1 matches NDBC 46253/46222 within 5–15% on Hs, direction within ±10–15°, period within ±3 s).
 
 **G1 partially-land cells — fraction-based mask, FLAGTR=2 transparency field (S8.1-A, 2026-08-27; ADR-109 amendment, Proposed).** The G1 wet/dry mask (D3) used to classify every cell wet or dry from ONE ETOPO 2022 15" (~460 m) sample nearest its centre — a coastline cell was entirely wall or entirely pass on the luck of which sample sat there, over- or under-counting an island whose tip only partly covers a cell (operator direction 2026-08-27: "it should also apply to cells that are not 100 percent island"). `derive_ww3_setup()` (`services/swan_domain.py`) now accepts an optional `fine_dem` — a NOAA NCEI Coastal Relief Model (CRM) Vol. 6 cut (~90 m/3", `services/bathymetry_resolver.fetch_crm_grid()`, a second OPeNDAP THREDDS collection distinct from the existing `regional/` DEMs) fetched/cached once by `services/ww3_grid_files.fetch_or_load_g1_fine_dem()` as `/etc/weewx-clearskies/swan_bathymetry_G1_fine.npz`. When supplied, every G1 cell gets a real **open-water fraction** `f` (share of native-resolution fine samples inside the cell's footprint with elevation < 0, vectorised binning — never a Python loop over the fine source). A cell is DRY iff `f ≤ F_DRY` (named constant, `0.05`, Q10-2), WET otherwise, carrying transparency `τ = f`; the S-row/W-column active-boundary test reads the SAME fraction mask. `G1_bottom.txt` keeps the ETOPO nearest-sample depth for every cell EXCEPT one wet by fraction whose centre ETOPO sample is land — that cell's depth becomes the mean of the fine-DEM's own wet samples inside it (`services/ww3_grid_files.wet_mean_depth()`; refuses rather than fabricates a depth if none exist). The deck gains `&MISC FLAGTR = 2 /` and the obstruction read line (`   12 1.0 1 1 '(....)' 'NAME' 'G1_obstr.txt'` — unit 12, distinct from the bottom/status units) **between the bottom-depth read and the status-map read** (as-built correction 2026-08-27, marine `d7d8632`: the first production `ww3_grid` run refused rc=62 with the obstruction line after the status map, and `G1_obstr.txt` must carry TWO NX×NY maps — x- then y-direction, written identical — or `w3grid` fails `PREMATURE END OF FILE`; and — second correction, 2026-08-28 reality gate — the maps hold **fractional obstruction `1 − τ`** (manual :15931: "fractional obstructions", 0 = open water), NOT the transparency `τ`: written as `τ`, every open-water cell was a full wall and the first rebuilt-grid transfer carried exactly 0.0 m at every point for every hour; all pinned by `tests/services/test_s81_ww3_grid_live_grammar.py`); `services/ww3_grid_files.write_ww3_grid_name_files()` writes `G1_bottom.txt`/`G1_status.txt`/`G1_obstr.txt` (nothing wrote these files before this round). `fine_dem=None` (no fine DEM available) reproduces the pre-round derivation byte-identical — FLAGTR=0, no obstruction field. A fetch failure refuses the whole `ww3_leg` derivation for that cycle (no ETOPO substitution — ETOPO's ~5.6 samples/cell cannot meet the fraction field's accuracy target). **Round A does not run `ww3_grid` or touch `level0/mod_def.ww3`** — the production rebuild hook on geometry/config change is a separate round (S8.1-B, Gap G10). See ADR-109's "Amendment (2026-08-27): D3/D13 Group2 — G1 partially-land cells" for the full design and KAT record.
+
+**D15 horizontal occupancy (recovery plan, A0/A1).** OSM is the sole authority for G1 horizontal water fraction: ocean setup uses directed `natural=coastline` ways, and Great Lakes/inland setup uses complete `natural=water` + `water=lake` rings. The fraction is `τ = water_area / cell_area`; the obstruction map is `1 − τ`. Incomplete, malformed, unhashable, or bbox-clipped OSM geometry refuses setup. Regular datum-converted bathymetry remains the sole depth authority for every cell; an OSM-wet cell without a valid regular-bathymetry depth refuses, and neither CRM nor another fine-depth source substitutes for it. The persisted setup identity includes the OSM geometry identity so an occupancy-source change invalidates dependent model artifacts together.
 
 **Daily continuation march (Q16 Round A, 2026-08-25; ADR-109 amendment note) — attempted remedy for the frozen-forecast defect.** Before this round, SWAN L2's 73-hour full run consumed the leg's 7-record (6 h) transfer as its offshore boundary for all 73 forecast hours, holding the +6 h ocean state frozen from hour 7 on (SWAN's own log: "data on boundary file exhausted," every cycle since 2026-08-19). Once daily at the **00Z** cycle, strictly AFTER that cycle's own 6 h leg and its production publish complete, WW3 marches **cycle+6 h → cycle+96 h** on the same G1 grid/binary/physics, starting from a **COPY** of the leg's own +6 h restart file (the leg's restart chain, D10, trap 23 stamping, is untouched — never consumed or diverted). 96 h, not 73: the worst-placed consumer cycle runs 24 h after the daily march, so covering all 72 forecast hours for every intervening cycle requires 24 + 72 = 96 h exact cover (Q16.1). Wall-clock ≈4 h at the standing D12 contention budget (`OMP_NUM_THREADS ≤ 4`, `nice 15`, never concurrent with a production full run); ceiling 6 h. Constants are fixed, not config keys: cycle 00Z, span 96 h, retention 2 (newest `level0/horizon_<token>/` directories kept). A horizon-march refusal logs its named reason; R3 separately refuses any L2 run that proves its staged boundary exhausted.
 
@@ -3265,9 +3345,11 @@ best-effort prune rule.
 
 **Fetch depths extended (Q16.1; wind corrected Q17).** Boundary partition fields to **+99 h** (was 72); GFS far-window wind to **+108 h** (was 84; Q16.1 set 96, corrected to 108 by Q17, operator ruling 2026-08-27 "a": the wind gatherer holds the GFS run one 6 h step BEHIND the march's HRRR cycle when the march fires — NOAA posts the 00Z GFS +96 h file ~04:00Z, after the ~03:30Z march — so +96 h reached only cycle+90 h and the march refused `ww3_horizon_wind_short` on every attempt; +108 h covers cycle+96 h under a two-step lag, +4 GRIB2 files per GFS cycle, 17 → 21), at GFS's own native 3-hourly cadence — no interpolation code of ours added anywhere; WW3 interpolates forcing internally (manual-cited: `docs/reference/ww3-user-manual-v6.07.txt` :8211, :10155–159, :14405–409). Per-cycle fetch cost: 25 → 34 GRIB2 files (**+36%**), uniformly across all cycles (the leg's own fetch depth grows too, to stay one fetch path — not just the 00Z long-march cycle). Great-Lakes product depth deliberately NOT extended (unused at this deployment).
 
-**Merged boundary transfer (the delivery mechanism for the march above — no change inside SWAN itself).** Each full cycle stages ONE BOUNDNEST3 transfer file for SWAN L2: the cycle's own 6 h leg records for hours 0–6, the newest horizon march's records for hours 7–72. Byte-preserving splice; header/axis/point-list must be byte-identical between the two sources or the merge refuses loudly. No horizon file (or short coverage) → stage the nowcast file alone with one WARNING (`ww3_horizon_short`). **R3 (2026-08-29) makes an exhausted staged boundary fail closed:** after the L2 PRINT/convergence check, exhaustion takes precedence even when convergence also fails. The run refuses before L2 hotstart promotion, parsing, L3/L4, cache, or marker writes. The full path re-raises for the normal same-cycle retry; the fast path returns no update. Both preserve last-good output. R3 does not mutate a prior persistent hotstart; the pre-existing crash-cleanup path remains responsible for deleting a hotstart set that crashed SWAN and retrying cold, and does not restore that poisoned state. This does not establish that the horizon merge is fixed. Hourly fill cycles (CHAIN-SERVES D8's hourly-substitution design) inherit the staged (merged) file unchanged — no new mechanism at that seam.
+**Merged boundary transfer (the delivery mechanism for the march above — no change inside SWAN itself).** Each full cycle streams one BOUNDNEST3 candidate for SWAN L2: the cycle's own records for hours 0–6 plus the newest horizon records for hours 7–72, exactly 73 hourly records. Header/axes and ordered point name/latitude/longitude/depth identity must match exactly; changing wind/current metadata is preserved verbatim. A missing, malformed, short, gapped, duplicated, or incompatible horizon refuses before SWAN — the raw six-hour leg is never a full-run or fast-run fallback. The candidate is written atomically under `level0/hstage_<token>/`; only after the downstream full run publishes is it promoted to the exact canonical path `level0/hstage_<token>/ww3_l2_transfer.ww3`. The same atomic state snapshot records that canonical path and SHA-256 hash with full-run success. A failed attempt removes its private candidate and leaves the previous canonical artifact unchanged. Fast fill resolves and hash-verifies that selected canonical artifact with the existing nine-hour age gate. **R3 (2026-08-29) makes an exhausted staged boundary fail closed:** after the L2 PRINT/convergence check, exhaustion takes precedence even when convergence also fails. The run refuses before L2 hotstart promotion, parsing, L3/L4, cache, or marker writes. The full path re-raises for the normal same-cycle retry; the fast path returns no update. Both preserve last-good output. R3 does not mutate a prior persistent hotstart; the pre-existing crash-cleanup path remains responsible for deleting a hotstart set that crashed SWAN and retrying cold, and does not restore that poisoned state.
 
 **Health surfaces.** New top-level `ww3Horizon` block (`lastSuccessCycleTime`, `coverageEndTime`, `wallClockS`, `refuseReason`, and — J28 — `inFlight`, `inFlightCycleTime`, `lastAttemptCycleTime`, `lastAttemptAt`) and existing `fullRun.l2BoundaryExhausted` boolean: a detector scans SWAN L2's PRINT output every run for the "data on boundary file exhausted" warning and surfaces it (one WARNING log line + the health boolean, FALSE=healthy, TRUE=a regression signal). **R3 (2026-08-29): TRUE is a failed cycle, not degraded published output.** Full and fast paths record the existing `no-publish: l2_boundary_exhausted` reason exactly once. A persisted successful fast update resets the flag and clears only that matching no-publish reason. The health reducer suppresses its legacy frozen-ocean reason when that no-publish reason is present. For legacy/restored flag-only state, it instead says the last attempt was refused with `attemptCycle=unknown`, and separately reports `pendingFullCycle` and `lastGoodCycle`; it does not invent a fast-cycle identity. The `ww3Horizon` block itself still never feeds `status`. `ww3Horizon.inFlight` is also what `scripts/deploy-marine.sh` reads before restarting the service (it waits, up to 6.5 h, rather than kill a running march; `--force-restart` overrides). See OPERATIONS-MANUAL.md for the full monitoring-key list.
+
+**Same-cycle WW3 reuse (R9).** A downstream SWAN refusal may reuse a completed six-hour WW3 leg only in the same service process and only if the input fingerprint still agrees: trigger cycle, exact persisted grid derivation, configured WW3 binary hashes, persisted NOAA boundary-cycle pin, source/cycle/fetch identities for every +0…+6 wind record, and the current configuration/geometry. It then requires the retained WW3 transfer and diagnostic transfer, +6 restart, nest output, and NOAA pin to be non-empty; the transfer must parse as exactly the ordered +0…+6 record sequence. A changed or incomplete component reruns WW3. This eligibility is intentionally memory-only, so restart survival is conservative rerun rather than unverified reuse; reuse never changes the leg success timestamp.
 
 **New artifacts + retention.** `level0/horizon_<token>/`, `level0/hstage_<token>/` (merge staging), and `level0/boundary_cycle_<token>.txt` (the NOAA cycle pin above) are additive to ADR-109 D12's `level0/` layout. In the unmerged A1 candidate, the existing atomic state snapshot records each current/preceding complete pair's directory token, setup identity, filenames, and file hashes. Only a third fully checked pair can retire the oldest record, and removal then requires both retained files to be present and hash-matched; incomplete, changed, or unrecorded directories are never removed. Disk use remains bounded only after this candidate's acceptance and deployment gates.
 

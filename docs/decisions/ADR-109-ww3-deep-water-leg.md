@@ -929,6 +929,35 @@ Retention is semantic rather than time-only: an H/D pair is retained together wh
 referenced, or the complete rollback predecessor. A0-I must still name the durable generation
 identity and reference-tracking mechanism before any deletion or promotion policy is implemented.
 
+## Amendment (2026-09-03): recovery-wave source reconciliation
+
+**Status: as-built clarification; recovery gates remain open.** The current
+Marine Model Recovery coding wave implements the approved A1/R1/R2 producer
+seams without changing this ADR's WW3 physics, grid, transfer grammar, or
+cadence. `grid_sizing_chain.py` and `swan_domain.py` persist one setup
+derivation with separate O/H/D contracts. The O contract uses OSM occupancy
+for wet outer-perimeter cells and regular datum-converted bathymetry for depth;
+the H contract is one ordered complete rectangular `CLOSED` L2 curve; D is a separate native-order
+diagnostic contract.
+
+After `ww3_shel`, `service.py` runs an ephemeral native `ww3_outp ITYPE=0`
+inventory. `services/ww3_runner.py` keeps that inventory out of promoted
+artifacts. `service.py::_ww3_build_post_shel_outp_plan()` validates the ordered
+unique effective `L2P*` subsequence against native land-filter evidence, then
+performs separate formatted native `ww3_outp` passes for H and D. A malformed,
+missing, or mismatched H/D output refuses the transaction; `state.py` records
+complete pair references and hashes in the existing atomic snapshot.
+
+The direct SWAN L2 handoff reads the selected H transfer with `BOUNDNEST3`.
+The full-run merge selects the cycle's +0…+6 records and a compatible horizon
+transfer for +7…+72; the fast fill reuses that selected boundary and does not
+mix a newer WW3 transfer with older nearshore output. Same-process WW3 reuse
+requires a matching full input identity and non-empty verified artifacts; a
+service restart reruns conservatively (`service.py`, `state.py`,
+`providers/nearshore/swan.py`). This is source behavior, not live acceptance
+evidence; A0/A0-I, R1, R2, and recovery gates are still open. Exact
+cycle-directory retention/deletion remains an open operator question.
+
 ## References
 
 - Plan: `docs/planning/MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.md` — §WW3 MODEL DESIGN
