@@ -217,18 +217,22 @@ historical-cold-run, native-binary, compatibility, retention, or live acceptance
 ### 5.7 As-built restart/resume and cleanup
 
 The completed recovery implementation resumes only owner-verified stages whose
-checkpoint still matches the current cycle, input identity, coverage, and
-SHA-256 hashes of the retained outputs. The atomic state snapshot restores
+checkpoint still names the current cycle and carries SHA-256 hashes of the
+retained outputs. The atomic state snapshot restores
 checkpoints for the WW3 leg, WW3 horizon, SWAN L2/L3/L4, SwellTrack, cache, and
 publication. In the full production recovery path, the runner reuses a
-completed WW3 leg and horizon only when their checkpoints and retained files
-still match; otherwise it rebuilds the affected stage and invalidates
-downstream checkpoints. The full SWAN L2/L3/L4 runner uses the same callback
-rule, so a verified level resumes while
-an identity or output mismatch forces that level and its downstream work to
-run again. The final SwellTrack/cache/publication tail resumes only when the
-forecast-cache artifact, coverage, final identity, and all three checkpoints
-match; otherwise the service re-enters that tail from SwellTrack.
+completed WW3 leg and horizon after restart or downstream failure while their
+checkpoints and retained files still match. For a same-cycle retry, only a
+missing or corrupt output proof causes that stage to rebuild; a new cycle
+starts a new stage attempt. Fresh provider timestamps or runtime identity
+alone do not invalidate a verified output. The full SWAN L2/L3/L4 runner uses the same
+callback rule, so a verified level remains available while only that level's
+missing or corrupt output causes it to run again. The final
+SwellTrack/cache/publication tail resumes only when the restored forecast-cache
+artifact and all three output checkpoints match; otherwise the service
+re-enters that tail from SwellTrack. The merged `ww3_l2_transfer.ww3` boundary
+is retained as the selected artifact and reused while its recorded file hash
+still matches; a downstream refusal does not delete or replace it.
 
 Private work is cleaned by ownership boundary. `WW3Runner.run_leg_cycle()`
 keeps its destination untouched until the complete WW3/H/D transaction

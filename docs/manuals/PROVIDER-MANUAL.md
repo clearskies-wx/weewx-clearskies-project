@@ -3349,7 +3349,7 @@ acceptance evidence; A0/A0-I, R1, R2, and recovery gates remain open.
 
 **Health surfaces.** New top-level `ww3Horizon` block (`lastSuccessCycleTime`, `coverageEndTime`, `wallClockS`, `refuseReason`, and — J28 — `inFlight`, `inFlightCycleTime`, `lastAttemptCycleTime`, `lastAttemptAt`) and existing `fullRun.l2BoundaryExhausted` boolean: a detector scans SWAN L2's PRINT output every run for the "data on boundary file exhausted" warning and surfaces it (one WARNING log line + the health boolean, FALSE=healthy, TRUE=a regression signal). **R3 (2026-08-29): TRUE is a failed cycle, not degraded published output.** Full and fast paths record the existing `no-publish: l2_boundary_exhausted` reason exactly once. A persisted successful fast update resets the flag and clears only that matching no-publish reason. The health reducer suppresses its legacy frozen-ocean reason when that no-publish reason is present. For legacy/restored flag-only state, it instead says the last attempt was refused with `attemptCycle=unknown`, and separately reports `pendingFullCycle` and `lastGoodCycle`; it does not invent a fast-cycle identity. The `ww3Horizon` block itself still never feeds `status`. `ww3Horizon.inFlight` is also what `scripts/deploy-marine.sh` reads before restarting the service (it waits, up to 6.5 h, rather than kill a running march; `--force-restart` overrides). See OPERATIONS-MANUAL.md for the full monitoring-key list.
 
-**Same-cycle WW3 reuse (R9).** A downstream SWAN refusal may reuse a completed six-hour WW3 leg only in the same service process and only if the input fingerprint still agrees: trigger cycle, exact persisted grid derivation, configured WW3 binary hashes, persisted NOAA boundary-cycle pin, source/cycle/fetch identities for every +0…+6 wind record, and the current configuration/geometry. It then requires the retained WW3 transfer and diagnostic transfer, +6 restart, nest output, and NOAA pin to be non-empty; the transfer must parse as exactly the ordered +0…+6 record sequence. A changed or incomplete component reruns WW3. This eligibility is intentionally memory-only, so restart survival is conservative rerun rather than unverified reuse; reuse never changes the leg success timestamp.
+**WW3 output reuse (R9).** A downstream SWAN refusal may reuse a completed six-hour WW3 leg for the same cycle when the recovery checkpoint proves that the retained WW3 transfer and diagnostic transfer, +6 restart, nest output, and NOAA pin are present, non-empty, and the transfer records are exactly the ordered +0…+6 sequence. Only a missing or corrupt WW3 output proof causes that leg to rerun; a downstream refusal does not discard the completed leg or selected merged boundary. Reuse never changes the leg success timestamp, and the same output-hash rule remains available after a process restart.
 
 **New artifacts + retention.** `level0/horizon_<token>/`, `level0/hstage_<token>/` (merge staging), and `level0/boundary_cycle_<token>.txt` (the NOAA cycle pin above) are additive to ADR-109 D12's `level0/` layout. In the unmerged A1 candidate, the existing atomic state snapshot records each current/preceding complete pair's directory token, setup identity, filenames, and file hashes. Only a third fully checked pair can retire the oldest record, and removal then requires both retained files to be present and hash-matched; incomplete, changed, or unrecorded directories are never removed. Disk use remains bounded only after this candidate's acceptance and deployment gates.
 
@@ -3369,12 +3369,18 @@ it does not close A0, A0-I, R1, R2, R11, or their evidence and acceptance gates.
 **Restart/resume and cleanup (as-built recovery behavior).** The marine state
 snapshot stores owner-validated checkpoints for the WW3 leg, its horizon,
 SWAN L2/L3/L4, SwellTrack, cache, and publication. In the full production
-recovery path after a process restart, each completed stage is reusable only when its cycle, input identity, coverage,
-and retained-output hashes still match. WW3 and the horizon are checked before
-the chain proceeds; SWAN's runner callbacks then reuse verified L2/L3/L4 work;
-the final SwellTrack/cache/publication tail reuses the restored forecast-cache
-artifact only when all three final checkpoints agree. Any mismatch invalidates
-that stage and downstream checkpoints and causes recomputation.
+recovery path after a process restart, completed stages remain reusable when
+their cycle checkpoint and retained-output hashes still match. For a same-cycle
+retry, only a stage's own missing or corrupt output proof causes recomputation;
+a new cycle starts a new stage attempt. Fresh provider timestamps or runtime
+identity alone do not invalidate verified output. WW3 and the
+horizon are checked before the chain proceeds; SWAN's runner callbacks then
+reuse verified L2/L3/L4 work. The final SwellTrack/cache/publication tail
+reuses the restored forecast-cache artifact when all three final output
+checkpoints agree. Only a stage's own missing or corrupt output causes that
+stage to recompute; a downstream refusal does not discard completed upstream
+output. The selected merged `ww3_l2_transfer.ww3` boundary is retained and
+reused while its recorded hash matches.
 
 `WW3Runner.run_leg_cycle()` keeps per-cycle work in a private staging tree and
 removes that tree on success or refusal; the destination is untouched until the

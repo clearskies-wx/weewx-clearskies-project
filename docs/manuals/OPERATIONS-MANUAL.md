@@ -1598,7 +1598,7 @@ cmp level0/mod_def.ww3 level0/mod_def.ww3.prev-<token>   # (expect: differ, afte
 
 **Disk/retention — R2 boundary selection.** `level0/horizon_<token>/` holds raw continuation output and remains independently retained from the consumer merge. `level0/hstage_<token>/ww3_l2_transfer.ww3` is the selected 73-record consumer boundary for that cycle. A full run first writes a private candidate in the same hstage directory; only a successfully published full run promotes it atomically to that exact canonical filename and records its path and SHA-256 with full-run success in `state_snapshot.json`. A failed candidate is removed and must not replace a previous selected canonical boundary. Operators must not copy, rename, or prune a selected canonical artifact by hand; use the normal recovery/rollback procedure so the state reference and file remain matched. `level0/boundary_cycle_<token>.txt` is the NOAA cycle pin the horizon march re-fetches against. Disk: horizon transfer output runs to hundreds of MB/day, retention-bounded (394 GB free measured at implementation time). See PROVIDER-MANUAL.md §14.18.
 
-**R9 retry/deploy guard.** A repeated full-run attempt can reuse its own WW3 leg only in the same running service process, for the identical full input identity: cycle, grid derivation, pinned WW3 binaries, NOAA boundary-cycle pin, hourly wind source records, and configuration/geometry. The service checks that the retained transfer, diagnostic transfer, +6 restart, nest output, and boundary pin still exist, are non-empty, and that the transfer records are exactly ordered from +0 through +6 hours. Any missing/corrupt artifact or changed identity reruns WW3; a service restart has no reusable in-memory identity and reruns conservatively. Reuse never records a new WW3 success time. `run_in_progress` covers the complete production attempt from WW3 through boundary staging, SWAN, parse, SwellTrack, and publication; its outer cleanup clears it on every refusal or exception. The guarded deployment script treats that active state as busy and does not restart the service.
+**R9 retry/deploy guard.** A repeated full-run attempt can reuse its completed WW3 leg for the same cycle when the recovery checkpoint proves the retained transfer, diagnostic transfer, +6 restart, nest output, and boundary pin are present, non-empty, and the transfer records are exactly ordered from +0 through +6 hours. Only a missing or corrupt WW3 output proof causes that leg to rerun; a downstream SWAN refusal does not discard the completed leg or selected merged boundary. Reuse does not record a new WW3 success time. `run_in_progress` covers the complete production attempt from WW3 through boundary staging, SWAN, parse, SwellTrack, and publication; its outer cleanup clears it on every refusal or exception. The guarded deployment script treats that active state as busy and does not restart the service.
 
 **Build/install-time verification citation:** the build/install steps above are the proven Phase F steps — see `scratch/F1-BUILD-REPORT.md` (cited in full via ADR-109 D2/D13). Supported-environment matrix for the WW3 build follows the marine service's own matrix above (native Debian/Ubuntu, LXD container, Docker, Proxmox VM, Raspberry Pi) — no additional environment constraints beyond gfortran/OpenMPI/NetCDF, which the marine service's `[nearshore]` extra already requires for SWAN.
 
@@ -1632,17 +1632,22 @@ complete A0, A0-I, A1, R1, R2, or full recovery.
 #### Restart/resume and cleanup (as-built recovery behavior)
 
 After a service restart, a stage resumes only when its owner-validated
-checkpoint still matches the current cycle, input identity, coverage, and
-SHA-256 hashes of its retained outputs. The existing atomic state snapshot
+checkpoint still names the current cycle and carries SHA-256 hashes of its
+retained outputs. The existing atomic state snapshot
 stores checkpoints for the WW3 leg, horizon, SWAN L2/L3/L4, SwellTrack, cache,
-and publication. In the full production recovery path, the runner reuses
-verified WW3 and horizon output; SWAN reuses verified L2/L3/L4 work
-directories; and the final SwellTrack/cache/publication tail reuses the
-restored forecast-cache artifact only when all three final checkpoints and
-their identity/coverage/hash proof match. Any
-missing or changed proof invalidates that stage and its downstream reuse
-(`state.py`, `service.py`, `providers/nearshore/swan.py`, and
-`services/swan_runner.py`).
+and publication. In the full production recovery path, verified WW3 and
+horizon output remains reusable after a restart or downstream refusal. For a
+same-cycle retry, only a stage's own missing or corrupt output proof causes a
+rebuild; a new cycle starts a new stage attempt. Fresh provider timestamps or
+runtime identity alone do not invalidate verified output. SWAN
+reuses verified L2/L3/L4 work directories, and the final
+SwellTrack/cache/publication tail reuses the restored forecast-cache artifact
+when its three output checkpoints still match. Only a stage's own missing or
+corrupt output causes that stage to rebuild; a downstream refusal leaves
+completed upstream output available (`state.py`, `service.py`,
+`providers/nearshore/swan.py`, and `services/swan_runner.py`). The selected
+merged `ww3_l2_transfer.ww3` boundary is retained and reused while its
+recorded hash matches.
 
 WW3's per-cycle staging tree is private and is removed on either successful
 promotion or refusal; its destination remains untouched until the complete
