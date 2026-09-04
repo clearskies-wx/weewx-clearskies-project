@@ -3366,6 +3366,34 @@ SWAN and retains verified last-good output if one exists. The seven-record leg
 transfer is never a production fallback. This restores the recovery plan §§5.3–5.4;
 it does not close A0, A0-I, R1, R2, R11, or their evidence and acceptance gates.
 
+**Restart/resume and cleanup (as-built recovery behavior).** The marine state
+snapshot stores owner-validated checkpoints for the WW3 leg, its horizon,
+SWAN L2/L3/L4, SwellTrack, cache, and publication. In the full production
+recovery path after a process restart, each completed stage is reusable only when its cycle, input identity, coverage,
+and retained-output hashes still match. WW3 and the horizon are checked before
+the chain proceeds; SWAN's runner callbacks then reuse verified L2/L3/L4 work;
+the final SwellTrack/cache/publication tail reuses the restored forecast-cache
+artifact only when all three final checkpoints agree. Any mismatch invalidates
+that stage and downstream checkpoints and causes recomputation.
+
+`WW3Runner.run_leg_cycle()` keeps per-cycle work in a private staging tree and
+removes that tree on success or refusal; the destination is untouched until the
+complete H/D transaction succeeds. SWAN removes only unproved private
+input/forcing/intermediate files before rewriting a non-verified level. A
+failed level's diagnostic work is retained for diagnosis, but its checkpoint
+is invalidated and cannot authorize reuse. Durable cache, grid-sizing,
+bathymetry, and WW3 restart files are outside this cleanup path
+(`state.py`, `service.py`, `services/ww3_runner.py`,
+`services/swan_runner.py`, and `providers/nearshore/swan.py`).
+
+The order is WW3 six-hour leg → +6…+96 horizon → verified +0…+72 merge →
+forcing/preflight → SWAN L2–L4 → SwellTrack → cache → publication. The local
+WW3 v6.07 manual's Type 4 restart-file section (`docs/reference/ww3-user-manual-v6.07.txt`,
+around line 19098) governs restart-file input; the SWAN manual's `BOUNDNEST3`
+section requires sequential formatted WW3 output locations and the 0.1
+corridor (`docs/reference/swan-user-manual.txt`, pp. 54–55). `INITIAL HOTSTART`
+is used only with verified input; failed or poisoned hotstarts are not reused.
+
 ### §14.19 Swell-card deep-water reference points (Q16 Round B, 2026-08-25)
 
 **What this is.** The swell display card's catalog (`multiSwell`, `swellHeight`, `swellHeightMinFt`/`MaxFt`, `periodMinS`/`MaxS`, `spectralComponents`) is now sourced primarily from watershed partitions of the WW3 deep-water leg's own spectra (§14.18), read at a small fan of **deep-water reference points** — deep water (≥ 200 m), post-island-shadowing, PRE-refraction (the industry-convention, Surfline-style deep-water swell reading). The 15 m SWAN L2 deep-water-reference table described in §14.15's "Multi-SPECOUT extraction" above is unchanged and keeps every job it had except naming the card's swells — see "Fallback" below. **NOT changed by this round:** the 1-D surf pipeline's `canonical_partitions`, `score_surf()`'s cross-swell input, SwellTrack, `perPartitionBreaks`, the 15 m DWR SPECOUT/TABLE outputs, and all surf-score scoring criteria — all still read the 15 m machinery exactly as §14.15/§14.17 describe.

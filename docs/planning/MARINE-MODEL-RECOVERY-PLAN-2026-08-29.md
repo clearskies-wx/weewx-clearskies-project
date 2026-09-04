@@ -214,6 +214,43 @@ source data. It never substitutes the six-hour boundary as a production fallback
 This correction restores §§5.3–5.4. It does not close A0, A0-I, R1, R2, R11, or any required
 historical-cold-run, native-binary, compatibility, retention, or live acceptance gate.
 
+### 5.7 As-built restart/resume and cleanup
+
+The completed recovery implementation resumes only owner-verified stages whose
+checkpoint still matches the current cycle, input identity, coverage, and
+SHA-256 hashes of the retained outputs. The atomic state snapshot restores
+checkpoints for the WW3 leg, WW3 horizon, SWAN L2/L3/L4, SwellTrack, cache, and
+publication. In the full production recovery path, the runner reuses a
+completed WW3 leg and horizon only when their checkpoints and retained files
+still match; otherwise it rebuilds the affected stage and invalidates
+downstream checkpoints. The full SWAN L2/L3/L4 runner uses the same callback
+rule, so a verified level resumes while
+an identity or output mismatch forces that level and its downstream work to
+run again. The final SwellTrack/cache/publication tail resumes only when the
+forecast-cache artifact, coverage, final identity, and all three checkpoints
+match; otherwise the service re-enters that tail from SwellTrack.
+
+Private work is cleaned by ownership boundary. `WW3Runner.run_leg_cycle()`
+keeps its destination untouched until the complete WW3/H/D transaction
+succeeds, and removes its per-cycle staging tree on success or any refusal.
+For SWAN, unproved private input/forcing/intermediate files are removed before
+rewriting a non-verified level. A failed level's diagnostic work is retained
+for diagnosis, while its recovery checkpoint is invalidated and can never
+authorize reuse. No cleanup path deletes the durable forecast cache, grid
+sizing, bathymetry, or WW3 restart outside its explicitly owned state
+(`state.py`, `service.py`, `services/ww3_runner.py`, `services/swan_runner.py`,
+and `providers/nearshore/swan.py`).
+
+The restart sequence remains ordered: WW3 six-hour leg, +6…+96 horizon,
+verified +0…+72 boundary merge, forcing acquisition/preflight, SWAN L2–L4,
+SwellTrack, cache persistence, and publication. The WW3 manual's Type 4
+restart-file contract (`docs/reference/ww3-user-manual-v6.07.txt`, §3.4,
+around line 19098) and the SWAN manual's `BOUNDNEST3` requirements (formatted
+WW3 output points in boundary order and the 0.1 corridor;
+`docs/reference/swan-user-manual.txt`, pp. 54–55) remain the governing input
+gates. SWAN `INITIAL HOTSTART` is only a verified initialization input; a
+failed or poisoned hotstart is not restored or reused.
+
 ## 6. Universal round workflow and agents
 
 Every repair phase is completed as one coding wave in the shared marine repo. The phase does not
@@ -270,6 +307,7 @@ Every completed coding phase must provide:
   project directive; meet engineering and security practices; and agree with the manuals and
   documentation? A stale, omitted, or contradicted document fails the phase.
 - `git diff --check`, changed-file allowlist, and doc-code sync.
+- **WW3/SWAN manual evidence where applicable:** the coding brief and independent reviewer cite the exact local-manual clauses for every changed native command, deck, boundary/transfer, output-point list, or hotstart. Before accepting a live row, preserve the generated deck/input and the relevant native output/log lines, compare them to those clauses, and record the result. A solver exit alone is not manual compliance; provider/cache/recovery behavior remains separately verified by its own gate.
 - Guarded deployment records the deployed commit/process start and checks the journal for new
   warning/error classes. The `test_engineer` then records real host, real input, real output, and
   the observed result for every applicable live condition.
@@ -1707,6 +1745,7 @@ quality-control, deployed, or live-evidence state.
 | 2026-09-03 | R4 / R8b | Independent post-code review found three source defects: unpadded WCOFS subset extraction, insufficient `currentForcing`/WCOFS provenance, and missing required provider/SwellTrack evidence for fast attempts. | Reopened only the affected R4/R8b coding slices; no live test, merge, deployment, or acceptance proceeds until they are corrected and independently re-reviewed. |
 | 2026-09-03 | R4 / R8b | Re-review confirmed the WCOFS two-cell pad but found that some failed fast exits still lacked their owner-stage record and that `hourlyFieldCount` repeated the native source count. | Reopened only those two evidence corrections; no live test, merge, deployment, or acceptance proceeds until the reviewer can verify honest terminal health and native-versus-hourly counts. |
 | 2026-09-03 | R4 / R8b | The final independent source review accepted the two-cell WCOFS pad, native-versus-hourly current counts, successful fast-stage coverage, and truthful owner-only fast refusal records. | Source audit complete; all remaining R4/R8 evidence is live-host-only and remains pending deployment of the reviewed candidate. |
+| 2026-09-03 | R4 / R8b live QC | Natural post-deploy fast cycle `2026-09-03T11:00:00Z` on candidate `df7b421` exhausted WCOFS across both available source paths before SWAN started. | Live refusal evidence passed: `wcofsCurrents`, `providerInputs`, and overall health all reported `currents_fetch_failed`; no SWAN/WW3 subprocess or publication occurred. Successful-current/full-cycle evidence remains pending real source availability. |
 
 - [x] Operator accepts §23's approval boundary and this plan — 2026-08-29.
 - [x] Old forward plan archived; redirect installed — 2026-08-29.

@@ -1629,6 +1629,38 @@ reader still references the older one. The recovery plan §8A A0-I gate must nam
 generation and reference mechanism before this becomes an operator action. This result does not
 complete A0, A0-I, A1, R1, R2, or full recovery.
 
+#### Restart/resume and cleanup (as-built recovery behavior)
+
+After a service restart, a stage resumes only when its owner-validated
+checkpoint still matches the current cycle, input identity, coverage, and
+SHA-256 hashes of its retained outputs. The existing atomic state snapshot
+stores checkpoints for the WW3 leg, horizon, SWAN L2/L3/L4, SwellTrack, cache,
+and publication. In the full production recovery path, the runner reuses
+verified WW3 and horizon output; SWAN reuses verified L2/L3/L4 work
+directories; and the final SwellTrack/cache/publication tail reuses the
+restored forecast-cache artifact only when all three final checkpoints and
+their identity/coverage/hash proof match. Any
+missing or changed proof invalidates that stage and its downstream reuse
+(`state.py`, `service.py`, `providers/nearshore/swan.py`, and
+`services/swan_runner.py`).
+
+WW3's per-cycle staging tree is private and is removed on either successful
+promotion or refusal; its destination remains untouched until the complete
+H/D transaction succeeds. SWAN cleanup removes only unproved private input,
+forcing, intermediate, and temporary hotstart files before rewriting a level.
+Diagnostics from a failed SWAN level remain available for diagnosis, but the
+failure record invalidates its recovery checkpoint, so those diagnostics are
+never reused as model state. Durable forecast cache, grid sizing, bathymetry,
+and WW3 restart artifacts are outside this cleanup boundary.
+
+The ordered recovery path is WW3 six-hour leg → +6…+96 horizon → verified
++0…+72 merge → forcing acquisition/preflight → SWAN L2–L4 → SwellTrack →
+cache persistence → publication. WW3 restart-file grammar follows the local
+v6.07 manual's Type 4 restart section (`docs/reference/ww3-user-manual-v6.07.txt`,
+around line 19098). SWAN's `BOUNDNEST3` gate requires sequential formatted WW3
+output locations and the 0.1 corridor (`docs/reference/swan-user-manual.txt`,
+pp. 54–55); `INITIAL HOTSTART` is used only when its input is verified.
+
 ---
 
 ### §4.1 Config Registry
