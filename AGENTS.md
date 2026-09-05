@@ -38,11 +38,13 @@ There is no separate mode subsystem in this repository. The applicable workflow 
 
 ## Codex model routing
 
-- Primary coordinator: `gpt-5.6-sol`, high reasoning.
-- Standard worker and repository implementation roles: `gpt-5.6-terra`, medium reasoning.
-- Routine reviewer and Clear Skies auditor: `gpt-5.6-terra`, high reasoning, read-only.
-- Difficult troubleshooter: `gpt-5.6-sol`, max reasoning, read-only and diagnostic-only.
-- Mechanical worker: `gpt-5.6-luna`, medium reasoning; it may not resolve ambiguity or architecture.
+- Primary coordinator: `gpt-5.6-terra`, high reasoning. It is the normal user-facing project manager and plan executor.
+- Workhorse coding: `gpt-5.3-codex-spark`, high reasoning, only for bounded implementation tasks with curated context.
+- Expert coding lead, QC, routine review, and research synthesis: `gpt-5.6-terra`, high reasoning. Expert coding leads may oversee bounded Spark workers; QC may coordinate Luna testing evidence; research leads may coordinate Luna retrieval.
+- Testing: `gpt-5.6-luna`, high reasoning, normally under QC direction.
+- Mechanical and retrieval work: `gpt-5.6-luna`, medium reasoning; it may not resolve ambiguity or architecture.
+- SOL adviser: `gpt-5.6-sol`, high reasoning, for exceptional reviews, planning, or difficult high-level tasks only after the user explicitly authorizes that named use in chat.
+- An explicit user model or reasoning-level request always overrides automatic routing.
 - Maximum concurrent supporting agents: three, excluding the coordinator.
 
 Project-local model and agent configuration lives in [.codex/](.codex/README.md). Every supporting agent must read this file and the applicable routed rules, receive bounded ownership, preserve concurrent work, and remain bound by the architectural gate below.
@@ -192,6 +194,13 @@ a remote** — it is where the never-push-without-the-word-"push" rule now lives
 - **Narrate the diagnostic plan before commands.** When investigating a problem, name the hypothesis and what each command tests *before* firing tool calls.
 - **For root-cause questions, never propose creating/editing records until the *why* is established.**
 - **Plain English to the user.** Every technical term, library name, RFC number, file name, or project-internal acronym gets defined the first time it appears in a conversation. Once per conversation is enough; later uses can lean on the earlier definition. New conversation = counter resets. Detailed rule and worked examples in [rules/clearskies-process.md](rules/clearskies-process.md) "Plain English when explaining decisions to the user."
+- **No shorthand technobabble.** Do not communicate with unexplained abbreviations, invented labels, internal shorthand, or compressed technical jargon. State what happened, why it matters, and what action is needed in plain English.
+- **Do not use process as a reason to avoid a decision.** Before calling work blocked, classify the failure from evidence:
+  1. A command, quoting, authentication, or tool-invocation mistake is **not** a system failure or blocker. Correct the invocation or use a safe alternate invocation, then continue.
+  2. Code that fails to perform its already-stated behavior is a **defect**. Trace it, add or run a focused test, make the smallest correction that restores that behavior, and continue. Do not relabel a defect as an architectural question merely because its fix touches persisted state, lifecycle code, or a large file. The existing architectural rule already permits fixing code that diverges from its own stated contract.
+  3. Stop for approval only when the proposed correction itself mechanically meets an architectural trigger and does not merely restore an existing stated contract, or when an external prerequisite genuinely cannot be obtained.
+
+  Before stopping, state in plain English: (a) what the system is supposed to do, (b) what it actually did, and (c) the smallest correction. If (c) restores (a), proceed rather than asking the operator to make that implementation decision. Never sit idle while calling work blocked: check the actual process, health, logs, and next existing recovery path.
 
 ### Self-audit before delivering, and prompt faithfulness → `rules/verification.md`
 
@@ -224,11 +233,11 @@ After a non-trivial task closes, triage the lessons that surfaced and write each
 - Surface the triage to the user before committing the rule edits — they may want to redirect a routing call, or judge that a "lesson" is actually a decision-log fact and not rule-shaped at all.
 - Anti-pattern: writing a long decision-log entry that captures the lesson in narrative form, then closing the task without lifting the rule-shaped portions into the rules files. The decision log earns its keep as a "what happened" record; the rule files earn theirs by shaping what happens next.
 
-### Memory system — DO NOT USE
+### Codex memory and repository records
 
-Auto-memory (the `memory/` directory) is **disabled by policy**. Do not write new memory entries.
+Codex manages its own optional cross-task memory outside this repository. Agents must not create a repository `memory/` directory or manually write, edit, or treat Codex-managed memory as a project record.
 
-**Where things go instead:**
+**Project records belong here instead:**
 - Behavioral rules / feedback / corrections → the relevant `rules/<domain>.md`
 - Facts about systems (URLs, IPs, paths, access methods) → the relevant `reference/<domain>.md`
 - Project plans → `docs/planning/<plan-name>.md`. Completed plans move to `docs/archive/`.
@@ -240,7 +249,6 @@ weather-belchertown/
 ├── AGENTS.md                          # This file — domain routing & operating rules
 ├── .env                               # Credentials (from Windows Server)
 ├── .codex/                           # Active Codex project and agent configuration
-├── .claude/                          # Preserved compatibility configuration; not authoritative
 ├── rules/
 │   ├── weather-skin.md               # Belchertown skin dev rules & practices
 │   ├── github.md                     # GitHub workflow rules

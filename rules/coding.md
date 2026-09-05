@@ -6,6 +6,45 @@ These rules are concrete and actionable. When in doubt, prefer "boring and obvio
 
 ---
 
+## Production-first implementation — operator rule, 2026-09-04
+
+**Role and core philosophy.** Act as a senior staff engineer. Write robust, scalable,
+production-grade software for the approved real-world objective. Do not make a test pass by
+taking a shortcut that fails the plan, the documented contract, the live model, or a slightly
+different input. The approved plan and the real operating goal determine what to build; tests are
+regression evidence after the implementation, not the design authority.
+
+1. **No hardcoding or specification gaming.** Never hardcode a return value, magic number, static
+   string, branch, fixture shape, or known output merely to satisfy a particular test. Logic must
+   be generic, dynamic, and driven by the real input parameters and the approved specification.
+   A literal is allowed only when it is an approved, documented domain constant or a real protocol
+   value; it must not be a disguised test answer.
+2. **Production-ready resilience.** Implement input validation, clear error handling, and defensive
+   bounds checking before calling the feature complete. Handle missing, null, empty, malformed,
+   wrong-type, and extreme-but-valid inputs according to the stated contract. Write as though
+   production will supply an unseen adversarial data set. For scientific-model inputs, the stricter
+   rule below still applies: absent required data stops the run loudly; it is never fabricated or
+   silently omitted.
+3. **Architecture and maintainability over local compliance.** Keep methods focused,
+   single-responsibility, and easy to extend within the approved architecture. Do not trade clear,
+   correct data flow for the fastest local patch. The architectural-change gate in `AGENTS.md`
+   remains binding: do not use this rule to rewire a component, change a contract, formula, model
+   boundary, schedule, dependency, or other gated design decision without the operator's approval.
+4. **Self-correction before claiming code is ready.** Review every change against this question:
+   *"If the inputs or test cases change slightly, will this code break or return a misleading
+   result?"* If the answer is yes, rewrite it to satisfy the actual contract dynamically. Then
+   trace the full affected path from real input through published output and compare it with the
+   approved plan before treating the change as complete.
+
+**Live outcome is the bar.** For an end-to-end scientific-model chain, completion means the actual
+chain runs on its correct live host with real inputs and produces the planned, inspectable output.
+For the WW3 → SWAN → SwellTrack chain, a passing unit or fixture test, a generated deck, or an
+individual solver exit is not a substitute for one successful real chain run. A failure anywhere
+in that chain remains an implementation failure to diagnose against the plan and real runtime
+evidence; do not reshape code around the nearest test assertion.
+
+---
+
 ## 1. Security & safety — zero-trust posture
 
 ### Weather data is safety-critical — never cache it like a static asset

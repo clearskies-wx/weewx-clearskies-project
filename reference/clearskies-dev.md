@@ -83,14 +83,28 @@ The production `docker-compose.yml` (Caddy + api + dashboard) is in the stack re
 
 | Machine | Role | What runs here |
 |---|---|---|
-| **DILBERT** (Windows workstation + WSL2) | Editing, git, planning, orchestration, local Linux unit tests | Codex desktop, VS Code, `git push`, brief-drafting; WSL Python/toolchains in project `scratch/` |
+| **DILBERT** (Windows workstation) | Editing, git, planning, orchestration | Codex desktop, VS Code, `git push`, brief-drafting |
 | **weather-dev** (LXD container on ratbert) | Runtime, tests, builds | `pytest`, `uv`, `docker compose`, `npm`, `vite` |
 
-Do not run Linux project toolchains directly in Windows. **WSL2 on DILBERT is an approved local
-Linux test environment** (operator ruling 2026-08-29): install whatever declared project/test
-dependencies are needed there, with project-specific virtual environments under the meta repo's
-gitignored `scratch/` directory. Do NOT edit source files on weather-dev (except test-author fixture
-captures, which are committed from weather-dev directly).
+Do not run Linux project toolchains directly in Windows. Do NOT edit source files on weather-dev
+(except test-author fixture captures, which are committed from weather-dev directly).
+
+### Linux-subsystem prohibition — operator rule, 2026-09-02
+
+Do not use the Windows Linux subsystem, its shells, or its virtual environments
+for this project. Use the native Windows runtime where available or the correct
+remote host through the approved test and deployment procedures.
+
+### Test-host rule — operator rule, 2026-09-02
+
+**All testing takes place only in the live project environments:**
+`librewxr` for marine work, `weewx` for API/database work, and `weather-dev`
+for dashboard and configuration work. Do not run project tests on the Windows
+workstation or any local substitute. Use the approved deployment/sync procedure
+to place the intended revision on the correct host first, and do not test on a
+host while its live model workload is active. Synthetic, mocked, fixture-only,
+simulated, and fake tests are prohibited: testing must use real available
+inputs and inspect the real output produced by the deployed software.
 
 ## Repo paths
 
@@ -237,6 +251,19 @@ them — never run manual `git pull`, `npm build`, `rsync`, `systemctl restart`,
 or `chown`/`chmod` on containers. See `AGENTS.md` "Filesystem permissions on
 containers" for why.
 
+**Windows shell boundary (2026-09-01):** Run these Bash deployment scripts
+from Git Bash on Windows, not PowerShell. The project SSH configuration uses a
+Windows `c:/...` key path. From a PowerShell-based agent session, invoke Git
+Bash explicitly:
+
+```powershell
+& 'C:\Program Files\Git\usr\bin\bash.exe' -lc 'cd /c/CODE/weather-belchertown && ./scripts/deploy-marine.sh --check-guard'
+```
+
+Use `--check-guard` first. A `busy` or `unknown-busy` result is a successful
+safety refusal, not a reason to retry through another shell or use
+`--force-restart` without an operator-directed decision.
+
 ### Dashboard + config UI → weather-dev
 
 ```bash
@@ -284,15 +311,13 @@ report a result from it.** It was last seen at `ba3af8f`, unrelated to any curre
 
 | Change touches… | Run its **tests** on | Runs in **production** on |
 |---|---|---|
-| WW3, SWAN, SwellTrack, surf endpoint, beach profile, marine providers | **WSL first** for feature-branch unit/contract tests; **librewxr** only for deployed/host-specific integration | **librewxr** — unified marine service on port 8780 |
+| WW3, SWAN, SwellTrack, surf endpoint, beach profile, marine providers | **librewxr**, after the approved deploy path and only while the model service is idle | **librewxr** — unified marine service on port 8780 |
 | Condition modules (haze, calibration, sky, fog), archive/DB, general API | **weewx** | weewx — API installed natively, reads the weewx archive |
 | Dashboard, config UI | **weather-dev** | weather-dev — dashboard build + Caddy |
 
-**Test SWAN/surf feature branches locally in WSL first.** This provides the required Linux runtime
-without changing the production checkout, creating remote scratch copies, or waiting for the model
-host to become idle. Use librewxr afterward for deployed integration, installed-binary behavior,
-real host paths, and live-model evidence. Testing it on weewx is still wrong: that host does not run
-the marine code in production.
+Test SWAN/surf work on librewxr only after the approved deploy path and with
+the model service idle. Testing it on weewx is still wrong: that host does not
+run the marine code in production.
 
 **Corrected 2026-07-25.** This table previously read "run its tests on **weewx** (librewxr has
 no test deps)" for the SWAN/surf row, and the section below asserted librewxr "cannot run
@@ -302,31 +327,23 @@ that does not run SWAN at all — and ran the test suite there. `pytest`, `pytes
 `pytest-timeout` were installed into librewxr's venv on 2026-07-25, so the stated blocker no
 longer exists either.
 
-### Deploy before container tests — WSL tests the local feature branch directly
+### Deploy before container tests
 
-WSL imports and tests the local feature branch directly, so it needs no push or deploy. Every
-container deploy path still pulls **from GitHub**: a pytest run on a container whose checkout
-predates your commit measures old code and is a false-clean result.
+Every container deploy path pulls **from GitHub**: a pytest run on a container
+whose checkout predates your commit measures old code and is a false-clean result.
 
 ```bash
 # Get the code onto weewx WITHOUT restarting the service (safe mid-phase):
 scripts/deploy-api.sh --no-restart
 ```
 
-### Run pytest in WSL first, then on the deployed host where required
+### Run pytest on the deployed host where required
 
-- **WW3, SWAN, SwellTrack, surf endpoint, beach profile, and marine providers:** run targeted unit/
-  contract tests in WSL against the local branch; after deploy, use librewxr for host-specific and
-  live integration evidence.
+- **WW3, SWAN, SwellTrack, surf endpoint, beach profile, and marine providers:** use librewxr only
+  after deployment and only when the model service is idle.
 - **Everything else (conditions, archive/DB, general API) → `weewx`.**
 
 ```bash
-# One-time/reusable local WSL environment (project scratch, gitignored):
-wsl.exe -e bash -lc 'cd /mnt/c/CODE/weather-belchertown && python3 -m venv scratch/wsl-venvs/marine && scratch/wsl-venvs/marine/bin/python -m pip install "./repos/weewx-clearskies-marine[nearshore,dev]"'
-
-# Targeted local marine tests on the current feature branch:
-wsl.exe -e bash -lc 'cd /mnt/c/CODE/weather-belchertown/repos/weewx-clearskies-marine && /mnt/c/CODE/weather-belchertown/scratch/wsl-venvs/marine/bin/python -m pytest tests/test_serve_nothing_on_failure.py -q --tb=short'
-
 # Marine tests — on librewxr, using the marine repository environment:
 ssh -F .local/ssh/config librewxr "sudo -u ubuntu bash -c 'cd /home/ubuntu/repos/weewx-clearskies-marine && .venv/bin/python -m pytest tests/test_z3_full_run_from_store.py -q'"
 ```

@@ -10,6 +10,46 @@ re-running the claim.
 
 ---
 
+## Phase sequencing — operator rule, 2026-09-02
+
+**Complete all coding in an approved phase before starting QC.** Do not
+interleave implementation with test-author rounds, audit rounds, review loops,
+or partial quality gates. During a phase, implement every approved coding item
+and record the exact files changed. Only after that coding phase is complete
+may the coordinator run verification, inspection, independent audit, commit,
+push, deployment, and live evidence collection.
+
+QC must answer the five questions in `rules/verification.md` before a phase
+can close. Tests do not drive production: they are post-coding evidence, not a
+productivity metric or a reason to reshape unfinished production work. Progress
+means completing approved tasks and software working with real inputs and
+outputs on the correct live host.
+
+The approved plan is the binding design. The coordinator must not code outside
+its parameters. Record non-blocking concerns in the plan journal. Raise
+blocking concerns to the operator immediately.
+
+## Persistent execution — operator rule, 2026-09-02
+
+For an active implementation request, do not emit a final response until the
+operator explicitly says **stop**, or every approved plan item is complete and
+its required evidence is recorded.
+
+A final response means work has stopped. Never send an empty, placeholder,
+status-only, or “continuing” final response.
+
+While approved work remains:
+
+- Keep the turn active; use commentary only for real progress or a concrete
+  blocker.
+- A busy deployment guard, active process, failed diagnostic, or incomplete
+  live gate blocks only its affected action. Continue every other unblocked
+  implementation item.
+- Do not ask whether to continue after the operator has already directed the
+  coordinator not to stop.
+
+---
+
 ## 1. Dispatch gate — four things, or the task is not ready
 
 **No agent is dispatched without all four of these written down first:**

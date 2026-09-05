@@ -11,6 +11,30 @@ These rules were collected here on 2026-07-27 from six locations — the root in
 
 ---
 
+## Phase sequencing — operator rule, 2026-09-02
+
+Supporting agents must not begin QC, audit, review, or test-author work while
+the coordinator is still implementing an approved coding phase. The coding
+phase must be completed first. Testing and independent review begin only when
+the coordinator explicitly dispatches the completed phase for QC.
+
+The approved plan is the binding design. Agents may not write code outside its
+parameters. Record non-blocking concerns in the plan journal. Agents must raise
+blocking concerns to the coordinator immediately and wait for the operator's
+direction on affected work.
+
+## Production-first implementation — operator rule, 2026-09-04
+
+Before writing implementation code, agents read and follow
+[`rules/coding.md`](coding.md)'s **"Production-first implementation"** section. The plan and the
+real deployed outcome define success; a passing test does not. Agents must not hardcode or shape
+logic around a visible test case, and must instead implement the complete approved behavior for
+real and adversarial inputs. For a model chain, an agent may not report its slice as sufficient
+evidence that the chain works: the chain must complete a real end-to-end run under the separate
+live-verification rules.
+
+---
+
 ## Git safety — agents and coordinator
 
 These rules apply to ALL repos, ALL domains. No exceptions.
@@ -31,9 +55,13 @@ These rules apply to ALL repos, ALL domains. No exceptions.
 
 ## Agent orchestration
 
-**Coordinator = `gpt-5.6-sol` with high reasoning.** Its job is to understand the governing material, break down work, write focused briefs, monitor, verify claims independently, make bounded judgment calls, and handle coordinator-only Git operations.
+**Coordinator = `gpt-5.6-terra` with high reasoning.** It is the normal user-facing project manager and plan executor. Its job is to understand the governing material, turn approved plans into bounded work, write focused briefs, monitor, verify claims independently, make bounded judgment calls, and handle coordinator-only Git operations. It may make ordinary execution decisions within an approved plan and architecture; architectural triggers still require the user's approval.
 
-**Route supporting work by task shape.** Standard implementation and repository-specific roles use `gpt-5.6-terra` with medium reasoning. Routine review uses Terra with high reasoning and a read-only sandbox. Difficult diagnosis uses `gpt-5.6-sol` with max reasoning and a read-only sandbox. Deterministic mechanical work uses `gpt-5.6-luna` with medium reasoning. Project definitions live in `.codex/agents/`; no more than three supporting agents may run concurrently.
+**Route supporting work by task shape and context budget.** `gpt-5.3-codex-spark` with high reasoning is the default workhorse for bounded implementation. Never give Spark a full plan, whole manuals, broad repository history, or large unfiltered logs: its brief names only the needed plan and manual sections, source files, allowlist, and verification command. A task that needs broad cross-service reasoning, multiple manuals/contracts, substantial history, or several dependent implementation slices goes to an expert coding lead on `gpt-5.6-terra` with high reasoning; that lead may decompose the work and oversee bounded Spark workers. QC, review, and research synthesis use Terra with high reasoning. QC may coordinate Luna test agents; research leads may coordinate Luna retrieval agents. Focused testing uses `gpt-5.6-luna` with high reasoning; deterministic mechanical and retrieval work uses Luna with medium reasoning. Project definitions live in `.codex/agents/`; no more than three supporting agents may run concurrently.
+
+**SOL is a user-authorized escalation, not an automatic lane.** `gpt-5.6-sol` with high reasoning may be used only for exceptional reviews, planning, or difficult high-level tasks after the user explicitly authorizes that named use in chat. The Coordinator records the authorization and purpose before dispatch. An explicit user request for any model or reasoning effort always overrides automatic routing.
+
+**Plans carry delegation intent.** Before execution, the plan identifies the owner role/model for each predictable task, the Spark-safe implementation slices, the Terra-led integration points, the planned QC gates, and any research work. The Coordinator may adapt ordinary sequencing and assignment decisions within the approved plan and architecture, but must keep Spark briefs context-bounded and must surface any architectural trigger to the user.
 
 **Lead reads and researches what it needs to understand — delegate what it doesn't need to personally comprehend.** The coordinator cannot coordinate what it doesn't understand. Reading project documents, tracing code paths, running diagnostic commands, checking logs, verifying container state — these are core coordinator activities when they inform judgment calls, agent prompts, QC, or stalemate-breaking. An agent summarizing a file is not the same as the lead understanding it. The lead reads directly when understanding is the point.
 
@@ -175,7 +203,7 @@ silently reverting across the 2026-07 plans.
 
 1. **Round identity** — round number, date, lead, teammates, auditor.
 2. **Scope (in / out)** — per "Scope binding before agent dispatch" above.
-3. **Reading list** — ordered list of files to read before coding. Extract relevant sections; do not say "read the full rules file" for a 150-line file when 10 lines are relevant. **For any SWAN task, cite the local docs (`docs/reference/swan-user-manual.pdf`, `docs/reference/swan-commands-extract.md`) and explicitly forbid downloading SWAN documentation — the manual is committed; re-fetching it from the web wastes time and tokens (2026-07-29).**
+3. **Reading list** — ordered list of files to read before coding. Extract relevant sections; do not say "read the full rules file" for a 150-line file when 10 lines are relevant. **For any SWAN task, cite the local docs (`docs/reference/swan-user-manual.pdf`, `docs/reference/swan-commands-extract.md`) and explicitly forbid downloading SWAN documentation — the manual is committed; re-fetching it from the web wastes time and tokens (2026-07-29). For any WW3 task, cite `docs/reference/ww3-user-manual-v6.07.txt`, `docs/reference/ww3-commands-extract.md`, and `docs/reference/SYNTAX-607-VERIFICATION.md`; do not web-download those committed manuals. A model-affecting brief names the exact manual clauses governing each generated deck, boundary/transfer, output point list, or native command it changes.**
 4. **Pre-round verification** — what the lead verified before writing the brief (repo HEAD, weather-dev sync state, pytest baseline, cross-check results). This is the lead's evidence that the starting state is clean.
 5. **Per-deliverable spec** — for each endpoint/module/component, the behavior decision tree or equivalent. Not "implement the endpoint" — the specific happy path, error paths, edge cases, and response shapes.
 6. **Lead calls** — decisions the lead has already made that the agent must follow (not re-derive). Cite the reasoning.

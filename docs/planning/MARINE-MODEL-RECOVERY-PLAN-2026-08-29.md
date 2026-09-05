@@ -1734,21 +1734,28 @@ expand the design.
 
 ## 24. Acceptance checklist
 
-### Execution checkpoint — 2026-09-03 (coding wave frozen for independent review)
+### Execution checkpoint — 2026-09-05 (candidate deployed; corrective coding wave active)
 
 This checkpoint is the §6.1 execution ledger. A local test result, control case, simulation, or
 uncommitted source change does not advance any column. Only observed live-host evidence advances a
 quality-control, deployed, or live-evidence state.
 
+The prior 2026-09-03 wording that described the completed coding wave as
+"uncommitted" and "No" under deployment is superseded by observed state: the
+clean candidate is committed and deployed on librewxr at marine
+`eff77fcf00757fb40e3cabe35487dd638beb5289` on
+`feature/ww3-automatic-setup`. Deployment to that test host is not acceptance:
+the A0/A0-I gates and every applicable post-code/live gate remain open.
+
 | Repair | Code | Documentation | QC | Deployed | Live evidence / next state |
 | --- | --- | --- | --- | --- | --- |
 | A0 / A0-I | N/A — evidence-only | Open | Open | N/A | Obtain real librewxr source/native-binary, compatibility, rollback, historical-cold-run, and retention evidence after the A1/R1/R2 coding wave. |
-| A1 / R1 / R2 | **Code complete** — uncommitted coding wave | **Complete** — source/doc reconciliation 2026-09-03 | Source audit passes; live QC pending candidate deployment | No | Obtain A0/A0-I real source/native-binary, compatibility/rollback, retention, and historical-cold-run evidence before merge/deployment. |
+| A1 / R1 / R2 | **Code complete** — committed candidate | **Complete** — source/doc reconciliation 2026-09-03 | Source audit passes; live QC open | Candidate deployed to librewxr; not an accepted deployment | Obtain A0/A0-I real source/native-binary, compatibility/rollback, retention, and historical-cold-run evidence before merge/deployment. |
 | R3 | Historical implementation; compatibility recheck open | Open | Not started | Historical deployment only | Recheck against the accepted R1/R2 contracts and obtain current live evidence before relying on its historic status. |
-| R4a–R4d | **Code complete** — review corrections incorporated | **Complete** — rechecked against corrected source | Source audit passes; live QC pending candidate deployment | No | Obtain the required live WCOFS full/fast, source-clock, preflight, and hotstart-quarantine evidence. |
+| R4a–R4d | **Corrective coding in progress** — live L4 current-file width defect | **Complete** — recheck required after correction | Reopened by live evidence | Candidate deployed to librewxr; not an accepted deployment | Correct L4 CURRENT dimensions, then obtain the required live WCOFS full/fast, source-clock, preflight, and hotstart-quarantine evidence. |
 | R5 | Open | Open | Not started | No | Start only after predecessor coding/deployment gates permit it. |
 | R6 / R7 | **Code complete** — uncommitted coding wave | **Complete** — source/doc reconciliation 2026-09-03 | Source audit passes; live QC pending candidate deployment | No | Obtain provenance/last-good live evidence after the required deployment gate. |
-| R8b / R8c | **Code complete** — review corrections incorporated | **Complete** — rechecked against corrected source | Source audit passes; live QC pending candidate deployment | No | Obtain live marine/API/operator-surface agreement for full, fast, restart, and named refusal states. |
+| R8b / R8c | **R8b corrective coding in progress** — truthful stage/current evidence; R8c open | **Complete** — recheck required after correction | R8b reopened by independent source review | Candidate deployed to librewxr; not an accepted deployment | Correct R8b, then obtain live marine/API/operator-surface agreement for full, fast, restart, and named refusal states. |
 | R9 | **Code complete** — uncommitted coding wave | **Complete** — source/doc reconciliation 2026-09-03 | Source audit passes; live QC pending candidate deployment | No | Obtain guarded deployment/restart evidence; a busy guard remains a safety refusal, not a test failure. |
 | R10A | Open | N/A until evidence exists | Not started | N/A | Gather only the approved evidence; R10B remains unapproved. |
 | R11 | Open | Open | Not started | No | Start after its stated predecessors are complete. |
@@ -1771,6 +1778,9 @@ quality-control, deployed, or live-evidence state.
 | 2026-09-03 | R4 / R8b | Re-review confirmed the WCOFS two-cell pad but found that some failed fast exits still lacked their owner-stage record and that `hourlyFieldCount` repeated the native source count. | Reopened only those two evidence corrections; no live test, merge, deployment, or acceptance proceeds until the reviewer can verify honest terminal health and native-versus-hourly counts. |
 | 2026-09-03 | R4 / R8b | The final independent source review accepted the two-cell WCOFS pad, native-versus-hourly current counts, successful fast-stage coverage, and truthful owner-only fast refusal records. | Source audit complete; all remaining R4/R8 evidence is live-host-only and remains pending deployment of the reviewed candidate. |
 | 2026-09-03 | R4 / R8b live QC | Natural post-deploy fast cycle `2026-09-03T11:00:00Z` on candidate `df7b421` exhausted WCOFS across both available source paths before SWAN started. | Live refusal evidence passed: `wcofsCurrents`, `providerInputs`, and overall health all reported `currents_fetch_failed`; no SWAN/WW3 subprocess or publication occurred. Successful-current/full-cycle evidence remains pending real source availability. |
+| 2026-09-05 | A0 / A0-I | The deployed candidate is committed and running on librewxr, but read-only inventory could not establish the installed WW3 executable/version, retained native WW3 decks/logs, multi-region source cases, compatibility/rollback, historical cold start, or exact approved retention evidence. | Keep A0/A0-I open; use only read-only retained evidence until a separately authorized native evidence action is ready. |
+| 2026-09-05 | R4a–R4c | Live L4 `CURRENT.txt` contains 50 values per row while its active SWAN deck declares 51 x-intervals and therefore requires 52 values. The same live health response reports `inputs.currents.available=true` while compact current forcing is unavailable and incomplete. | Reopen the bounded R4/R8b coding correction. Do not publish new evidence or treat a source tail as complete current forcing until the existing contract is restored. |
+| 2026-09-05 | R8b | Independent source review found that ordinary WW3-horizon refusals can leave the owning stage unknown, fast health can assert L3/L4 success when topology did not run them, and compact current counts can be recorded before emitted/preflight-valid proof. | Reopen only the named R8b owner paths and regression guards; repeat source review and live evidence after the correction. |
 
 - [x] Operator accepts §23's approval boundary and this plan — 2026-08-29.
 - [x] Old forward plan archived; redirect installed — 2026-08-29.

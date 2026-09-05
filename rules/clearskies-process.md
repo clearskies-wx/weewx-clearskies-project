@@ -5,6 +5,17 @@ Incident history and rationale at [reference/process-rule-history.md](../referen
 
 ---
 
+## Approved plan is binding design — operator rule, 2026-09-02
+
+The approved plan is the design and is law for its scope. Code must stay
+within its stated design parameters, sequence, approvals, and gates. Writing
+code outside those parameters is a violation, not an implementation option.
+
+Record non-blocking concerns in the plan journal. Raise a blocking concern to
+the operator immediately, in plain language, before changing affected code.
+
+---
+
 ## Architecture document discipline
 
 **Read `docs/ARCHITECTURE.md` before any architecture work.** Before proposing, discussing, or implementing any infrastructure change, deployment fix, proxy configuration, service placement, container change, endpoint change, or config-file change: read `docs/ARCHITECTURE.md` first. This is the single source of truth for what each service is, where it runs, what it exposes, and how traffic flows. Do not re-derive the architecture from ADRs, observation, or memory.
@@ -133,18 +144,17 @@ Moved 2026-07-27 (task A3). "Audit rules" and "Round-close verification gate" no
 
 ## Runtime environment
 
-**Use WSL for local Linux unit/contract tests; use the correct runtime host for deployed/live
-evidence** (operator ruling 2026-08-29). Do not run Linux project toolchains directly in Windows.
-Project-specific WSL environments live under the meta repo's gitignored `scratch/` directory and
-may install the declared dependencies needed for testing. `weather-dev` remains the dashboard/config
-runtime and browser-build host; weewx remains the API/DB runtime; librewxr remains the marine model
-runtime. File sync/deploy still goes through the project scripts. Browser testing:
+All testing takes place only on the live project hosts: `weather-dev` for dashboard/config work,
+`weewx` for API/DB work, and `librewxr` for marine work. Do not run project tests on the Windows
+workstation or any local substitute. Synthetic, mocked, fixture-only, simulated, and fake tests
+are prohibited; verification must use real host software, real available inputs, and real outputs.
+File sync/deploy still goes through the project scripts.
+Browser testing:
 `http://192.168.2.113:<port>`.
 
 **Use librewxr when marine work needs it.** librewxr is the project's test system for the marine
-software, not a production-only destination to avoid. After local WSL tests pass, move verified
-marine work there for installed-binary, host-specific, and live-model evidence using the project
-scripts and the host safeguards in `reference/clearskies-dev.md`.
+software. Use the approved project scripts and the host safeguards in
+`reference/clearskies-dev.md`.
 
 **The API runs on the `weewx` container (`weewx.shaneburkhardt.com`), NOT weather-dev.** The API co-locates with weewx because it reads the weewx archive DB and `weewx.conf` locally. Dashboard, config UI, tests, and builds run on weather-dev. Do not run the API on weather-dev — see `reference/clearskies-dev.md` §"There should be NO clearskies-api running on weather-dev." To deploy API changes: push to GitHub → SSH to the weewx container → `git pull --ff-only` in the API repo → `sudo systemctl restart weewx-clearskies-api`.
 

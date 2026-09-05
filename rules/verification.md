@@ -10,6 +10,62 @@ task A3 of the Marine Model Restoration Plan.
 
 ---
 
+## Real-data verification only — operator rule, 2026-09-02
+
+**Synthetic, mocked, fixture-only, simulated, and fake tests are banned.** They
+do not prove that software works. Any result used to support a repair, audit,
+deployment, or plan gate must run the real deployed software on its correct
+live project host, use real available inputs, and inspect the real output it
+produces. A test double, fabricated provider response, or handwritten model
+artifact is never functional evidence.
+
+Use `librewxr` for marine-model work, `weewx` for API/database work, and
+`weather-dev` for dashboard/configuration work. If real input data is not
+available, the gate remains open; do not replace it with a synthetic substitute.
+
+---
+
+## QC gate questions — operator rule, 2026-09-02
+
+Every QC review, audit, and close gate answers all five questions with direct
+evidence:
+
+1. Does the code follow the approved plan?
+2. Does the code advance the stated project directive?
+3. Does the code meet applicable engineering best practices?
+4. Does the code meet applicable security best practices?
+5. Does the code follow the governing project documentation and manuals? If
+   not, is the code wrong or is the documentation wrong?
+
+The fifth question requires an explicit conclusion. A mismatch is never
+silently accepted and a document is never changed merely to make a review
+green. Correct the code when it diverges from the approved/manual contract;
+surface a genuine documentation error for an operator decision.
+
+## WW3 and SWAN manual gate — operator rule, 2026-09-03
+
+For any coding or QC item that creates, changes, consumes, or validates a WW3
+or SWAN deck, boundary, transfer, output-point list, hotstart, or native
+command, the committed local model manual is a mandatory design and evidence
+authority. The implementation brief and independent review cite the exact
+relevant manual clause, not merely the manual filename. QC preserves the
+generated input/deck and the native program's relevant output or log lines,
+then checks them against that clause before declaring the item accepted.
+
+This manual check supplements, rather than replaces, live input/output and
+reality evidence. The manuals cannot validate provider caching, persisted
+generation lifecycle, or forecast correctness; those remain separate plan and
+runtime gates. A manual/deck mismatch fails the item even if the solver exits
+successfully.
+
+**Testing does not drive production.** Tests are evidence after coding is
+complete; they are not a productivity measure, a substitute for completing a
+task, or a reason to repeatedly reshape production code around a test. The
+measure of progress is completion of approved task work and software working
+with real inputs and outputs on its correct live host.
+
+---
+
 ## The three layers, and what each is worth
 
 Three different things get called "verification." They catch different failures and **none of them
