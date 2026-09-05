@@ -3693,7 +3693,7 @@ components:
 
     MarineForecastPoint:
       type: object
-      description: Single timestep from a WaveWatch III wave forecast, optionally enriched with OFS water temperature.
+      description: Single timestep from a configured surf-spot model wave forecast, optionally enriched with OFS water temperature.
       properties:
         time: { type: string, format: date-time, description: "Forecast valid time" }
         waveHeight: { type: number, nullable: true, description: "group_wave_height; significant wave height" }
