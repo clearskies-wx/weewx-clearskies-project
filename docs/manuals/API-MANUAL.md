@@ -151,7 +151,7 @@ The canonical data model defines 9 core entity types and 2 container types:
 | `SpectralWaveComponent` | Single swell system from spectral decomposition (NDBC) |
 | `TidePrediction` | Predicted high/low tide event (CO-OPS) |
 | `WaterLevel` | Observed water level reading (CO-OPS) |
-| `MarineForecastPoint` | Single timestep of marine wave forecast (WaveWatch III) |
+| `MarineForecastPoint` | Single timestep of a configured surf location's wave-model forecast |
 | `MarineTextForecast` | NWS marine zone text forecast period |
 | `SurfForecast` | Surf quality forecast per spot per timestep |
 | `FishingForecast` | Fishing conditions forecast per spot per period |
@@ -2177,7 +2177,7 @@ If datum matching cannot be confirmed — for example, if a DEM's `vertical_datu
 
 #### MarineForecastPoint
 
-Single timestep of a marine location's wave forecast, optionally enriched with OFS water temperature. **Source depends on the location (RW-1, register ruling 13, 2026-08-06):** surf-spot locations (`location.id in marine_config.surf_spots`) get every wave field below from the wave model's own computed swell breakdown (`services/model_wave_source.py`, reading the SWAN last-good cache's watershed partitions); all other locations get WaveWatch III's forecast, unchanged.
+Single timestep of a configured surf location's wave-model forecast, optionally enriched with OFS water temperature. **Source depends on the location (marine `9d9bdaa`, 2026-09-05):** locations whose IDs are present in `marine_config.surf_spots` get the wave fields below from the wave model's own computed swell breakdown (`services/model_wave_source.py`, reading the SWAN last-good cache's watershed partitions). A location without a configured surf spot does not request or return a WaveWatch forecast; its marine bundle retains configured NDBC observations and other non-wave data and has an empty `forecast` list.
 
 | Field | Type | Unit group | Nullable | Description |
 |---|---|---|---|---|
@@ -2359,7 +2359,7 @@ Summary snapshot for one marine location (used by the marine landing page locati
 
 | Card field | Primary source | Fallback | Unit conversion |
 |---|---|---|---|
-| `waveHeight` | **Surf-spot locations** (`location.id in marine_config.surf_spots`): the wave model's own computed swell breakdown, via `services/model_wave_source.py` reading the same SWAN last-good cache the surf endpoint uses (RW-1, register ruling 13 "ONE source of offshore truth", 2026-08-06) — combined/total Hs from that timestep's watershed partitions, never WaveWatch III. **All other locations:** WaveWatch III first forecast point (offshore, deep-water, 50 km resolution), unchanged. | NDBC buoy Hs (already-fetched observation) → null. Suppressed (null) for harbor-classified locations. A surf-spot location with no cached SWAN data yet (cold start) goes straight to this fallback — WaveWatch III is never used as a substitute for a surf spot. | meter → operator `group_wave_height` |
+| `waveHeight` | **Surf-spot locations** (`location.id in marine_config.surf_spots`): the wave model's own computed swell breakdown, via `services/model_wave_source.py` reading the same SWAN last-good cache the surf endpoint uses (RW-1, register ruling 13 "ONE source of offshore truth", 2026-08-06) — combined/total Hs from that timestep's watershed partitions, never WaveWatch III. **All other locations:** the configured NDBC buoy observation only; no model-wave request. | NDBC buoy Hs (already-fetched observation) → null. Suppressed (null) for harbor-classified locations. A surf-spot location with no cached SWAN data yet retains this NDBC fallback; it does not request WaveWatch III. | meter → operator `group_wave_height` |
 | `windSpeed` | Station hardware via weewx archive (when `is_station_served()` returns True) | Configured forecast provider `fetch_current_conditions(lat, lon)` | Provider handles conversion |
 | `windDirection` | Same as windSpeed | Same as windSpeed | degrees (no conversion) |
 | `airTemp` | Same as windSpeed | Same as windSpeed | Provider handles conversion |
@@ -2572,7 +2572,13 @@ Four enrichment processors for marine data. Each follows the existing enrichment
 
 **SWAN is the only nearshore wave model.** SWAN runs in the marine service on a schedule tied to the extended HRRR cycles (4×/day at 00/06/12/18Z). All SWAN code left the API this phase; there is no `[nearshore]` pip extra in the API. There is no `nearshore_model` config key — SWAN runs when the marine service is configured and has SWAN available. NWPS is eliminated (ADR-093 supersedes ADR-084).
 
-**WaveWatch III is NOT a surf forecast source.** WW3 remains the deep-water boundary input to SWAN (via `providers/marine/wavewatch.py`) and continues serving the marine endpoint's offshore forecast. WW3 is never used as a surf endpoint data source. The surf endpoint serves the last successful SWAN cache if the runner fails — no fallback to any other model.
+**WaveWatch III is not a marine endpoint forecast source.** Only configured
+surf spots receive model-wave forecast entries. A non-surf location does not
+request or return a WaveWatch forecast; its marine response retains configured
+NDBC observations and other non-wave data and has an empty `forecast` list.
+WaveWatch remains an input to the project WW3/SWAN model chain, and is never a
+surf endpoint data source. The surf endpoint serves the last successful SWAN
+cache if the runner fails — no fallback to any other model.
 
 **Data pipeline per forecast timestep (ADR-095 corrected, amended for SwellTrack):**
 
@@ -3046,7 +3052,7 @@ All marine endpoints return the standard response envelope (§2): `data`, `stati
 
 | Endpoint | `refreshInterval` (seconds) | Rationale |
 |---|---|---|
-| `/marine` | 1800 | Matches WaveWatch III cache TTL |
+| `/marine` | 1800 | Marine endpoint response cache TTL |
 | `/tides` | 600 | Observed water levels update every 6–10 min |
 | `/surf` | 1800 | Matches wave forecast cache TTL |
 | `/fishing` | 3600 | Scoring inputs change slowly |
@@ -3092,7 +3098,7 @@ When no marine locations are configured (no `[marine]` section in `api.conf`), n
 | `observation.airTemp` | Station hardware | `marine_weather_cache` | °C internal |
 | `observation.pressure` | Station hardware | `marine_weather_cache` | hPa internal |
 | `observation.visibility` | `marine_weather_cache` | null | km internal |
-| `observation.waveHeight` | **Surf-spot locations:** the wave model's own computed swell breakdown via `services/model_wave_source.py` (RW-1, register ruling 13, 2026-08-06), never WaveWatch III. **All other locations:** WaveWatch III first forecast point (offshore, deep-water), unchanged. | NDBC buoy Hs (already-fetched observation) → null | Meters internal. Null for harbor locations. |
+| `observation.waveHeight` | **Surf-spot locations:** the wave model's own computed swell breakdown via `services/model_wave_source.py` (RW-1, register ruling 13, 2026-08-06), never WaveWatch III. **All other locations:** the configured NDBC buoy observation only; no model-wave request. | NDBC buoy Hs (already-fetched observation) → null | Meters internal. Null for harbor locations. |
 | `observation.waterTemp` | `ocean_data_resolver.resolve()` (OFS → MUR SST → RTOFS) | NDBC buoy | °C internal |
 | `observation.weatherCode` | `marine_weather_cache` | null | WMO code integer |
 | `observation.isDay` | `marine_weather_cache` | null | boolean |

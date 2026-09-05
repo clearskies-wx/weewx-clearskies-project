@@ -1304,7 +1304,7 @@ CO-OPS Data API returns JSON. Base URL: `https://api.tidesandcurrents.noaa.gov/a
 
 **Rate limiting:** 2 req/s (NOMADS is shared NOAA infrastructure), paced with a 0.55s sleep between per-forecast-hour requests — same pattern as §14.14/§14.16.
 
-**RW-1 (register ruling 13, "ONE source of offshore truth", 2026-08-06): this provider is no longer called for surf-spot locations.** A surf-spot location's wave fields come from `services/model_wave_source.py`, with no WaveWatch fallback when the model has no cached data. WaveWatch continues to serve non-surf marine locations. The project WW3 leg (§14.18), not WaveWatch, owns the deep-water model boundary.
+**Marine endpoint use (landed 2026-09-05, marine `9d9bdaa`).** The marine endpoint does not call this provider for either location summaries or location details. Only locations whose IDs are present in `marine_config.surf_spots` request and return the wave model's forecast through `services/model_wave_source.py`. If a configured surf spot has no cached model data, its model forecast is empty and its existing NDBC observation remains available. A location without a configured surf spot does not request or return a WaveWatch forecast; it retains its configured NDBC observation and other non-wave data and returns an empty `forecast` list. The project WW3 leg (§14.18) remains the model-chain deep-water leg.
 
 ### §14.3a WW3 station spectral boundary fetch (T8.10b) — SUPERSEDED, deleted 2026-08-09 (Phase B, ADR-104 D3/D4)
 
@@ -3507,6 +3507,12 @@ and their supporting marine components live in `weewx_clearskies_marine/`.
 The API's `PROVIDER_MODULES` registry has zero marine entries and the API
 does not import marine provider modules. Marine data crosses this boundary
 only through the HTTP interface described in API-MANUAL §19.
+
+**Marine endpoint wave rule (landed 2026-09-05, marine `9d9bdaa`):** only a
+location configured in `marine_config.surf_spots` receives a model-wave
+forecast from `services/model_wave_source.py`. The endpoint does not call
+WaveWatch for a non-surf location. Such a location retains its configured NDBC
+observation and other non-wave data and returns an empty `forecast` list.
 
 ### §15.1 Provider modules in the marine service
 

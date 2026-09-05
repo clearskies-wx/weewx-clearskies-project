@@ -1127,7 +1127,7 @@ Unified conditions dashboard pattern (Windfinder/My Marine Forecast reference). 
 5. **Waves** — `Card footprint="full"`:
    - Wave stats (height, period, direction) as `MarineStatTile` tiles at top
    - 72h wave forecast chart below (`WaveForecastChart` with legend)
-   - Wave data from SWAN model (not buoy)
+   - Wave forecast data is available only for locations configured as surf spots and comes from the API's model forecast. A non-surf location has no wave forecast; its configured NDBC wave observation may still appear in Current Conditions.
    - Self-hides for harbor locations where wave data is null
 6. **Tide Forecast** — `Card footprint="full"`:
    - `TideChart` (left margin ≥40px to prevent clipping, XAxis domain starts at first data point)
@@ -1308,7 +1308,7 @@ Alert filtering applies within each activity tab, sourced from the general alert
 
 | Data type | `refreshInterval` (seconds) | Source |
 |---|---|---|
-| Marine forecast (WaveWatch III) | 1800 | Provider cache TTL |
+| Marine location data | 1800 | Marine endpoint response cache TTL |
 | Nearshore surf (SWAN) | 21600 | Extended HRRR cycle cadence (4×/day at 00/06/12/18Z) |
 | Buoy observations (NDBC) | 3600 | Provider cache TTL |
 | Tide predictions (CO-OPS) | 21600 | Predictions don't change within tidal epoch |
