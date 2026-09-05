@@ -1791,7 +1791,7 @@ the A0/A0-I gates and every applicable post-code/live gate remain open.
 | 2026-09-05 | R3 / R11 recovery identity | The R3 recheck exposed a real controller escape: a typed normal-timeline gap could bypass `_initial_recovery_source_identity()` and reach the outer runner error handler instead of entering the existing controlled recovery identity path. The same recheck exposed stale test doubles for current keyword-only interfaces and required WCOFS input. | Marine `2b20d72` catches the typed gap as the established explicit unknown wind identity; strict selected-recovery forcing remains fail-closed. The updated harnesses preserve R3's refusal and R9's unproved-checkpoint rebuild guards. Independent source review passed; guarded deployment completed at 18:20:09 UTC. The post-deploy focused test is deferred while the guard is busy. |
 | 2026-09-05 | R9 / D10 identity reuse | Source review found that ordinary reuse recorded grid/input/runtime identities but ignored them when matching a checkpoint. Marine `43c06a3` restores ordinary identity checks while keeping §5.7 restored exact-cycle recovery output-proof-only; review then found and corrected native-cadence horizon fingerprinting plus a missing-wind escape in `49947aa`. | Both commits were independently reviewed and guardedly deployed. With the service idle, the focused R9 controller guard passed: 17 passed, 1 dependency warning. Fresh real cycle/grid-change evidence and the remaining full plan gates remain open. |
 | 2026-09-05 | R11 recovery intent | Source trace found a self-contradictory parser: `_write_recovery_intent()` stores `sources` as an object, while `_read_recovery_intent()` rejected every object as malformed before its own object-type check. A valid persisted intent therefore could not retain the one-restart state across process restart. | At operator direction, `25b5807` was force-deployed through `deploy-marine.sh --force-restart` at 21:42:16 UTC. Fresh live evidence: guard returned `health=idle; service=active; descendants=none`; the process had `NRestarts=0`; the intent became `status=blocked`; and the journal recorded that the 18Z cycle had used its one restart. `/health` reports that new attempt failed for `ww3_leg_ww3_restart_missing` while serving the valid last-good forecast. This closes the parser-loop correction only; all remaining R11 and plan live gates remain open. |
-| 2026-09-05 | Endpoint configuration lifecycle | Read-only live logs recorded 872 `Marine station distances resolved` calls in under ten minutes, including sub-millisecond bursts. Source trace confirms each endpoint falls back to `load_marine_config()` because `POST /config` persists and parses the payload but never invokes the endpoint wiring functions. | No code change: applying parsed configuration at startup/config-push rather than on every request changes the computation lifecycle and requires explicit operator approval. The current behavior does not corrupt model data, but it creates avoidable request-path work and log volume. |
+| 2026-09-05 | Endpoint configuration lifecycle | Read-only live logs recorded 872 `Marine station distances resolved` calls in under ten minutes, including sub-millisecond bursts. Source trace confirms each endpoint deliberately falls back to `load_marine_config()` when no configuration is wired, so a pushed configuration takes effect without a service restart. | Non-blocking performance/log-volume observation only. The current endpoint behavior returns the current persisted configuration and does not affect the model chain. No code change or operator decision is required by this recovery plan. |
 
 - [x] Operator accepts §23's approval boundary and this plan — 2026-08-29.
 - [x] Old forward plan archived; redirect installed — 2026-08-29.
@@ -1841,21 +1841,3 @@ A1 promotion cannot close until this is decided.
 **Recommendation:** State the exact number or age of complete generations to retain
 and the required condition before deletion. Do not authorize a partial-pair or
 in-use deletion.
-
-### Endpoint configuration application lifecycle
-
-**Decision needed:** May the marine service apply a successfully parsed configuration
-to its endpoint modules at service startup and after `POST /config`, instead of
-parsing the persisted configuration on every endpoint request?
-
-**Why this matters:** The current request-time fallback caused 872 repeated station
-distance resolutions in under ten minutes. Applying configuration at startup or at
-the configuration update changes when that computation happens, so it is an
-architectural lifecycle change even though the parsed values and endpoint responses
-would stay the same.
-
-**Recommendation:** Approve only a narrow repair that keeps the existing payload,
-endpoint responses, model schedule, and validation rules unchanged; it should merely
-give every endpoint the same already-validated configuration after startup or a
-successful configuration push. Without approval, the service will retain the
-current safe but noisy request-time parsing behavior.
