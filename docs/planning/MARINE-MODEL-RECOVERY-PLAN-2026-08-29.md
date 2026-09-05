@@ -1454,9 +1454,10 @@ outside the close gate unless the operator later activates the optional follow-o
 
 ### Same-cycle WW3 reuse (approved D10 with plan acceptance)
 
-- Reuse only in the same process, same cycle, matching grid/binary/input fingerprint, with every
-  nonzero +0…+6 artifact and restart/pin present.
-- Any mismatch or process restart reruns WW3.
+- Reuse only for the same cycle with matching grid/binary/input fingerprint and every nonzero
+  +0…+6 artifact and restart/pin present. Under §5.7's later, specific as-built rule, a restart
+  may resume only owner-verified stages whose restored checkpoint still names that cycle and whose
+  retained outputs match their recorded SHA-256 hashes; any other restart reruns WW3.
 - Reuse does not stamp a new WW3 success time.
 
 Tasks:
@@ -1479,7 +1480,8 @@ Tasks:
 Gate R9:
 
 - Real downstream failures invoke WW3 once; artifact hashes remain unchanged on retry.
-- Missing/corrupt/fingerprint mismatch reruns; restart reruns conservatively.
+- Missing/corrupt/fingerprint mismatch reruns. After restart, only §5.7's exact
+  owner-verified checkpoint resume may reuse; otherwise WW3 reruns conservatively.
 - Deploy started in WW3/Python/SWAN/horizon phases waits and never sends SIGTERM.
 - A real exception at any production phase clears state.
 - Same-cycle reuse is evidenced from real attempts; production is never deliberately failed for this gate.
@@ -1785,6 +1787,7 @@ the A0/A0-I gates and every applicable post-code/live gate remain open.
 | 2026-09-05 | R9 / recovery controller | The guarded focused host regression set exposed an ordinary full-run dispatch failure before WW3/SWAN: a missing or wrong-cycle selected recovery artifact raised `recovery_forcing_invalid` through the preliminary recovery-block check. | Corrected and independently source-reviewed in marine `f5df467`; the strict recovery-consumption reader remains fail-closed, while an unavailable preliminary recovery identity returns no block. Deployed only through the idle guarded script. After the natural post-restart attempt returned idle, the exact focused host guard passed: 79 passed, 1 dependency warning. Live chain evidence remains pending. |
 | 2026-09-05 | R4 / R8b live QC | Independent read-only QC found that the post-`f5df467` 17:20–17:27 store-driven full attempt fetched 24 WCOFS fields and completed by reusing validated WW3/boundary/SwellTrack/cache/publication state. Stable L2/L3/L4 `CURRENT.txt`, `INPUT`, cache, and last-full-run artifacts predate the 17:19 deploy; retained L4 is 24,820 rows × 50 values against its 51×169 deck's 52-value requirement. | Treat the retained L4 mismatch as stale pre-fix artifact evidence, not a regression of `f5df467`; it cannot close fresh-current acceptance. The later fast attempt correctly refused the 29-hour-old L2 boundary, preserved last-good, and reported failed health with no false success. Await a guarded genuinely fresh full run that rewrites L4 before measuring the corrected 24,820 × 52 contract; R4 provenance/full evidence and R8b full-stage matrix remain open. |
 | 2026-09-05 | A0 / A0-I inventory | Independent read-only inventory confirmed the six installed WW3 binaries, retained hash-matched cycle/horizon H/D pairs for the 2026-09-04 12Z generation and its predecessor, and the retained merged H-stage. Local manual clauses confirm the native formatted `ww3_outp` transfer mechanism and SWAN's ordered BOUNDNEST3 corridor rules. | These retained artifacts are historical/reused and cannot close the fresh native-inventory, D1 selection/order, global-source, compatibility/rollback, cold-run, or fresh-SWAN gates. A0-I's exact cycle-directory retention rule remains an explicit operator-decision prerequisite; current-plus-predecessor references do not authorize a deletion policy. |
+| 2026-09-05 | R9 plan reconciliation | Post-deploy evidence showed a restart resuming a hash-matched 12Z WW3/horizon/boundary checkpoint. R9's earlier generic restart sentence conflicted with §5.7's later, specific as-built rule that authorizes exactly this owner-verified resume. | Resolved the contradiction within this plan: §5.7 governs restart reuse only when the checkpoint names the current cycle and hashes match; missing, corrupt, or mismatched state still reruns WW3. No code or architecture changed. |
 
 - [x] Operator accepts §23's approval boundary and this plan — 2026-08-29.
 - [x] Old forward plan archived; redirect installed — 2026-08-29.
