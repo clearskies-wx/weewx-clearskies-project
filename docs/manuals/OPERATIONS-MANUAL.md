@@ -1660,6 +1660,15 @@ non-finite wind component, the recovery tail refuses as
 `recovery_wind_invalid`; valid retained WW3 artifacts remain available for a
 later retry.
 
+The artifact also records exact STOFS WLEVEL and WCOFS CURRENT forcing so
+SWAN cannot fetch a newer input after restoring an older WW3 run. STOFS must
+be the selected recovery cycle with complete hourly fields through +72 h. For
+a selected 12Z run, WCOFS must be that date's native 03Z issue with complete
+f003…f072 records; its explicit terminal-current hold reaches the selected
+run end. A source identity, valid-time, coverage, geometry, or finite-value
+mismatch refuses as `recovery_forcing_invalid`; no provider fallback or
+current-cycle substitution is attempted.
+
 WW3's per-cycle staging tree is private and is removed on either successful
 promotion or refusal; its destination remains untouched until the complete
 H/D transaction succeeds. SWAN cleanup removes only unproved private input,

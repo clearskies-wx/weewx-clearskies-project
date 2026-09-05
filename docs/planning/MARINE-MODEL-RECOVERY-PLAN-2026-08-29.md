@@ -245,6 +245,16 @@ extra, wrong-cycle, invalid-geometry, or non-finite U/V fields refuse the
 tail. It neither reads nor modifies the normal `wind_timeline.json`, so a
 new routine poll cannot mix current wind into the retained WW3 recovery.
 
+The same artifact also carries the recovery's STOFS WLEVEL and WCOFS CURRENT
+records plus their exact issue-cycle identities. STOFS is fetched once from
+the selected cycle through selected-cycle +72 h, with every hourly field
+required. WCOFS is fetched once from its native daily 03Z issue selected by
+the recovery anchor (for a 12Z selected cycle, that day's 03Z issue), with
+every native f003…f072 three-hour field required; its existing final-field
+tail hold remains explicit through the selected SWAN window end. No fresh
+current-time provider selector, fallback cycle, or mixed issue cycle may
+supply selected recovery forcing.
+
 Private work is cleaned by ownership boundary. `WW3Runner.run_leg_cycle()`
 keeps its destination untouched until the complete WW3/H/D transaction
 succeeds, and removes its per-cycle staging tree on success or any refusal.

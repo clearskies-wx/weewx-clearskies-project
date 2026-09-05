@@ -3395,6 +3395,17 @@ revalidating the persisted artifact. This is isolated from the normal
 historical recovery, and an invalid artifact refuses the SWAN tail without
 rerunning valid WW3 output.
 
+The same `recovery_wind_timeline.json` artifact contains STOFS WLEVEL and
+WCOFS CURRENT records rather than allowing downstream SWAN code to fetch them
+at wall-clock time. STOFS is one exact selected-cycle fetch with every hourly
+field through selected +72 h. WCOFS's configured native issue is 03Z, so a
+selected 12Z recovery uses exactly that date's 03Z WCOFS issue and requires
+f003 through f072 at native three-hour cadence; the already-defined terminal
+current hold is recorded through the selected run end. The artifact rejects a
+wrong issue, wrong valid time, missing/duplicate/extra record, invalid grid,
+or non-finite WLEVEL/CURRENT value. No current-time provider fallback is
+available on this path.
+
 `WW3Runner.run_leg_cycle()` keeps per-cycle work in a private staging tree and
 removes that tree on success or refusal; the destination is untouched until the
 complete H/D transaction succeeds. SWAN removes only unproved private
