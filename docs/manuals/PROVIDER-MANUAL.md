@@ -3382,6 +3382,19 @@ stage to recompute; a downstream refusal does not discard completed upstream
 output. The selected merged `ww3_l2_transfer.ww3` boundary is retained and
 reused while its recorded hash matches.
 
+**Selected historical-wind recovery.** When restart selects retained WW3 leg
+and horizon outputs, SWAN obtains wind only from the same explicitly selected
+UTC source cycle. HRRR is requested once for f00–f48 and GFS once for
+f048–f072; neither provider may fall back to another cycle. The results are
+validated for exact native valid times, source/cycle provenance, unique
+records, finite U/V values, and valid grid geometry before a single atomic
+`recovery_wind_timeline.json` is written under the existing SWAN work root.
+The strict reader returns the normal near/far window shape only after
+revalidating the persisted artifact. This is isolated from the normal
+`wind_timeline.json`: a routine current-cycle update cannot alter a selected
+historical recovery, and an invalid artifact refuses the SWAN tail without
+rerunning valid WW3 output.
+
 `WW3Runner.run_leg_cycle()` keeps per-cycle work in a private staging tree and
 removes that tree on success or refusal; the destination is untouched until the
 complete H/D transaction succeeds. SWAN removes only unproved private

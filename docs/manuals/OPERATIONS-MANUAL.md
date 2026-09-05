@@ -1649,6 +1649,17 @@ completed upstream output available (`state.py`, `service.py`,
 merged `ww3_l2_transfer.ww3` boundary is retained and reused while its
 recorded hash matches.
 
+**Selected WW3 recovery wind artifact.** `recovery_wind_timeline.json` lives
+under the existing durable SWAN work root and belongs to one selected UTC
+recovery cycle only. It is written atomically after exact-cycle HRRR f00–f48
+and GFS f048–f072 retrieval and strict validation, then reread before the
+SWAN tail starts. It is not a routine cache and never replaces or is replaced
+by `wind_timeline.json`. If it is absent, corrupt, mixes cycles/sources,
+contains a gap, duplicate, unexpected valid time, invalid geometry, or
+non-finite wind component, the recovery tail refuses as
+`recovery_wind_invalid`; valid retained WW3 artifacts remain available for a
+later retry.
+
 WW3's per-cycle staging tree is private and is removed on either successful
 promotion or refusal; its destination remains untouched until the complete
 H/D transaction succeeds. SWAN cleanup removes only unproved private input,

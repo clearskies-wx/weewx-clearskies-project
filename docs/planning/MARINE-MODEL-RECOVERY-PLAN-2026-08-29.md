@@ -234,6 +234,17 @@ re-enters that tail from SwellTrack. The merged `ww3_l2_transfer.ww3` boundary
 is retained as the selected artifact and reused while its recorded file hash
 still matches; a downstream refusal does not delete or replace it.
 
+For a selected retained WW3 leg/horizon recovery, the downstream SWAN run
+never reads the mutable routine wind timeline. It makes one exact-cycle HRRR
+and GFS fetch for the selected cycle, stores only that result atomically as
+`recovery_wind_timeline.json` under the existing SWAN work root, strictly
+rereads it, and then continues the merge/SWAN tail. The artifact contains
+HRRR f00–f48 at hourly valid times and GFS f048–f072 at three-hour valid
+times, all from the selected source cycle; malformed, missing, duplicate,
+extra, wrong-cycle, invalid-geometry, or non-finite U/V fields refuse the
+tail. It neither reads nor modifies the normal `wind_timeline.json`, so a
+new routine poll cannot mix current wind into the retained WW3 recovery.
+
 Private work is cleaned by ownership boundary. `WW3Runner.run_leg_cycle()`
 keeps its destination untouched until the complete WW3/H/D transaction
 succeeds, and removes its per-cycle staging tree on success or any refusal.
