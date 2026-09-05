@@ -337,6 +337,21 @@ or other alternative provider is selected on containment failure. The compact
 arrays. This amendment changes no architecture or public contract; it aligns
 the accepted R4 behavior with current source.
 
+## Amendment (2026-09-04): R11 selected current forcing
+
+**Status: as-built source clarification; no decision change.** The R11
+recovery path uses the current R4 source contract already recorded above. For a
+selected recovery cycle, STOFS water levels are fetched for that exact cycle
+through +72 hours. WCOFS currents are fetched from the selected date's native
+03Z issue and require the complete f003–f072 native three-hour sequence; the
+existing terminal hold is explicit through the SWAN window. The selected
+records are persisted with their issue-cycle identities in the recovery
+forcing artifact before SWAN uses them. A missing issue waits for that issue;
+wrong-cycle, incomplete, malformed, invalid-geometry, or non-finite data
+refuses the recovery tail. No alternate current source or wall-clock provider
+selection is added. This is implemented in the marine service recovery and
+forcing paths and does not reopen the accepted current-source decision.
+
 ## Implementation guidance
 
 - **SWAN command syntax is pre-researched and pinned** — see the plan's "SWAN SYNTAX PRESCRIPTIONS" section

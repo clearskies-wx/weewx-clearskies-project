@@ -3197,6 +3197,24 @@ side's Hs via `4×√m0` — a real property of the two file formats' differing 
 parser or in the comparison logic (each side correctly uses its own parsed axis; assuming the two files share
 an unrounded axis would be the actual defect). `SEAM_HS_TOLERANCE` (±10%) is sized well above this floor.
 
+#### §14.15a Exact κ=1 wave-group limit and wire values (R5; as-built source behavior)
+
+The wave-group statistics path treats correlation `κ = 1` as an exact limit. It
+returns `p11 = p22 = 1`; the resulting `nSet`, `nRep`, and `tSetS` are
+unbounded internally. The finite-wire adapter keeps the finite statistics
+(`ν`, `Qp`, `κ`, `Tm02`, and the band) and writes JSON `null` only for those
+unbounded run-length or set-interval fields. It does not use an epsilon or a
+clamp, and it never writes `NaN` or `Infinity` to the published representation.
+
+`nSet` is attached to each parsed partition together with `nRep` and `tSetS`.
+An invalid or out-of-range spectral numeric value raises the typed expected
+numeric-domain error at the wave-group boundary; the SWAN cycle refuses rather
+than publishing a partial result. Unexpected programming errors are not
+converted into this expected refusal. The existing scoring path treats a null
+`tSetS` as its established consistency fallback. This describes the source
+implementation in `services/wave_groups.py` and `services/swan_runner.py`; it
+is not live acceptance evidence.
+
 ### §14.16 GFS wind provider (Phase 7 — supplements HRRR for 72-hour forecast)
 
 **Module identity:** `providers/wind/gfs.py`, `PROVIDER_ID = "gfs"`, `DOMAIN = "wind"`.
@@ -3423,6 +3441,36 @@ around line 19098) governs restart-file input; the SWAN manual's `BOUNDNEST3`
 section requires sequential formatted WW3 output locations and the 0.1
 corridor (`docs/reference/swan-user-manual.txt`, pp. 54–55). `INITIAL HOTSTART`
 is used only with verified input; failed or poisoned hotstarts are not reused.
+
+**Automatic recovery (R11; as-built source behavior).** A failed full cycle
+persists one small atomic `recovery_intent.json` under the existing SWAN work
+root. Its identity contains the forecast cycle, compact source identities, and
+runtime identity. The same identity may request one controlled process restart;
+if it fails again without a source or runtime change, it is recorded as blocked
+and is not restarted repeatedly. An unreadable or incomplete intent is ignored
+and cannot authorize reuse or publication.
+
+Recovery refreshes the required time-varying inputs through their existing
+provider seams. For a selected retained WW3 cycle, HRRR is fetched for f00–f48
+and GFS for f048–f072 with that exact cycle and cache bypass limited to the
+recovery fetch. STOFS is fetched for the selected cycle through +72 hours.
+WCOFS uses that date's native 03Z issue (for a selected 12Z cycle) and its
+three-hour fields through f072, including the existing terminal hold. The
+validated wind, water-level, and current records are written atomically to
+`recovery_wind_timeline.json`, reread, and then supplied to SWAN; routine
+`wind_timeline.json` is not used or changed by this path.
+
+If the required WCOFS issue is not posted, recovery records a blocked wait for
+that issue and does not request another restart. Missing grid sizing, missing
+required source data, malformed records, wrong cycles, gaps, invalid geometry,
+or non-finite values refuse the recovery tail and preserve any verified
+last-good output. When no prior recovery forcing identity exists, the intent
+records explicit unavailable markers for absent sources; it does not invent
+forcing. Verified WW3, horizon, SWAN-level, SwellTrack, cache, and publication
+checkpoints are reused only when their cycle and retained-output hashes still
+match. A new cache is published only after the complete chain succeeds; the
+matching recovery intent is then cleared by the successful cycle. This is
+source behavior, not live acceptance evidence.
 
 ### §14.19 Swell-card deep-water reference points (Q16 Round B, 2026-08-25)
 

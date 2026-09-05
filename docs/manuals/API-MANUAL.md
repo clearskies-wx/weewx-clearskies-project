@@ -2101,15 +2101,24 @@ Single swell system from NDBC spectral decomposition.
 | `period` | float | `group_wave_period` | No | Peak period (Tp = 1/fp) |
 | `direction` | float | — | No | Mean wave direction (energy-weighted circular mean, degrees true north) |
 | `energy` | float | — | No | Zeroth spectral moment m₀ (m²) |
-| `frequencyRange` | list[float] | — | No | [min_hz, max_hz] bounds of this spectral partition. For NDBC (`spectralComponents`), real bounds from that partition's local-maxima boundaries. **For SWAN (`multiSwell`), always `[0.0, 0.0]`** — SWAN's TABLE PT* bulk output (T4B.2) carries no per-partition frequency-bin bounds, so this field is not derivable on the SWAN path and is emitted as `[0.0, 0.0]` rather than a real value. Do not read the zeros as meaningful, and do not rely on this field for SWAN-sourced components. |
+| `frequencyRange` | list[float] | — | No | [min_hz, max_hz] bounds of this spectral partition. For NDBC (`spectralComponents`), real bounds from that partition's local-maxima boundaries. For SWAN's nearshore TABLE path (`multiSwell` with `swellSource="nearshore_table"`), this remains `[0.0, 0.0]` because TABLE PT* bulk output has no per-partition frequency-bin bounds. For the WW3 deep-reference path (`swellSource="deep_reference"`), it carries the partition's real frequency bounds. |
 | `classification` | str | — | No | (locale) `"groundswell"` (period ≥ 12s), `"swell"` (8–12s), `"wind_swell"` (< 8s) |
 | `nu` | float | — | Yes | **Added S2 (2026-08-27, ADR-101 Amendment 1).** Longuet-Higgins spectral width parameter (`sqrt(m0*m2/m1² - 1)`) over this partition's half-way band. `null` when no band could be computed for this partition this hour (no spectrum, no PT partitions, or this partition's own period was unavailable). |
 | `qp` | float | — | Yes | **Added S2.** Goda (1970) spectral peakedness over this partition's band. `null` under the same conditions as `nu`. |
 | `kappa` | float | — | Yes | **Added S2.** Battjes & van Vledder (1984) successive-height correlation — the modulus of the partition band's spectral autocorrelation at lag `tm02S`, divided by m0. `null` under the same conditions as `nu`. |
 | `tm02S` | float | `group_wave_period` | Yes | **Added S2.** Mean zero-up-crossing period (Tm02 = sqrt(m0/m2)) over this partition's band. `null` under the same conditions as `nu`. |
 | `nRep` | float | — | Yes | **Added S2.** Kimura (1980) mean total run length (waves; eq. 19), from the bivariate-Rayleigh transition probabilities at threshold H > H1/10 (ρ = 1.80). `null` under the same conditions as `nu`. |
+| `nSet` | float | — | Yes | **Added R5.** Kimura (1980) mean qualifying-wave run length (waves; eq. 16). `null` when the exact κ=1 limit makes the value unbounded or when no usable partition band exists. |
 | `tSetS` | float | `group_wave_period` | Yes | **Added S2.** Set interval, `T_set = nRep * tm02S`, seconds. Feeds the Consistency factor's timing term (`f_int(T_set/60)`). `null` under the same conditions as `nu`. |
 | `bandHz` | list[float] | — | Yes | **Added S2.** `[f_lo, f_hi]` half-way band edges (ADR-101 Amendment 1 ruling C) used to compute this partition's group statistics. `null` under the same conditions as `nu`. |
+
+**R5 exact-limit representation.** When a partition has exactly `κ = 1`, the
+finite fields remain numeric and only the physically unbounded `nSet`, `nRep`,
+and `tSetS` fields are `null`. JSON responses and cached payloads never contain
+`NaN` or `Infinity`. An invalid/out-of-domain spectral numeric input refuses
+the affected model cycle; it is not converted into a partial response. This
+is the existing response-model contract implemented by the marine service,
+not a live acceptance claim.
 
 #### TidePrediction
 

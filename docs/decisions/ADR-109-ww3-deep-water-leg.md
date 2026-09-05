@@ -958,6 +958,35 @@ service restart reruns conservatively (`service.py`, `state.py`,
 evidence; A0/A0-I, R1, R2, and recovery gates are still open. Exact
 cycle-directory retention/deletion remains an open operator question.
 
+## Amendment (2026-09-04): R11 automatic recovery implementation
+
+**Status: as-built source clarification; no decision change.** The recovery
+implementation records one atomic `recovery_intent.json` for a failed full
+cycle. Its identity combines the forecast cycle, compact source identities,
+and runtime identity. It requests at most one controlled process restart for an
+unchanged identity; a repeated failure is recorded as blocked rather than
+restarting repeatedly. Incomplete or unreadable intent is ignored and cannot
+authorize reuse or publication.
+
+After restart, the state snapshot is restored before the pending-cycle
+decision. The runner rechecks retained output hashes and resumes only the
+verified WW3 leg, horizon, SWAN levels, SwellTrack, cache, and publication
+stages that match the selected cycle. A missing or corrupt stage proof causes
+that stage to rebuild; a downstream refusal does not discard verified upstream
+output. The normal WW3 restart-chaining decision between model cycles remains
+the D10 design; this amendment records cross-process stage recovery.
+
+For a selected retained cycle, recovery fetches HRRR f00–f48, GFS f048–f072,
+and STOFS through +72 hours for that exact cycle. It fetches WCOFS from that
+date's native 03Z issue and requires f003–f072, with the existing terminal
+hold. The records are atomically stored and reread in
+`recovery_wind_timeline.json`, isolated from the routine wind timeline. An
+unposted WCOFS issue is a blocked wait; missing, wrong-cycle, malformed,
+incomplete, invalid-geometry, or non-finite forcing is a failed recovery and
+preserves last-good output. A successful complete publication clears only the
+matching recovery intent. These statements describe source behavior and do not
+claim live acceptance evidence.
+
 ## References
 
 - Plan: `docs/planning/MARINE-MODEL-EVOLUTION-PLAN-2026-08-15.md` — §WW3 MODEL DESIGN

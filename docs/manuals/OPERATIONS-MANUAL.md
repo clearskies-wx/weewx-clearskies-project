@@ -1686,6 +1686,33 @@ around line 19098). SWAN's `BOUNDNEST3` gate requires sequential formatted WW3
 output locations and the 0.1 corridor (`docs/reference/swan-user-manual.txt`,
 pp. 54–55); `INITIAL HOTSTART` is used only when its input is verified.
 
+**R11 automatic recovery controller (as-built source behavior).** A failed
+full cycle records one atomic `recovery_intent.json` under the existing SWAN
+work root. The record contains the cycle, compact source identity, runtime
+identity, reason, status, and timestamps; it contains no forcing arrays. One
+controlled process restart is allowed for one unchanged cycle/source/runtime
+identity. A second failure with that identity is `blocked` and does not flap
+the service. An incomplete or unreadable intent is ignored and cannot authorize
+reuse or publication.
+
+Recovery refreshes the time-varying inputs at the existing provider seams and
+stores the selected result in the atomic `recovery_wind_timeline.json` input
+artifact. HRRR f00–f48, GFS f048–f072, and STOFS through +72 hours use the
+selected recovery cycle. WCOFS uses the selected date's native 03Z issue and
+requires f003–f072, with the defined terminal hold. The artifact is reread
+before SWAN and is isolated from the routine wind timeline. A missing or
+unposted WCOFS issue is `blocked` while waiting for that issue; malformed,
+incomplete, wrong-cycle, invalid-geometry, or non-finite data is `failed` and
+preserves the last-good forecast. No source is substituted.
+
+On a clean start or when an input has never been recorded, the controller keeps
+an explicit unavailable identity until the required source is obtained; it does
+not invent input or claim success. Retained stages are reusable only when their
+current-cycle checkpoints and output hashes still match. Publication remains
+after the complete chain and its existing output checks; successful publication
+clears the matching recovery intent. These are source behaviors and are not
+live acceptance evidence.
+
 ---
 
 ### §4.1 Config Registry

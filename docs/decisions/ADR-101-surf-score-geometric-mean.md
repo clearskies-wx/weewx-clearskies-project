@@ -168,14 +168,32 @@ threshold Hs; the KAT ALSO states the H1/10-threshold values computed by the sam
 integration before looking at the implementation) and fixed synthetic spectra → exact T_set, C, S,
 factor value.
 
-## Amendment 2 (2026-09-03): Marine recovery documentation scope
+## Amendment 2 (2026-09-03): R11 recovery documentation scope (R5 is recorded below)
 
 **N/A for the recovery coding wave.** The accepted weighted-geometric-mean
 formula and its five weights were not changed by A1/R1/R2, R4, R6/R7, R8b/R8c,
-or R9. The current marine source changes are in provider, orchestration, state,
-and health paths; `enrichment/surf_scorer.py` is not part of the current source
-diff. No scoring contract, weight, or public response field is altered by this
-documentation reconciliation.
+or R9. R5's exact-limit representation is recorded in the implementation note
+below; it does not change the accepted scoring formula or weights. The R11
+recovery source changes are in provider, orchestration, state, and health paths;
+`enrichment/surf_scorer.py` is not part of the R11 source diff. No scoring
+contract or weight is altered by this documentation reconciliation.
+
+## Amendment 3 (2026-09-04): R5 exact κ=1 implementation note
+
+**Status: as-built source clarification; no decision change.** The accepted
+Consistency formula and its five scoring weights remain unchanged. The landed
+wave-group implementation handles exact `κ = 1` by returning `p11 = p22 = 1`
+and unbounded internal `nSet`, `nRep`, and `tSetS` values. The wire adapter
+retains finite `ν`, `Qp`, `κ`, `Tm02`, and band values, and maps only those
+unbounded fields to JSON `null`; it does not approximate the limit with an
+epsilon or clamp. `nSet` is carried on each parsed partition. Invalid or
+out-of-range spectral numeric input raises the typed expected numeric-domain
+error and prevents publication of that cycle; unexpected programming errors
+remain fatal. The source locations are `services/wave_groups.py` and
+`services/swan_runner.py` in the marine implementation commit `25a7c62`.
+
+This note documents implementation of the accepted design. It does not claim
+live κ=1 occurrence or live end-to-end proof.
 
 ## References
 
