@@ -1820,3 +1820,23 @@ the A0/A0-I gates and every applicable post-code/live gate remain open.
 - [ ] R12 four-anchor/reality/health gate passes.
 - [ ] No untracked deferred item remains in narrative prose.
 - [ ] Coordinator walks the original operator request line by line before close.
+
+## OPEN OPERATOR QUESTIONS
+
+### A0-I — Exact retention rule for completed WW3 cycle directories
+
+**Decision needed:** Specify the exact rule that permits deleting an older complete
+cycle/horizon boundary-and-diagnostic pair after a newer pair succeeds. The current
+approved direction retains the active pair and one complete rollback predecessor,
+and never deletes one member of a pair or anything still needed for forecast
+coverage or rollback. It does not say when an older eligible pair is actually
+deleted, how many complete generations remain, or what durable reference check
+authorizes the deletion.
+
+**Why this matters:** Without that exact rule, the service must continue to retain
+files rather than guess which historical model output is safe to remove. A0-I and
+A1 promotion cannot close until this is decided.
+
+**Recommendation:** State the exact number or age of complete generations to retain
+and the required condition before deletion. Do not authorize a partial-pair or
+in-use deletion.
