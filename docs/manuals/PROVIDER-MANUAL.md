@@ -1300,7 +1300,7 @@ CO-OPS Data API returns JSON. Base URL: `https://api.tidesandcurrents.noaa.gov/a
 
 **Grid:** Single global gfswave 0.16° grid, coverage unchanged from the ERDDAP era (-77.5°..77.5°S, global longitude).
 
-**Error handling:** `GeographicallyUnsupported` (south of -77.5°S); `ProviderUnavailableError` when no valid last-good exists and bootstrap is also exhausted; `QuotaExhausted`/`KeyInvalid`/`TransientNetworkError`/`ProviderProtocolError` only propagate when there is no last-good forecast to fall back to — while one exists, these are logged and absorbed, never raised. `endpoints/marine.py`'s 3 call sites now let `ProviderError` propagate to the RFC 9457 handler (`errors.py`) instead of swallowing it in a bare `except Exception:`.
+**Error handling:** `GeographicallyUnsupported` (south of -77.5°S); `ProviderUnavailableError` when no valid last-good exists and bootstrap is also exhausted; `QuotaExhausted`/`KeyInvalid`/`TransientNetworkError`/`ProviderProtocolError` only propagate when there is no last-good forecast to fall back to — while one exists, these are logged and absorbed, never raised.
 
 **Rate limiting:** 2 req/s (NOMADS is shared NOAA infrastructure), paced with a 0.55s sleep between per-forecast-hour requests — same pattern as §14.14/§14.16.
 

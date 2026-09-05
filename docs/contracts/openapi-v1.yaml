@@ -755,11 +755,13 @@ paths:
       summary: Marine conditions for one location
       description: |
         Aggregates NDBC buoy observation (if `ndbc_station_ids` configured),
-        WaveWatch III offshore forecast (always attempted), and NWS marine
-        zone text forecast (if `nws_marine_zone_id` configured). Each
-        provider call is independently best-effort — a single provider
-        outage never fails the whole response. Tide data is NOT included
-        here; see `GET /tides/{locationId}`.
+        the model wave forecast for a configured surf spot, and NWS marine
+        zone text forecast (if `nws_marine_zone_id` configured). Model wave
+        forecast entries exist only for locations with a configured surf
+        spot; non-surf locations return an empty `forecast` list. Each
+        data source is independently best-effort — an outage never fails the
+        whole response. Tide data is NOT included here; see
+        `GET /tides/{locationId}`.
       operationId: getMarineLocation
       parameters:
         - { $ref: '#/components/parameters/LocationId' }
@@ -3931,6 +3933,7 @@ components:
         forecast:
           type: array
           items: { $ref: '#/components/schemas/MarineForecastPoint' }
+          description: Model wave forecast entries for configured surf spots only; empty for non-surf locations.
         textForecast:
           type: array
           items: { $ref: '#/components/schemas/MarineTextForecast' }
