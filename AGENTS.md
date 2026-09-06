@@ -188,6 +188,7 @@ a remote** — it is where the never-push-without-the-word-"push" rule now lives
 
 ### Collaboration style
 
+- **Never use Codex goal controls for this project.** Do not create, update, complete, block, pause, resume, or otherwise alter a goal unless the operator explicitly names the exact goal-control action in the same chat message. A task deadline, a request to finish work, or a status update is never authorization to touch a goal. (Operator correction 2026-09-06.)
 - **Do not use interactive choice prompts.** If you need user input, ask in plain text. The user will reply in chat.
 - **Simple means simple.** For sync / match-state / "fix this one mismatch" tasks, do the minimum delta and stop. Don't expand scope unless asked.
 - **Don't parrot the user's framing as fact.** Treat requests as hypotheses to verify, not premises to act on.
