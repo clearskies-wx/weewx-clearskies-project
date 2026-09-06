@@ -92,16 +92,18 @@ Unless an operator-approved decision below says otherwise:
 | D6 Per-hour provenance and existing age semantics | **APPROVED 2026-08-29** | Change the internal runner→endpoint cache payload; keep `lastRunTime/dataAge` tied to the selected complete full run; add no public field | trigger 4 |
 | D7 Near-zero invariant publication gate | **APPROVED 2026-08-29** | Keep timestamp, return `modelStatus=unavailable`, null wave result | served null semantics |
 | D8 Current-forcing health metadata | **APPROVED 2026-08-29** | Add `inputs.currents` + compact `currentForcing`; retain old key | trigger 4; persists in existing snapshot |
-| D9 Horizon worker evidence | **APPROVED EVIDENCE ROUND 2026-08-29** | Benchmark checkpointed/yielding vs controlled concurrency; no worker choice yet | later triggers 5/6/7 |
+| D9 Horizon worker evidence | **DELEGATED 2026-09-06; R10A OPEN** | Retain the existing synchronous, single-process horizon monolith unless the required R10A measurement shows a violation of the already-locked resource or production-latency ceilings. No R10B worker/process/artifact implementation is authorized or needed if it passes. | later triggers 5/6/7 only if R10A fails the ceilings |
 | D10 Same-cycle successful WW3 reuse on SWAN retry | **APPROVED 2026-08-29** | Reuse only same-process, fingerprint-matching artifacts | trigger 6 |
 | D11 SWAN hotstart quarantine before first repaired publish | **APPROVED 2026-08-29** | Transactionally quarantine tokened L2/L3/L4 hotstarts; never touch WW3 restart | recoverable state mutation |
 | D12 Recovery intent + runtime generation | **APPROVED 2026-08-29** | One atomic intent under existing work root; fingerprint includes deployed revision/binary/config hashes | triggers 5/6/7 |
 | D13 Unified Model Health | **APPROVED 2026-08-29; design in §16** | Stage-by-stage required health, deployed revision, API/admin reporting | triggers 4/7 |
 | D14 WW3 automatic setup parity | **APPROVED 2026-08-30 for A1 local implementation and residual H/D ruling; A0 remains a merge/deployment gate** | O1: every wet G1 perimeter cell is active and NOAA-supplied. H1 retains the existing grids and formatted `FREE` transfer: one ordered, complete rectangular `CLOSED` L2 boundary, including land-covered portions; the mask/bathymetry still controls land. After `ww3_shel`, an ephemeral native `ww3_outp ITYPE=0` inventory captures post-land-filter registered names/effective ordinals, validates contiguous effective ordinals and an ordered/unique `L2P*` subsequence whose gaps exactly match shel land-filter evidence, then builds the final H selector in memory only; it is never persisted, published, or spectral input. D1 is a second formatted native `ww3_outp` pass selecting every ordered diagnostic from `diagnostic_output_contract` in its native source-inventory order; H remains boundary-only. The minimal durable setup-generation envelope is authorized only to group approved artifacts, atomically select one complete current generation, and retain one hash-matched predecessor. | trigger 5 approved for the H inventory and D1 second pass inline in the existing leg/horizon producer transaction, with no schedule/cadence/trigger change; narrow triggers 4/7 approved for the versioned diagnostic contract and exactly its two named persisted transfer artifacts; no dependency, config, endpoint, port, grid, format, or other artifact authority |
 | D15 OSM-only horizontal occupancy and regular-depth separation | **APPROVED DIRECTION 2026-08-30; exact implementation gated in A0-G** | OSM is the sole horizontal provider; ocean uses `natural=coastline`, Great Lakes/inland water uses `natural=water` + `water=lake`; regular datum-converted bathymetry supplies every depth; `τ=water_fraction`, obstruction=`1−τ`; no GSHHG/fallback/fine-depth substitution | triggers 1/4/7 approved as scoped; no new provider |
+| D16 Live marine test reservation | **APPROVED 2026-09-06** | Use the acknowledged ephemeral `/run/weewx-clearskies/marine-test-hold` sentinel. The runner acknowledges it, lets active work finish, gates new full/fast/catch-up dispatch, keeps queued work pending, and leaves API last-good serving and wind assembly independent; release removes the sentinel. | additive `/health` health object and runtime sentinel only; no normal trigger, retry, cadence, model, or service-boundary change |
 
-Acceptance of this plan approves D6–D8 and D10–D13 as written. D9 remains evidence-only; worker
-placement requires a later explicit choice after the benchmark gate.
+Acceptance of this plan approves D6–D8 and D10–D13 as written. D9's 2026-09-06 delegated
+disposition retains the monolith pending the still-required R10A measurement; worker placement
+requires a later explicit architectural decision only if the locked ceilings are violated.
 
 ## 5. Cold-recovery state machine
 
@@ -1486,10 +1488,42 @@ Gate R9:
 - A real exception at any production phase clears state.
 - Same-cycle reuse is evidenced from real attempts; production is never deliberately failed for this gate.
 
+### 17.1 Live test reservation (D16, operator delegation 2026-09-06)
+
+The point-in-time deployment guard is not a reservation: it was idle at 07:51
+UTC, but queued 06Z work began at 07:54 UTC. The operator authorized either a
+testing stop mechanism or tests during non-idle operation; this plan records
+the selected acknowledged ephemeral hold. `scripts/run-marine-tests.sh`
+requests the runtime-only sentinel
+`/run/weewx-clearskies/marine-test-hold` and waits for the runner to acknowledge
+it. An active model is never killed. After it finishes, the runner gates new
+full, fast, and catch-up/horizon dispatch while queued work remains pending;
+the API continues serving last-good output and wind assembly remains
+independent. Removing the sentinel releases the hold on a later runner
+iteration, with no ordinary trigger, retry interval, or model-cadence change.
+
+The wrapper may begin tests only when `/health` reports
+`modelTestHold.requested=true` and `modelTestHold.acknowledged=true`,
+`run_in_progress=false`, `ww3Horizon.inFlight=false`, the service is active,
+and no service descendants exist. It verifies the `librewxr` alias, accepts
+only rooted `tests/...` selectors, atomically owns one hold at a time, polls at
+most 23,400 seconds, changes to the fixed marine checkout, and runs the selected
+host tests as `ubuntu`. Its pre-acquisition `EXIT`/signal traps terminate an
+active SSH test command and release only the sentinel token this wrapper owns;
+cleanup failure is a nonzero result, and `--release` is the explicit stale-hold
+cleanup path. It does not deploy, restart,
+stop, pull, or push. This procedure has not yet received live acceptance
+evidence.
+
+The live acceptance drill covers a passing selector, a failing selector, and an
+interrupted wrapper. Each path must leave the sentinel absent, the later runner
+health unacknowledged, and queued production work available to resume. A second
+concurrent acquisition must refuse without removing the first wrapper's hold.
+
 ## 18. R10A/R10B — Horizon worker evidence, decision, and optional implementation
 
 **Owner:** `troubleshooter` evidence → operator decision → §6 universal workflow
-**Status:** R10A evidence is open; R10B remains blocked until D9 is explicitly decided
+**Status:** R10A evidence is open; D9's monolith disposition was delegated on 2026-09-06; R10B remains unauthorized unless the locked ceilings are violated
 
 The 4½-hour continuation is our own WW3 computation from the production leg's +6 h restart out to
 +96 h. It is 96 rather than 72 because one daily horizon must cover later consumer cycles: worst
@@ -1522,12 +1556,12 @@ Checkpoint candidates, if measured, carry trigger cycle, chunk start/end, NOAA p
 binary hashes, restart hash, completed transfer segment, and atomic completion state. Partial or
 mismatched checkpoints never resume.
 
-After R10A evidence, the operator selects monolith, checkpointed worker, concurrency, or hybrid.
-R10B implements and live-gates that explicit choice. If monolith is retained, record it as the D9
-decision; it is not an untracked deferral. Any checkpoint manifest or worker placement is an
-architectural/persisted-artifact decision and receives its own accepted amendment before code. A
-later approval of a worker or artifact does not approve service/process placement; that remains a
-separate D9 architectural decision.
+R10A still measures the locked ceilings and equivalence conditions. The operator's delegated
+default is the existing synchronous, single-process monolith. If R10A demonstrates a ceiling
+violation, stop for a new explicit worker/concurrency decision before any R10B implementation.
+Any checkpoint manifest, worker, or process placement is an architectural/persisted-artifact
+decision and receives its own accepted amendment before code; this disposition does not authorize
+one. If the monolith remains within the ceilings, R10B is not needed.
 
 ## 19. R11 — Automatic cold recovery implementation
 
@@ -1644,7 +1678,8 @@ text explicitly says evidence/decision only:
 18. R7c near-zero gate.
 19. R8c authenticated API pass-through and operator UI agreement; CheckMK remains optional.
 20. R9 same-cycle reuse and whole-attempt deployment guard.
-21. R10A evidence; R10B only after the later operator worker choice.
+21. R10A evidence; R10B only if the locked ceilings are violated and a later explicit worker choice
+    is approved.
 22. R11 automatic cold recovery.
 23. R12 four-anchor close gate.
 
@@ -1677,8 +1712,8 @@ evidence in the round record.
 | R8a | Operations Manual health schema/reducer and `unknown`-evidence interpretation; Provider Manual model-stage ownership; API Manual §19/OpenAPI update or evidenced `N/A` for existing opaque pass-through; marine/API changelogs. |
 | R8b | Operations Manual stage instrumentation, reason-code, and health interpretation; Provider Manual model-stage/provenance ownership; API Manual §19/OpenAPI update or evidenced `N/A` for existing opaque pass-through; marine/API changelogs. |
 | R8c | API Manual §19 and OpenAPI for authenticated opaque pass-through; distinct stack Operator Manual and localized operator/admin help for model-versus-transport freshness and reason/action display; Operations Manual cross-surface health interpretation; Root Architecture only if it describes health routing; optional CheckMK remains documented as unimplemented; marine/API/stack changelogs. |
-| R9 | Operations Manual guarded deployment and reuse interpretation; Provider Manual same-cycle reuse constraints; ADR-109 if accepted lifecycle/artifact policy changes; marine changelog. |
-| R10A | Operations Manual evidence procedure and no-deploy decision record; ADR-109 and Evolution Plan only for the operator-selected result; marine changelog only if shipped behavior changes. |
+| R9 | Operations Manual guarded deployment, acknowledged test-hold procedure, and reuse interpretation; Provider Manual same-cycle reuse constraints; API Manual opaque health pass-through only; ADR-109 if accepted lifecycle/artifact policy changes; marine changelog. |
+| R10A | Operations Manual evidence procedure and no-deploy decision record; ADR-109 and Evolution Plan for the delegated monolith disposition; marine changelog only for shipped source behavior. |
 | R10B | Root Architecture, Operations Manual, Provider Manual, ADR-109, Evolution Plan, API Manual/OpenAPI/operator help, changelogs, and licensing/notice only to the exact extent of the later approved worker/artifact decision. |
 | R11 | Operations Manual recovery controller, recovery intent, source refresh, rollback, and health; Provider Manual cold-recovery validity; API Manual/OpenAPI and operator help for existing health/status semantics; ADR-109 and ADR-104/successor where their accepted policies are implemented; marine/API changelogs. |
 | R12 | Operations Manual end-to-end acceptance/reality/rollback procedure; Provider Manual chain validity; API Manual/OpenAPI/operator help for verified existing health semantics; changelogs and plan close record. |
@@ -1699,7 +1734,8 @@ Acceptance of this plan activates D6–D8 and D10–D13 exactly as scoped. It do
 
 - any grid, model handoff, formula, coefficient, provider family, visitor contract, port, dependency,
   endpoint, or config-key change;
-- any R10B worker/process/cadence choice before R10A evidence and a later explicit operator ruling;
+- any R10B worker/process/cadence implementation; D9 retains the monolith pending R10A, and a worker
+  would require a later explicit operator ruling if the locked ceilings are violated;
 - any new persisted artifact beyond the accepted recovery intent and additions to the existing
   state/cache contracts, **except** D1's exactly approved
   `level0/cycle_<token>/ww3_outp/ww3_diagnostic_transfer.ww3` and
@@ -1723,8 +1759,12 @@ cold-run gate pass; production stays fail-closed and non-publishing until R1/R2.
 
 D1 consumes every ordered diagnostic in native source-inventory order and refuses/logs a
 missing/mismatched H or D. Its producer passes structural validation, atomic pre-promotion and
-setup/generation identity gates; exact cycle-directory retention remains promotion/merge-blocked
-until A0-I names it and the operator approves it; current approval covers files, not deletion policy.
+setup/generation identity gates. The operator's 2026-09-06 A0-I delegation now names exact
+retention: two complete raw WW3 H/D generations per kind (current plus one rollback predecessor),
+with a third candidate protected until the new owner checkpoint persists; canonical reference,
+checkpoint-output, and selected-`hstage` checks protect any malformed, relative, unresolvable,
+still-referenced, incomplete, or hash-mismatched candidate, and deletion removes only a complete
+pair/root. This decision adds no cleanup schedule, persisted schema, or chronological gate.
 R8b owns canonical `modelHealth`. Historical 2×4 control-case results are not acceptance evidence;
 production-compatible real native input/output supplies the required live proof. A failed
 A0/H/D/cold-run gate, missing
@@ -1732,22 +1772,60 @@ authoritative revision source, or need for a dependency, config key, endpoint, p
 artifact outside the approved scope remains a stop-and-surface event, not implied permission to
 expand the design.
 
+The operator's 2026-09-06 D16 approval is a narrow exception for the runtime-only test-hold
+sentinel and additive `/health` `modelTestHold` object. It authorizes no public visitor contract,
+normal scheduling, cadence, service-boundary, or model-responsibility change. The source wrapper
+and hold behavior remain pending independent post-code review, guarded deployment, and live host
+testing.
+
 ---
 
 ## 24. Acceptance checklist
 
-### Execution checkpoint — 2026-09-05 (candidate deployed; corrective coding wave active)
+### Execution checkpoint — 2026-09-06 (local D16 source review complete; deploy/live pending)
 
 This checkpoint is the §6.1 execution ledger. A local test result, control case, simulation, or
 uncommitted source change does not advance any column. Only observed live-host evidence advances a
 quality-control, deployed, or live-evidence state.
 
-The prior 2026-09-03 wording that described the completed coding wave as
-"uncommitted" and "No" under deployment is superseded by observed state: the
-clean candidate is committed and deployed on librewxr at marine
-`eff77fcf00757fb40e3cabe35487dd638beb5289` on
-`feature/ww3-automatic-setup`. Deployment to that test host is not acceptance:
+The source and documentation phase for the testability/recovery correction is
+complete in the local worktrees. Marine `8eb8c88` contains the runner/state/
+health implementation and `4932801` adds the focused lifecycle guards. The D16
+production path and corrected wrapper passed independent post-code source review;
+guarded deployment and live test-hold execution remain open, so neither is
+claimed below. Earlier deployed state remains historical evidence only. The
+currently deployed librewxr baseline is marine `aa8bc86` on
+`feature/ww3-automatic-setup`; it predates D16 and does not expose
+`modelTestHold`. Deployment to that test host is not acceptance:
 the A0/A0-I gates and every applicable post-code/live gate remain open.
+
+**§7 document-impact declaration — MMR-2026-09-06-TESTABILITY-CLOSEOUT.**
+This correction changes the following allowlisted documentation: Root
+`ARCHITECTURE.md` (runtime hold boundary); Provider and Operations manuals
+(runner acknowledgment, horizon proof, cache-health truth, retention, and the
+operator procedure); API Manual §19 (opaque additive health pass-through);
+ADR-109 and the Marine Model Evolution Plan (operator-delegated D9/A0-I
+decisions); this Recovery Plan (decision register, executable remaining path,
+checkpoint, journal, and open-question reconciliation); and the marine
+`CHANGELOG.md` (operational/upgrade impact). The source authorities are
+`endpoints/health.py`, `state.py`, `service.py`, and
+`providers/nearshore/swan.py` in the marine repository, plus the root operator
+wrapper `scripts/run-marine-tests.sh`; the wrapper and source have not received
+live acceptance here. `docs/contracts/openapi-v1.yaml`
+is **N/A** because the health object remains an API-opaque pass-through and no
+visitor endpoint or modeled schema changed. Stack code/help, licensing, and
+frozen local SWAN/WW3 manuals are **N/A**: no corresponding source, legal, or
+manual text changed.
+
+**Remaining executable path.** D16 source review and local commits are complete.
+Remote publication still requires the operator's explicit word `push`; absent
+that word, no push is performed. After guarded deployment (only when no active model would be
+interrupted), the coordinator runs `scripts/run-marine-tests.sh` for focused
+live selectors, waits for the acknowledged hold and idle health conditions,
+releases it, and records the real results. Only then do the remaining native,
+recovery, four-anchor, reality, resource, journal, and independent-auditor
+gates proceed. None of these later steps is claimed by this documentation
+phase.
 
 | Repair | Code | Documentation | QC | Deployed | Live evidence / next state |
 | --- | --- | --- | --- | --- | --- |
@@ -1758,8 +1836,9 @@ the A0/A0-I gates and every applicable post-code/live gate remain open.
 | R5 | Open | Open | Not started | No | Start only after predecessor coding/deployment gates permit it. |
 | R6 / R7 | **Code complete** — uncommitted coding wave | **Complete** — source/doc reconciliation 2026-09-03 | Source audit passes; live QC pending candidate deployment | No | Obtain provenance/last-good live evidence after the required deployment gate. |
 | R8b / R8c | **R8b code complete** — marine `1cd1209` restores truthful horizon/current/nested-level evidence; R8c status view is committed as Stack `d773645` | Complete — R8c updates the Stack Operator Manual and translations | R8b post-code independent source review passes; R8c's committed focused guards cover opaque parsing and display fallbacks | R8b is deployed on librewxr as part of running commit `f5df467`; R8c Stack `d773645` is deployed to weather-dev | Obtain authenticated live marine/API/operator-surface agreement for full, fast, restart, and named refusal states. |
-| R9 | **Code complete** — uncommitted coding wave | **Complete** — source/doc reconciliation 2026-09-03 | Source audit passes; live QC pending candidate deployment | No | Obtain guarded deployment/restart evidence; a busy guard remains a safety refusal, not a test failure. |
-| R10A | Open | N/A until evidence exists | Not started | N/A | Gather only the approved evidence; R10B remains unapproved. |
+| R9 | **Code complete** — local candidate marine `8eb8c88`; D16 guards in `4932801` | **Complete** — this documentation phase | Broader R9 post-code review and live QC pending | No accepted deployment of this wave | Use the acknowledged hold for guarded live testing; a busy guard is not a test failure. |
+| D16 testability hold | **Code complete** — marine `8eb8c88`, guards `4932801`, root wrapper committed locally | **Complete** — this documentation phase | Independent source review passes; live host execution pending | No accepted deployment of this wave | Push authorization, guarded deploy, then passing/failing/interrupted/concurrent hold drills and focused live tests. |
+| R10A | Open | **Complete** — delegated D9 disposition documented; evidence procedure remains | Not started | N/A | Measure the locked ceilings; retain the monolith if it passes. R10B remains unauthorized unless the measurement shows a violation and a later decision approves a worker. |
 | R11 | Open | Open | Not started | No | Start after its stated predecessors are complete. |
 | R12 | Open | Open | Not started | No | Close only after the required four-anchor live evidence and independent review. |
 
@@ -1800,6 +1879,9 @@ the A0/A0-I gates and every applicable post-code/live gate remain open.
 | 2026-09-06 | R8c operator health display deployment | Stack `d773645` (model-health status view, translations, and Stack Operator Manual) was fast-forwarded to `main`, pushed, synchronized alone through `sync-to-weather-dev.sh`, then published by `redeploy-weather-dev.sh --skip-pull`. The configuration service was active and both the rebuilt dashboard output and public index refreshed at 04:40 UTC. | The API pass-through remains deployed at API `701eb6e`; the Stack now has the operator surface. A read-only browser navigation reached the login page with an expired session, so authenticated rendering has not been claimed. |
 | 2026-09-06 | R8c authenticated failure/serving agreement | The authenticated Stack Status page rendered marine status `degraded`, its exact terminal fast attempt `2026-09-06T03:00:00Z` as failed/`run_refused`, the owner stage `boundaryMerge=failed/boundary_merge_failed`, the separately failed 00Z full and horizon attempts, and the valid 18Z last-good serving selection with its runtime identities. Immediate read-only marine `/health` inspection returned the same attempt identifiers, timestamps, reason codes, boundary-merge coverage, selected cycle, valid-time range, and binary/config/grid identities. | This closes the live authenticated agreement for the observed failure-and-last-good combination: the operator UI, API pass-through, and marine ledger tell the same truth. It does not replace the remaining full-success/restart coverage required by the broader R8 gate. |
 | 2026-09-06 | Forecast-cache compact migration and restart recovery | With the service idle, the deployed atomic writer rewrote the live 155,688,741-byte legacy cache as the gzip-framed compact document. The resulting file is 15,652,298 bytes, begins with gzip bytes `1f 8b`, and decodes to one spot with 73 spectral entries and 310,858 restored band stations. The deployed reader fixes `ee7714c` and `ae888e1` cover the recovery checkpoint and serving-health readers. After the guarded restart at 07:20:13 UTC, the startup journal recorded `restored recovery-eligible forecast cache from disk (1 spots)` and `/health` reported the valid 2026-09-05T18:00:00Z last-good selection with its original model time and `run_refused` reason. | This closes the compact-cache migration and restart restoration evidence: the durable form is below the 64 MB threshold, restores the restart-safe band-station payload, and health reports the restored last-good truthfully. The interrupted 00Z horizon is separately recorded above; it does not alter the retained last-good selection. |
+| 2026-09-06 | R9 / testability hold | The deployment guard was idle at 07:51 UTC, but queued 06Z work began at 07:54 UTC. The idle observation was therefore not a reservation. | Operator authorization permitted either a testing hold or tests during non-idle operation; the selected acknowledged ephemeral hold is documented in D16. Marine `8eb8c88` and guard `4932801` are committed locally. Independent source review rejected two wrapper drafts for real working-directory, cleanup, ownership, signal, and deadline defects; the final locked single-remote-process wrapper passed all five source-review questions. Guarded deployment and live host testing remain pending. |
+| 2026-09-06 | A0-I / D9 delegation | The operator delegated exact raw-output retention and the horizon-worker disposition. | Retain two complete raw WW3 H/D generations per kind (current plus one rollback predecessor), protect a third candidate until checkpoint ownership is durable, and delete only a fully unreferenced complete pair/root after canonical checks. Retain the synchronous single-process horizon monolith unless the still-required R10A measurement violates locked ceilings; no R10B worker/process/artifact implementation is authorized by this entry. |
+| 2026-09-06 | R8b / cache-health correction | Source now bases compact-cache serving health on loader-restored per-spot last-good memory matching the selected cycle; malformed codec data cannot claim valid serving, and restore logs count actual restored spots. | This is source-backed documentation only. No live verification of the correction is claimed; repeat the focused host checks after review and guarded deployment. |
 
 - [x] Operator accepts §23's approval boundary and this plan — 2026-08-29.
 - [x] Old forward plan archived; redirect installed — 2026-08-29.
@@ -1817,8 +1899,8 @@ the A0/A0-I gates and every applicable post-code/live gate remain open.
       pass before A1 merge/deployment; H-only/D-only preservation fails closed until then.
 - [ ] A0 proves the approved H inventory and D1 contract/resource gates, including H-only/D-only
       compatibility policy, before A1 merge/deployment.
-- [ ] A0-I names, and the operator approves, D1's exact cycle-directory retention before D1
-      promotion or A1 merge; the existing file-path approval is not deletion-policy approval.
+- [ ] A0-I exact cycle-directory retention was delegated by the operator on 2026-09-06 and is
+      recorded in D16/ADR-109; implementation review and live retention/rollback evidence remain open.
 - [ ] A1 matrix row is complete: its §7 document-impact declaration is evidenced, every applicable
       authority is updated in the same functional change (or evidenced `N/A`), and post-code
       reviewer QC passes before atomic rollback gate or deployment.
@@ -1832,20 +1914,11 @@ the A0/A0-I gates and every applicable post-code/live gate remain open.
 
 ## OPEN OPERATOR QUESTIONS
 
-### A0-I — Exact retention rule for completed WW3 cycle directories
-
-**Decision needed:** Specify the exact rule that permits deleting an older complete
-cycle/horizon boundary-and-diagnostic pair after a newer pair succeeds. The current
-approved direction retains the active pair and one complete rollback predecessor,
-and never deletes one member of a pair or anything still needed for forecast
-coverage or rollback. It does not say when an older eligible pair is actually
-deleted, how many complete generations remain, or what durable reference check
-authorizes the deletion.
-
-**Why this matters:** Without that exact rule, the service must continue to retain
-files rather than guess which historical model output is safe to remove. A0-I and
-A1 promotion cannot close until this is decided.
-
-**Recommendation:** State the exact number or age of complete generations to retain
-and the required condition before deletion. Do not authorize a partial-pair or
-in-use deletion.
+No operator decision remains open in this section. The A0-I retention question
+was delegated and decided on 2026-09-06: retain two complete raw WW3 H/D
+generations per kind, protect a third candidate until the new owner checkpoint
+persists, and delete only an entire pair/root after the canonical reference and
+checkpoint checks documented in D16 and ADR-109. Implementation review and live
+evidence remain acceptance gates in §24. R10A is likewise an evidence gate, not
+an unresolved operator question; D9 retains the monolith unless the locked
+measurement ceilings are violated.

@@ -1247,3 +1247,34 @@ come from has changed. No `/health` field, endpoint, env var, or API-side change
 for everything that is not a binary fact. KATs: marine `tests/test_j24_ww3_binaries_file.py`
 (the production failure pinned: a pushed config with NO `ww3` block still yields the file's
 pins; the file wins over stale pushed pins; an absent file is byte-identical to pre-round).
+
+## Amendment (2026-09-06): testability hold, A0-I retention, and D9 horizon disposition
+
+**Status: operator-delegated decisions recorded; source review and live evidence remain open.**
+On 2026-09-06 the operator delegated the choice needed to make live testing safe while the
+runner is normally busy. The selected mechanism is an acknowledged, ephemeral test hold. The
+marine runner observes the runtime-only sentinel
+`/run/weewx-clearskies/marine-test-hold` and reports the additive
+`/health` object `modelTestHold: {requested: bool, acknowledged: bool}`. A request alone is
+not an idle reservation: the runner acknowledges it, allows any active model to finish, then
+gates new full, fast, and catch-up/horizon dispatch while queued work remains pending. The API
+continues serving last-good output and wind assembly remains independent. Removing the sentinel
+releases the hold on a later runner iteration; ordinary triggers, retry intervals, model cadence,
+and the WW3/SWAN responsibility split are unchanged. No active model is killed.
+
+The operator also delegated A0-I's exact raw-output retention rule: retain two complete raw WW3
+H/D generations per kind, the current generation and one rollback predecessor. Durable rotation
+may expose a third candidate, but it is not deleted until the new owner checkpoint persists.
+Immediately before deletion, current and previous references, every recovery-checkpoint output
+(including dynamic cluster keys), and the selected `hstage` are checked by absolute, canonical
+path. Malformed, relative, unresolvable, still-referenced, incomplete, or hash-mismatched state
+retains the candidate. Deletion removes only the entire pair/root; a crash or checkpoint-write
+failure retains extra output. The count-based horizon pruner is removed. No cleanup schedule,
+persisted schema, or new chronological gate is introduced.
+
+For the recovery plan's D9 horizon-worker choice, the delegated disposition is to retain the
+existing synchronous, single-process horizon monolith unless the still-required R10A measurement
+shows a violation of the already-locked resource or production-latency ceilings. No R10B worker,
+process, or artifact implementation is authorized or needed if it passes. R10A remains an open
+measurement gate. These choices change no native formula, deck grammar, model domain/grid,
+handoff, or cadence.

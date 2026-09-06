@@ -157,6 +157,19 @@ then may SWAN start. Missing, short, corrupt, or wrong-cycle continuation data
 refuses the new cycle before SWAN; the six-hour transfer is never used alone as a
 production boundary. Open A0, A0-I, R1, R2, and recovery evidence gates remain open.
 
+**Operator testing reservation (implemented in the current marine source; live
+verification and deployment remain pending).** The marine runner also observes
+the runtime-only sentinel `/run/weewx-clearskies/marine-test-hold`. A request is
+not an idle observation or a reservation by itself: the runner acknowledges it
+in `/health` as `modelTestHold.acknowledged` before it gates new full, fast, and
+catch-up/horizon dispatch. A model already running is allowed to finish; the
+hold does not stop or kill it. While acknowledged, the API continues serving
+the last-good output and independent wind assembly continues, while queued
+model work remains pending. Removing the sentinel releases the hold on a later
+runner iteration. `scripts/run-marine-tests.sh` is the operator wrapper that
+requests, verifies, and releases this reservation; it does not deploy, restart,
+stop, pull, or push.
+
 ## Configuration boundary
 
 The API is the operator-configuration source of truth. It validates and stores

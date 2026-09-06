@@ -1258,6 +1258,36 @@ deployment workflow. The script provisions the package and service, applies
 the guarded restart policy, and verifies the result. Its package and service
 commands are deployment internals, not manual operator procedure.
 
+#### Live marine test reservation
+
+Use `scripts/run-marine-tests.sh` when focused pytest checks must run against
+the live marine host while the runner normally continues to schedule model
+work:
+
+```bash
+scripts/run-marine-tests.sh tests/test_r8b_serving_truth.py
+scripts/run-marine-tests.sh --release
+```
+
+The wrapper verifies that the `librewxr` SSH alias resolves exactly to
+`librewxr.shaneburkhardt.com`, accepts only rooted `tests/...` pytest selectors,
+and atomically acquires the runtime-only sentinel
+`/run/weewx-clearskies/marine-test-hold`. The model runner acknowledges the
+request; a point-in-time idle check is not a reservation. The wrapper waits in
+60-second polls for at most 23,400 seconds, then requires both hold flags in
+`/health`, `run_in_progress=false`, `ww3Horizon.inFlight=false`, an active
+service, and no service descendants. An already-running model is never killed;
+the hold waits for it to finish and gates new full, fast, and catch-up/horizon
+dispatch while queued work stays pending. The API continues serving last-good
+output and wind assembly remains independent. The `EXIT` trap releases the
+sentinel only when the current wrapper owns it; a concurrent wrapper fails
+instead of sharing or releasing another test run's hold. The trap is installed
+before acquisition, terminates an active SSH test command on interruption, and
+reports a release failure with a nonzero exit. `--release` is the explicit stale-
+hold cleanup path and likewise fails if cleanup cannot be confirmed. The wrapper does not
+deploy, restart, stop, pull, or push, and this procedure has not yet received
+live acceptance evidence.
+
 SWAN 41.51AB must be compiled and on PATH (`/usr/local/bin/swan`) on
 whichever host runs the marine service. Use `scripts/install_swan.sh` or the
 Docker image. The marine service verifies its own SWAN binary.
@@ -1412,7 +1442,7 @@ The API polls the marine service health check every 60 seconds:
 GET {marine_service_url}/health
 ```
 
-No auth required. Response fields: `status`, `version`, `last_run`, `spots`, `run_in_progress`, `reasons`, `inputs`, `invariants`, `fullRun`. Three consecutive failures → API removes marine capabilities from `/api/v1/capabilities` and continues serving last-good cached marine data. Non-marine API functionality is unaffected. (The API's failure-detection loop keys off HTTP-level failures / `last_run`, not off `status` — see B3, MARINE-MODEL-RESTORATION-PLAN.md, 2026-07-27.)
+No auth required. Response fields: `status`, `version`, `last_run`, `spots`, `run_in_progress`, `modelTestHold`, `reasons`, `inputs`, `invariants`, `fullRun`. Three consecutive failures → API removes marine capabilities from `/api/v1/capabilities` and continues serving last-good cached marine data. Non-marine API functionality is unaffected. (The API's failure-detection loop keys off HTTP-level failures / `last_run`, not off `status` — see B3, MARINE-MODEL-RESTORATION-PLAN.md, 2026-07-27.)
 
 **`status`** (B3, 2026-07-27 — previously hardcoded to `"ok"` on every call regardless of what the model was doing): one of `ok` / `degraded` / `failed`.
 
@@ -1478,6 +1508,17 @@ The Stack source provides operator guidance through state, reason, coverage,
 and source columns; it does not start, retry, or restart a model. CheckMK is
 not integrated (`endpoints/health.py`, API companion-health route, and Stack
 `admin/status` route/template).
+
+**Operator test-hold health.** The additive `modelTestHold` object reports
+`{requested: bool, acknowledged: bool}`. `requested` reflects the presence of
+the runtime-only `/run/weewx-clearskies/marine-test-hold` sentinel;
+`acknowledged` is set only after the marine runner observes it. Both values must
+be true before live tests begin. This is a reservation for dispatch, not a
+claim that a currently running model has stopped: `run_in_progress` and
+`ww3Horizon.inFlight` must also be false, the service must be active, and its
+cgroup must have no model descendants. Removing the sentinel clears the
+acknowledgement on a later runner iteration and leaves the ordinary full, fast,
+and catch-up/horizon schedule unchanged.
 
 **H-1 reasons (SURF-PHYSICS-REMODEL-PLAN-2026-08-05, 2026-08-06) — floor status at `degraded`:**
 

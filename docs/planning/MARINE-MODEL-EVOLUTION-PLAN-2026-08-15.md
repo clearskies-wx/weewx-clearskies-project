@@ -1691,9 +1691,45 @@ Provider and Operations manuals, API Manual, ADR-100/101/104/109, marine and
 Stack changelogs, and Stack Operator Manual carry the applicable source-backed
 updates. `docs/contracts/openapi-v1.yaml` is **N/A**: the recovery source adds
 no visitor endpoint, response field, or modeled API schema; `GET
-/setup/marine/health` remains an authenticated opaque pass-through. Exact
-cycle-directory retention/deletion policy and any future R10B worker choice
-remain open questions and are not resolved here.
+/setup/marine/health` remains an authenticated opaque pass-through. The operator
+delegated the exact cycle-directory retention rule and the D9 horizon disposition
+on 2026-09-06; the amendment below records both decisions. Source review,
+independent post-code review, guarded deployment, and live evidence remain
+pending.
+
+### Documentation reconciliation amendment — testability and A0-I/D9 decisions (2026-09-06)
+
+The operator authorized either a testing stop mechanism or tests during ordinary
+non-idle operation and delegated the coordinator's choice. The selected design
+is an acknowledged ephemeral hold: the marine runner observes
+`/run/weewx-clearskies/marine-test-hold`, reports
+`modelTestHold: {requested: bool, acknowledged: bool}` through its existing
+health response, and gates new full, fast, and catch-up/horizon dispatch only
+after an active model finishes. It never kills an active model. While held,
+queued work remains pending, the API serves last-good output, and wind assembly
+continues independently. Removing the sentinel releases the hold on a later
+runner iteration. The wrapper `scripts/run-marine-tests.sh` requests, verifies,
+and releases this hold; it does not deploy, restart, stop, pull, or push. The
+normal trigger, retry, and model cadence are unchanged. Live execution of the
+wrapper remains pending.
+
+The delegated A0-I rule retains exactly two complete raw WW3 H/D generations per
+kind: current and one rollback predecessor. A durable rotation may return a
+third candidate, but deletion waits for the new owner checkpoint. Before
+deletion, current/previous references, every recovery checkpoint output
+(including dynamic cluster keys), and selected `hstage` are checked by absolute,
+canonical path. Malformed, relative, unresolvable, still-referenced,
+incomplete, or hash-mismatched state retains the candidate; deletion removes
+only the entire pair/root. A crash or checkpoint-write failure retains extra
+output. The count-based horizon pruner is removed. No cleanup schedule,
+persisted schema, or chronological gate is added.
+
+For D9, retain the existing synchronous single-process horizon monolith unless
+the still-required R10A measurement violates the already-locked resource or
+production-latency ceilings. No R10B worker/process/artifact implementation is
+authorized or needed if it passes. R10A remains an open measurement gate; these
+decisions do not change native formulas, deck grammar, model domain/grid,
+handoff, or cadence.
 
 ---
 
