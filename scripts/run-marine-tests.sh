@@ -44,7 +44,7 @@ fi
 # Selectors are a narrow argument vector, never a remote shell fragment.
 if [ "${release_only}" = "0" ]; then
     for selector in "$@"; do
-        if [[ ! "${selector}" =~ ^[A-Za-z0-9_./:\[\]=,-]+$ ]] \
+        if [[ ! "${selector}" =~ ^[A-Za-z0-9_./:=,-]+$ ]] \
             || [[ "${selector}" != tests/* ]] \
             || [[ "${selector}" == ../* || "${selector}" == */../* || "${selector}" == */.. ]]; then
             echo "Unsafe pytest selector: ${selector}" >&2
