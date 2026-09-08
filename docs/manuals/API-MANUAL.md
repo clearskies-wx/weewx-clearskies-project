@@ -2251,6 +2251,25 @@ forecast provider is fetched using the API's target-unit setting, so the
 regular series follows the same display-unit contract as the regular forecast
 endpoint; the provider identifier and each point's UTC time remain attached.
 
+#### Private Fishing temperature-profile timeline
+
+For a configured Fishing location, the marine detail response has one additive
+**internal-only** field, `temperatureProfileTimeline`, before the API builds
+the public response. Each entry carries the OFS record's actual `validTime`,
+its finite `layers` (`depthM` in metres and `waterTemperatureC` in Celsius),
+and source provenance whose `validTime` must equal the outer entry time. This
+timeline is independent of the surf-wave `forecast` list, so a harbour with no
+surf forecast still supplies its eligible water-column inputs.
+
+The API uses only timeline layers whose source-valid time falls within the
+Fishing period and converts them into the existing private
+`temperatureCandidates` scorer transport shape. It strips
+`temperatureProfileTimeline` before public Marine conversion, enrichment, and
+the response envelope; it is not a dashboard field and is intentionally absent
+from the public OpenAPI `MarineBundle` schema. A surface observation, offshore
+buoy value, a missing depth, or a mismatched outer/provenance time is never a
+Fishing candidate.
+
 For the NWS regional join, the API uses the configured station timezone to
 classify an existing hourly point into its local day column (06:00–18:00) or
 night column (18:00–06:00). A CWF label is eligible only if that day/night

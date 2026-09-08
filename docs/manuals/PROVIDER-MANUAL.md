@@ -1848,6 +1848,7 @@ The response's `osm_type` field carries the raw OSM tag value (e.g. `groyne`, `d
 - Cache grid coordinates per model (lat, lon, depth, mask, h arrays). TTL = 24h.
 - Cycle selection: `floor(current_utc_hour / 6) * 6` for 4x/day models, fixed cycle for 1x/day (WCOFS = 03z). Fall back up to 4 cycles.
 - Variables extracted at the nearest water grid point: `temp`, `salt`, `u_eastward`, `v_northward` (all `[time, Depth, ny, nx]`), `zeta`, `zetatomllw` (`[time, ny, nx]`), `h`, `mask` (`[ny, nx]`).
+- **Fishing depth profile (Fishing and Boating remediation):** `fetch_forecast()` retains every finite non-negative `temp[Depth, ny, nx]` layer from each source regulargrid file with that file's actual forecast valid time. It does not collapse the WCOFS column to `Depth=0`. The resolver preserves the timestamped layers for the marine detail route's private `temperatureProfileTimeline`; the API converts only in-period layers to the existing scorer transport and strips the timeline before the public Marine response. `water_temp_c` remains the real zero-depth value for legacy surface consumers and is never substituted with a deeper layer.
 
 **Cache:** Key includes model name + cycle + lat/lon (rounded to 3 decimals). TTL = 1800s.
 
@@ -3602,6 +3603,14 @@ surface value. Fishing requests the selected species' habitat-depth value when
 the water-column profile supplies it; if no local water-column value exists,
 the field remains visibly missing and is not silently replaced by an offshore
 surface reading.
+
+For the Fishing scorer handoff, the marine detail route carries an
+internal-only `temperatureProfileTimeline`: actual source valid time, finite
+depth/temperature layers, and matching source provenance for each OFS file.
+This path is available for Fishing harbours even though their public wave
+forecast list is empty. The API admits only layers whose outer and provenance
+valid times agree and that fall within the scored period, then removes the
+timeline at the public API boundary.
 
 ### Offshore observation boundary
 

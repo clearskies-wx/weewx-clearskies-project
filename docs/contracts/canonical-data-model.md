@@ -425,6 +425,17 @@ Added Phase 5 (ADR-083 marine domain architecture, archived to PROVIDER-MANUAL �
 | `MarineBundle` | Container: `GET /api/v1/marine[/{locationId}]` — matches `models/responses.py` | API-MANUAL §16 |
 | `TideBundle` | Container: `GET /api/v1/tides[/{locationId}]` — matches `models/responses.py` | API-MANUAL §16 |
 
+**Private Fishing transport field:** the authenticated marine-detail response
+may additionally carry `temperatureProfileTimeline` for configured Fishing
+locations. It is not a public `MarineBundle` field: the API strips it before
+the public envelope and OpenAPI schema. Each timeline entry is
+`{validTime, layers, provenance}` where every layer is
+`{depthM, waterTemperatureC}` in metres/Celsius and
+`provenance.validTime == validTime`. Only finite, non-negative depth layers
+with a real source-valid time may enter the existing private Fishing
+`temperatureCandidates` transport; surface observations and offshore NDBC or
+CO-OPS values are excluded.
+
 **Surf/Fishing/BeachSafety bundle note:** there are no `SurfBundle`/`FishingBundle`/`BeachSafetyBundle` Pydantic classes — earlier drafts were removed from `models/responses.py` (T4.3, Phase 4 cleanup) because they never matched the actual dict shapes `endpoints/surf.py`/`fishing.py`/`beach_safety.py` return. See API-MANUAL §16 for the ground-truth shapes.
 
 **Marine unit groups:** Five groups added — `group_wave_height`, `group_wave_period`, `group_water_level`, `group_ocean_speed`, `group_visibility`. These are **not** weewx-archive groups and do not follow the §2 `target_unit`/`[StdConvert]`-override mechanism — they default to a fixed maritime-convention unit set (knots, nautical miles, feet/meters) regardless of the station's land unit system. Full base-unit/conversion/preset-default table: API-MANUAL §16 "Marine unit groups".
