@@ -44,6 +44,24 @@ weewx host; Caddy, the Dashboard, and Config UI share the front-end host. The
 marine service may run with the API or on a separate compute host. This
 installation uses the separate host shown above.
 
+### Marine service process model
+
+`weewx-clearskies-marine` remains one API-only marine service on its existing
+host, port 8780, authenticated TLS boundary, configuration file, cached output,
+and persisted model state. Its one systemd unit starts two same-host operating
+system processes: the **marine request process** owns the existing listener and
+answers internal API requests; its local **marine model-runner process**
+assembles model wind inputs and runs WW3, SWAN, and SwellTrack. The
+model-runner has no listener, port, route, configuration surface, or separate
+data store. This separation ensures active model work cannot block `/tides`,
+`/fishing`, `/marine`, buoy, or other marine routes in the request process.
+The request process reads the model-runner's existing atomically replaced state
+snapshot for health reporting and supervises/restarts an unexpectedly exited
+model-runner without taking down request routes. Before opening listeners it
+loads the existing durable state snapshot; recovery uses three bounded delays
+(5, 15, then 60 seconds), after which health truthfully reports the runner
+unavailable rather than retrying forever.
+
 ## Authoritative port registry
 
 | Port | Service | Binding and use |

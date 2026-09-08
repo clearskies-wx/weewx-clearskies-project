@@ -1225,6 +1225,25 @@ marine-provider fetches — runs in `weewx-clearskies-marine` on port 8780. The
 API communicates with it over authenticated HTTPS. The old compute-offload
 service and its port are not part of the deployed architecture.
 
+The one existing `weewx-clearskies-marine` systemd unit starts a same-host
+**marine request process** and its local **marine model-runner process**. The
+request process is the only process that listens on 8780 and serves the
+existing authenticated internal routes. The model-runner has no port, endpoint,
+configuration key, cache namespace, or persisted-data format of its own; it
+uses the same atomic `marine.conf`, model state, and cache/output paths while
+assembling wind and executing WW3/SWAN/SwellTrack. This is process isolation,
+not a second service. An active model run therefore cannot occupy the request
+process and block `/tides`, `/fishing`, `/marine`, buoy, or another active
+marine route. Before opening listeners and on every mtime change, `/health`
+reads the existing atomic model-state snapshot, so its model fields remain
+truthful even before a child relay arrives. If the model-runner exits
+unexpectedly, the request process keeps serving routes and attempts three
+bounded recoveries after 5, 15, and 60 seconds. Exhaustion is not a successful
+model result: health reports the runner unavailable while preserving the last
+durable model state, rather than retrying forever. A replacement that remains
+alive for one normal five-minute model-check interval resets that budget, so a
+later isolated exit begins a new bounded recovery episode.
+
 #### Deployment topologies
 
 Two topologies are supported. Choose same-host unless CPU and memory constraints require otherwise.
