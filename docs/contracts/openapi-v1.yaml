@@ -447,6 +447,16 @@ paths:
           required: false
           description: ISO date (YYYY-MM-DD). Default = station-local today.
           schema: { type: string, format: date }
+        - name: lat
+          in: query
+          required: false
+          description: Latitude. Supply with `lon` to compute for that location; omit both for the station.
+          schema: { type: number, minimum: -90, maximum: 90 }
+        - name: lon
+          in: query
+          required: false
+          description: Longitude. Supply with `lat` to compute for that location; omit both for the station.
+          schema: { type: number, minimum: -180, maximum: 180 }
       responses:
         '200':
           description: Almanac snapshot
@@ -668,6 +678,17 @@ paths:
       operationId: getAlmanacPositions
       tags:
         - Almanac
+      parameters:
+        - name: lat
+          in: query
+          required: false
+          description: Latitude. Supply with `lon` to compute for that location; omit both for the station.
+          schema: { type: number, minimum: -90, maximum: 90 }
+        - name: lon
+          in: query
+          required: false
+          description: Longitude. Supply with `lat` to compute for that location; omit both for the station.
+          schema: { type: number, minimum: -180, maximum: 180 }
       responses:
         '200':
           description: Current positions
@@ -907,9 +928,9 @@ paths:
         independent review, and live
         behavior gates pass, after which they are removed. This adds no API
         field or endpoint.
-       operationId: getFishingLocation
-       parameters:
-         - { $ref: '#/components/parameters/LocationId' }
+      operationId: getFishingLocation
+      parameters:
+        - { $ref: '#/components/parameters/LocationId' }
         - name: selectedSpecies
           in: query
           required: false
@@ -919,7 +940,7 @@ paths:
             An unknown or ineligible choice is rejected; the browser never
             calculates a replacement score.
           schema: { type: string, minLength: 1 }
-       responses:
+      responses:
         '200':
           description: Fishing forecast bundle
           content:
@@ -4287,12 +4308,12 @@ components:
 
     FishingPressureCheck:
       type: object
-      description: "TARGET (Fishing and Boating remediation Phase 1; not yet shipped): live per-location Fishing pressure-series compatibility result."
+      description: "Provider pressure-series coverage represented by this Fishing response. It is not a fresh setup-time compatibility check."
       properties:
         locationId: { type: string }
         supported: { type: boolean }
         provider: { type: string }
-        checkedAt: { type: string, format: date-time }
+        checkedAt: { type: string, format: date-time, nullable: true, description: "Present only for a separately performed setup-time compatibility check; null on forecast responses." }
         validFrom: { type: string, format: date-time, nullable: true }
         validTo: { type: string, format: date-time, nullable: true }
         reason: { type: string, nullable: true }
