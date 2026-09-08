@@ -1108,37 +1108,44 @@ Tab/accordion headers show activity-appropriate qualitative labels — not force
 |---|---|---|
 | Boating | Wind/wave/visibility thresholds | Excellent / Good / Fair / Poor / Dangerous |
 | Surfing | Surf quality scorer (1–5 stars) | Star display (★★★☆☆) + `qualityLabel` + numeric `XX/100` (both — see §Surf Score Card) |
-| Fishing | Fishing scorer (0–100) | Excellent (80+) / Good (60–79) / Fair (40–59) / Poor (<40) |
+| Fishing | **TARGET:** selected-species scorer | active / less active / low activity / inactive; no generic quality scale |
 | Beach Safety | Itemized hazards (no overall badge) | Individual hazard indicators — no collapsed "Safe/Dangerous" |
 
 ### Tab content — Boating (F21 redesign)
 
-Unified conditions dashboard pattern (Windfinder/My Marine Forecast reference). All data from enriched API detail endpoint (§18 enrichment contract). Uses `Card` / `CardHeader` / `CardTitle as="h3"` / `CardContent` throughout.
+**Target state (Fishing and Boating remediation Phase 1; not yet shipped):**
+unified conditions dashboard using the normalized API detail payload. The
+Dashboard renders source/provenance and unavailable values; it never chooses a
+provider or treats an offshore buoy as selected-point conditions.
+Offshore context renders `no_buoy_selected` as intentionally absent,
+`selected_buoy_no_observation` as a configured station with no reading,
+`provider_failure` as a source failure, and `observations_available` as the
+configured station records shown with their identity, distance, valid time, and
+supplied measurements. None of these states is local selected-point conditions.
 
 **Panel order (top to bottom):**
 
 1. **Alerts** — `AlertsPanel` (with per-activity filterTypes: `marineZone` + `coastalFlood`)
 2. **Current Conditions** — `Card footprint="full"`:
-   - Weather icon (`WeatherIcon` from `observation?.weatherCode`) when available
-   - `<dl>` grid of `MarineStatTile` components: air temp, water temp, pressure + trend indicator (`PressureTrend` component), visibility, dewpoint, water level offset (from tide compositor), storm surge badge (when `stormSurgeLevel` non-null)
-   - When ALL fields null: "Conditions unavailable" message
-3. **Wind Card** — `Card footprint="wide"`:
-   - Wind speed, gust, direction (cardinal) as MarineStatTile components — extracted from Current Conditions into a dedicated card
-5. **Waves** — `Card footprint="full"`:
-   - Wave stats (height, period, direction) as `MarineStatTile` tiles at top
-   - 72h wave forecast chart below (`WaveForecastChart` with legend)
-   - Wave forecast data is available only for locations configured as surf spots and comes from the API's model forecast. A non-surf location has no wave forecast; its configured NDBC wave observation may still appear in Current Conditions.
-   - Self-hides for harbor locations where wave data is null
-6. **Tide Forecast** — `Card footprint="full"`:
-   - `TideChart` (left margin ≥40px to prevent clipping, XAxis domain starts at first data point)
-   - Total water level overlay when compositor data available
-7. **Marine Forecast** — `Card footprint="full"`:
+   - One full `MarineObservation` payload: weather icon/description, air and feels-like temperature, humidity, dew point, wind speed/gust/direction, pressure and three-hour trend, visibility, resolved surface-water temperature, tide/current-water-level context, update time, and source/provenance.
+   - Missing values render as unavailable; no offshore buoy substitution.
+   - Water temperature displays the API's actual coverage-aware selection and its valid time/depth: local sensor first, WCOFS only for covered West-Coast points, configured regional model/ERDDAP or national fallback elsewhere.
+3. **Boating Forecast** — `Card footprint="full"`:
    - Structured columns following `DailyColumns` pattern (from `ForecastDailyCard`)
-   - Each period column: period name, wind (speed + direction icon), seas (wave height text), visibility, weather text
+   - Each period column carries regular location forecast data plus aligned NWS marine additions: regional wind, seas, visibility, and marine-weather narrative. NWS values are labelled as regional additions and do not overwrite location weather.
+   - NWS marine periods use their parsed UTC validity start/end windows; untimed prose is not rendered as a forecast column.
    - `HorizontalScrollNav` for horizontal scrolling
-   - NOT expandable `<details>/<summary>` text blobs
+4. **Offshore Observations** — `Card footprint="wide"` (when configured):
+   - Separately labelled NDBC station, offshore distance, valid time, and available wave/spectral observations.
+   - Explicitly describes this as navigation/exit context for travel beyond a protected harbour, never as wave conditions at the selected point.
+5. **Tides, Currents, and Water Level** — `Card footprint="full"`:
+   - `TideChart` with CO-OPS predictions and total-water-level/current context when available.
+   - Missing tide/current values remain visibly unavailable.
 
-**Removed from BoatingTab:** "Nearest Offshore Buoy" panel (F21b), "Weather at {location}" panel (duplicate of conditions), standalone wind forecast chart (wind consolidated into Conditions).
+All cards use `Card` / `CardHeader` / `CardTitle as="h3"` / `CardContent` and
+the shared `MarineStatTile` components. The prior disconnected wind, NWS-text,
+and buoy panels are not retained.
+
 
 ### Tab content — Surfing (F22 redesign, updated ADR-095/096/097)
 
@@ -1233,32 +1240,37 @@ Surfaces the surf scoring system (`enrichment/surf_scorer.py`). Data sources fro
 
 ### Tab content — Fishing (F23 redesign)
 
-Surfaces the fishing scoring system (`enrichment/fishing_scorer.py`). Hero conditions summary + solunar display matching Almanac page quality.
+**Target state (Fishing and Boating remediation Phase 1; not yet shipped):**
+renders the API's selected-species forecast and normalized Current Conditions
+payload. The Dashboard does not select providers, derive regional eligibility,
+collapse species, or calculate fallback values.
+
+The Dashboard receives only setup-filtered practical choices and the selected
+forecast responses. It never reads the target source
+`repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.xlsx`
+or target generated database
+`repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.sqlite`,
+and it performs no species lookup, profile fallback, or geographic eligibility
+calculation. The storage boundary and its migration sequence are internal to
+the API/marine service target and are not a new Dashboard API surface.
 
 **Panel order:**
 
 1. **Alerts** — `AlertsPanel`
-2. **Fishing Score Card** — `Card footprint="wide"`:
-   - `conditionsText` as subtitle
-   - Overall score (0-100) as prominent numeric display + qualitative label (Excellent/Good/Fair/Poor)
-   - Scoring breakdown bars below the score (absorbed from the former separate card): 4 weighted factors — Pressure (37.5%), Tide (31.25%), Solunar (18.75%), Time (12.5%). Each bar: label, score (0-100), colored fill (green >60, amber 30-60, muted <30). Click/tap each bar for explanation text.
-3. **Current Conditions Card** — `Card footprint="wide"`:
-   - All stats from MarineObservation via `useMarineDetail`: barometric pressure + trend (PressureTrend component), wind speed, wind gust, wind direction (cardinal), water temperature, air temperature, tide state (rising/falling)
-4. **Forecast Periods** — `Card footprint="full"`:
-   - Semantic `<table>` (day rows × period columns); each period cell is a `<button>` that expands a per-period species accordion below the grid
-   - Each period cell: overall score (color-coded), top species by score, major/minor solunar indicator, and — per period — wind speed + cardinal direction, wind gust (shown only when non-null), and swell height + swell period, all sourced from `FishingForecast.windSpeed/windDirection/windGust/swellHeight/swellPeriod` (`GET /fishing/{locationId}`). These per-period tokens are visually compact/aria-hidden; the button's `aria-label` carries the full equivalent sentence for screen readers.
-   - `HorizontalScrollNav` for scrolling
-5. **Solunar Calendar** — `Card footprint="full"`:
-   - Uses `MoonPhaseIcon` from `components/moon-phase-icon.tsx` (same component as Almanac page)
-   - Major/minor feeding periods as time windows on a horizontal timeline
-   - Moon phase icon + illumination percentage
-   - Arc visualization similar to `SunMoonDetailCard` sun/moon arc styling
-   - Major periods: accent color bars. Minor periods: muted color bars. Current time indicator.
-6. **Species Forecast** — `Card footprint="full"`:
-   - Data table with `<thead>/<tbody>/<th scope>` following DESIGN-MANUAL §11 data table pattern
-   - Columns: Species name, Score (0-100), Status (active/less active/inactive with color badge), Notes (optional — shown only when at least one species has a seasonal note from the scorer)
-   - Alternating row backgrounds (`bg-muted/30`), sticky first column on mobile (`position: sticky, left: 0`)
-7. **Tide Forecast** — `Card footprint="full"`:
+2. **Current Conditions Card** — `Card footprint="full"`:
+   - One normalized API payload shared with Boating: weather icon/description, air and feels-like temperature, humidity, dew point, wind speed/gust/direction, pressure and three-hour trend, visibility, resolved surface-water temperature, tide/current-water-level context, update time, and source/provenance.
+   - Null fields render an explicit unavailable state; the card never substitutes an offshore buoy value or performs source selection.
+   - Water temperature shows the API-selected source, valid time, and depth; WCOFS is shown only for covered West-Coast points, with configured regional model/ERDDAP or national fallbacks elsewhere.
+3. **Fishing Forecast** — `Card footprint="full"`:
+   - Species-selection strip at the top, using the API's setup-derived choice and disclosed member species/profile level.
+   - Surf-style time-column forecast/table with one selected-species score and status per period; no generic score and no competing Species Forecast card.
+   - Each period carries its start/end window, selected-species score and explanation, tide/current state, depth-appropriate water temperature, pressure trend, major/minor solunar marker, time-matched nearshore weather, and informational swell height/period.
+   - Expanded period detail exposes the environmental core, each applied refinement, source/provenance, and any hard-stop reason. The selected choice controls all displayed score and suitability content.
+   - `HorizontalScrollNav` provides responsive horizontal access; accessible labels include the full period and selected-species explanation.
+4. **Solunar / Sun & Moon** — `Card footprint="full"`:
+   - Matches the Almanac `SunMoonDetailCard` in complete information, visual hierarchy, responsive behavior, and accessibility: arcs/current positions, phase/illumination, rise/set times, and the two-day sun/moon detail tables.
+   - Adds major/minor feeding windows as the fishing-specific overlay; it is not a reduced bespoke timeline.
+5. **Tide Forecast** — `Card footprint="full"`:
    - `TideChart` (shared component, reused as-is)
 
 ### Tab content — Beach Safety (F24 redesign)

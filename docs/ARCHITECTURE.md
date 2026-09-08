@@ -178,6 +178,36 @@ marine service does not read API configuration files directly. Configuration
 keys, secret handling, and recovery procedures are in the
 [Operations Manual](manuals/OPERATIONS-MANUAL.md).
 
+### Fishing matrix storage target (not yet shipped)
+
+**TARGET — Fishing and Boating remediation Phase 1; not yet shipped.** Once the
+framework receives operator sign-off, the planned operational source will be
+one signed-off Excel table at the candidate path
+`repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.xlsx`.
+It contains only the approved operational lookup fields; it does not contain
+research provenance, source identifiers, assessment details, or workflow
+status. A target build interface,
+`python -m weewx_clearskies_marine.tools.build_fishing_species_matrix`, will
+validate the approved headers, types, allowed codes, required fields, unique
+keys, FAO-area keys, and conservation flags before atomically replacing the
+sibling generated
+`repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.sqlite`.
+If validation or generation fails, the previous database remains and the build
+fails loudly.
+
+The generated database will contain exactly one logical data table. Each species
+or practical category has one complete profile, and its `fao_areas` field lists
+every applicable FAO area; it is not split into per-area or fallback profiles. The
+marine service will open the packaged database read-only and select only the
+rows and columns required for the current request. Neither the API nor the
+marine service will parse Excel at runtime or materialize the global matrix in
+module-level Python dictionaries. Packaging carries the generated SQLite
+database, not a runtime Excel reader. The current YAML catalogue and loader
+remain only until agreed setup selections and scoring comparison cases are
+equivalent, independently reviewed, and live behavior is proved in Phase 4;
+only then are the YAML data and loader removed. This section documents a
+planned boundary, not a shipped implementation.
+
 ## Authority routing
 
 | Need | Authoritative source |

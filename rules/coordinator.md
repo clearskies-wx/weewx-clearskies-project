@@ -71,6 +71,99 @@ the work; skipping them and letting the agent improvise is not delegation, it is
 is a decision, not a delegation back. When an agent proposes a design, it is a finding to evaluate,
 not a plan to accept.
 
+## 1a. Research dispatch gate — the coordinator defines the work
+
+Research is not ready to dispatch until the coordinator can provide all of the
+following in one self-contained brief:
+
+1. **Purpose and downstream use.** Name the decision, record, plan section,
+   implementation input, or other deliverable the research will directly
+   support. "Research this topic" is not a purpose.
+2. **Exact research question and scope.** Name the subject, population,
+   geography, period, cases, and exclusions. State whether the assignment is
+   retrieval, comparison, synthesis, or validation.
+3. **Approved methodology and source policy.** State which source classes are
+   required, allowed, supplementary, or excluded; how qualitative, subjective,
+   practitioner, community, commercial, governmental, or academic evidence is
+   to be treated; and what kinds of inference the task permits. The coordinator
+   derives this from the operator and governing plan rather than delegating the
+   methodological choice.
+4. **Exact output contract.** List every required field, definition, unit,
+   allowed value or code shape, citation requirement, and the exact return
+   format. Include one representative example when shape or interpretation
+   could otherwise be ambiguous.
+5. **Known state to preserve.** Provide existing accepted values, completed
+   research, prior decisions, and explicit items that must not be cleared,
+   challenged, re-derived, or silently replaced.
+6. **Failure and stopping behavior.** State what searches or checks constitute
+   a completed attempt, what the agent returns when a field is unresolved, and
+   whether the coordinator should broaden, reassign, defer, or surface it. An
+   agent may not invent this policy.
+7. **Application step.** Name who will apply the result, the exact target, and
+   how the coordinator will verify that the returned research entered the real
+   deliverable. A report that is never applied is not completed research work.
+
+If any item is missing, the coordinator finishes the brief before dispatch. It
+does not ask the research agent to design the assignment and does not use agent
+initiative as a substitute for coordination.
+
+Give research agents only the context needed for the bounded question. Do not
+fork a long conversation by default or require whole plans, manuals, or broad
+project history when exact sections and current inputs are sufficient. A
+returned essay does not satisfy a field-, row-, comparison-, or decision-shaped
+output contract. Correct the agent against the original brief before accepting
+or applying its result.
+
+## 1b. Operator corrections and handoff discipline
+
+An assistant-authored handoff or resume prompt is a fallible state summary, not
+a new source of authority. It may point to governing files and record verified
+current state; it may not introduce a schema, methodology, source restriction,
+artifact, workflow, or architectural decision that the operator or governing
+plan did not approve.
+
+Before issuing a handoff, compare it with the latest operator corrections and
+remove superseded instructions, temporary workarounds, stale blockers, and
+agent-created requirements. Mark any still-needed workaround with its purpose
+and explicit end condition. Do not preserve a workaround as permanent design
+merely because another session created it.
+
+When the operator corrects an active task, immediately update all subsequent
+agent instructions and stop using any conflicting earlier brief or handoff.
+Do not answer a correction by generating another elaborate process unless the
+operator asked for one; correct the work and continue.
+
+## 1c. Canonical-artifact and destructive-transformation gate
+
+Before deleting, replacing, flattening, migrating, or broadly rewriting a
+canonical artifact, the coordinator must establish all of the following:
+
+1. the exact canonical source and intended output;
+2. an original that is already recoverable from Git or a user-controlled
+   backup;
+3. the approved records, fields, formulas, relationships, formatting, and other
+   content that must survive;
+4. a candidate output produced separately from the canonical source; and
+5. semantic checks against that candidate before replacement, including the
+   applicable keys, counts, field names, types, null changes, formulas,
+   relationships, and representative known records.
+
+Never create a replacement artifact and save it over the only canonical copy
+before those checks pass. For a local edit, change the exact cells, records, or
+sections required rather than rewriting the full used range or whole file. One
+requested final artifact does not prohibit a temporary validation candidate;
+remove the candidate after successful replacement and verification.
+
+A byte hash proves only that two files have identical bytes. A visual render
+proves only what was visible. Neither proves that records stayed aligned or
+that required content survived. Use the semantic checks appropriate to the
+artifact.
+
+Any authoritative artifact that spans sessions must move to an
+operator-approved tracked project path before substantial population or
+revision continues. `scratch/` and untracked `outputs/` may hold working or
+delivery files, but never the only authoritative multi-session copy.
+
 ## 2. Acceptance gate — an agent's report is a claim, not a result
 
 **This is the single canonical statement of the rule.** `rules/agents.md` points here rather than

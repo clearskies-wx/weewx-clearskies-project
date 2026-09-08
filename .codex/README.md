@@ -4,9 +4,9 @@ This directory is the active Codex configuration for the Weather Belchertown and
 
 ## Coordinator
 
-`.codex/config.toml` selects `gpt-5.6-terra` with high reasoning and its 1,050,000-token context window for new project tasks. The Coordinator is the normal user-facing task owner: it manages approved plans, assigns work, preserves project context, and synthesizes results.
+This project sets a 1,050,000-token context window but does not set a coordinator model or reasoning default. The operator chooses the model and reasoning level for every task; project routing guidance never overrides that choice. The Coordinator is the normal user-facing task owner: it manages approved plans, assigns work, preserves project context, and synthesizes results.
 
-Existing tasks retain the model configuration with which they were opened. Restart the Codex desktop app and open a new task after changing model defaults.
+The context setting does not select or restrict the model shown in the task window. Existing tasks retain the configuration with which they were opened, so open a new task after changing the selected model, reasoning level, or context setting.
 
 ## Supporting agents
 
@@ -17,7 +17,7 @@ Codex may run at most three supporting agents concurrently, excluding the coordi
 | Workhorse coding roles | `gpt-5.3-codex-spark` | high | bounded implementation only; never given broad project context |
 | Expert coding lead | `gpt-5.6-terra` | high | context-heavy or cross-cutting work; may oversee bounded Spark work |
 | QC and review | `gpt-5.6-terra` | high | adversarial phase gates; may coordinate Luna testing evidence |
-| Research lead | `gpt-5.6-terra` | high | source judgment and synthesis; may coordinate Luna retrieval |
+| `research_lead` | `gpt-5.6-terra` | high | bounded source judgment and synthesis under a coordinator-defined method and output contract |
 | Testing | `gpt-5.6-luna` | high | focused test evidence, normally for QC |
 | Mechanical and retrieval work | `gpt-5.6-luna` | medium | deterministic, low-judgment work only |
 | SOL adviser | `gpt-5.6-sol` | high | 1,050,000-token context; only after the user explicitly authorizes a named task |
@@ -49,6 +49,7 @@ Use the project roles by judgment level, not simply by file type:
 | --- | --- | --- |
 | `expert_coder` (Terra, high) | Cross-service phases, dependent slices, design interpretation, and integration | Exact edits, inventories, ordinary documentation, or routine checks |
 | `worker` (Spark, high) | A single explicit coding slice with a strict file allowlist | Design choices, multi-service integration, or manual reconciliation |
+| `research_lead` (Terra, high) | One bounded research question with a coordinator-defined method and output contract | Choosing the methodology, redesigning the deliverable, editing the destination artifact, or returning an unstructured report when structured fields were requested |
 | `documentation_author` (Luna, high) | Documentation based on verified source and a stated scope | Deciding what the design should be |
 | `test_engineer` (Luna, high) | Post-phase live-environment quality checks using real input and output | Designing code or testing during implementation |
 | `mechanical_worker` (Luna, medium) | Exact replacements, inventories, and bounded formatting | Any judgment call |

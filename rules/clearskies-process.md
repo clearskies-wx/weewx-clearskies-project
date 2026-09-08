@@ -89,6 +89,26 @@ Use the Nygard format. Template at `docs/decisions/_TEMPLATE.md`. Required: Stat
 
 ## Research rules
 
+**The research method belongs to the task, not the agent.** Before dispatch,
+the coordinator defines the research purpose, exact question, scope, accepted
+source classes, treatment of qualitative and quantitative material, permitted
+inference, required fields/units, return format, existing state to preserve,
+and what happens when a search is unresolved. Use the complete research
+dispatch gate in `rules/coordinator.md` §1a. A research agent may evaluate
+sources within that method; it may not replace the method with its own academic,
+commercial, community, practitioner, or other preferred standard.
+
+**Research output must enter the real deliverable.** The coordinator applies
+and verifies returned work in the named target before treating the assignment
+as progress or launching replacement research for the same question. Reports,
+queues, status fields, evidence ledgers, and source collections are supporting
+material only unless the operator explicitly named one as a deliverable. Do
+not turn the research process into the product's data model.
+
+**Treat Clear Skies research, catalogue design, and geographic eligibility as global unless the user explicitly narrows the task.** Do not use United States regional labels, local examples, or an existing U.S.-only table as the governing geography for a global feature. Where the approved data model uses FAO areas, every record, query, fallback, and validation must use the applicable FAO area; an older local-region record may serve only as historical evidence and must never be restored into the global matrix unchanged. Before changing a geographic record, verify its global-region key against the authoritative global-region table.
+
+**Why (2026-09-07):** A coordinator restored generic Fishing-category rows into a legacy U.S.-region table after finding prior row IDs, even though the active global matrix uses FAO areas. The result reintroduced a U.S.-only geography into a global catalogue instead of repairing the FAO-scoped records.
+
 **Research external systems before asking the user.** Check docs/specs before raising questions the docs already settle. Local weewx 5.3 docs at `docs/reference/weewx-5.3/`. Per-provider API docs at `docs/reference/api-docs/`.
 
 **Don't dismiss user-named options.** Evaluate ALL options the user proposes. Every option gets a row — even if the conclusion is "exclude — reason."

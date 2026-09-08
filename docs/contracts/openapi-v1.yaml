@@ -754,13 +754,18 @@ paths:
       tags: [Marine]
       summary: Marine conditions for one location
       description: |
-        Aggregates NDBC buoy observation (if `ndbc_station_ids` configured),
-        the model wave forecast for a configured surf spot, and NWS marine
-        zone text forecast (if `nws_marine_zone_id` configured). Model wave
-        forecast entries exist only for locations with a configured surf
-        spot; non-surf locations return an empty `forecast` list. Each
-        data source is independently best-effort — an outage never fails the
-        whole response. Tide data is NOT included here; see
+        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        returns one normalized Current Conditions payload for the selected
+        location, the provider-neutral `regularForecast` at the marine
+        coordinates, the model wave forecast when the location is a configured
+        surf spot, and NWS marine-zone periods when configured. Current
+        weather is station-served within the station-service radius and uses
+        the configured forecast provider at the location otherwise. The API
+        assigns CWF UTC bounds and `marineAdditions` only when a CWF label maps
+        to an existing regular-forecast day/night column; unmatched periods
+        retain null bounds and remain unavailable for alignment. CWF fields do
+        not replace location weather. An offshore NDBC observation remains
+        separately labelled context. Tide data is returned by
         `GET /tides/{locationId}`.
       operationId: getMarineLocation
       parameters:
@@ -882,16 +887,39 @@ paths:
       tags: [Marine]
       summary: 3-day fishing forecast for a location
       description: |
-        3 days × 6 periods/day (dawn/morning/midday/afternoon/evening/night),
-        scored by enrichment/fishing_scorer.py from NDBC pressure trend,
-        CO-OPS tide state, water temperature, and solunar intensity.
-        Species and habitat features come from the location's
-        `FishingSpotConfig` and CUDEM bathymetric profile (reused from the
-        location's `surf` sub-block, if configured).
-      operationId: getFishingLocation
-      parameters:
-        - { $ref: '#/components/parameters/LocationId' }
-      responses:
+        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        returns 3 days × 6 time-matched periods. Each period carries only the
+        selected-species score and explanation, using the provider-neutral
+        hourly pressure series, location-first nearshore weather, CO-OPS tide
+        state, depth-appropriate water temperature, and solunar marker. NDBC
+        pressure and offshore weather never determine Harbour-local inputs.
+        Species choices and their complete effective profiles come from the
+        location's derived global species-matrix selection; setup blocks a
+        location when its selected provider cannot supply the required hourly
+        pressure series. TARGET storage boundary (not yet shipped): the
+        internal selection source will be the target candidate, once the
+        framework receives operator sign-off:
+        `repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.xlsx`,
+        generated into its sibling target
+        `repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.sqlite`;
+        the API and marine service do not parse Excel at runtime. The current
+        YAML catalogue and loader stay only until the Phase 4 equivalence,
+        independent review, and live
+        behavior gates pass, after which they are removed. This adds no API
+        field or endpoint.
+       operationId: getFishingLocation
+       parameters:
+         - { $ref: '#/components/parameters/LocationId' }
+        - name: selectedSpecies
+          in: query
+          required: false
+          description: >
+            One eligible configured Fishing species choice for this location.
+            When omitted, the service scores the first configured choice.
+            An unknown or ineligible choice is rejected; the browser never
+            calculates a replacement score.
+          schema: { type: string, minLength: 1 }
+       responses:
         '200':
           description: Fishing forecast bundle
           content:
@@ -1902,6 +1930,18 @@ components:
         windSpeed: { type: number, nullable: true }
         windDir: { type: number, nullable: true }
         windGust: { type: number, nullable: true }
+        pressure:
+          type: number
+          nullable: true
+          description: "TARGET (Fishing and Boating remediation Phase 1; not yet shipped): provider-neutral hourly mean-sea-level pressure in hPa."
+        pressureSource:
+          type: string
+          nullable: true
+          description: "TARGET: provider identifier for the time-matched pressure value; null when pressure is unavailable."
+        marineAdditions:
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/MarineForecastAugmentation' }]
+          description: "TARGET: regional NWS marine additions attached only when a CWF label maps to this existing regular-forecast column; null when no matching period exists."
         precipProbability: { type: number, nullable: true, minimum: 0, maximum: 100 }
         precipAmount: { type: number, nullable: true }
         precipType: { type: string, nullable: true }
@@ -1945,6 +1985,28 @@ components:
         source: { type: string }
         extras: { $ref: '#/components/schemas/Observation/properties/extras' }
       required: [validDate, source]
+
+    MarineForecastAugmentation:
+      type: object
+      description: |
+        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        regional marine information from an NWS Coastal Waters Forecast period
+        that maps to the parent regular-forecast column. The API assigns the
+        explicit UTC bounds from that existing column; these additions never
+        replace location weather fields on the parent point.
+      properties:
+        source: { type: string, example: "nws_cwf" }
+        validTime: { type: string, format: date-time }
+        periodStart: { type: string, format: date-time }
+        periodEnd: { type: string, format: date-time }
+        periodName: { type: string, description: "CWF period label used for the existing-column match" }
+        issuanceTime: { type: string, format: date-time, nullable: true, description: "UTC time when NWS issued the CWF product" }
+        wind: { type: string, nullable: true }
+        seas: { type: string, nullable: true }
+        visibility: { type: string, nullable: true }
+        weather: { type: string, nullable: true }
+        text: { type: string }
+      required: [source, validTime, periodStart, periodEnd, periodName, text]
 
     ForecastDiscussion:
       type: object
@@ -2863,7 +2925,7 @@ components:
         providerId: { type: string }
         domain:
           type: string
-          enum: [forecast, alerts, aqi, earthquakes, radar]
+          enum: [forecast, alerts, aqi, earthquakes, radar, marine, tides, buoy, ocean, nearshore]
         suppliedCanonicalFields:
           type: array
           items: { type: string }
@@ -2872,6 +2934,10 @@ components:
           description: '"global" or operator-meaningful region descriptor.'
         defaultPollIntervalSeconds: { type: integer, minimum: 0 }
         operatorNotes: { type: string, nullable: true }
+        fishingPressure:
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/FishingPressureCapability' }]
+          description: "TARGET: provider capability for the required hourly mean-sea-level pressure series used by Fishing."
         tileUrlTemplate:
           type: string
           nullable: true
@@ -2893,6 +2959,16 @@ components:
           nullable: true
           description: 'Operator-supplied iframe URL. iframe radar provider only.'
       required: [providerId, domain, suppliedCanonicalFields, geographicCoverage]
+
+    FishingPressureCapability:
+      type: object
+      description: Provider-level Fishing pressure-series capability metadata.
+      properties:
+        supported: { type: boolean }
+        locationSpecific:
+          type: boolean
+          description: "True when setup must perform a live check at each Fishing location before saving."
+      required: [supported, locationSpecific]
 
     CapabilityRegistry:
       type: object
@@ -3642,9 +3718,12 @@ components:
     MarineObservation:
       type: object
       description: |
-        Single buoy observation snapshot from NDBC standard met data.
-        Every field except stationId/time may be null (genuinely absent
-        from a given buoy's payload).
+        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        normalized current-conditions payload for the selected marine
+        location. It is not a buoy-only payload. Station hardware is used
+        within the configured station-service radius; otherwise the selected
+        forecast provider is used at the marine coordinates. Missing source
+        values remain null and are explained by provenance.
       properties:
         windSpeed: { type: number, nullable: true, description: "group_ocean_speed" }
         windDirection: { type: number, nullable: true, description: "Degrees true north" }
@@ -3655,18 +3734,69 @@ components:
         meanWaveDirection: { type: number, nullable: true, description: "Degrees true north" }
         pressure: { type: number, nullable: true, description: "group_pressure; sea-level pressure" }
         airTemp: { type: number, nullable: true, description: "group_temperature" }
+        feelsLike: { type: number, nullable: true, description: "group_temperature; apparent air temperature" }
+        humidity: { type: number, nullable: true, description: "Relative humidity percentage" }
         waterTemp: { type: number, nullable: true, description: "group_temperature; sea surface temperature" }
         dewpoint: { type: number, nullable: true, description: "group_temperature" }
         visibility: { type: number, nullable: true, description: "group_visibility" }
         pressureTendency: { type: number, nullable: true, description: "group_pressure; 3-hour tendency" }
         tideLevel: { type: number, nullable: true, description: "group_water_level; where reported" }
-        stationId: { type: string }
+        weatherCode: { type: string, nullable: true, description: "Normalized weather-state code" }
+        weatherText: { type: string, nullable: true, description: "Normalized weather-state description" }
+        isDay: { type: boolean, nullable: true }
         time: { type: string, format: date-time }
-        spectralComponents:
-          type: array
-          nullable: true
-          items: { $ref: '#/components/schemas/SpectralWaveComponent' }
-      required: [stationId, time]
+        source:
+          type: string
+          description: "Normalized selected-location source role: station, forecast_provider, mixed, or unavailable"
+        provenance:
+          type: object
+          description: "Per-domain provenance for conditions, pressure, water temperature, and tide/current context."
+          properties:
+            conditions:
+              nullable: true
+              allOf: [{ $ref: '#/components/schemas/MarineFieldProvenance' }]
+            pressure:
+              nullable: true
+              allOf: [{ $ref: '#/components/schemas/MarineFieldProvenance' }]
+            waterTemperature:
+              nullable: true
+              allOf: [{ $ref: '#/components/schemas/WaterTemperatureProvenance' }]
+            tideCurrent:
+              nullable: true
+              allOf: [{ $ref: '#/components/schemas/MarineFieldProvenance' }]
+          required: [conditions, pressure, waterTemperature, tideCurrent]
+      required: [time, source, provenance]
+
+    MarineFieldProvenance:
+      type: object
+      description: Provenance for one normalized marine field group.
+      properties:
+        available: { type: boolean }
+        source: { type: string, description: "Source identifier or role" }
+        sourceType: { type: string, enum: [observed, forecast, modeled, unavailable] }
+        validTime: { type: string, format: date-time, nullable: true }
+        distanceKm: { type: number, nullable: true, minimum: 0 }
+        unit: { type: string, nullable: true }
+      required: [available, source, sourceType, validTime, unit]
+
+    WaterTemperatureProvenance:
+      type: object
+      description: >-
+        Water-temperature source, coverage, valid time, and depth. Selection is
+        coverage-aware at the chosen point: local sensor first; WCOFS only where
+        its West-Coast coverage includes that point; configured regional model
+        or ERDDAP sources and national fallbacks elsewhere; a buoy or tide-station
+        observation is last resort. The selected source, valid time, and depth
+        are carried with the value.
+      properties:
+        available: { type: boolean }
+        source: { type: string }
+        sourceType: { type: string, enum: [observed, modeled, forecast, unavailable] }
+        validTime: { type: string, format: date-time, nullable: true }
+        coverageTier: { type: string, nullable: true, enum: [local_sensor, ofs, regional_erddap, rtofs, mur_sst, observed, unavailable] }
+        depthM: { type: number, nullable: true, minimum: 0 }
+        unit: { type: string, nullable: true }
+      required: [available, source, sourceType, validTime, coverageTier, depthM, unit]
 
     TidePrediction:
       type: object
@@ -3693,7 +3823,11 @@ components:
 
     MarineForecastPoint:
       type: object
-      description: Single timestep from a configured surf-spot model wave forecast, optionally enriched with OFS water temperature.
+      description: |
+        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        single timestep from a configured surf-spot model wave forecast. Its
+        water temperature is selected by the coverage-aware resolver rather
+        than assumed to be OFS, and its selected source record remains attached.
       properties:
         time: { type: string, format: date-time, description: "Forecast valid time" }
         waveHeight: { type: number, nullable: true, description: "group_wave_height; significant wave height" }
@@ -3707,14 +3841,27 @@ components:
         windWaveHeight: { type: number, nullable: true, description: "group_wave_height" }
         windWavePeriod: { type: number, nullable: true, description: "group_wave_period" }
         windWaveDirection: { type: number, nullable: true }
-        waterTemp: { type: number, nullable: true, description: "group_temperature; OFS model forecast water temp — from ofs.fetch_forecast() via ocean_data_resolver.resolve_forecast()" }
-      required: [time]
+        waterTemp: { type: number, nullable: true, description: "group_temperature; coverage-aware location/depth-appropriate forecast water temperature; null when no eligible source supplies it" }
+        waterTempProvenance:
+          allOf: [{ $ref: '#/components/schemas/WaterTemperatureProvenance' }]
+          description: "Selected water-temperature source, source type, valid time, coverage tier, depth, and unit; unavailable is explicit. WCOFS is eligible only for a point within its West-Coast coverage."
+      required: [time, waterTempProvenance]
 
     MarineTextForecast:
       type: object
-      description: Single period from an NWS marine zone text forecast.
+      description: |
+        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        one NWS Coastal Waters Forecast period. The provider preserves
+        issuanceTime but does not infer UTC bounds from a prose label. The API
+        assigns explicit bounds only when the label maps to an existing
+        regular-forecast day/night column; otherwise both bounds remain null
+        and the period is unavailable for alignment. It augments, and never
+        replaces, location weather.
       properties:
+        periodStart: { type: string, format: date-time, nullable: true, description: "UTC validity start assigned from a matching existing regular-forecast column; null when unmatched" }
+        periodEnd: { type: string, format: date-time, nullable: true, description: "UTC validity end assigned from a matching existing regular-forecast column; null when unmatched" }
         periodName: { type: string, description: "e.g. Tonight, Thursday" }
+        issuanceTime: { type: string, format: date-time, nullable: true, description: "UTC time when NWS issued the CWF product" }
         text: { type: string, description: "Full forecast narrative" }
         wind: { type: string, nullable: true }
         seas: { type: string, nullable: true }
@@ -3769,28 +3916,58 @@ components:
 
     FishingForecast:
       type: object
-      description: Fishing conditions forecast for one spot/period (enrichment/fishing_scorer.py). Wind/swell fields are informational, not inputs to overallScore.
+      description: |
+        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        selected-species conditions forecast for one location and time window.
+        There is no generic or overall score; `score` belongs only to the
+        selected species.
       properties:
         periodStart: { type: string, format: date-time }
         periodEnd: { type: string, format: date-time }
         periodLabel: { type: string, description: "e.g. Early Morning, Late Afternoon" }
-        overallScore: { type: integer, minimum: 0, maximum: 100 }
-        pressureScore: { type: integer, minimum: 0, maximum: 100 }
-        tideScore: { type: integer, minimum: 0, maximum: 100 }
-        solunarScore: { type: integer, minimum: 0, maximum: 100 }
-        waterTempScore: { type: integer, minimum: 0, maximum: 100 }
-        timeofdayScore: { type: integer, minimum: 0, maximum: 100 }
-        speciesScores:
+        selectedSpecies: { type: string }
+        profileLevel: { type: string, enum: [direct_species, collapsed_group, functional_category] }
+        score: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+        status: { type: string, nullable: true, enum: [active, less_active, low_activity, inactive] }
+        coreScore: { type: number, nullable: true, minimum: 0 }
+        temperatureSuitability: { type: number, nullable: true, minimum: 0, maximum: 1 }
+        tideCurrentSuitability: { type: number, nullable: true, minimum: 0, maximum: 1 }
+        pressureSuitability: { type: number, nullable: true, minimum: 0, maximum: 1.1 }
+        factorProvenance:
+          type: object
+          description: "Required availability, source, valid-time, unit, and fallback record for every scored environmental factor. A runtime outage retains available=false and its actual source record; any numeric suitability is the documented profile fallback, never a disguised observation."
+          properties:
+            temperature:
+              allOf: [{ $ref: '#/components/schemas/WaterTemperatureProvenance' }]
+            tideCurrent:
+              allOf: [{ $ref: '#/components/schemas/MarineFieldProvenance' }]
+            pressure:
+              allOf: [{ $ref: '#/components/schemas/MarineFieldProvenance' }]
+          required: [temperature, tideCurrent, pressure]
+        pressureTrend: { type: number, nullable: true, description: "group_pressure; time-matched 3-hour mean-sea-level pressure change in hPa" }
+        tideState: { type: string, nullable: true }
+        solunarState: { type: string, enum: [major, minor, none] }
+        appliedAdjustments:
           type: array
-          nullable: true
           items: { type: object, additionalProperties: true }
+        hardStopReason: { type: string, nullable: true }
+        waterTemperature: { type: number, nullable: true, description: "group_temperature; depth-appropriate selected-species value" }
+        waterTemperatureProvenance:
+          allOf: [{ $ref: '#/components/schemas/WaterTemperatureProvenance' }]
+          description: "Selected water-temperature source, type, valid time, coverage tier, depth, and unit; unavailable is explicit."
         conditionsText: { type: string }
-        windSpeed: { type: number, nullable: true, description: "group_ocean_speed; informational, not scored" }
+        windSpeed: { type: number, nullable: true, description: "group_ocean_speed; time-matched nearshore wind, informational" }
         windDirection: { type: number, nullable: true }
-        windGust: { type: number, nullable: true, description: "group_ocean_speed; informational" }
-        swellHeight: { type: number, nullable: true, description: "group_wave_height; informational, not scored" }
-        swellPeriod: { type: number, nullable: true, description: "group_wave_period; informational" }
-      required: [periodStart, periodEnd, periodLabel, overallScore, pressureScore, tideScore, solunarScore, waterTempScore, timeofdayScore, conditionsText]
+        windGust: { type: number, nullable: true, description: "group_ocean_speed; time-matched nearshore gust, informational" }
+        weatherProvenance:
+          allOf: [{ $ref: '#/components/schemas/MarineFieldProvenance' }]
+          description: "Nearshore weather source and valid time for wind and gust; unavailable is explicit."
+        swellHeight: { type: number, nullable: true, description: "group_wave_height; time-matched swell, informational" }
+        swellPeriod: { type: number, nullable: true, description: "group_wave_period; time-matched swell, informational" }
+        swellProvenance:
+          allOf: [{ $ref: '#/components/schemas/MarineFieldProvenance' }]
+          description: "Swell source and valid time; unavailable is explicit."
+      required: [periodStart, periodEnd, periodLabel, selectedSpecies, profileLevel, score, status, coreScore, temperatureSuitability, tideCurrentSuitability, pressureSuitability, factorProvenance, solunarState, appliedAdjustments, waterTemperatureProvenance, weatherProvenance, swellProvenance, conditionsText]
 
     SolunarTimes:
       type: object
@@ -3891,7 +4068,7 @@ components:
         currentConditions:
           nullable: true
           allOf: [{ $ref: '#/components/schemas/MarineObservation' }]
-          description: "Latest buoy observation, if buoy-capable. Always null on the current list-route implementation (deferred pending a cache warmer)."
+          description: "Normalized current-conditions payload when populated; it is not restricted to buoy data. The list route may remain null when no list-route fetch is performed."
         currentTide:
           type: object
           nullable: true
@@ -3920,7 +4097,15 @@ components:
 
     MarineBundle:
       type: object
-      description: Container for GET /marine/{locationId}. Matches models/responses.py exactly.
+      description: |
+        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        container for GET /marine/{locationId}. `observation` is the
+        normalized Current Conditions payload. `regularForecast` is the
+        configured forecast provider's hourly series at the marine location's
+        coordinates. `textForecast` periods preserve NWS issuance time and
+        nullable bounds; the API fills bounds and attaches regional additions
+        only for labels that map to an existing `regularForecast` day/night
+        column.
       properties:
         locationId: { type: string }
         locationName: { type: string }
@@ -3930,16 +4115,61 @@ components:
         observation:
           nullable: true
           allOf: [{ $ref: '#/components/schemas/MarineObservation' }]
+          description: "Normalized Current Conditions payload for the selected location."
+        offshoreObservations:
+          allOf: [{ $ref: '#/components/schemas/OffshoreObservationContext' }]
+          description: "TARGET: selected offshore-buoy context and every configured NDBC record, separately labelled and never selected-point weather or wave conditions."
         forecast:
           type: array
           items: { $ref: '#/components/schemas/MarineForecastPoint' }
           description: Model wave forecast entries for configured surf spots only; empty for non-surf locations.
+        regularForecast:
+          type: array
+          items: { $ref: '#/components/schemas/HourlyForecastPoint' }
+          description: "TARGET: provider-neutral hourly forecast at the configured marine location coordinates; empty when no usable provider series is returned. NDBC is not a fallback."
         textForecast:
           type: array
           items: { $ref: '#/components/schemas/MarineTextForecast' }
         source: { type: string, example: "ndbc+wavewatch+nws_marine" }
         generatedAt: { type: string, format: date-time }
-      required: [locationId, locationName, coordinates, forecast, textForecast, source, generatedAt]
+      required: [locationId, locationName, coordinates, offshoreObservations, forecast, regularForecast, textForecast, source, generatedAt]
+
+    OffshoreMarineObservation:
+      type: object
+      description: |
+        One configured NDBC offshore context record. This is offshore
+        navigation/exit context, not `MarineObservation` and never selected
+        location conditions. An unavailable record preserves its station
+        identity and explicit data state without borrowing local metadata.
+      properties:
+        stationId: { type: string }
+        distanceKm: { type: number, nullable: true, minimum: 0 }
+        dataState: { type: string, enum: [available, no_observation, provider_failure] }
+        source: { type: string, enum: [ndbc, unavailable] }
+        validTime: { type: string, format: date-time, nullable: true }
+        waterTemp: { type: number, nullable: true, description: "group_temperature; offshore buoy observation only" }
+        airTemp: { type: number, nullable: true, description: "group_temperature; offshore buoy observation only" }
+        pressure: { type: number, nullable: true, description: "group_pressure; offshore buoy observation only" }
+        windSpeed: { type: number, nullable: true, description: "group_ocean_speed; offshore buoy observation only" }
+        windDirection: { type: number, nullable: true, description: "Degrees true north; offshore buoy observation only" }
+        windGust: { type: number, nullable: true, description: "group_ocean_speed; offshore buoy observation only" }
+        waveHeight: { type: number, nullable: true, description: "group_wave_height; offshore buoy observation only" }
+        wavePeriod: { type: number, nullable: true, description: "group_wave_period; offshore buoy observation only" }
+        spectralComponents:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SpectralWaveComponent' }
+      required: [stationId, distanceKm, dataState, source, validTime]
+
+    OffshoreObservationContext:
+      type: object
+      description: Selected offshore-buoy context state, distinct from individual station records.
+      properties:
+        selectionState: { type: string, enum: [no_buoy_selected, selected_buoy_no_observation, provider_failure, observations_available] }
+        observations:
+          type: array
+          items: { $ref: '#/components/schemas/OffshoreMarineObservation' }
+      required: [selectionState, observations]
 
     TideBundle:
       type: object
@@ -3960,14 +4190,16 @@ components:
         generatedAt: { type: string, format: date-time }
       required: [locationId, locationName, coordinates, predictions, waterLevels, source, generatedAt]
 
-    # ---------- Surf / Fishing / Beach-safety: actual endpoint shapes ----------
+    # ---------- Surf and Beach-safety: actual endpoint shapes; Fishing: Phase 1 target contract ----------
     #
     # There are no SurfBundle/FishingBundle/BeachSafetyBundle Pydantic models
     # (Phase 0C drafts of those classes, written ahead of the Phase 5 endpoint
     # implementations, were removed from models/responses.py - T4.3, Phase 4
-    # cleanup). The schemas below are the actual ground-truth shapes, read
-    # directly from endpoints/surf.py, endpoints/fishing.py,
-    # endpoints/beach_safety.py. See API-MANUAL §16.
+    # cleanup). Surf and Beach-safety schemas below are actual ground-truth
+    # shapes, read directly from endpoints/surf.py and endpoints/beach_safety.py.
+    # Fishing schemas below are explicitly marked Phase 1 target contracts and
+    # must not be read as the current endpoints/fishing.py response. See
+    # API-MANUAL §16.
 
     ExternalLink:
       type: object
@@ -4020,6 +4252,52 @@ components:
         generatedAt: { type: string, format: date-time }
       required: [locationId, locationName, coordinates, forecast, waterTemp, spectralComponents, tidePredictions, source, generatedAt]
 
+    FishingSpeciesChoice:
+      type: object
+      description: "TARGET (Fishing and Boating remediation Phase 1; not yet shipped): derived practical Fishing choice from the global species matrix."
+      properties:
+        choiceId: { type: string }
+        displayName: { type: string }
+        candidateGroup: { type: string, nullable: true }
+        memberSpecies:
+          type: array
+          items: { type: string }
+        profileLevel:
+          type: string
+          enum: [direct_species, collapsed_group, functional_category]
+        completeProfileMatch: { type: boolean }
+      required: [choiceId, displayName, memberSpecies, profileLevel, completeProfileMatch]
+
+    FishingSpeciesSelection:
+      type: object
+      description: |
+        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        setup-derived species selection for a location. The API resolves the
+        region and category, compares complete score-affecting and legal
+        profiles, and returns the resulting choices. The Dashboard does not
+        perform geographic eligibility or grouping.
+      properties:
+        region: { type: string }
+        targetCategory: { type: string, enum: [saltwater_inshore, bottom_fish, freshwater_sport, salmonids] }
+        selectedChoiceId: { type: string }
+        choices:
+          type: array
+          items: { $ref: '#/components/schemas/FishingSpeciesChoice' }
+      required: [region, targetCategory, selectedChoiceId, choices]
+
+    FishingPressureCheck:
+      type: object
+      description: "TARGET (Fishing and Boating remediation Phase 1; not yet shipped): live per-location Fishing pressure-series compatibility result."
+      properties:
+        locationId: { type: string }
+        supported: { type: boolean }
+        provider: { type: string }
+        checkedAt: { type: string, format: date-time }
+        validFrom: { type: string, format: date-time, nullable: true }
+        validTo: { type: string, format: date-time, nullable: true }
+        reason: { type: string, nullable: true }
+      required: [locationId, supported, provider, checkedAt]
+
     FishingDayEntry:
       type: object
       properties:
@@ -4033,8 +4311,9 @@ components:
     FishingData:
       type: object
       description: |
-        Actual GET /fishing/{locationId} data shape (see components/schemas
-        note above). Nested by day - no flat top-level forecast list or
+        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        proposed GET /fishing/{locationId} contract. It is not the current
+        endpoint shape. Nested by day - no flat top-level forecast list or
         singular top-level solunar field.
       properties:
         locationId: { type: string }
@@ -4052,6 +4331,10 @@ components:
         targetCategory:
           type: string
           enum: [saltwater_inshore, bottom_fish, freshwater_sport, salmonids]
+        speciesSelection:
+          $ref: '#/components/schemas/FishingSpeciesSelection'
+        pressureCompatibility:
+          $ref: '#/components/schemas/FishingPressureCheck'
         habitatFeatures:
           type: object
           nullable: true
@@ -4062,7 +4345,7 @@ components:
           items: { $ref: '#/components/schemas/TidePrediction' }
         source: { type: string, example: "ndbc+coops+solunar" }
         generatedAt: { type: string, format: date-time }
-      required: [locationId, locationName, coordinates, days, species, targetCategory, tidePredictions, source, generatedAt]
+      required: [locationId, locationName, coordinates, days, species, targetCategory, speciesSelection, pressureCompatibility, tidePredictions, source, generatedAt]
 
     FishingLocationCard:
       type: object

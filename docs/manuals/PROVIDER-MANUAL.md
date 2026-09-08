@@ -327,6 +327,7 @@ The GFE text engine (API-MANUAL §15) generates forecast narratives from provide
 | `windSpeed` | Y | Y | Y | Y | Wind phrases |
 | `windDir` | Y | Y | Y | Y | Wind direction |
 | `windGust` | Y | — | Y | Y | Gust phrases (> sustained + 10 mph) |
+| `pressure` | Y | location-specific grid | Y | Y | Provider-neutral hourly mean-sea-level pressure for time-matched Fishing trends |
 | `precipProbability` | Y | Y | Y | Y | PoP qualification + coverage derivation |
 | `precipAmount` | Y | — | Y | Y | Coverage language, snow accumulation |
 | `precipType` | Y | Y | Y | Y | Weather type phrases |
@@ -344,7 +345,7 @@ The GFE text engine (API-MANUAL §15) generates forecast narratives from provide
 | `humidityMax` / `humidityMin` | Y | — | Y | Y/— | Fire: humidity recovery |
 | `narrative` | Y | Y (`detailedForecast`) | — | Y | NWS pass-through |
 
-**NWS is the thinnest provider** for text engine fields. Its default `/forecast/hourly` endpoint provides only temperature, wind (as string), precip probability, weather icon/text. It does not supply humidity, wind gust, precip amount, cloud cover, visibility, UV, dewpoint, or feels-like without using the raw `/gridpoints` endpoint (out of scope). This is why NWS uses pass-through instead of the text engine.
+**NWS is the thinnest provider** for text engine fields. Its default `/forecast/hourly` endpoint provides only temperature, wind (as string), precip probability, weather icon/text. It does not supply humidity, wind gust, precip amount, cloud cover, visibility, UV, dewpoint, or feels-like without using the raw `/gridpoints` endpoint (out of scope for text generation). This is why NWS uses pass-through instead of the text engine. Fishing is the explicit exception for pressure: the provider reads the raw-grid pressure layer, aligns it to the regular hourly forecast by its UTC validity interval, and leaves pressure null when that layer is absent or invalid. Setup separately checks the selected location's live grid before Fishing can be enabled.
 
 ### Fields available from provider APIs but not yet mapped
 
@@ -1244,7 +1245,7 @@ Return stations sorted by haversine distance from the target coordinates, with c
 
 **Cache:** Key = `(provider_id, station_id, file_type)`. TTL = 60 min for all three file types. Station discovery (`activestations.xml`) cached 24 hr. **Negative cache (V3-F8, 2026-08-02):** a standard-met 404 is cached as empty (`observation=None`) at a shorter 30-min TTL (`_NEGATIVE_CACHE_TTL = 1800`), preventing repeated network requests for misconfigured or non-existent station IDs.
 
-**Station ID casing (V3-F8):** NDBC's flat-file server is case-sensitive (`PRJC1.txt` → 200, `prjc1.txt` → 404). All URL construction applies `.upper()` to the station ID; cache keys, `MarineObservation.stationId`, and log messages retain the original configured casing.
+**Station ID casing (V3-F8):** NDBC's flat-file server is case-sensitive (`PRJC1.txt` → 200, `prjc1.txt` → 404). All URL construction applies `.upper()` to the station ID; cache keys and log messages retain the original configured casing. The emitted station identity belongs only to the separately labelled `OffshoreMarineObservation` record, never `MarineObservation`.
 
 **Error handling:** HTTP 404 for standard-met file → `observation=None` (negative-cached, see above; formerly raised `ProviderProtocolError`). Spectral file 404 → `available=False` (not an error — station lacks that sensor). Empty file body → log WARNING, return empty observation (not error). Network errors → canonical taxonomy via `ProviderHTTPClient`.
 
@@ -1553,7 +1554,7 @@ confirming it matches `providers/marine/wavewatch.py`'s handling).
 
 **CAPABILITY:** `geographic_coverage = "us_coastal"`, `auth_required = []`. `supplied_canonical_fields` includes period name, forecast text, wind, seas, visibility, weather.
 
-**Wire format and parsing (corrected 2026-07-11):** `GET https://api.weather.gov/zones/coastal/{zoneId}/forecast` does **not exist** on the live NWS API — it returns 404 "Forecasts for marine areas are not yet supported by this API." Marine zone forecasts are published only as CWF (Coastal Waters Forecast) free-text products, keyed by WFO (not by zone), the same product-list/product-detail resource shape §14.5 uses for SRF:
+**Wire format and parsing (corrected 2026-07-11):** the zone-specific endpoint `GET https://api.weather.gov/zones/coastal/{zoneId}/forecast` is not implemented by the live NWS API — that endpoint returns 404 with "Forecasts for marine areas are not yet supported by this API." This is a limitation of that zone endpoint, not an absence of NWS marine forecasts. NWS publishes marine-zone forecasts as CWF (Coastal Waters Forecast) free-text products, keyed by WFO (not by zone), using the same product-list/product-detail resource shape §14.5 uses for SRF:
 
 1. `GET https://api.weather.gov/products/types/CWF/locations/{wfo}` with `User-Agent: weewx-clearskies-api/{version} (contact email)` — a JSON-LD envelope with an `@graph` array of product stubs, most recent first in practice. Take `@graph[0]`; use its `@id` URL, or fall back to `{base}/products/{id}` from its `id` (UUID).
 2. `GET` that product URL → `productText`, the raw CWF text.
@@ -1563,6 +1564,15 @@ confirming it matches `providers/marine/wavewatch.py`'s handling).
 **CWF text parsing:** A CWF product concatenates one UGC (Universal Geographic Code) header segment per zone-group, e.g. `AMZ250-121115-` (zone id + 6-digit expiration), each terminated by a `$$` line. A header may abbreviate additional zones sharing identical text to their 3-digit suffix (e.g. `AMZ250-256-262-121115-` → `AMZ250`, `AMZ256`, `AMZ262`). Locate the segment for the operator's configured `zone_id`, then split it into forecast periods on `.PERIOD...` markers (e.g. `.TONIGHT...`, `.SUN...`, `.SUN NIGHT...` — the narrative follows immediately on the same line, unlike SRF's standalone day-period header lines). Per period:
 
 - `period_name` — the marker text, title-cased (e.g. "Tonight", "Sun Night").
+- **TARGET (Fishing and Boating remediation Phase 1; not yet shipped):**
+  `period_start` and `period_end` — nullable at the provider boundary. CWF
+  labels and the product issuance time do not provide machine-readable UTC
+  period bounds, so `nws_marine` preserves `issuanceTime` and leaves these two
+  fields null rather than inferring an interval. The API companion proxy may
+  assign explicit UTC bounds only after the period label maps to an existing
+  regular-forecast day/night column; it uses that column's bounds. An
+  unrecognised label or a label with no corresponding regular-forecast column
+  remains unavailable and is not attached to a forecast column.
 - `text` — the full, whitespace-normalized period narrative.
 - `wind` — first sentence matching `<compass> winds...` (e.g. "W winds 10 to 15 kt with gusts up to 20 kt.").
 - `seas` — first sentence starting with "Seas" (e.g. "Seas 2 to 4 ft."); a "Wave Detail..." sentence immediately following is folded into `seas`.
@@ -1994,7 +2004,7 @@ Standard ERDDAP griddap URL pattern: `https://{server}/erddap/griddap/{datasetID
 
 **Fallback chain (`mode="modeled"`):**
 
-1. `location_config.ofs_model` set → OFS provider (§14.10). If fails, try `ofs_fallback`.
+1. **TARGET (Fishing and Boating remediation Phase 1; not yet shipped):** a configured `location_config.ofs_model` is eligible only after its published coverage is verified to include the selected point and requested depth. WCOFS is therefore West-Coast-only, never a nationwide default. If no eligible OFS source covers the point or it fails, try `ofs_fallback`.
 2. `location_config.ofs_region` set → ERDDAP regional model (§14.11, PacIOOS/CARICOOS).
 3. Global fallback, split by `needs`:
    - `needs="full"`: RTOFS via ERDDAP (column + forecast), then MUR SST (surface only).
@@ -3517,6 +3527,119 @@ source behavior, not live acceptance evidence.
 §14 consolidates prescriptive rules from: ADR-083 (marine domain architecture), ADR-084 (NWPS supplementation — superseded by ADR-093), ADR-085 (eccodes dependency), ADR-087 (NDBC spectral data), ADR-088 (fishing scoring — bathymetry for habitat), ADR-089 (marine zone alerts), ADR-091 (marine card data sources, OFS ocean data, composite water level), ADR-093 (SWAN + SwellTrack replaces NWPS — amended for multi-transect, SurfBeat, compute offloading), ADR-094 (HRRR wind source for surf scoring), ADR-095 (SWAN model corrections — amended for multi-SPECOUT + SwellTrack break points), ADR-096 (scoring restructure — amended for multi-transect inputs), ADR-097 (beach profile — amended for SwellTrack; the "blended SurfBeat output" amendment was REVERSED 2026-08-23 by operator ruling — the profile is SwellTrack only). ADRs are archived in `docs/archive/decisions/` and explain the *why* behind these rules.
 
 ---
+
+## §14.20 Fishing and Boating source assembly target (Phase 1; not yet shipped)
+
+This subsection is the approved target for the remediation plan. It describes
+provider responsibilities before implementation; the current deployment may
+still show the pre-remediation gaps recorded in the plan's evidence ledger.
+
+### Location-first nearshore weather
+
+For a marine location within the configured station-service radius, station
+hardware supplies the normalized current weather fields. Outside that radius,
+the configured forecast provider is queried at the marine location coordinates.
+The selected source supplies air temperature, feels-like temperature, humidity,
+dew point, wind, gust/direction, pressure and three-hour trend, visibility,
+weather state, update time, and source/provenance. NDBC is not a nearshore
+weather fallback.
+
+### Provider-neutral hourly pressure
+
+Every forecast provider that can support Fishing maps hourly mean-sea-level
+pressure to the canonical `HourlyForecastPoint.pressure` field in hPa and
+retains its `validTime` and `pressureSource`. The API derives a real three-hour
+change from those time-matched points (or from the archive for a
+station-served location). The provider capability declaration exposes a
+machine-readable `fishingPressure` object with `supported` and
+`locationSpecific`. Aeris, Open-Meteo, and OpenWeatherMap advertise
+`supported: true` and `locationSpecific: false`. NWS advertises both as true:
+it is eligible, not globally rejected, but setup must check its selected grid
+at every Fishing location. Before `/setup/apply` writes anything, that check
+reports provider, UTC `checked_at`, validity coverage, and an unavailable
+reason; it blocks Fishing when no continuous three-hour pressure window exists
+and tells the operator to choose a provider that supplies pressure there.
+
+### NWS marine-zone augmentation
+
+`nws_marine` parses each Coastal Waters Forecast period into regional wind,
+seas, visibility, and marine-weather narrative, and preserves the product's
+`issuanceTime`. Its `periodStart`/`periodEnd` fields are nullable: the provider
+does not infer UTC bounds from prose labels. The API companion proxy joins a
+period to the public `regularForecast` only when its label maps to an existing
+local day/night forecast column. It then assigns `periodStart`/`periodEnd` from
+that existing column's explicit UTC bounds and attaches the regional fields as
+`marineAdditions`; the location-weather provider's values are never replaced.
+An unknown label or a label for which no regular-forecast column exists keeps
+both bounds null and produces no `marineAdditions`, so the period remains
+unavailable for alignment rather than receiving an invented interval. These
+regional additions are not emitted as an untimed substitute for the regular
+forecast.
+
+### Water-temperature provenance and depth
+
+The ocean resolver remains the single source-selection path and selects by
+coverage at the chosen point. It prefers a genuinely nearby local sensor;
+WCOFS is eligible only where its West-Coast coverage includes that point;
+configured regional model or ERDDAP sources and national fallbacks serve other
+locations; and a clearly labelled buoy or tide-station observation is a last
+resort. The normalized result carries the actual selected source, source type,
+coverage tier, valid time, and depth. Current Conditions uses the resolved
+surface value. Fishing requests the selected species' habitat-depth value when
+the water-column profile supplies it; if no local water-column value exists,
+the field remains visibly missing and is not silently replaced by an offshore
+surface reading.
+
+### Offshore observation boundary
+
+NDBC remains an independently labelled offshore observation for navigation and
+exit context, large-scale swell reference, and spectral observation where
+available. Its wind, pressure, air temperature, and water temperature do not
+determine Harbour-local current conditions or Fishing's location pressure
+trend. Any NDBC display names the station, offshore distance, valid time, and
+which fields are genuinely missing.
+
+### Source failure and provenance
+
+Providers may return an unavailable field when the upstream payload genuinely
+does not contain it, but they must preserve the reason and source metadata.
+They must not copy one current observation into future forecast periods or
+silently substitute an offshore value for a location/depth-specific value.
+The API exposes null plus provenance for missing data; the Dashboard renders
+that state and never performs provider selection or fallback logic.
+
+### Fishing matrix storage target (not yet shipped)
+
+**TARGET — Fishing and Boating remediation Phase 1; not yet shipped.** Once the
+framework receives operator sign-off, the marine service's future operational
+lookup source will be one signed-off Excel table at the candidate path
+`repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.xlsx`.
+The workbook contains only the approved operational fields. It does not carry
+research URLs, IUCN assessment identifiers, research provenance, assessment
+details, workflow status, or supporting tables. The only operational
+conservation flag is `near_threatened`; other IUCN outcomes are unflagged.
+
+The documented target build interface is
+`python -m weewx_clearskies_marine.tools.build_fishing_species_matrix`; this is
+not an existing executable. It validates approved headers, types, allowed
+codes, required fields, unique keys, FAO-area keys, and conservation flags,
+then atomically replaces the sibling generated
+`repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.sqlite`.
+If validation or generation fails, the previous database remains untouched and
+the build fails loudly. The generated database has one logical data table and
+exactly two indexes: `(fao_area, fishing_type)` for setup and
+`(selection_key, fao_area, fishing_type)` for forecast and permitted fallback
+lookup.
+
+At runtime the packaged SQLite database is opened read-only. Queries select
+only the rows and columns needed for the current setup or forecast request;
+the service does not parse Excel or materialize the global matrix as
+module-level Python dictionaries. Packaging carries the generated database,
+not a runtime Excel reader. The current YAML catalogue and loader stay in
+place only until equivalence of the agreed setup selections and scoring
+comparison cases, independent review, and live behavior are proved in Phase 4;
+then the YAML data and loader are removed. This describes a target boundary,
+not shipped runtime behavior.
 
 ## §15 Marine Service Provider Architecture (current as-built)
 

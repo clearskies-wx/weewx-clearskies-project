@@ -40,7 +40,8 @@ There is no separate mode subsystem in this repository. The applicable workflow 
 
 - Primary coordinator: `gpt-5.6-terra`, high reasoning. It is the normal user-facing project manager and plan executor.
 - Workhorse coding: `gpt-5.3-codex-spark`, high reasoning, only for bounded implementation tasks with curated context.
-- Expert coding lead, QC, routine review, and research synthesis: `gpt-5.6-terra`, high reasoning. Expert coding leads may oversee bounded Spark workers; QC may coordinate Luna testing evidence; research leads may coordinate Luna retrieval.
+- Expert coding lead, QC, and routine review: `gpt-5.6-terra`, high reasoning. Expert coding leads may oversee bounded Spark workers; QC may coordinate Luna testing evidence.
+- Research: the `research_lead` role on `gpt-5.6-terra`, high reasoning, for bounded work under the coordinator-defined method and output contract.
 - Testing: `gpt-5.6-luna`, high reasoning, normally under QC direction.
 - Mechanical and retrieval work: `gpt-5.6-luna`, medium reasoning; it may not resolve ambiguity or architecture.
 - SOL adviser: `gpt-5.6-sol`, high reasoning, for exceptional reviews, planning, or difficult high-level tasks only after the user explicitly authorizes that named use in chat.
@@ -188,10 +189,11 @@ a remote** — it is where the never-push-without-the-word-"push" rule now lives
 
 ### Collaboration style
 
-- **Never use Codex goal controls for this project.** Do not create, update, complete, block, pause, resume, or otherwise alter a goal unless the operator explicitly names the exact goal-control action in the same chat message. A task deadline, a request to finish work, or a status update is never authorization to touch a goal. (Operator correction 2026-09-06.)
+- **Never use Codex goal controls for this project.** Do not create, update, complete, block, pause, resume, or otherwise alter a goal unless the operator explicitly names the exact goal-control action in the same chat message. A task deadline, a request to finish work, or a status update is never authorization to touch a goal. When goal creation is explicitly requested, omit `token_budget` unless the operator explicitly supplies a numerical token budget; a time limit is never a token budget. Goal state never replaces or blocks ordinary work that the current task still authorizes. (Operator correction 2026-09-06; clarified 2026-09-07.)
 - **Do not use interactive choice prompts.** If you need user input, ask in plain text. The user will reply in chat.
 - **Simple means simple.** For sync / match-state / "fix this one mismatch" tasks, do the minimum delta and stop. Don't expand scope unless asked.
-- **Don't parrot the user's framing as fact.** Treat requests as hypotheses to verify, not premises to act on.
+- **Explicit operator requirements are requirements, not hypotheses.** The operator owns task scope, deliverables, accepted methodology, source policy, and corrections. The rule below about verifying framing applies to factual and causal claims; it never authorizes rethinking or replacing an operator-approved plan, method, schema, source class, or existing user-owned data. The latest explicit operator correction controls the current task and removes conflicting earlier assistant-authored summaries or handoffs.
+- **Don't parrot the user's factual framing as fact.** Treat factual and causal claims as hypotheses to verify, not premises to act on. Verify the state; do not use this rule to reopen the operator's requirements.
 - **Narrate the diagnostic plan before commands.** When investigating a problem, name the hypothesis and what each command tests *before* firing tool calls.
 - **For root-cause questions, never propose creating/editing records until the *why* is established.**
 - **Plain English to the user.** Every technical term, library name, RFC number, file name, or project-internal acronym gets defined the first time it appears in a conversation. Once per conversation is enough; later uses can lean on the earlier definition. New conversation = counter resets. Detailed rule and worked examples in [rules/clearskies-process.md](rules/clearskies-process.md) "Plain English when explaining decisions to the user."

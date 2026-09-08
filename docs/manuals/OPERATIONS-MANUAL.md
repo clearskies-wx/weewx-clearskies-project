@@ -1027,6 +1027,17 @@ absent-key-means-Auto / present-key-means-override contract above are unchanged 
 
 Species data (lists, scoring profiles, seasonal behavior) is loaded from `data/species.yaml` inside the API package at process start. Operators can edit this file to add local species, adjust temperature ranges, or add seasonal closures. Changes take effect after an API restart (`sudo systemctl restart weewx-clearskies-api`).
 
+**Conservation screening for the target global Fishing matrix:** Each exact
+source taxon is screened against its global IUCN Red List assessment before it
+can appear as an operator-selectable entry. `critically_endangered`,
+`endangered`, and `vulnerable` taxa are excluded. `near_threatened` taxa remain
+selectable with an IUCN flag and stable assessment source ID in the matrix.
+Other IUCN outcomes are not flagged. The screen does not replace local fishing
+law, community management, or the matrix's separate legal-availability record.
+It screens exact source members, not a practical collapsed group label; the
+group remains available only when its remaining eligible members still have
+matching complete profiles.
+
 The YAML file contains four sections:
 
 | Section | Purpose |

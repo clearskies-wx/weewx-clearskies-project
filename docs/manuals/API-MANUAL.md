@@ -147,7 +147,7 @@ The canonical data model defines 9 core entity types and 2 container types:
 | `EarthquakeRecord` | Single earthquake event |
 | `AQIReading` | Air quality index reading from a provider module |
 | `StationMetadata` | Station identity (name, lat, lon, alt, timezone, archiveIntervalSeconds, weekStartDay) |
-| `MarineObservation` | Buoy observation snapshot (NDBC standard met) |
+| `MarineObservation` | **TARGET (Fishing and Boating remediation Phase 1; not yet shipped):** normalized selected-location Current Conditions payload; not an NDBC buoy snapshot |
 | `SpectralWaveComponent` | Single swell system from spectral decomposition (NDBC) |
 | `TidePrediction` | Predicted high/low tide event (CO-OPS) |
 | `WaterLevel` | Observed water level reading (CO-OPS) |
@@ -165,7 +165,7 @@ The canonical data model defines 9 core entity types and 2 container types:
 | `TideBundle` | Container: predictions + observations per location |
 | `MarineAlertSummary` | One active NWS alert tagged with a dashboard-tab `alertType` (T3.5) |
 
-Note: `GET /api/v1/surf[/{locationId}]`, `GET /api/v1/fishing[/{locationId}]`, and `GET /api/v1/beach-safety[/{locationId}]` return plain dicts (the standard envelope, §2), not Pydantic-backed bundle models — see "Surf bundle (actual shape)," "Fishing bundle (actual shape)," and "Beach-safety bundle (actual shape)" below for their ground-truth field tables.
+Note: `GET /api/v1/surf[/{locationId}]`, `GET /api/v1/fishing[/{locationId}]`, and `GET /api/v1/beach-safety[/{locationId}]` return plain dicts (the standard envelope, §2), not Pydantic-backed bundle models. See the ground-truth Surf and Beach-safety tables below; the Fishing table is explicitly a Phase 1 target contract, not the current response shape.
 
 ### Response shapes
 
@@ -2069,7 +2069,10 @@ All marine models follow the §2 naming convention (weewx-aligned camelCase, ide
 
 #### MarineObservation
 
-Single buoy observation snapshot from NDBC standard met data.
+**TARGET (Fishing and Boating remediation Phase 1; not yet shipped):** one
+normalized Current Conditions payload for the selected marine location. It is
+not a buoy snapshot. The payload retains per-field provenance; offshore NDBC
+data is a separately labelled navigation/exit context.
 
 | Field | Type | Unit group | Nullable | Description |
 |---|---|---|---|---|
@@ -2087,9 +2090,14 @@ Single buoy observation snapshot from NDBC standard met data.
 | `visibility` | float | `group_visibility` | Yes | Visibility |
 | `pressureTendency` | float | `group_pressure` | Yes | 3-hour pressure tendency |
 | `tideLevel` | float | `group_water_level` | Yes | Tide level (where reported) |
-| `stationId` | str | — | No | NDBC station identifier |
-| `time` | str | — | No | Observation time (UTC ISO-8601) |
-| `spectralComponents` | list[SpectralWaveComponent] | — | Yes | Decomposed swell systems (when spectral data available) |
+| `weatherCode` | str | — | Yes | Normalized weather-state code |
+| `weatherText` | str | — | Yes | Normalized weather-state description |
+| `isDay` | bool | — | Yes | Day/night flag from the selected weather source |
+| `time` | str | — | No | Selected source update or observation time (UTC ISO-8601) |
+| `feelsLike` | float | `group_temperature` | Yes | Apparent air temperature |
+| `humidity` | float | — | Yes | Relative humidity percentage |
+| `source` | str | — | No | Selected-location source role: station, forecast provider, mixed, or unavailable |
+| `provenance` | object | — | No | Conditions, pressure, water-temperature, and tide/current source records, including explicit unavailable values |
 
 #### SpectralWaveComponent
 
@@ -2195,20 +2203,63 @@ Single timestep of a configured surf location's wave-model forecast, optionally 
 | `windWaveHeight` | float | `group_wave_height` | Yes | Wind wave height. Surf spots: the single partition whose `is_wind_sea` flag is True (SWAN watershed partition 1 in the raw TABLE output, before the descending-height re-sort — see `watershed_partitions_to_component_format()`, PROVIDER-MANUAL §14.15). `null` if this timestep has no wind-sea partition. |
 | `windWavePeriod` | float | `group_wave_period` | Yes | Wind wave period |
 | `windWaveDirection` | float | — | Yes | Wind wave direction (degrees true north) |
-| `waterTemp` | float | `group_temperature` | Yes | Sea surface water temperature from OFS model forecast time series. Populated by `ocean_data_resolver.resolve_forecast()` → `ofs.fetch_forecast()`. Null when OFS is not configured for the location, the location is on land, or all OFS cycles are unavailable. Source: `ofs.py` `fetch_forecast()`, PROVIDER-MANUAL §14.10. |
+| `waterTemp` | float | `group_temperature` | Yes | **TARGET (Fishing and Boating remediation Phase 1; not yet shipped):** depth-appropriate forecast water temperature selected by coverage at the location. A nearby local sensor is preferred; WCOFS is eligible only for a point within its West Coast coverage; other locations continue through the configured regional or national source chain. The returned provenance carries the selected source, type, valid time, coverage tier, and depth; `null` is explicit when no eligible source can supply the value. |
 
 #### MarineTextForecast
 
-Single period from NWS marine zone text forecast.
+**TARGET (Fishing and Boating remediation Phase 1; not yet shipped):** one NWS
+Coastal Waters Forecast period. The provider preserves the product issuance
+time but does not infer UTC bounds from a prose label. The API assigns explicit
+UTC bounds only when the period label maps to an existing `regularForecast`
+day/night column; unmatched periods retain null bounds and remain unavailable
+for alignment. A matched period augments that regular-forecast point and never
+replaces the location-weather provider's values.
 
 | Field | Type | Unit group | Nullable | Description |
 |---|---|---|---|---|
-| `periodName` | str | — | No | Period label (e.g., "Tonight", "Thursday") |
+| `periodName` | str | — | No | Provider period label (e.g., "Tonight", "Thursday") |
+| `issuanceTime` | str | — | Yes | UTC time when NWS issued the CWF product; preserved as provenance |
+| `periodStart`, `periodEnd` | str | — | **Yes** | UTC validity bounds assigned by the API only after the label maps to an existing regular-forecast day/night column; both remain `null` for an unmatched or unrecognised period |
 | `text` | str | — | No | Full forecast narrative |
 | `wind` | str | — | Yes | Wind description extracted from narrative |
 | `seas` | str | — | Yes | Seas description |
 | `visibility` | str | — | Yes | Visibility description |
 | `weather` | str | — | Yes | Weather description |
+
+#### MarineBundle `regularForecast` and regional additions
+
+**TARGET (Fishing and Boating remediation Phase 1; not yet shipped):** the
+detail route `GET /api/v1/marine/{locationId}` exposes `regularForecast` as the
+public provider-neutral hourly forecast at the configured marine location's
+coordinates. It is separate from the model-wave `forecast` list and from the
+NWS `textForecast` list. Every point retains its provider `source`, UTC
+`validTime`, nullable provider fields, and provider-neutral hourly pressure
+(`pressure` plus `pressureSource` when available).
+
+The source boundary is location-first for current conditions, while the
+regular hourly forecast remains the configured forecast provider's time series:
+
+| Location state | Current `observation` weather fields | `regularForecast` | Regional CWF additions |
+|---|---|---|---|
+| Within the configured station-service radius | Station archive supplies supported current wind, gust, temperature, pressure, and related fields; forecast-provider weather state fields remain provider-sourced where present | Configured forecast provider queried at the marine location coordinates | Matching CWF period is attached to the existing regular-forecast column as `marineAdditions`; unmatched period remains unaligned |
+| Outside the station-service radius | Configured forecast provider queried at the marine location coordinates | Same configured forecast-provider series at the marine location coordinates | Same label-to-existing-column matching rule |
+| No provider, failed provider fetch, or no usable hourly points | Explicit unavailable/null values; no NDBC substitution | Empty list when no usable provider series is returned | No additions; CWF periods are not given invented bounds |
+
+NDBC observations are not a source for `regularForecast` or for selected-point
+weather. They remain separately labelled offshore context. The configured
+forecast provider is fetched using the API's target-unit setting, so the
+regular series follows the same display-unit contract as the regular forecast
+endpoint; the provider identifier and each point's UTC time remain attached.
+
+For the NWS regional join, the API uses the configured station timezone to
+classify an existing hourly point into its local day column (06:00–18:00) or
+night column (18:00–06:00). A CWF label is eligible only if that day/night
+column exists in `regularForecast`; the assigned `periodStart` and `periodEnd`
+are the corresponding explicit UTC bounds of that existing column. An
+unknown label, an `EXTENDED` label, or a recognised label with no existing
+column leaves the CWF period's `periodStart` and `periodEnd` null and attaches
+no `marineAdditions`. No UTC interval is fabricated from issuance time,
+period order, or the current clock.
 
 #### SurfForecast
 
@@ -2262,26 +2313,36 @@ Surf quality forecast for one spot at one timestep.
 
 #### FishingForecast
 
-Fishing conditions forecast for one spot for one period.
+**TARGET (Fishing and Boating remediation Phase 1; not yet shipped):**
+selected-species Fishing conditions for one period. There is no generic
+`overallScore` or shared component score.
 
 | Field | Type | Unit group | Nullable | Description |
 |---|---|---|---|---|
 | `periodStart` | str | — | No | Period start time (UTC ISO-8601) |
 | `periodEnd` | str | — | No | Period end time (UTC ISO-8601) |
 | `periodLabel` | str | — | No | (locale) Human-readable period: "Early Morning", "Late Afternoon", etc. |
-| `overallScore` | int | — | No | Composite score 0–100 (pressure + tide + solunar + time of day; does NOT include temperature — temperature is per-species only) |
-| `pressureScore` | int | — | No | Pressure component sub-score 0–100 |
-| `tideScore` | int | — | No | Tide component sub-score 0–100 |
-| `solunarScore` | int | — | No | Solunar component sub-score 0–100 |
-| `waterTempScore` | int\|null | — | No | Always null — temperature scoring is per-species via `speciesScores`, not a single composite value. Retained in the response schema for backward compatibility. |
-| `timeofdayScore` | int | — | No | Time-of-day component sub-score 0–100 |
-| `speciesScores` | list[object] | — | Yes | Per-species score adjustments; each entry's `status` field is (locale) |
+| `selectedSpecies` | str | — | No | Selected source species or disclosed collapsed group |
+| `profileLevel` | str | — | No | Direct species, collapsed group, or geographic functional-category fallback |
+| `score` | int | — | Yes | Selected-species score 0–100; `null` when a required core input is unavailable |
+| `status` | str | — | Yes | Active, less active, low activity, or inactive; `null` when a required core input is unavailable |
+| `coreScore` | float | — | Yes | Environmental core before bounded refinements; `null` when unavailable |
+| `temperatureSuitability`, `tideCurrentSuitability`, `pressureSuitability` | float | — | Yes | Approved core-factor values, 0–1; all are `null` when a required core input is unavailable |
+| `factorProvenance` | object | — | No | Required availability/source record for temperature, tide/current, and pressure. It is contract metadata, not a user-facing explanation. |
+| `hardStopReason` | str | — | Yes | Closure or out-of-range temperature reason; score is then zero/inactive |
+| `appliedAdjustments` | list[object] | — | No | Disclosed time, season, and solunar refinements |
+| `waterTemperatureProvenance`, `weatherProvenance`, `swellProvenance` | object | — | No | Selected source records, each carrying explicit availability and valid time; water also carries coverage tier and depth |
 | `conditionsText` | str | — | No | (locale) Natural-language conditions summary |
 | `windSpeed` | float | `group_ocean_speed` | Yes | Wind speed (informational, not scored) |
 | `windDirection` | float | — | Yes | Wind direction (informational) |
 | `windGust` | float | `group_ocean_speed` | Yes | Wind gust (informational) |
 | `swellHeight` | float | `group_wave_height` | Yes | Swell height (informational, not scored) |
 | `swellPeriod` | float | `group_wave_period` | Yes | Swell period (informational) |
+
+When a required core input is unavailable, the service logs the location,
+period, input name, and source/provenance at warning level. It does not return a
+visitor-facing explanation; score, status, core, and suitability values are
+`null`.
 
 #### SolunarTimes
 
@@ -2355,15 +2416,15 @@ Summary snapshot for one marine location (used by the marine landing page locati
 
 #### Card data source contract (ADR-091)
 
-`_location_summary()` in `endpoints/marine.py` populates card fields from these sources. The dashboard never sees provider names — it renders whatever the API returns.
+`_location_summary()` in `endpoints/marine.py` populates card fields from these sources. **TARGET:** the dashboard renders the API's selected source/provenance label and unavailable state, but never chooses a provider or combines source records itself.
 
 | Card field | Primary source | Fallback | Unit conversion |
 |---|---|---|---|
-| `waveHeight` | **Surf-spot locations** (`location.id in marine_config.surf_spots`): the wave model's own computed swell breakdown, via `services/model_wave_source.py` reading the same SWAN last-good cache the surf endpoint uses (RW-1, register ruling 13 "ONE source of offshore truth", 2026-08-06) — combined/total Hs from that timestep's watershed partitions, never WaveWatch III. **All other locations:** the configured NDBC buoy observation only; no model-wave request. | NDBC buoy Hs (already-fetched observation) → null. Suppressed (null) for harbor-classified locations. A surf-spot location with no cached SWAN data yet retains this NDBC fallback; it does not request WaveWatch III. | meter → operator `group_wave_height` |
+| `waveHeight` | Surf-spot locations (`location.id in marine_config.surf_spots`) only: the wave model's own computed swell breakdown, via `services/model_wave_source.py` reading the same SWAN last-good cache the surf endpoint uses. | `null` when model output is unavailable, and always `null` for a non-surf selected location. A configured NDBC buoy belongs only in separately labelled Offshore Observations; it never supplies selected-point wave conditions. | meter → operator `group_wave_height` |
 | `windSpeed` | Station hardware via weewx archive (when `is_station_served()` returns True) | Configured forecast provider `fetch_current_conditions(lat, lon)` | Provider handles conversion |
 | `windDirection` | Same as windSpeed | Same as windSpeed | degrees (no conversion) |
 | `airTemp` | Same as windSpeed | Same as windSpeed | Provider handles conversion |
-| `waterTemp` | Ocean data resolver `resolve(needs="surface")` — tiered: on-premises sensor → OFS → MUR SST → RTOFS | Full chain in PROVIDER-MANUAL §14.12 | Celsius → operator `group_temperature` |
+| `waterTemp` | Coverage-aware resolver: local sensor, then a configured regional source that covers the chosen point, then national fallback | Clearly labelled offshore observation only as last resort, otherwise null | Celsius → operator `group_temperature`; carry source, valid time, coverage tier, and depth. WCOFS is West-Coast-only. |
 | `weatherCode` | Configured forecast provider `fetch_current_conditions(lat, lon)` | None | WMO code (no conversion) |
 | `isDay` | Configured forecast provider | None | boolean |
 
@@ -2456,16 +2517,19 @@ The existing TideBundle fields (`predictions`, `waterLevels`, `locationId`, `loc
 
 Bundles wrap domain-specific models with location metadata, freshness block (§2), and stationClock (§2). Follow the existing `ForecastBundle` pattern.
 
-**`MarineBundle` and `TideBundle` are implemented as declared** — `endpoints/marine.py` and `endpoints/tides.py` construct and `model_dump()` these exact Pydantic models from `models/responses.py`.
+**Current implementation note:** `TideBundle` is implemented as declared.
+`MarineBundle` remains the target response shape below; its normalized
+Current Conditions, `regularForecast`, and provenance additions are not yet
+shipped (Phase 1).
 
 | Bundle | Contains | Response for |
 |---|---|---|
-| `MarineBundle` | `MarineObservation`, `list[MarineForecastPoint]`, `list[MarineTextForecast]` | `GET /api/v1/marine[/{locationId}]` |
+| `MarineBundle` | `MarineObservation`, `list[HourlyForecastPoint]` (`regularForecast`), `list[MarineForecastPoint]`, `list[MarineTextForecast]` | `GET /api/v1/marine[/{locationId}]` |
 | `TideBundle` | `list[TidePrediction]`, `list[WaterLevel]`, `totalWaterLevelForecast` (ADR-091), `currentResidual` (ADR-091), `stormSurgeLevel` (ADR-091) | `GET /api/v1/tides[/{locationId}]` |
 
 Each bundle also carries: `locationId`, `locationName`, `coordinates`, `freshness` block, `stationClock`, `units`.
 
-**There are no `SurfBundle`, `FishingBundle`, or `BeachSafetyBundle` Pydantic models.** Earlier drafts of those three classes (written in Phase 0C, ahead of the Phase 5 endpoint implementations) were removed from `models/responses.py` (T4.3, Phase 4 cleanup) — they were never referenced by `endpoints/surf.py`, `endpoints/fishing.py`, or `endpoints/beach_safety.py`, which each build and return a plain dict directly (the standard envelope, §2), and their field shapes had drifted from what those endpoints actually return. The tables below are the actual, ground-truth shapes — sourced by reading the endpoint code directly — and are what `docs/contracts/openapi-v1.yaml` documents.
+**There are no `SurfBundle`, `FishingBundle`, or `BeachSafetyBundle` Pydantic models.** Earlier drafts of those three classes (written in Phase 0C, ahead of the Phase 5 endpoint implementations) were removed from `models/responses.py` (T4.3, Phase 4 cleanup) — they were never referenced by `endpoints/surf.py`, `endpoints/fishing.py`, or `endpoints/beach_safety.py`, which each build and return a plain dict directly (the standard envelope, §2). The Surf and Beach-safety tables below are current, ground-truth shapes sourced by reading endpoint code. The Fishing table is a separately labelled Phase 1 target contract; it is not a statement of the current endpoint shape. The OpenAPI contract uses the same distinction.
 
 ##### Surf bundle (actual shape) — `GET /api/v1/surf[/{locationId}]`
 
@@ -2489,9 +2553,16 @@ Source: `endpoints/surf.py`.
 | `source` | str | No | Fixed string `"swan+coops+nws_srf"` (ADR-096, amended 2026-08-07 — was `"swan+ndbc+coops+nws_srf"`; NDBC removed from the surf endpoint, marine `8e17e84`) |
 | `generatedAt` | str | No | UTC ISO-8601 with Z |
 
-##### Fishing bundle (actual shape) — `GET /api/v1/fishing[/{locationId}]`
+##### Fishing bundle (**TARGET Phase 1; not yet shipped**) — `GET /api/v1/fishing[/{locationId}]`
 
-Source: `endpoints/fishing.py`. Nested by day: no flat top-level `forecast` list or singular top-level `solunar` field — each day carries its own periods and solunar data.
+**Proposed target contract, not the current endpoint shape.** The implementation must produce a response nested by day: no flat top-level `forecast` list or singular top-level `solunar` field — each day carries its own periods and solunar data.
+
+The optional `selectedSpecies` query parameter names one eligible configured
+choice for the location. When it is absent, the service scores the first
+configured choice. The API forwards it only through the authenticated
+API-to-marine proxy; the marine service rejects an unknown or ineligible value.
+The returned score is always server-scored for that one selected species—the
+Dashboard never derives or substitutes a score.
 
 | Field | Type | Nullable | Description |
 |---|---|---|---|
@@ -2499,11 +2570,13 @@ Source: `endpoints/fishing.py`. Nested by day: no flat top-level `forecast` list
 | `locationName` | str | No | Display name |
 | `coordinates` | object | No | `{lat, lon}` |
 | `days` | list[object] | No | One entry per forecast day (3 days). Each entry: `{"date": "YYYY-MM-DD", "periods": list[FishingForecast], "solunar": SolunarTimes}` |
-| `species` | list[str] | No | From the location's `FishingSpotConfig.species` |
-| `targetCategory` | str | No | First entry from the location's `FishingSpotConfig.target_categories` list (singular for wire compatibility; config supports multiple categories) |
+| `species` | list[str] | No | Derived practical choices exposed to the visitor; not an unvalidated raw catalogue list |
+| `targetCategory` | str | No | Selected fishing category used by setup's matrix derivation (config may retain multiple categories) |
+| `speciesSelection` | object | No | Derived selection record: region, category, selected choice, candidate group, disclosed source-species members, effective profile level, and complete-profile comparison result |
+| `pressureCompatibility` | object | No | Live per-location provider check: `supported`, provider, check time, coverage window, and an unavailable reason. Setup blocks enabling or saving Fishing when the selected provider cannot supply the required hourly pressure series at that location. For NWS this is a real location-specific grid check, not a provider-wide assumption. |
 | `habitatFeatures` | object \| null | Yes | CUDEM-derived habitat annotations (drop-offs, reefs, ledges, channels, pinnacles); `null` when the location has no bathymetric profile (i.e., no `surf` sub-block configured) |
-| `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions, also used server-side to derive each period's `tide_state` input to the fishing scorer |
-| `source` | str | No | Fixed string `"ndbc+coops+solunar"` |
+| `tidePredictions` | list[TidePrediction] | No | CO-OPS tide predictions, also used server-side to derive each period's tide/current state |
+| `source` | str | No | Composite source roles for this response; does not imply that NDBC supplied local weather or pressure |
 | `generatedAt` | str | No | UTC ISO-8601 with Z |
 
 ##### Beach-safety bundle (actual shape) — `GET /api/v1/beach-safety[/{locationId}]`
@@ -2904,34 +2977,93 @@ Quality labels: 1 = "Poor", 2 = "Fair", 3 = "Good", 4 = "Very Good", 5 = "Epic".
 
 **File:** `enrichment/fishing_scorer.py`
 **Registration:** Against the fishing endpoint.
-**Inputs:** Pressure trend (from weewx archive or NDBC buoy), tide state (from CO-OPS), water temperature (from ocean data resolver — same tiered fallback as marine/surf endpoints; NDBC/CO-OPS as last-resort fallback only), solunar intensity (from solunar processor), current time.
-**Outputs:** `FishingForecast` with overall_score (0–100) and per-component sub-scores.
+**Inputs:** The selected species' time-matched nearshore weather, provider-neutral
+three-hour pressure change, CO-OPS tide/current state, depth-appropriate ocean
+temperature, solunar marker, seasonal activity, and current period
+window. NDBC is never the Harbour-local pressure or weather source.
+**Outputs:** `FishingForecast` with only the selected-species score, status,
+environmental core, applied adjustments, hard-stop reason, and source context.
 
-**Four-component weighted scoring (general conditions):**
+**Approved selected-species scoring (target; not yet shipped):**
 
-| Component | Weight | Scoring method |
-|---|---|---|
-| Barometric pressure trend | 0.375 | 3-hour pressure delta. Rapid drop (> 3 hPa/3hr) = 100 (peak). Falling (1–3 hPa/3hr) = 80. Stable (< 1 hPa/3hr) = 50. Rising slow (1–3 hPa/3hr) = 30. Rising rapid (> 3 hPa/3hr) = 20 (fish stop feeding during rapid pressure increases). |
-| Tide state | 0.3125 | Position in tidal cycle from CO-OPS predictions. Outgoing (ebb) = 100 (flushes bait). Incoming (flood) = 80. Peak flow (midpoint between tidal extremes) = 70. Slack high = 30. Slack low = 20. |
-| Solunar intensity | 0.1875 | From solunar processor. During major period + new/full moon = 100. During major period (non-peak moon) = 80. During minor period = 60. Outside any period = 30. |
-| Time of day | 0.125 | Dawn = 100, Dusk = 90 (low-light feeding peaks). Morning = 70. Night = 50 (species-dependent). Midday = 30. |
+1. An out-of-range depth-appropriate temperature is a hard stop: score `0`,
+   status `inactive`.
+2. Otherwise `core = 100 × temperature^0.50 × tide_current^0.30 × pressure^0.20`.
+   Temperature is `1.00` optimal, `0.80` good, `0.45` marginal-but-active, and
+   `0.00` outside the active range. Tide/current is `1.00` preferred, `0.70`
+   acceptable, or `0.40` poor. Pressure uses the selected profile's researched
+   falling, stable, or rising multiplier and pressure sensitivity, selected by
+   the signed local three-hour trend; stable applies when its absolute change
+   is below 1 hPa. There are no universal pressure-band scores.
+3. Apply only documented bounded refinements: time `1.10/1.00/0.90`, season
+   `1.15/1.00/0.85`, and the profile's major/minor, active-tide-alignment, and
+   full-moon solunar terms. `final = min(100, core × time × season × solunar, core + 10)`.
+4. Status is `active` only at final `65–100` with core at least `55`,
+   `less_active` at `35–64`, `low_activity` below `35`, and `inactive` for a
+   hard stop. Every selected row has complete profile treatments; runtime never
+   turns an unfinished or blank matrix field into a neutral adjustment or
+   borrows an adjustment from another species.
 
-Water temperature is **not** part of the general `overallScore`. Temperature is scored **per species** using each species' own optimal/good/marginal ranges from `SPECIES_PROFILES` — a 72°F day scores high for redfish (optimal 68–80°F) but low for striped bass (optimal 55–68°F). This matches industry practice (Fishbrain, BassForecast) where bite scores are species-specific.
+There is no generic Fishing score and no permanent pressure-sensitivity penalty.
+The response exposes the signed pressure trend as factual context. The
+visitor-facing page remains a simple selected-species score and explanation;
+source fallback derivation is setup material, not a hidden dashboard
+calculation.
 
-**Final score** = Σ(component_score × weight) × species_modifier × temp_multiplier × seasonal_multiplier, scaled to 0–100 integer.
+**One-profile selection (TARGET, not yet shipped):** Setup uses one complete
+profile for each species or practical category. Its `fao_areas` field lists
+coverage only; it does not create per-area, regional, or fallback profiles.
+The dashboard receives the selected profile and never performs coverage or
+profile resolution itself.
 
-**Species profiles:** Four target categories (operators can select multiple), each with species auto-populated from 11 US biogeographic regions:
+**Global conservation screen (Fishing matrix):** Before regional eligibility is
+derived, the matrix screens every source taxon against its current global IUCN
+Red List assessment. A taxon assessed as `critically_endangered`, `endangered`,
+or `vulnerable` is excluded from the selectable matrix. A `near_threatened`
+taxon remains selectable, but its operational matrix row carries only the
+`near_threatened` conservation flag. `least_concern`, `data_deficient`, and
+`not_evaluated` records do not receive a conservation flag. The operational
+matrix carries no IUCN assessment identifier, research URL, or other research
+provenance; those are inputs to reconstruction and review, not runtime fields.
+The screen applies to the exact source member, never directly to a familiar
+collapsed group label. After excluded members are removed, setup may continue
+to show that group only when every remaining eligible member has the same
+complete profile; if no eligible member remains, it is absent. This is a
+global catalogue screen, not a legal finding or a score coefficient.
 
-| Category | Example species | Pressure sensitivity | Typical temp range (°F) |
-|---|---|---|---|
-| Saltwater inshore | Redfish, Speckled Trout, Flounder, Snook | High | 55–85 |
-| Bottom fish | Grouper, Snapper, Sheepshead, Tautog | Moderate | Species-specific, varies widely |
-| Freshwater sport | Bass, Walleye, Pike, Catfish | High | 55–75 |
-| Salmonids | Salmon, Steelhead, Trout | Moderate | 45–65 |
+### Fishing matrix storage target (not yet shipped)
 
-Each species has: optimal temp range (1.0×), good range (0.8×), marginal range (0.5×), inactive below/above (0.1×). Spawning season multipliers (2.0–3.0× during peak runs).
+**TARGET — Fishing and Boating remediation Phase 1; not yet shipped.** Once
+the framework receives operator sign-off, the sole human-edited operational
+source will be one signed-off Excel table at the candidate path
+`repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.xlsx`.
+It contains only the approved identity, coverage, habitat, scoring, and
+conservation-flag fields. It is not a research or
+provenance store and has no source URLs, source IDs, assessment details,
+research notes, status fields, or supporting tables.
 
-Species data is loaded from `data/species.yaml` (an operator-editable reference file; parsed once at process start by `enrichment/fishing_species.py`), keyed by biogeographic region and target category. No external API.
+The target build command is
+`python -m weewx_clearskies_marine.tools.build_fishing_species_matrix`.
+This is a documented future interface, not an existing executable. It will
+validate approved headers, value types, allowed codes, required fields, unique
+keys, FAO-area keys, and conservation flags before atomically replacing the
+sibling generated
+`repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.sqlite`.
+Validation or generation failure leaves the old database untouched and fails
+the build loudly.
+
+The target SQLite database has one logical data table. Each species or practical
+category has one complete profile whose `fao_areas` field lists coverage; it has
+no per-area, regional, or fallback profile rows. The marine service opens the packaged database read-only and selects
+only needed rows and columns. Neither the API nor the marine service parses
+Excel at runtime or materializes the global matrix in module-level Python
+dictionaries. Packaging carries SQLite, not a runtime Excel reader.
+
+The current YAML catalogue and loader remain only until agreed setup selections
+and scoring comparison cases are equivalent, independently reviewed, and live
+behavior is proved in Phase 4. Only then are the YAML data and loader removed.
+This target boundary is not a claim that the Excel workbook, generated SQLite,
+generator, or retirement has shipped.
 
 **Solunar evidence caveat:** Presented as one factor with appropriate context — "Solunar theory suggests feeding activity correlates with moon position. Scientific evidence is mixed; environmental conditions (pressure, temperature, tides) have stronger research support."
 
@@ -2974,7 +3106,7 @@ Computed locally via Skyfield — no external API call. Skyfield is already a pr
 | `SpectralWaveComponent.classification` | "groundswell" | `marine.swell_class.<value>` | `i18n.t("marine.swell_class.groundswell")` |
 | `FishingForecast.periodLabel` | "Early Morning" | `fishing.period.<value>` | `i18n.t("fishing.period.early_morning")` |
 | `FishingForecast.conditionsText` | "Falling pressure with incoming tide..." | `fishing.conditions.*` composition templates | Flat `i18n.t()` template strings filled in with `str.format()` (T4.4); see `SurfForecast.conditionsText` row |
-| `FishingForecast.speciesScores[].status` | "active" | `fishing.species_status.<value>` | `i18n.t("fishing.species_status.active")` |
+| `FishingForecast.status` | "active" | `fishing.species_status.<value>` | `i18n.t("fishing.species_status.active")` |
 | ~~`BeachSafetyAssessment.safetyLevel`~~ | ~~"caution"~~ | ~~`beach_safety.level.<value>`~~ | **Deprecated (T9.1).** `safetyLevel` is always null in v1 — see §16 "BeachSafetyAssessment". The `beach_safety.level.<value>` locale keys may remain in locale files harmlessly unused; no code path resolves them. |
 | `BeachSafetyAssessment.comfortLevel` | "cool" | `beach_safety.comfort.<value>` | `i18n.t("beach_safety.comfort.cool")` |
 | `SurfZoneForecast.ripCurrentRisk` | "moderate" | `beach_safety.rip_risk.<value>` | `i18n.t("beach_safety.rip_risk.moderate")` |
@@ -3023,7 +3155,7 @@ API proxies that response.
 | `GET /api/v1/marine[/{locationId}]` | `list[MarineLocationSummary]` | `MarineBundle` | At least one location with `marine` activity enabled |
 | `GET /api/v1/tides[/{locationId}]` | `list[MarineLocationSummary]` | `TideBundle` | At least one location with a `coops_station_ids` entry configured. Per ADR-090, all four activities (marine, surf, fishing, beach_safety) use tide data, so "tide-capable" means "has a CO-OPS station configured," not a specific activity value. |
 | `GET /api/v1/surf[/{locationId}]` | `list[object]` (`locationId`, `name`, `lat`, `lon`, `qualityStars`, `conditionsText` — metadata only, no live fetch) | Surf bundle, actual shape (§16) | At least one location with `surf` activity enabled |
-| `GET /api/v1/fishing[/{locationId}]` | `list[object]` (`locationId`, `name`, `lat`, `lon`) | Fishing bundle, actual shape (§16) | At least one location with `fishing` activity enabled |
+| `GET /api/v1/fishing[/{locationId}]` | `list[object]` (`locationId`, `name`, `lat`, `lon`) | Fishing bundle, Phase 1 target contract (§16; not current shape) | At least one location with `fishing` activity enabled |
 | `GET /api/v1/beach-safety[/{locationId}]` | `list[object]` (`locationId`, `name`, `lat`, `lon`, `safetyLevel` — always null, T9.1 — `ripCurrentRisk`, `waterTemp` — live-fetched per card) | Beach-safety bundle, actual shape (§16) | At least one location with `beach_safety` activity enabled |
 | `GET /api/v1/almanac/solunar` | — (single route, no location list) | `SolunarTimes` (or `list[SolunarTimes]` when `days` > 1) | Always available (not gated by marine feature) |
 
@@ -3088,26 +3220,29 @@ When no marine locations are configured (no `[marine]` section in `api.conf`), n
 
 `GET /api/v1/marine/{locationId}` must return an enriched `MarineBundle` observation using the same data sources as the card summary endpoint (`_location_summary()`). The raw NDBC buoy observation alone is insufficient — most buoys do not report wind, air temp, pressure, visibility, or weather conditions.
 
-**Enrichment sources (applied after the NDBC buoy fetch):**
+**Enrichment sources (target; not yet shipped):**
 
 | Response field | Primary source | Fallback | Notes |
 |---|---|---|---|
-| `observation.windSpeed` | Station hardware (when `is_station_served()`) | `marine_weather_cache.get_current_conditions()` | Knots in API internal units |
-| `observation.windDirection` | Station hardware | `marine_weather_cache` | Degrees |
-| `observation.windGust` | Station hardware | `marine_weather_cache` | Knots |
-| `observation.airTemp` | Station hardware | `marine_weather_cache` | °C internal |
-| `observation.pressure` | Station hardware | `marine_weather_cache` | hPa internal |
-| `observation.visibility` | `marine_weather_cache` | null | km internal |
-| `observation.waveHeight` | **Surf-spot locations:** the wave model's own computed swell breakdown via `services/model_wave_source.py` (RW-1, register ruling 13, 2026-08-06), never WaveWatch III. **All other locations:** the configured NDBC buoy observation only; no model-wave request. | NDBC buoy Hs (already-fetched observation) → null | Meters internal. Null for harbor locations. |
-| `observation.waterTemp` | `ocean_data_resolver.resolve()` (OFS → MUR SST → RTOFS) | NDBC buoy | °C internal |
-| `observation.weatherCode` | `marine_weather_cache` | null | WMO code integer |
-| `observation.isDay` | `marine_weather_cache` | null | boolean |
+| `observation.windSpeed` | Station hardware when `is_station_served(location.id)` | Otherwise the configured forecast provider at the marine location coordinates | Knots in API internal units |
+| `observation.windDirection` | Station hardware when station-served | Otherwise the configured forecast provider at the marine location coordinates | Degrees |
+| `observation.windGust` | Station hardware when station-served | Otherwise the configured forecast provider at the marine location coordinates | Knots |
+| `observation.airTemp` | Station hardware when station-served | Otherwise the configured forecast provider at the marine location coordinates | °C internal |
+| `observation.pressure` | Station hardware when station-served | Otherwise the configured forecast provider at the marine location coordinates | hPa internal; the three-hour trend uses the same source's archive or time-matched hourly series |
+| `observation.visibility` | Station hardware when station-supported and station-served | Otherwise the configured forecast provider at the marine location coordinates | km internal |
+| `observation.waveHeight` | Surf-spot locations only: the wave model's own computed swell breakdown via `services/model_wave_source.py`, never WaveWatch III. | `null` when model output is unavailable and for every non-surf selected location. NDBC values remain only in separately labelled Offshore Observations. | Meters internal. |
+| `observation.waterTemp` | Coverage-aware `ocean_data_resolver.resolve()`: nearby local sensor first, then an OFS or regional source that covers the selected point, then national fallback | Clearly labelled buoy or tide-station observation only as a last resort; otherwise null | °C internal. WCOFS is eligible only on its West Coast coverage; it is never a nationwide default. The response retains selected source, source type, valid time, coverage tier, and depth. |
+| `observation.weatherCode` | Configured forecast provider at the marine location coordinates | null | WMO code integer; never selected from NDBC |
+| `observation.isDay` | Configured forecast provider at the marine location coordinates | null | boolean; never selected from NDBC |
 
 **Implementation rule:** Do NOT refactor `_location_summary()` and `get_marine_location()` into a shared function. The two endpoints have different response shapes and different additional data. Copy the enrichment dispatch pattern.
 
 **Unit conversion:** Apply `_convert_observation()` to the enriched observation (same as current behavior, but now with non-null fields).
 
-**Existing fields preserved:** `dominantPeriod`, `averagePeriod`, `spectralComponents` from the NDBC buoy remain in the response when available.
+**Offshore-only fields:** NDBC `dominantPeriod`, `averagePeriod`, and
+`spectralComponents` appear only in an `OffshoreMarineObservation` record when
+available. They are not fields of `MarineObservation` and never supply
+selected-point conditions.
 
 ### GRIB2 temporal awareness requirement
 
@@ -3488,6 +3623,8 @@ Marine service configuration is never read directly from `api.conf`. It is pushe
 
 **Push result surfaced to the caller (T7.6, 2026-07-25).** `ApplyResponse` carries `marine_config_push: {attempted: bool, ok: bool, error: str|null}` — `attempted` is `false` (with `ok`/`error` not meaningful) when `marine_service_url` isn't configured; otherwise `ok` reflects whether the marine service accepted the push, and `error` is a human-readable reason when it did not. This does not change the failure-handling behavior above — the push still never fails `/setup/apply` — it only gives the wizard/admin UI something to render instead of the outcome living solely in the API's own ERROR log.
 
+**Fishing pressure setup enforcement (Fishing and Boating remediation Phase 3).** Each forecast provider's `/api/v1/capabilities` declaration carries an optional `fishingPressure: {supported: bool, locationSpecific: bool}` object. Aeris, Open-Meteo, and OpenWeatherMap advertise `{true, false}`. NWS advertises `{true, true}` because pressure is available only where its live raw forecast grid carries a usable series. When an apply request contains Fishing locations, `POST /setup/apply` resolves the provider that request will leave configured before writing `api.conf` or secrets. A provider with no supported pressure capability is rejected. For NWS, setup checks every Fishing location for a continuous three-hour pressure window. An absent, null, malformed, unsupported-unit, or too-short series rejects the request with an instruction to choose a provider that supplies pressure there; a transport failure returns 503 so setup does not silently accept an unchecked Fishing configuration. A successful NWS apply returns `fishing_pressure_checks`, with one transient result per Fishing location: `location_id`, `supported`, `provider`, `checked_at`, `valid_from`, `valid_to`, and `reason`. It is not a configuration key or persisted record.
+
 **Config recovery pull (T6.4b):** `GET /setup/marine/config`, authenticated with `Authorization: Bearer {MARINE_SERVICE_SECRET}`, returns exactly the payload the push above sends — both are built by one serializer (`_build_marine_service_config_payload()` in `endpoints/setup.py`) so the push and pull shapes cannot drift apart. The marine service calls this only at startup, and only when it has no local config on disk (an existing local config always wins — the pull never overwrites it). See OPERATIONS-MANUAL.md "Config push model" for the marine-side trigger conditions (`CLEARSKIES_MARINE_API_URL`) and failure/degradation behaviour.
 
 The marine service never parses `api.conf` directly. This ensures the API remains the single source of truth for all operator-facing configuration.
@@ -3752,7 +3889,7 @@ Wire shape (`SurfForecast`, confirmed against the marine service):
 }
 ```
 
-resolves to the outward `SurfForecast` shape the dashboard has always seen — `qualityLabel`, `windQuality`, `conditionsText` — with the `*Key`/`conditionsTextParts` fields removed. `qualityKey` is `null` in the unavailable case (`conditionsTextParts.unavailable: true`, every other part field `null`); `windQualityKey` stays populated (wind is an independent observation). `FishingForecast` follows the same pattern: `periodLabelKey` → `periodLabel`, `speciesScores[].statusKey` → `speciesScores[].status`, and a `conditionsTextParts` object of `{overallLabelKey, pressurePhraseKey, tidePhraseKey, solunarClauseKey, activeSpeciesNames}`.
+resolves to the outward `SurfForecast` shape the dashboard has always seen — `qualityLabel`, `windQuality`, `conditionsText` — with the `*Key`/`conditionsTextParts` fields removed. `qualityKey` is `null` in the unavailable case (`conditionsTextParts.unavailable: true`, every other part field `null`); `windQualityKey` stays populated (wind is an independent observation). **TARGET:** Fishing resolves `periodLabelKey` → `periodLabel` and `statusKey` → selected-species `status`; no `speciesScores[]` or generic-score phrases remain.
 
 **`currentResidual` (C-37).** The marine service emits `{"valueM": 0.45, "quality": "good", "source": "coops_observed"}` — canonical meters, no description. The API converts `valueM` to the operator's display unit and adds `value` (rounded) and `description` (`"+0.45 m vs prediction"` / `"+1.48 ft vs prediction"`), matching the pre-separation format exactly.
 

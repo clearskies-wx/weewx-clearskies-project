@@ -204,6 +204,39 @@ Surfline. These rules make that check mandatory and mechanical.
   and surface it; never alter code to satisfy it. A test pinning dead design is a standing
   instruction to the next agent to revert the system, which is how "finished" capabilities vanish.
 
+## Research and artifact verification boundaries
+
+**Review research against the approved method, not the reviewer's preferred
+method.** A research review verifies that each claim is supported by an allowed
+source, applies to the assigned subject and scope, uses the required unit or
+value shape, and satisfies the stated output contract. It may not require
+peer-reviewed, governmental, quantitative, or other preferred evidence when
+the operator or governing plan permits qualitative, subjective, practitioner,
+community, commercial, or other sources. A methodological concern outside the
+approved review question is reported once as a concern; it is not a reason to
+reject, rewrite, clear, or withhold otherwise compliant research.
+
+**Auxiliary status is never proof of substantive incompleteness.** A blank
+source link, queue entry, status flag, missing identifier, or separate evidence
+record does not prove that the underlying requested value or work is absent.
+Verify the actual target deliverable and its task-defined required fields before
+claiming that work is missing or ordering duplicate research.
+
+**Canonical-artifact transformations are verified before replacement.** When a
+task deletes, flattens, migrates, restructures, or broadly rewrites an existing
+artifact, verification runs against a separate candidate while the original is
+still recoverable. The gate checks the task's applicable record keys, row or
+object counts, required fields, types, units, null changes, formulas,
+relationships, formatting, and representative known records. It also
+enumerates every intentionally removed field or object. Only after the
+candidate passes may it replace the canonical source.
+
+Never accept "the file opens," "the render looks right," or "the hashes match"
+as proof of content preservation. A render checks appearance; a hash checks
+byte equality. Neither detects shifted values, dropped records, wrong types, or
+a faithfully copied mistake. Re-run the semantic checks after replacement as a
+final confirmation, not as the first opportunity to discover loss.
+
 ## Audit rules
 
 **Two audit modes, both required for non-trivial work.** Runtime tests against real backends + source-only review against ADRs/rules. Neither alone is sufficient. Order: dev produces → tests run on weather-dev → auditor reviews diff → lead synthesizes.

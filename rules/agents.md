@@ -59,7 +59,9 @@ These rules apply to ALL repos, ALL domains. No exceptions.
 
 **Route supporting work by task shape and context budget.** `gpt-5.3-codex-spark` with high reasoning is the default workhorse for bounded implementation. Never give Spark a full plan, whole manuals, broad repository history, or large unfiltered logs: its brief names only the needed plan and manual sections, source files, allowlist, and verification command. A task that needs broad cross-service reasoning, multiple manuals/contracts, substantial history, or several dependent implementation slices goes to an expert coding lead on `gpt-5.6-terra` with high reasoning; that lead may decompose the work and oversee bounded Spark workers. QC, review, and research synthesis use Terra with high reasoning. QC may coordinate Luna test agents; research leads may coordinate Luna retrieval agents. Focused testing uses `gpt-5.6-luna` with high reasoning; deterministic mechanical and retrieval work uses Luna with medium reasoning. Project definitions live in `.codex/agents/`; no more than three supporting agents may run concurrently.
 
-**SOL is a user-authorized escalation, not an automatic lane.** `gpt-5.6-sol` with high reasoning may be used only for exceptional reviews, planning, or difficult high-level tasks after the user explicitly authorizes that named use in chat. The Coordinator records the authorization and purpose before dispatch. An explicit user request for any model or reasoning effort always overrides automatic routing.
+**Spark is forbidden for research.** Do not dispatch `gpt-5.3-codex-spark` for research, source retrieval, web searching, source review, evidence synthesis, catalogue research, or any task whose result depends on evaluating sources. Those tasks go to the `research_lead` role (Terra with high reasoning), or the coordinator performs the bounded research directly. Spark is implementation-only: one explicitly specified coding slice with a strict file allowlist. A Spark quota error after an inappropriate research dispatch is coordinator error, never a project blocker.
+
+**SOL is a user-authorized escalation, not an automatic lane.** No agent—including the Coordinator, an expert lead, or a supporting agent—may invoke, dispatch, select, switch to, or otherwise use `gpt-5.6-sol` unless the user has explicitly authorized that specific SOL invocation in chat. This prohibition applies before the SOL role starts, regardless of whether the proposed work is read-only, planning, review, diagnosis, implementation, or delegation. Once authorization exists, SOL may be used only for exceptional reviews, planning, or difficult high-level tasks. The Coordinator records the authorization, named task, and purpose before dispatch. An explicit user request for any model or reasoning effort always overrides automatic routing.
 
 **Plans carry delegation intent.** Before execution, the plan identifies the owner role/model for each predictable task, the Spark-safe implementation slices, the Terra-led integration points, the planned QC gates, and any research work. The Coordinator may adapt ordinary sequencing and assignment decisions within the approved plan and architecture, but must keep Spark briefs context-bounded and must surface any architectural trigger to the user.
 
@@ -72,6 +74,48 @@ These rules apply to ALL repos, ALL domains. No exceptions.
 **Why (2026-06-14, corrected):** The original rule (2026-05-18) said "lead does NOT do research grunt work" and "the only direct tool calls the lead makes are spawning agents." This was never the user's intent. It over-corrected from "lead reads too many files before spawning agents" to "lead delegates ALL reading." The coordinator's value is judgment informed by direct understanding — reading, diagnosing, and verifying are part of the job. The distinction is understanding vs. mechanical bulk work, not "all research" vs. "no research."
 
 **Small, focused tasks.** Each agent gets one specific job with a clear deliverable. "Implement 2 provider modules + tile proxy + wiring" is too big. "Implement openweathermap.py radar provider per this spec" is right. Shorter runs = less idle-bug risk, easier to monitor, cheaper to retry.
+
+## Research-agent contract
+
+A research agent answers the bounded question the coordinator assigned; it
+does not decide what should be researched, redefine the intended use, redesign
+the deliverable, or substitute its own methodology. The coordinator's brief
+must satisfy `rules/coordinator.md` §1a before research begins.
+
+The research agent must:
+
+- follow the brief's source policy exactly, including its treatment of
+  qualitative, subjective, practitioner, community, commercial,
+  governmental, and academic material;
+- return every requested field in the specified format, definitions, units,
+  and value shapes;
+- preserve existing accepted values and decisions named in the brief;
+- cite the supporting source for each claim when citations are required;
+- state which assigned searches or checks were performed for any unresolved
+  field; and
+- keep conclusions within the assigned subject, population, geography,
+  period, and downstream use.
+
+The research agent must not:
+
+- impose a stricter or different evidence standard because it personally
+  prefers another source class or methodology;
+- turn a retrieval task into peer review, policy design, architecture,
+  taxonomy redesign, data-model design, or a general essay;
+- reject qualitative or practitioner evidence when the brief permits it;
+- clear, downgrade, re-litigate, or replace accepted data outside an explicit
+  validation assignment;
+- edit the destination artifact, project plan, governing documents, or code
+  unless the brief separately grants an exact file allowlist and edit task; or
+- create supporting tables, queues, ledgers, identifiers, or files that the
+  deliverable contract does not require.
+
+If the brief leaves a consequential choice unresolved, the agent reports the
+specific missing instruction to the coordinator before proceeding. It does not
+ask the operator directly and does not choose the policy itself. A source not
+proving more than it actually says is a scope limit to report; it is not
+permission to discard other allowed sources or redefine the product's standard
+of usefulness.
 
 **Agents must read source documents directly — NEVER paraphrase manuals or plans into agent prompts.** The coordinator tells the agent WHICH files to read and WHICH sections are relevant, and the agent reads the original text itself. The coordinator's prompt provides: (1) the task description and deliverables, (2) a reading list of specific file paths and section names/line ranges the agent must read before coding, (3) scope block and verification commands per the existing rules. The coordinator does NOT restate, summarize, or paraphrase manual content, plan task specs, design criteria, or acceptance criteria into the prompt — the agent reads those from the source documents.
 
@@ -208,6 +252,15 @@ silently reverting across the 2026-07 plans.
 5. **Per-deliverable spec** — for each endpoint/module/component, the behavior decision tree or equivalent. Not "implement the endpoint" — the specific happy path, error paths, edge cases, and response shapes.
 6. **Lead calls** — decisions the lead has already made that the agent must follow (not re-derive). Cite the reasoning.
 7. **Open questions** — questions the agent must surface to the coordinator through the team message channel, NOT resolve unilaterally. Every open question must have been audited against ADRs first per the existing "Audit open questions against ADRs before surfacing" rule.
+
+**Research briefs must also satisfy `rules/coordinator.md` §1a in full.** The
+per-deliverable specification for research is its exact output contract:
+purpose, question, scope, methodology/source policy, fields, definitions,
+units, value shapes, existing accepted state, failure behavior, return format,
+and application step. "Research X," a list of links, or a plan filename is not
+a research brief. The file allowlist is `none` unless the coordinator has
+separately authorized a specific research artifact; the destination product or
+workbook is never implicitly writable.
 
 **Prompt anti-patterns (from incidents):**
 - A design that names a third-party field, option or API is verified against the INSTALLED package before it goes into a brief (2026-08-27: a brief specified `kind_detail === 'primary'`, which does not exist in the Protomaps roads schema; and Leaflet layer `minZoom`/`maxZoom` — which the map aggregates and which silently forced the fitBounds zoom).

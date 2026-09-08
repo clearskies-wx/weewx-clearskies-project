@@ -145,14 +145,14 @@ Without Surfline's proprietary calibration data, Clear Skies can provide:
 
 Fishing forecasts combine multiple environmental factors to predict fish feeding activity. The evidence base varies by factor:
 
-**Strongest evidence:**
-- **Water temperature:** Fish metabolism roughly doubles with every 10°C increase. Species have well-documented optimal temperature ranges. This is the most reliably predictive factor — if water temperature is outside a species' comfort zone, nothing else matters.
-- **Barometric pressure trend:** Research consistently shows falling pressure triggers increased feeding (fish detect pressure changes via swim bladders and lateral lines). Stable high pressure = moderate activity. Rapid drops = feeding frenzy (fish "know" bad weather limits future feeding opportunities). Rising pressure after a front = slow fishing initially, improving over 12-24 hours.
-- **Tide state and current:** Water movement concentrates baitfish and triggers predatory feeding. Outgoing (ebb) tide is generally rated highest (flushes bait from estuaries), incoming flood is second, slack tides (high and low) are poorest.
+**Best-supported inputs:**
+- **Water temperature at the fish's actual depth:** Fish metabolism and distribution are temperature-dependent, but the useful value is species-specific and depth-specific. A surface reading cannot stand in for a bottom fish or a mid-water fish. Temperature must therefore be assessed against an evidence-backed species range at its habitat depth.
+- **Tide state and current:** Water movement can affect feeding and movement, but its direction and strength are species- and location-specific. There is no defensible universal rule that an outgoing tide is always best. For example, striped bass activity increased on outgoing flow at one tide gate, while a multi-species lagoon study found contrasting tide-direction responses among species.
 
 **Moderate evidence:**
 - **Time of day:** Dawn and dusk feeding peaks are well-established for most species. Low-light conditions favor ambush predators. Midday is generally poorest except in deep water or overcast conditions.
-- **Moon phase (solunar theory):** Formalized by John Alden Knight in 1926. Theory: major feeding periods when moon is directly overhead (transit) or underfoot, minor periods at moonrise/moonset. Major periods last 2-3 hours, minor 1-2 hours. Scientific evidence is mixed — some peer-reviewed studies show correlations for specific species, others find no significant effect. The practical consensus among anglers is that solunar periods are useful as a tiebreaker when other conditions are favorable, but water temperature, pressure, and tides matter more.
+- **Barometric pressure trend:** Fish can physiologically respond to pressure changes, particularly through buoyancy-related mechanisms. That establishes a reason to retain an observed pressure trend as a condition, but it does **not** establish a universal feeding response or a general numerical penalty. The available feeding study found no significant relationship for yellow perch, and this brief found no equivalent validated relationship for the Southern California species list.
+- **Moon phase (solunar theory):** Formalized by John Alden Knight in 1926. Theory: major feeding periods when moon is directly overhead (transit) or underfoot, minor periods at moonrise/moonset. Major periods last 2-3 hours, minor 1-2 hours. Scientific evidence is species-specific and mixed: documented catch effects can reverse from one species to another. Solunar periods therefore belong as a bounded tiebreaker when the environmental conditions are already viable, not as a rescuing factor.
 
 **Weaker/anecdotal evidence:**
 - Cloud cover influence on feeding (widely believed, inconsistently supported)
@@ -933,6 +933,78 @@ Not already in this brief's Sources section:
 - García-Reyes, M. & Largier, J. (2012). Seasonality of coastal upwelling. *JGR: Oceans*, 117(C3).
 - Bourassa, M.A., et al. (2019). Remotely Sensed Winds for Marine Forecasting. *Frontiers in Marine Science*, 6, 443.
 
+### 11.9 Fishing-score evidence update (2026-09-05)
+
+This update was added while reconstructing the Fishing tab plan. It corrects two overstatements in the original brief: a universal "falling pressure means better fishing" rule is not supported by the evidence reviewed, and there is no universal "outgoing tide is best" rule.
+
+#### What the additional research supports
+
+| Factor | Evidence-supported conclusion | What Clear Skies may claim |
+|---|---|---|
+| Legal season | A legal closure is an objective constraint, independent of environmental conditions. | A closed season makes the species unavailable; no score may override it. |
+| Water temperature | Habitat and temperature matter, but the relevant temperature differs by species and depth. CDFW and NOAA sources place California halibut in shallow coastal, bay, and sandy habitat, while kelp bass are a kelp/reef-associated species. | Use a species' documented habitat depth and temperature band. Do not score every species from one offshore surface observation. |
+| Tide/current | Measured fish activity changes with tide and current, but the direction varies by species and setting. A striped-bass tide-gate study found greater activity on outgoing flow; a multi-species lagoon study found different tide responses by species. | Present tide/current as a species and location rule, with its source. Do not present ebb, flood, or slack as universally best. |
+| Time of day | Fish activity and catchability can show daily rhythms. The size and direction of the effect depend on species, habitat, light, and fishing method. | Use only a bounded species-specific adjustment after viable environmental conditions are established. |
+| Atmospheric pressure | Pressure changes can alter buoyancy-related behavior, but direct feeding/catch evidence is sparse and inconsistent. A controlled yellow-perch study found no significant feeding effect. No comparable validated response curve was found for the Southern California list. | Show the measured trend and keep it available for a cautious species rule. Do not describe it as a proven general feeding trigger or assign a large, universal score effect. |
+| Moon and solunar periods | Multiple fisheries studies find lunar effects for some species, while the best phase differs among species and some species have no significant relationship. | Preserve the major/minor periods as useful context and apply, at most, a bounded tiebreaker. Moon conditions cannot rescue bad temperature, closure, or poor local conditions. |
+
+#### Consequence for score design
+
+The score must not embed fishing folklore as a global mathematical rule. The evidence supports this order of treatment:
+
+1. Enforce legal closures and species-specific inactive temperature boundaries first.
+2. Build the environmental result from the species' depth-appropriate temperature and documented local tide/current response.
+3. Apply only bounded, evidence-recorded species adjustments for time of day and pressure trend.
+4. Use solunar periods as a small tiebreaker, never as a way to turn unsuitable conditions into a favorable forecast.
+
+The research does **not** supply defensible universal numerical exponents, pressure-response curves, or multiplier values for the Pacific Southwest list. Those values must be recorded per species with their source, confidence, and a focused test case before they become score constants. Where species evidence is absent, the matrix uses a documented regional functional fallback rather than silently inventing behavior or withholding a score. The fallback description belongs in setup/help material, not the ordinary Fishing page.
+
+#### Southern California evidence anchors
+
+- CDFW states that adult California halibut move into shallow coastal waters and bays to spawn, usually February through September. NOAA's Southwest Fisheries Science Center describes California halibut as a nearshore sandy-environment species, generally to 30 m depth, with bays and estuaries used as nursery grounds. These support habitat/depth and seasonal evidence for that species; they do not by themselves establish a preferred feeding-temperature interval.
+- NOAA identifies kelp bass as an important recreational species of the West Coast kelp-forest habitat. This supports the need to assess a kelp/reef fish at mid-water habitat depth, not against a generic surface value.
+- The current Pacific Southwest species table contains many other species. Each needs the same level of source review before its existing temperature, tide, time, seasonal, or pressure values are retained, changed, or used as a hard stop.
+
+### 11.10 Global fishing-catalogue review (2026-09-05)
+
+The Fishing setup catalogue was reviewed across every configured region and category: 90 unique displayed labels, including Pacific, Atlantic, Gulf, Caribbean, Hawaiian/Pacific-territory, freshwater, Great Lakes, Alaska, and salmonid choices. This review is the evidence basis for location-filtered Fishing selection. It does **not** claim that a taxonomic or habitat source alone proves a feeding multiplier.
+
+#### Selection rule derived from the review
+
+A selectable Fishing choice is derived from the global source-species matrix during setup. Each source species carries a candidate familiar group label plus its habitat-depth, temperature, tide/current, pressure, time, seasonal, legal-availability, and geographic fields. Setup filters to the operator's region/category and collapses source species with the same candidate label only when every score-affecting field matches. A familiar label is not automatically invalid just because it is a group; it becomes invalid only when the research shows that its eligible members require materially different treatment.
+
+Setup must therefore resolve the selected location to a region, derive only the supported choices for that region/category, and never offer a worldwide catalogue. It does not need a hand-maintained Southern California or other regional subgroup. The dashboard receives the derived configured choice and does not make this decision itself.
+
+#### Review outcomes
+
+| Region | Exact taxa or valid aliases that can remain selectable | Labels that need a location-specific split or a completed matrix profile before they can collapse into one displayed choice |
+|---|---|---|
+| Pacific Southwest/Central/Northwest | California halibut (*Paralichthys californicus*), Pacific halibut (*Hippoglossus stenolepis*), California corbina (*Menticirrhus undulatus*), California sheephead (*Semicossyphus pulcher*), kelp bass (*Paralabrax clathratus*), barred sand bass (*P. nebulifer*), white seabass (*Atractoscion nobilis*), California barracuda (*Sphyraena argentea*), Pacific chub mackerel (*Scomber japonicus*), Pacific bonito (*Sarda chiliensis*), white croaker (*Genyonemus lineatus*), lingcod (*Ophiodon elongatus*), cabezon (*Scorpaenichthys marmoratus*), California scorpionfish (*Scorpaena guttata*, the local sport-fishing meaning of “sculpin”), Dungeness crab (*Metacarcinus magister*), petrale sole (*Eopsetta jordani*), and white sturgeon (*Acipenser transmontanus*) where locally available. | Generic `halibut` duplicates/conflicts with named California/Pacific halibut; `surfperch` covers multiple species; `flounder`, `rockfish`, and Pacific Southwest `grouper` have no one defensible profile. `Sheepshead` must never silently stand for California sheephead. |
+| Alaska | Pacific halibut, lingcod where locally available, sablefish (*Anoplopoma fimbria*), Chinook/king salmon (*Oncorhynchus tshawytscha*), coho/silver salmon (*O. kisutch*), steelhead (*O. mykiss*) in documented drainages, Arctic char (*Salvelinus alpinus*), and Dolly Varden (*S. malma*). | `Salmon`, `trout`, and `rockfish` each cover members with different habitat, timing, protection, and regulation. King/silver are aliases, not a second scoreable taxon; the same taxon still needs distinct regional/life-history treatment when conditions or law differ. |
+| Hawaii/Pacific territories | Hawaiian bonefish/‘ō‘io (*Albula glossodonta*), giant trevally (*Caranx ignobilis*), mahi-mahi (*Coryphaena hippurus*), yellowfin tuna (*Thunnus albacares*), skipjack tuna (*Katsuwonus pelamis*), and wahoo (*Acanthocybium solandri*) are exact identity candidates. | `Papio`, `trevally`, `tuna`, `snapper`, and `grouper` have multiple locally regulated taxa. Hawaii’s `bluefish` has no identified regional basis. Pacific territories cover jurisdictions too broad for one legal/season profile; exact identity does not alone make an entry available everywhere. Wahoo is pelagic and cannot remain a bottom-fish selection. |
+| Atlantic Northeast | Striped bass (*Morone saxatilis*), bluefish (*Pomatomus saltatrix*), Atlantic sheepshead (*Archosargus probatocephalus*), black sea bass (*Centropristis striata*), scup (*Stenotomus chrysops*), summer flounder (*Paralichthys dentatus*), winter flounder (*Pseudopleuronectes americanus*), weakfish (*Cynoscion regalis*), tautog (*Tautoga onitis*), Atlantic cod (*Gadus morhua*), haddock (*Melanogrammus aeglefinus*), and Atlantic pollock (*Pollachius virens*) are named taxa. | Generic `flounder` overlaps named flatfish and has no shared profile. Freshwater `catfish`, `pike`, and `trout` require named taxa. |
+| Atlantic Southeast/Gulf | Redfish is a valid alias for red drum (*Sciaenops ocellatus*); speckled trout is an alias for spotted seatrout (*Cynoscion nebulosus*). Common snook (*Centropomus undecimalis*), cobia (*Rachycentron canadum*), Florida pompano (*Trachinotus carolinus*), Atlantic tarpon (*Megalops atlanticus*), crevalle jack (*Caranx hippos*), black drum (*Pogonias cromis*), king mackerel (*Scomberomorus cavalla*), and Atlantic sheepshead are named candidates where local range supports them. | `Flounder` requires at least Southern and Gulf flounder distinction. `Grouper`, `snapper`, `amberjack`, and generic `triggerfish` require named regional membership. Freshwater `catfish`, `crappie`, and `bream` are not one scoring unit. |
+| Caribbean | Bonefish (*Albula vulpes*), Atlantic tarpon, common snook where locally present, mahi-mahi, permit (*Trachinotus falcatus*), great barracuda (*Sphyraena barracuda*), wahoo, yellowtail snapper (*Ocyurus chrysurus*), and hogfish (*Lachnolaimus maximus*) are named candidates. | Caribbean `grouper`, `snapper`, and `tuna` each cover separate managed taxa and need a location-specific membership/profile before setup can collapse them into one displayed choice. |
+| Freshwater, Great Lakes, and salmonids | Named candidates include largemouth bass (*Micropterus nigricans*), smallmouth bass (*M. dolomieu*), walleye (*Sander vitreus*), northern pike (*Esox lucius*), muskellunge (*E. masquinongy*), yellow perch (*Perca flavescens*), channel catfish (*Ictalurus punctatus*), lake trout (*Salvelinus namaycush*), brown trout (*Salmo trutta*), rainbow/steelhead (*O. mykiss*), Atlantic salmon (*S. salar*), and the named Pacific salmon. | `Catfish`, `pike`, `trout`, `salmon`, `crappie`, `bream`, and `sturgeon` are not globally one unit. A freshwater selection must also be checked against the actual waterbody, stocking/range, life history, and local regulation. Landlocked and sea-run Atlantic salmon remain separate life-history selections despite sharing a taxon. |
+
+#### What the sources support—and what they do not
+
+- Government, FAO, and FishBase sources reliably establish identity, range, habitat/depth, and management context. That is enough to decide location availability and which water-column depth is relevant.
+- FishBase/AquaMaps occurrence or tolerance data is not proof of a feeding optimum, an inactive temperature boundary, or a score multiplier.
+- The review found no credible global basis for the current numeric pressure sensitivity, tide/current, time-of-day, or seasonal multipliers. They must be a clearly labelled product judgment or a clearly labelled regional functional fallback. They must never be described as research-derived for every taxon.
+- Legal closures and seasons are jurisdictional. A region-wide month multiplier cannot represent island, state, federal-water, watershed, or stocked-water rules. Resolve legality at the configured fishing location.
+- Freshwater temperature is a separate coverage problem. Ocean water-column sources cannot be used for lake/river species; without a genuine local freshwater depth/temperature source, the required temperature core is incomplete.
+
+#### Evidence anchors
+
+- [California Department of Fish and Wildlife — Surf Zone Fishes](https://wildlife.ca.gov/Conservation/Marine/Surf) documents multiple distinct California surfperch and reports different local tide associations for California corbina and surfperch species.
+- [California Department of Fish and Wildlife — groundfish groupings](https://wildlife.ca.gov/Conservation/Marine/Groundfish/Nearshore-Shelf-And-Slope) distinguishes rockfish by depth/management group; it does not support one rockfish score.
+- [NOAA Fisheries — Pacific salmon and steelhead](https://www.fisheries.noaa.gov/species/pacific-salmon-and-steelhead) and [Alaska Department of Fish and Game fish inventory](https://www.adfg.alaska.gov/index.cfm?adfg=animals.listfish&sort=scientific) identify distinct salmon, steelhead, char, and rockfish units.
+- [Hawaii Division of Aquatic Resources scientific-name list](https://dlnr.hawaii.gov/dar/fishing/fishing-regulations/scientific-names-of-regulated-species/) shows that local `ulua`/`pāpio` terminology covers multiple carangids.
+- [NOAA Fisheries — summer flounder](https://www.fisheries.noaa.gov/species/summer-flounder), [Atlantic pollock](https://www.fisheries.noaa.gov/species/atlantic-pollock), and [Northeast groundfish](https://www.fisheries.noaa.gov/species/northeast-multispecies-groundfish) support exact northeast identity/range/management, not a generic flounder rule.
+- [Florida Fish and Wildlife Conservation Commission saltwater regulations](https://myfwc.com/fishing/saltwater/recreational/) demonstrates coast- and species-specific legal context; [Puerto Rico's island-based fishery plan](https://www.caribbeanfmc.com/fishery-management-plans/puerto-rico-island-based-fishery-management-plan) demonstrates the same problem for Caribbean grouper/snapper groups.
+- [USGS aquatic species profiles](https://nas.er.usgs.gov/) and [Michigan Department of Natural Resources fish directory](https://www.michigan.gov/dnr/education/michigan-species/fish-species) support named freshwater/Great Lakes units and separate life histories.
+
 ## Sources
 
 - [NDBC Wave Measurement FAQ](https://www.ndbc.noaa.gov/faq/wavecalc.shtml)
@@ -942,6 +1014,14 @@ Not already in this brief's Sources section:
 - [NDBC Station List](https://www.ndbc.noaa.gov/to_station.shtml)
 - [NWS Marine Weather Services](https://www.weather.gov/marine/)
 - [NWS Marine Forecasts FAQ](https://www.weather.gov/marine/faq)
+- [California Department of Fish and Wildlife — Nearshore Fishes](https://wildlife.ca.gov/Conservation/Marine/Nearshore)
+- [NOAA Fisheries — Kelp Forest Habitat on the West Coast](https://www.fisheries.noaa.gov/west-coast/habitat-conservation/kelp-forest-habitat-west-coast)
+- [NOAA Southwest Fisheries Science Center — Pacific Coast regional summary (California halibut habitat and depth)](https://swfsc-publications.fisheries.noaa.gov/publications/CR/2015/2015Yoklavich.pdf)
+- [Richmond et al. — Activity Patterns of Anadromous Fish below a Tide Gate](https://academic.oup.com/mcf/article/13/3/200/7819984)
+- [Piazzon et al. — Tides and moon drive fish movements in a brackish lagoon](https://doi.org/10.1016/j.ecss.2018.09.016)
+- [VanderWeyst — The Effect of Barometric Pressure on Feeding Activity of Yellow Perch](https://pines.bemidjistate.edu/j-earth-life-sci/50/)
+- [Pulver — Does the Lunar Cycle Affect Reef Fish Catch Rates?](https://doi.org/10.1080/02755947.2017.1293574)
+- [Lowry et al. — Lunar landings: lunar phase and gamefish-tournament catch rates](https://doi.org/10.1016/j.fishres.2007.07.011)
 - [NWS Marine Weather Safety Rules](https://www.weather.gov/mlb/windsea_rules)
 - [NWS Marine Text Forecasts by Zone](https://www.weather.gov/marine/textzones)
 - [NWS Marine Zone Map](https://www.weather.gov/marine/AllZones)

@@ -122,6 +122,27 @@ Depth categories for SoCal species:
 
 The scorer evaluates: "what is the temperature at this species' target depth range?" → compare to the species' optimal/good/marginal temp thresholds → produce a temperature suitability score (0–100).
 
+### Species-profile evidence requirements (added 2026-09-05)
+
+The depth categories above are a useful data-access taxonomy, not proof of every current species-profile value. A fishing score may only use a species temperature boundary, target depth, seasonal rule, tide/current preference, time-of-day rule, or pressure response when the profile records:
+
+1. a primary fisheries, government, or established scientific source;
+2. what that source actually supports (for example, habitat depth, spawning season, observed temperature association, or measured catch response);
+3. the evidence date, place, life stage, and confidence; and
+4. a test case at every boundary used by the scorer.
+
+The source must not be stretched beyond its evidence. A source that establishes habitat depth supports choosing the water-column level to inspect; it does not, by itself, establish a temperature optimum or a feeding multiplier.
+
+Southern California examples establish the difference. [CDFW](https://wildlife.ca.gov/Conservation/Marine/Nearshore) says adult California halibut move into shallow coastal waters and bays for spawning, generally February through September, and [NOAA's Southwest Fisheries Science Center](https://swfsc-publications.fisheries.noaa.gov/publications/CR/2015/2015Yoklavich.pdf) describes the species as nearshore and sandy, generally to 30 m depth. Those facts support a shallow/bottom habitat query and a seasonal evidence record. [NOAA Fisheries](https://www.fisheries.noaa.gov/west-coast/habitat-conservation/kelp-forest-habitat-west-coast) identifies kelp bass as a recreationally important kelp-forest species, supporting a reef/mid-water query. Neither source establishes the numerical temperature, tide, pressure, or time-of-day values currently in the species table. Those require their own evidence before they are used as score constants.
+
+When a species lacks a source-backed value, its profile uses the documented regional functional fallback. The fallback hierarchy belongs in setup/help documentation, not the ordinary Fishing page. It must not borrow a value from an unrelated species or silently invent a generic behavior.
+
+### Freshwater and global catalogue guard (added 2026-09-05)
+
+The OFS/RTOFS hierarchy in this brief is an ocean-data hierarchy. It cannot supply the depth-appropriate temperature for freshwater, Great Lakes, river, or stocked-water selections. A global Fishing catalogue must therefore check that a selection is available in the configured waterbody and that a genuine local freshwater temperature/depth source exists before it calculates that species' temperature core. It must not substitute an ocean model, a distant surface observation, or a generic regional temperature.
+
+This is especially important when one taxon has different local life histories. Landlocked and sea-run Atlantic salmon share a scientific name but need different depth, availability, legal, and seasonal treatment; rainbow trout and steelhead are the same taxon with different life histories. The selection catalogue may preserve practical regional groups when their named members share a supported profile, but it must split a group when its members need different depth/temperature treatment.
+
 ### Why this is not optional — the current scoring is broken
 
 The existing fishing scorer evaluates species temperature suitability, but it uses NDBC buoy 46253 surface temperature — a single reading from 12 miles offshore at the ocean surface. A rockfish species living at 100m on a reef is being scored against open-ocean surface temp. A halibut on the bottom in 20m of water is being scored against the same number. The scores are fiction.
