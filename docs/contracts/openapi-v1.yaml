@@ -775,7 +775,7 @@ paths:
       tags: [Marine]
       summary: Marine conditions for one location
       description: |
-        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        Deployed Fishing and Boating remediation contract:
         returns one normalized Current Conditions payload for the selected
         location, the provider-neutral `regularForecast` at the marine
         coordinates, the model wave forecast when the location is a configured
@@ -908,7 +908,7 @@ paths:
       tags: [Marine]
       summary: 3-day fishing forecast for a location
       description: |
-        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        Deployed Fishing and Boating remediation contract:
         returns 3 days × 6 time-matched periods. Each period carries only the
         selected-species score and explanation, using the provider-neutral
         hourly pressure series, location-first nearshore weather, CO-OPS tide
@@ -917,17 +917,16 @@ paths:
         Species choices and their complete effective profiles come from the
         location's derived global species-matrix selection; setup blocks a
         location when its selected provider cannot supply the required hourly
-        pressure series. TARGET storage boundary (not yet shipped): the
-        internal selection source will be the target candidate, once the
-        framework receives operator sign-off:
+        pressure series. The internal selection source is the signed-off
+        workbook:
         `repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.xlsx`,
-        generated into its sibling target
+        generated into its sibling
         `repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.sqlite`;
-        the API and marine service do not parse Excel at runtime. The current
-        YAML catalogue and loader stay only until the Phase 4 equivalence,
-        independent review, and live
-        behavior gates pass, after which they are removed. This adds no API
-        field or endpoint.
+        the generator expands each workbook `fao_areas` entry into an exact
+        `(selection_key, fao_area, fishing_type)` runtime row. The API and
+        marine service do not parse Excel at runtime, and the legacy YAML
+        catalogue and loader have been removed. This adds no API field or
+        endpoint.
       operationId: getFishingLocation
       parameters:
         - { $ref: '#/components/parameters/LocationId' }
@@ -1954,15 +1953,15 @@ components:
         pressure:
           type: number
           nullable: true
-          description: "TARGET (Fishing and Boating remediation Phase 1; not yet shipped): provider-neutral hourly mean-sea-level pressure in hPa."
+          description: "Provider-neutral hourly mean-sea-level pressure in hPa."
         pressureSource:
           type: string
           nullable: true
-          description: "TARGET: provider identifier for the time-matched pressure value; null when pressure is unavailable."
+          description: "Provider identifier for the time-matched pressure value; null when pressure is unavailable."
         marineAdditions:
           nullable: true
           allOf: [{ $ref: '#/components/schemas/MarineForecastAugmentation' }]
-          description: "TARGET: regional NWS marine additions attached only when a CWF label maps to this existing regular-forecast column; null when no matching period exists."
+          description: "Regional NWS marine additions attached only when a CWF label maps to this existing regular-forecast column; null when no matching period exists."
         precipProbability: { type: number, nullable: true, minimum: 0, maximum: 100 }
         precipAmount: { type: number, nullable: true }
         precipType: { type: string, nullable: true }
@@ -2010,7 +2009,7 @@ components:
     MarineForecastAugmentation:
       type: object
       description: |
-        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        Deployed Fishing and Boating remediation contract:
         regional marine information from an NWS Coastal Waters Forecast period
         that maps to the parent regular-forecast column. The API assigns the
         explicit UTC bounds from that existing column; these additions never
@@ -2958,7 +2957,7 @@ components:
         fishingPressure:
           nullable: true
           allOf: [{ $ref: '#/components/schemas/FishingPressureCapability' }]
-          description: "TARGET: provider capability for the required hourly mean-sea-level pressure series used by Fishing."
+          description: "Provider capability for the required hourly mean-sea-level pressure series used by Fishing."
         tileUrlTemplate:
           type: string
           nullable: true
@@ -3739,7 +3738,7 @@ components:
     MarineObservation:
       type: object
       description: |
-        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        Deployed Fishing and Boating remediation contract:
         normalized current-conditions payload for the selected marine
         location. It is not a buoy-only payload. Station hardware is used
         within the configured station-service radius; otherwise the selected
@@ -3845,7 +3844,7 @@ components:
     MarineForecastPoint:
       type: object
       description: |
-        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        Deployed Fishing and Boating remediation contract:
         single timestep from a configured surf-spot model wave forecast. Its
         water temperature is selected by the coverage-aware resolver rather
         than assumed to be OFS, and its selected source record remains attached.
@@ -3871,7 +3870,7 @@ components:
     MarineTextForecast:
       type: object
       description: |
-        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        Deployed Fishing and Boating remediation contract:
         one NWS Coastal Waters Forecast period. The provider preserves
         issuanceTime but does not infer UTC bounds from a prose label. The API
         assigns explicit bounds only when the label maps to an existing
@@ -3938,7 +3937,7 @@ components:
     FishingForecast:
       type: object
       description: |
-        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        Deployed Fishing and Boating remediation contract:
         selected-species conditions forecast for one location and time window.
         There is no generic or overall score; `score` belongs only to the
         selected species.
@@ -4119,7 +4118,7 @@ components:
     MarineBundle:
       type: object
       description: |
-        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        Deployed Fishing and Boating remediation contract:
         container for GET /marine/{locationId}. `observation` is the
         normalized Current Conditions payload. `regularForecast` is the
         configured forecast provider's hourly series at the marine location's
@@ -4139,7 +4138,7 @@ components:
           description: "Normalized Current Conditions payload for the selected location."
         offshoreObservations:
           allOf: [{ $ref: '#/components/schemas/OffshoreObservationContext' }]
-          description: "TARGET: selected offshore-buoy context and every configured NDBC record, separately labelled and never selected-point weather or wave conditions."
+          description: "Selected offshore-buoy context and every configured NDBC record, separately labelled and never selected-point weather or wave conditions."
         forecast:
           type: array
           items: { $ref: '#/components/schemas/MarineForecastPoint' }
@@ -4147,7 +4146,7 @@ components:
         regularForecast:
           type: array
           items: { $ref: '#/components/schemas/HourlyForecastPoint' }
-          description: "TARGET: provider-neutral hourly forecast at the configured marine location coordinates; empty when no usable provider series is returned. NDBC is not a fallback."
+          description: "Provider-neutral hourly forecast at the configured marine location coordinates; empty when no usable provider series is returned. NDBC is not a fallback."
         textForecast:
           type: array
           items: { $ref: '#/components/schemas/MarineTextForecast' }
@@ -4211,16 +4210,15 @@ components:
         generatedAt: { type: string, format: date-time }
       required: [locationId, locationName, coordinates, predictions, waterLevels, source, generatedAt]
 
-    # ---------- Surf and Beach-safety: actual endpoint shapes; Fishing: Phase 1 target contract ----------
+    # ---------- Surf, Fishing, and Beach-safety: deployed endpoint shapes ----------
     #
     # There are no SurfBundle/FishingBundle/BeachSafetyBundle Pydantic models
     # (Phase 0C drafts of those classes, written ahead of the Phase 5 endpoint
     # implementations, were removed from models/responses.py - T4.3, Phase 4
     # cleanup). Surf and Beach-safety schemas below are actual ground-truth
     # shapes, read directly from endpoints/surf.py and endpoints/beach_safety.py.
-    # Fishing schemas below are explicitly marked Phase 1 target contracts and
-    # must not be read as the current endpoints/fishing.py response. See
-    # API-MANUAL §16.
+    # Fishing schemas below are the deployed endpoints/fishing.py response.
+    # See API-MANUAL §16.
 
     ExternalLink:
       type: object
@@ -4275,7 +4273,7 @@ components:
 
     FishingSpeciesChoice:
       type: object
-      description: "TARGET (Fishing and Boating remediation Phase 1; not yet shipped): derived practical Fishing choice from the global species matrix."
+      description: "Derived practical Fishing choice from the global species matrix."
       properties:
         choiceId: { type: string }
         displayName: { type: string }
@@ -4292,7 +4290,7 @@ components:
     FishingSpeciesSelection:
       type: object
       description: |
-        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
+        Deployed Fishing and Boating remediation contract:
         setup-derived species selection for a location. The API resolves the
         region and category, compares complete score-affecting profiles, and
         returns the resulting choices. The Dashboard does not
@@ -4332,10 +4330,8 @@ components:
     FishingData:
       type: object
       description: |
-        TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
-        proposed GET /fishing/{locationId} contract. It is not the current
-        endpoint shape. Nested by day - no flat top-level forecast list or
-        singular top-level solunar field.
+        Deployed GET /fishing/{locationId} contract. Nested by day: no flat
+        top-level forecast list or singular top-level solunar field.
       properties:
         locationId: { type: string }
         locationName: { type: string }

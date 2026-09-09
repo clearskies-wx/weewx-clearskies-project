@@ -1013,7 +1013,7 @@ absent-key-means-Auto / present-key-means-override contract above are unchanged 
 |---|---|---|---|
 | `target_categories` | list[str] | `saltwater_inshore`, `bottom_fish`, `freshwater_sport`, `salmonids` | Target fishing categories (multi-select). Backward compat: a bare string `target_category` is normalized to a single-element list on load. |
 | `species` | list[str] | — | Selected species/category keys returned by the generated Fishing matrix after the location's FAO area and fishing type are applied. |
-| ~~`biogeographic_region`~~ | — | — | Retired for the target Fishing matrix; United States regional lists do not determine eligibility. |
+| ~~`biogeographic_region`~~ | — | — | Retired; United States regional lists do not determine eligibility. |
 
 **Beach safety configuration (`[[beach_safety]]` sub-block):**
 
@@ -1025,8 +1025,7 @@ absent-key-means-Auto / present-key-means-override contract above are unchanged 
 
 ### Fishing matrix source and runtime lookup
 
-**TARGET — Fishing and Boating remediation Phase 1; not yet shipped.** The sole
-editable authority is one structured `.xlsx` workbook at the candidate path
+The sole editable authority is one structured `.xlsx` workbook at
 `repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.xlsx`.
 It contains exactly one worksheet and one table. Each editable row is one
 global species or practical-category profile with one fishing type and a
@@ -1058,12 +1057,16 @@ database. If validation or generation fails, it fails loudly and leaves the
 prior generated SQLite database untouched. An incomplete profile is therefore
 not silently neutralized, and a species/category omitted from the selected
 matrix rows is not silently scored with a default profile; it is unavailable
-until a complete eligible profile is present. The existing YAML catalogue and
-loader remain only during the approved equivalence and live-proof transition;
-they are removed after that proof, so this target contract does not authorize
-editing YAML or restarting the API to change Fishing profiles.
+until a complete eligible profile is present. The legacy YAML catalogue and
+loader have been removed after equivalence and live-proof checks. Operators
+must edit the workbook and regenerate the packaged SQLite database; the running
+service opens that database read-only.
 
-**Conservation screening for the target global Fishing matrix:** Screen exact
+The deployed live audit compared 191 workbook profiles with 667 expanded SQLite
+rows and found no missing, unexpected, or value-mismatch rows. It also verified
+the two lookup indexes and the read-only database boundary.
+
+**Conservation screening for the global Fishing matrix:** Screen exact
 source species against the current global IUCN Red List assessment before
 making a selection available. Exclude `critically_endangered`, `endangered`,
 and `vulnerable` species. Retain `near_threatened` species with only the
@@ -1083,9 +1086,10 @@ Step-by-step wizard flow for adding a marine location:
 4. **CO-OPS station discovery:** Same `GET /setup/marine/discover-stations` call also queries the CO-OPS metadata API and returns nearest tide/water-level stations with distances, available products, and a `quality` tier (excellent ≤20mi, good ≤40mi, fair beyond). Operator confirms or overrides.
 5. **NWS zone discovery:** System queries NWS `/points` → CWA. Discovers marine zones within the configured alert radius (shared with the marine alert radius feature). Operator confirms.
 6. **Surf spot configuration** (if surf activity selected): Operator draws a **shoreline segment** on the Leaflet map (2-point polyline along the shore) to define the surfable measurement zone — replaces the previous pin-drop method. The system generates transects perpendicular to local isobath orientation at 10m spacing (configurable via `transect_spacing_m`). Transects are displayed on the map as thin perpendicular lines fanning out from the segment. Discovered OBSTACLE structures are shown as colored lines. Transects crossing an OBSTACLE render in orange (structure-affected); open transects render in blue. Operator can drag segment endpoints to adjust. The operator also selects bottom type, topographic feature, directional exposure. L3 grid is automatically enabled when structures are present near the spot, disabled for structure-free open beaches (operator can override in admin). CUDEM bathymetric profiles are downloaded on-demand at runtime during SWAN runs (cached at `/etc/weewx-clearskies/spot_profiles/`); no wizard-time download occurs. Wizard calls `GET /setup/marine/discover-structures` (`lat`, `lon`, `radius_m`) to pre-populate nearby coastal structures from OpenStreetMap (see "Structure auto-discovery" above); operator confirms, edits, removes, or adds structures manually — any structure with no OSM `material` tag match requires the operator to pick a material before saving.
-7. **Fishing spot configuration** (if fishing activity selected; target — not yet shipped): System resolves the location to an FAO area. The setup query filters the generated SQLite runtime rows by that area and the selected fishing type, then returns the eligible practical choices. Operator selects one or more target categories and species/category keys from those choices. The dashboard receives the choices only; it does not perform geographic eligibility or profile fallback.
-8. **Beach safety configuration** (if beach safety selected): Operator optionally adds external links (water quality, lifeguard reports, wildlife alerts).
-9. **Review and save:** System presents a summary of the configured location with all discovered stations, zones, and settings. Operator confirms. Wizard sends the accumulated `marine` block on the next `POST /setup/apply` call. The API validates all locations (coordinates, activity/bottom-type/topographic-feature/target-category enums, NDBC/CO-OPS station-id and NWS marine-zone-id formats), and writes the result to `api.conf [marine]` using the nested-subsection shape shown above (`[[[[surf]]]]`/`[[[[fishing]]]]`/`[[[[beach_safety]]]]` inside each location's own section — not top-level `[[surf_spots]]`/`[[fishing_spots]]` sections). When the marine service reports SWAN is available (`GET /setup/marine/swan-check` returns `available: true`), the wizard also collects SWAN nested grid configuration (outer grid resolution, inner nest resolution, inner nest bounding box, deployment mode) — see §4 SWAN wizard step.
+7. **Fishing spot configuration** (if fishing activity selected): System resolves the location to an FAO area. The setup query filters the generated SQLite runtime rows by that area and the selected fishing type, then returns the eligible practical choices. Operator selects one or more target categories and species/category keys from those choices. The dashboard receives the choices only; it does not perform geographic eligibility or profile fallback.
+8. **Fishing pressure check:** Before `POST /setup/apply` writes configuration or secrets, the API checks the selected provider at every Fishing location for a continuous hourly-pressure window. An unavailable, malformed, unsupported-unit, or too-short NWS series rejects the save with HTTP 422 and an instruction to select a provider that supplies pressure there; a provider transport failure returns 503. The unavailable-Huntington-Harbour rejection path was verified by the authenticated 2026-09-09 pre-write HTTP 422; a successful NWS save at a pressure-capable location is a separate case.
+9. **Beach safety configuration** (if beach safety selected): Operator optionally adds external links (water quality, lifeguard reports, wildlife alerts).
+10. **Review and save:** System presents a summary of the configured location with all discovered stations, zones, and settings. Operator confirms. Wizard sends the accumulated `marine` block on the next `POST /setup/apply` call. The API validates all locations (coordinates, activity/bottom-type/topographic-feature/target-category enums, NDBC/CO-OPS station-id and NWS marine-zone-id formats), and writes the result to `api.conf [marine]` using the nested-subsection shape shown above (`[[[[surf]]]]`/`[[[[fishing]]]]`/`[[[[beach_safety]]]]` inside each location's own section — not top-level `[[surf_spots]]`/`[[fishing_spots]]` sections). When the marine service reports SWAN is available (`GET /setup/marine/swan-check` returns `available: true`), the wizard also collects SWAN nested grid configuration (outer grid resolution, inner nest resolution, inner nest bounding box, deployment mode) — see §4 SWAN wizard step.
 
 ### SWAN configuration
 

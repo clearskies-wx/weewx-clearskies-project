@@ -147,7 +147,7 @@ The canonical data model defines 9 core entity types and 2 container types:
 | `EarthquakeRecord` | Single earthquake event |
 | `AQIReading` | Air quality index reading from a provider module |
 | `StationMetadata` | Station identity (name, lat, lon, alt, timezone, archiveIntervalSeconds, weekStartDay) |
-| `MarineObservation` | **TARGET (Fishing and Boating remediation Phase 1; not yet shipped):** normalized selected-location Current Conditions payload; not an NDBC buoy snapshot |
+| `MarineObservation` | Normalized selected-location Current Conditions payload; not an NDBC buoy snapshot |
 | `SpectralWaveComponent` | Single swell system from spectral decomposition (NDBC) |
 | `TidePrediction` | Predicted high/low tide event (CO-OPS) |
 | `WaterLevel` | Observed water level reading (CO-OPS) |
@@ -165,7 +165,7 @@ The canonical data model defines 9 core entity types and 2 container types:
 | `TideBundle` | Container: predictions + observations per location |
 | `MarineAlertSummary` | One active NWS alert tagged with a dashboard-tab `alertType` (T3.5) |
 
-Note: `GET /api/v1/surf[/{locationId}]`, `GET /api/v1/fishing[/{locationId}]`, and `GET /api/v1/beach-safety[/{locationId}]` return plain dicts (the standard envelope, §2), not Pydantic-backed bundle models. See the ground-truth Surf and Beach-safety tables below; the Fishing table is explicitly a Phase 1 target contract, not the current response shape.
+Note: `GET /api/v1/surf[/{locationId}]`, `GET /api/v1/fishing[/{locationId}]`, and `GET /api/v1/beach-safety[/{locationId}]` return plain dicts (the standard envelope, §2), not Pydantic-backed bundle models. The Fishing response is documented below as the deployed selected-species contract.
 
 ### Response shapes
 
@@ -2069,10 +2069,9 @@ All marine models follow the §2 naming convention (weewx-aligned camelCase, ide
 
 #### MarineObservation
 
-**TARGET (Fishing and Boating remediation Phase 1; not yet shipped):** one
-normalized Current Conditions payload for the selected marine location. It is
-not a buoy snapshot. The payload retains per-field provenance; offshore NDBC
-data is a separately labelled navigation/exit context.
+One normalized Current Conditions payload is returned for the selected marine
+location. It is not a buoy snapshot. The payload retains per-field provenance;
+offshore NDBC data is a separately labelled navigation/exit context.
 
 | Field | Type | Unit group | Nullable | Description |
 |---|---|---|---|---|
@@ -2203,12 +2202,11 @@ Single timestep of a configured surf location's wave-model forecast, optionally 
 | `windWaveHeight` | float | `group_wave_height` | Yes | Wind wave height. Surf spots: the single partition whose `is_wind_sea` flag is True (SWAN watershed partition 1 in the raw TABLE output, before the descending-height re-sort — see `watershed_partitions_to_component_format()`, PROVIDER-MANUAL §14.15). `null` if this timestep has no wind-sea partition. |
 | `windWavePeriod` | float | `group_wave_period` | Yes | Wind wave period |
 | `windWaveDirection` | float | — | Yes | Wind wave direction (degrees true north) |
-| `waterTemp` | float | `group_temperature` | Yes | **TARGET (Fishing and Boating remediation Phase 1; not yet shipped):** depth-appropriate forecast water temperature selected by coverage at the location. A nearby local sensor is preferred; WCOFS is eligible only for a point within its West Coast coverage; other locations continue through the configured regional or national source chain. The returned provenance carries the selected source, type, valid time, coverage tier, and depth; `null` is explicit when no eligible source can supply the value. |
+| `waterTemp` | float | `group_temperature` | Yes | Depth-appropriate forecast water temperature selected by coverage at the location. A nearby local sensor is preferred; WCOFS is eligible only for a point within its West Coast coverage; other locations continue through the configured regional or national source chain. The returned provenance carries the selected source, type, valid time, coverage tier, and depth; `null` is explicit when no eligible source can supply the value. |
 
 #### MarineTextForecast
 
-**TARGET (Fishing and Boating remediation Phase 1; not yet shipped):** one NWS
-Coastal Waters Forecast period. The provider preserves the product issuance
+One NWS Coastal Waters Forecast period is represented here. The provider preserves the product issuance
 time but does not infer UTC bounds from a prose label. The API assigns explicit
 UTC bounds only when the period label maps to an existing `regularForecast`
 day/night column; unmatched periods retain null bounds and remain unavailable
@@ -2228,8 +2226,7 @@ replaces the location-weather provider's values.
 
 #### MarineBundle `regularForecast` and regional additions
 
-**TARGET (Fishing and Boating remediation Phase 1; not yet shipped):** the
-detail route `GET /api/v1/marine/{locationId}` exposes `regularForecast` as the
+The detail route `GET /api/v1/marine/{locationId}` exposes `regularForecast` as the
 public provider-neutral hourly forecast at the configured marine location's
 coordinates. It is separate from the model-wave `forecast` list and from the
 NWS `textForecast` list. Every point retains its provider `source`, UTC
@@ -2332,7 +2329,7 @@ Surf quality forecast for one spot at one timestep.
 
 #### FishingForecast
 
-**TARGET (Fishing and Boating remediation Phase 1; not yet shipped):**
+**Deployed selected-species contract:**
 selected-species Fishing conditions for one period. There is no generic
 `overallScore` or shared component score.
 
@@ -2435,7 +2432,7 @@ Summary snapshot for one marine location (used by the marine landing page locati
 
 #### Card data source contract (ADR-091)
 
-`_location_summary()` in `endpoints/marine.py` populates card fields from these sources. **TARGET:** the dashboard renders the API's selected source/provenance label and unavailable state, but never chooses a provider or combines source records itself.
+`_location_summary()` in `endpoints/marine.py` populates card fields from these sources. The dashboard renders the API's selected source/provenance label and unavailable state, but never chooses a provider or combines source records itself.
 
 | Card field | Primary source | Fallback | Unit conversion |
 |---|---|---|---|
@@ -2537,9 +2534,9 @@ The existing TideBundle fields (`predictions`, `waterLevels`, `locationId`, `loc
 Bundles wrap domain-specific models with location metadata, freshness block (§2), and stationClock (§2). Follow the existing `ForecastBundle` pattern.
 
 **Current implementation note:** `TideBundle` is implemented as declared.
-`MarineBundle` remains the target response shape below; its normalized
-Current Conditions, `regularForecast`, and provenance additions are not yet
-shipped (Phase 1).
+`MarineBundle` is the deployed response shape below; its normalized Current
+Conditions, `regularForecast`, and provenance additions are assembled by the
+API proxy and returned with the standard envelope.
 
 | Bundle | Contains | Response for |
 |---|---|---|
@@ -2548,7 +2545,7 @@ shipped (Phase 1).
 
 Each bundle also carries: `locationId`, `locationName`, `coordinates`, `freshness` block, `stationClock`, `units`.
 
-**There are no `SurfBundle`, `FishingBundle`, or `BeachSafetyBundle` Pydantic models.** Earlier drafts of those three classes (written in Phase 0C, ahead of the Phase 5 endpoint implementations) were removed from `models/responses.py` (T4.3, Phase 4 cleanup) — they were never referenced by `endpoints/surf.py`, `endpoints/fishing.py`, or `endpoints/beach_safety.py`, which each build and return a plain dict directly (the standard envelope, §2). The Surf and Beach-safety tables below are current, ground-truth shapes sourced by reading endpoint code. The Fishing table is a separately labelled Phase 1 target contract; it is not a statement of the current endpoint shape. The OpenAPI contract uses the same distinction.
+**There are no `SurfBundle`, `FishingBundle`, or `BeachSafetyBundle` Pydantic models.** Earlier drafts of those three classes (written in Phase 0C, ahead of the Phase 5 endpoint implementations) were removed from `models/responses.py` (T4.3, Phase 4 cleanup) — they were never referenced by `endpoints/surf.py`, `endpoints/fishing.py`, or `endpoints/beach_safety.py`, which each build and return a plain dict directly (the standard envelope, §2). The tables below describe the deployed response shapes sourced from the endpoint contract and live response evidence. The OpenAPI contract uses the same distinction.
 
 ##### Surf bundle (actual shape) — `GET /api/v1/surf[/{locationId}]`
 
@@ -2572,9 +2569,9 @@ Source: `endpoints/surf.py`.
 | `source` | str | No | Fixed string `"swan+coops+nws_srf"` (ADR-096, amended 2026-08-07 — was `"swan+ndbc+coops+nws_srf"`; NDBC removed from the surf endpoint, marine `8e17e84`) |
 | `generatedAt` | str | No | UTC ISO-8601 with Z |
 
-##### Fishing bundle (**TARGET Phase 1; not yet shipped**) — `GET /api/v1/fishing[/{locationId}]`
+##### Fishing bundle (deployed selected-species contract) — `GET /api/v1/fishing[/{locationId}]`
 
-**Proposed target contract, not the current endpoint shape.** The implementation must produce a response nested by day: no flat top-level `forecast` list or singular top-level `solunar` field — each day carries its own periods and solunar data.
+The response is nested by day: there is no flat top-level `forecast` list or singular top-level `solunar` field; each day carries its own periods and solunar data.
 
 The optional `selectedSpecies` query parameter names one eligible configured
 choice for the location. When it is absent, the service scores the first
@@ -3003,7 +3000,7 @@ window. NDBC is never the Harbour-local pressure or weather source.
 **Outputs:** `FishingForecast` with only the selected-species score, status,
 environmental core, applied adjustments, hard-stop reason, and source context.
 
-**Approved selected-species scoring (target; not yet shipped):**
+**Approved selected-species scoring (deployed):**
 
 1. An out-of-range depth-appropriate temperature is a hard stop: score `0`,
    status `inactive`.
@@ -3029,7 +3026,7 @@ visitor-facing page remains a simple selected-species score and explanation;
 source fallback derivation is setup material, not a hidden dashboard
 calculation.
 
-**One-profile selection (TARGET, not yet shipped):** Setup uses one complete
+**One-profile selection (deployed):** Setup uses one complete
 profile for each species or practical category. Its `fao_areas` field lists
 coverage only; it does not create per-area, regional, or fallback profiles.
 The dashboard receives the selected profile and never performs coverage or
@@ -3050,39 +3047,38 @@ to show that group only when every remaining eligible member has the same
 complete profile; if no eligible member remains, it is absent. This is a
 global catalogue screen, not a legal finding or a score coefficient.
 
-### Fishing matrix storage target (not yet shipped)
+### Fishing matrix storage (deployed, remediation Phase 4)
 
-**TARGET — Fishing and Boating remediation Phase 1; not yet shipped.** Once
-the framework receives operator sign-off, the sole human-edited operational
-source will be one signed-off Excel table at the candidate path
+The sole human-edited operational source is one signed-off Excel table at
 `repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.xlsx`.
 It contains only the approved identity, coverage, habitat, scoring, and
 conservation-flag fields. It is not a research or
 provenance store and has no source URLs, source IDs, assessment details,
 research notes, status fields, or supporting tables.
 
-The target build command is
+The build command is
 `python -m weewx_clearskies_marine.tools.build_fishing_species_matrix`.
-This is a documented future interface, not an existing executable. It will
-validate approved headers, value types, allowed codes, required fields, unique
+It validates approved headers, value types, allowed codes, required fields, unique
 keys, FAO-area keys, and conservation flags before atomically replacing the
 sibling generated
 `repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.sqlite`.
 Validation or generation failure leaves the old database untouched and fails
 the build loudly.
 
-The target SQLite database has one logical data table. Each species or practical
-category has one complete profile whose `fao_areas` field lists coverage; it has
-no per-area, regional, or fallback profile rows. The marine service opens the packaged database read-only and selects
+The SQLite database has one logical data table. Each editable species or
+practical-category profile has a `fao_areas` coverage list; generation emits
+one exact `(selection_key, fao_area, fishing_type)` runtime row for every listed
+area while preserving the profile. The editable workbook has no per-area,
+regional, or fallback profile rows. The marine service opens the packaged database read-only and selects
 only needed rows and columns. Neither the API nor the marine service parses
 Excel at runtime or materializes the global matrix in module-level Python
 dictionaries. Packaging carries SQLite, not a runtime Excel reader.
 
-The current YAML catalogue and loader remain only until agreed setup selections
-and scoring comparison cases are equivalent, independently reviewed, and live
-behavior is proved in Phase 4. Only then are the YAML data and loader removed.
-This target boundary is not a claim that the Excel workbook, generated SQLite,
-generator, or retirement has shipped.
+The legacy YAML catalogue and loader have been removed after equivalence and
+independent live checks. The deployed audit observed 191 workbook profiles,
+667 expanded runtime rows, zero missing/unexpected/value-mismatch rows, a
+read-only database boundary, and both required lookup indexes. The live source
+audit also found no module-level full-catalogue materialization.
 
 **Solunar evidence caveat:** Presented as one factor with appropriate context — "Solunar theory suggests feeding activity correlates with moon position. Scientific evidence is mixed; environmental conditions (pressure, temperature, tides) have stronger research support."
 
@@ -3141,13 +3137,13 @@ Computed locally via Skyfield — no external API call. Skyfield is already a pr
 
 **Implementation requirement:** Each enrichment processor's output function must accept a `locale` parameter (defaulting to `i18n.get_active_locale()`). All label lookups use `i18n.t(key, locale=locale)`. All number formatting in composed text uses `i18n.format_number(value, decimals, locale=locale)`. `surf_scorer.py` and `fishing_scorer.py` compose `conditionsText` from flat `surf.conditions.*`/`fishing.conditions.*` template strings (T4.4); this is deliberately lighter than the component-order + connector + custom-CJK-composer architecture in `sse/conditions_text.py` (used for the current-conditions `weatherText` field), which exists to handle a longer, more structurally variable sentence (temperature/sky/wind/precipitation in locale-dependent order). Surf/fishing conditions text is short and fixed-shape enough that per-locale sentence templates are sufficient — read `sse/conditions_text.py` only if a future marine feature needs component reordering or CJK-specific composition.
 
-**Locale file additions:** Each locale file (`locales/{locale}.json`) must gain the following top-level sections:
+**Locale resource contract:** Each locale file (`locales/{locale}.json`) carries the following top-level sections:
 - `"surf"` — quality labels (5), wind quality labels (5), swell classifications (3), conditions composition templates
 - `"fishing"` — period labels (6), species status labels (3), habitat feature labels (5), conditions composition templates, solunar caveat text
 - `"beach_safety"` — safety level labels (3), comfort level labels (4), rip current risk labels (3)
 - `"marine"` — swell classification labels (3, shared with surf)
 
-English (`en.json`) is the authoritative source. All 12 other locale files must have the same key structure — placeholder English values are acceptable for v1, to be replaced with proper translations before release.
+English (`en.json`) is the authoritative source. All 12 other locale files must retain the same key structure — placeholder English values are acceptable for v1, to be replaced with proper translations before release. The Gate 3–4 live audit did not exercise browser locale rendering; full locale/theme resource revalidation remains an open closeout item rather than a passed gate.
 
 ---
 
@@ -3174,7 +3170,7 @@ API proxies that response.
 | `GET /api/v1/marine[/{locationId}]` | `list[MarineLocationSummary]` | `MarineBundle` | At least one location with `marine` activity enabled |
 | `GET /api/v1/tides[/{locationId}]` | `list[MarineLocationSummary]` | `TideBundle` | At least one location with a `coops_station_ids` entry configured. Per ADR-090, all four activities (marine, surf, fishing, beach_safety) use tide data, so "tide-capable" means "has a CO-OPS station configured," not a specific activity value. |
 | `GET /api/v1/surf[/{locationId}]` | `list[object]` (`locationId`, `name`, `lat`, `lon`, `qualityStars`, `conditionsText` — metadata only, no live fetch) | Surf bundle, actual shape (§16) | At least one location with `surf` activity enabled |
-| `GET /api/v1/fishing[/{locationId}]` | `list[object]` (`locationId`, `name`, `lat`, `lon`) | Fishing bundle, Phase 1 target contract (§16; not current shape) | At least one location with `fishing` activity enabled |
+| `GET /api/v1/fishing[/{locationId}]` | `list[object]` (`locationId`, `name`, `lat`, `lon`) | Fishing bundle, deployed selected-species shape (§16) | At least one location with `fishing` activity enabled |
 | `GET /api/v1/beach-safety[/{locationId}]` | `list[object]` (`locationId`, `name`, `lat`, `lon`, `safetyLevel` — always null, T9.1 — `ripCurrentRisk`, `waterTemp` — live-fetched per card) | Beach-safety bundle, actual shape (§16) | At least one location with `beach_safety` activity enabled |
 | `GET /api/v1/almanac/solunar` | — (single route, no location list) | `SolunarTimes` (or `list[SolunarTimes]` when `days` > 1) | Always available (not gated by marine feature) |
 
@@ -3239,7 +3235,7 @@ When no marine locations are configured (no `[marine]` section in `api.conf`), n
 
 `GET /api/v1/marine/{locationId}` must return an enriched `MarineBundle` observation using the same data sources as the card summary endpoint (`_location_summary()`). The raw NDBC buoy observation alone is insufficient — most buoys do not report wind, air temp, pressure, visibility, or weather conditions.
 
-**Enrichment sources (target; not yet shipped):**
+**Enrichment sources (deployed):**
 
 | Response field | Primary source | Fallback | Notes |
 |---|---|---|---|
@@ -3644,6 +3640,13 @@ Marine service configuration is never read directly from `api.conf`. It is pushe
 
 **Fishing pressure setup enforcement (Fishing and Boating remediation Phase 3).** Each forecast provider's `/api/v1/capabilities` declaration carries an optional `fishingPressure: {supported: bool, locationSpecific: bool}` object. Aeris, Open-Meteo, and OpenWeatherMap advertise `{true, false}`. NWS advertises `{true, true}` because pressure is available only where its live raw forecast grid carries a usable series. When an apply request contains Fishing locations, `POST /setup/apply` resolves the provider that request will leave configured before writing `api.conf` or secrets. A provider with no supported pressure capability is rejected. For NWS, setup checks every Fishing location for a continuous three-hour pressure window. An absent, null, malformed, unsupported-unit, or too-short series rejects the request with an instruction to choose a provider that supplies pressure there; a transport failure returns 503 so setup does not silently accept an unchecked Fishing configuration. A successful NWS apply returns `fishing_pressure_checks`, with one transient result per Fishing location: `location_id`, `supported`, `provider`, `checked_at`, `valid_from`, `valid_to`, and `reason`. It is not a configuration key or persisted record.
 
+The 2026-09-09 authenticated real-host save test verified this enforcement.
+An in-memory NWS Fishing `POST /setup/apply` request for Huntington Harbour
+returned HTTP 422 before any configuration or secret persistence and named the
+unavailable hourly pressure series. This proves the rejection path for an
+unavailable NWS location; a successful NWS save for a pressure-capable location
+remains a separate case.
+
 **Config recovery pull (T6.4b):** `GET /setup/marine/config`, authenticated with `Authorization: Bearer {MARINE_SERVICE_SECRET}`, returns exactly the payload the push above sends — both are built by one serializer (`_build_marine_service_config_payload()` in `endpoints/setup.py`) so the push and pull shapes cannot drift apart. The marine service calls this only at startup, and only when it has no local config on disk (an existing local config always wins — the pull never overwrites it). See OPERATIONS-MANUAL.md "Config push model" for the marine-side trigger conditions (`CLEARSKIES_MARINE_API_URL`) and failure/degradation behaviour.
 
 The marine service never parses `api.conf` directly. This ensures the API remains the single source of truth for all operator-facing configuration.
@@ -3908,7 +3911,7 @@ Wire shape (`SurfForecast`, confirmed against the marine service):
 }
 ```
 
-resolves to the outward `SurfForecast` shape the dashboard has always seen — `qualityLabel`, `windQuality`, `conditionsText` — with the `*Key`/`conditionsTextParts` fields removed. `qualityKey` is `null` in the unavailable case (`conditionsTextParts.unavailable: true`, every other part field `null`); `windQualityKey` stays populated (wind is an independent observation). **TARGET:** Fishing resolves `periodLabelKey` → `periodLabel` and `statusKey` → selected-species `status`; no `speciesScores[]` or generic-score phrases remain.
+resolves to the outward `SurfForecast` shape the dashboard has always seen — `qualityLabel`, `windQuality`, `conditionsText` — with the `*Key`/`conditionsTextParts` fields removed. `qualityKey` is `null` in the unavailable case (`conditionsTextParts.unavailable: true`, every other part field `null`); `windQualityKey` stays populated (wind is an independent observation). Fishing resolves `periodLabelKey` → `periodLabel` and `statusKey` → selected-species `status`; no `speciesScores[]` or generic-score phrases remain.
 
 **`currentResidual` (C-37).** The marine service emits `{"valueM": 0.45, "quality": "good", "source": "coops_observed"}` — canonical meters, no description. The API converts `valueM` to the operator's display unit and adds `value` (rounded) and `description` (`"+0.45 m vs prediction"` / `"+1.48 ft vs prediction"`), matching the pre-separation format exactly.
 

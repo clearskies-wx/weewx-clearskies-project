@@ -1564,7 +1564,7 @@ confirming it matches `providers/marine/wavewatch.py`'s handling).
 **CWF text parsing:** A CWF product concatenates one UGC (Universal Geographic Code) header segment per zone-group, e.g. `AMZ250-121115-` (zone id + 6-digit expiration), each terminated by a `$$` line. A header may abbreviate additional zones sharing identical text to their 3-digit suffix (e.g. `AMZ250-256-262-121115-` → `AMZ250`, `AMZ256`, `AMZ262`). Locate the segment for the operator's configured `zone_id`, then split it into forecast periods on `.PERIOD...` markers (e.g. `.TONIGHT...`, `.SUN...`, `.SUN NIGHT...` — the narrative follows immediately on the same line, unlike SRF's standalone day-period header lines). Per period:
 
 - `period_name` — the marker text, title-cased (e.g. "Tonight", "Sun Night").
-- **TARGET (Fishing and Boating remediation Phase 1; not yet shipped):**
+- **As built (Fishing and Boating remediation Phase 3):**
   `period_start` and `period_end` — nullable at the provider boundary. CWF
   labels and the product issuance time do not provide machine-readable UTC
   period bounds, so `nws_marine` preserves `issuanceTime` and leaves these two
@@ -2005,7 +2005,7 @@ Standard ERDDAP griddap URL pattern: `https://{server}/erddap/griddap/{datasetID
 
 **Fallback chain (`mode="modeled"`):**
 
-1. **TARGET (Fishing and Boating remediation Phase 1; not yet shipped):** a configured `location_config.ofs_model` is eligible only after its published coverage is verified to include the selected point and requested depth. WCOFS is therefore West-Coast-only, never a nationwide default. If no eligible OFS source covers the point or it fails, try `ofs_fallback`.
+1. A configured `location_config.ofs_model` is eligible only after its published coverage is verified to include the selected point and requested depth. WCOFS is therefore West-Coast-only, never a nationwide default. If no eligible OFS source covers the point or it fails, try `ofs_fallback`.
 2. `location_config.ofs_region` set → ERDDAP regional model (§14.11, PacIOOS/CARICOOS).
 3. Global fallback, split by `needs`:
    - `needs="full"`: RTOFS via ERDDAP (column + forecast), then MUR SST (surface only).
@@ -3542,11 +3542,12 @@ source behavior, not live acceptance evidence.
 
 ---
 
-## §14.20 Fishing and Boating source assembly target (Phase 1; not yet shipped)
+## §14.20 Fishing and Boating source assembly (deployed, remediation Phases 3–4)
 
-This subsection is the approved target for the remediation plan. It describes
-provider responsibilities before implementation; the current deployment may
-still show the pre-remediation gaps recorded in the plan's evidence ledger.
+This subsection documents the provider responsibilities implemented by the
+remediation. Live Gate 3–4 evidence confirms the source separation, pressure
+provenance, target-depth water data, tide provenance, and offshore observation
+boundary described below.
 
 ### Location-first nearshore weather
 
@@ -3630,25 +3631,27 @@ silently substitute an offshore value for a location/depth-specific value.
 The API exposes null plus provenance for missing data; the Dashboard renders
 that state and never performs provider selection or fallback logic.
 
-### Fishing matrix storage target (not yet shipped)
+### Fishing matrix storage (deployed, remediation Phase 4)
 
-**TARGET — Fishing and Boating remediation Phase 1; not yet shipped.** Once the
-framework receives operator sign-off, the marine service's future operational
-lookup source will be one signed-off Excel table at the candidate path
+The marine service's operational lookup source is one signed-off Excel table at
 `repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.xlsx`.
 The workbook contains only the approved operational fields. It does not carry
 research URLs, IUCN assessment identifiers, research provenance, assessment
 details, workflow status, or supporting tables. The only operational
 conservation flag is `near_threatened`; other IUCN outcomes are unflagged.
 
-The documented target build interface is
-`python -m weewx_clearskies_marine.tools.build_fishing_species_matrix`; this is
-not an existing executable. It validates approved headers, types, allowed
+The build interface is
+`python -m weewx_clearskies_marine.tools.build_fishing_species_matrix`.
+It validates approved headers, types, allowed
 codes, required fields, unique keys, FAO-area keys, and conservation flags,
 then atomically replaces the sibling generated
 `repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.sqlite`.
 If validation or generation fails, the previous database remains untouched and
 the build fails loudly. The generated database has one logical data table and
+expands every editable profile's `fao_areas` list into exact
+`(selection_key, fao_area, fishing_type)` runtime rows while preserving the
+profile fields. The workbook itself has one global profile row, not one editable
+row per FAO area. The database has
 exactly two indexes: `(fao_area, fishing_type)` for setup and
 `(selection_key, fao_area, fishing_type)` for forecast and permitted fallback
 lookup.
@@ -3657,11 +3660,10 @@ At runtime the packaged SQLite database is opened read-only. Queries select
 only the rows and columns needed for the current setup or forecast request;
 the service does not parse Excel or materialize the global matrix as
 module-level Python dictionaries. Packaging carries the generated database,
-not a runtime Excel reader. The current YAML catalogue and loader stay in
-place only until equivalence of the agreed setup selections and scoring
-comparison cases, independent review, and live behavior are proved in Phase 4;
-then the YAML data and loader are removed. This describes a target boundary,
-not shipped runtime behavior.
+not a runtime Excel reader. The legacy YAML catalogue and loader have been
+removed. The live audit confirmed workbook/database equivalence (191 profiles,
+667 expanded rows), read-only access, both required indexes, and no full
+catalogue materialization in the inspected lookup path.
 
 ## §15 Marine Service Provider Architecture (current as-built)
 

@@ -356,8 +356,10 @@ temperature, CO-OPS tide provenance, timed NWS marine additions, and separately
 labelled NDBC offshore observations. The live NWS pressure check truthfully
 reports no hourly pressure series at Huntington Harbour; Open-Meteo returned
 real pressure data but is not the configured live provider, and OpenWeatherMap
-has no configured credential. Gate 3 remains open because its live setup-save
-enforcement cannot be exercised without changing the operator configuration.
+has no configured credential. The previously open NWS setup-save check is now
+proven: on 2026-09-09 an authenticated in-memory NWS Fishing
+`POST /setup/apply` returned HTTP 422 before any configuration or secret
+persistence, naming Huntington Harbour's unavailable hourly pressure series.
 Provider-neutral hourly pressure is
 carried by Xweather, Open-Meteo, OpenWeatherMap, and the location-specific NWS
 grid check. The API assembles location forecast rows, source/provenance, and
