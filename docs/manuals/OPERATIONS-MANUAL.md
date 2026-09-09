@@ -1012,8 +1012,8 @@ absent-key-means-Auto / present-key-means-override contract above are unchanged 
 | Field | Type | Valid values | Description |
 |---|---|---|---|
 | `target_categories` | list[str] | `saltwater_inshore`, `bottom_fish`, `freshwater_sport`, `salmonids` | Target fishing categories (multi-select). Backward compat: a bare string `target_category` is normalized to a single-element list on load. |
-| `species` | list[str] | — | Auto-populated from biogeographic region + selected categories. Species data loaded from `data/species.yaml` (see "Species database customization" below). |
-| `biogeographic_region` | str | — | Auto-classified from coordinates (11 US regions) |
+| `species` | list[str] | — | Selected species/category keys returned by the generated Fishing matrix after the location's FAO area and fishing type are applied. |
+| ~~`biogeographic_region`~~ | — | — | Retired for the target Fishing matrix; United States regional lists do not determine eligibility. |
 
 **Beach safety configuration (`[[beach_safety]]` sub-block):**
 
@@ -1023,64 +1023,55 @@ absent-key-means-Auto / present-key-means-override contract above are unchanged 
 
 **Validation:** Missing `[marine]` section → `load_marine_config()` returns `None` (no error, no marine features). Empty `[marine]` section → empty `MarineConfig`. Invalid values (out-of-range coordinates, unknown bottom type, unknown activity) → clear error naming the offending field and location.
 
-### Species database customization
+### Fishing matrix source and runtime lookup
 
-Species data (lists, scoring profiles, seasonal behavior) is loaded from `data/species.yaml` inside the API package at process start. Operators can edit this file to add local species, adjust temperature ranges, or add seasonal closures. Changes take effect after an API restart (`sudo systemctl restart weewx-clearskies-api`).
+**TARGET — Fishing and Boating remediation Phase 1; not yet shipped.** The sole
+editable authority is one structured `.xlsx` workbook at the candidate path
+`repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.xlsx`.
+It contains exactly one worksheet and one table. Each editable row is one
+global species or practical-category profile with one fishing type and a
+`fao_areas` list. A workbook row is not a per-FAO editable row. The
+deterministic build command
+`python -m weewx_clearskies_marine.tools.build_fishing_species_matrix`
+validates the approved headers, types, allowed codes, required fields,
+FAO-area values, conservation flags, and duplicate runtime keys, then expands
+each listed area into an exact `(selection_key, fao_area, fishing_type)` row in
+the generated SQLite database.
 
-**Conservation screening for the target global Fishing matrix:** Each exact
-source taxon is screened against its global IUCN Red List assessment before it
-can appear as an operator-selectable entry. `critically_endangered`,
-`endangered`, and `vulnerable` taxa are excluded. `near_threatened` taxa remain
-selectable with an IUCN flag and stable assessment source ID in the matrix.
-Other IUCN outcomes are not flagged. The screen does not replace local fishing
-law, community management, or the matrix's separate legal-availability record.
-It screens exact source members, not a practical collapsed group label; the
-group remains available only when its remaining eligible members still have
-matching complete profiles.
+The generated database is the packaged runtime lookup and has one logical data
+table with these indexes:
 
-The YAML file contains four sections:
+- `(fao_area, fishing_type)` for setup eligibility queries; and
+- `(selection_key, fao_area, fishing_type)` for forecast profile queries and
+  approved fallback lookup.
 
-| Section | Purpose |
-|---|---|
-| `regions` | Biogeographic region bounding boxes (11 US regions). Used by `classify_region()` to auto-determine which species list applies to a given coordinate. |
-| `species_by_region` | Species lists per region per target category. Controls which species appear as checkboxes in the wizard. |
-| `species_profiles` | Per-species scoring parameters: pressure sensitivity, temperature ranges (optimal/good/marginal in °F), tide and time-of-day preferences with multipliers. |
-| `seasonal_behavior` | Per-species per-month entries for spawning runs (score multiplier), pre-spawn activity boosts, and regulatory closures. |
+The service opens the packaged SQLite database read-only. It selects only the
+rows and columns needed for the current setup or forecast request; it does not
+parse the Excel workbook at startup or materialize the global matrix as
+module-level Python dictionaries. The workbook contains only operational
+fields: it has no source URLs or source IDs, IUCN assessment identifiers,
+research notes, status, queue, evidence, quality-control, or legal-availability
+fields. The product does not determine fishing legality.
 
-**Adding a new species** (worked example — adding "spotted bay bass" to `pacific_sw`):
+The generator validates the complete profile before replacing the generated
+database. If validation or generation fails, it fails loudly and leaves the
+prior generated SQLite database untouched. An incomplete profile is therefore
+not silently neutralized, and a species/category omitted from the selected
+matrix rows is not silently scored with a default profile; it is unavailable
+until a complete eligible profile is present. The existing YAML catalogue and
+loader remain only during the approved equivalence and live-proof transition;
+they are removed after that proof, so this target contract does not authorize
+editing YAML or restarting the API to change Fishing profiles.
 
-1. Add the species name to the appropriate category in `species_by_region`:
-   ```yaml
-   pacific_sw:
-     saltwater_inshore:
-       - spotted bay bass    # ← add here
-       - california halibut
-       # ... existing species
-   ```
-
-2. Add a scoring profile in `species_profiles`:
-   ```yaml
-   spotted bay bass:
-     pressure_sensitivity: 0.7
-     temp_optimal: [65.0, 78.0]
-     temp_good: [58.0, 82.0]
-     temp_marginal: [50.0, 88.0]
-     tide_preference: incoming
-     tide_multiplier: 1.15
-     time_preference: dawn
-     time_multiplier: 1.2
-   ```
-
-3. Optionally add seasonal behavior in `seasonal_behavior`:
-   ```yaml
-   spotted bay bass:
-     4: {pre_spawn_multiplier: 1.5}
-     5: {spawning_multiplier: 2.0}
-   ```
-
-4. Restart the API: `sudo systemctl restart weewx-clearskies-api`
-
-Species listed in `species_by_region` but missing from `species_profiles` receive a neutral default profile (no temperature penalty, no tide/time preference) — the scorer degrades gracefully rather than failing.
+**Conservation screening for the target global Fishing matrix:** Screen exact
+source species against the current global IUCN Red List assessment before
+making a selection available. Exclude `critically_endangered`, `endangered`,
+and `vulnerable` species. Retain `near_threatened` species with only the
+operational `near_threatened` flag. Do not flag `least_concern`,
+`data_deficient`, or `not_evaluated`. Screen exact source members, never a
+practical group label; remove a group only when every exact source species
+beneath it is excluded. Research citations and assessment details stay outside
+the operational workbook and generated runtime table.
 
 ### Marine location setup procedure
 
@@ -1092,7 +1083,7 @@ Step-by-step wizard flow for adding a marine location:
 4. **CO-OPS station discovery:** Same `GET /setup/marine/discover-stations` call also queries the CO-OPS metadata API and returns nearest tide/water-level stations with distances, available products, and a `quality` tier (excellent ≤20mi, good ≤40mi, fair beyond). Operator confirms or overrides.
 5. **NWS zone discovery:** System queries NWS `/points` → CWA. Discovers marine zones within the configured alert radius (shared with the marine alert radius feature). Operator confirms.
 6. **Surf spot configuration** (if surf activity selected): Operator draws a **shoreline segment** on the Leaflet map (2-point polyline along the shore) to define the surfable measurement zone — replaces the previous pin-drop method. The system generates transects perpendicular to local isobath orientation at 10m spacing (configurable via `transect_spacing_m`). Transects are displayed on the map as thin perpendicular lines fanning out from the segment. Discovered OBSTACLE structures are shown as colored lines. Transects crossing an OBSTACLE render in orange (structure-affected); open transects render in blue. Operator can drag segment endpoints to adjust. The operator also selects bottom type, topographic feature, directional exposure. L3 grid is automatically enabled when structures are present near the spot, disabled for structure-free open beaches (operator can override in admin). CUDEM bathymetric profiles are downloaded on-demand at runtime during SWAN runs (cached at `/etc/weewx-clearskies/spot_profiles/`); no wizard-time download occurs. Wizard calls `GET /setup/marine/discover-structures` (`lat`, `lon`, `radius_m`) to pre-populate nearby coastal structures from OpenStreetMap (see "Structure auto-discovery" above); operator confirms, edits, removes, or adds structures manually — any structure with no OSM `material` tag match requires the operator to pick a material before saving.
-7. **Fishing spot configuration** (if fishing activity selected): System auto-classifies biogeographic region from coordinates. Operator selects one or more target categories (multi-select checkboxes). Species checkboxes populate with the union of all selected categories' species for that region (no duplicates). Operator unchecks any species they don't target.
+7. **Fishing spot configuration** (if fishing activity selected; target — not yet shipped): System resolves the location to an FAO area. The setup query filters the generated SQLite runtime rows by that area and the selected fishing type, then returns the eligible practical choices. Operator selects one or more target categories and species/category keys from those choices. The dashboard receives the choices only; it does not perform geographic eligibility or profile fallback.
 8. **Beach safety configuration** (if beach safety selected): Operator optionally adds external links (water quality, lifeguard reports, wildlife alerts).
 9. **Review and save:** System presents a summary of the configured location with all discovered stations, zones, and settings. Operator confirms. Wizard sends the accumulated `marine` block on the next `POST /setup/apply` call. The API validates all locations (coordinates, activity/bottom-type/topographic-feature/target-category enums, NDBC/CO-OPS station-id and NWS marine-zone-id formats), and writes the result to `api.conf [marine]` using the nested-subsection shape shown above (`[[[[surf]]]]`/`[[[[fishing]]]]`/`[[[[beach_safety]]]]` inside each location's own section — not top-level `[[surf_spots]]`/`[[fishing_spots]]` sections). When the marine service reports SWAN is available (`GET /setup/marine/swan-check` returns `available: true`), the wizard also collects SWAN nested grid configuration (outer grid resolution, inner nest resolution, inner nest bounding box, deployment mode) — see §4 SWAN wizard step.
 
