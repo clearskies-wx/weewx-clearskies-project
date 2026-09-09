@@ -115,7 +115,9 @@ fallback still requires the location matrix audit.
 **Allowlist:** `repos/weewx-clearskies-marine/weewx_clearskies_marine/endpoints/fishing.py`,
 `repos/weewx-clearskies-marine/weewx_clearskies_marine/enrichment/fishing_scorer.py`,
 `repos/weewx-clearskies-marine/weewx_clearskies_marine/enrichment/fishing_species.py`,
-`repos/weewx-clearskies-marine/weewx_clearskies_marine/data/species.yaml`,
+`repos/weewx-clearskies-marine/weewx_clearskies_marine/tools/build_fishing_species_matrix.py`,
+`repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.xlsx`,
+`repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.sqlite`,
 `repos/weewx-clearskies-marine/tests/test_fishing_remediation_known_answers.py`,
 `repos/weewx-clearskies-marine/tests/test_fishing_endpoint_remediation.py`, and
 `repos/weewx-clearskies-marine/tests/test_fishing_species_selection.py`. No

@@ -4294,8 +4294,8 @@ components:
       description: |
         TARGET (Fishing and Boating remediation Phase 1; not yet shipped):
         setup-derived species selection for a location. The API resolves the
-        region and category, compares complete score-affecting and legal
-        profiles, and returns the resulting choices. The Dashboard does not
+        region and category, compares complete score-affecting profiles, and
+        returns the resulting choices. The Dashboard does not
         perform geographic eligibility or grouping.
       properties:
         region: { type: string }

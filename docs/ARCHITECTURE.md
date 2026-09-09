@@ -213,17 +213,17 @@ sibling generated
 If validation or generation fails, the previous database remains and the build
 fails loudly.
 
-The generated database will contain exactly one logical data table. Each species
-or practical category has one complete profile, and its `fao_areas` field lists
-every applicable FAO area; it is not split into per-area or fallback profiles. The
-marine service will open the packaged database read-only and select only the
-rows and columns required for the current request. Neither the API nor the
-marine service will parse Excel at runtime or materialize the global matrix in
-module-level Python dictionaries. Packaging carries the generated SQLite
-database, not a runtime Excel reader. The current YAML catalogue and loader
-remain only until agreed setup selections and scoring comparison cases are
-equivalent, independently reviewed, and live behavior is proved in Phase 4;
-only then are the YAML data and loader removed. This section documents a
+The generated database contains exactly one logical data table. Each row is one
+selectable species or practical category for one FAO area and fishing type. The
+marine service selects only the rows and columns required for the current
+request, using the approved same-area fallback order: direct profile, matching
+practical category, then matching functional fishing category. Neither the API
+nor the marine service parses Excel at runtime or materializes the global
+matrix in module-level Python dictionaries. Packaging carries the generated
+SQLite database, not a runtime Excel reader. The current YAML catalogue and
+loader remain only until agreed setup selections and scoring comparison cases
+are equivalent, independently reviewed, and live behavior is proved in Phase
+4; only then are the YAML data and loader removed. This section documents a
 planned boundary, not a shipped implementation.
 
 ## Authority routing
