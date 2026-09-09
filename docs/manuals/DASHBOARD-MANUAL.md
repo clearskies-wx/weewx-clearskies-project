@@ -1108,12 +1108,12 @@ Tab/accordion headers show activity-appropriate qualitative labels — not force
 |---|---|---|
 | Boating | Wind/wave/visibility thresholds | Excellent / Good / Fair / Poor / Dangerous |
 | Surfing | Surf quality scorer (1–5 stars) | Star display (★★★☆☆) + `qualityLabel` + numeric `XX/100` (both — see §Surf Score Card) |
-| Fishing | **TARGET:** selected-species scorer | active / less active / low activity / inactive; no generic quality scale |
+| Fishing | Selected-species scorer | active / less active / low activity / inactive; no generic quality scale |
 | Beach Safety | Itemized hazards (no overall badge) | Individual hazard indicators — no collapsed "Safe/Dangerous" |
 
 ### Tab content — Boating (F21 redesign)
 
-**Target state (Fishing and Boating remediation Phase 1; not yet shipped):**
+**Deployed state (Fishing and Boating remediation Phases 3–5):**
 unified conditions dashboard using the normalized API detail payload. The
 Dashboard renders source/provenance and unavailable values; it never chooses a
 provider or treats an offshore buoy as selected-point conditions.
@@ -1131,10 +1131,14 @@ supplied measurements. None of these states is local selected-point conditions.
    - Missing values render as unavailable; no offshore buoy substitution.
    - Water temperature displays the API's actual coverage-aware selection and its valid time/depth: local sensor first, WCOFS only for covered West-Coast points, configured regional model/ERDDAP or national fallback elsewhere.
 3. **Boating Forecast** — `Card footprint="full"`:
-   - Structured columns following `DailyColumns` pattern (from `ForecastDailyCard`)
-   - Each period column carries regular location forecast data plus aligned NWS marine additions: regional wind, seas, visibility, and marine-weather narrative. NWS values are labelled as regional additions and do not overwrite location weather.
-   - NWS marine periods use their parsed UTC validity start/end windows; untimed prose is not rendered as a forecast column.
-   - `HorizontalScrollNav` for horizontal scrolling
+   - Individual horizontally scrollable period cards using the regular forecast
+     time-column pattern; the page does not render a multi-row all-period matrix.
+   - Each period card carries regular location forecast data plus aligned NWS
+     marine additions: regional wind, seas, visibility, and marine-weather
+     narrative. NWS values are labelled as regional additions and do not
+     overwrite location weather.
+   - NWS marine periods use their parsed UTC validity start/end windows;
+     untimed prose is not rendered as a forecast period.
 4. **Offshore Observations** — `Card footprint="wide"` (when configured):
    - Separately labelled NDBC station, offshore distance, valid time, and available wave/spectral observations.
    - Explicitly describes this as navigation/exit context for travel beyond a protected harbour, never as wave conditions at the selected point.
@@ -1240,19 +1244,19 @@ Surfaces the surf scoring system (`enrichment/surf_scorer.py`). Data sources fro
 
 ### Tab content — Fishing (F23 redesign)
 
-**Target state (Fishing and Boating remediation Phase 1; not yet shipped):**
+**Deployed state (Fishing and Boating remediation Phases 3–5):**
 renders the API's selected-species forecast and normalized Current Conditions
 payload. The Dashboard does not select providers, derive regional eligibility,
 collapse species, or calculate fallback values.
 
 The Dashboard receives only setup-filtered practical choices and the selected
-forecast responses. It never reads the target source
+forecast responses. It never reads the source
 `repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.xlsx`
-or target generated database
+or generated database
 `repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.sqlite`,
 and it performs no species lookup, profile fallback, or geographic eligibility
 calculation. The storage boundary and its migration sequence are internal to
-the API/marine service target and are not a new Dashboard API surface.
+the API/marine service and are not a Dashboard API surface.
 
 **Panel order:**
 
@@ -1262,8 +1266,11 @@ the API/marine service target and are not a new Dashboard API surface.
    - Null fields render an explicit unavailable state; the card never substitutes an offshore buoy value or performs source selection.
    - Water temperature shows the API-selected source, valid time, and depth; WCOFS is shown only for covered West-Coast points, with configured regional model/ERDDAP or national fallbacks elsewhere.
 3. **Fishing Forecast** — `Card footprint="full"`:
-   - Species-selection strip at the top, using the API's setup-derived choice and disclosed member species/profile level.
-   - Surf-style time-column forecast/table with one selected-species score and status per period; no generic score and no competing Species Forecast card.
+    - One non-wrapping horizontal species-selection strip at the top, using the
+      API's setup-derived choices and disclosed member species/profile level.
+    - Individual horizontally scrollable period cards with one
+      selected-species score and status per period; no generic score and no
+      competing Species Forecast card.
    - Each period carries its start/end window, selected-species score and explanation, tide/current state, depth-appropriate water temperature, pressure trend, major/minor solunar marker, time-matched nearshore weather, and informational swell height/period.
    - Expanded period detail exposes the environmental core, each applied refinement, source/provenance, and any hard-stop reason. The selected choice controls all displayed score and suitability content.
    - `HorizontalScrollNav` provides responsive horizontal access; accessible labels include the full period and selected-species explanation.

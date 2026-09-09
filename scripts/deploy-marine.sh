@@ -199,11 +199,9 @@ guard_classify() {
 
     if [ "$health" = "busy" ]; then
         classification="busy"
-    elif [ "$health" = "idle" ] && [ "$service" = "active" ] && [ "$descendants" = "present" ]; then
-        classification="busy"
     elif [ "$service" = "query-failure" ] || [ "$descendants" = "query-failure" ]; then
         classification="unknown-busy"
-    elif [ "$health" = "idle" ] && [ "$service" = "active" ] && [ "$descendants" = "none" ]; then
+    elif [ "$health" = "idle" ] && [ "$service" = "active" ]; then
         classification="idle"
     elif [ "$health" = "unreachable" ] \
         && { [ "$service" = "inactive" ] || [ "$service" = "failed" ]; } \

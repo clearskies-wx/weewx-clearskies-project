@@ -1564,7 +1564,7 @@ confirming it matches `providers/marine/wavewatch.py`'s handling).
 **CWF text parsing:** A CWF product concatenates one UGC (Universal Geographic Code) header segment per zone-group, e.g. `AMZ250-121115-` (zone id + 6-digit expiration), each terminated by a `$$` line. A header may abbreviate additional zones sharing identical text to their 3-digit suffix (e.g. `AMZ250-256-262-121115-` → `AMZ250`, `AMZ256`, `AMZ262`). Locate the segment for the operator's configured `zone_id`, then split it into forecast periods on `.PERIOD...` markers (e.g. `.TONIGHT...`, `.SUN...`, `.SUN NIGHT...` — the narrative follows immediately on the same line, unlike SRF's standalone day-period header lines). Per period:
 
 - `period_name` — the marker text, title-cased (e.g. "Tonight", "Sun Night").
-- **TARGET (Fishing and Boating remediation Phase 1; not yet shipped):**
+- **As built (Fishing and Boating remediation Phase 3):**
   `period_start` and `period_end` — nullable at the provider boundary. CWF
   labels and the product issuance time do not provide machine-readable UTC
   period bounds, so `nws_marine` preserves `issuanceTime` and leaves these two
@@ -1848,6 +1848,7 @@ The response's `osm_type` field carries the raw OSM tag value (e.g. `groyne`, `d
 - Cache grid coordinates per model (lat, lon, depth, mask, h arrays). TTL = 24h.
 - Cycle selection: `floor(current_utc_hour / 6) * 6` for 4x/day models, fixed cycle for 1x/day (WCOFS = 03z). Fall back up to 4 cycles.
 - Variables extracted at the nearest water grid point: `temp`, `salt`, `u_eastward`, `v_northward` (all `[time, Depth, ny, nx]`), `zeta`, `zetatomllw` (`[time, ny, nx]`), `h`, `mask` (`[ny, nx]`).
+- **Fishing depth profile (Fishing and Boating remediation):** `fetch_forecast()` retains every finite non-negative `temp[Depth, ny, nx]` layer from each source regulargrid file with that file's actual forecast valid time. It does not collapse the WCOFS column to `Depth=0`. The resolver preserves the timestamped layers for the marine detail route's private `temperatureProfileTimeline`; the API converts only in-period layers to the existing scorer transport and strips the timeline before the public Marine response. `water_temp_c` remains the real zero-depth value for legacy surface consumers and is never substituted with a deeper layer.
 
 **Cache:** Key includes model name + cycle + lat/lon (rounded to 3 decimals). TTL = 1800s.
 
@@ -2004,7 +2005,7 @@ Standard ERDDAP griddap URL pattern: `https://{server}/erddap/griddap/{datasetID
 
 **Fallback chain (`mode="modeled"`):**
 
-1. **TARGET (Fishing and Boating remediation Phase 1; not yet shipped):** a configured `location_config.ofs_model` is eligible only after its published coverage is verified to include the selected point and requested depth. WCOFS is therefore West-Coast-only, never a nationwide default. If no eligible OFS source covers the point or it fails, try `ofs_fallback`.
+1. A configured `location_config.ofs_model` is eligible only after its published coverage is verified to include the selected point and requested depth. WCOFS is therefore West-Coast-only, never a nationwide default. If no eligible OFS source covers the point or it fails, try `ofs_fallback`.
 2. `location_config.ofs_region` set → ERDDAP regional model (§14.11, PacIOOS/CARICOOS).
 3. Global fallback, split by `needs`:
    - `needs="full"`: RTOFS via ERDDAP (column + forecast), then MUR SST (surface only).
@@ -3385,6 +3386,19 @@ explicit architectural decision.
 
 **Health surfaces.** New top-level `ww3Horizon` block (`lastSuccessCycleTime`, `coverageEndTime`, `wallClockS`, `refuseReason`, and — J28 — `inFlight`, `inFlightCycleTime`, `lastAttemptCycleTime`, `lastAttemptAt`) and existing `fullRun.l2BoundaryExhausted` boolean: a detector scans SWAN L2's PRINT output every run for the "data on boundary file exhausted" warning and surfaces it (one WARNING log line + the health boolean, FALSE=healthy, TRUE=a regression signal). **R3 (2026-08-29): TRUE is a failed cycle, not degraded published output.** Full and fast paths record the existing `no-publish: l2_boundary_exhausted` reason exactly once. A persisted successful fast update resets the flag and clears only that matching no-publish reason. The health reducer suppresses its legacy frozen-ocean reason when that no-publish reason is present. For legacy/restored flag-only state, it instead says the last attempt was refused with `attemptCycle=unknown`, and separately reports `pendingFullCycle` and `lastGoodCycle`; it does not invent a fast-cycle identity. The `ww3Horizon` block itself still never feeds `status`. `ww3Horizon.inFlight` is also what `scripts/deploy-marine.sh` reads before restarting the service (it waits, up to 6.5 h, rather than kill a running march; `--force-restart` overrides). See OPERATIONS-MANUAL.md for the full monitoring-key list.
 
+**Same-host execution isolation (approved 2026-09-08).** The marine service
+keeps one authenticated API-facing listener and one set of configuration,
+cache, and persisted model outputs. Its local marine request process serves the
+existing provider routes, while its local marine model-runner process owns wind
+assembly plus WW3, SWAN, and SwellTrack execution. The model-runner exposes no
+route or port and introduces no provider or store. A model run therefore must
+not block `/tides`, `/fishing`, `/marine`, buoy, or another provider route; a
+model failure remains an honest model-data condition, not a reason for the
+request process to stop serving independent provider data. The request process
+refreshes health from the runner's existing atomic state snapshot and supervises
+an unexpected runner exit; a replacement runner preserves last-good output and
+does not turn an unproven new model cycle into a published result.
+
 **WW3 output reuse (R9).** A downstream SWAN refusal may reuse a completed six-hour WW3 leg for the same cycle when the recovery checkpoint proves that the retained WW3 transfer and diagnostic transfer, +6 restart, nest output, and NOAA pin are present, non-empty, and the transfer records are exactly the ordered +0…+6 sequence. Only a missing or corrupt WW3 output proof causes that leg to rerun; a downstream refusal does not discard the completed leg or selected merged boundary. Reuse never changes the leg success timestamp, and the same output-hash rule remains available after a process restart.
 
 **New artifacts + retention.** `level0/horizon_<token>/`, `level0/hstage_<token>/` (merge staging), and `level0/boundary_cycle_<token>.txt` (the NOAA cycle pin above) are additive to ADR-109 D12's `level0/` layout. The atomic state snapshot records each current/preceding complete pair's directory token, setup identity, filenames, and file hashes. The A0-I rule retains exactly two complete raw WW3 H/D generations per kind: current and one rollback predecessor. Durable rotation may return a third candidate, but the owner must not delete it until the new owner checkpoint has persisted. Immediately before deletion, the service checks current and previous generation references, every recovery-checkpoint output (including dynamic cluster keys), and the selected `hstage` by absolute, canonical path. Any malformed, relative, unresolvable, still-referenced, incomplete, or hash-mismatched state retains the candidate. Deletion removes only the entire pair/root; a crash or checkpoint-write failure retains extra output. The former count-based horizon pruner is removed. No cleanup schedule or persisted schema is added, and this rule does not add a chronological ordering gate.
@@ -3528,11 +3542,12 @@ source behavior, not live acceptance evidence.
 
 ---
 
-## §14.20 Fishing and Boating source assembly target (Phase 1; not yet shipped)
+## §14.20 Fishing and Boating source assembly (deployed, remediation Phases 3–4)
 
-This subsection is the approved target for the remediation plan. It describes
-provider responsibilities before implementation; the current deployment may
-still show the pre-remediation gaps recorded in the plan's evidence ledger.
+This subsection documents the provider responsibilities implemented by the
+remediation. Live Gate 3–4 evidence confirms the source separation, pressure
+provenance, target-depth water data, tide provenance, and offshore observation
+boundary described below.
 
 ### Location-first nearshore weather
 
@@ -3590,6 +3605,14 @@ the water-column profile supplies it; if no local water-column value exists,
 the field remains visibly missing and is not silently replaced by an offshore
 surface reading.
 
+For the Fishing scorer handoff, the marine detail route carries an
+internal-only `temperatureProfileTimeline`: actual source valid time, finite
+depth/temperature layers, and matching source provenance for each OFS file.
+This path is available for Fishing harbours even though their public wave
+forecast list is empty. The API admits only layers whose outer and provenance
+valid times agree and that fall within the scored period, then removes the
+timeline at the public API boundary.
+
 ### Offshore observation boundary
 
 NDBC remains an independently labelled offshore observation for navigation and
@@ -3608,25 +3631,27 @@ silently substitute an offshore value for a location/depth-specific value.
 The API exposes null plus provenance for missing data; the Dashboard renders
 that state and never performs provider selection or fallback logic.
 
-### Fishing matrix storage target (not yet shipped)
+### Fishing matrix storage (deployed, remediation Phase 4)
 
-**TARGET — Fishing and Boating remediation Phase 1; not yet shipped.** Once the
-framework receives operator sign-off, the marine service's future operational
-lookup source will be one signed-off Excel table at the candidate path
+The marine service's operational lookup source is one signed-off Excel table at
 `repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.xlsx`.
 The workbook contains only the approved operational fields. It does not carry
 research URLs, IUCN assessment identifiers, research provenance, assessment
 details, workflow status, or supporting tables. The only operational
 conservation flag is `near_threatened`; other IUCN outcomes are unflagged.
 
-The documented target build interface is
-`python -m weewx_clearskies_marine.tools.build_fishing_species_matrix`; this is
-not an existing executable. It validates approved headers, types, allowed
+The build interface is
+`python -m weewx_clearskies_marine.tools.build_fishing_species_matrix`.
+It validates approved headers, types, allowed
 codes, required fields, unique keys, FAO-area keys, and conservation flags,
 then atomically replaces the sibling generated
 `repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.sqlite`.
 If validation or generation fails, the previous database remains untouched and
 the build fails loudly. The generated database has one logical data table and
+expands every editable profile's `fao_areas` list into exact
+`(selection_key, fao_area, fishing_type)` runtime rows while preserving the
+profile fields. The workbook itself has one global profile row, not one editable
+row per FAO area. The database has
 exactly two indexes: `(fao_area, fishing_type)` for setup and
 `(selection_key, fao_area, fishing_type)` for forecast and permitted fallback
 lookup.
@@ -3635,11 +3660,10 @@ At runtime the packaged SQLite database is opened read-only. Queries select
 only the rows and columns needed for the current setup or forecast request;
 the service does not parse Excel or materialize the global matrix as
 module-level Python dictionaries. Packaging carries the generated database,
-not a runtime Excel reader. The current YAML catalogue and loader stay in
-place only until equivalence of the agreed setup selections and scoring
-comparison cases, independent review, and live behavior are proved in Phase 4;
-then the YAML data and loader are removed. This describes a target boundary,
-not shipped runtime behavior.
+not a runtime Excel reader. The legacy YAML catalogue and loader have been
+removed. The live audit confirmed workbook/database equivalence (191 profiles,
+667 expanded rows), read-only access, both required indexes, and no full
+catalogue materialization in the inspected lookup path.
 
 ## §15 Marine Service Provider Architecture (current as-built)
 

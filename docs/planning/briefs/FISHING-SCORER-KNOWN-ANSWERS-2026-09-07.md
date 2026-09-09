@@ -17,10 +17,9 @@ No case uses fishing-legality data. The plan excludes that data.
 For a signed local three-hour pressure change `delta` in hPa:
 
 - `abs(delta) < 1` means stable pressure and factor `1.00`.
-- Otherwise, `rate_weight = min(1, (abs(delta) - 1) / 2)`.
 - Select the profile's falling multiplier for `delta <= -1` or rising
   multiplier for `delta >= 1`.
-- `pressure = 1 + sensitivity × rate_weight × (selected_multiplier - 1)`.
+- `pressure = 1 + sensitivity × (selected_multiplier - 1)`.
 
 After a valid core:
 
@@ -41,20 +40,20 @@ does not change a test's underlying expected value.
 | Outside active temperature | target-depth temperature outside the selected profile's marginal active range | hard stop; do not calculate core or refinements | score `0`; Inactive |
 | Missing target-depth temperature, tide/current, or pressure | the required input remains unavailable after its plan-authorized source resolution | withhold score; do not calculate core or refinements | score, status, core, and suitability are all `null` |
 
-## Dynamic pressure cases
+## Pressure-response cases
 
 Use the completed black sea bass profile: sensitivity `0.75`, falling multiplier
 `1.10`, stable multiplier `1.00`, rising multiplier `0.75`. Temperature and
 tide/current are both `1.00`; refinements are normal.
 
-| Three-hour delta | Rate weight | Pressure calculation | Core | Final / status | What it protects |
-|---|---:|---|---:|---|---|
-| `+0.5 hPa` | n/a | stable factor `1.00000` | `100.00000` | `100.00000`, Active | No permanent sensitivity penalty under stable pressure. |
-| `-2 hPa` | `0.50` | `1 + 0.75 × 0.50 × (1.10 - 1) = 1.03750` | `100.73900` | `100.00000`, Active | A gradual falling trend uses only half of the profile response. |
-| `-3 hPa` | `1.00` | `1 + 0.75 × 1.00 × (1.10 - 1) = 1.07500` | `101.45692` | `100.00000`, Active | A fast falling trend reaches the profile's full response. |
-| `+2 hPa` | `0.50` | `1 + 0.75 × 0.50 × (0.75 - 1) = 0.90625` | `98.05045` | `98.05045`, Active | A gradual rising trend changes only the pressure factor. |
-| `+3 hPa` | `1.00` | `1 + 0.75 × 1.00 × (0.75 - 1) = 0.81250` | `95.93226` | `95.93226`, Active | A fast rising trend reaches the full profile response. |
-| Any non-stable delta; sensitivity `0` | any | `1 + 0 × rate_weight × (multiplier - 1) = 1.00000` | unchanged by pressure | unchanged by pressure | A pressure-insensitive profile never receives another species' response. |
+| Three-hour delta | Pressure calculation | Core | Final / status | What it protects |
+|---|---|---:|---|---|
+| `+0.5 hPa` | stable factor `1.00000` | `100.00000` | `100.00000`, Active | No permanent sensitivity penalty under stable pressure. |
+| `-2 hPa` | `1 + 0.75 × (1.10 - 1) = 1.07500` | `101.45692` | `100.00000`, Active | A falling trend uses the selected falling response. |
+| `-3 hPa` | `1 + 0.75 × (1.10 - 1) = 1.07500` | `101.45692` | `100.00000`, Active | Trend size above the threshold does not change the selected response. |
+| `+2 hPa` | `1 + 0.75 × (0.75 - 1) = 0.81250` | `95.93226` | `95.93226`, Active | A rising trend uses the selected rising response. |
+| `+3 hPa` | `1 + 0.75 × (0.75 - 1) = 0.81250` | `95.93226` | `95.93226`, Active | Trend size above the threshold does not change the selected response. |
+| Any non-stable delta; sensitivity `0` | `1 + 0 × (multiplier - 1) = 1.00000` | unchanged by pressure | unchanged by pressure | A pressure-insensitive profile never receives another species' response. |
 
 ## Refinement and status cases
 

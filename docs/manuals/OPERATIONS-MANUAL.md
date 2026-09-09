@@ -1012,8 +1012,8 @@ absent-key-means-Auto / present-key-means-override contract above are unchanged 
 | Field | Type | Valid values | Description |
 |---|---|---|---|
 | `target_categories` | list[str] | `saltwater_inshore`, `bottom_fish`, `freshwater_sport`, `salmonids` | Target fishing categories (multi-select). Backward compat: a bare string `target_category` is normalized to a single-element list on load. |
-| `species` | list[str] | — | Auto-populated from biogeographic region + selected categories. Species data loaded from `data/species.yaml` (see "Species database customization" below). |
-| `biogeographic_region` | str | — | Auto-classified from coordinates (11 US regions) |
+| `species` | list[str] | — | Selected species/category keys returned by the generated Fishing matrix after the location's FAO area and fishing type are applied. |
+| ~~`biogeographic_region`~~ | — | — | Retired; United States regional lists do not determine eligibility. |
 
 **Beach safety configuration (`[[beach_safety]]` sub-block):**
 
@@ -1023,64 +1023,58 @@ absent-key-means-Auto / present-key-means-override contract above are unchanged 
 
 **Validation:** Missing `[marine]` section → `load_marine_config()` returns `None` (no error, no marine features). Empty `[marine]` section → empty `MarineConfig`. Invalid values (out-of-range coordinates, unknown bottom type, unknown activity) → clear error naming the offending field and location.
 
-### Species database customization
+### Fishing matrix source and runtime lookup
 
-Species data (lists, scoring profiles, seasonal behavior) is loaded from `data/species.yaml` inside the API package at process start. Operators can edit this file to add local species, adjust temperature ranges, or add seasonal closures. Changes take effect after an API restart (`sudo systemctl restart weewx-clearskies-api`).
+The sole editable authority is one structured `.xlsx` workbook at
+`repos/weewx-clearskies-marine/weewx_clearskies_marine/data/fishing_species_matrix.xlsx`.
+It contains exactly one worksheet and one table. Each editable row is one
+global species or practical-category profile with one fishing type and a
+`fao_areas` list. A workbook row is not a per-FAO editable row. The
+deterministic build command
+`python -m weewx_clearskies_marine.tools.build_fishing_species_matrix`
+validates the approved headers, types, allowed codes, required fields,
+FAO-area values, conservation flags, and duplicate runtime keys, then expands
+each listed area into an exact `(selection_key, fao_area, fishing_type)` row in
+the generated SQLite database.
 
-**Conservation screening for the target global Fishing matrix:** Each exact
-source taxon is screened against its global IUCN Red List assessment before it
-can appear as an operator-selectable entry. `critically_endangered`,
-`endangered`, and `vulnerable` taxa are excluded. `near_threatened` taxa remain
-selectable with an IUCN flag and stable assessment source ID in the matrix.
-Other IUCN outcomes are not flagged. The screen does not replace local fishing
-law, community management, or the matrix's separate legal-availability record.
-It screens exact source members, not a practical collapsed group label; the
-group remains available only when its remaining eligible members still have
-matching complete profiles.
+The generated database is the packaged runtime lookup and has one logical data
+table with these indexes:
 
-The YAML file contains four sections:
+- `(fao_area, fishing_type)` for setup eligibility queries; and
+- `(selection_key, fao_area, fishing_type)` for forecast profile queries and
+  approved fallback lookup.
 
-| Section | Purpose |
-|---|---|
-| `regions` | Biogeographic region bounding boxes (11 US regions). Used by `classify_region()` to auto-determine which species list applies to a given coordinate. |
-| `species_by_region` | Species lists per region per target category. Controls which species appear as checkboxes in the wizard. |
-| `species_profiles` | Per-species scoring parameters: pressure sensitivity, temperature ranges (optimal/good/marginal in °F), tide and time-of-day preferences with multipliers. |
-| `seasonal_behavior` | Per-species per-month entries for spawning runs (score multiplier), pre-spawn activity boosts, and regulatory closures. |
+The service opens the packaged SQLite database read-only. It selects only the
+rows and columns needed for the current setup or forecast request; it does not
+parse the Excel workbook at startup or materialize the global matrix as
+module-level Python dictionaries. The workbook contains only operational
+fields: it has no source URLs or source IDs, IUCN assessment identifiers,
+research notes, status, queue, evidence, quality-control, or legal-availability
+fields. The product does not determine fishing legality.
 
-**Adding a new species** (worked example — adding "spotted bay bass" to `pacific_sw`):
+The generator validates the complete profile before replacing the generated
+database. If validation or generation fails, it fails loudly and leaves the
+prior generated SQLite database untouched. An incomplete profile is therefore
+not silently neutralized, and a species/category omitted from the selected
+matrix rows is not silently scored with a default profile; it is unavailable
+until a complete eligible profile is present. The legacy YAML catalogue and
+loader have been removed after equivalence and live-proof checks. Operators
+must edit the workbook and regenerate the packaged SQLite database; the running
+service opens that database read-only.
 
-1. Add the species name to the appropriate category in `species_by_region`:
-   ```yaml
-   pacific_sw:
-     saltwater_inshore:
-       - spotted bay bass    # ← add here
-       - california halibut
-       # ... existing species
-   ```
+The deployed live audit compared 191 workbook profiles with 667 expanded SQLite
+rows and found no missing, unexpected, or value-mismatch rows. It also verified
+the two lookup indexes and the read-only database boundary.
 
-2. Add a scoring profile in `species_profiles`:
-   ```yaml
-   spotted bay bass:
-     pressure_sensitivity: 0.7
-     temp_optimal: [65.0, 78.0]
-     temp_good: [58.0, 82.0]
-     temp_marginal: [50.0, 88.0]
-     tide_preference: incoming
-     tide_multiplier: 1.15
-     time_preference: dawn
-     time_multiplier: 1.2
-   ```
-
-3. Optionally add seasonal behavior in `seasonal_behavior`:
-   ```yaml
-   spotted bay bass:
-     4: {pre_spawn_multiplier: 1.5}
-     5: {spawning_multiplier: 2.0}
-   ```
-
-4. Restart the API: `sudo systemctl restart weewx-clearskies-api`
-
-Species listed in `species_by_region` but missing from `species_profiles` receive a neutral default profile (no temperature penalty, no tide/time preference) — the scorer degrades gracefully rather than failing.
+**Conservation screening for the global Fishing matrix:** Screen exact
+source species against the current global IUCN Red List assessment before
+making a selection available. Exclude `critically_endangered`, `endangered`,
+and `vulnerable` species. Retain `near_threatened` species with only the
+operational `near_threatened` flag. Do not flag `least_concern`,
+`data_deficient`, or `not_evaluated`. Screen exact source members, never a
+practical group label; remove a group only when every exact source species
+beneath it is excluded. Research citations and assessment details stay outside
+the operational workbook and generated runtime table.
 
 ### Marine location setup procedure
 
@@ -1092,9 +1086,10 @@ Step-by-step wizard flow for adding a marine location:
 4. **CO-OPS station discovery:** Same `GET /setup/marine/discover-stations` call also queries the CO-OPS metadata API and returns nearest tide/water-level stations with distances, available products, and a `quality` tier (excellent ≤20mi, good ≤40mi, fair beyond). Operator confirms or overrides.
 5. **NWS zone discovery:** System queries NWS `/points` → CWA. Discovers marine zones within the configured alert radius (shared with the marine alert radius feature). Operator confirms.
 6. **Surf spot configuration** (if surf activity selected): Operator draws a **shoreline segment** on the Leaflet map (2-point polyline along the shore) to define the surfable measurement zone — replaces the previous pin-drop method. The system generates transects perpendicular to local isobath orientation at 10m spacing (configurable via `transect_spacing_m`). Transects are displayed on the map as thin perpendicular lines fanning out from the segment. Discovered OBSTACLE structures are shown as colored lines. Transects crossing an OBSTACLE render in orange (structure-affected); open transects render in blue. Operator can drag segment endpoints to adjust. The operator also selects bottom type, topographic feature, directional exposure. L3 grid is automatically enabled when structures are present near the spot, disabled for structure-free open beaches (operator can override in admin). CUDEM bathymetric profiles are downloaded on-demand at runtime during SWAN runs (cached at `/etc/weewx-clearskies/spot_profiles/`); no wizard-time download occurs. Wizard calls `GET /setup/marine/discover-structures` (`lat`, `lon`, `radius_m`) to pre-populate nearby coastal structures from OpenStreetMap (see "Structure auto-discovery" above); operator confirms, edits, removes, or adds structures manually — any structure with no OSM `material` tag match requires the operator to pick a material before saving.
-7. **Fishing spot configuration** (if fishing activity selected): System auto-classifies biogeographic region from coordinates. Operator selects one or more target categories (multi-select checkboxes). Species checkboxes populate with the union of all selected categories' species for that region (no duplicates). Operator unchecks any species they don't target.
-8. **Beach safety configuration** (if beach safety selected): Operator optionally adds external links (water quality, lifeguard reports, wildlife alerts).
-9. **Review and save:** System presents a summary of the configured location with all discovered stations, zones, and settings. Operator confirms. Wizard sends the accumulated `marine` block on the next `POST /setup/apply` call. The API validates all locations (coordinates, activity/bottom-type/topographic-feature/target-category enums, NDBC/CO-OPS station-id and NWS marine-zone-id formats), and writes the result to `api.conf [marine]` using the nested-subsection shape shown above (`[[[[surf]]]]`/`[[[[fishing]]]]`/`[[[[beach_safety]]]]` inside each location's own section — not top-level `[[surf_spots]]`/`[[fishing_spots]]` sections). When the marine service reports SWAN is available (`GET /setup/marine/swan-check` returns `available: true`), the wizard also collects SWAN nested grid configuration (outer grid resolution, inner nest resolution, inner nest bounding box, deployment mode) — see §4 SWAN wizard step.
+7. **Fishing spot configuration** (if fishing activity selected): System resolves the location to an FAO area. The setup query filters the generated SQLite runtime rows by that area and the selected fishing type, then returns the eligible practical choices. Operator selects one or more target categories and species/category keys from those choices. The dashboard receives the choices only; it does not perform geographic eligibility or profile fallback.
+8. **Fishing pressure check:** Before `POST /setup/apply` writes configuration or secrets, the API checks the selected provider at every Fishing location for a continuous hourly-pressure window. An unavailable, malformed, unsupported-unit, or too-short NWS series rejects the save with HTTP 422 and an instruction to select a provider that supplies pressure there; a provider transport failure returns 503. The unavailable-Huntington-Harbour rejection path was verified by the authenticated 2026-09-09 pre-write HTTP 422; a successful NWS save at a pressure-capable location is a separate case.
+9. **Beach safety configuration** (if beach safety selected): Operator optionally adds external links (water quality, lifeguard reports, wildlife alerts).
+10. **Review and save:** System presents a summary of the configured location with all discovered stations, zones, and settings. Operator confirms. Wizard sends the accumulated `marine` block on the next `POST /setup/apply` call. The API validates all locations (coordinates, activity/bottom-type/topographic-feature/target-category enums, NDBC/CO-OPS station-id and NWS marine-zone-id formats), and writes the result to `api.conf [marine]` using the nested-subsection shape shown above (`[[[[surf]]]]`/`[[[[fishing]]]]`/`[[[[beach_safety]]]]` inside each location's own section — not top-level `[[surf_spots]]`/`[[fishing_spots]]` sections). When the marine service reports SWAN is available (`GET /setup/marine/swan-check` returns `available: true`), the wizard also collects SWAN nested grid configuration (outer grid resolution, inner nest resolution, inner nest bounding box, deployment mode) — see §4 SWAN wizard step.
 
 ### SWAN configuration
 
@@ -1224,6 +1219,25 @@ This section documents the deployed standalone marine service
 marine-provider fetches — runs in `weewx-clearskies-marine` on port 8780. The
 API communicates with it over authenticated HTTPS. The old compute-offload
 service and its port are not part of the deployed architecture.
+
+The one existing `weewx-clearskies-marine` systemd unit starts a same-host
+**marine request process** and its local **marine model-runner process**. The
+request process is the only process that listens on 8780 and serves the
+existing authenticated internal routes. The model-runner has no port, endpoint,
+configuration key, cache namespace, or persisted-data format of its own; it
+uses the same atomic `marine.conf`, model state, and cache/output paths while
+assembling wind and executing WW3/SWAN/SwellTrack. This is process isolation,
+not a second service. An active model run therefore cannot occupy the request
+process and block `/tides`, `/fishing`, `/marine`, buoy, or another active
+marine route. Before opening listeners and on every mtime change, `/health`
+reads the existing atomic model-state snapshot, so its model fields remain
+truthful even before a child relay arrives. If the model-runner exits
+unexpectedly, the request process keeps serving routes and attempts three
+bounded recoveries after 5, 15, and 60 seconds. Exhaustion is not a successful
+model result: health reports the runner unavailable while preserving the last
+durable model state, rather than retrying forever. A replacement that remains
+alive for one normal five-minute model-check interval resets that budget, so a
+later isolated exit begins a new bounded recovery episode.
 
 #### Deployment topologies
 
@@ -1604,7 +1618,7 @@ marches at 4183.58–4509.74 s, ADR-109 D12).
 
 **00Z daily long march (Q16 Round A, 2026-08-25; ADR-109 amendment note).** In addition to the four 6-hourly legs above, the **00Z** cycle ALSO runs a continuation march once daily, strictly AFTER that cycle's own 6 h leg and production publish complete: `cycle+6h → cycle+96h` on the same G1 grid/binary/physics, starting from a COPY of the leg's own +6 h restart (the leg's restart chain above is untouched). Wall-clock ≈4 h at the same contention budget as the leg (never concurrent with a production full run); ceiling 6 h. It stages a merged boundary transfer for SWAN L2 — hours 0–6 from that cycle's own leg, hours 7–72 from the newest 00Z march — rather than the 7-record leg file alone. This staging does not establish that the horizon merge is fixed: R3 refuses a new cycle if L2 PRINT proves the boundary exhausted. See PROVIDER-MANUAL.md §14.18 for the merge/cycle-pin mechanics and ADR-109's amendment note for the full design.
 
-**Retry (J28, 2026-08-28, operator order — "the 72 hours never fired").** The march is no longer once-a-day-and-forgotten: it is attempted after ANY cycle's publish, and from the runner loop's own tick as a catch-up, whenever the newest horizon transfer on disk cannot cover the last published cycle's 72 h window (no file, no recorded coverage, or coverage ending before `cycle + 72 h`) — at most 3 attempts per cycle, 30 min apart, counter in-memory (a restart resets it: a restart is what killed the previous attempt). The 00Z-only refusal is gone. On the production host the march had never succeeded before this (08-27 refused on short wind; 08-28's was killed by a deploy's `systemctl restart` — the march is a child of the service). **R3 supersedes the prior publish behavior:** L2 boundary exhaustion now refuses the new cycle and preserves last-good output; it does not establish that the horizon merge is fixed. **Deploy guard:** `scripts/deploy-marine.sh` runs a fail-closed guard before every named mutation phase (source, environment/config, WW3 pins, unit, bootstrap/migration) and immediately before restart. It first requires the local SSH alias `librewxr` to resolve to `librewxr.shaneburkhardt.com`; a missing or different FQDN fails before SSH. The guard accepts health only when the remote loopback response is HTTP 200 with valid duplicate-free JSON and actual Boolean `ww3Horizon.inFlight` and `run_in_progress` fields; non-200, statusless, empty, malformed, or duplicate-key responses are malformed and therefore `unknown-busy`. A true busy field is `busy`. False fields are idle only with an active service and no descendant. The recursive cgroup walk makes a confirmed descendant with reachable idle health and an active service `busy`; a descendant in every other inconsistent state remains `unknown-busy`, unless health itself is busy. Health unreachable is idle only when the service is inactive or failed and has no descendant; in particular, an active unreachable service is `unknown-busy`. Any transition state, query failure, or unlisted combination makes the result `unknown-busy`.
+**Retry (J28, 2026-08-28, operator order — "the 72 hours never fired").** The march is no longer once-a-day-and-forgotten: it is attempted after ANY cycle's publish, and from the runner loop's own tick as a catch-up, whenever the newest horizon transfer on disk cannot cover the last published cycle's 72 h window (no file, no recorded coverage, or coverage ending before `cycle + 72 h`) — at most 3 attempts per cycle, 30 min apart, counter in-memory (a restart resets it: a restart is what killed the previous attempt). The 00Z-only refusal is gone. On the production host the march had never succeeded before this (08-27 refused on short wind; 08-28's was killed by a deploy's `systemctl restart` — the march is a child of the service). **R3 supersedes the prior publish behavior:** L2 boundary exhaustion now refuses the new cycle and preserves last-good output; it does not establish that the horizon merge is fixed. **Deploy guard:** `scripts/deploy-marine.sh` runs a fail-closed guard before every named mutation phase (source, environment/config, WW3 pins, unit, bootstrap/migration) and immediately before restart. It first requires the local SSH alias `librewxr` to resolve to `librewxr.shaneburkhardt.com`; a missing or different FQDN fails before SSH. The guard accepts health only when the remote loopback response is HTTP 200 with valid duplicate-free JSON and actual Boolean `ww3Horizon.inFlight` and `run_in_progress` fields; non-200, statusless, empty, malformed, or duplicate-key responses are malformed and therefore `unknown-busy`. A true busy field is `busy`. False fields are idle with an active service, including when descendant processes are present, and with no query failures on health/service state. A descendant in every other inconsistent state remains `unknown-busy`, unless health itself is busy. Health unreachable is idle only when the service is inactive or failed and has no descendant; in particular, an active unreachable service is `unknown-busy`. Any transition state, query failure, or unlisted combination makes the result `unknown-busy`.
 
 Run `scripts/deploy-marine.sh --check-guard` for this read-only classification. It makes no mutation, names the health/service/descendant evidence, exits **0** for idle, and exits **2** for busy or `unknown-busy`. A normal deploy rechecks every 60 seconds for at most 23,400 seconds (6.5 h), then refuses the next mutation. `--force-restart` is the sole guard bypass and is operator-only. **Visibility:** `fullRun.l2BoundaryExhausted = true` records exactly one `no-publish: l2_boundary_exhausted` reason (admin status page pass-through) and no new forecast. Mechanics in PROVIDER-MANUAL.md §14.18 "Retry".
 

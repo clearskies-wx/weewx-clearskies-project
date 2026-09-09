@@ -9,6 +9,22 @@ implementation proceed under this plan; phase gates remain required.
 
 **Current live target:** [Huntington Harbour](https://weather.shaneburkhardt.com/marine), location ID `huntington-harbor`.
 
+**Execution update — 2026-09-09:** The API, Marine service, and dashboard
+changes required for the live Fishing depth-profile repair are deployed. The
+Marine service is running the updated source; focused deployed checks passed
+with 35 tests and 2 non-failing deprecation warnings. Live Huntington Harbour
+evidence confirms that public Marine responses omit the private profile field,
+the private service-to-service response carries timestamped WCOFS depth layers,
+and Fishing uses an eligible 12 m layer for Kelp bass when all core inputs are
+available. Raw evidence is retained under
+`scratch/fishing-boating-remediation-2026-09-06/`.
+
+This does not close the plan. Gate 1 remains open pending independent
+verification of the documentation reconciliation that records the operator's
+resolved matrix-row contract; Gate 5 remains open because the required
+live browser session was unavailable; and Phase 6 requires the remaining
+cross-provider, browser, and operator visual evidence.
+
 ## 1. Outcome
 
 Visitors can use either tab without interpreting incomplete data, recycled observations, or opaque scores.
@@ -139,11 +155,14 @@ The forecast exposes the final score, useful fishing factors, pressure trend, ev
 ### 3.6.2 Global fishing lookup and setup filtering
 
 The catalogue is one global operational lookup table, not a research database
-and not a collection of regional lists. Each row represents exactly one
-selectable species or existing practical category, carries every applicable FAO
-area in its `fao_areas` field, and has one fishing type. The row contains only the identity and scoring inputs that setup
-and the Fishing scorer consume. Section 11 defines the workbook contract and
-the recovery source for reconstructing it.
+and not a collection of regional lists. Each editable row is exactly one
+global selectable species or existing practical-category profile, carries every
+applicable FAO area in its `fao_areas` field, and has one fishing type. The
+deterministic export expands each listed area into one exact
+`(selection_key, fao_area, fishing_type)` runtime row; the workbook row is not
+repeated once per FAO area. The editable row contains only the identity and
+scoring inputs that setup and the Fishing scorer consume. Section 11 defines
+the workbook contract and the recovery source for reconstructing it.
 
 Before any source taxon is eligible for this matrix, screen its current global
 IUCN Red List category. Exclude `critically_endangered`, `endangered`, and
@@ -156,12 +175,14 @@ to exact source members before any practical-label collapse: a familiar group
 is retained only when the non-excluded, locally eligible members still have
 matching complete profiles.
 
-Every selectable row receives a complete effective profile through this fixed
+Every selectable choice receives a complete effective profile through this fixed
 fallback order: its own FAO-scoped profile; the existing matching practical
 category in that FAO area; then the matching functional fishing category in
 that FAO area. A functional category is specific to both the FAO area and the
 fishing type—for example, rockfish in that area or bottom fish in that area.
 There is no worldwide default and no general regional-fishing fallback.
+These are runtime lookup steps: the exact-area row is generated from a global
+workbook profile, and no additional per-area editable profile row is created.
 
 During setup, the API resolves the operator's location to an FAO area and
 filters the lookup table by that area and the selected fishing type. The
@@ -219,10 +240,15 @@ Fishing requires a provider-neutral, hourly mean-sea-level-pressure series so th
 
 ### Phase 1 — Manuals and contract alignment before code
 
-**Status:** Documentation alignment completed 2026-09-08. The target-state
-architecture, manuals, OpenAPI contract, matrix build boundary, provider
-pressure requirement, NWS location check, and later-phase evidence sheets have
-been updated. Gate 1 still requires its independent audit before it can pass.
+**Status:** Documentation alignment and a subsequent source audit are complete
+through 2026-09-09. The target-state architecture, manuals, OpenAPI contract,
+provider pressure requirement, NWS location check, and later-phase evidence
+sheets have been updated. The operator resolved the matrix-row contract on
+2026-09-09: the sole editable workbook table has one global
+species/practical-category profile row, one fishing type, and a `fao_areas`
+list; deterministic generation expands that list into exact runtime
+`fao_area` rows. Gate 1 remains open pending independent verification of this
+documentation reconciliation; no other phase or gate status changes here.
 
 **Owner:** documentation lead. **No implementation code.**
 
@@ -247,7 +273,7 @@ the matrix, decide the methodology, edit the workbook, or reinterpret existing
 practical categories. **No production formula changes.**
 
 **Workbook reconstruction and population: COMPLETE 2026-09-07.** The approved
-single-table workbook has 191 complete exact-species profiles. It contains no
+single-table workbook has 191 complete exact-species global profile rows. It contains no
 generic, proxy, or unresolved-species-complex rows; no fishing-legality data;
 and no required operational blanks or duplicate keys. The scope is Great Lakes
 freshwater plus world oceans and seas. This completion covers the workbook,
@@ -261,10 +287,11 @@ dynamic pressure-trend weighting research in
    recovery source. Extract its existing usable lookup values without copying
    its worksheet structure, queues, evidence tables, or status machinery.
 2. Build the framework workbook defined in Section 11 with exactly one table
-   and one fully populated representative row: black sea bass, FAO area 21,
-   bottom fishing. Populate every operational field in that row, including the
-   applicable conservation result, using the approved value meanings and
-   units. Do not add any other species rows yet.
+   and one fully populated representative global profile row: black sea bass,
+   with `fao_areas` containing FAO area 21 and fishing type `bottom`. Populate
+   every operational field in that row, including the applicable conservation
+   result, using the approved value meanings and units. Do not add any other
+   species/profile rows yet.
 3. Render the framework table, explain every column in plain English, and stop
    for the operator's explicit sign-off on the table structure, row meaning,
    column names, units, allowed value codes, and layout. A successful file
@@ -277,11 +304,12 @@ dynamic pressure-trend weighting research in
    require research. Do not use a research queue, blank source identifier, or
    profile-status label as proof that research is missing.
 5. Complete the remaining research one fish or practical category at a time.
-   Before every assignment, the coordinator supplies the exact FAO area,
-   fishing type, required output fields, units or allowed value codes, source
-   scope, existing values to preserve, and the required row-shaped return
-   format. The agent may not change the field list, challenge the category,
-   redesign the scoring method, or return a general essay instead of values.
+   Before every assignment, the coordinator supplies the applicable FAO
+   area or areas, fishing type, required output fields, units or allowed value
+   codes, source scope, existing values to preserve, and the required global
+   profile-shaped return format. The agent may not change the field list,
+   challenge the category, redesign the scoring method, or return a general
+   essay instead of values or area coverage.
 6. Use practical sport-fishing sources for behavioral and fishing-outcome
    fields: regional magazines, fishing publications, charter and guide reports,
    angler logs, creel or tournament results, and established fishing blogs.
@@ -290,10 +318,12 @@ dynamic pressure-trend weighting research in
    status requires them. Do not reject an operator-approved source class by
    substituting a stricter academic standard.
 7. Enter each returned research packet into the one operational table and
-   verify that exact row before assigning another fish. A research report that
-   is not applied to the table is not progress. A narrow unsuccessful search is
-   not proof that a value is unavailable; broaden or reassign the search and
-   keep the field marked unfinished.
+   verify that exact global profile row, its `fao_areas` list, units, and codes
+   before assigning another fish. A research report that is not applied to the
+   table is not progress. A narrow unsuccessful search is not proof that a
+   value is unavailable; broaden or reassign the search and keep the field
+   marked unfinished. Deterministic generation separately verifies that area
+   expansion produces unique runtime keys.
 8. Complete the exact-species IUCN Red List screen defined in Section 11 before
    finalizing the selectable rows. Do not apply a Red List category directly to
    a practical group and do not remove a group unless every exact source species
@@ -305,20 +335,32 @@ dynamic pressure-trend weighting research in
    sheets.
 
 **Acceptance:** The reconstructed workbook contains exactly the one table
-defined in Section 11. Every required operational field is populated for every
-selectable species/category × FAO area × fishing-type row; all lookup keys are
-unique; no United States regional key remains; practical categories and Red
-List decisions follow the stated rules; and every returned research result has
-been applied. Independent review verifies the table contents and known-answer
-arithmetic without adding research, provenance, queue, or quality-control
-structures to the workbook.
+defined in Section 11. Every required operational field is populated in every
+selectable global species/category profile row; each row has one fishing type,
+no duplicate entry in its `fao_areas` list, and deterministic expansion
+produces a unique `(selection_key, fao_area, fishing_type)` runtime key for
+each listed area. No United States regional list or region key remains;
+practical categories and Red List decisions follow the stated rules; and
+every returned research result has been applied. Independent review verifies
+the table contents, the area-expansion key set, and known-answer arithmetic
+without adding research, provenance, queue, or quality-control structures to
+the workbook.
 
 ### Phase 3 — Truthful location data assembly
 
 **Depends on:** Phases 1 and 2.
 
-**Status:** Local implementation complete; deployment and Gate 3 live proof
-remain pending explicit push authorization. Provider-neutral hourly pressure is
+**Status:** Implementation is deployed. Real-host Gate 3 evidence confirms
+provider-neutral Aeris pressure with valid times, timestamped WCOFS target-depth
+temperature, CO-OPS tide provenance, timed NWS marine additions, and separately
+labelled NDBC offshore observations. The live NWS pressure check truthfully
+reports no hourly pressure series at Huntington Harbour; Open-Meteo returned
+real pressure data but is not the configured live provider, and OpenWeatherMap
+has no configured credential. The previously open NWS setup-save check is now
+proven: on 2026-09-09 an authenticated in-memory NWS Fishing
+`POST /setup/apply` returned HTTP 422 before any configuration or secret
+persistence, naming Huntington Harbour's unavailable hourly pressure series.
+Provider-neutral hourly pressure is
 carried by Xweather, Open-Meteo, OpenWeatherMap, and the location-specific NWS
 grid check. The API assembles location forecast rows, source/provenance, and
 the authenticated time-matched scorer input; NDBC remains a separately labelled
@@ -345,37 +387,42 @@ still required.
 
 **Depends on:** Phases 1–3.
 
-**Status:** Local implementation complete; deployment and Gate 4 live proof
-remain pending explicit push authorization. The generated SQLite matrix,
+**Status:** Implementation is deployed and the focused known-answer guard now
+passes on librewxr. Live evidence verified read-only SQLite access, required
+index use, workbook/database value equivalence, no global runtime catalogue,
+hard stops, null-on-missing-core-input behavior, selected-species scores, and
+time-matched target-depth WCOFS input. The generated SQLite matrix,
 read-only selected-profile lookup, FAO resolver, authenticated API-to-marine
 time-matched input handoff, selected-species request, and approved scorer are
 implemented. The scorer uses the fixed geometric core, discrete
 falling/stable/rising profile pressure response, hard stops, bounded refinements,
 and selected-species-only output. Known-answer guards cover the formula,
 selection, provenance, missing core inputs, depth-qualified temperature, and
-no-generic-score behavior. The remaining Gate 4 checks are workbook/database
-equivalence, query plans, YAML retirement verification, and deployed live
-evidence.
+no-generic-score behavior. Gate 4 remains open pending resolution of the
+matrix-row contract conflict and full gate synthesis.
 
 1. Implement the Fishing-score structure in §3.6: hard stops, weighted geometric environmental core, species-specific pressure response, bounded time/season adjustments, and solunar tiebreaker.
-2. Generate the Section 11 SQLite database from the signed-off and completed `.xlsx` table. Implement a narrow read-only lookup layer over its single data table. Setup queries by FAO area and fishing type and returns only the eligible practical choices. Forecast scoring queries only the configured selection rows and approved fallback rows needed for that request. Do not load the full database into module-level dictionaries, parse Excel at runtime, or create parallel research, evidence, taxonomy, queue, or profile tables. The staged recovery workbook is never deployed or queried at runtime.
+2. Generate the Section 11 SQLite database from the signed-off and completed `.xlsx` table. Implement a narrow read-only lookup layer over its single data table. Setup queries by FAO area and fishing type and returns only the eligible practical choices. Forecast scoring queries only the configured exact-area runtime rows and approved fallback rows needed for that request. Do not load the full database into module-level dictionaries, parse Excel at runtime, or create parallel research, evidence, taxonomy, queue, or profile tables. The staged recovery workbook is never deployed or queried at runtime.
 3. Add the known-answer regression guards designed in Phase 2, endpoint integration checks, profile coverage validation, and a saved live-Harbour regression record. These guards protect the approved formula and contract; Gate 4 proves the deployed scorer and endpoint against real timestamped inputs.
 4. Confirm that a change in each input changes only the score components it is supposed to affect, and that no non-core adjustment can overcome a hard stop or poor environmental core.
 
-**Acceptance:** Every scoring branch has a known-answer test; the generated SQLite table is value-for-value equivalent to the signed-off workbook; query-plan evidence shows the setup and forecast indexes are used; the service returns only the requested subset without constructing a full in-memory catalogue; every setup choice maps to one complete eligible FAO-area/fishing-type row; no undefined category or unfinished row is silently scored; the visitor-facing Fishing page does not expose the internal fallback trail; and the live Harbour forecast no longer converts a Fair environmental result into near-universal inactivity through a permanent pressure-sensitivity multiplier. After those checks pass, the YAML loader and `species.yaml` are removed in the same phase so only one runtime path remains.
+**Acceptance:** Every scoring branch has a known-answer test; every generated SQLite runtime row and value matches the corresponding signed-off workbook profile, with one runtime row for each listed FAO area; query-plan evidence shows the setup and forecast indexes are used; the service returns only the requested subset without constructing a full in-memory catalogue; every setup choice maps to one complete eligible FAO-area/fishing-type runtime row; no undefined category or unfinished row is silently scored; the visitor-facing Fishing page does not expose the internal fallback trail; and the live Harbour forecast no longer converts a Fair environmental result into near-universal inactivity through a permanent pressure-sensitivity multiplier. After those checks pass, the YAML loader and `species.yaml` are removed in the same phase so only one runtime path remains.
 
 ### Phase 5 — Boating and Fishing presentation rebuild
 
 **Depends on:** Phases 1–4.
 
-**Status:** Local implementation complete; deployment and Gate 5 live proof
-remain pending explicit push authorization. Boating now follows the approved
+**Status:** The dashboard is deployed from the Fishing/Boating main revision.
+Boating now follows the approved
 card order and renders regular forecast columns, labelled Regional NWS
 additions, all Offshore Observations states, and the route/exit non-local
 warning. Fishing uses the shared normalized Current Conditions card, durable
 server-scored species selection, selected-species forecast detail, and the
 complete live Almanac Sun & Moon component with only major/minor overlays.
-The dashboard production build passes after independent source review.
+The dashboard production build passes after independent source review. Gate 5
+remains open: live API captures were collected, but the required browser test
+environment returned HTTP 403 and no usable browser session was available for
+desktop/mobile, theme, keyboard, scrolling, or operator visual checks.
 
 1. Rebuild Boating into this card order: activity-relevant marine/coastal-flood alerts; shared Current Conditions; Boating Forecast; Offshore Observations; Tides, Currents, and Water Level. Do not retain disconnected wind, NWS-text, or buoy panels that duplicate these responsibilities.
 2. Build the Boating Forecast using the regular Forecast page's time-column/card pattern and shared components. Add boating rows rather than recreating a separate forecast grammar. Parsed NWS wind, seas, visibility, and marine-weather fields belong in the matching forecast periods, never in a separate text-forecast card.
@@ -410,11 +457,11 @@ After Phase 0, independently verify the redacted Huntington Harbour captures aga
 
 ### Gate 1 — Manual and contract alignment
 
-After Phase 1, independently compare every affected manual and OpenAPI statement with this plan, then rerun the Phase-1 evidence sheet against the live baseline it describes. The gate fails on any contradiction, untagged target-state claim, missing source/fallback rule, missing provider-compatibility block, or manual instruction that would let an implementation agent build the old behavior. It also fails unless the manuals and architecture name the tracked `.xlsx` source, generated SQLite runtime database, deterministic generation command, read-only query boundary, indexes, packaging behavior, validation failure behavior, and YAML retirement sequence. This is a documentation/design gate, not proof of a changed live behavior.
+After Phase 1, independently compare every affected manual and OpenAPI statement with this plan, then rerun the Phase-1 evidence sheet against the live baseline it describes. The gate fails on any contradiction, untagged target-state claim, missing source/fallback rule, missing provider-compatibility block, or manual instruction that would let an implementation agent build the old behavior. It also fails unless the manuals and architecture name the tracked `.xlsx` source, the one-global-profile-row/`fao_areas` workbook contract, generated exact-area SQLite runtime rows, deterministic generation command, read-only query boundary, indexes, packaging behavior, validation failure behavior, and YAML retirement sequence. This is a documentation/design gate, not proof of a changed live behavior.
 
 ### Gate 2 — Fishing matrix and formula design
 
-Gate 2 cannot begin until the operator's Phase 2 framework-table sign-off is recorded. After population, independently verify that the workbook still has exactly the approved single worksheet/table, exact signed-off columns, unique species/category × FAO area × fishing-type keys, correct value types and units, no required blanks, no United States regional keys, and no research/provenance support structures. Verify the exact-species Red List decisions and confirm that practical categories were retained or removed only under Section 11.3. Sample the active-task research results only to confirm that values were transferred to the correct rows; do not replace the operator-approved recreational-fishing source policy with a journal-publication standard. Independently reproduce the formula's hand-calculated known-answer cases and each permitted fallback level. This is a research/design gate, not proof of changed live behavior.
+Gate 2 cannot begin until the operator's Phase 2 framework-table sign-off is recorded. After population, independently verify that the workbook still has exactly the approved single worksheet/table, exact signed-off columns, one global profile row per selection key and fishing type, one fishing type per row, no duplicate FAO area within a row's `fao_areas` list, and unique exact-area `(selection_key, fao_area, fishing_type)` keys after deterministic expansion. Verify correct value types and units, no required blanks, no United States regional-list keys, and no research/provenance support structures. Verify the exact-species Red List decisions and confirm that practical categories were retained or removed only under Section 11.3. Sample the active-task research results only to confirm that values were transferred to the correct global profile rows; do not replace the operator-approved recreational-fishing source policy with a journal-publication standard. Independently reproduce the formula's hand-calculated known-answer cases and each permitted fallback level. This is a research/design gate, not proof of changed live behavior.
 
 ### Gate 3 — Provider and location-data contract
 
@@ -422,7 +469,7 @@ After Phase 3, use the evidence sheet's real-host, real-provider commands to pro
 
 ### Gate 4 — Fishing-score implementation
 
-After Phase 4, first prove that every generated SQLite row and value matches the signed-off workbook and that the database opens read-only. Record SQLite query-plan output showing the FAO-area/fishing-type index for setup and the selection/FAO-area/fishing-type index for forecast lookup. Verify by code inspection and runtime observation that the full matrix is not reconstructed as module-level Python dictionaries. Confirm that the legacy YAML data and loader are absent after the equivalence gate passes. Then run the evidence sheet's real timestamped inputs through the deployed scorer and endpoint, using the known-answer guards only to detect regression: closed season, inactive temperature, pressure states, tide/current states, time effects, solunar effects, and selected-species behavior. Prove that a hard stop cannot be rescued and that pressure sensitivity no longer acts as a permanent score penalty.
+After Phase 4, first prove that every generated SQLite runtime row and value matches the corresponding signed-off workbook profile, with one runtime row for each listed FAO area, and that the database opens read-only. Record SQLite query-plan output showing the FAO-area/fishing-type index for setup and the selection/FAO-area/fishing-type index for forecast lookup. Verify by code inspection and runtime observation that the full matrix is not reconstructed as module-level Python dictionaries. Confirm that the legacy YAML data and loader are absent after the equivalence gate passes. Then run the evidence sheet's real timestamped inputs through the deployed scorer and endpoint, using the known-answer guards only to detect regression: seasonal activity refinements, inactive temperature, pressure states, tide/current states, time effects, solunar effects, and selected-species behavior. Prove that a hard stop cannot be rescued and that pressure sensitivity no longer acts as a permanent score penalty.
 
 ### Gate 5 — Boating and Fishing page behavior
 
@@ -462,16 +509,21 @@ links, staging mirrors, or a research database.
 ### 11.1 One-table deliverable
 
 The human-editable deliverable is one structured `.xlsx` workbook containing
-exactly one worksheet and one table. One row means one selectable species or
-existing practical category × FAO area × fishing type. The workbook is the
-sole manually maintained matrix source. It is not read by the running service,
-and it is not where the research process, citations, audit narrative, or task
-state are stored.
+exactly one worksheet and one table. Each editable row is one global selectable
+species or existing practical-category profile. It has one fishing type and a
+`fao_areas` list containing every applicable FAO area. A workbook row is not a
+per-FAO editable row. The deterministic generator expands each listed area
+into one exact `(selection_key, fao_area, fishing_type)` SQLite runtime row,
+where the profile values are preserved. The workbook is the sole manually
+maintained matrix source. It is not read by the running service, and it is not
+where the research process, citations, audit narrative, or task state are
+stored.
 
 The table contains only these operational field groups:
 
 1. the stable selection key and visitor-facing label;
-2. the FAO area and fishing type that make the row eligible;
+2. the `fao_areas` coverage list and one fishing type that make generated
+   runtime rows eligible;
 3. the complete direct profile for the one species or practical category;
 4. habitat-depth limits used to obtain the applicable water temperature;
 5. every temperature-band boundary required by §3.6.1;
@@ -539,16 +591,25 @@ vetting, not additional operational workbook tables or columns.
 
 ### 11.4 Approved runtime storage — generated SQLite
 
+**Operator decision, 2026-09-09:** The sole editable `.xlsx` table has one
+global species or practical-category profile row, one fishing type, and a
+`fao_areas` list. A one-table workbook does not mean one editable row per FAO
+area. Deterministic generation validates that table and expands each listed
+area into exact `fao_area` SQLite runtime rows. Setup and forecast queries use
+those exact runtime rows and the indexes below.
+
 **Operator decision, 2026-09-07:** The `.xlsx` table is the editable source and
 a generated SQLite database is the runtime lookup. The current YAML catalogue
 is not the final runtime format.
 
-The SQLite database contains one logical data table with the same approved row
-meaning and operational fields as the signed-off workbook. It is generated
-deterministically from the workbook and is never edited independently. The
-generator validates the approved headers, value types, allowed codes, required
-fields, unique row keys, FAO-area keys, and Red List flags before replacing the
-generated database.
+The SQLite database contains one logical data table of exact runtime rows. For
+each editable global profile row, deterministic generation emits one row per
+entry in its `fao_areas` list, adds that exact `fao_area` runtime key, and
+preserves the approved operational profile fields. It is never edited
+independently. The generator validates the approved headers, value types,
+allowed codes, required fields, duplicate-free FAO-area lists, runtime key
+uniqueness, FAO-area keys, and Red List flags before replacing the generated
+database.
 
 The runtime database has these indexes:
 
@@ -659,7 +720,8 @@ After framework approval, execute this loop:
 1. recover the row's existing values from the staged workbook and later task
    records;
 2. assign research only for the fields still missing;
-3. receive one row-shaped packet;
+3. receive one global profile-shaped packet, including its applicable
+   `fao_areas` coverage;
 4. enter it immediately into the operational table;
 5. verify the exact row, units, codes, and key uniqueness; and
 6. only then assign the next fish or category.
