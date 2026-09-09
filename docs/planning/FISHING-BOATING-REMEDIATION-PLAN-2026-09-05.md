@@ -9,6 +9,21 @@ implementation proceed under this plan; phase gates remain required.
 
 **Current live target:** [Huntington Harbour](https://weather.shaneburkhardt.com/marine), location ID `huntington-harbor`.
 
+**Execution update — 2026-09-09:** The API, Marine service, and dashboard
+changes required for the live Fishing depth-profile repair are deployed. The
+Marine service is running the updated source; focused deployed checks passed
+with 35 tests and 2 non-failing deprecation warnings. Live Huntington Harbour
+evidence confirms that public Marine responses omit the private profile field,
+the private service-to-service response carries timestamped WCOFS depth layers,
+and Fishing uses an eligible 12 m layer for Kelp bass when all core inputs are
+available. Raw evidence is retained under
+`scratch/fishing-boating-remediation-2026-09-06/`.
+
+This does not close the plan. Gate 1 remains open because this plan contains
+conflicting matrix-row statements; Gate 5 remains open because the required
+live browser session was unavailable; and Phase 6 requires the remaining
+cross-provider, browser, and operator visual evidence.
+
 ## 1. Outcome
 
 Visitors can use either tab without interpreting incomplete data, recycled observations, or opaque scores.
@@ -219,10 +234,13 @@ Fishing requires a provider-neutral, hourly mean-sea-level-pressure series so th
 
 ### Phase 1 — Manuals and contract alignment before code
 
-**Status:** Documentation alignment completed 2026-09-08. The target-state
-architecture, manuals, OpenAPI contract, matrix build boundary, provider
-pressure requirement, NWS location check, and later-phase evidence sheets have
-been updated. Gate 1 still requires its independent audit before it can pass.
+**Status:** Documentation alignment and a subsequent source audit are complete
+through 2026-09-09. The target-state architecture, manuals, OpenAPI contract,
+provider pressure requirement, NWS location check, and later-phase evidence
+sheets have been updated. Gate 1 remains open: the plan itself conflicts on
+whether matrix profiles are one global row with multiple FAO areas or exact
+FAO-area/fishing-type rows. No documentation may claim this decision is settled
+until the operator resolves that contradiction.
 
 **Owner:** documentation lead. **No implementation code.**
 
@@ -317,8 +335,15 @@ structures to the workbook.
 
 **Depends on:** Phases 1 and 2.
 
-**Status:** Local implementation complete; deployment and Gate 3 live proof
-remain pending explicit push authorization. Provider-neutral hourly pressure is
+**Status:** Implementation is deployed. Real-host Gate 3 evidence confirms
+provider-neutral Aeris pressure with valid times, timestamped WCOFS target-depth
+temperature, CO-OPS tide provenance, timed NWS marine additions, and separately
+labelled NDBC offshore observations. The live NWS pressure check truthfully
+reports no hourly pressure series at Huntington Harbour; Open-Meteo returned
+real pressure data but is not the configured live provider, and OpenWeatherMap
+has no configured credential. Gate 3 remains open because its live setup-save
+enforcement cannot be exercised without changing the operator configuration.
+Provider-neutral hourly pressure is
 carried by Xweather, Open-Meteo, OpenWeatherMap, and the location-specific NWS
 grid check. The API assembles location forecast rows, source/provenance, and
 the authenticated time-matched scorer input; NDBC remains a separately labelled
@@ -345,17 +370,19 @@ still required.
 
 **Depends on:** Phases 1–3.
 
-**Status:** Local implementation complete; deployment and Gate 4 live proof
-remain pending explicit push authorization. The generated SQLite matrix,
+**Status:** Implementation is deployed and the focused known-answer guard now
+passes on librewxr. Live evidence verified read-only SQLite access, required
+index use, workbook/database value equivalence, no global runtime catalogue,
+hard stops, null-on-missing-core-input behavior, selected-species scores, and
+time-matched target-depth WCOFS input. The generated SQLite matrix,
 read-only selected-profile lookup, FAO resolver, authenticated API-to-marine
 time-matched input handoff, selected-species request, and approved scorer are
 implemented. The scorer uses the fixed geometric core, discrete
 falling/stable/rising profile pressure response, hard stops, bounded refinements,
 and selected-species-only output. Known-answer guards cover the formula,
 selection, provenance, missing core inputs, depth-qualified temperature, and
-no-generic-score behavior. The remaining Gate 4 checks are workbook/database
-equivalence, query plans, YAML retirement verification, and deployed live
-evidence.
+no-generic-score behavior. Gate 4 remains open pending resolution of the
+matrix-row contract conflict and full gate synthesis.
 
 1. Implement the Fishing-score structure in §3.6: hard stops, weighted geometric environmental core, species-specific pressure response, bounded time/season adjustments, and solunar tiebreaker.
 2. Generate the Section 11 SQLite database from the signed-off and completed `.xlsx` table. Implement a narrow read-only lookup layer over its single data table. Setup queries by FAO area and fishing type and returns only the eligible practical choices. Forecast scoring queries only the configured selection rows and approved fallback rows needed for that request. Do not load the full database into module-level dictionaries, parse Excel at runtime, or create parallel research, evidence, taxonomy, queue, or profile tables. The staged recovery workbook is never deployed or queried at runtime.
@@ -368,14 +395,17 @@ evidence.
 
 **Depends on:** Phases 1–4.
 
-**Status:** Local implementation complete; deployment and Gate 5 live proof
-remain pending explicit push authorization. Boating now follows the approved
+**Status:** The dashboard is deployed from the Fishing/Boating main revision.
+Boating now follows the approved
 card order and renders regular forecast columns, labelled Regional NWS
 additions, all Offshore Observations states, and the route/exit non-local
 warning. Fishing uses the shared normalized Current Conditions card, durable
 server-scored species selection, selected-species forecast detail, and the
 complete live Almanac Sun & Moon component with only major/minor overlays.
-The dashboard production build passes after independent source review.
+The dashboard production build passes after independent source review. Gate 5
+remains open: live API captures were collected, but the required browser test
+environment returned HTTP 403 and no usable browser session was available for
+desktop/mobile, theme, keyboard, scrolling, or operator visual checks.
 
 1. Rebuild Boating into this card order: activity-relevant marine/coastal-flood alerts; shared Current Conditions; Boating Forecast; Offshore Observations; Tides, Currents, and Water Level. Do not retain disconnected wind, NWS-text, or buoy panels that duplicate these responsibilities.
 2. Build the Boating Forecast using the regular Forecast page's time-column/card pattern and shared components. Add boating rows rather than recreating a separate forecast grammar. Parsed NWS wind, seas, visibility, and marine-weather fields belong in the matching forecast periods, never in a separate text-forecast card.
