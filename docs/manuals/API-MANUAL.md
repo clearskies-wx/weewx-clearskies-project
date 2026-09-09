@@ -3029,13 +3029,11 @@ visitor-facing page remains a simple selected-species score and explanation;
 source fallback derivation is setup material, not a hidden dashboard
 calculation.
 
-**FAO-area selection (TARGET, not yet shipped):** Setup resolves the operator
-location to an FAO area and selects only the matching fishing-type rows. Each
-row represents one species or practical category for that FAO area and fishing
-type. The approved same-area fallback order is direct profile, matching
-practical category, then matching functional fishing category. The dashboard
-receives the selected result and never performs geographic eligibility or
-fallback resolution itself.
+**One-profile selection (TARGET, not yet shipped):** Setup uses one complete
+profile for each species or practical category. Its `fao_areas` field lists
+coverage only; it does not create per-area, regional, or fallback profiles.
+The dashboard receives the selected profile and never performs coverage or
+profile resolution itself.
 
 **Global conservation screen (Fishing matrix):** Before regional eligibility is
 derived, the matrix screens every source taxon against its current global IUCN
@@ -3073,13 +3071,12 @@ sibling generated
 Validation or generation failure leaves the old database untouched and fails
 the build loudly.
 
-The target SQLite database has one logical data table. Each row is a species or
-practical category × FAO area × fishing type profile. The marine service opens
-the packaged database read-only and selects only the needed rows and columns,
-including the approved same-area fallback rows when required. Neither the API
-nor the marine service parses Excel at runtime or materializes the global
-matrix in module-level Python dictionaries. Packaging carries SQLite, not a
-runtime Excel reader.
+The target SQLite database has one logical data table. Each species or practical
+category has one complete profile whose `fao_areas` field lists coverage; it has
+no per-area, regional, or fallback profile rows. The marine service opens the packaged database read-only and selects
+only needed rows and columns. Neither the API nor the marine service parses
+Excel at runtime or materializes the global matrix in module-level Python
+dictionaries. Packaging carries SQLite, not a runtime Excel reader.
 
 The current YAML catalogue and loader remain only until agreed setup selections
 and scoring comparison cases are equivalent, independently reviewed, and live
