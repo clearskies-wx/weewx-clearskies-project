@@ -1266,14 +1266,20 @@ the API/marine service and are not a Dashboard API surface.
    - Null fields render an explicit unavailable state; the card never substitutes an offshore buoy value or performs source selection.
    - Water temperature shows the API-selected source, valid time, and depth; WCOFS is shown only for covered West-Coast points, with configured regional model/ERDDAP or national fallbacks elsewhere.
 3. **Fishing Forecast** — `Card footprint="full"`:
-    - One non-wrapping horizontal species-selection strip at the top, using the
-      API's setup-derived choices and disclosed member species/profile level.
-    - Individual horizontally scrollable period cards with one
-      selected-species score and status per period; no generic score and no
-      competing Species Forecast card.
-   - Each period carries its start/end window, selected-species score and explanation, tide/current state, depth-appropriate water temperature, pressure trend, major/minor solunar marker, time-matched nearshore weather, and informational swell height/period.
-   - Expanded period detail exposes the environmental core, each applied refinement, source/provenance, and any hard-stop reason. The selected choice controls all displayed score and suitability content.
-   - `HorizontalScrollNav` provides responsive horizontal access; accessible labels include the full period and selected-species explanation.
+   - One native Fish dropdown in the card header, using the API's setup-derived
+     choices and disclosed member species/profile level. The page must not render
+     a species strip or a wall of selection buttons.
+   - One 72-hour Surf Forecast-style grid: a sticky left row-label column,
+     grouped day headings, fixed-width aligned period columns, and horizontal
+     scrolling through `HorizontalScrollNav`. The page must not render individual
+     Fishing period cards or a generic-score card.
+   - Every period column carries its start/end window, selected-species score and
+     status, tide/current state, depth-appropriate water temperature, pressure
+     trend, wind, swell height/period, and major/minor solunar state. Missing data
+     remains explicit and is never fabricated.
+   - Selecting a time column expands the detailed selected-species explanation
+     below the shared grid: environmental core, applied refinements,
+     source/provenance, and any hard-stop reason.
 4. **Solunar / Sun & Moon** — `Card footprint="full"`:
    - Matches the Almanac `SunMoonDetailCard` in complete information, visual hierarchy, responsive behavior, and accessibility: arcs/current positions, phase/illumination, rise/set times, and the two-day sun/moon detail tables.
    - Adds major/minor feeding windows as the fishing-specific overlay; it is not a reduced bespoke timeline.
